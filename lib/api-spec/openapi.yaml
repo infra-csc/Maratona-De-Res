@@ -3,9 +3,6 @@ info:
   title: Api
   version: 0.1.0
   description: Maratona de Resultados API
-servers:
-  - url: /api
-    description: Base API path
 tags:
   - name: health
   - name: auth

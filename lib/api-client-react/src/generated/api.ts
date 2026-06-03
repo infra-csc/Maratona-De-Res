@@ -111,7 +111,7 @@ export const getHealthCheckUrl = () => {
 
 
 
-  return `/api/healthz`
+  return `/healthz`
 }
 
 /**
@@ -134,7 +134,7 @@ export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus>
 
 export const getHealthCheckQueryKey = () => {
     return [
-    `/api/healthz`
+    `/healthz`
     ] as const;
     }
 
@@ -188,7 +188,7 @@ export const getLoginUrl = () => {
 
 
 
-  return `/api/auth/login`
+  return `/auth/login`
 }
 
 /**
@@ -259,7 +259,7 @@ export const getGetMeUrl = () => {
 
 
 
-  return `/api/auth/me`
+  return `/auth/me`
 }
 
 /**
@@ -282,7 +282,7 @@ export const getMe = async ( options?: RequestInit): Promise<User> => {
 
 export const getGetMeQueryKey = () => {
     return [
-    `/api/auth/me`
+    `/auth/me`
     ] as const;
     }
 
@@ -336,7 +336,7 @@ export const getLogoutUrl = () => {
 
 
 
-  return `/api/auth/logout`
+  return `/auth/logout`
 }
 
 /**
@@ -406,7 +406,7 @@ export const getGetUsersUrl = () => {
 
 
 
-  return `/api/users`
+  return `/users`
 }
 
 /**
@@ -429,7 +429,7 @@ export const getUsers = async ( options?: RequestInit): Promise<User[]> => {
 
 export const getGetUsersQueryKey = () => {
     return [
-    `/api/users`
+    `/users`
     ] as const;
     }
 
@@ -483,7 +483,7 @@ export const getCreateUserUrl = () => {
 
 
 
-  return `/api/users`
+  return `/users`
 }
 
 /**
@@ -554,7 +554,7 @@ export const getGetUserUrl = (id: number,) => {
 
 
 
-  return `/api/users/${id}`
+  return `/users/${id}`
 }
 
 /**
@@ -577,7 +577,7 @@ export const getUser = async (id: number, options?: RequestInit): Promise<User> 
 
 export const getGetUserQueryKey = (id: number,) => {
     return [
-    `/api/users/${id}`
+    `/users/${id}`
     ] as const;
     }
 
@@ -631,7 +631,7 @@ export const getUpdateUserUrl = (id: number,) => {
 
 
 
-  return `/api/users/${id}`
+  return `/users/${id}`
 }
 
 /**
@@ -703,7 +703,7 @@ export const getDeleteUserUrl = (id: number,) => {
 
 
 
-  return `/api/users/${id}`
+  return `/users/${id}`
 }
 
 /**
@@ -773,7 +773,7 @@ export const getResetUserPasswordUrl = (id: number,) => {
 
 
 
-  return `/api/users/${id}/reset-password`
+  return `/users/${id}/reset-password`
 }
 
 /**
@@ -845,7 +845,7 @@ export const getGetAreasUrl = () => {
 
 
 
-  return `/api/areas`
+  return `/areas`
 }
 
 /**
@@ -868,7 +868,7 @@ export const getAreas = async ( options?: RequestInit): Promise<Area[]> => {
 
 export const getGetAreasQueryKey = () => {
     return [
-    `/api/areas`
+    `/areas`
     ] as const;
     }
 
@@ -922,7 +922,7 @@ export const getCreateAreaUrl = () => {
 
 
 
-  return `/api/areas`
+  return `/areas`
 }
 
 /**
@@ -993,7 +993,7 @@ export const getUpdateAreaUrl = (id: number,) => {
 
 
 
-  return `/api/areas/${id}`
+  return `/areas/${id}`
 }
 
 /**
@@ -1072,7 +1072,7 @@ export const getGetEmployeesUrl = (params?: GetEmployeesParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/employees?${stringifiedParams}` : `/api/employees`
+  return stringifiedParams.length > 0 ? `/employees?${stringifiedParams}` : `/employees`
 }
 
 /**
@@ -1095,7 +1095,7 @@ export const getEmployees = async (params?: GetEmployeesParams, options?: Reques
 
 export const getGetEmployeesQueryKey = (params?: GetEmployeesParams,) => {
     return [
-    `/api/employees`, ...(params ? [params] : [])
+    `/employees`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -1149,7 +1149,7 @@ export const getCreateEmployeeUrl = () => {
 
 
 
-  return `/api/employees`
+  return `/employees`
 }
 
 /**
@@ -1220,7 +1220,7 @@ export const getGetEmployeeUrl = (id: number,) => {
 
 
 
-  return `/api/employees/${id}`
+  return `/employees/${id}`
 }
 
 /**
@@ -1243,7 +1243,7 @@ export const getEmployee = async (id: number, options?: RequestInit): Promise<Em
 
 export const getGetEmployeeQueryKey = (id: number,) => {
     return [
-    `/api/employees/${id}`
+    `/employees/${id}`
     ] as const;
     }
 
@@ -1297,7 +1297,7 @@ export const getUpdateEmployeeUrl = (id: number,) => {
 
 
 
-  return `/api/employees/${id}`
+  return `/employees/${id}`
 }
 
 /**
@@ -1369,7 +1369,7 @@ export const getGetEmployeeHistoryUrl = (id: number,) => {
 
 
 
-  return `/api/employees/${id}/history`
+  return `/employees/${id}/history`
 }
 
 /**
@@ -1392,7 +1392,7 @@ export const getEmployeeHistory = async (id: number, options?: RequestInit): Pro
 
 export const getGetEmployeeHistoryQueryKey = (id: number,) => {
     return [
-    `/api/employees/${id}/history`
+    `/employees/${id}/history`
     ] as const;
     }
 
@@ -1453,7 +1453,7 @@ export const getGetEventsUrl = (params?: GetEventsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/events?${stringifiedParams}` : `/api/events`
+  return stringifiedParams.length > 0 ? `/events?${stringifiedParams}` : `/events`
 }
 
 /**
@@ -1476,7 +1476,7 @@ export const getEvents = async (params?: GetEventsParams, options?: RequestInit)
 
 export const getGetEventsQueryKey = (params?: GetEventsParams,) => {
     return [
-    `/api/events`, ...(params ? [params] : [])
+    `/events`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -1530,7 +1530,7 @@ export const getCreateEventUrl = () => {
 
 
 
-  return `/api/events`
+  return `/events`
 }
 
 /**
@@ -1601,7 +1601,7 @@ export const getGetEventUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}`
+  return `/events/${id}`
 }
 
 /**
@@ -1624,7 +1624,7 @@ export const getEvent = async (id: number, options?: RequestInit): Promise<Event
 
 export const getGetEventQueryKey = (id: number,) => {
     return [
-    `/api/events/${id}`
+    `/events/${id}`
     ] as const;
     }
 
@@ -1678,7 +1678,7 @@ export const getUpdateEventUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}`
+  return `/events/${id}`
 }
 
 /**
@@ -1750,7 +1750,7 @@ export const getDeleteEventUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}`
+  return `/events/${id}`
 }
 
 /**
@@ -1820,7 +1820,7 @@ export const getCloseEventUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/close`
+  return `/events/${id}/close`
 }
 
 /**
@@ -1892,7 +1892,7 @@ export const getReopenEventUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/reopen`
+  return `/events/${id}/reopen`
 }
 
 /**
@@ -1962,7 +1962,7 @@ export const getGetEventResultUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/result`
+  return `/events/${id}/result`
 }
 
 /**
@@ -1985,7 +1985,7 @@ export const getEventResult = async (id: number, options?: RequestInit): Promise
 
 export const getGetEventResultQueryKey = (id: number,) => {
     return [
-    `/api/events/${id}/result`
+    `/events/${id}/result`
     ] as const;
     }
 
@@ -2039,7 +2039,7 @@ export const getGetEventFeedbackUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/feedback`
+  return `/events/${id}/feedback`
 }
 
 /**
@@ -2062,7 +2062,7 @@ export const getEventFeedback = async (id: number, options?: RequestInit): Promi
 
 export const getGetEventFeedbackQueryKey = (id: number,) => {
     return [
-    `/api/events/${id}/feedback`
+    `/events/${id}/feedback`
     ] as const;
     }
 
@@ -2116,7 +2116,7 @@ export const getReleaseEventFeedbackUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/feedback/release`
+  return `/events/${id}/feedback/release`
 }
 
 /**
@@ -2186,7 +2186,7 @@ export const getGetEventParticipantsUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/participants`
+  return `/events/${id}/participants`
 }
 
 /**
@@ -2209,7 +2209,7 @@ export const getEventParticipants = async (id: number, options?: RequestInit): P
 
 export const getGetEventParticipantsQueryKey = (id: number,) => {
     return [
-    `/api/events/${id}/participants`
+    `/events/${id}/participants`
     ] as const;
     }
 
@@ -2263,7 +2263,7 @@ export const getAddEventParticipantUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/participants`
+  return `/events/${id}/participants`
 }
 
 /**
@@ -2336,7 +2336,7 @@ export const getRemoveEventParticipantUrl = (id: number,
 
 
 
-  return `/api/events/${id}/participants/${participantId}`
+  return `/events/${id}/participants/${participantId}`
 }
 
 /**
@@ -2407,7 +2407,7 @@ export const getGetEventCriteriaUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/criteria`
+  return `/events/${id}/criteria`
 }
 
 /**
@@ -2430,7 +2430,7 @@ export const getEventCriteria = async (id: number, options?: RequestInit): Promi
 
 export const getGetEventCriteriaQueryKey = (id: number,) => {
     return [
-    `/api/events/${id}/criteria`
+    `/events/${id}/criteria`
     ] as const;
     }
 
@@ -2484,7 +2484,7 @@ export const getUpdateEventCriteriaUrl = (id: number,) => {
 
 
 
-  return `/api/events/${id}/criteria`
+  return `/events/${id}/criteria`
 }
 
 /**
@@ -2556,7 +2556,7 @@ export const getGetCriteriaUrl = () => {
 
 
 
-  return `/api/criteria`
+  return `/criteria`
 }
 
 /**
@@ -2579,7 +2579,7 @@ export const getCriteria = async ( options?: RequestInit): Promise<Criterion[]> 
 
 export const getGetCriteriaQueryKey = () => {
     return [
-    `/api/criteria`
+    `/criteria`
     ] as const;
     }
 
@@ -2633,7 +2633,7 @@ export const getCreateCriterionUrl = () => {
 
 
 
-  return `/api/criteria`
+  return `/criteria`
 }
 
 /**
@@ -2704,7 +2704,7 @@ export const getUpdateCriterionUrl = (id: number,) => {
 
 
 
-  return `/api/criteria/${id}`
+  return `/criteria/${id}`
 }
 
 /**
@@ -2783,7 +2783,7 @@ export const getGetEvaluationsUrl = (params?: GetEvaluationsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/evaluations?${stringifiedParams}` : `/api/evaluations`
+  return stringifiedParams.length > 0 ? `/evaluations?${stringifiedParams}` : `/evaluations`
 }
 
 /**
@@ -2806,7 +2806,7 @@ export const getEvaluations = async (params?: GetEvaluationsParams, options?: Re
 
 export const getGetEvaluationsQueryKey = (params?: GetEvaluationsParams,) => {
     return [
-    `/api/evaluations`, ...(params ? [params] : [])
+    `/evaluations`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -2860,7 +2860,7 @@ export const getCreateEvaluationUrl = () => {
 
 
 
-  return `/api/evaluations`
+  return `/evaluations`
 }
 
 /**
@@ -2931,7 +2931,7 @@ export const getUpdateEvaluationUrl = (id: number,) => {
 
 
 
-  return `/api/evaluations/${id}`
+  return `/evaluations/${id}`
 }
 
 /**
@@ -3003,7 +3003,7 @@ export const getSubmitEvaluationUrl = (id: number,) => {
 
 
 
-  return `/api/evaluations/${id}/submit`
+  return `/evaluations/${id}/submit`
 }
 
 /**
@@ -3073,7 +3073,7 @@ export const getReopenEvaluationUrl = (id: number,) => {
 
 
 
-  return `/api/evaluations/${id}/reopen`
+  return `/evaluations/${id}/reopen`
 }
 
 /**
@@ -3150,7 +3150,7 @@ export const getGetCalibrationsUrl = (params?: GetCalibrationsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/calibrations?${stringifiedParams}` : `/api/calibrations`
+  return stringifiedParams.length > 0 ? `/calibrations?${stringifiedParams}` : `/calibrations`
 }
 
 /**
@@ -3173,7 +3173,7 @@ export const getCalibrations = async (params?: GetCalibrationsParams, options?: 
 
 export const getGetCalibrationsQueryKey = (params?: GetCalibrationsParams,) => {
     return [
-    `/api/calibrations`, ...(params ? [params] : [])
+    `/calibrations`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -3227,7 +3227,7 @@ export const getCreateCalibrationUrl = () => {
 
 
 
-  return `/api/calibrations`
+  return `/calibrations`
 }
 
 /**
@@ -3305,7 +3305,7 @@ export const getGetAbsencesUrl = (params?: GetAbsencesParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/absences?${stringifiedParams}` : `/api/absences`
+  return stringifiedParams.length > 0 ? `/absences?${stringifiedParams}` : `/absences`
 }
 
 /**
@@ -3328,7 +3328,7 @@ export const getAbsences = async (params?: GetAbsencesParams, options?: RequestI
 
 export const getGetAbsencesQueryKey = (params?: GetAbsencesParams,) => {
     return [
-    `/api/absences`, ...(params ? [params] : [])
+    `/absences`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -3382,7 +3382,7 @@ export const getCreateAbsenceUrl = () => {
 
 
 
-  return `/api/absences`
+  return `/absences`
 }
 
 /**
@@ -3453,7 +3453,7 @@ export const getDeleteAbsenceUrl = (id: number,) => {
 
 
 
-  return `/api/absences/${id}`
+  return `/absences/${id}`
 }
 
 /**
@@ -3523,7 +3523,7 @@ export const getGetRulesUrl = () => {
 
 
 
-  return `/api/rules`
+  return `/rules`
 }
 
 /**
@@ -3546,7 +3546,7 @@ export const getRules = async ( options?: RequestInit): Promise<Rule[]> => {
 
 export const getGetRulesQueryKey = () => {
     return [
-    `/api/rules`
+    `/rules`
     ] as const;
     }
 
@@ -3600,7 +3600,7 @@ export const getUpdateRuleUrl = (key: string,) => {
 
 
 
-  return `/api/rules/${key}`
+  return `/rules/${key}`
 }
 
 /**
@@ -3672,7 +3672,7 @@ export const getGetPlatoonRulesUrl = () => {
 
 
 
-  return `/api/platoon-rules`
+  return `/platoon-rules`
 }
 
 /**
@@ -3695,7 +3695,7 @@ export const getPlatoonRules = async ( options?: RequestInit): Promise<PlatoonRu
 
 export const getGetPlatoonRulesQueryKey = () => {
     return [
-    `/api/platoon-rules`
+    `/platoon-rules`
     ] as const;
     }
 
@@ -3749,7 +3749,7 @@ export const getCreatePlatoonRuleUrl = () => {
 
 
 
-  return `/api/platoon-rules`
+  return `/platoon-rules`
 }
 
 /**
@@ -3820,7 +3820,7 @@ export const getUpdatePlatoonRuleUrl = (id: number,) => {
 
 
 
-  return `/api/platoon-rules/${id}`
+  return `/platoon-rules/${id}`
 }
 
 /**
@@ -3892,7 +3892,7 @@ export const getDeletePlatoonRuleUrl = (id: number,) => {
 
 
 
-  return `/api/platoon-rules/${id}`
+  return `/platoon-rules/${id}`
 }
 
 /**
@@ -3969,7 +3969,7 @@ export const getGetDashboardSummaryUrl = (params?: GetDashboardSummaryParams,) =
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/dashboard/summary?${stringifiedParams}` : `/api/dashboard/summary`
+  return stringifiedParams.length > 0 ? `/dashboard/summary?${stringifiedParams}` : `/dashboard/summary`
 }
 
 /**
@@ -3992,7 +3992,7 @@ export const getDashboardSummary = async (params?: GetDashboardSummaryParams, op
 
 export const getGetDashboardSummaryQueryKey = (params?: GetDashboardSummaryParams,) => {
     return [
-    `/api/dashboard/summary`, ...(params ? [params] : [])
+    `/dashboard/summary`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4053,7 +4053,7 @@ export const getGetDashboardPlatoonDistributionUrl = (params?: GetDashboardPlato
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/dashboard/platoon-distribution?${stringifiedParams}` : `/api/dashboard/platoon-distribution`
+  return stringifiedParams.length > 0 ? `/dashboard/platoon-distribution?${stringifiedParams}` : `/dashboard/platoon-distribution`
 }
 
 /**
@@ -4076,7 +4076,7 @@ export const getDashboardPlatoonDistribution = async (params?: GetDashboardPlato
 
 export const getGetDashboardPlatoonDistributionQueryKey = (params?: GetDashboardPlatoonDistributionParams,) => {
     return [
-    `/api/dashboard/platoon-distribution`, ...(params ? [params] : [])
+    `/dashboard/platoon-distribution`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4137,7 +4137,7 @@ export const getGetDashboardTopEmployeesUrl = (params?: GetDashboardTopEmployees
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/dashboard/top-employees?${stringifiedParams}` : `/api/dashboard/top-employees`
+  return stringifiedParams.length > 0 ? `/dashboard/top-employees?${stringifiedParams}` : `/dashboard/top-employees`
 }
 
 /**
@@ -4160,7 +4160,7 @@ export const getDashboardTopEmployees = async (params?: GetDashboardTopEmployees
 
 export const getGetDashboardTopEmployeesQueryKey = (params?: GetDashboardTopEmployeesParams,) => {
     return [
-    `/api/dashboard/top-employees`, ...(params ? [params] : [])
+    `/dashboard/top-employees`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4221,7 +4221,7 @@ export const getGetDashboardQuarterlyEvolutionUrl = (params?: GetDashboardQuarte
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/dashboard/quarterly-evolution?${stringifiedParams}` : `/api/dashboard/quarterly-evolution`
+  return stringifiedParams.length > 0 ? `/dashboard/quarterly-evolution?${stringifiedParams}` : `/dashboard/quarterly-evolution`
 }
 
 /**
@@ -4244,7 +4244,7 @@ export const getDashboardQuarterlyEvolution = async (params?: GetDashboardQuarte
 
 export const getGetDashboardQuarterlyEvolutionQueryKey = (params?: GetDashboardQuarterlyEvolutionParams,) => {
     return [
-    `/api/dashboard/quarterly-evolution`, ...(params ? [params] : [])
+    `/dashboard/quarterly-evolution`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4305,7 +4305,7 @@ export const getGetQuarterlyResultsUrl = (params: GetQuarterlyResultsParams,) =>
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/results/quarterly?${stringifiedParams}` : `/api/results/quarterly`
+  return stringifiedParams.length > 0 ? `/results/quarterly?${stringifiedParams}` : `/results/quarterly`
 }
 
 /**
@@ -4328,7 +4328,7 @@ export const getQuarterlyResults = async (params: GetQuarterlyResultsParams, opt
 
 export const getGetQuarterlyResultsQueryKey = (params?: GetQuarterlyResultsParams,) => {
     return [
-    `/api/results/quarterly`, ...(params ? [params] : [])
+    `/results/quarterly`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4382,7 +4382,7 @@ export const getCloseQuarterUrl = () => {
 
 
 
-  return `/api/results/quarterly/close`
+  return `/results/quarterly/close`
 }
 
 /**
@@ -4453,7 +4453,7 @@ export const getUpdateBonusPaymentUrl = (id: number,) => {
 
 
 
-  return `/api/results/quarterly/${id}/payment`
+  return `/results/quarterly/${id}/payment`
 }
 
 /**
@@ -4532,7 +4532,7 @@ export const getGetQuarterEligibilityUrl = (params?: GetQuarterEligibilityParams
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/quarter-eligibility?${stringifiedParams}` : `/api/quarter-eligibility`
+  return stringifiedParams.length > 0 ? `/quarter-eligibility?${stringifiedParams}` : `/quarter-eligibility`
 }
 
 /**
@@ -4555,7 +4555,7 @@ export const getQuarterEligibility = async (params?: GetQuarterEligibilityParams
 
 export const getGetQuarterEligibilityQueryKey = (params?: GetQuarterEligibilityParams,) => {
     return [
-    `/api/quarter-eligibility`, ...(params ? [params] : [])
+    `/quarter-eligibility`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4609,7 +4609,7 @@ export const getSetQuarterEligibilityUrl = () => {
 
 
 
-  return `/api/quarter-eligibility`
+  return `/quarter-eligibility`
 }
 
 /**
@@ -4687,7 +4687,7 @@ export const getGetRankingUrl = (params: GetRankingParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/ranking?${stringifiedParams}` : `/api/ranking`
+  return stringifiedParams.length > 0 ? `/ranking?${stringifiedParams}` : `/ranking`
 }
 
 /**
@@ -4710,7 +4710,7 @@ export const getRanking = async (params: GetRankingParams, options?: RequestInit
 
 export const getGetRankingQueryKey = (params?: GetRankingParams,) => {
     return [
-    `/api/ranking`, ...(params ? [params] : [])
+    `/ranking`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4771,7 +4771,7 @@ export const getGetAuditLogsUrl = (params?: GetAuditLogsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/audit-logs?${stringifiedParams}` : `/api/audit-logs`
+  return stringifiedParams.length > 0 ? `/audit-logs?${stringifiedParams}` : `/audit-logs`
 }
 
 /**
@@ -4794,7 +4794,7 @@ export const getAuditLogs = async (params?: GetAuditLogsParams, options?: Reques
 
 export const getGetAuditLogsQueryKey = (params?: GetAuditLogsParams,) => {
     return [
-    `/api/audit-logs`, ...(params ? [params] : [])
+    `/audit-logs`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -4848,7 +4848,7 @@ export const getGetIntegrationStatusUrl = () => {
 
 
 
-  return `/api/integration/status`
+  return `/integration/status`
 }
 
 /**
@@ -4871,7 +4871,7 @@ export const getIntegrationStatus = async ( options?: RequestInit): Promise<Inte
 
 export const getGetIntegrationStatusQueryKey = () => {
     return [
-    `/api/integration/status`
+    `/integration/status`
     ] as const;
     }
 
@@ -4925,7 +4925,7 @@ export const getTriggerSyncUrl = () => {
 
 
 
-  return `/api/integration/sync`
+  return `/integration/sync`
 }
 
 /**
@@ -4995,7 +4995,7 @@ export const getImportEventsCSVUrl = () => {
 
 
 
-  return `/api/integration/import/events`
+  return `/integration/import/events`
 }
 
 /**
@@ -5066,7 +5066,7 @@ export const getImportEmployeesCSVUrl = () => {
 
 
 
-  return `/api/integration/import/employees`
+  return `/integration/import/employees`
 }
 
 /**
@@ -5137,7 +5137,7 @@ export const getImportParticipantsCSVUrl = () => {
 
 
 
-  return `/api/integration/import/participants`
+  return `/integration/import/participants`
 }
 
 /**
@@ -5215,7 +5215,7 @@ export const getExportEventResultsUrl = (params: ExportEventResultsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/exports/event-results?${stringifiedParams}` : `/api/exports/event-results`
+  return stringifiedParams.length > 0 ? `/exports/event-results?${stringifiedParams}` : `/exports/event-results`
 }
 
 /**
@@ -5238,7 +5238,7 @@ export const exportEventResults = async (params: ExportEventResultsParams, optio
 
 export const getExportEventResultsQueryKey = (params?: ExportEventResultsParams,) => {
     return [
-    `/api/exports/event-results`, ...(params ? [params] : [])
+    `/exports/event-results`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -5299,7 +5299,7 @@ export const getExportQuarterlyResultsUrl = (params: ExportQuarterlyResultsParam
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/exports/quarterly-results?${stringifiedParams}` : `/api/exports/quarterly-results`
+  return stringifiedParams.length > 0 ? `/exports/quarterly-results?${stringifiedParams}` : `/exports/quarterly-results`
 }
 
 /**
@@ -5322,7 +5322,7 @@ export const exportQuarterlyResults = async (params: ExportQuarterlyResultsParam
 
 export const getExportQuarterlyResultsQueryKey = (params?: ExportQuarterlyResultsParams,) => {
     return [
-    `/api/exports/quarterly-results`, ...(params ? [params] : [])
+    `/exports/quarterly-results`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -5383,7 +5383,7 @@ export const getExportRankingUrl = (params: ExportRankingParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/exports/ranking?${stringifiedParams}` : `/api/exports/ranking`
+  return stringifiedParams.length > 0 ? `/exports/ranking?${stringifiedParams}` : `/exports/ranking`
 }
 
 /**
@@ -5406,7 +5406,7 @@ export const exportRanking = async (params: ExportRankingParams, options?: Reque
 
 export const getExportRankingQueryKey = (params?: ExportRankingParams,) => {
     return [
-    `/api/exports/ranking`, ...(params ? [params] : [])
+    `/exports/ranking`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -5467,7 +5467,7 @@ export const getExportCajuBonusesUrl = (params: ExportCajuBonusesParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/exports/caju-bonuses?${stringifiedParams}` : `/api/exports/caju-bonuses`
+  return stringifiedParams.length > 0 ? `/exports/caju-bonuses?${stringifiedParams}` : `/exports/caju-bonuses`
 }
 
 /**
@@ -5490,7 +5490,7 @@ export const exportCajuBonuses = async (params: ExportCajuBonusesParams, options
 
 export const getExportCajuBonusesQueryKey = (params?: ExportCajuBonusesParams,) => {
     return [
-    `/api/exports/caju-bonuses`, ...(params ? [params] : [])
+    `/exports/caju-bonuses`, ...(params ? [params] : [])
     ] as const;
     }
 
