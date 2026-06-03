@@ -87,3 +87,28 @@ export function calculateBonusByScore(score: number, rules: PlatoonRuleData[]): 
   const platoon = getPlatoonByScore(score, rules);
   return platoon ? platoon.bonusValue : 0;
 }
+
+/**
+ * Converte uma nota bruta (0–5) para percentual (0–100).
+ * Útil para exibição e relatórios sem alterar o cálculo base.
+ */
+export function convertScoreToPercentage(score: number, maxScore = 5): number {
+  if (maxScore === 0) return 0;
+  return Math.round((score / maxScore) * 100 * 100) / 100;
+}
+
+/**
+ * Normaliza pesos para que a soma seja igual a targetSum (padrão: 20).
+ * Usado ao redistribuir pesos após adicionar/remover quesitos.
+ */
+export function normalizeWeights(weights: number[], targetSum = 20): number[] {
+  const total = weights.reduce((a, b) => a + b, 0);
+  if (total === 0) return weights.map(() => 0);
+  const factor = targetSum / total;
+  const normalized = weights.map(w => Math.round(w * factor * 100) / 100);
+  // Correct rounding drift on last element
+  const currentSum = normalized.reduce((a, b) => a + b, 0);
+  const drift = Math.round((targetSum - currentSum) * 100) / 100;
+  if (normalized.length > 0) normalized[normalized.length - 1] += drift;
+  return normalized;
+}
