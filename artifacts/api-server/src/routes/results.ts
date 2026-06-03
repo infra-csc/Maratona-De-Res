@@ -39,7 +39,7 @@ async function loadPlatoonRules(): Promise<PlatoonRuleMapped[]> {
  * A nota é por critério do evento (média das avaliações), com calibração no
  * nível do critério substituindo a média. O resultado é o mesmo para todos.
  */
-async function computeEventTeamResult(eventId: number) {
+export async function computeEventTeamResult(eventId: number) {
   const eventCriteriaRows = await db
     .select({
       criterionId: eventCriteriaTable.criterionId,

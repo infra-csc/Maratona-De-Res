@@ -41,7 +41,7 @@ export default function RankingPage() {
     }
   }
 
-  const fmt = (v: number) => `${(v * 100).toFixed(2)}%`;
+  const fmt = (v: number) => `${v.toFixed(1)}/100`;
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (

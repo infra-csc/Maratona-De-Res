@@ -61,7 +61,7 @@ router.get("/dashboard/summary", async (req, res) => {
     .where(and(
       eq(quarterlyResultsTable.year, year),
       eq(quarterlyResultsTable.quarter, quarter),
-      sql`${quarterlyResultsTable.finalResult}::numeric < 0.5`
+      sql`${quarterlyResultsTable.finalResult}::numeric < 50`
     ))
     .orderBy(sql`${quarterlyResultsTable.finalResult}::numeric ASC`)
     .limit(5);

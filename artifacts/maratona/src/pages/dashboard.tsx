@@ -23,7 +23,7 @@ export default function DashboardPage() {
   const { data: topEmployees } = useGetDashboardTopEmployees({ year, quarter });
   const { data: evolution } = useGetDashboardQuarterlyEvolution({ year });
 
-  const fmt = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const fmt = (v: number) => `${v.toFixed(1)}/100`;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -138,8 +138,8 @@ export default function DashboardPage() {
                 <BarChart data={evolution}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                   <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={v => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 12 }} domain={[0, 1]} />
-                  <Tooltip formatter={v => [`${((v as number) * 100).toFixed(1)}%`, "Média"]} />
+                  <YAxis tickFormatter={v => `${(v as number).toFixed(0)}`} tick={{ fontSize: 12 }} domain={[0, 100]} />
+                  <Tooltip formatter={v => [`${(v as number).toFixed(1)}/100`, "Média"]} />
                   <Bar dataKey="average" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
