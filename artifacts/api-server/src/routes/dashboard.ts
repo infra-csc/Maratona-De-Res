@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, evaluationsTable, absencesTable, quarterlyResultsTable, employeesTable, platoonRulesTable } from "@workspace/db";
+import { db, eventsTable, evaluationsTable, absencesTable, quarterlyResultsTable, employeesTable, platoonRulesTable, eventParticipantsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 
@@ -13,7 +13,11 @@ router.get("/dashboard/summary", async (req, res) => {
   const events = await db.select().from(eventsTable).where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter)));
   const totalEvents = events.length;
 
-  const allEvals = await db.select().from(evaluationsTable).where(
+  const allEvals = await db.select({
+    id: evaluationsTable.id,
+    eventId: evaluationsTable.eventId,
+    status: evaluationsTable.status,
+  }).from(evaluationsTable).where(
     sql`${evaluationsTable.eventId} IN (SELECT id FROM events WHERE year = ${year} AND quarter = ${quarter})`
   );
   const pendingEvaluations = allEvals.filter(e => e.status === "draft").length;
@@ -30,18 +34,43 @@ router.get("/dashboard/summary", async (req, res) => {
     : null;
 
   const totalBonusPreview = quarterResults.reduce((s, r) => s + parseFloat(r.bonusValue), 0);
-
   const eventsInCalibration = events.filter(e => e.status === "calibration").length;
 
-  const eventsWithPendencies = events
-    .filter(e => e.status === "open")
-    .slice(0, 5)
-    .map(e => ({ eventId: e.id, eventName: e.name, pendingCount: 0 }));
+  const openEvents = events.filter(e => e.status === "open");
+  const eventsWithPendencies: { eventId: number; eventName: string; pendingCount: number }[] = [];
+  for (const ev of openEvents.slice(0, 5)) {
+    const evEvals = allEvals.filter(e => e.eventId === ev.id);
+    const pending = evEvals.filter(e => e.status === "draft").length;
+    const participantCount = await db.select({ count: sql<number>`count(*)` })
+      .from(eventParticipantsTable)
+      .where(eq(eventParticipantsTable.eventId, ev.id));
+    const pCount = Number(participantCount[0]?.count ?? 0);
+    const totalExpected = pCount;
+    const pendingFinal = totalExpected > 0 ? totalExpected - evEvals.filter(e => e.status === "submitted").length : pending;
+    eventsWithPendencies.push({ eventId: ev.id, eventName: ev.name, pendingCount: Math.max(0, pendingFinal) });
+  }
 
-  const atRiskEmployees = quarterResults
-    .filter(r => parseFloat(r.finalResult) < 0.5)
-    .slice(0, 5)
-    .map(r => ({ employeeId: r.employeeId, employeeName: "", currentScore: parseFloat(r.finalResult) }));
+  const atRiskResults = await db
+    .select({
+      employeeId: quarterlyResultsTable.employeeId,
+      employeeName: employeesTable.name,
+      finalResult: quarterlyResultsTable.finalResult,
+    })
+    .from(quarterlyResultsTable)
+    .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    .where(and(
+      eq(quarterlyResultsTable.year, year),
+      eq(quarterlyResultsTable.quarter, quarter),
+      sql`${quarterlyResultsTable.finalResult}::numeric < 0.5`
+    ))
+    .orderBy(sql`${quarterlyResultsTable.finalResult}::numeric ASC`)
+    .limit(5);
+
+  const atRiskEmployees = atRiskResults.map(r => ({
+    employeeId: r.employeeId,
+    employeeName: r.employeeName ?? "",
+    currentScore: parseFloat(r.finalResult),
+  }));
 
   res.json({
     year, quarter, totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations,
@@ -96,7 +125,7 @@ router.get("/dashboard/top-employees", async (req, res) => {
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
     .where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)))
-    .orderBy(sql`${quarterlyResultsTable.finalResult} DESC`)
+    .orderBy(sql`${quarterlyResultsTable.finalResult}::numeric DESC`)
     .limit(10);
 
   res.json(results.map(r => ({

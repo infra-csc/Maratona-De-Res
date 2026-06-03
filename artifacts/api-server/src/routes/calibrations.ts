@@ -44,7 +44,7 @@ router.get("/calibrations", async (req, res) => {
   })));
 });
 
-router.post("/calibrations", requireRole("admin", "rh", "avaliador"), async (req, res) => {
+router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { eventId, employeeId, criterionId, calibratedScore, calibrationReason } = req.body;
   if (!eventId || !employeeId || !criterionId || calibratedScore === undefined || !calibrationReason) {
     res.status(400).json({ error: "Campos obrigatórios" });

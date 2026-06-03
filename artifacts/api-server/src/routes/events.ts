@@ -199,11 +199,45 @@ router.get("/events/:id/criteria", async (req, res) => {
 router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const { activeCriterionIds } = req.body;
-  const existing = await db.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, eventId));
-  for (const ec of existing) {
-    const isActive = (activeCriterionIds as number[]).includes(ec.criterionId);
-    await db.update(eventCriteriaTable).set({ active: isActive }).where(eq(eventCriteriaTable.id, ec.id));
+  const existing = await db
+    .select({
+      id: eventCriteriaTable.id,
+      criterionId: eventCriteriaTable.criterionId,
+      originalWeight: criteriaTable.defaultWeight,
+    })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .where(eq(eventCriteriaTable.eventId, eventId));
+
+  const activeIds = activeCriterionIds as number[];
+  const activeRows = existing.filter(ec => activeIds.includes(ec.criterionId));
+  const rawTotal = activeRows.reduce((s, ec) => s + parseFloat(ec.originalWeight ?? "1"), 0);
+
+  const TARGET_WEIGHT = 20;
+  const redistributed = new Map<number, number>();
+  if (activeRows.length > 0 && rawTotal > 0) {
+    let assigned = 0;
+    activeRows.forEach((ec, idx) => {
+      const raw = parseFloat(ec.originalWeight ?? "1");
+      if (idx === activeRows.length - 1) {
+        redistributed.set(ec.id, Math.round((TARGET_WEIGHT - assigned) * 100) / 100);
+      } else {
+        const share = Math.round((raw / rawTotal) * TARGET_WEIGHT * 100) / 100;
+        redistributed.set(ec.id, share);
+        assigned += share;
+      }
+    });
   }
+
+  for (const ec of existing) {
+    const isActive = activeIds.includes(ec.criterionId);
+    const newWeight = isActive ? String(redistributed.get(ec.id) ?? parseFloat(ec.originalWeight ?? "1")) : null;
+    await db.update(eventCriteriaTable).set({
+      active: isActive,
+      weightOverride: newWeight,
+    }).where(eq(eventCriteriaTable.id, ec.id));
+  }
+
   const updatedCriteria = await db
     .select({
       id: eventCriteriaTable.id,
@@ -217,11 +251,18 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(eq(eventCriteriaTable.eventId, eventId));
+
   const activeCriteria = updatedCriteria.filter(c => c.active);
   const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
   res.json(updatedCriteria.map(c => {
     const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, responsibleAreaName: null };
+    return {
+      ...c,
+      originalWeight: parseFloat(c.originalWeight ?? "1"),
+      weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null,
+      normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0,
+      weight: c.active ? parseFloat(c.weightOverride ?? c.originalWeight ?? "1") : 0,
+    };
   }));
 });
 

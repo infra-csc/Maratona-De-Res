@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, rulesTable, platoonRulesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -33,14 +33,56 @@ router.get("/platoon-rules", async (_req, res) => {
   })));
 });
 
+type RangeRow = { id: number; minScore: number; maxScore: number; minInclusive: boolean; maxInclusive: boolean };
+
+function validatePlatoonRanges(ranges: RangeRow[]): string | null {
+  const active = [...ranges].sort((a, b) => a.minScore - b.minScore);
+  for (let i = 0; i < active.length - 1; i++) {
+    const curr = active[i];
+    const next = active[i + 1];
+    const currMax = curr.maxScore;
+    const nextMin = next.minScore;
+    if (currMax > nextMin) {
+      return `Sobreposição de intervalos detectada: "${curr.minScore}–${curr.maxScore}" e "${next.minScore}–${next.maxScore}"`;
+    }
+    if (currMax < nextMin) {
+      return `Lacuna entre intervalos detectada: ${curr.maxScore} → ${next.minScore}`;
+    }
+    const boundaryOk = curr.maxInclusive !== next.minInclusive;
+    if (!boundaryOk) {
+      return `Conflito de inclusão no limite ${currMax}: "${curr.minScore}–${curr.maxScore}" e "${next.minScore}–${next.maxScore}" cobrem o mesmo ponto`;
+    }
+  }
+  return null;
+}
+
 router.post("/platoon-rules", requireRole("admin"), async (req, res) => {
   const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, description, displayOrder } = req.body;
   if (!name || minScore === undefined || maxScore === undefined) {
     res.status(400).json({ error: "Campos obrigatórios: name, minScore, maxScore" });
     return;
   }
+  if (parseFloat(minScore) >= parseFloat(maxScore)) {
+    res.status(400).json({ error: "minScore deve ser menor que maxScore" });
+    return;
+  }
+
+  const existing = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true));
+  const allRanges: RangeRow[] = [
+    ...existing.map(r => ({
+      id: r.id,
+      minScore: parseFloat(r.minScore as unknown as string),
+      maxScore: parseFloat(r.maxScore as unknown as string),
+      minInclusive: r.minInclusive,
+      maxInclusive: r.maxInclusive,
+    })),
+    { id: -1, minScore: parseFloat(minScore), maxScore: parseFloat(maxScore), minInclusive: minInclusive ?? true, maxInclusive: maxInclusive ?? false },
+  ];
+  const err = validatePlatoonRanges(allRanges);
+  if (err) { res.status(400).json({ error: err }); return; }
+
   const [rule] = await db.insert(platoonRulesTable).values({
-    name, color: color ?? "#gray",
+    name, color: color ?? "#94a3b8",
     minScore: String(minScore), maxScore: String(maxScore),
     minInclusive: minInclusive ?? true, maxInclusive: maxInclusive ?? false,
     bonusValue: String(bonusValue ?? 0),
@@ -55,6 +97,38 @@ router.patch("/platoon-rules/:id", requireRole("admin"), async (req, res) => {
   const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, description, active, displayOrder } = req.body;
   const [before] = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+
+  const newMinScore = minScore !== undefined ? parseFloat(minScore) : parseFloat(before.minScore as unknown as string);
+  const newMaxScore = maxScore !== undefined ? parseFloat(maxScore) : parseFloat(before.maxScore as unknown as string);
+  const newMinInclusive = minInclusive !== undefined ? minInclusive : before.minInclusive;
+  const newMaxInclusive = maxInclusive !== undefined ? maxInclusive : before.maxInclusive;
+  const willBeActive = active !== undefined ? active : before.active;
+
+  if (newMinScore >= newMaxScore) {
+    res.status(400).json({ error: "minScore deve ser menor que maxScore" });
+    return;
+  }
+
+  if (willBeActive) {
+    const otherActive = await db.select().from(platoonRulesTable)
+      .where(eq(platoonRulesTable.active, true));
+    const otherRanges: RangeRow[] = otherActive
+      .filter(r => r.id !== id)
+      .map(r => ({
+        id: r.id,
+        minScore: parseFloat(r.minScore as unknown as string),
+        maxScore: parseFloat(r.maxScore as unknown as string),
+        minInclusive: r.minInclusive,
+        maxInclusive: r.maxInclusive,
+      }));
+    const allRanges: RangeRow[] = [
+      ...otherRanges,
+      { id, minScore: newMinScore, maxScore: newMaxScore, minInclusive: newMinInclusive, maxInclusive: newMaxInclusive },
+    ];
+    const err = validatePlatoonRanges(allRanges);
+    if (err) { res.status(400).json({ error: err }); return; }
+  }
+
   const [rule] = await db.update(platoonRulesTable).set({
     ...(name !== undefined && { name }),
     ...(color !== undefined && { color }),

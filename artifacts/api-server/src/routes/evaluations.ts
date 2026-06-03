@@ -40,7 +40,7 @@ router.get("/evaluations", async (req, res) => {
   res.json(evaluations.map(e => ({ ...e, score: parseFloat(e.score as unknown as string) })));
 });
 
-router.post("/evaluations", async (req, res) => {
+router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req, res) => {
   const { eventId, employeeId, criterionId, score, comments } = req.body;
   if (!eventId || !employeeId || !criterionId || score === undefined) {
     res.status(400).json({ error: "Campos obrigatórios: eventId, employeeId, criterionId, score" });

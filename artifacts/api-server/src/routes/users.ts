@@ -73,8 +73,8 @@ router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(areaId !== undefined && { areaId }),
     ...(active !== undefined && { active }),
   }).where(eq(usersTable.id, id)).returning();
-  await audit(req.user!.userId, "update", "users", id, before, user);
-  res.json(user);
+  await audit(req.user!.userId, "update", "users", id, before, { ...user, passwordHash: undefined });
+  res.json({ ...user, passwordHash: undefined });
 });
 
 router.delete("/users/:id", requireRole("admin"), async (req, res) => {
