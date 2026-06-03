@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, quarterlyResultsTable, employeesTable, eventsTable } from "@workspace/db";
+import { db, quarterlyResultsTable, employeesTable, eventsTable, absencesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { computeEventTeamResult } from "./results.js";
@@ -111,6 +111,50 @@ router.get("/exports/caju-bonuses", async (req, res) => {
     .orderBy(quarterlyResultsTable.bonusValue);
 
   res.json({ filename: `bonus-caju-Q${quarter}-${year}.csv`, data: toCsv(results as never) });
+});
+
+router.get("/exports/absences", async (req, res) => {
+  const { year, quarter } = req.query;
+  const conditions = [];
+  if (year) conditions.push(eq(absencesTable.year, parseInt(year as string)));
+  if (quarter) conditions.push(eq(absencesTable.quarter, parseInt(quarter as string)));
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+
+  const results = await db
+    .select({
+      "Nome": employeesTable.name,
+      "Data": absencesTable.date,
+      "Ano": absencesTable.year,
+      "Trimestre": absencesTable.quarter,
+      "Quantidade": absencesTable.quantity,
+      "Motivo": absencesTable.reason,
+    })
+    .from(absencesTable)
+    .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
+    .where(whereClause)
+    .orderBy(absencesTable.date);
+
+  const suffix = year && quarter ? `-Q${quarter}-${year}` : "";
+  res.json({ filename: `faltas${suffix}.csv`, data: toCsv(results as never) });
+});
+
+router.get("/exports/pending-evaluations", async (_req, res) => {
+  const openEvents = await db.select().from(eventsTable).where(eq(eventsTable.status, "open"));
+  const rows: Record<string, unknown>[] = [];
+  for (const ev of openEvents) {
+    const team = await computeEventTeamResult(ev.id);
+    for (const cd of team.criteriaDetails) {
+      if (cd.status !== "avaliado") {
+        rows.push({
+          "Evento": ev.name,
+          "Critério": cd.criterionName,
+          "Área Responsável": cd.responsibleAreaLabel ?? "",
+          "Status": cd.status,
+        });
+      }
+    }
+  }
+  res.json({ filename: `avaliacoes-pendentes.csv`, data: toCsv(rows) });
 });
 
 export default router;

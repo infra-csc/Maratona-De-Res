@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetAbsences, useCreateAbsence, useDeleteAbsence, useGetEmployees, getGetAbsencesQueryKey } from "@workspace/api-client-react";
+import { useGetAbsences, useCreateAbsence, useDeleteAbsence, useGetEmployees, getGetAbsencesQueryKey, exportAbsences } from "@workspace/api-client-react";
 import type { AbsenceInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, UserX } from "lucide-react";
+import { Plus, Trash2, UserX, Download } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const currentYear = new Date().getFullYear();
@@ -52,6 +52,19 @@ export default function AbsencesPage() {
 
   const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
 
+  async function handleExport() {
+    try {
+      const data = await exportAbsences({ year, quarter });
+      const blob = new Blob([data.data], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = data.filename;
+      a.click();
+    } catch {
+      toast({ title: "Erro ao exportar", variant: "destructive" });
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
@@ -61,6 +74,10 @@ export default function AbsencesPage() {
           </h1>
           <p className="text-muted-foreground text-sm">Registre e gerencie ausências</p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button data-testid="button-export-absences" size="sm" variant="outline" onClick={handleExport}>
+            <Download size={15} className="mr-1.5" /> Exportar CSV
+          </Button>
         {canEdit && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -129,6 +146,7 @@ export default function AbsencesPage() {
             </DialogContent>
           </Dialog>
         )}
+        </div>
       </div>
 
       <div className="flex gap-3">

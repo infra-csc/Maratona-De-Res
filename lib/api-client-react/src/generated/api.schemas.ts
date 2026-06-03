@@ -804,3 +804,8 @@ year: number;
 quarter: number;
 };
 
+export type ExportAbsencesParams = {
+year?: number;
+quarter?: number;
+};
+

@@ -49,6 +49,7 @@ export * from './eventTeamCriterion';
 export * from './eventTeamParticipant';
 export * from './eventTeamResult';
 export * from './eventUpdate';
+export * from './exportAbsencesParams';
 export * from './exportCajuBonusesParams';
 export * from './exportEventResultsParams';
 export * from './exportQuarterlyResultsParams';

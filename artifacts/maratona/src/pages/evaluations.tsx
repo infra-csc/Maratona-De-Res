@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey, exportPendingEvaluations } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Send, Users, MessageSquareShare } from "lucide-react";
+import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const currentYear = new Date().getFullYear();
@@ -107,13 +107,31 @@ export default function EvaluationsPage() {
   });
   const hasDrafts = activeCriteria.some(c => getEval(c.criterionId)?.status === "draft");
 
+  async function handleExportPending() {
+    try {
+      const data = await exportPendingEvaluations();
+      const blob = new Blob([data.data], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = data.filename;
+      a.click();
+    } catch {
+      toast({ title: "Erro ao exportar", variant: "destructive" });
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 data-testid="text-page-title" className="text-2xl font-bold">Avaliação da Equipe</h1>
-        <p className="text-muted-foreground text-sm">
-          A nota é única por critério e aplicada igualmente a toda a equipe do evento (escala 1 a 5).
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 data-testid="text-page-title" className="text-2xl font-bold">Avaliação da Equipe</h1>
+          <p className="text-muted-foreground text-sm">
+            A nota é única por critério e aplicada igualmente a toda a equipe do evento (escala 1 a 5).
+          </p>
+        </div>
+        <Button data-testid="button-export-pending" size="sm" variant="outline" onClick={handleExportPending}>
+          <Download size={15} className="mr-1.5" /> Exportar Pendentes
+        </Button>
       </div>
 
       <div className="flex gap-3 items-center">

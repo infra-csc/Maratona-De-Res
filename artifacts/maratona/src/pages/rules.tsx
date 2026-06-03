@@ -113,7 +113,7 @@ export default function RulesPage() {
                     <td className="px-4 py-2.5 text-center">
                       <Input
                         data-testid={`input-platoon-min-${p.id}`}
-                        type="number" min="0" max="1" step="0.01" className="w-24 mx-auto text-center"
+                        type="number" min="0" max="100" step="1" className="w-24 mx-auto text-center"
                         value={platoonValues[p.id]?.minScore ?? p.minScore}
                         onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))}
                       />
@@ -121,7 +121,7 @@ export default function RulesPage() {
                     <td className="px-4 py-2.5 text-center">
                       <Input
                         data-testid={`input-platoon-max-${p.id}`}
-                        type="number" min="0" max="1.01" step="0.01" className="w-24 mx-auto text-center"
+                        type="number" min="0" max="100" step="1" className="w-24 mx-auto text-center"
                         value={platoonValues[p.id]?.maxScore ?? p.maxScore}
                         onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))}
                       />

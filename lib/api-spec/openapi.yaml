@@ -1481,6 +1481,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/CsvExport"
 
+  /exports/absences:
+    get:
+      operationId: exportAbsences
+      tags: [exports]
+      summary: Export absences CSV
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsvExport"
+
+  /exports/pending-evaluations:
+    get:
+      operationId: exportPendingEvaluations
+      tags: [exports]
+      summary: Export pending evaluations CSV
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsvExport"
+
 components:
   schemas:
     HealthStatus:

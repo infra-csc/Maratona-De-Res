@@ -53,6 +53,7 @@ import type {
   EventParticipantInput,
   EventTeamResult,
   EventUpdate,
+  ExportAbsencesParams,
   ExportCajuBonusesParams,
   ExportEventResultsParams,
   ExportQuarterlyResultsParams,
@@ -5527,6 +5528,167 @@ export function useExportCajuBonuses<TData = Awaited<ReturnType<typeof exportCaj
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getExportCajuBonusesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportAbsencesUrl = (params?: ExportAbsencesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/exports/absences?${stringifiedParams}` : `/exports/absences`
+}
+
+/**
+ * @summary Export absences CSV
+ */
+export const exportAbsences = async (params?: ExportAbsencesParams, options?: RequestInit): Promise<CsvExport> => {
+
+  return customFetch<CsvExport>(getExportAbsencesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportAbsencesQueryKey = (params?: ExportAbsencesParams,) => {
+    return [
+    `/exports/absences`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>(params?: ExportAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportAbsencesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAbsences>>> = ({ signal }) => exportAbsences(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportAbsencesQueryResult = NonNullable<Awaited<ReturnType<typeof exportAbsences>>>
+export type ExportAbsencesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export absences CSV
+ */
+
+export function useExportAbsences<TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>(
+ params?: ExportAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportAbsencesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportPendingEvaluationsUrl = () => {
+
+
+
+
+  return `/exports/pending-evaluations`
+}
+
+/**
+ * @summary Export pending evaluations CSV
+ */
+export const exportPendingEvaluations = async ( options?: RequestInit): Promise<CsvExport> => {
+
+  return customFetch<CsvExport>(getExportPendingEvaluationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportPendingEvaluationsQueryKey = () => {
+    return [
+    `/exports/pending-evaluations`
+    ] as const;
+    }
+
+
+export const getExportPendingEvaluationsQueryOptions = <TData = Awaited<ReturnType<typeof exportPendingEvaluations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportPendingEvaluations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportPendingEvaluationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportPendingEvaluations>>> = ({ signal }) => exportPendingEvaluations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportPendingEvaluations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportPendingEvaluationsQueryResult = NonNullable<Awaited<ReturnType<typeof exportPendingEvaluations>>>
+export type ExportPendingEvaluationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export pending evaluations CSV
+ */
+
+export function useExportPendingEvaluations<TData = Awaited<ReturnType<typeof exportPendingEvaluations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportPendingEvaluations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportPendingEvaluationsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

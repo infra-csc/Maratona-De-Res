@@ -1520,3 +1520,26 @@ export const ExportCajuBonusesResponse = zod.object({
 })
 
 
+/**
+ * @summary Export absences CSV
+ */
+export const ExportAbsencesQueryParams = zod.object({
+  "year": zod.coerce.number().optional(),
+  "quarter": zod.coerce.number().optional()
+})
+
+export const ExportAbsencesResponse = zod.object({
+  "filename": zod.string(),
+  "data": zod.string()
+})
+
+
+/**
+ * @summary Export pending evaluations CSV
+ */
+export const ExportPendingEvaluationsResponse = zod.object({
+  "filename": zod.string(),
+  "data": zod.string()
+})
+
+
