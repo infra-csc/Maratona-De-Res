@@ -2,14 +2,19 @@ import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable, eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable, platoonRulesTable, employeesTable, rulesTable } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { calculateEventResult, calculateQuarterGrossAverage, calculateAbsencePenalty, calculateQuarterFinalResult, getPlatoonByScore } from "../lib/calculations.js";
+import { calculateEventResult, calculateQuarterGrossAverage, calculateAbsencePenalty, calculateQuarterFinalResult, getPlatoonByScore, validateCalculationExample } from "../lib/calculations.js";
 import { audit } from "../lib/audit.js";
 
 const router = Router();
 router.use(requireAuth);
 
+// Log validation on startup
+if (!validateCalculationExample()) {
+  console.error("❌ ERRO DE CÁLCULO: pesos=[3,3,2,3,3,3,3], notas=[4,4,4,3,2,3,5] deveria retornar 71");
+}
+
 router.get("/events/:id/result", async (req, res) => {
-  const eventId = parseInt(req.params.id);
+  const eventId = parseInt(req.params.id as string);
 
   const participants = await db
     .select({ employeeId: eventParticipantsTable.employeeId, employeeName: employeesTable.name })
@@ -30,18 +35,25 @@ router.get("/events/:id/result", async (req, res) => {
     .where(eq(eventCriteriaTable.eventId, eventId));
 
   const activeCriteria = eventCriteriaRows.filter(c => c.active);
-  const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
-  const normalizedCriteria = activeCriteria.map(c => {
-    const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return { ...c, normalizedWeight: totalWeight > 0 ? w / totalWeight : 0 };
-  });
 
   const allEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
   const allCalibrations = await db.select().from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
 
+  const platoonRulesMapped = platoonRules.map(r => ({
+    name: r.name,
+    color: r.color,
+    minScore: parseFloat(r.minScore as unknown as string),
+    maxScore: parseFloat(r.maxScore as unknown as string),
+    minInclusive: r.minInclusive,
+    maxInclusive: r.maxInclusive,
+    bonusValue: parseFloat(r.bonusValue as unknown as string),
+  }));
+
   const results = participants.map(p => {
-    const criteriaDetails = normalizedCriteria.map(c => {
+    const criteriaDetails = activeCriteria.map(c => {
+      const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
+
       const evalScores = allEvals
         .filter(e => e.employeeId === p.employeeId && e.criterionId === c.criterionId && e.status === "submitted")
         .map(e => parseFloat(e.score as unknown as string));
@@ -51,39 +63,28 @@ router.get("/events/:id/result", async (req, res) => {
       const calibration = allCalibrations.find(cal => cal.employeeId === p.employeeId && cal.criterionId === c.criterionId);
       const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
       const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
-      const scorePercentual = scoreUsed !== null ? scoreUsed / 5 : null;
-      const weightedContribution = scorePercentual !== null ? scorePercentual * c.normalizedWeight : null;
+      const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
 
       return {
         criterionId: c.criterionId!,
         criterionName: c.criterionName ?? "",
+        weight,
         averageScore,
         calibratedScore,
         scoreUsed,
-        scorePercentual,
-        normalizedWeight: c.normalizedWeight,
-        weightedContribution,
+        criterionTotal,
       };
     });
 
     const criteriaForCalc = criteriaDetails.map(cd => ({
       criterionId: cd.criterionId,
-      weight: cd.normalizedWeight,
+      weight: cd.weight,
       averageScore: cd.averageScore,
       calibratedScore: cd.calibratedScore,
     }));
 
     const eventScore = calculateEventResult(criteriaForCalc);
-
-    const platoon = getPlatoonByScore(eventScore, platoonRules.map(r => ({
-      name: r.name,
-      color: r.color,
-      minScore: parseFloat(r.minScore as unknown as string),
-      maxScore: parseFloat(r.maxScore as unknown as string),
-      minInclusive: r.minInclusive,
-      maxInclusive: r.maxInclusive,
-      bonusValue: parseFloat(r.bonusValue as unknown as string),
-    })));
+    const platoon = getPlatoonByScore(eventScore, platoonRulesMapped);
 
     return {
       employeeId: p.employeeId!,
@@ -91,6 +92,8 @@ router.get("/events/:id/result", async (req, res) => {
       eventId,
       eventScore,
       projectedPlatoon: platoon?.name ?? null,
+      projectedPlatoonColor: platoon?.color ?? null,
+      projectedBonus: platoon?.bonusValue ?? 0,
       criteriaDetails,
     };
   });
@@ -102,7 +105,7 @@ router.get("/results/quarterly", async (req, res) => {
   const { year, quarter, employeeId, platoon } = req.query;
   if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
 
-  let query = db
+  const query = db
     .select({
       employeeId: quarterlyResultsTable.employeeId,
       employeeName: employeesTable.name,
@@ -122,8 +125,7 @@ router.get("/results/quarterly", async (req, res) => {
     .where(and(
       eq(quarterlyResultsTable.year, parseInt(year as string)),
       eq(quarterlyResultsTable.quarter, parseInt(quarter as string)),
-    ))
-    .$dynamic();
+    ));
 
   const results = await query;
   const filtered = results
@@ -169,7 +171,7 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
   }));
 
   const penaltyRuleRow = await db.select().from(rulesTable).where(eq(rulesTable.key, "absence_penalty_per_absence")).limit(1);
-  const penaltyPerAbsence = penaltyRuleRow[0] ? parseFloat(penaltyRuleRow[0].value) : 0.01;
+  const penaltyPerAbsence = penaltyRuleRow[0] ? parseFloat(penaltyRuleRow[0].value) : 50;
 
   let processed = 0;
   const warnings: string[] = [];
@@ -203,21 +205,25 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
       if (isParticipant.length === 0) continue;
 
       const criteria = eventCriteriaRows.filter(c => c.eventId === eventId && c.active);
-      const totalWeight = criteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
 
       const criteriaForCalc = criteria.map(c => {
-        const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
+        const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
         const evalScores = allEvals
           .filter(e => e.eventId === eventId && e.criterionId === c.criterionId && e.status === "submitted")
           .map(e => parseFloat(e.score as unknown as string));
         const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
         const calibration = allCalibrations.find(cal => cal.eventId === eventId && cal.criterionId === c.criterionId);
         const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
-        return { criterionId: c.criterionId!, weight: totalWeight > 0 ? w / totalWeight : 0, averageScore, calibratedScore };
+        return { criterionId: c.criterionId!, weight, averageScore, calibratedScore };
       });
 
       const eventScore = calculateEventResult(criteriaForCalc);
-      eventScores.push(eventScore);
+      if (eventScore > 0) eventScores.push(eventScore);
+    }
+
+    if (eventScores.length === 0) {
+      warnings.push(`Colaborador ID ${employeeId}: sem eventos com avaliações`);
+      continue;
     }
 
     const absenceRows = await db.select().from(absencesTable)

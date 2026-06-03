@@ -20,6 +20,7 @@ import UsersPage from "@/pages/users";
 import RulesPage from "@/pages/rules";
 import IntegrationPage from "@/pages/integration";
 import AuditPage from "@/pages/audit";
+import MyPerformancePage from "@/pages/my-performance";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -77,6 +78,7 @@ function AppRoutes() {
       <Route path="/rules" component={() => <ProtectedRoute component={RulesPage} />} />
       <Route path="/integration" component={() => <ProtectedRoute component={IntegrationPage} />} />
       <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} />} />
+      <Route path="/meu-desempenho" component={() => <ProtectedRoute component={MyPerformancePage} />} />
       <Route component={NotFound} />
     </Switch>
   );

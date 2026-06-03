@@ -16,6 +16,7 @@ import rankingRouter from "./ranking.js";
 import auditRouter from "./audit.js";
 import integrationRouter from "./integration.js";
 import exportsRouter from "./exports.js";
+import myPerformanceRouter from "./my-performance.js";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(rankingRouter);
 router.use(auditRouter);
 router.use(integrationRouter);
 router.use(exportsRouter);
+router.use(myPerformanceRouter);
 
 export default router;

@@ -14,6 +14,7 @@ export const evaluationsTable = pgTable("evaluations", {
   evaluatorUserId: integer("evaluator_user_id").notNull().references(() => usersTable.id),
   score: numeric("score", { precision: 5, scale: 2 }).notNull(),
   comments: text("comments"),
+  commentVisibility: text("comment_visibility").notNull().default("internal"),
   status: text("status").notNull().default("draft"),
   submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

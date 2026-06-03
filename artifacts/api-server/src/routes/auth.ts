@@ -23,7 +23,13 @@ router.post("/auth/login", async (req, res) => {
     res.status(401).json({ error: "Credenciais inválidas" });
     return;
   }
-  const token = signToken({ userId: user.id, email: user.email, role: user.role });
+  const token = signToken({
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    areaId: user.areaId ?? null,
+    employeeId: user.employeeId ?? null,
+  });
   await audit(user.id, "login", "users", user.id);
   let areaName: string | null = null;
   if (user.areaId) {
@@ -39,6 +45,7 @@ router.post("/auth/login", async (req, res) => {
       role: user.role,
       areaId: user.areaId,
       areaName,
+      employeeId: user.employeeId ?? null,
       active: user.active,
       createdAt: user.createdAt,
     },
@@ -56,7 +63,17 @@ router.get("/auth/me", requireAuth, async (req, res) => {
     const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, user.areaId)).limit(1);
     areaName = area?.name ?? null;
   }
-  res.json({ id: user.id, name: user.name, email: user.email, role: user.role, areaId: user.areaId, areaName, active: user.active, createdAt: user.createdAt });
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    areaId: user.areaId,
+    areaName,
+    employeeId: user.employeeId ?? null,
+    active: user.active,
+    createdAt: user.createdAt,
+  });
 });
 
 router.post("/auth/logout", requireAuth, async (_req, res) => {

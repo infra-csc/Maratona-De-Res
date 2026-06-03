@@ -1,13 +1,3 @@
-export function convertScoreToPercentage(score: number, maxScore = 5): number {
-  return score / maxScore;
-}
-
-export function normalizeWeights(weights: number[]): number[] {
-  const total = weights.reduce((a, b) => a + b, 0);
-  if (total === 0) return weights.map(() => 0);
-  return weights.map((w) => w / total);
-}
-
 export function getAverageEvaluatorScore(scores: number[]): number | null {
   if (scores.length === 0) return null;
   return scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -28,30 +18,38 @@ export interface CriterionData {
   calibratedScore: number | null;
 }
 
-export function calculateEventResult(criteria: CriterionData[], maxScore = 5): number {
-  const activeCriteria = criteria.filter(
-    (c) => getScoreUsedForCalculation(c.averageScore, c.calibratedScore) !== null,
-  );
-  if (activeCriteria.length === 0) return 0;
-
-  const weights = activeCriteria.map((c) => c.weight);
-  const normalizedWeights = normalizeWeights(weights);
-
-  let totalContribution = 0;
-  for (let i = 0; i < activeCriteria.length; i++) {
-    const score = getScoreUsedForCalculation(
-      activeCriteria[i].averageScore,
-      activeCriteria[i].calibratedScore,
-    )!;
-    const pct = convertScoreToPercentage(score, maxScore);
-    totalContribution += pct * normalizedWeights[i];
+/**
+ * Calcula o resultado do evento: Σ(nota_usada × peso)
+ * Com pesos somando 20 e notas de 0-5, o resultado fica na escala 0-100.
+ * Exemplo: pesos=[3,3,2,3,3,3,3], notas=[4,4,4,3,2,3,5] → 71
+ */
+export function calculateEventResult(criteria: CriterionData[]): number {
+  let total = 0;
+  for (const c of criteria) {
+    const score = getScoreUsedForCalculation(c.averageScore, c.calibratedScore);
+    if (score !== null) {
+      total += score * c.weight;
+    }
   }
-  return totalContribution;
+  return Math.round(total * 100) / 100;
+}
+
+export function validateCalculationExample(): boolean {
+  const weights = [3, 3, 2, 3, 3, 3, 3];
+  const scores = [4, 4, 4, 3, 2, 3, 5];
+  const criteria: CriterionData[] = weights.map((weight, i) => ({
+    criterionId: i + 1,
+    weight,
+    averageScore: scores[i],
+    calibratedScore: null,
+  }));
+  const result = calculateEventResult(criteria);
+  return result === 71;
 }
 
 export function calculateQuarterGrossAverage(eventScores: number[]): number {
   if (eventScores.length === 0) return 0;
-  return eventScores.reduce((a, b) => a + b, 0) / eventScores.length;
+  return Math.round((eventScores.reduce((a, b) => a + b, 0) / eventScores.length) * 100) / 100;
 }
 
 export function calculateAbsencePenalty(totalAbsences: number, penaltyPerAbsence: number): number {
@@ -59,7 +57,7 @@ export function calculateAbsencePenalty(totalAbsences: number, penaltyPerAbsence
 }
 
 export function calculateQuarterFinalResult(grossAverage: number, absencePenalty: number): number {
-  return Math.max(0, grossAverage - absencePenalty);
+  return Math.min(100, Math.max(0, Math.round((grossAverage - absencePenalty) * 100) / 100));
 }
 
 export interface PlatoonRuleData {

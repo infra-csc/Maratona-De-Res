@@ -1,0 +1,560 @@
+Ajuste final com base no regulamento oficial da Maratona de Resultados – Cenografia.
+
+Desconsiderar a data de início/vigência do documento. O app não deve travar regras por data de início.
+
+Não recomece o projeto do zero. Corrija e evolua o app existente.
+
+---
+
+# 1. Correção principal: avaliação por TIME do evento
+
+A avaliação não é individualizada por pessoa dentro do mesmo evento.
+
+A regra correta é:
+
+```txt
+A avaliação é feita por time de cada evento.
+Todo o time de cenografia participante do mesmo evento recebe a mesma nota daquele evento.
+```
+
+Porém, para cálculo trimestral, a nota do evento precisa ser lançada individualmente para cada colaborador participante.
+
+Ou seja:
+
+```txt
+Evento X teve nota 85 para o time.
+Participaram: João, Maria e Pedro.
+João recebe 85 no evento X.
+Maria recebe 85 no evento X.
+Pedro recebe 85 no evento X.
+```
+
+Depois, cada colaborador terá sua média trimestral considerando apenas os eventos em que participou.
+
+Essa regra precisa substituir qualquer lógica que permita notas diferentes para pessoas do mesmo time no mesmo evento, exceto se no futuro houver uma regra específica autorizando exceção.
+
+---
+
+# 2. Ajuste no modelo de dados
+
+Manter participantes do evento individualizados, mas a avaliação deve ser por evento/time.
+
+Criar ou ajustar estrutura para permitir:
+
+## event_team_evaluations
+
+Campos sugeridos:
+
+```txt
+id
+event_id
+criterion_id
+evaluator_user_id
+score
+comments
+status: draft | submitted
+comment_visibility: internal | public
+created_at
+updated_at
+submitted_at
+```
+
+Essa tabela representa a nota do time naquele critério.
+
+Depois, o resultado do evento deve ser aplicado a todos os colaboradores participantes do evento.
+
+Manter também uma tabela ou visão de resultado individual:
+
+## employee_event_results
+
+Campos sugeridos:
+
+```txt
+id
+event_id
+employee_id
+event_score
+calibrated_event_score
+final_event_score
+platoon_projected
+created_at
+updated_at
+```
+
+A nota é igual para todos os participantes do mesmo evento, mas fica gravada por colaborador para cálculo trimestral.
+
+---
+
+# 3. Público elegível
+
+Adicionar regra de elegibilidade.
+
+São elegíveis:
+
+```txt
+Cenotécnicos
+Líderes de Cenografia, montagem e marcenaria
+```
+
+Não são elegíveis:
+
+```txt
+Outras áreas operacionais não listadas
+Gestores fora da estrutura de cenografia
+Colaboradores desligados antes da data de crédito do bônus
+Colaboradores afastados por motivos disciplinares, conforme regra interna
+```
+
+No cadastro do colaborador, adicionar campos:
+
+```txt
+eligible_for_bonus boolean
+eligibility_status: eligible | not_eligible | suspended | terminated
+eligibility_reason
+```
+
+No cálculo do bônus, calcular resultado para histórico, mas só gerar bônus se o colaborador estiver elegível.
+
+---
+
+# 4. Critérios oficiais da avaliação
+
+Substituir os quesitos anteriores pelos critérios oficiais abaixo.
+
+Cada evento é avaliado em 7 critérios fixos.
+
+```txt
+1. Perda de Material/Estrutura
+Área envolvida: Logística
+O que avalia: Retorno de todo material enviado, integridade, ausência de perdas e extravios.
+Peso: 3
+
+2. Ferramentas & Case
+Área envolvida: Cenografia
+O que avalia: Retorno de ferramentas, cases e itens de uso contínuo, organização e controle.
+Peso: 2
+
+3. Qualidade da Entrega
+Áreas envolvidas: Atendimento e Ativação
+O que avalia: Acabamento, estética, estado geral da cenografia, montagem conforme previsto.
+Peso: 3
+
+4. Obrigações Estruturais
+Áreas envolvidas: Produtores de Cenografia ou liderança em campo, Sup. Ceno
+O que avalia: Estaiamento, aterramento, segurança estrutural, cumprimento de padrões técnicos.
+Peso: 3
+
+5. Logística Reversa
+Área envolvida: Logística
+O que avalia: Desmontagem, carregamento, retorno ao CD sem danos, organização da carga.
+Peso: 3
+
+6. Prazo de Entrega
+Área envolvida: Produção
+O que avalia: Cumprimento de cronograma, horários de montagem e desmontagem, alinhamento com o cliente/evento.
+Peso: 3
+
+7. Conduta e Comportamento
+Áreas envolvidas: Produtores locais e Departamento Pessoal
+O que avalia: Uso de EPI, uniforme, respeito a normas de segurança, postura profissional, respeito a horários e convivência.
+Peso: 3
+```
+
+Total dos pesos:
+
+```txt
+3 + 2 + 3 + 3 + 3 + 3 + 3 = 20
+```
+
+---
+
+# 5. Escala oficial de notas
+
+A escala oficial é de 1 a 5.
+
+Usar:
+
+```txt
+5 = Atendeu completamente, com excelência
+4 = Atendeu bem, com pequenas observações
+3 = Atendeu minimamente, com pontos claros de melhoria
+2 = Abaixo do esperado, vários problemas
+1 = Crítico, não atendeu ao básico
+```
+
+Ajustar validações para nota mínima 1 e máxima 5.
+
+Não permitir nota 0 na avaliação oficial.
+
+Se o sistema precisar representar ausência de nota, usar status `pendente`, e não nota 0.
+
+---
+
+# 6. Cálculo oficial do evento
+
+O cálculo continua sendo:
+
+```txt
+Total do critério = Nota usada x Peso
+Nota do evento/time = Soma dos totais dos critérios
+```
+
+Como a soma dos pesos é 20 e a nota máxima é 5:
+
+```txt
+20 x 5 = 100
+```
+
+Resultado do evento fica em escala de 20 a 100 quando todos os critérios estiverem preenchidos com nota mínima 1.
+
+Se algum critério estiver pendente, não fechar o evento normalmente.
+
+---
+
+# 7. Calibração
+
+A Diretoria/RH pode calibrar notas seguindo fluxo interno.
+
+A calibração deve ser feita no nível do critério do evento/time, não por colaborador individual.
+
+Exemplo:
+
+```txt
+Evento X
+Critério: Prazo de Entrega
+Nota original média: 3
+Nota calibrada: 4
+Motivo: Evidências complementares apresentadas pela liderança.
+```
+
+A nota calibrada substitui a nota original no cálculo do evento.
+
+Quando a nota do evento for recalculada, o novo resultado deve ser aplicado a todos os colaboradores participantes daquele evento.
+
+---
+
+# 8. Resultado trimestral individual
+
+Para cada colaborador elegível:
+
+```txt
+1. Listar todos os eventos em que ele participou no trimestre.
+2. Somar a pontuação dos eventos.
+3. Dividir pelo número de eventos do colaborador no trimestre.
+```
+
+Fórmula:
+
+```txt
+Média trimestral = Soma dos pontos dos eventos / Número de eventos do colaborador no trimestre
+```
+
+Depois aplicar penalidades, se houver:
+
+```txt
+Resultado final do trimestre = Média trimestral - descontos por faltas
+```
+
+O resultado final não pode ficar abaixo de 0 nem acima de 100.
+
+---
+
+# 9. Pelotões e bônus oficiais
+
+Usar as faixas oficiais:
+
+```txt
+Pelotão Quênia:
+Média trimestral >= 90
+Bônus: R$ 3.200
+Situação: Excelência excepcional
+
+Pelotão Azul:
+Média trimestral >= 80 e < 90
+Bônus: R$ 2.400
+Situação: Performance sólida
+
+Pelotão Verde:
+Média trimestral >= 70 e < 80
+Bônus: R$ 1.600
+Situação: Nível mínimo esperado
+
+Pelotão Branco:
+Média trimestral < 70
+Bônus: R$ 0
+Situação: Sem direito ao bônus
+```
+
+Não há pagamento parcial.
+
+Se o colaborador não atingir pelo menos 70, fica em Pelotão Branco e não recebe bônus no trimestre.
+
+---
+
+# 10. Faltas, advertências e disciplina
+
+Faltas não justificadas geram penalidade de pontos conforme regra operacional.
+
+Valor inicial:
+
+```txt
+1 falta não justificada = -50 pontos no trimestre
+```
+
+Esse valor deve continuar editável na tela de Regras.
+
+Advertências e questões disciplinares podem:
+
+```txt
+Reduzir a nota no critério Conduta e Comportamento
+ou
+Tornar o colaborador temporariamente inelegível ao programa no trimestre
+```
+
+Criar controle para inelegibilidade trimestral:
+
+```txt
+employee_quarter_eligibility
+```
+
+Campos sugeridos:
+
+```txt
+id
+employee_id
+year
+quarter
+eligible boolean
+reason
+created_by_user_id
+created_at
+updated_at
+```
+
+Se o colaborador estiver inelegível no trimestre, mostrar resultado calculado apenas para histórico, mas bônus deve ser R$ 0.
+
+---
+
+# 11. Feedback do evento
+
+Criar fluxo de feedback por evento.
+
+O feedback só pode ser liberado quando todas as etapas de avaliação daquele evento estiverem concluídas.
+
+O feedback deve conter:
+
+```txt
+Pontuação do time no evento
+Destaques positivos
+Pontos de atenção
+Situação da média acumulada do colaborador no trimestre, quando aplicável
+```
+
+O feedback é preferencialmente enviado por WhatsApp, mas no app deve existir uma tela ou seção para montar/copiar o texto do feedback.
+
+Criar botão:
+
+```txt
+Gerar feedback do evento
+```
+
+O texto gerado não deve expor nomes dos avaliadores.
+
+---
+
+# 12. Sigilo e transparência
+
+As áreas envolvidas na avaliação podem ser mostradas de forma genérica.
+
+Exemplo:
+
+```txt
+Logística
+Cenografia
+Atendimento
+Ativação
+Produção
+Produtores
+Departamento Pessoal
+```
+
+Mas os avaliadores individuais não devem ser divulgados para os colaboradores avaliados.
+
+O colaborador pode consultar:
+
+```txt
+Critérios
+Pesos
+Faixas de bonificação
+Resultado do evento
+Resultado trimestral
+Pelotão
+Bônus projetado ou final
+Feedback liberado
+```
+
+O colaborador não pode consultar:
+
+```txt
+Nome do avaliador
+E-mail do avaliador
+Usuário que lançou nota
+Usuário que calibrou nota
+Comentários internos
+Histórico interno de ajuste
+```
+
+---
+
+# 13. Pagamento e status do bônus
+
+Criar controle de status do bônus trimestral.
+
+Campos sugeridos:
+
+```txt
+bonus_status: projected | approved | scheduled | paid | blocked | not_eligible
+payment_method: Caju Saldo Livre
+payment_due_date
+paid_at
+payment_notes
+```
+
+Regra:
+
+```txt
+A bonificação é paga exclusivamente via Cartão Caju, modalidade Saldo Caju.
+O crédito ocorre em até 10 dias úteis após o fechamento do trimestre.
+O colaborador precisa estar ativo e elegível na data do crédito.
+```
+
+---
+
+# 14. Revisões do programa
+
+Criar regra de governança:
+
+Mudanças em valores de bônus, critérios, pesos e estrutura de pelotões devem:
+
+```txt
+Gerar log de auditoria
+Ter data de vigência futura
+Não afetar ciclos trimestrais já fechados
+```
+
+Adicionar campos se necessário:
+
+```txt
+effective_from_year
+effective_from_quarter
+applies_to_future_cycles_only boolean
+```
+
+---
+
+# 15. Ajustes na visualização
+
+Como a avaliação é por time, a tela “Avaliação do Evento” deve focar primeiro no evento/time, não no colaborador individual.
+
+Estrutura sugerida:
+
+## Cabeçalho
+
+```txt
+Evento
+Data
+Cidade/UF
+Cliente
+Status
+Trimestre
+Time de cenografia participante
+Nota do evento
+Pelotão projetado do evento
+Pendências
+```
+
+## Time participante
+
+Listar os colaboradores do time:
+
+```txt
+Nome
+Função
+Elegível
+Resultado recebido no evento
+Status no trimestre
+```
+
+Todos recebem a mesma nota do evento.
+
+## Critérios do evento
+
+Mostrar os 7 critérios em cards modernos:
+
+```txt
+Critério
+Área responsável
+O que avalia
+Peso
+Nota original
+Nota calibrada
+Nota usada
+Total do critério
+Comentários
+Status
+```
+
+## Resultado do evento
+
+Card destacado:
+
+```txt
+Nota do time no evento: 71/100
+Peso total: 20
+Critérios avaliados: 7 de 7
+Feedback: Liberado ou Pendente
+```
+
+---
+
+# 16. Tela “Meu Desempenho”
+
+Na visão do colaborador, deixar claro que a nota é do time do evento.
+
+Mostrar:
+
+```txt
+Evento
+Nota do time no evento
+Sua média acumulada no trimestre
+Pelotão atual
+Bônus projetado
+Faltas/penalidades, se houver
+Feedback liberado
+```
+
+Não mostrar nomes dos avaliadores.
+
+---
+
+# 17. Critérios de aceite dessa correção
+
+Este ajuste estará correto se:
+
+1. A avaliação for por time de evento, não individualizada por colaborador.
+2. Todos os participantes do mesmo evento receberem a mesma nota do evento.
+3. A nota for gravada individualmente por colaborador para cálculo trimestral.
+4. Os critérios oficiais estiverem corretos.
+5. Os pesos oficiais somarem 20.
+6. A escala oficial for de 1 a 5.
+7. O app não aceitar nota 0 em avaliação oficial.
+8. A calibração atuar no critério do evento/time.
+9. A nota calibrada recalcular o resultado para todos os participantes.
+10. O cálculo trimestral considerar os eventos de cada colaborador.
+11. Faltas e inelegibilidade impactarem o bônus.
+12. O colaborador não ver nomes dos avaliadores.
+13. As áreas responsáveis aparecerem apenas de forma genérica.
+14. O feedback só ser liberado após conclusão das avaliações.
+15. O bônus respeitar status de elegibilidade e pagamento via Caju.
+16. Alterações futuras de regras não afetarem trimestres fechados.
+17. O app continuar com visual moderno, claro e superior ao Excel.

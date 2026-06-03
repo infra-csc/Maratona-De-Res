@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Calendar, Users, BarChart3, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck,
-  Database, LogOut, ChevronDown, ChevronRight, Target, Menu, X
+  Database, LogOut, ChevronDown, ChevronRight, Target, Menu, X, TrendingUp
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -30,6 +30,7 @@ const navItems: NavItem[] = [
   { label: "Regras do Sistema", path: "/rules", icon: Settings, roles: ["admin"] },
   { label: "Integração", path: "/integration", icon: Database, roles: ["admin", "rh"] },
   { label: "Auditoria", path: "/audit", icon: ShieldCheck, roles: ["admin", "rh", "diretoria"] },
+  { label: "Meu Desempenho", path: "/meu-desempenho", icon: TrendingUp },
 ];
 
 export function Sidebar() {
