@@ -134,7 +134,7 @@ async function seed() {
 
   // Pelotões — escala 0-100 (Nota × Peso, max 5×20=100)
   await db.insert(platoonRulesTable).values([
-    { name: "Pelotão Quênia", color: "#dc2626", minScore: "90", maxScore: "101", minInclusive: true, maxInclusive: false, bonusValue: "3200.00", description: "Top performers — bônus máximo Caju", displayOrder: 1 },
+    { name: "Pelotão Quênia", color: "#dc2626", minScore: "90", maxScore: "100", minInclusive: true, maxInclusive: true, bonusValue: "3200.00", description: "Top performers — bônus máximo Caju", displayOrder: 1 },
     { name: "Pelotão Azul",   color: "#2563eb", minScore: "80", maxScore: "90",  minInclusive: true, maxInclusive: false, bonusValue: "2400.00", description: "Alta performance",   displayOrder: 2 },
     { name: "Pelotão Verde",  color: "#16a34a", minScore: "70", maxScore: "80",  minInclusive: true, maxInclusive: false, bonusValue: "1600.00", description: "Boa performance",    displayOrder: 3 },
     { name: "Pelotão Branco", color: "#64748b", minScore: "0",  maxScore: "70",  minInclusive: true, maxInclusive: false, bonusValue: "0.00",    description: "Precisa melhorar",  displayOrder: 4 },

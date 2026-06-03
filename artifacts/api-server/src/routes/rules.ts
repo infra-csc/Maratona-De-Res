@@ -37,6 +37,17 @@ type RangeRow = { id: number; minScore: number; maxScore: number; minInclusive: 
 
 function validatePlatoonRanges(ranges: RangeRow[]): string | null {
   const active = [...ranges].sort((a, b) => a.minScore - b.minScore);
+  if (active.length === 0) {
+    return "É necessário pelo menos um intervalo de pelotão.";
+  }
+  const first = active[0];
+  const last = active[active.length - 1];
+  if (first.minScore !== 0) {
+    return `Cobertura incompleta: o menor intervalo deve iniciar em 0 (atual: ${first.minScore}).`;
+  }
+  if (last.maxScore !== 100) {
+    return `Cobertura incompleta: o maior intervalo deve terminar em 100 (atual: ${last.maxScore}).`;
+  }
   for (let i = 0; i < active.length - 1; i++) {
     const curr = active[i];
     const next = active[i + 1];

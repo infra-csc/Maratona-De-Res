@@ -175,6 +175,28 @@ export default function DashboardPage() {
         </Card>
       )}
 
+      {summary?.atRiskEmployees && summary.atRiskEmployees.length > 0 && (
+        <Card className="border-destructive/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-destructive">
+              <AlertTriangle size={16} />
+              Colaboradores em Risco (abaixo de 50/100)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {summary.atRiskEmployees.map((emp, i) => (
+                <div key={emp.employeeId} data-testid={`row-at-risk-${emp.employeeId}`} className="flex items-center gap-3 py-1.5 px-2 rounded-md bg-destructive/5">
+                  <span className="text-sm font-bold text-muted-foreground w-6 text-right">{i + 1}.</span>
+                  <span className="flex-1 text-sm font-medium">{emp.employeeName}</span>
+                  <span className="text-sm font-bold text-destructive">{fmt(emp.currentScore ?? 0)}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0 && (
         <Card className="border-destructive/30">
           <CardHeader className="pb-2">

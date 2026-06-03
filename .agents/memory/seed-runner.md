@@ -4,8 +4,8 @@ description: How to run the Maratona api-server seed script, and the ordering co
 ---
 
 # Rule
-The api-server has no `tsx` in its devDependencies, so run the seed with the workspace-level tsx binary:
-`/home/runner/workspace/scripts/node_modules/.bin/tsx artifacts/api-server/src/seed.ts`
+The api-server has no `tsx` in its devDependencies, so run the seed with the workspace-level tsx binary (resolve it relative to the repo root rather than hardcoding an absolute path):
+`./scripts/node_modules/.bin/tsx artifacts/api-server/src/seed.ts` (run from the workspace root).
 
 The seed must wipe existing data in reverse foreign-key order BEFORE inserting, or FK constraints fail.
 

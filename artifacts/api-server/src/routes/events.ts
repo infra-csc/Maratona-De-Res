@@ -3,6 +3,7 @@ import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable,
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { convertScoreToPercentage, normalizeWeights } from "../lib/calculations.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -23,7 +24,12 @@ router.get("/events", async (req, res) => {
       .where(and(eq(evaluationsTable.eventId, ev.id), eq(evaluationsTable.status, "submitted")));
     const totalEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, ev.id));
     const progress = totalEvals.length > 0 ? submittedEvals.length / totalEvals.length : 0;
-    return { ...ev, participantCount: participants.length, evaluationProgress: progress, averageScore: null };
+    const scored = submittedEvals.filter(e => e.score != null);
+    const avgRaw = scored.length > 0
+      ? scored.reduce((s, e) => s + parseFloat(e.score as unknown as string), 0) / scored.length
+      : null;
+    const averageScore = avgRaw != null ? convertScoreToPercentage(avgRaw) : null;
+    return { ...ev, participantCount: participants.length, evaluationProgress: progress, averageScore };
   }));
   res.json(enriched);
 });
@@ -211,21 +217,14 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
 
   const activeIds = activeCriterionIds as number[];
   const activeRows = existing.filter(ec => activeIds.includes(ec.criterionId));
-  const rawTotal = activeRows.reduce((s, ec) => s + parseFloat(ec.originalWeight ?? "1"), 0);
 
   const TARGET_WEIGHT = 20;
   const redistributed = new Map<number, number>();
-  if (activeRows.length > 0 && rawTotal > 0) {
-    let assigned = 0;
+  if (activeRows.length > 0) {
+    const rawWeights = activeRows.map(ec => parseFloat(ec.originalWeight ?? "1"));
+    const normalized = normalizeWeights(rawWeights, TARGET_WEIGHT);
     activeRows.forEach((ec, idx) => {
-      const raw = parseFloat(ec.originalWeight ?? "1");
-      if (idx === activeRows.length - 1) {
-        redistributed.set(ec.id, Math.round((TARGET_WEIGHT - assigned) * 100) / 100);
-      } else {
-        const share = Math.round((raw / rawTotal) * TARGET_WEIGHT * 100) / 100;
-        redistributed.set(ec.id, share);
-        assigned += share;
-      }
+      redistributed.set(ec.id, normalized[idx]);
     });
   }
 
