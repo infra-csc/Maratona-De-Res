@@ -1,0 +1,290 @@
+# Ajuste de permissões, visibilidade e privacidade das avaliações
+
+Adicionar regras claras de acesso para garantir que cada perfil veja apenas o que deve ver.
+
+---
+
+## 1. Cada área só avalia seus próprios quesitos
+
+Cada quesito possui uma área responsável.
+
+Exemplo:
+
+```txt
+Perda de material/estrutura = área responsável X
+Ferramentas & case = área responsável X
+Qualidade da entrega = área responsável Y
+Logística reversa = área responsável Z
+Prazo da entrega = área responsável Z
+Conduta e comportamento = área responsável RH/Operações
+```
+
+O usuário com perfil **Avaliador** só pode visualizar e avaliar os quesitos vinculados à sua própria área.
+
+Regras:
+
+* Avaliador da área Produção só vê quesitos da área Produção.
+* Avaliador da área Operações só vê quesitos da área Operações.
+* Avaliador da área Atendimento só vê quesitos da área Atendimento.
+* Avaliador não pode ver, editar ou consultar notas de quesitos de outras áreas.
+* Avaliador não pode ver calibração da Diretoria.
+* Avaliador não pode ver ranking geral de bônus, exceto se também tiver perfil autorizado.
+
+Essa regra deve ser aplicada tanto no front-end quanto no back-end.
+
+Não basta esconder no front-end. As APIs também precisam validar a permissão.
+
+---
+
+## 2. Privacidade dos avaliadores
+
+O colaborador avaliado não deve ver o nome de quem fez a avaliação.
+
+Quando o colaborador visualizar seus resultados, ele poderá ver:
+
+* Evento
+* Quesito
+* O que é analisado
+* Nota final do quesito
+* Comentário, se liberado pela regra do RH/Diretoria
+* Resultado do evento
+* Resultado mensal
+* Resultado trimestral
+* Resultado anual
+* Pelotão atual
+* Projeção de bônus
+* Status das avaliações
+
+Mas ele **não pode ver**:
+
+* Nome do avaliador
+* E-mail do avaliador
+* Área específica que deu determinada nota, se isso permitir identificar a pessoa
+* Histórico interno de calibração da Diretoria
+* Comentários internos marcados como privados
+
+---
+
+## 3. Visão do colaborador avaliado
+
+Criar uma visão chamada:
+
+```txt
+Meu Desempenho
+```
+
+Essa tela será usada pela pessoa avaliada, ou seja, o colaborador que participou dos eventos.
+
+Ela deve mostrar o andamento da avaliação sem expor quem avaliou.
+
+A tela deve ter filtros:
+
+* Ano
+* Trimestre
+* Mês
+* Evento
+
+Como o bônus é calculado por trimestre, o filtro principal deve ser:
+
+```txt
+Ano + Trimestre
+```
+
+Mas o colaborador também pode consultar mês e evento para acompanhar sua evolução.
+
+---
+
+## 4. Tela “Meu Desempenho”
+
+A tela deve mostrar:
+
+## Resumo do trimestre
+
+Cards:
+
+```txt
+Resultado parcial do trimestre
+Pelotão atual
+Bônus projetado
+Eventos avaliados
+Eventos pendentes
+Faltas registradas
+Desconto por faltas
+```
+
+Exemplo:
+
+```txt
+Resultado trimestral atual: 82/100
+Pelotão atual: Azul
+Bônus projetado: R$ 2.400
+Eventos avaliados: 4
+Faltas: 0
+```
+
+---
+
+## Histórico por evento
+
+Tabela ou cards:
+
+```txt
+Evento | Data | Resultado | Status | Pelotão projetado
+```
+
+Exemplo:
+
+```txt
+ECO RUN - MOSSORÓ | 17/05/2026 | 71/100 | Fechado | Verde
+Evento X | 25/05/2026 | 88/100 | Fechado | Azul
+Evento Y | 10/06/2026 | Pendente | Em avaliação | -
+```
+
+---
+
+## Detalhe das avaliações
+
+Ao clicar em um evento, o colaborador pode ver os quesitos avaliados.
+
+Mostrar:
+
+```txt
+Quesito
+O que é analisado
+Nota final usada
+Total do quesito
+Comentário liberado
+Status
+```
+
+Não mostrar:
+
+```txt
+Nome do avaliador
+E-mail do avaliador
+Usuário que lançou a nota
+Usuário que calibrou a nota
+```
+
+---
+
+## 5. Status de andamento
+
+Criar indicadores para o colaborador acompanhar o andamento.
+
+Status possíveis:
+
+```txt
+Pendente de avaliação
+Em avaliação
+Aguardando calibração
+Calibrado
+Fechado
+Computado no trimestre
+```
+
+Esses status devem aparecer de forma visual com badges.
+
+---
+
+## 6. Visão mensal, trimestral e anual
+
+O app deve permitir consultar desempenho em três níveis:
+
+## Mensal
+
+Mostra eventos e resultados dentro do mês selecionado.
+
+Objetivo: acompanhamento operacional.
+
+## Trimestral
+
+Mostra o resultado oficial usado para cálculo do bônus.
+
+Objetivo: apuração do bônus Caju.
+
+## Anual
+
+Mostra evolução histórica do colaborador ao longo do ano.
+
+Objetivo: análise de performance e evolução.
+
+Importante:
+
+```txt
+O bônus sempre é calculado pelo resultado trimestral.
+```
+
+---
+
+## 7. Regra de bônus na visão do colaborador
+
+Na tela “Meu Desempenho”, mostrar o bônus como projeção enquanto o trimestre estiver aberto.
+
+Exemplo:
+
+```txt
+Bônus projetado: R$ 2.400
+Pelotão atual: Azul
+Status: Parcial, trimestre ainda aberto
+```
+
+Quando o trimestre for fechado, mostrar:
+
+```txt
+Bônus final: R$ 2.400
+Pelotão final: Azul
+Status: Trimestre fechado
+```
+
+---
+
+## 8. Controle de comentários
+
+Adicionar regra para comentários:
+
+* Comentário interno: visível apenas para avaliadores autorizados, RH, Diretoria e Admin.
+* Comentário público/liberado: pode ser visto pelo colaborador avaliado.
+* Comentário de calibração: visível apenas para Diretoria, RH e Admin.
+
+Adicionar no banco, se necessário, um campo:
+
+```txt
+comment_visibility: internal | public
+```
+
+Por padrão, comentários devem ser internos.
+
+RH/Admin podem liberar comentários para visualização do colaborador, se desejarem.
+
+---
+
+## 9. Segurança nas APIs
+
+Garantir as seguintes regras no back-end:
+
+* Avaliador só consulta avaliações da sua área.
+* Avaliador só cria/edita notas dos quesitos da sua área.
+* Colaborador avaliado só consulta seus próprios resultados.
+* Colaborador avaliado não recebe dados de identificação dos avaliadores.
+* Diretoria, RH e Admin podem consultar visão completa.
+* Visualizador pode ver dashboards consolidados, mas sem dados sensíveis de autoria das avaliações.
+
+---
+
+## 10. Critérios de aceite desse ajuste
+
+Este ajuste estará correto se:
+
+1. Cada área só visualizar seus próprios quesitos.
+2. Avaliador não conseguir avaliar quesitos de outra área.
+3. A regra funcionar no front-end e no back-end.
+4. O colaborador avaliado tiver uma tela “Meu Desempenho”.
+5. O colaborador conseguir acompanhar resultado por mês, trimestre, ano e evento.
+6. O trimestre for o principal período para cálculo do bônus.
+7. O colaborador não conseguir ver o nome de quem avaliou.
+8. O colaborador não conseguir ver o usuário que calibrou a nota.
+9. Comentários internos não aparecerem para o colaborador.
+10. Dashboard e ranking respeitarem permissões por perfil.
+11. RH, Diretoria e Admin continuarem com visão completa.
+12. A experiência continuar moderna, visual e profissional.

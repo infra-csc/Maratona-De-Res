@@ -1,0 +1,1 @@
+- [Maratona app architecture](maratona-architecture.md) — full-stack PT-BR perf management app; api at /api (port 8080), frontend at / (port 23916); vite proxies /api → localhost:8080

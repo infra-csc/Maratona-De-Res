@@ -1,0 +1,29 @@
+import { pgTable, serial, text, boolean, integer, numeric } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+import { areasTable } from "./areas";
+import { eventsTable } from "./events";
+
+export const criteriaTable = pgTable("criteria", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  responsibleAreaId: integer("responsible_area_id").references(() => areasTable.id),
+  defaultWeight: numeric("default_weight", { precision: 5, scale: 2 }).notNull().default("1"),
+  active: boolean("active").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(0),
+});
+
+export const eventCriteriaTable = pgTable("event_criteria", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
+  criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
+  active: boolean("active").notNull().default(true),
+  weightOverride: numeric("weight_override", { precision: 5, scale: 2 }),
+});
+
+export const insertCriterionSchema = createInsertSchema(criteriaTable).omit({ id: true });
+export const insertEventCriterionSchema = createInsertSchema(eventCriteriaTable).omit({ id: true });
+export type InsertCriterion = z.infer<typeof insertCriterionSchema>;
+export type Criterion = typeof criteriaTable.$inferSelect;
+export type EventCriterion = typeof eventCriteriaTable.$inferSelect;

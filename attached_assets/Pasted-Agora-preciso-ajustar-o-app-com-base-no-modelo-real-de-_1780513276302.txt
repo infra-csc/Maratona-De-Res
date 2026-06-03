@@ -1,0 +1,625 @@
+Agora preciso ajustar o app com base no modelo real de avaliação que usamos hoje.
+
+Importante: **a planilha enviada é apenas uma referência de regra de negócio, quesitos, pesos, notas, comentários e cálculo. Não quero que o app copie o visual da planilha.**
+
+O app deve manter a lógica da planilha, mas transformar isso em uma experiência web moderna, visual, profissional e muito melhor que Excel.
+
+Não recomece o projeto do zero. Continue a partir do app **Maratona de Resultados – Cenográfica** já criado.
+
+---
+
+# 1. O que a planilha representa
+
+A planilha mostra como a avaliação é feita hoje.
+
+Ela possui:
+
+* Nome do evento
+* Colaboradores avaliados
+* Resultado por colaborador
+* Quesitos
+* Campo “O que é analisado”
+* Peso
+* Nota final
+* Total
+* Comentários das notas
+
+Use isso como referência funcional, não como referência visual.
+
+O app não precisa parecer uma planilha.
+
+---
+
+# 2. Quesitos fixos da avaliação
+
+Os quesitos da avaliação são fixos para os eventos.
+
+Criar estes 7 quesitos como base principal do sistema:
+
+```txt
+Perda de material/estrutura
+Ferramentas & case
+Qualidade da entrega
+Qualidade técnica da montagem
+Logística reversa
+Prazo da entrega
+Conduta e comportamento
+```
+
+Na planilha existe um item chamado **Qualidade da entrega1**. No app, esse item deve ser tratado como:
+
+```txt
+Qualidade técnica da montagem
+```
+
+Isso evita nome duplicado e deixa o processo mais claro.
+
+---
+
+# 3. Campo “O que é analisado”
+
+O campo **“O que é analisado”** também deve ser fixo para cada quesito.
+
+Criar as descrições abaixo:
+
+```txt
+Perda de material/estrutura:
+Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.
+
+Ferramentas & case:
+Todas as ferramentas e cases devem retornar à base corretamente.
+
+Qualidade da entrega:
+Avalia acabamento, materiais em bom estado e qualidade visual da entrega.
+
+Qualidade técnica da montagem:
+Avalia se a montagem foi executada corretamente, se houve problemas estruturais, necessidade de ajustes em arena ou falhas que impactaram a entrega.
+
+Logística reversa:
+Avalia se a carga foi feita adequadamente e conforme o alinhamento combinado.
+
+Prazo da entrega:
+Avalia se as entregas ocorreram dentro do cronograma, sem atrasos e sem custos adicionais de mão de obra.
+
+Conduta e comportamento:
+Avalia uso de uniforme, EPI, envio de comprovações e fotos, horários na arena, comportamento profissional e cuidado com ferramentas.
+```
+
+Essas descrições devem aparecer para orientar o avaliador no momento da avaliação.
+
+---
+
+# 4. Pesos fixos iniciais
+
+Usar os pesos atuais da planilha:
+
+```txt
+Perda de material/estrutura = 3
+Ferramentas & case = 3
+Qualidade da entrega = 2
+Qualidade técnica da montagem = 3
+Logística reversa = 3
+Prazo da entrega = 3
+Conduta e comportamento = 3
+
+Total = 20
+```
+
+Por padrão, todos os eventos devem usar os 7 quesitos.
+
+Mesmo assim, manter a estrutura técnica preparada para desativar algum quesito em um evento específico no futuro.
+
+Caso algum quesito seja desativado em um evento, o app deve redistribuir proporcionalmente os pesos dos quesitos ativos para continuar fechando em 20.
+
+---
+
+# 5. Regra de cálculo correta
+
+A regra atual é:
+
+```txt
+Total do quesito = Nota usada x Peso
+Resultado do evento = Soma dos totais dos quesitos
+```
+
+Como a soma dos pesos é 20 e a nota máxima é 5:
+
+```txt
+20 x 5 = 100 pontos
+```
+
+Portanto, o resultado do evento já fica naturalmente em uma escala de 0 a 100.
+
+Não dividir novamente por 20 se o cálculo já estiver usando:
+
+```txt
+nota x peso
+```
+
+---
+
+# 6. Nota usada no cálculo
+
+Para cada colaborador, evento e quesito:
+
+```txt
+Se existir nota calibrada pela Diretoria:
+usar nota calibrada.
+
+Se não existir nota calibrada:
+usar a nota original/média dos avaliadores.
+```
+
+Nomenclatura oficial do app:
+
+```txt
+Nota Original = média das notas dos avaliadores
+Nota Calibrada = nota ajustada pela Diretoria
+Nota Usada = nota que entra no cálculo
+Total do Quesito = Nota Usada x Peso
+Resultado do Evento = soma dos totais dos quesitos
+Resultado Trimestral = média dos eventos - desconto por faltas
+```
+
+---
+
+# 7. Exemplo obrigatório para validar o cálculo
+
+Criar um teste ou validação no código com este exemplo:
+
+```txt
+Pesos = [3, 3, 2, 3, 3, 3, 3]
+Notas = [4, 4, 4, 3, 2, 3, 5]
+```
+
+Cálculo esperado:
+
+```txt
+3 x 4 = 12
+3 x 4 = 12
+2 x 4 = 8
+3 x 3 = 9
+3 x 2 = 6
+3 x 3 = 9
+3 x 5 = 15
+
+Resultado = 71
+```
+
+O app precisa retornar exatamente:
+
+```txt
+71
+```
+
+Se retornar diferente de 71, o cálculo está errado.
+
+---
+
+# 8. Nova tela: Avaliação do Evento
+
+Criar ou ajustar uma tela chamada:
+
+```txt
+Avaliação do Evento
+```
+
+Essa tela deve substituir a lógica da planilha, mas com visual moderno.
+
+Não criar uma tabela crua parecida com Excel.
+
+Criar uma experiência web premium, com cards, indicadores, badges, totalizadores e visual limpo.
+
+---
+
+# 9. Cabeçalho da tela
+
+No topo da tela, exibir um card grande com:
+
+* Nome do evento
+* Data do evento
+* Cidade/UF
+* Cliente
+* Status
+* Trimestre
+* Quantidade de colaboradores
+* Média do evento
+* Avaliações pendentes
+* Peso total dos quesitos
+
+Exemplo:
+
+```txt
+ECO RUN - MOSSORÓ
+Data: 17/05/2026
+Peso total: 20
+Média do evento: 71
+Status: Em avaliação
+```
+
+---
+
+# 10. Lista de colaboradores do evento
+
+Mostrar os colaboradores participantes do evento em cards ou tabela moderna.
+
+Campos:
+
+```txt
+Colaborador
+Função
+Resultado do Evento
+Status da Avaliação
+Pelotão Projetado
+```
+
+Ao clicar em um colaborador, abrir a avaliação detalhada dele.
+
+Exemplo:
+
+```txt
+Gabriel Menezes | Cenográfica | 71/100 | Avaliado | Verde
+Abraim Silva | Cenográfica | 71/100 | Avaliado | Verde
+Erick Ramos | Cenográfica | 71/100 | Avaliado | Verde
+```
+
+---
+
+# 11. Avaliação detalhada do colaborador
+
+Ao selecionar um colaborador, mostrar os 7 quesitos fixos.
+
+A visualização pode ser em cards ou em uma tabela premium, mas não deve parecer Excel.
+
+Cada quesito deve mostrar:
+
+* Nome do quesito
+* O que é analisado
+* Peso
+* Nota original
+* Nota calibrada, se houver
+* Nota usada no cálculo
+* Total do quesito
+* Comentários
+* Status
+
+Exemplo de card:
+
+```txt
+Perda de material/estrutura
+
+Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.
+
+Peso: 3
+Nota usada: 4
+Total: 12 pontos
+Comentário: Não demos falta - a verificar depois
+Status: Avaliado
+```
+
+O campo **Total** deve ser destacado visualmente.
+
+---
+
+# 12. Card de resultado final do colaborador no evento
+
+Na avaliação detalhada, mostrar um card de resultado final com:
+
+```txt
+Resultado do evento: 71/100
+Pelotão projetado: Verde
+Peso total avaliado: 20
+Quesitos avaliados: 7 de 7
+Pendências: 0
+```
+
+Esse card deve atualizar automaticamente conforme as notas forem preenchidas ou calibradas.
+
+---
+
+# 13. Experiência do avaliador
+
+O avaliador não deve preencher uma planilha.
+
+Criar uma experiência guiada:
+
+1. Seleciona o evento.
+2. Visualiza os colaboradores pendentes.
+3. Seleciona um colaborador.
+4. O app mostra os 7 quesitos fixos.
+5. Para cada quesito, o avaliador informa nota de 0 a 5.
+6. O avaliador preenche comentário.
+7. Comentário obrigatório quando nota for menor que 3.
+8. O app calcula automaticamente o total de cada quesito.
+9. O app mostra o resultado parcial em tempo real.
+10. O avaliador pode salvar rascunho.
+11. O avaliador pode enviar avaliação final.
+
+Após envio, bloquear edição para perfil Avaliador.
+
+Admin pode reabrir avaliação.
+
+---
+
+# 14. Experiência da Diretoria
+
+A Diretoria deve ter uma tela de calibração visual.
+
+Ela deve conseguir ver:
+
+* Colaborador
+* Evento
+* Quesito
+* O que é analisado
+* Nota original
+* Comentários dos avaliadores
+* Nota calibrada
+* Diferença entre nota original e calibrada
+* Motivo da calibração
+* Resultado recalculado
+
+Se a Diretoria alterar a nota, o app deve recalcular automaticamente:
+
+* Total do quesito
+* Resultado do evento
+* Resultado trimestral
+* Pelotão
+* Bônus
+
+Motivo deve ser obrigatório quando a nota calibrada for diferente da nota original.
+
+---
+
+# 15. Comentários
+
+Os comentários são importantes no processo atual.
+
+O app deve permitir:
+
+* Comentário por quesito
+* Comentário obrigatório para nota menor que 3
+* Visualização de comentários dos avaliadores
+* Comentário da Diretoria na calibração
+* Histórico de comentários
+* Botão “ver mais” para comentários longos
+
+---
+
+# 16. Resultado trimestral
+
+O resultado trimestral continua sendo:
+
+```txt
+Resultado trimestral = média dos resultados dos eventos do trimestre - desconto por faltas
+```
+
+Cada falta desconta o valor configurado na tela de Regras.
+
+Valor inicial:
+
+```txt
+1 falta = -50 pontos
+```
+
+O resultado final nunca pode ficar abaixo de 0 nem acima de 100.
+
+```txt
+resultado_final = min(100, max(0, resultado_final))
+```
+
+---
+
+# 17. Pelotões e bônus
+
+Usar a classificação abaixo:
+
+```txt
+Pelotão Quênia:
+resultado >= 90
+bônus Caju = R$ 3.200
+
+Pelotão Azul:
+resultado >= 80 e resultado < 90
+bônus Caju = R$ 2.400
+
+Pelotão Verde:
+resultado >= 70 e resultado < 80
+bônus Caju = R$ 1.600
+
+Pelotão Branco:
+resultado < 70
+sem bônus
+```
+
+Essas regras devem continuar editáveis por Admin/RH na tela de Regras.
+
+Não permitir lacunas entre as faixas.
+
+---
+
+# 18. Dashboard e Ranking
+
+O dashboard e o ranking devem usar o cálculo real:
+
+```txt
+Resultado do evento = soma(nota usada x peso)
+```
+
+No ranking, mostrar:
+
+* Posição
+* Colaborador
+* Média dos eventos
+* Faltas
+* Resultado final
+* Pelotão
+* Bônus Caju
+* Quantidade de eventos avaliados
+
+A tela de ranking deve continuar sendo uma tela especial da **Maratona de Resultados**, com:
+
+* Pódio dos 3 melhores
+* Cards por pelotão
+* Lista completa ranqueada
+* Medalhas ou ícones
+* Destaque visual do bônus
+* Filtros por ano e trimestre
+
+---
+
+# 19. Importação baseada no modelo atual
+
+Preparar uma importação manual por CSV baseada no modelo da planilha atual.
+
+CSV sugerido:
+
+```txt
+event_name
+event_date
+employee_name
+criterion_name
+criterion_description
+weight
+score
+comments
+```
+
+Exemplo:
+
+```txt
+ECO RUN - MOSSORÓ,2026-05-17,Gabriel Menezes,Perda de material/estrutura,Todo material enviado retornando à base sem perda,3,4,Não demos falta - a verificar depois
+ECO RUN - MOSSORÓ,2026-05-17,Gabriel Menezes,Ferramentas & case,Todas ferramentas retornando à base,3,4,Não demos falta de nada em Belém
+```
+
+A importação deve permitir criar:
+
+* Evento
+* Colaboradores
+* Quesitos
+* Pesos
+* Notas
+* Comentários
+
+E calcular o resultado automaticamente.
+
+---
+
+# 20. Seed com exemplo real
+
+Adicionar um seed com o exemplo abaixo:
+
+Evento:
+
+```txt
+ECO RUN - MOSSORÓ
+Data: 17/05/2026
+Cidade: Mossoró
+UF: RN
+Trimestre: 2
+```
+
+Colaboradores:
+
+```txt
+Gabriel Menezes
+Abraim Silva
+Erick Ramos
+```
+
+Notas exemplo:
+
+```txt
+Perda de material/estrutura | Peso 3 | Nota 4 | Total 12
+Ferramentas & case | Peso 3 | Nota 4 | Total 12
+Qualidade da entrega | Peso 2 | Nota 4 | Total 8
+Qualidade técnica da montagem | Peso 3 | Nota 3 | Total 9
+Logística reversa | Peso 3 | Nota 2 | Total 6
+Prazo da entrega | Peso 3 | Nota 3 | Total 9
+Conduta e comportamento | Peso 3 | Nota 5 | Total 15
+```
+
+Resultado esperado:
+
+```txt
+71
+```
+
+Usar esse seed para validar que o cálculo do app está correto.
+
+---
+
+# 21. Ajustes de design
+
+A tela de avaliação precisa ser melhor que Excel.
+
+Usar:
+
+* Cards bem organizados
+* Badges coloridos
+* Indicadores de pendência
+* Total do quesito destacado
+* Resultado final em card grande
+* Comentários com boa leitura
+* Filtros limpos
+* Layout responsivo
+* Visual premium
+* Microinterações
+* Toasts de sucesso/erro
+* Loading states
+* Empty states
+
+Status visuais:
+
+```txt
+Pendente = amarelo
+Rascunho = cinza
+Enviado = azul
+Calibrado = roxo
+Fechado = verde
+```
+
+Pelotões:
+
+```txt
+Quênia = dourado/preto
+Azul = azul forte
+Verde = verde
+Branco = branco/cinza
+```
+
+---
+
+# 22. Critérios de aceite deste ajuste
+
+Este ajuste estará correto se:
+
+1. O app não copiar o visual da planilha.
+2. A planilha for usada apenas como referência de regra.
+3. Os 7 quesitos forem fixos.
+4. O campo “O que é analisado” for fixo para cada quesito.
+5. Os pesos iniciais forem iguais ao modelo atual.
+6. O cálculo for `nota usada x peso`.
+7. O resultado do evento for a soma dos totais dos quesitos.
+8. O exemplo da planilha retornar exatamente 71.
+9. A tela de avaliação for moderna, visual e profissional.
+10. O avaliador conseguir preencher notas e comentários facilmente.
+11. Comentário for obrigatório para nota menor que 3.
+12. A Diretoria conseguir calibrar notas.
+13. A nota calibrada substituir a nota original.
+14. Dashboard, ranking e trimestre usarem esse cálculo.
+15. O resultado trimestral descontar faltas.
+16. Os pelotões e bônus continuarem funcionando.
+17. Todos os dados estiverem conectados ao banco.
+18. Nenhum botão principal ficar sem função.
+
+---
+
+# 23. Muito importante
+
+Não transformar a tela em uma cópia de Excel.
+
+A experiência deve ser melhor do que a planilha atual.
+
+A planilha serve para mostrar o processo atual, mas o app precisa entregar uma visualização mais clara, mais bonita, mais rápida e mais confiável.
+
+O objetivo é substituir o Excel por um sistema web profissional para a **Maratona de Resultados – Cenográfica**.

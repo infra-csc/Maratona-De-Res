@@ -1,22 +1,37 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Maratona de Resultados API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: users
+  - name: areas
+  - name: employees
+  - name: events
+  - name: criteria
+  - name: evaluations
+  - name: calibrations
+  - name: absences
+  - name: rules
+  - name: platoon-rules
+  - name: dashboard
+  - name: results
+  - name: ranking
+  - name: audit
+  - name: integration
+  - name: exports
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +39,1353 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: OK
+
+  /users:
+    get:
+      operationId: getUsers
+      tags: [users]
+      summary: List users
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /users/{id}/reset-password:
+    post:
+      operationId: resetUserPassword
+      tags: [users]
+      summary: Reset user password
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: OK
+
+  /areas:
+    get:
+      operationId: getAreas
+      tags: [areas]
+      summary: List areas
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Area"
+    post:
+      operationId: createArea
+      tags: [areas]
+      summary: Create area
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AreaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Area"
+
+  /areas/{id}:
+    patch:
+      operationId: updateArea
+      tags: [areas]
+      summary: Update area
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AreaUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Area"
+
+  /employees:
+    get:
+      operationId: getEmployees
+      tags: [employees]
+      summary: List employees
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Employee"
+    post:
+      operationId: createEmployee
+      tags: [employees]
+      summary: Create employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmployeeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+
+  /employees/{id}:
+    get:
+      operationId: getEmployee
+      tags: [employees]
+      summary: Get employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+    patch:
+      operationId: updateEmployee
+      tags: [employees]
+      summary: Update employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmployeeUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+
+  /employees/{id}/history:
+    get:
+      operationId: getEmployeeHistory
+      tags: [employees]
+      summary: Get employee quarterly history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuarterlyResult"
+
+  /events:
+    get:
+      operationId: getEvents
+      tags: [events]
+      summary: List events
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+    patch:
+      operationId: updateEvent
+      tags: [events]
+      summary: Update event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /events/{id}/close:
+    post:
+      operationId: closeEvent
+      tags: [events]
+      summary: Close event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForceCloseInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{id}/reopen:
+    post:
+      operationId: reopenEvent
+      tags: [events]
+      summary: Reopen event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{id}/result:
+    get:
+      operationId: getEventResult
+      tags: [results]
+      summary: Get event results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeEventResult"
+
+  /events/{id}/participants:
+    get:
+      operationId: getEventParticipants
+      tags: [events]
+      summary: List event participants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventParticipant"
+    post:
+      operationId: addEventParticipant
+      tags: [events]
+      summary: Add participant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventParticipantInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventParticipant"
+
+  /events/{id}/participants/{participantId}:
+    delete:
+      operationId: removeEventParticipant
+      tags: [events]
+      summary: Remove participant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: participantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /events/{id}/criteria:
+    get:
+      operationId: getEventCriteria
+      tags: [events]
+      summary: Get event criteria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventCriterion"
+    put:
+      operationId: updateEventCriteria
+      tags: [events]
+      summary: Update event active criteria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCriteriaUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventCriterion"
+
+  /criteria:
+    get:
+      operationId: getCriteria
+      tags: [criteria]
+      summary: List criteria
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Criterion"
+    post:
+      operationId: createCriterion
+      tags: [criteria]
+      summary: Create criterion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CriterionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Criterion"
+
+  /criteria/{id}:
+    patch:
+      operationId: updateCriterion
+      tags: [criteria]
+      summary: Update criterion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CriterionUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Criterion"
+
+  /evaluations:
+    get:
+      operationId: getEvaluations
+      tags: [evaluations]
+      summary: List evaluations
+      parameters:
+        - name: eventId
+          in: query
+          schema:
+            type: integer
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Evaluation"
+    post:
+      operationId: createEvaluation
+      tags: [evaluations]
+      summary: Create or upsert evaluation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+
+  /evaluations/{id}:
+    patch:
+      operationId: updateEvaluation
+      tags: [evaluations]
+      summary: Update evaluation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluationUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+
+  /evaluations/{id}/submit:
+    post:
+      operationId: submitEvaluation
+      tags: [evaluations]
+      summary: Submit evaluation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+
+  /evaluations/{id}/reopen:
+    post:
+      operationId: reopenEvaluation
+      tags: [evaluations]
+      summary: Reopen evaluation (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+
+  /calibrations:
+    get:
+      operationId: getCalibrations
+      tags: [calibrations]
+      summary: List calibrations
+      parameters:
+        - name: eventId
+          in: query
+          schema:
+            type: integer
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Calibration"
+    post:
+      operationId: createCalibration
+      tags: [calibrations]
+      summary: Create or upsert calibration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalibrationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Calibration"
+
+  /absences:
+    get:
+      operationId: getAbsences
+      tags: [absences]
+      summary: List absences
+      parameters:
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Absence"
+    post:
+      operationId: createAbsence
+      tags: [absences]
+      summary: Register absence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbsenceInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Absence"
+
+  /absences/{id}:
+    delete:
+      operationId: deleteAbsence
+      tags: [absences]
+      summary: Delete absence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /rules:
+    get:
+      operationId: getRules
+      tags: [rules]
+      summary: Get system rules
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rule"
+
+  /rules/{key}:
+    patch:
+      operationId: updateRule
+      tags: [rules]
+      summary: Update rule
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+
+  /platoon-rules:
+    get:
+      operationId: getPlatoonRules
+      tags: [platoon-rules]
+      summary: List platoon rules
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlatoonRule"
+    post:
+      operationId: createPlatoonRule
+      tags: [platoon-rules]
+      summary: Create platoon rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlatoonRuleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatoonRule"
+
+  /platoon-rules/{id}:
+    patch:
+      operationId: updatePlatoonRule
+      tags: [platoon-rules]
+      summary: Update platoon rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlatoonRuleUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatoonRule"
+    delete:
+      operationId: deletePlatoonRule
+      tags: [platoon-rules]
+      summary: Delete platoon rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/platoon-distribution:
+    get:
+      operationId: getDashboardPlatoonDistribution
+      tags: [dashboard]
+      summary: Get platoon distribution
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlatoonDistribution"
+
+  /dashboard/top-employees:
+    get:
+      operationId: getDashboardTopEmployees
+      tags: [dashboard]
+      summary: Get top 10 employees
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuarterlyResult"
+
+  /dashboard/quarterly-evolution:
+    get:
+      operationId: getDashboardQuarterlyEvolution
+      tags: [dashboard]
+      summary: Get quarterly evolution chart data
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuarterlyEvolution"
+
+  /results/quarterly:
+    get:
+      operationId: getQuarterlyResults
+      tags: [results]
+      summary: Get quarterly results
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+        - name: platoon
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuarterlyResult"
+
+  /results/quarterly/close:
+    post:
+      operationId: closeQuarter
+      tags: [results]
+      summary: Close a quarter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseQuarterInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuarterCloseResult"
+
+  /ranking:
+    get:
+      operationId: getRanking
+      tags: [ranking]
+      summary: Get ranking (Maratona de Resultados)
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RankingEntry"
+
+  /audit-logs:
+    get:
+      operationId: getAuditLogs
+      tags: [audit]
+      summary: Get audit logs
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: entity
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogPage"
+
+  /integration/status:
+    get:
+      operationId: getIntegrationStatus
+      tags: [integration]
+      summary: Get integration status
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationStatus"
+
+  /integration/sync:
+    post:
+      operationId: triggerSync
+      tags: [integration]
+      summary: Trigger external sync
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
+  /integration/import/events:
+    post:
+      operationId: importEventsCSV
+      tags: [integration]
+      summary: Import events from CSV
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CsvImportInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /integration/import/employees:
+    post:
+      operationId: importEmployeesCSV
+      tags: [integration]
+      summary: Import employees from CSV
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CsvImportInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /integration/import/participants:
+    post:
+      operationId: importParticipantsCSV
+      tags: [integration]
+      summary: Import participants from CSV
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CsvImportInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /exports/event-results:
+    get:
+      operationId: exportEventResults
+      tags: [exports]
+      summary: Export event results CSV
+      parameters:
+        - name: eventId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsvExport"
+
+  /exports/quarterly-results:
+    get:
+      operationId: exportQuarterlyResults
+      tags: [exports]
+      summary: Export quarterly results CSV
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsvExport"
+
+  /exports/ranking:
+    get:
+      operationId: exportRanking
+      tags: [exports]
+      summary: Export ranking CSV
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsvExport"
+
+  /exports/caju-bonuses:
+    get:
+      operationId: exportCajuBonuses
+      tags: [exports]
+      summary: Export Caju bonus report CSV
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsvExport"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +1396,1015 @@ components:
       required:
         - status
 
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required: [id, name, email, role, active]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        areaId:
+          type: ["integer", "null"]
+        areaName:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+
+    UserInput:
+      type: object
+      required: [name, email, role, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        areaId:
+          type: ["integer", "null"]
+        password:
+          type: string
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        areaId:
+          type: ["integer", "null"]
+        active:
+          type: boolean
+
+    ResetPasswordInput:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+
+    Area:
+      type: object
+      required: [id, name, active]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        active:
+          type: boolean
+
+    AreaInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    AreaUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        active:
+          type: boolean
+
+    Employee:
+      type: object
+      required: [id, name, department, functionName, active]
+      properties:
+        id:
+          type: integer
+        externalId:
+          type: ["string", "null"]
+        name:
+          type: string
+        document:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        department:
+          type: string
+        functionName:
+          type: string
+        active:
+          type: boolean
+        sourceType:
+          type: string
+        createdAt:
+          type: string
+
+    EmployeeInput:
+      type: object
+      required: [name, department, functionName]
+      properties:
+        name:
+          type: string
+        document:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        department:
+          type: string
+        functionName:
+          type: string
+
+    EmployeeUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        document:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        department:
+          type: string
+        functionName:
+          type: string
+        active:
+          type: boolean
+
+    Event:
+      type: object
+      required: [id, name, startDate, endDate, year, quarter, status]
+      properties:
+        id:
+          type: integer
+        externalId:
+          type: ["string", "null"]
+        name:
+          type: string
+        clientName:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        year:
+          type: integer
+        quarter:
+          type: integer
+        status:
+          type: string
+        eventWeight:
+          type: number
+        forcedClosed:
+          type: boolean
+        participantCount:
+          type: integer
+        evaluationProgress:
+          type: number
+        averageScore:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+
+    EventDetail:
+      type: object
+      required: [id, name, startDate, endDate, year, quarter, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        clientName:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        year:
+          type: integer
+        quarter:
+          type: integer
+        status:
+          type: string
+        forcedClosed:
+          type: boolean
+        forcedCloseReason:
+          type: ["string", "null"]
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventParticipant"
+        criteria:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventCriterion"
+        evaluationMatrix:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvaluationMatrixRow"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmployeeEventResult"
+
+    EventInput:
+      type: object
+      required: [name, startDate, endDate, year, quarter]
+      properties:
+        name:
+          type: string
+        clientName:
+          type: string
+        location:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        year:
+          type: integer
+        quarter:
+          type: integer
+
+    EventUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        clientName:
+          type: string
+        location:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        status:
+          type: string
+
+    ForceCloseInput:
+      type: object
+      properties:
+        forced:
+          type: boolean
+        reason:
+          type: string
+
+    EventParticipant:
+      type: object
+      required: [id, eventId, employeeId, employeeName, functionName]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        functionName:
+          type: string
+        teamName:
+          type: ["string", "null"]
+        confirmed:
+          type: boolean
+
+    EventParticipantInput:
+      type: object
+      required: [employeeId]
+      properties:
+        employeeId:
+          type: integer
+        functionName:
+          type: string
+        teamName:
+          type: string
+
+    Criterion:
+      type: object
+      required: [id, name, defaultWeight, active, displayOrder]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        responsibleAreaId:
+          type: ["integer", "null"]
+        responsibleAreaName:
+          type: ["string", "null"]
+        defaultWeight:
+          type: number
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
+
+    CriterionInput:
+      type: object
+      required: [name, defaultWeight]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        responsibleAreaId:
+          type: integer
+        defaultWeight:
+          type: number
+        displayOrder:
+          type: integer
+
+    CriterionUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        responsibleAreaId:
+          type: integer
+        defaultWeight:
+          type: number
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
+
+    EventCriterion:
+      type: object
+      required: [id, eventId, criterionId, criterionName, active, normalizedWeight]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        responsibleAreaName:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        originalWeight:
+          type: number
+        weightOverride:
+          type: ["number", "null"]
+        normalizedWeight:
+          type: number
+
+    EventCriteriaUpdate:
+      type: object
+      required: [activeCriterionIds]
+      properties:
+        activeCriterionIds:
+          type: array
+          items:
+            type: integer
+
+    Evaluation:
+      type: object
+      required: [id, eventId, employeeId, criterionId, evaluatorUserId, score, status]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        evaluatorUserId:
+          type: integer
+        evaluatorName:
+          type: string
+        score:
+          type: number
+        comments:
+          type: ["string", "null"]
+        status:
+          type: string
+        submittedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    EvaluationInput:
+      type: object
+      required: [eventId, employeeId, criterionId, score]
+      properties:
+        eventId:
+          type: integer
+        employeeId:
+          type: integer
+        criterionId:
+          type: integer
+        score:
+          type: number
+        comments:
+          type: string
+
+    EvaluationUpdate:
+      type: object
+      properties:
+        score:
+          type: number
+        comments:
+          type: string
+
+    EvaluationMatrixRow:
+      type: object
+      required: [employeeId, employeeName, criteria]
+      properties:
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        criteria:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvaluationMatrixCell"
+
+    EvaluationMatrixCell:
+      type: object
+      required: [criterionId, criterionName, status]
+      properties:
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        status:
+          type: string
+        averageScore:
+          type: ["number", "null"]
+        calibratedScore:
+          type: ["number", "null"]
+
+    Calibration:
+      type: object
+      required: [id, eventId, employeeId, criterionId, calibratedScore, calibrationReason]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        responsibleAreaName:
+          type: ["string", "null"]
+        originalAverageScore:
+          type: ["number", "null"]
+        calibratedScore:
+          type: number
+        calibrationReason:
+          type: string
+        calibratedByUserId:
+          type: integer
+        calibratedByName:
+          type: string
+        calibratedAt:
+          type: string
+
+    CalibrationInput:
+      type: object
+      required: [eventId, employeeId, criterionId, calibratedScore, calibrationReason]
+      properties:
+        eventId:
+          type: integer
+        employeeId:
+          type: integer
+        criterionId:
+          type: integer
+        calibratedScore:
+          type: number
+        calibrationReason:
+          type: string
+
+    Absence:
+      type: object
+      required: [id, employeeId, date, year, quarter, quantity]
+      properties:
+        id:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        eventId:
+          type: ["integer", "null"]
+        eventName:
+          type: ["string", "null"]
+        date:
+          type: string
+        year:
+          type: integer
+        quarter:
+          type: integer
+        quantity:
+          type: integer
+        reason:
+          type: ["string", "null"]
+        registeredByUserId:
+          type: integer
+        createdAt:
+          type: string
+
+    AbsenceInput:
+      type: object
+      required: [employeeId, date, year, quarter]
+      properties:
+        employeeId:
+          type: integer
+        eventId:
+          type: integer
+        date:
+          type: string
+        year:
+          type: integer
+        quarter:
+          type: integer
+        quantity:
+          type: integer
+        reason:
+          type: string
+
+    Rule:
+      type: object
+      required: [id, key, value, description]
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        value:
+          type: string
+        description:
+          type: string
+        updatedAt:
+          type: ["string", "null"]
+
+    RuleUpdate:
+      type: object
+      required: [value]
+      properties:
+        value:
+          type: string
+
+    PlatoonRule:
+      type: object
+      required: [id, name, color, minScore, maxScore, bonusValue, active, displayOrder]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+        minScore:
+          type: number
+        maxScore:
+          type: number
+        minInclusive:
+          type: boolean
+        maxInclusive:
+          type: boolean
+        bonusValue:
+          type: number
+        description:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
+
+    PlatoonRuleInput:
+      type: object
+      required: [name, color, minScore, maxScore, bonusValue]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+        minScore:
+          type: number
+        maxScore:
+          type: number
+        minInclusive:
+          type: boolean
+        maxInclusive:
+          type: boolean
+        bonusValue:
+          type: number
+        description:
+          type: string
+        displayOrder:
+          type: integer
+
+    PlatoonRuleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+        minScore:
+          type: number
+        maxScore:
+          type: number
+        minInclusive:
+          type: boolean
+        maxInclusive:
+          type: boolean
+        bonusValue:
+          type: number
+        description:
+          type: string
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
+
+    DashboardSummary:
+      type: object
+      required: [year, quarter, totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations, eventsInCalibration, quarterAverage, totalBonusPreview, totalAbsences, eventsWithPendencies, atRiskEmployees]
+      properties:
+        year:
+          type: integer
+        quarter:
+          type: integer
+        totalEvents:
+          type: integer
+        totalEmployeesEvaluated:
+          type: integer
+        pendingEvaluations:
+          type: integer
+        submittedEvaluations:
+          type: integer
+        eventsInCalibration:
+          type: integer
+        quarterAverage:
+          type: ["number", "null"]
+        totalBonusPreview:
+          type: number
+        totalAbsences:
+          type: integer
+        eventsWithPendencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventPendency"
+        atRiskEmployees:
+          type: array
+          items:
+            $ref: "#/components/schemas/AtRiskEmployee"
+
+    EventPendency:
+      type: object
+      required: [eventId, eventName, pendingCount]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        pendingCount:
+          type: integer
+
+    AtRiskEmployee:
+      type: object
+      required: [employeeId, employeeName]
+      properties:
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        currentScore:
+          type: ["number", "null"]
+
+    PlatoonDistribution:
+      type: object
+      required: [platoonName, color, count, percentage]
+      properties:
+        platoonName:
+          type: string
+        color:
+          type: string
+        count:
+          type: integer
+        percentage:
+          type: number
+
+    QuarterlyEvolution:
+      type: object
+      required: [year, quarter, label, average]
+      properties:
+        year:
+          type: integer
+        quarter:
+          type: integer
+        label:
+          type: string
+        average:
+          type: number
+
+    EmployeeEventResult:
+      type: object
+      required: [employeeId, employeeName, eventId, eventScore]
+      properties:
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        eventId:
+          type: integer
+        eventScore:
+          type: number
+        projectedPlatoon:
+          type: ["string", "null"]
+        criteriaDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/CriterionScoreDetail"
+
+    CriterionScoreDetail:
+      type: object
+      required: [criterionId, criterionName, normalizedWeight]
+      properties:
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        averageScore:
+          type: ["number", "null"]
+        calibratedScore:
+          type: ["number", "null"]
+        scoreUsed:
+          type: ["number", "null"]
+        scorePercentual:
+          type: ["number", "null"]
+        normalizedWeight:
+          type: number
+        weightedContribution:
+          type: ["number", "null"]
+
+    QuarterlyResult:
+      type: object
+      required: [employeeId, employeeName, year, quarter, finalResult, platoon, bonusValue]
+      properties:
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        year:
+          type: integer
+        quarter:
+          type: integer
+        eventsCount:
+          type: integer
+        grossAverage:
+          type: number
+        totalAbsences:
+          type: integer
+        absencePenalty:
+          type: number
+        finalResult:
+          type: number
+        platoon:
+          type: ["string", "null"]
+        platoonColor:
+          type: ["string", "null"]
+        bonusValue:
+          type: number
+        eventBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventBreakdown"
+
+    EventBreakdown:
+      type: object
+      required: [eventId, eventName, score]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        score:
+          type: number
+
+    CloseQuarterInput:
+      type: object
+      required: [year, quarter]
+      properties:
+        year:
+          type: integer
+        quarter:
+          type: integer
+        forced:
+          type: boolean
+        reason:
+          type: string
+
+    QuarterCloseResult:
+      type: object
+      required: [success, year, quarter, totalProcessed]
+      properties:
+        success:
+          type: boolean
+        year:
+          type: integer
+        quarter:
+          type: integer
+        totalProcessed:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+
+    RankingEntry:
+      type: object
+      required: [position, employeeId, employeeName, finalResult, platoon, bonusValue, eventsCount, absences]
+      properties:
+        position:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        finalResult:
+          type: number
+        platoon:
+          type: ["string", "null"]
+        platoonColor:
+          type: ["string", "null"]
+        bonusValue:
+          type: number
+        eventsCount:
+          type: integer
+        absences:
+          type: integer
+
+    AuditLog:
+      type: object
+      required: [id, action, entity, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        userName:
+          type: ["string", "null"]
+        action:
+          type: string
+        entity:
+          type: string
+        entityId:
+          type: ["string", "null"]
+        beforeJson:
+          type: ["string", "null"]
+        afterJson:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    AuditLogPage:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    IntegrationStatus:
+      type: object
+      required: [configured, lastSync, eventsImported, employeesImported, participantsImported, logs]
+      properties:
+        configured:
+          type: boolean
+        lastSync:
+          type: ["string", "null"]
+        eventsImported:
+          type: integer
+        employeesImported:
+          type: integer
+        participantsImported:
+          type: integer
+        logs:
+          type: array
+          items:
+            type: string
+
+    SyncResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        eventsSync:
+          type: integer
+        employeesSync:
+          type: integer
+        participantsSync:
+          type: integer
+
+    CsvImportInput:
+      type: object
+      required: [csvData]
+      properties:
+        csvData:
+          type: string
+
+    ImportResult:
+      type: object
+      required: [success, inserted, errors]
+      properties:
+        success:
+          type: boolean
+        inserted:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    CsvExport:
+      type: object
+      required: [filename, data]
+      properties:
+        filename:
+          type: string
+        data:
+          type: string
