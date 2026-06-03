@@ -1,0 +1,1320 @@
+Crie um aplicativo web completo chamado **Maratona de Resultados – Cenográfica**.
+
+O objetivo do app é avaliar trimestralmente os colaboradores da função **Cenográfica** que trabalham nos eventos da empresa, calcular a média ponderada por evento, consolidar o resultado por trimestre, aplicar descontos por faltas e classificar os colaboradores em pelotões com bônus no cartão Caju.
+
+Este app precisa ser funcional, bonito, moderno e pronto para evoluir. Não quero apenas um protótipo visual. Quero banco de dados, autenticação, regras, cálculos, telas, validações, seed inicial e dashboard.
+
+---
+
+# 1. Stack obrigatória
+
+Use:
+
+* React + TypeScript + Vite no front-end
+* Node.js + Express no back-end
+* PostgreSQL como banco de dados
+* Prisma ou Drizzle ORM
+* TailwindCSS
+* shadcn/ui ou componentes equivalentes
+* Autenticação simples por e-mail e senha
+* Controle de acesso por perfil
+* Layout responsivo
+* Interface em português do Brasil
+
+Organize o projeto em:
+
+```txt
+/client
+/server
+/shared
+/server/db
+/server/routes
+/server/services
+/server/utils
+/client/pages
+/client/components
+/client/components/ui
+/client/lib
+```
+
+---
+
+# 2. Regra de negócio principal
+
+O app avalia colaboradores da área **Cenográfica** por evento.
+
+Cada evento possui colaboradores participantes.
+
+Cada colaborador é avaliado em até **7 quesitos**, mas nem todos os eventos usam todos os quesitos.
+
+Cada quesito possui um peso definido pelo RH. A soma padrão dos pesos é **20**.
+
+Quando um evento não usa todos os quesitos, os pesos dos quesitos ativos no evento devem ser redistribuídos proporcionalmente para continuar fechando em **20**.
+
+Cada avaliador informa uma nota de **0 a 5**.
+
+A Diretoria pode calibrar a nota depois das avaliações. Quando existir nota calibrada, ela substitui a média original no cálculo final.
+
+A consolidação é feita por **trimestre**.
+
+Cada falta desconta pontos do resultado final do trimestre. O valor inicial é **50 pontos por falta**, mas deve ser editável na tela de regras.
+
+---
+
+# 3. Perfis de usuário
+
+Crie os seguintes perfis:
+
+## Admin
+
+Pode acessar e editar tudo.
+
+## RH
+
+Pode configurar:
+
+* Quesitos
+* Pesos
+* Pelotões
+* Bônus
+* Regras de faltas
+* Relatórios
+* Resultados
+
+## Avaliador
+
+Pode:
+
+* Ver apenas eventos e quesitos vinculados à sua área
+* Avaliar colaboradores
+* Salvar rascunho
+* Enviar avaliação final
+
+Não pode alterar pesos, bônus, calibração ou regras.
+
+## Diretoria
+
+Pode:
+
+* Visualizar avaliações consolidadas
+* Inserir nota calibrada
+* Fechar evento
+* Fechar trimestre
+* Visualizar ranking e bônus
+
+## Visualizador
+
+Pode apenas consultar dashboards e resultados.
+
+---
+
+# 4. Cálculos obrigatórios
+
+Crie funções utilitárias no back-end para os cálculos. Essas funções precisam ser reutilizáveis e fáceis de testar.
+
+## 4.1 Conversão da nota
+
+A nota do avaliador é de 0 a 5.
+
+Converter para escala de 0 a 100:
+
+```txt
+nota_percentual = (nota / 5) * 100
+```
+
+Exemplos:
+
+```txt
+5 = 100
+4 = 80
+3 = 60
+2 = 40
+1 = 20
+0 = 0
+```
+
+---
+
+## 4.2 Normalização dos pesos
+
+A soma oficial dos pesos deve ser 20.
+
+Se o evento usar todos os quesitos, usar os pesos normais.
+
+Se o evento usar apenas alguns quesitos, recalcular os pesos proporcionalmente.
+
+Fórmula:
+
+```txt
+peso_normalizado = (peso_original / soma_pesos_ativos_do_evento) * 20
+```
+
+Exemplo:
+
+Pesos originais:
+
+```txt
+Qualidade da Entrega = 4
+Cumprimento de Prazo = 4
+Organização e Planejamento = 3
+Trabalho em Equipe = 3
+Proatividade = 2
+Comunicação = 2
+Postura e Segurança = 2
+Total = 20
+```
+
+Se o evento usar só os 4 primeiros:
+
+```txt
+Soma ativa = 4 + 4 + 3 + 3 = 14
+```
+
+Os pesos devem ser redistribuídos para fechar 20.
+
+---
+
+## 4.3 Nota usada no cálculo
+
+Para cada colaborador, evento e quesito:
+
+1. Se existir nota calibrada pela Diretoria, usar a nota calibrada.
+2. Se não existir nota calibrada, usar a média das notas enviadas pelos avaliadores.
+3. Se não houver avaliação enviada, marcar como pendente.
+4. Não permitir fechamento normal do evento com pendências.
+5. Admin/Diretoria podem forçar fechamento, mas devem informar justificativa.
+
+---
+
+## 4.4 Resultado do evento
+
+Para cada colaborador em cada evento:
+
+```txt
+resultado_evento = soma(nota_percentual_do_quesito * peso_normalizado_do_quesito) / 20
+```
+
+O resultado deve ficar entre 0 e 100.
+
+---
+
+## 4.5 Resultado trimestral
+
+O resultado trimestral considera os eventos fechados dentro do trimestre.
+
+Regra padrão:
+
+```txt
+media_bruta_trimestre = média simples dos resultados dos eventos do trimestre
+```
+
+Deixe o código preparado para futuramente permitir peso por evento:
+
+```txt
+media_bruta_trimestre = soma(resultado_evento * peso_evento) / soma(peso_evento)
+```
+
+Na primeira versão, todo evento tem peso 1.
+
+---
+
+## 4.6 Desconto por faltas
+
+Cada falta desconta pontos do trimestre.
+
+Valor inicial:
+
+```txt
+1 falta = -50 pontos
+```
+
+Fórmula:
+
+```txt
+desconto_faltas = quantidade_faltas * pontos_por_falta
+resultado_final = media_bruta_trimestre - desconto_faltas
+```
+
+O resultado final não pode ser menor que 0 nem maior que 100.
+
+```txt
+resultado_final = min(100, max(0, resultado_final))
+```
+
+---
+
+## 4.7 Pelotões e bônus
+
+Crie classificação configurável.
+
+Regras iniciais:
+
+```txt
+Pelotão Quênia:
+resultado >= 90
+bônus = R$ 3.200
+
+Pelotão Azul:
+resultado >= 80 e resultado < 90
+bônus = R$ 2.400
+
+Pelotão Verde:
+resultado >= 70 e resultado < 80
+bônus = R$ 1.600
+
+Pelotão Branco:
+resultado < 70
+bônus = R$ 0
+```
+
+Essas regras devem ser editáveis na tela de Regras.
+
+Importante: evitar lacunas. Toda nota de 0 a 100 precisa cair em algum pelotão.
+
+---
+
+# 5. Banco de dados
+
+Crie as tabelas abaixo com relacionamentos, validações e timestamps.
+
+## users
+
+Campos:
+
+* id
+* name
+* email
+* password_hash
+* role
+* area_id
+* active
+* created_at
+* updated_at
+
+## areas
+
+Campos:
+
+* id
+* name
+* description
+* active
+* created_at
+* updated_at
+
+## employees
+
+Campos:
+
+* id
+* external_id nullable
+* name
+* document nullable
+* email nullable
+* phone nullable
+* department
+* function_name
+* active
+* source_type: manual | external
+* created_at
+* updated_at
+
+## events
+
+Campos:
+
+* id
+* external_id nullable
+* name
+* client_name nullable
+* location nullable
+* city nullable
+* state nullable
+* start_date
+* end_date
+* year
+* quarter
+* status: draft | open | in_evaluation | calibration | closed
+* event_weight default 1
+* forced_closed boolean default false
+* forced_close_reason nullable
+* source_type: manual | external
+* created_at
+* updated_at
+
+## event_participants
+
+Campos:
+
+* id
+* event_id
+* employee_id
+* function_name
+* team_name nullable
+* confirmed boolean
+* source_type: manual | external
+* created_at
+* updated_at
+
+## criteria
+
+Campos:
+
+* id
+* name
+* description
+* responsible_area_id
+* default_weight
+* active
+* display_order
+* created_at
+* updated_at
+
+## event_criteria
+
+Campos:
+
+* id
+* event_id
+* criterion_id
+* active
+* weight_override nullable
+* normalized_weight
+* created_at
+* updated_at
+
+Sempre que alterar os quesitos ativos do evento, recalcular o normalized_weight.
+
+## evaluations
+
+Campos:
+
+* id
+* event_id
+* employee_id
+* criterion_id
+* evaluator_user_id
+* score decimal
+* comments
+* status: draft | submitted
+* submitted_at nullable
+* created_at
+* updated_at
+
+Validações:
+
+* score entre 0 e 5
+* permitir decimal, exemplo 4.5
+* comentário obrigatório para nota menor que 3
+* avaliador só pode editar enquanto status for draft
+
+## calibrations
+
+Campos:
+
+* id
+* event_id
+* employee_id
+* criterion_id
+* original_average_score
+* calibrated_score decimal
+* calibration_reason
+* calibrated_by_user_id
+* calibrated_at
+* created_at
+* updated_at
+
+Validações:
+
+* calibrated_score entre 0 e 5
+* motivo obrigatório quando calibrated_score for diferente da original_average_score
+
+## absences
+
+Campos:
+
+* id
+* employee_id
+* event_id nullable
+* date
+* year
+* quarter
+* quantity default 1
+* reason nullable
+* registered_by_user_id
+* created_at
+* updated_at
+
+## rules
+
+Campos:
+
+* id
+* key
+* value
+* description
+* updated_by_user_id
+* updated_at
+
+Criar regras iniciais:
+
+```txt
+points_per_absence = 50
+total_weight = 20
+score_min = 0
+score_max = 5
+comment_required_below = 3
+```
+
+## platoon_rules
+
+Campos:
+
+* id
+* name
+* color
+* min_score
+* max_score
+* min_inclusive boolean
+* max_inclusive boolean
+* bonus_value
+* description
+* active
+* display_order
+* created_at
+* updated_at
+
+## audit_logs
+
+Campos:
+
+* id
+* user_id
+* action
+* entity
+* entity_id
+* before_json
+* after_json
+* created_at
+
+Registrar auditoria em:
+
+* alteração de pesos
+* alteração de regras
+* alteração de bônus
+* envio de avaliação
+* alteração de avaliação
+* calibração da diretoria
+* fechamento de evento
+* fechamento de trimestre
+* registro de falta
+* importação manual
+* sincronização externa
+
+---
+
+# 6. Seeds iniciais
+
+Crie dados iniciais para o app funcionar.
+
+## Usuários
+
+Senha inicial para todos:
+
+```txt
+123456
+```
+
+Usuários:
+
+```txt
+Admin Geral | admin@empresa.com | Admin
+RH | rh@empresa.com | RH
+Diretoria | diretoria@empresa.com | Diretoria
+Avaliador Produção | producao@empresa.com | Avaliador
+Avaliador Operações | operacoes@empresa.com | Avaliador
+Visualizador | visualizador@empresa.com | Visualizador
+```
+
+## Áreas
+
+```txt
+RH
+Diretoria
+Produção
+Operações
+Cenografia
+Logística
+Atendimento
+```
+
+## Quesitos iniciais
+
+```txt
+Qualidade da Entrega | Peso 4 | Área Produção
+Cumprimento de Prazo | Peso 4 | Área Operações
+Organização e Planejamento | Peso 3 | Área Produção
+Trabalho em Equipe | Peso 3 | Área Operações
+Proatividade | Peso 2 | Área Produção
+Comunicação | Peso 2 | Área Atendimento
+Postura e Segurança | Peso 2 | Área Operações
+```
+
+Total dos pesos: 20.
+
+## Pelotões iniciais
+
+```txt
+Quênia | >= 90 até 100 | R$ 3.200 | dourado/preto
+Azul | >= 80 até < 90 | R$ 2.400 | azul
+Verde | >= 70 até < 80 | R$ 1.600 | verde
+Branco | >= 0 até < 70 | R$ 0 | branco/cinza
+```
+
+## Dados demonstrativos
+
+Crie pelo menos:
+
+* 4 eventos
+* 12 colaboradores Cenográfica
+* Participantes vinculados aos eventos
+* Algumas avaliações
+* Algumas calibrações
+* Algumas faltas
+
+Esses dados são apenas para demonstração do dashboard e ranking.
+
+---
+
+# 7. Telas obrigatórias
+
+Crie uma sidebar moderna com as seguintes telas:
+
+1. Dashboard
+2. Eventos
+3. Avaliações
+4. Calibração
+5. Resultado Trimestral
+6. Ranking
+7. Colaboradores
+8. Faltas
+9. Regras
+10. Integração
+11. Usuários
+12. Auditoria
+
+---
+
+# 8. Dashboard
+
+O dashboard deve ser uma visão executiva do trimestre.
+
+Cards principais:
+
+* Eventos do trimestre
+* Colaboradores avaliados
+* Avaliações pendentes
+* Avaliações enviadas
+* Eventos em calibração
+* Média geral do trimestre
+* Total previsto de bônus Caju
+* Faltas registradas
+
+Gráficos e blocos:
+
+* Distribuição por pelotão
+* Top 10 colaboradores
+* Colaboradores em risco
+* Eventos com pendências
+* Evolução por trimestre
+
+Filtros:
+
+* Ano
+* Trimestre
+* Evento
+* Pelotão
+* Colaborador
+
+---
+
+# 9. Eventos
+
+Tela com tabela de eventos.
+
+Colunas:
+
+* Nome
+* Cliente
+* Data início
+* Data fim
+* Cidade/UF
+* Trimestre
+* Status
+* Colaboradores
+* Progresso das avaliações
+* Média do evento
+
+Ações:
+
+* Criar evento
+* Editar evento
+* Abrir detalhes
+* Configurar quesitos
+* Adicionar colaboradores
+* Fechar evento
+* Reabrir evento, apenas Admin/Diretoria
+
+---
+
+# 10. Detalhe do Evento
+
+Ao abrir um evento, mostrar abas:
+
+## Resumo
+
+Mostrar:
+
+* Dados gerais
+* Status
+* Quesitos ativos
+* Pesos originais
+* Pesos normalizados
+* Quantidade de colaboradores
+* Progresso por área avaliadora
+* Pendências
+* Média geral do evento
+
+## Colaboradores
+
+Tabela:
+
+```txt
+Colaborador | Função | Status Avaliação | Média Original | Nota Calibrada | Resultado Evento | Pelotão Projetado
+```
+
+## Quesitos
+
+Permitir ativar/desativar quesitos do evento.
+
+Tabela:
+
+```txt
+Quesito | Área Responsável | Peso Original | Ativo no Evento | Peso Normalizado
+```
+
+Quando alterar quesitos, recalcular pesos automaticamente.
+
+Exibir alerta:
+
+```txt
+Pesos recalculados automaticamente para fechar em 20.
+```
+
+## Avaliações
+
+Matriz:
+
+```txt
+Colaborador x Quesito
+```
+
+Status:
+
+* Pendente
+* Rascunho
+* Enviado
+* Calibrado
+
+## Resultado
+
+Mostrar cálculo detalhado:
+
+```txt
+Colaborador
+Quesito
+Nota média original
+Nota calibrada
+Nota usada no cálculo
+Peso aplicado
+Resultado ponderado
+Resultado final do evento
+```
+
+---
+
+# 11. Avaliações
+
+Tela usada pelos avaliadores.
+
+O avaliador deve ver somente:
+
+* Eventos abertos
+* Quesitos da área dele
+* Colaboradores pendentes de avaliação
+
+Interface desejada:
+
+* Seleção de evento
+* Cards dos colaboradores
+* Input de nota 0 a 5 usando slider, estrelas ou botões
+* Campo de comentário
+* Botão Salvar rascunho
+* Botão Enviar avaliação
+
+Validações:
+
+* Não enviar sem nota
+* Comentário obrigatório para nota abaixo de 3
+* Após enviar, bloquear edição para Avaliador
+* Admin pode reabrir avaliação
+
+---
+
+# 12. Calibração
+
+Tela usada pela Diretoria.
+
+Filtros:
+
+* Evento
+* Colaborador
+* Quesito
+* Área
+* Status
+
+Tabela:
+
+```txt
+Colaborador | Quesito | Área | Média Avaliadores | Nota Calibrada | Diferença | Motivo | Status
+```
+
+Funcionalidades:
+
+* Inserir nota calibrada de 0 a 5
+* Ver comentários dos avaliadores
+* Exigir motivo quando alterar nota
+* Salvar calibração
+* Fechar calibração do evento
+
+Alertas:
+
+* Nota calibrada muito diferente da média original
+* Avaliações pendentes
+* Colaborador sem avaliação em algum quesito
+
+---
+
+# 13. Resultado Trimestral
+
+Tela de consolidação por trimestre.
+
+Filtros:
+
+* Ano
+* Trimestre
+* Colaborador
+* Pelotão
+* Evento
+
+Tabela:
+
+```txt
+Ranking | Colaborador | Eventos Avaliados | Média Bruta | Faltas | Desconto | Resultado Final | Pelotão | Bônus Caju
+```
+
+Detalhe expandido por colaborador:
+
+* Eventos do trimestre
+* Resultado por evento
+* Quesitos avaliados
+* Faltas
+* Histórico de calibração
+* Cálculo do bônus
+
+Ações:
+
+* Recalcular trimestre
+* Fechar trimestre
+* Exportar CSV/Excel
+* Gerar relatório
+
+Regras:
+
+* Não permitir fechamento se houver avaliação pendente
+* Não permitir fechamento se houver evento em calibração
+* Permitir fechamento forçado somente para Admin/Diretoria com justificativa
+
+---
+
+# 14. Ranking — Maratona de Resultados
+
+Criar uma tela visual chamada **Maratona de Resultados**.
+
+Essa tela deve ter aparência especial, mais bonita que uma tabela comum.
+
+Elementos:
+
+* Pódio dos 3 melhores
+* Lista ranqueada completa
+* Cards por pelotão
+* Medalhas ou ícones
+* Destaque do bônus Caju
+* Busca por colaborador
+* Filtro por ano e trimestre
+
+Mostrar em cada posição:
+
+```txt
+Posição
+Nome
+Resultado final
+Pelotão
+Bônus Caju
+Quantidade de eventos
+Faltas
+```
+
+Separar visualmente:
+
+* Pelotão Quênia
+* Pelotão Azul
+* Pelotão Verde
+* Pelotão Branco
+
+---
+
+# 15. Colaboradores
+
+Tela para cadastro de colaboradores.
+
+Campos:
+
+* Nome
+* Documento
+* E-mail
+* Telefone
+* Departamento
+* Função
+* Status
+* Origem: manual ou external
+
+Ações:
+
+* Criar
+* Editar
+* Ativar/inativar
+* Ver histórico
+* Ver eventos participados
+* Ver resultados trimestrais
+
+---
+
+# 16. Faltas
+
+Tela para registrar faltas.
+
+Campos:
+
+* Colaborador
+* Evento opcional
+* Data
+* Ano
+* Trimestre
+* Quantidade
+* Motivo
+
+Mostrar impacto:
+
+```txt
+Quantidade de faltas x pontos por falta = desconto no trimestre
+```
+
+Exemplo:
+
+```txt
+1 falta x 50 pontos = -50 pontos
+```
+
+---
+
+# 17. Regras
+
+Tela disponível para Admin e RH.
+
+Dividir em seções:
+
+## Pesos dos Quesitos
+
+Tabela editável:
+
+```txt
+Quesito | Área Responsável | Peso | Ativo | Ordem
+```
+
+Validações:
+
+* Soma dos pesos ativos deve fechar em 20
+* Mostrar alerta se não fechar
+* Confirmar antes de salvar alteração
+
+## Pelotões e Bônus
+
+Tabela editável:
+
+```txt
+Pelotão | Cor | Nota mínima | Nota máxima | Bônus | Ativo
+```
+
+Validações:
+
+* Não permitir faixas sobrepostas
+* Não permitir lacunas entre 0 e 100
+* Sempre deve existir uma regra para qualquer resultado entre 0 e 100
+
+## Faltas
+
+Permitir editar:
+
+```txt
+Pontos descontados por falta
+```
+
+Valor inicial: 50.
+
+## Parâmetros Gerais
+
+Permitir editar:
+
+* Peso total da avaliação
+* Nota mínima
+* Nota máxima
+* Comentário obrigatório abaixo de qual nota
+
+Toda alteração deve gerar log de auditoria.
+
+---
+
+# 18. Integração com outro app Replit
+
+A integração real será fase 2, mas a estrutura precisa estar preparada desde agora.
+
+Criar tela chamada **Integração**.
+
+Mostrar:
+
+* Status da integração
+* Banco externo configurado ou não
+* Última sincronização
+* Eventos importados
+* Colaboradores importados
+* Participantes importados
+* Botão Sincronizar agora
+* Logs de sincronização
+
+Criar variável de ambiente:
+
+```txt
+EXTERNAL_DATABASE_URL
+```
+
+Criar service:
+
+```txt
+externalIntegrationService
+```
+
+Métodos preparados:
+
+```txt
+syncEventsFromExternalApp()
+syncEmployeesFromExternalApp()
+syncEventParticipantsFromExternalApp()
+```
+
+Se `EXTERNAL_DATABASE_URL` não estiver configurada, mostrar:
+
+```txt
+Integração ainda não configurada. O sistema está usando dados manuais.
+```
+
+Criar também importação manual por CSV.
+
+CSV de eventos:
+
+```txt
+name,client_name,location,city,state,start_date,end_date,year,quarter
+```
+
+CSV de colaboradores:
+
+```txt
+name,email,department,function_name
+```
+
+CSV de participantes:
+
+```txt
+event_name,employee_name,function_name,team_name
+```
+
+---
+
+# 19. Usuários
+
+Tela para Admin gerenciar usuários.
+
+Campos:
+
+* Nome
+* E-mail
+* Perfil
+* Área
+* Status
+
+Ações:
+
+* Criar usuário
+* Editar usuário
+* Ativar/inativar
+* Resetar senha
+
+---
+
+# 20. Auditoria
+
+Tela disponível para Admin.
+
+Mostrar:
+
+* Data/hora
+* Usuário
+* Ação
+* Entidade
+* ID da entidade
+* Antes
+* Depois
+
+Filtros:
+
+* Usuário
+* Ação
+* Entidade
+* Período
+
+---
+
+# 21. Exportações
+
+Criar exportação CSV para:
+
+* Resultado por evento
+* Resultado trimestral
+* Ranking
+* Faltas
+* Avaliações pendentes
+* Bônus Caju
+
+Relatório de bônus Caju:
+
+```txt
+Colaborador
+Documento
+Ano
+Trimestre
+Resultado final
+Pelotão
+Valor do bônus
+Quantidade de faltas
+Eventos avaliados
+```
+
+---
+
+# 22. Design obrigatório
+
+O app precisa parecer um sistema SaaS premium.
+
+Não quero aparência crua.
+
+Use:
+
+* Sidebar moderna
+* Topbar com usuário logado
+* Cards brancos com sombra suave
+* Bordas arredondadas
+* Badges coloridos
+* Tabelas com filtros e paginação
+* Skeleton loading
+* Empty states bonitos
+* Toasts de sucesso e erro
+* Modais de confirmação
+* Ícones modernos
+* Espaçamento confortável
+* Tipografia limpa
+* Visual executivo
+
+Paleta sugerida:
+
+```txt
+Primária: navy / azul escuro
+Secundária: azul vivo
+Sucesso: verde
+Alerta: dourado
+Erro: vermelho
+Neutro: branco, cinza claro, grafite
+```
+
+Cores dos pelotões:
+
+```txt
+Quênia: dourado/preto
+Azul: azul forte
+Verde: verde
+Branco: branco/cinza
+```
+
+---
+
+# 23. Componentes reutilizáveis
+
+Criar componentes:
+
+* AppSidebar
+* Topbar
+* PageHeader
+* StatCard
+* StatusBadge
+* PlatoonBadge
+* ScoreBadge
+* DataTable
+* FilterBar
+* EmptyState
+* ConfirmDialog
+* ScoreInput
+* WeightDistributionCard
+* RankingPodium
+* AuditLogTable
+* ExportButton
+* LoadingSkeleton
+
+---
+
+# 24. Funções obrigatórias de cálculo
+
+Criar e usar estas funções:
+
+```txt
+convertScoreToPercentage(score)
+normalizeWeights(criteria, totalWeight)
+getAverageEvaluatorScore(evaluations)
+getScoreUsedForCalculation(evaluations, calibration)
+calculateEventResult(employeeId, eventId)
+calculateQuarterGrossAverage(employeeId, year, quarter)
+calculateAbsencePenalty(employeeId, year, quarter)
+calculateQuarterFinalResult(employeeId, year, quarter)
+getPlatoonByScore(score)
+calculateBonusByScore(score)
+```
+
+Essas funções precisam ser usadas nas telas e nas APIs, não apenas criadas sem uso.
+
+---
+
+# 25. APIs necessárias
+
+Crie endpoints REST para:
+
+* Login
+* Usuários
+* Áreas
+* Colaboradores
+* Eventos
+* Participantes do evento
+* Quesitos
+* Quesitos do evento
+* Avaliações
+* Calibrações
+* Faltas
+* Regras
+* Pelotões
+* Dashboard
+* Resultado do evento
+* Resultado trimestral
+* Ranking
+* Auditoria
+* Integração
+* Exportações CSV
+
+---
+
+# 26. Ordem de implementação
+
+Siga esta ordem:
+
+1. Criar schema do banco
+2. Criar migrations
+3. Criar seed inicial
+4. Criar autenticação e perfis
+5. Criar funções de cálculo
+6. Criar APIs
+7. Criar layout principal
+8. Criar telas principais
+9. Conectar telas às APIs
+10. Criar dashboard e ranking
+11. Criar exportações
+12. Revisar visual
+13. Validar cálculos com dados seed
+
+---
+
+# 27. Critérios de aceite
+
+O app só estará correto se:
+
+1. Login funcionar.
+2. Perfis restringirem acesso corretamente.
+3. Eventos puderem ser criados e editados.
+4. Colaboradores puderem ser criados e vinculados a eventos.
+5. Quesitos puderem ser ativados/desativados por evento.
+6. Pesos forem recalculados automaticamente para fechar 20.
+7. Avaliadores conseguirem dar nota de 0 a 5.
+8. Comentário for obrigatório para nota menor que 3.
+9. Diretoria conseguir calibrar nota.
+10. Nota calibrada substituir a média original.
+11. Resultado do evento for calculado por média ponderada.
+12. Resultado trimestral considerar eventos do trimestre.
+13. Faltas descontarem pontos do trimestre.
+14. Resultado final nunca ficar abaixo de 0.
+15. Pelotão ser calculado corretamente.
+16. Bônus Caju ser calculado corretamente.
+17. RH/Admin conseguirem editar regras.
+18. Dashboard mostrar dados reais do banco.
+19. Ranking mostrar classificação correta.
+20. Auditoria registrar alterações importantes.
+21. Integração externa ficar preparada, mesmo sem estar ativa.
+22. Interface ficar bonita, moderna e profissional.
+
+---
+
+# 28. Importante para o Replit Agent
+
+Não entregue apenas telas estáticas.
+
+Não deixe botões sem função.
+
+Não crie dados mockados fixos no front-end se já houver banco.
+
+Use o banco PostgreSQL como fonte principal.
+
+Use dados seed apenas para demonstração inicial.
+
+Sempre que houver pendência, mostrar alerta visual.
+
+Sempre que uma ação for concluída, mostrar toast.
+
+Sempre que houver erro, mostrar mensagem clara.
+
+Priorize primeiro funcionamento real, depois refinamento visual.
+
+O resultado final precisa ser um app funcional para gestão da **Maratona de Resultados – Cenográfica**.
