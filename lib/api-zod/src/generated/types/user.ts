@@ -15,6 +15,8 @@ export interface User {
   areaId?: number | null;
   /** @nullable */
   areaName?: string | null;
+  /** @nullable */
+  employeeId?: number | null;
   active: boolean;
   createdAt?: string;
 }

@@ -20,6 +20,11 @@ export interface Employee {
   department: string;
   functionName: string;
   active: boolean;
+  eligibleForBonus?: boolean;
+  /** @nullable */
+  eligibilityStatus?: string | null;
+  /** @nullable */
+  eligibilityReason?: string | null;
   sourceType?: string;
   createdAt?: string;
 }

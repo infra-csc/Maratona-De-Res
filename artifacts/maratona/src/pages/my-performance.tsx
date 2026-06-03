@@ -54,7 +54,7 @@ interface EventSummary {
   eventScore: number;
   projectedPlatoon: string | null;
   projectedPlatoonColor: string | null;
-  evaluationsSubmitted: number;
+  evaluatedCriteria: number;
   totalCriteria: number;
   isPending: boolean;
   criteriaDetails: CriterionDetail[];
@@ -142,7 +142,7 @@ function EventCard({ event }: { event: EventSummary }) {
         {open && (
           <div className="border-t bg-muted/20 p-4 space-y-3">
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <span>Quesitos avaliados: {event.evaluationsSubmitted}/{event.totalCriteria}</span>
+              <span>Quesitos avaliados: {event.evaluatedCriteria}/{event.totalCriteria}</span>
               {event.isPending && <span className="text-amber-600 flex items-center gap-1"><Clock size={12} />Pendente</span>}
             </div>
             <div className="space-y-2">

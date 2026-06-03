@@ -24,13 +24,11 @@ async function seed() {
   console.log("✓ Dados anteriores removidos");
 
   const areas = await db.insert(areasTable).values([
-    { name: "Cenografia", description: "Equipe de cenografia e montagem" },
-    { name: "Iluminação", description: "Equipe de iluminação técnica" },
-    { name: "Sonorização", description: "Equipe de áudio e som" },
-    { name: "Produção", description: "Coordenação e produção de eventos" },
-    { name: "Logística", description: "Transporte e logística operacional" },
-    { name: "TI", description: "Tecnologia da informação e sistemas" },
-    { name: "Gestão de Pessoas", description: "RH e desenvolvimento humano" },
+    { name: "Cenografia", description: "Equipe de cenografia e montagem" },               // 0
+    { name: "Logística", description: "Transporte e logística operacional" },              // 1
+    { name: "Atendimento e Ativação", description: "Atendimento ao cliente e ativação" }, // 2
+    { name: "Produção", description: "Coordenação e produção de eventos" },               // 3
+    { name: "Departamento Pessoal", description: "RH e departamento pessoal" },            // 4
   ]).returning();
 
   console.log(`✓ ${areas.length} áreas criadas`);
@@ -38,12 +36,12 @@ async function seed() {
   const hash = await bcrypt.hash("123456", 12);
   const users = await db.insert(usersTable).values([
     { name: "Admin Sistema", email: "admin@cenografica.com.br", passwordHash: hash, role: "admin" },
-    { name: "Ana Paula RH", email: "rh@cenografica.com.br", passwordHash: hash, role: "rh", areaId: areas[6].id },
+    { name: "Ana Paula RH", email: "rh@cenografica.com.br", passwordHash: hash, role: "rh", areaId: areas[4].id },
     { name: "Carlos Avaliador", email: "avaliador@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[0].id },
     { name: "Diretoria Geral", email: "diretoria@cenografica.com.br", passwordHash: hash, role: "diretoria" },
     { name: "Visualizador", email: "visualizador@cenografica.com.br", passwordHash: hash, role: "visualizador" },
-    { name: "Marcos Avaliador Logística", email: "avaliador2@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[4].id },
-    { name: "Patricia RH Pessoas", email: "avaliador3@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[6].id },
+    { name: "Marcos Avaliador Logística", email: "avaliador2@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[1].id },
+    { name: "Patricia RH Pessoas", email: "avaliador3@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[4].id },
   ]).returning();
 
   console.log(`✓ ${users.length} usuários criados`);
@@ -69,51 +67,58 @@ async function seed() {
   // Nota máx = 5 → resultado máx = 5×20 = 100
   const criteria = await db.insert(criteriaTable).values([
     {
-      name: "Perda de material/estrutura",
+      name: "Perda de Material/Estrutura",
       description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.",
-      responsibleAreaId: areas[0].id, // Cenografia
+      responsibleAreaId: areas[1].id, // Logística
+      responsibleAreaLabel: "Logística",
       defaultWeight: "3",
       displayOrder: 1,
     },
     {
-      name: "Ferramentas & case",
-      description: "Todas as ferramentas e cases devem retornar à base corretamente.",
+      name: "Ferramentas & Case",
+      description: "Todas as ferramentas e cases devem retornar à base corretamente, sem perdas ou danos.",
       responsibleAreaId: areas[0].id, // Cenografia
-      defaultWeight: "3",
+      responsibleAreaLabel: "Cenografia",
+      defaultWeight: "2",
       displayOrder: 2,
     },
     {
-      name: "Qualidade da entrega",
-      description: "Avalia acabamento, materiais em bom estado e qualidade visual da entrega.",
-      responsibleAreaId: areas[0].id, // Cenografia
-      defaultWeight: "2",
+      name: "Qualidade da Entrega",
+      description: "Avalia acabamento, materiais em bom estado, qualidade visual e satisfação na ativação/atendimento.",
+      responsibleAreaId: areas[2].id, // Atendimento e Ativação
+      responsibleAreaLabel: "Atendimento e Ativação",
+      defaultWeight: "3",
       displayOrder: 3,
     },
     {
-      name: "Qualidade técnica da montagem",
-      description: "Avalia se a montagem foi executada corretamente, se houve problemas estruturais, necessidade de ajustes em arena ou falhas que impactaram a entrega.",
-      responsibleAreaId: areas[0].id, // Cenografia
+      name: "Obrigações Estruturais",
+      description: "Avalia o cumprimento das obrigações estruturais da montagem, conforme alinhamento dos produtores de cenografia e supervisão.",
+      responsibleAreaId: areas[3].id, // Produção
+      responsibleAreaLabel: "Produtores de Cenografia / Sup. Ceno",
       defaultWeight: "3",
       displayOrder: 4,
     },
     {
-      name: "Logística reversa",
-      description: "Avalia se a carga foi feita adequadamente e conforme o alinhamento combinado.",
-      responsibleAreaId: areas[4].id, // Logística
+      name: "Logística Reversa",
+      description: "Avalia se a carga de retorno foi feita adequadamente e conforme o alinhamento combinado.",
+      responsibleAreaId: areas[1].id, // Logística
+      responsibleAreaLabel: "Logística",
       defaultWeight: "3",
       displayOrder: 5,
     },
     {
-      name: "Prazo da entrega",
+      name: "Prazo de Entrega",
       description: "Avalia se as entregas ocorreram dentro do cronograma, sem atrasos e sem custos adicionais de mão de obra.",
-      responsibleAreaId: areas[4].id, // Logística
+      responsibleAreaId: areas[3].id, // Produção
+      responsibleAreaLabel: "Produção",
       defaultWeight: "3",
       displayOrder: 6,
     },
     {
-      name: "Conduta e comportamento",
+      name: "Conduta e Comportamento",
       description: "Avalia uso de uniforme, EPI, envio de comprovações e fotos, horários na arena, comportamento profissional e cuidado com ferramentas.",
-      responsibleAreaId: areas[6].id, // Gestão de Pessoas
+      responsibleAreaId: areas[4].id, // Departamento Pessoal
+      responsibleAreaLabel: "Produtores locais e Departamento Pessoal",
       defaultWeight: "3",
       displayOrder: 7,
     },
@@ -211,51 +216,47 @@ async function seed() {
 
   console.log("✓ Participantes e critérios dos eventos configurados");
 
-  // Avaliações usando notas do exemplo validador: [4,4,4,3,2,3,5] → 71
-  // pesos=[3,3,2,3,3,3,3] → 3×4+3×4+2×4+3×3+3×2+3×3+3×5 = 12+12+8+9+6+9+15 = 71
+  // Avaliação por TIME do evento: uma nota por (evento, critério, avaliador).
+  // Todos os participantes do time recebem a MESMA nota do evento.
+  // pesos oficiais=[3,2,3,3,3,3,3], notas=[4,4,4,3,2,3,5]
+  //   = 3×4+2×4+3×4+3×3+3×2+3×3+3×5 = 12+8+12+9+6+9+15 = 71
   const exampleScores = [4, 4, 4, 3, 2, 3, 5];
   const closedEvents = events.filter(e => e.status === "closed");
 
   for (const ev of closedEvents) {
-    for (const emp of participantSubset) {
-      for (let i = 0; i < criteria.length; i++) {
-        const c = criteria[i];
-        const score = exampleScores[i % exampleScores.length];
-        await db.insert(evaluationsTable).values({
-          eventId: ev.id,
-          employeeId: emp.id,
-          criterionId: c.id,
-          evaluatorUserId: users[2].id,
-          score: String(score),
-          comments: score < 3 ? "Logística reversa com dificuldades — necessita atenção na próxima missão" : null,
-          commentVisibility: score < 3 ? "internal" : "internal",
-          status: "submitted",
-          submittedAt: new Date(),
-        });
-      }
+    for (let i = 0; i < criteria.length; i++) {
+      const c = criteria[i];
+      const score = exampleScores[i % exampleScores.length];
+      await db.insert(evaluationsTable).values({
+        eventId: ev.id,
+        criterionId: c.id,
+        evaluatorUserId: users[2].id,
+        score: String(score),
+        comments: score < 3 ? "Ponto de atenção do time neste critério — reforçar na próxima missão." : null,
+        commentVisibility: "internal",
+        status: "submitted",
+        submittedAt: new Date(),
+      });
     }
   }
 
-  console.log("✓ Avaliações seed criadas (resultado esperado: 71/100)");
+  console.log("✓ Avaliações do time criadas (resultado do evento esperado: 71/100)");
 
-  // Calibrações para primeiros 4 colaboradores
+  // Calibração no nível do critério do evento (não por colaborador).
   for (const ev of closedEvents) {
-    for (const emp of participantSubset.slice(0, 4)) {
-      for (const c of criteria.slice(0, 2)) {
-        await db.insert(calibrationsTable).values({
-          eventId: ev.id,
-          employeeId: emp.id,
-          criterionId: c.id,
-          originalAverageScore: String(4.0),
-          calibratedScore: String(4.0),
-          calibrationReason: "Calibração de alinhamento — mantido pela Diretoria",
-          calibratedByUserId: users[3].id,
-        });
-      }
+    for (const c of criteria.slice(0, 2)) {
+      await db.insert(calibrationsTable).values({
+        eventId: ev.id,
+        criterionId: c.id,
+        originalAverageScore: String(4.0),
+        calibratedScore: String(4.0),
+        calibrationReason: "Calibração de alinhamento do evento — mantido pela Diretoria",
+        calibratedByUserId: users[3].id,
+      });
     }
   }
 
-  console.log("✓ Calibrações seed criadas");
+  console.log("✓ Calibrações do evento criadas");
 
   // Ausências: apenas 1 colaborador, para não impactar muito os resultados de demonstração
   await db.insert(absencesTable).values({
@@ -272,8 +273,8 @@ async function seed() {
   console.log("✓ Ausências seed criadas");
   console.log("\n✅ Seed concluído com sucesso!");
   console.log("\n📊 Validação de cálculo:");
-  console.log("   Pesos: [3,3,2,3,3,3,3], Notas: [4,4,4,3,2,3,5]");
-  console.log("   Esperado: 71 | Resultado:", [3,3,2,3,3,3,3].reduce((s, w, i) => s + w * [4,4,4,3,2,3,5][i], 0));
+  console.log("   Pesos oficiais: [3,2,3,3,3,3,3], Notas: [4,4,4,3,2,3,5]");
+  console.log("   Esperado: 71 | Resultado:", [3,2,3,3,3,3,3].reduce((s, w, i) => s + w * [4,4,4,3,2,3,5][i], 0));
   console.log("\n👤 Usuários criados (senha: 123456):");
   users.forEach((u: typeof users[number]) => console.log(`   ${u.email} — ${u.role}`));
 }

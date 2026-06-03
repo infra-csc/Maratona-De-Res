@@ -8,8 +8,8 @@
 
 export interface EvaluationInput {
   eventId: number;
-  employeeId: number;
   criterionId: number;
   score: number;
   comments?: string;
+  commentVisibility?: string;
 }

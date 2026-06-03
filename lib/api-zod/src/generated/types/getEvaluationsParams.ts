@@ -8,6 +8,5 @@
 
 export type GetEvaluationsParams = {
 eventId?: number;
-employeeId?: number;
 status?: string;
 };

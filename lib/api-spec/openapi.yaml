@@ -507,9 +507,45 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/EmployeeEventResult"
+                $ref: "#/components/schemas/EventTeamResult"
+
+  /events/{id}/feedback:
+    get:
+      operationId: getEventFeedback
+      tags: [results]
+      summary: Get event team feedback (gated on completion; no evaluator names)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventFeedback"
+
+  /events/{id}/feedback/release:
+    post:
+      operationId: releaseEventFeedback
+      tags: [results]
+      summary: Release event feedback to participants (after all evaluations done)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventFeedback"
 
   /events/{id}/participants:
     get:
@@ -688,10 +724,6 @@ paths:
           in: query
           schema:
             type: integer
-        - name: employeeId
-          in: query
-          schema:
-            type: integer
         - name: status
           in: query
           schema:
@@ -793,10 +825,6 @@ paths:
       summary: List calibrations
       parameters:
         - name: eventId
-          in: query
-          schema:
-            type: integer
-        - name: employeeId
           in: query
           schema:
             type: integer
@@ -1140,6 +1168,76 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuarterCloseResult"
 
+  /results/quarterly/{id}/payment:
+    patch:
+      operationId: updateBonusPayment
+      tags: [results]
+      summary: Update bonus payment status (Caju Saldo Livre)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BonusPaymentInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuarterlyResult"
+
+  /quarter-eligibility:
+    get:
+      operationId: getQuarterEligibility
+      tags: [results]
+      summary: List quarterly ineligibility records
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuarterEligibility"
+    post:
+      operationId: setQuarterEligibility
+      tags: [results]
+      summary: Set quarterly eligibility for an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuarterEligibilityInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuarterEligibility"
+
   /ranking:
     get:
       operationId: getRanking
@@ -1430,6 +1528,8 @@ components:
           type: ["integer", "null"]
         areaName:
           type: ["string", "null"]
+        employeeId:
+          type: ["integer", "null"]
         active:
           type: boolean
         createdAt:
@@ -1525,6 +1625,12 @@ components:
           type: string
         active:
           type: boolean
+        eligibleForBonus:
+          type: boolean
+        eligibilityStatus:
+          type: ["string", "null"]
+        eligibilityReason:
+          type: ["string", "null"]
         sourceType:
           type: string
         createdAt:
@@ -1564,6 +1670,12 @@ components:
           type: string
         active:
           type: boolean
+        eligibleForBonus:
+          type: boolean
+        eligibilityStatus:
+          type: string
+        eligibilityReason:
+          type: string
 
     Event:
       type: object
@@ -1820,28 +1932,26 @@ components:
 
     Evaluation:
       type: object
-      required: [id, eventId, employeeId, criterionId, evaluatorUserId, score, status]
+      required: [id, eventId, criterionId, score, status]
       properties:
         id:
           type: integer
         eventId:
           type: integer
-        employeeId:
-          type: integer
-        employeeName:
-          type: string
         criterionId:
           type: integer
         criterionName:
-          type: string
+          type: ["string", "null"]
         evaluatorUserId:
-          type: integer
+          type: ["integer", "null"]
         evaluatorName:
-          type: string
+          type: ["string", "null"]
         score:
           type: number
         comments:
           type: ["string", "null"]
+        commentVisibility:
+          type: string
         status:
           type: string
         submittedAt:
@@ -1851,17 +1961,17 @@ components:
 
     EvaluationInput:
       type: object
-      required: [eventId, employeeId, criterionId, score]
+      required: [eventId, criterionId, score]
       properties:
         eventId:
-          type: integer
-        employeeId:
           type: integer
         criterionId:
           type: integer
         score:
           type: number
         comments:
+          type: string
+        commentVisibility:
           type: string
 
     EvaluationUpdate:
@@ -1870,6 +1980,8 @@ components:
         score:
           type: number
         comments:
+          type: string
+        commentVisibility:
           type: string
 
     EvaluationMatrixRow:
@@ -1902,20 +2014,16 @@ components:
 
     Calibration:
       type: object
-      required: [id, eventId, employeeId, criterionId, calibratedScore, calibrationReason]
+      required: [id, eventId, criterionId, calibratedScore, calibrationReason]
       properties:
         id:
           type: integer
         eventId:
           type: integer
-        employeeId:
-          type: integer
-        employeeName:
-          type: string
         criterionId:
           type: integer
         criterionName:
-          type: string
+          type: ["string", "null"]
         responsibleAreaName:
           type: ["string", "null"]
         originalAverageScore:
@@ -1927,17 +2035,15 @@ components:
         calibratedByUserId:
           type: integer
         calibratedByName:
-          type: string
+          type: ["string", "null"]
         calibratedAt:
           type: string
 
     CalibrationInput:
       type: object
-      required: [eventId, employeeId, criterionId, calibratedScore, calibrationReason]
+      required: [eventId, criterionId, calibratedScore, calibrationReason]
       properties:
         eventId:
-          type: integer
-        employeeId:
           type: integer
         criterionId:
           type: integer
@@ -1945,6 +2051,8 @@ components:
           type: number
         calibrationReason:
           type: string
+        originalAverageScore:
+          type: number
 
     Absence:
       type: object
@@ -2215,6 +2323,8 @@ components:
       type: object
       required: [employeeId, employeeName, year, quarter, finalResult, platoon, bonusValue]
       properties:
+        id:
+          type: integer
         employeeId:
           type: integer
         employeeName:
@@ -2239,10 +2349,188 @@ components:
           type: ["string", "null"]
         bonusValue:
           type: number
+        eligible:
+          type: boolean
+        eligibilityReason:
+          type: ["string", "null"]
+        bonusStatus:
+          type: ["string", "null"]
+        paymentMethod:
+          type: ["string", "null"]
+        paymentDueDate:
+          type: ["string", "null"]
+        paidAt:
+          type: ["string", "null"]
+        paymentNotes:
+          type: ["string", "null"]
         eventBreakdown:
           type: array
           items:
             $ref: "#/components/schemas/EventBreakdown"
+
+    BonusPaymentInput:
+      type: object
+      properties:
+        bonusStatus:
+          type: string
+        paymentMethod:
+          type: string
+        paymentDueDate:
+          type: string
+        paidAt:
+          type: ["string", "null"]
+        paymentNotes:
+          type: string
+
+    EventTeamResult:
+      type: object
+      required: [eventId, eventScore, totalCriteria, evaluatedCriteria, isComplete]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        eventStatus:
+          type: string
+        feedbackReleased:
+          type: boolean
+        eventScore:
+          type: number
+        projectedPlatoon:
+          type: ["string", "null"]
+        projectedPlatoonColor:
+          type: ["string", "null"]
+        projectedBonus:
+          type: number
+        totalCriteria:
+          type: integer
+        evaluatedCriteria:
+          type: integer
+        pendingCriteria:
+          type: integer
+        isComplete:
+          type: boolean
+        hasCalibration:
+          type: boolean
+        criteriaDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventTeamCriterion"
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventTeamParticipant"
+
+    EventTeamCriterion:
+      type: object
+      required: [criterionId, criterionName, weight, status]
+      properties:
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        criterionDescription:
+          type: ["string", "null"]
+        responsibleAreaLabel:
+          type: ["string", "null"]
+        weight:
+          type: number
+        averageScore:
+          type: ["number", "null"]
+        calibratedScore:
+          type: ["number", "null"]
+        scoreUsed:
+          type: ["number", "null"]
+        criterionTotal:
+          type: ["number", "null"]
+        status:
+          type: string
+
+    EventTeamParticipant:
+      type: object
+      required: [employeeId, employeeName, eventScore]
+      properties:
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        functionName:
+          type: string
+        eligible:
+          type: boolean
+        eventScore:
+          type: number
+
+    EventFeedback:
+      type: object
+      required: [eventId, eventName, eventScore, isComplete, feedbackReleased, text]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        eventScore:
+          type: number
+        projectedPlatoon:
+          type: ["string", "null"]
+        totalCriteria:
+          type: integer
+        evaluatedCriteria:
+          type: integer
+        isComplete:
+          type: boolean
+        feedbackReleased:
+          type: boolean
+        highlights:
+          type: array
+          items:
+            type: string
+        attentionPoints:
+          type: array
+          items:
+            type: string
+        text:
+          type: string
+
+    QuarterEligibility:
+      type: object
+      required: [id, employeeId, year, quarter, eligible]
+      properties:
+        id:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: ["string", "null"]
+        year:
+          type: integer
+        quarter:
+          type: integer
+        eligible:
+          type: boolean
+        reason:
+          type: ["string", "null"]
+        createdByUserId:
+          type: ["integer", "null"]
+        createdByName:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+
+    QuarterEligibilityInput:
+      type: object
+      required: [employeeId, year, quarter, eligible]
+      properties:
+        employeeId:
+          type: integer
+        year:
+          type: integer
+        quarter:
+          type: integer
+        eligible:
+          type: boolean
+        reason:
+          type: string
 
     EventBreakdown:
       type: object

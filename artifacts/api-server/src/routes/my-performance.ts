@@ -1,6 +1,10 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable, eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable, platoonRulesTable, employeesTable } from "@workspace/db";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import {
+  db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
+  eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
+  platoonRulesTable, employeesTable, areasTable, employeeQuarterEligibilityTable,
+} from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore } from "../lib/calculations.js";
 
@@ -9,9 +13,9 @@ router.use(requireAuth);
 
 /**
  * GET /my-performance
- * Retorna o desempenho do colaborador vinculado ao usuário autenticado.
+ * Desempenho do colaborador. A nota é do TIME do evento (mesma para todos).
  * - Nunca expõe o nome do avaliador
- * - Comentários internos ficam ocultos
+ * - Comentários internos ficam ocultos (apenas comentários públicos do time)
  */
 router.get("/my-performance", async (req, res) => {
   const employeeId = req.user!.employeeId;
@@ -30,7 +34,6 @@ router.get("/my-performance", async (req, res) => {
     return;
   }
 
-  // Resultado trimestral consolidado (se fechado)
   const [quarterResult] = await db.select().from(quarterlyResultsTable)
     .where(and(
       eq(quarterlyResultsTable.employeeId, employeeId),
@@ -38,7 +41,13 @@ router.get("/my-performance", async (req, res) => {
       eq(quarterlyResultsTable.quarter, currentQuarter),
     )).limit(1);
 
-  // Eventos que o colaborador participou no trimestre
+  const [quarterElig] = await db.select().from(employeeQuarterEligibilityTable)
+    .where(and(
+      eq(employeeQuarterEligibilityTable.employeeId, employeeId),
+      eq(employeeQuarterEligibilityTable.year, currentYear),
+      eq(employeeQuarterEligibilityTable.quarter, currentQuarter),
+    )).limit(1);
+
   const participations = await db
     .select({
       eventId: eventParticipantsTable.eventId,
@@ -46,6 +55,7 @@ router.get("/my-performance", async (req, res) => {
       eventCity: eventsTable.city,
       eventState: eventsTable.state,
       eventStatus: eventsTable.status,
+      feedbackReleased: eventsTable.feedbackReleased,
       startDate: eventsTable.startDate,
       endDate: eventsTable.endDate,
     })
@@ -75,14 +85,18 @@ router.get("/my-performance", async (req, res) => {
         criterionId: eventCriteriaTable.criterionId,
         criterionName: criteriaTable.name,
         criterionDescription: criteriaTable.description,
+        responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
+        responsibleAreaName: areasTable.name,
         active: eventCriteriaTable.active,
         weight: eventCriteriaTable.weightOverride,
         defaultWeight: criteriaTable.defaultWeight,
       })
       .from(eventCriteriaTable)
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+      .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
       .where(and(eq(eventCriteriaTable.eventId, p.eventId), eq(eventCriteriaTable.active, true)));
 
+    // Avaliações do TIME do evento (não por colaborador)
     const allEvals = await db.select({
       criterionId: evaluationsTable.criterionId,
       score: evaluationsTable.score,
@@ -90,19 +104,13 @@ router.get("/my-performance", async (req, res) => {
       commentVisibility: evaluationsTable.commentVisibility,
       status: evaluationsTable.status,
     }).from(evaluationsTable)
-      .where(and(
-        eq(evaluationsTable.eventId, p.eventId),
-        eq(evaluationsTable.employeeId, employeeId),
-      ));
+      .where(eq(evaluationsTable.eventId, p.eventId));
 
     const allCalibrations = await db.select({
       criterionId: calibrationsTable.criterionId,
       calibratedScore: calibrationsTable.calibratedScore,
     }).from(calibrationsTable)
-      .where(and(
-        eq(calibrationsTable.eventId, p.eventId),
-        eq(calibrationsTable.employeeId, employeeId),
-      ));
+      .where(eq(calibrationsTable.eventId, p.eventId));
 
     const criteriaDetails = eventCriteriaRows.map(c => {
       const weight = parseFloat(c.weight ?? c.defaultWeight ?? "1");
@@ -115,7 +123,7 @@ router.get("/my-performance", async (req, res) => {
       const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
       const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
 
-      // Public comments only — never expõe nome do avaliador
+      // Apenas comentários públicos — nunca expõe nome do avaliador
       const publicComments = allEvals
         .filter(e => e.criterionId === c.criterionId && e.commentVisibility === "public" && e.comments)
         .map(e => e.comments!);
@@ -124,12 +132,14 @@ router.get("/my-performance", async (req, res) => {
         criterionId: c.criterionId,
         criterionName: c.criterionName,
         criterionDescription: c.criterionDescription,
+        responsibleAreaLabel: c.responsibleAreaLabel ?? c.responsibleAreaName ?? null,
         weight,
         scoreUsed,
         criterionTotal,
         hasCalibration: calibratedScore !== null,
         publicComments,
-        evaluated: evalScores.length > 0,
+        evaluated: scoreUsed !== null,
+        status: scoreUsed !== null ? "avaliado" : "pendente",
       };
     });
 
@@ -141,8 +151,9 @@ router.get("/my-performance", async (req, res) => {
     }));
     const eventScore = calculateEventResult(criteriaForCalc);
     const platoon = getPlatoonByScore(eventScore, platoonRulesMapped);
-    const allSubmitted = allEvals.filter(e => e.status === "submitted").length;
+    const evaluatedCriteria = criteriaDetails.filter(c => c.evaluated).length;
     const totalExpected = eventCriteriaRows.length;
+    const isComplete = totalExpected > 0 && evaluatedCriteria === totalExpected;
 
     eventSummaries.push({
       eventId: p.eventId,
@@ -152,12 +163,14 @@ router.get("/my-performance", async (req, res) => {
       startDate: p.startDate,
       endDate: p.endDate,
       status: p.eventStatus,
+      feedbackReleased: p.feedbackReleased ?? false,
       eventScore,
+      teamScore: eventScore,
       projectedPlatoon: platoon?.name ?? null,
       projectedPlatoonColor: platoon?.color ?? null,
-      evaluationsSubmitted: allSubmitted,
+      evaluatedCriteria,
       totalCriteria: totalExpected,
-      isPending: allSubmitted < totalExpected,
+      isPending: !isComplete,
       criteriaDetails,
     });
   }
@@ -173,19 +186,29 @@ router.get("/my-performance", async (req, res) => {
   const pendingEvents = eventSummaries.filter(e => e.isPending || e.status === "open").length;
   const evaluatedEvents = eventSummaries.filter(e => !e.isPending && e.status !== "open").length;
 
-  const grossAverage = eventSummaries.length > 0
-    ? eventSummaries.filter(e => e.eventScore > 0).reduce((s, e) => s + e.eventScore, 0) / Math.max(1, eventSummaries.filter(e => e.eventScore > 0).length)
+  const scoredEvents = eventSummaries.filter(e => e.eventScore > 0);
+  const grossAverage = scoredEvents.length > 0
+    ? scoredEvents.reduce((s, e) => s + e.eventScore, 0) / scoredEvents.length
     : null;
+
+  const registrationEligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
+  const quarterEligible = !quarterElig || quarterElig.eligible;
+  const eligible = registrationEligible && quarterEligible;
 
   let currentPlatoon = null;
   let currentBonus = null;
+  let bonusStatus: string | null = null;
+  let finalResult: number | null = null;
   if (quarterResult) {
     currentPlatoon = quarterResult.platoon;
     currentBonus = parseFloat(quarterResult.bonusValue as unknown as string);
+    bonusStatus = quarterResult.bonusStatus;
+    finalResult = parseFloat(quarterResult.finalResult as unknown as string);
   } else if (grossAverage !== null) {
     const proj = getPlatoonByScore(grossAverage, platoonRulesMapped);
     currentPlatoon = proj?.name ?? null;
-    currentBonus = proj?.bonusValue ?? null;
+    currentBonus = eligible ? (proj?.bonusValue ?? null) : 0;
+    bonusStatus = eligible ? "projected" : "not_eligible";
   }
 
   res.json({
@@ -194,18 +217,23 @@ router.get("/my-performance", async (req, res) => {
       name: employee.name,
       department: employee.department,
       functionName: employee.functionName,
+      eligible,
+      eligibilityStatus: employee.eligibilityStatus,
     },
     period: { year: currentYear, quarter: currentQuarter },
     summary: {
       grossAverage,
       currentPlatoon,
       projectedBonus: currentBonus,
+      bonusStatus,
+      eligible,
       evaluatedEvents,
       pendingEvents,
       totalAbsences,
       isQuarterClosed: !!quarterResult,
-      finalResult: quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : null,
+      finalResult,
       absencePenalty: quarterResult ? parseFloat(quarterResult.absencePenalty as unknown as string) : null,
+      paymentMethod: quarterResult ? quarterResult.paymentMethod : "Caju Saldo Livre",
     },
     events: eventSummaries,
   });

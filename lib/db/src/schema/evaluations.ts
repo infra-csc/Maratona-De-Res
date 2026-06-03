@@ -6,10 +6,11 @@ import { employeesTable } from "./employees";
 import { criteriaTable } from "./criteria";
 import { usersTable } from "./users";
 
+// Avaliação por TIME do evento: a nota é por (evento, critério, avaliador).
+// O resultado do evento é aplicado a TODOS os participantes do time.
 export const evaluationsTable = pgTable("evaluations", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
-  employeeId: integer("employee_id").notNull().references(() => employeesTable.id),
   criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
   evaluatorUserId: integer("evaluator_user_id").notNull().references(() => usersTable.id),
   score: numeric("score", { precision: 5, scale: 2 }).notNull(),
@@ -20,10 +21,10 @@ export const evaluationsTable = pgTable("evaluations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Calibração no nível do critério do evento/time (não por colaborador).
 export const calibrationsTable = pgTable("calibrations", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
-  employeeId: integer("employee_id").notNull().references(() => employeesTable.id),
   criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
   originalAverageScore: numeric("original_average_score", { precision: 5, scale: 2 }),
   calibratedScore: numeric("calibrated_score", { precision: 5, scale: 2 }).notNull(),
@@ -32,8 +33,24 @@ export const calibrationsTable = pgTable("calibrations", {
   calibratedAt: timestamp("calibrated_at").notNull().defaultNow(),
 });
 
+// Resultado do evento gravado por colaborador (mesma nota para todos do time),
+// para cálculo trimestral individual.
+export const employeeEventResultsTable = pgTable("employee_event_results", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
+  employeeId: integer("employee_id").notNull().references(() => employeesTable.id),
+  eventScore: numeric("event_score", { precision: 6, scale: 2 }).notNull().default("0"),
+  calibratedEventScore: numeric("calibrated_event_score", { precision: 6, scale: 2 }),
+  finalEventScore: numeric("final_event_score", { precision: 6, scale: 2 }).notNull().default("0"),
+  platoonProjected: text("platoon_projected"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const insertEvaluationSchema = createInsertSchema(evaluationsTable).omit({ id: true, createdAt: true });
 export const insertCalibrationSchema = createInsertSchema(calibrationsTable).omit({ id: true, calibratedAt: true });
+export const insertEmployeeEventResultSchema = createInsertSchema(employeeEventResultsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEvaluation = z.infer<typeof insertEvaluationSchema>;
 export type Evaluation = typeof evaluationsTable.$inferSelect;
 export type Calibration = typeof calibrationsTable.$inferSelect;
+export type EmployeeEventResult = typeof employeeEventResultsTable.$inferSelect;

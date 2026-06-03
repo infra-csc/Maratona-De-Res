@@ -9,6 +9,7 @@ export const criteriaTable = pgTable("criteria", {
   name: text("name").notNull(),
   description: text("description"),
   responsibleAreaId: integer("responsible_area_id").references(() => areasTable.id),
+  responsibleAreaLabel: text("responsible_area_label"),
   defaultWeight: numeric("default_weight", { precision: 5, scale: 2 }).notNull().default("1"),
   active: boolean("active").notNull().default(true),
   displayOrder: integer("display_order").notNull().default(0),

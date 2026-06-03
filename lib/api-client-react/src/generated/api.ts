@@ -27,6 +27,7 @@ import type {
   AreaUpdate,
   AuditLogPage,
   AuthResponse,
+  BonusPaymentInput,
   Calibration,
   CalibrationInput,
   CloseQuarterInput,
@@ -37,7 +38,6 @@ import type {
   CsvImportInput,
   DashboardSummary,
   Employee,
-  EmployeeEventResult,
   EmployeeInput,
   EmployeeUpdate,
   Evaluation,
@@ -47,9 +47,11 @@ import type {
   EventCriteriaUpdate,
   EventCriterion,
   EventDetail,
+  EventFeedback,
   EventInput,
   EventParticipant,
   EventParticipantInput,
+  EventTeamResult,
   EventUpdate,
   ExportCajuBonusesParams,
   ExportEventResultsParams,
@@ -66,6 +68,7 @@ import type {
   GetEmployeesParams,
   GetEvaluationsParams,
   GetEventsParams,
+  GetQuarterEligibilityParams,
   GetQuarterlyResultsParams,
   GetRankingParams,
   HealthStatus,
@@ -77,6 +80,8 @@ import type {
   PlatoonRuleInput,
   PlatoonRuleUpdate,
   QuarterCloseResult,
+  QuarterEligibility,
+  QuarterEligibilityInput,
   QuarterlyEvolution,
   QuarterlyResult,
   RankingEntry,
@@ -1963,9 +1968,9 @@ export const getGetEventResultUrl = (id: number,) => {
 /**
  * @summary Get event results
  */
-export const getEventResult = async (id: number, options?: RequestInit): Promise<EmployeeEventResult[]> => {
+export const getEventResult = async (id: number, options?: RequestInit): Promise<EventTeamResult> => {
 
-  return customFetch<EmployeeEventResult[]>(getGetEventResultUrl(id),
+  return customFetch<EventTeamResult>(getGetEventResultUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2028,6 +2033,153 @@ export function useGetEventResult<TData = Awaited<ReturnType<typeof getEventResu
 
 
 
+
+export const getGetEventFeedbackUrl = (id: number,) => {
+
+
+
+
+  return `/api/events/${id}/feedback`
+}
+
+/**
+ * @summary Get event team feedback (gated on completion; no evaluator names)
+ */
+export const getEventFeedback = async (id: number, options?: RequestInit): Promise<EventFeedback> => {
+
+  return customFetch<EventFeedback>(getGetEventFeedbackUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEventFeedbackQueryKey = (id: number,) => {
+    return [
+    `/api/events/${id}/feedback`
+    ] as const;
+    }
+
+
+export const getGetEventFeedbackQueryOptions = <TData = Awaited<ReturnType<typeof getEventFeedback>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventFeedback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEventFeedbackQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEventFeedback>>> = ({ signal }) => getEventFeedback(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEventFeedback>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEventFeedbackQueryResult = NonNullable<Awaited<ReturnType<typeof getEventFeedback>>>
+export type GetEventFeedbackQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get event team feedback (gated on completion; no evaluator names)
+ */
+
+export function useGetEventFeedback<TData = Awaited<ReturnType<typeof getEventFeedback>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventFeedback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEventFeedbackQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReleaseEventFeedbackUrl = (id: number,) => {
+
+
+
+
+  return `/api/events/${id}/feedback/release`
+}
+
+/**
+ * @summary Release event feedback to participants (after all evaluations done)
+ */
+export const releaseEventFeedback = async (id: number, options?: RequestInit): Promise<EventFeedback> => {
+
+  return customFetch<EventFeedback>(getReleaseEventFeedbackUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReleaseEventFeedbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseEventFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof releaseEventFeedback>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['releaseEventFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof releaseEventFeedback>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  releaseEventFeedback(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReleaseEventFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof releaseEventFeedback>>>
+
+    export type ReleaseEventFeedbackMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Release event feedback to participants (after all evaluations done)
+ */
+export const useReleaseEventFeedback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseEventFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof releaseEventFeedback>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getReleaseEventFeedbackMutationOptions(options));
+    }
 
 export const getGetEventParticipantsUrl = (id: number,) => {
 
@@ -4294,6 +4446,233 @@ export const useCloseQuarter = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCloseQuarterMutationOptions(options));
+    }
+
+export const getUpdateBonusPaymentUrl = (id: number,) => {
+
+
+
+
+  return `/api/results/quarterly/${id}/payment`
+}
+
+/**
+ * @summary Update bonus payment status (Caju Saldo Livre)
+ */
+export const updateBonusPayment = async (id: number,
+    bonusPaymentInput: BonusPaymentInput, options?: RequestInit): Promise<QuarterlyResult> => {
+
+  return customFetch<QuarterlyResult>(getUpdateBonusPaymentUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bonusPaymentInput,)
+  }
+);}
+
+
+
+
+export const getUpdateBonusPaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBonusPayment>>, TError,{id: number;data: BodyType<BonusPaymentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBonusPayment>>, TError,{id: number;data: BodyType<BonusPaymentInput>}, TContext> => {
+
+const mutationKey = ['updateBonusPayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBonusPayment>>, {id: number;data: BodyType<BonusPaymentInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateBonusPayment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBonusPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof updateBonusPayment>>>
+    export type UpdateBonusPaymentMutationBody = BodyType<BonusPaymentInput>
+    export type UpdateBonusPaymentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update bonus payment status (Caju Saldo Livre)
+ */
+export const useUpdateBonusPayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBonusPayment>>, TError,{id: number;data: BodyType<BonusPaymentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBonusPayment>>,
+        TError,
+        {id: number;data: BodyType<BonusPaymentInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateBonusPaymentMutationOptions(options));
+    }
+
+export const getGetQuarterEligibilityUrl = (params?: GetQuarterEligibilityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/quarter-eligibility?${stringifiedParams}` : `/api/quarter-eligibility`
+}
+
+/**
+ * @summary List quarterly ineligibility records
+ */
+export const getQuarterEligibility = async (params?: GetQuarterEligibilityParams, options?: RequestInit): Promise<QuarterEligibility[]> => {
+
+  return customFetch<QuarterEligibility[]>(getGetQuarterEligibilityUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetQuarterEligibilityQueryKey = (params?: GetQuarterEligibilityParams,) => {
+    return [
+    `/api/quarter-eligibility`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetQuarterEligibilityQueryOptions = <TData = Awaited<ReturnType<typeof getQuarterEligibility>>, TError = ErrorType<unknown>>(params?: GetQuarterEligibilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQuarterEligibilityQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuarterEligibility>>> = ({ signal }) => getQuarterEligibility(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQuarterEligibility>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetQuarterEligibilityQueryResult = NonNullable<Awaited<ReturnType<typeof getQuarterEligibility>>>
+export type GetQuarterEligibilityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List quarterly ineligibility records
+ */
+
+export function useGetQuarterEligibility<TData = Awaited<ReturnType<typeof getQuarterEligibility>>, TError = ErrorType<unknown>>(
+ params?: GetQuarterEligibilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetQuarterEligibilityQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSetQuarterEligibilityUrl = () => {
+
+
+
+
+  return `/api/quarter-eligibility`
+}
+
+/**
+ * @summary Set quarterly eligibility for an employee
+ */
+export const setQuarterEligibility = async (quarterEligibilityInput: QuarterEligibilityInput, options?: RequestInit): Promise<QuarterEligibility> => {
+
+  return customFetch<QuarterEligibility>(getSetQuarterEligibilityUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      quarterEligibilityInput,)
+  }
+);}
+
+
+
+
+export const getSetQuarterEligibilityMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setQuarterEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setQuarterEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext> => {
+
+const mutationKey = ['setQuarterEligibility'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setQuarterEligibility>>, {data: BodyType<QuarterEligibilityInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setQuarterEligibility(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetQuarterEligibilityMutationResult = NonNullable<Awaited<ReturnType<typeof setQuarterEligibility>>>
+    export type SetQuarterEligibilityMutationBody = BodyType<QuarterEligibilityInput>
+    export type SetQuarterEligibilityMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set quarterly eligibility for an employee
+ */
+export const useSetQuarterEligibility = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setQuarterEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setQuarterEligibility>>,
+        TError,
+        {data: BodyType<QuarterEligibilityInput>},
+        TContext
+      > => {
+      return useMutation(getSetQuarterEligibilityMutationOptions(options));
     }
 
 export const getGetRankingUrl = (params: GetRankingParams,) => {

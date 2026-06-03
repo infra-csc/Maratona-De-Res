@@ -33,6 +33,7 @@ export const LoginResponse = zod.object({
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
+  "employeeId": zod.number().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -49,6 +50,7 @@ export const GetMeResponse = zod.object({
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
+  "employeeId": zod.number().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -64,6 +66,7 @@ export const GetUsersResponseItem = zod.object({
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
+  "employeeId": zod.number().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -96,6 +99,7 @@ export const GetUserResponse = zod.object({
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
+  "employeeId": zod.number().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -123,6 +127,7 @@ export const UpdateUserResponse = zod.object({
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
+  "employeeId": zod.number().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -207,6 +212,9 @@ export const GetEmployeesResponseItem = zod.object({
   "department": zod.string(),
   "functionName": zod.string(),
   "active": zod.boolean(),
+  "eligibleForBonus": zod.boolean().optional(),
+  "eligibilityStatus": zod.string().nullish(),
+  "eligibilityReason": zod.string().nullish(),
   "sourceType": zod.string().optional(),
   "createdAt": zod.string().optional()
 })
@@ -243,6 +251,9 @@ export const GetEmployeeResponse = zod.object({
   "department": zod.string(),
   "functionName": zod.string(),
   "active": zod.boolean(),
+  "eligibleForBonus": zod.boolean().optional(),
+  "eligibilityStatus": zod.string().nullish(),
+  "eligibilityReason": zod.string().nullish(),
   "sourceType": zod.string().optional(),
   "createdAt": zod.string().optional()
 })
@@ -262,7 +273,10 @@ export const UpdateEmployeeBody = zod.object({
   "phone": zod.string().optional(),
   "department": zod.string().optional(),
   "functionName": zod.string().optional(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "eligibleForBonus": zod.boolean().optional(),
+  "eligibilityStatus": zod.string().optional(),
+  "eligibilityReason": zod.string().optional()
 })
 
 export const UpdateEmployeeResponse = zod.object({
@@ -275,6 +289,9 @@ export const UpdateEmployeeResponse = zod.object({
   "department": zod.string(),
   "functionName": zod.string(),
   "active": zod.boolean(),
+  "eligibleForBonus": zod.boolean().optional(),
+  "eligibilityStatus": zod.string().nullish(),
+  "eligibilityReason": zod.string().nullish(),
   "sourceType": zod.string().optional(),
   "createdAt": zod.string().optional()
 })
@@ -288,6 +305,7 @@ export const GetEmployeeHistoryParams = zod.object({
 })
 
 export const GetEmployeeHistoryResponseItem = zod.object({
+  "id": zod.number().optional(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
   "year": zod.number(),
@@ -300,6 +318,13 @@ export const GetEmployeeHistoryResponseItem = zod.object({
   "platoon": zod.string().nullable(),
   "platoonColor": zod.string().nullish(),
   "bonusValue": zod.number(),
+  "eligible": zod.boolean().optional(),
+  "eligibilityReason": zod.string().nullish(),
+  "bonusStatus": zod.string().nullish(),
+  "paymentMethod": zod.string().nullish(),
+  "paymentDueDate": zod.string().nullish(),
+  "paidAt": zod.string().nullish(),
+  "paymentNotes": zod.string().nullish(),
   "eventBreakdown": zod.array(zod.object({
   "eventId": zod.number(),
   "eventName": zod.string(),
@@ -547,24 +572,84 @@ export const GetEventResultParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const GetEventResultResponseItem = zod.object({
-  "employeeId": zod.number(),
-  "employeeName": zod.string(),
+export const GetEventResultResponse = zod.object({
   "eventId": zod.number(),
+  "eventName": zod.string().optional(),
+  "eventStatus": zod.string().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "eventScore": zod.number(),
   "projectedPlatoon": zod.string().nullish(),
+  "projectedPlatoonColor": zod.string().nullish(),
+  "projectedBonus": zod.number().optional(),
+  "totalCriteria": zod.number(),
+  "evaluatedCriteria": zod.number(),
+  "pendingCriteria": zod.number().optional(),
+  "isComplete": zod.boolean(),
+  "hasCalibration": zod.boolean().optional(),
   "criteriaDetails": zod.array(zod.object({
   "criterionId": zod.number(),
   "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaLabel": zod.string().nullish(),
+  "weight": zod.number(),
   "averageScore": zod.number().nullish(),
   "calibratedScore": zod.number().nullish(),
   "scoreUsed": zod.number().nullish(),
-  "scorePercentual": zod.number().nullish(),
-  "normalizedWeight": zod.number(),
-  "weightedContribution": zod.number().nullish()
+  "criterionTotal": zod.number().nullish(),
+  "status": zod.string()
+})).optional(),
+  "participants": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "functionName": zod.string().optional(),
+  "eligible": zod.boolean().optional(),
+  "eventScore": zod.number()
 })).optional()
 })
-export const GetEventResultResponse = zod.array(GetEventResultResponseItem)
+
+
+/**
+ * @summary Get event team feedback (gated on completion; no evaluator names)
+ */
+export const GetEventFeedbackParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEventFeedbackResponse = zod.object({
+  "eventId": zod.number(),
+  "eventName": zod.string(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "totalCriteria": zod.number().optional(),
+  "evaluatedCriteria": zod.number().optional(),
+  "isComplete": zod.boolean(),
+  "feedbackReleased": zod.boolean(),
+  "highlights": zod.array(zod.string()).optional(),
+  "attentionPoints": zod.array(zod.string()).optional(),
+  "text": zod.string()
+})
+
+
+/**
+ * @summary Release event feedback to participants (after all evaluations done)
+ */
+export const ReleaseEventFeedbackParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReleaseEventFeedbackResponse = zod.object({
+  "eventId": zod.number(),
+  "eventName": zod.string(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "totalCriteria": zod.number().optional(),
+  "evaluatedCriteria": zod.number().optional(),
+  "isComplete": zod.boolean(),
+  "feedbackReleased": zod.boolean(),
+  "highlights": zod.array(zod.string()).optional(),
+  "attentionPoints": zod.array(zod.string()).optional(),
+  "text": zod.string()
+})
 
 
 /**
@@ -716,21 +801,19 @@ export const UpdateCriterionResponse = zod.object({
  */
 export const GetEvaluationsQueryParams = zod.object({
   "eventId": zod.coerce.number().optional(),
-  "employeeId": zod.coerce.number().optional(),
   "status": zod.coerce.string().optional()
 })
 
 export const GetEvaluationsResponseItem = zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "employeeId": zod.number(),
-  "employeeName": zod.string().optional(),
   "criterionId": zod.number(),
-  "criterionName": zod.string().optional(),
-  "evaluatorUserId": zod.number(),
-  "evaluatorName": zod.string().optional(),
+  "criterionName": zod.string().nullish(),
+  "evaluatorUserId": zod.number().nullish(),
+  "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
   "createdAt": zod.string().optional()
@@ -743,10 +826,10 @@ export const GetEvaluationsResponse = zod.array(GetEvaluationsResponseItem)
  */
 export const CreateEvaluationBody = zod.object({
   "eventId": zod.number(),
-  "employeeId": zod.number(),
   "criterionId": zod.number(),
   "score": zod.number(),
-  "comments": zod.string().optional()
+  "comments": zod.string().optional(),
+  "commentVisibility": zod.string().optional()
 })
 
 
@@ -759,20 +842,20 @@ export const UpdateEvaluationParams = zod.object({
 
 export const UpdateEvaluationBody = zod.object({
   "score": zod.number().optional(),
-  "comments": zod.string().optional()
+  "comments": zod.string().optional(),
+  "commentVisibility": zod.string().optional()
 })
 
 export const UpdateEvaluationResponse = zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "employeeId": zod.number(),
-  "employeeName": zod.string().optional(),
   "criterionId": zod.number(),
-  "criterionName": zod.string().optional(),
-  "evaluatorUserId": zod.number(),
-  "evaluatorName": zod.string().optional(),
+  "criterionName": zod.string().nullish(),
+  "evaluatorUserId": zod.number().nullish(),
+  "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
   "createdAt": zod.string().optional()
@@ -789,14 +872,13 @@ export const SubmitEvaluationParams = zod.object({
 export const SubmitEvaluationResponse = zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "employeeId": zod.number(),
-  "employeeName": zod.string().optional(),
   "criterionId": zod.number(),
-  "criterionName": zod.string().optional(),
-  "evaluatorUserId": zod.number(),
-  "evaluatorName": zod.string().optional(),
+  "criterionName": zod.string().nullish(),
+  "evaluatorUserId": zod.number().nullish(),
+  "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
   "createdAt": zod.string().optional()
@@ -813,14 +895,13 @@ export const ReopenEvaluationParams = zod.object({
 export const ReopenEvaluationResponse = zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "employeeId": zod.number(),
-  "employeeName": zod.string().optional(),
   "criterionId": zod.number(),
-  "criterionName": zod.string().optional(),
-  "evaluatorUserId": zod.number(),
-  "evaluatorName": zod.string().optional(),
+  "criterionName": zod.string().nullish(),
+  "evaluatorUserId": zod.number().nullish(),
+  "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
   "createdAt": zod.string().optional()
@@ -831,23 +912,20 @@ export const ReopenEvaluationResponse = zod.object({
  * @summary List calibrations
  */
 export const GetCalibrationsQueryParams = zod.object({
-  "eventId": zod.coerce.number().optional(),
-  "employeeId": zod.coerce.number().optional()
+  "eventId": zod.coerce.number().optional()
 })
 
 export const GetCalibrationsResponseItem = zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "employeeId": zod.number(),
-  "employeeName": zod.string().optional(),
   "criterionId": zod.number(),
-  "criterionName": zod.string().optional(),
+  "criterionName": zod.string().nullish(),
   "responsibleAreaName": zod.string().nullish(),
   "originalAverageScore": zod.number().nullish(),
   "calibratedScore": zod.number(),
   "calibrationReason": zod.string(),
   "calibratedByUserId": zod.number().optional(),
-  "calibratedByName": zod.string().optional(),
+  "calibratedByName": zod.string().nullish(),
   "calibratedAt": zod.string().optional()
 })
 export const GetCalibrationsResponse = zod.array(GetCalibrationsResponseItem)
@@ -858,10 +936,10 @@ export const GetCalibrationsResponse = zod.array(GetCalibrationsResponseItem)
  */
 export const CreateCalibrationBody = zod.object({
   "eventId": zod.number(),
-  "employeeId": zod.number(),
   "criterionId": zod.number(),
   "calibratedScore": zod.number(),
-  "calibrationReason": zod.string()
+  "calibrationReason": zod.string(),
+  "originalAverageScore": zod.number().optional()
 })
 
 
@@ -1082,6 +1160,7 @@ export const GetDashboardTopEmployeesQueryParams = zod.object({
 })
 
 export const GetDashboardTopEmployeesResponseItem = zod.object({
+  "id": zod.number().optional(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
   "year": zod.number(),
@@ -1094,6 +1173,13 @@ export const GetDashboardTopEmployeesResponseItem = zod.object({
   "platoon": zod.string().nullable(),
   "platoonColor": zod.string().nullish(),
   "bonusValue": zod.number(),
+  "eligible": zod.boolean().optional(),
+  "eligibilityReason": zod.string().nullish(),
+  "bonusStatus": zod.string().nullish(),
+  "paymentMethod": zod.string().nullish(),
+  "paymentDueDate": zod.string().nullish(),
+  "paidAt": zod.string().nullish(),
+  "paymentNotes": zod.string().nullish(),
   "eventBreakdown": zod.array(zod.object({
   "eventId": zod.number(),
   "eventName": zod.string(),
@@ -1130,6 +1216,7 @@ export const GetQuarterlyResultsQueryParams = zod.object({
 })
 
 export const GetQuarterlyResultsResponseItem = zod.object({
+  "id": zod.number().optional(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
   "year": zod.number(),
@@ -1142,6 +1229,13 @@ export const GetQuarterlyResultsResponseItem = zod.object({
   "platoon": zod.string().nullable(),
   "platoonColor": zod.string().nullish(),
   "bonusValue": zod.number(),
+  "eligible": zod.boolean().optional(),
+  "eligibilityReason": zod.string().nullish(),
+  "bonusStatus": zod.string().nullish(),
+  "paymentMethod": zod.string().nullish(),
+  "paymentDueDate": zod.string().nullish(),
+  "paidAt": zod.string().nullish(),
+  "paymentNotes": zod.string().nullish(),
   "eventBreakdown": zod.array(zod.object({
   "eventId": zod.number(),
   "eventName": zod.string(),
@@ -1167,6 +1261,86 @@ export const CloseQuarterResponse = zod.object({
   "quarter": zod.number(),
   "totalProcessed": zod.number(),
   "warnings": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Update bonus payment status (Caju Saldo Livre)
+ */
+export const UpdateBonusPaymentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateBonusPaymentBody = zod.object({
+  "bonusStatus": zod.string().optional(),
+  "paymentMethod": zod.string().optional(),
+  "paymentDueDate": zod.string().optional(),
+  "paidAt": zod.string().nullish(),
+  "paymentNotes": zod.string().optional()
+})
+
+export const UpdateBonusPaymentResponse = zod.object({
+  "id": zod.number().optional(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "year": zod.number(),
+  "quarter": zod.number(),
+  "eventsCount": zod.number().optional(),
+  "grossAverage": zod.number().optional(),
+  "totalAbsences": zod.number().optional(),
+  "absencePenalty": zod.number().optional(),
+  "finalResult": zod.number(),
+  "platoon": zod.string().nullable(),
+  "platoonColor": zod.string().nullish(),
+  "bonusValue": zod.number(),
+  "eligible": zod.boolean().optional(),
+  "eligibilityReason": zod.string().nullish(),
+  "bonusStatus": zod.string().nullish(),
+  "paymentMethod": zod.string().nullish(),
+  "paymentDueDate": zod.string().nullish(),
+  "paidAt": zod.string().nullish(),
+  "paymentNotes": zod.string().nullish(),
+  "eventBreakdown": zod.array(zod.object({
+  "eventId": zod.number(),
+  "eventName": zod.string(),
+  "score": zod.number()
+})).optional()
+})
+
+
+/**
+ * @summary List quarterly ineligibility records
+ */
+export const GetQuarterEligibilityQueryParams = zod.object({
+  "year": zod.coerce.number().optional(),
+  "quarter": zod.coerce.number().optional(),
+  "employeeId": zod.coerce.number().optional()
+})
+
+export const GetQuarterEligibilityResponseItem = zod.object({
+  "id": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string().nullish(),
+  "year": zod.number(),
+  "quarter": zod.number(),
+  "eligible": zod.boolean(),
+  "reason": zod.string().nullish(),
+  "createdByUserId": zod.number().nullish(),
+  "createdByName": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
+})
+export const GetQuarterEligibilityResponse = zod.array(GetQuarterEligibilityResponseItem)
+
+
+/**
+ * @summary Set quarterly eligibility for an employee
+ */
+export const SetQuarterEligibilityBody = zod.object({
+  "employeeId": zod.number(),
+  "year": zod.number(),
+  "quarter": zod.number(),
+  "eligible": zod.boolean(),
+  "reason": zod.string().optional()
 })
 
 

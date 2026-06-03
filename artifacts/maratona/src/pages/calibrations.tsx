@@ -1,19 +1,17 @@
 import { useState } from "react";
-import { useGetEvents, useGetCalibrations, useGetEventParticipants, useGetEventCriteria, useGetEvaluations, useCreateCalibration, getGetCalibrationsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, getGetCalibrationsQueryKey } from "@workspace/api-client-react";
 import type { CalibrationInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Target, Plus } from "lucide-react";
 
 const currentYear = new Date().getFullYear();
-const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
 
 export default function CalibrationsPage() {
   const { toast } = useToast();
@@ -22,9 +20,6 @@ export default function CalibrationsPage() {
   const [open, setOpen] = useState(false);
 
   const { data: events } = useGetEvents({ year: currentYear });
-  const { data: participants } = useGetEventParticipants(selectedEventId!, {
-    query: { enabled: !!selectedEventId, queryKey: ["ep", selectedEventId] as unknown[] },
-  });
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["ec", selectedEventId] as unknown[] },
   });
@@ -38,7 +33,7 @@ export default function CalibrationsPage() {
     { query: { enabled: !!selectedEventId, queryKey: calQKey } }
   );
 
-  const { register, handleSubmit, reset, setValue, watch } = useForm<CalibrationInput & { employeeId: number; criterionId: number }>();
+  const { register, handleSubmit, reset, setValue } = useForm<CalibrationInput & { criterionId: number }>();
 
   const createMutation = useCreateCalibration({
     mutation: {
@@ -52,27 +47,27 @@ export default function CalibrationsPage() {
     },
   });
 
-  function getAvgScore(empId: number, critId: number) {
+  function getAvgScore(critId: number) {
     const scores = (evaluations ?? [])
-      .filter(e => e.employeeId === empId && e.criterionId === critId && e.status === "submitted")
+      .filter(e => e.criterionId === critId && e.status === "submitted")
       .map(e => parseFloat(e.score as unknown as string));
     return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   }
 
-  function getCalibration(empId: number, critId: number) {
-    return (calibrations ?? []).find(c => c.employeeId === empId && c.criterionId === critId);
+  function getCalibration(critId: number) {
+    return (calibrations ?? []).find(c => c.criterionId === critId);
   }
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 data-testid="text-page-title" className="text-2xl font-bold flex items-center gap-2">
             <Target size={22} className="text-primary" /> Calibrações
           </h1>
-          <p className="text-muted-foreground text-sm">Ajuste as notas por responsável de área</p>
+          <p className="text-muted-foreground text-sm">Ajuste a nota da equipe por critério (nível do evento)</p>
         </div>
         {selectedEventId && (
           <Dialog open={open} onOpenChange={setOpen}>
@@ -84,28 +79,21 @@ export default function CalibrationsPage() {
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle>Registrar Calibração</DialogTitle></DialogHeader>
               <form
-                onSubmit={handleSubmit(d => createMutation.mutate({
-                  data: {
-                    eventId: selectedEventId,
-                    employeeId: Number(d.employeeId),
-                    criterionId: Number(d.criterionId),
-                    calibratedScore: Number(d.calibratedScore),
-                    calibrationReason: d.calibrationReason,
-                  },
-                }))}
+                onSubmit={handleSubmit(d => {
+                  const critId = Number(d.criterionId);
+                  const avg = getAvgScore(critId);
+                  createMutation.mutate({
+                    data: {
+                      eventId: selectedEventId,
+                      criterionId: critId,
+                      calibratedScore: Number(d.calibratedScore),
+                      calibrationReason: d.calibrationReason,
+                      originalAverageScore: avg ?? undefined,
+                    },
+                  });
+                })}
                 className="space-y-3 pt-2"
               >
-                <div className="space-y-1.5">
-                  <Label>Colaborador</Label>
-                  <Select onValueChange={v => setValue("employeeId", Number(v))}>
-                    <SelectTrigger data-testid="select-cal-employee"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {(participants ?? []).map(p => (
-                        <SelectItem key={p.employeeId} value={String(p.employeeId)}>{p.employeeName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-1.5">
                   <Label>Critério</Label>
                   <Select onValueChange={v => setValue("criterionId", Number(v))}>
@@ -118,11 +106,11 @@ export default function CalibrationsPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Nota Calibrada (0-5)</Label>
+                  <Label>Nota Calibrada (1-5)</Label>
                   <Input
                     data-testid="input-calibrated-score"
                     type="number"
-                    min="0" max="5" step="0.1"
+                    min="1" max="5" step="1"
                     {...register("calibratedScore", { required: true, valueAsNumber: true })}
                   />
                 </div>
@@ -165,35 +153,33 @@ export default function CalibrationsPage() {
           <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="bg-muted/50 text-muted-foreground">
-                <th className="px-4 py-3 text-left font-medium">Colaborador</th>
                 <th className="px-4 py-3 text-left font-medium">Critério</th>
+                <th className="px-4 py-3 text-left font-medium">Área Responsável</th>
                 <th className="px-4 py-3 text-center font-medium">Nota Média</th>
                 <th className="px-4 py-3 text-center font-medium">Nota Calibrada</th>
                 <th className="px-4 py-3 text-left font-medium">Justificativa</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {(participants ?? []).flatMap(p =>
-                activeCriteria.map(c => {
-                  const avg = getAvgScore(p.employeeId, c.criterionId);
-                  const cal = getCalibration(p.employeeId, c.criterionId);
-                  return (
-                    <tr key={`${p.employeeId}-${c.criterionId}`} data-testid={`row-cal-${p.employeeId}-${c.criterionId}`} className="hover:bg-muted/30">
-                      <td className="px-4 py-2.5 font-medium">{p.employeeName}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{c.criterionName}</td>
-                      <td className="px-4 py-2.5 text-center">{avg != null ? avg.toFixed(2) : "—"}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        {cal ? (
-                          <span className="font-bold text-primary">{parseFloat(cal.calibratedScore as unknown as string).toFixed(2)}</span>
-                        ) : "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-48">{cal?.calibrationReason ?? "—"}</td>
-                    </tr>
-                  );
-                })
-              )}
-              {(!participants || participants.length === 0) && (
-                <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum participante</td></tr>
+              {activeCriteria.map(c => {
+                const avg = getAvgScore(c.criterionId);
+                const cal = getCalibration(c.criterionId);
+                return (
+                  <tr key={c.criterionId} data-testid={`row-cal-${c.criterionId}`} className="hover:bg-muted/30">
+                    <td className="px-4 py-2.5 font-medium">{c.criterionName}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground text-xs">{c.responsibleAreaName ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-center">{avg != null ? avg.toFixed(2) : "—"}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      {cal ? (
+                        <span className="font-bold text-primary">{parseFloat(cal.calibratedScore as unknown as string).toFixed(2)}</span>
+                      ) : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-48">{cal?.calibrationReason ?? "—"}</td>
+                  </tr>
+                );
+              })}
+              {activeCriteria.length === 0 && (
+                <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum critério ativo</td></tr>
               )}
             </tbody>
           </table>

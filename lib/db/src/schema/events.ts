@@ -18,6 +18,8 @@ export const eventsTable = pgTable("events", {
   status: text("status").notNull().default("open"),
   forcedClosed: boolean("forced_closed").notNull().default(false),
   forcedCloseReason: text("forced_close_reason"),
+  feedbackReleased: boolean("feedback_released").notNull().default(false),
+  feedbackReleasedAt: timestamp("feedback_released_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

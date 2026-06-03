@@ -41,9 +41,13 @@ router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
 
 router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const { name, document, email, phone, department, functionName, active } = req.body;
+  const { name, document, email, phone, department, functionName, active, eligibleForBonus, eligibilityStatus, eligibilityReason } = req.body;
   const [before] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (eligibilityStatus !== undefined && !["eligible", "not_eligible", "suspended", "terminated"].includes(eligibilityStatus)) {
+    res.status(400).json({ error: "eligibilityStatus inválido" });
+    return;
+  }
   const [employee] = await db.update(employeesTable).set({
     ...(name !== undefined && { name }),
     ...(document !== undefined && { document }),
@@ -52,6 +56,9 @@ router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(department !== undefined && { department }),
     ...(functionName !== undefined && { functionName }),
     ...(active !== undefined && { active }),
+    ...(eligibleForBonus !== undefined && { eligibleForBonus }),
+    ...(eligibilityStatus !== undefined && { eligibilityStatus }),
+    ...(eligibilityReason !== undefined && { eligibilityReason }),
   }).where(eq(employeesTable.id, id)).returning();
   await audit(req.user!.userId, "update", "employees", id, before, employee);
   res.json(employee);

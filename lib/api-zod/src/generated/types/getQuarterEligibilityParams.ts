@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetCalibrationsParams = {
-eventId?: number;
+export type GetQuarterEligibilityParams = {
+year?: number;
+quarter?: number;
+employeeId?: number;
 };

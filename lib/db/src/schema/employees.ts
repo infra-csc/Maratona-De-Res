@@ -12,6 +12,10 @@ export const employeesTable = pgTable("employees", {
   department: text("department").notNull().default("Geral"),
   functionName: text("function_name").notNull().default("Colaborador"),
   active: boolean("active").notNull().default(true),
+  // Elegibilidade ao programa de bonificação
+  eligibleForBonus: boolean("eligible_for_bonus").notNull().default(true),
+  eligibilityStatus: text("eligibility_status").notNull().default("eligible"), // eligible | not_eligible | suspended | terminated
+  eligibilityReason: text("eligibility_reason"),
   sourceType: text("source_type").notNull().default("manual"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

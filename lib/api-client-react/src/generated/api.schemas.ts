@@ -89,6 +89,11 @@ export interface Employee {
   department: string;
   functionName: string;
   active: boolean;
+  eligibleForBonus?: boolean;
+  /** @nullable */
+  eligibilityStatus?: string | null;
+  /** @nullable */
+  eligibilityReason?: string | null;
   sourceType?: string;
   createdAt?: string;
 }
@@ -110,6 +115,9 @@ export interface EmployeeUpdate {
   department?: string;
   functionName?: string;
   active?: boolean;
+  eligibleForBonus?: boolean;
+  eligibilityStatus?: string;
+  eligibilityReason?: string;
 }
 
 export interface Event {
@@ -303,15 +311,17 @@ export interface EventCriteriaUpdate {
 export interface Evaluation {
   id: number;
   eventId: number;
-  employeeId: number;
-  employeeName?: string;
   criterionId: number;
-  criterionName?: string;
-  evaluatorUserId: number;
-  evaluatorName?: string;
+  /** @nullable */
+  criterionName?: string | null;
+  /** @nullable */
+  evaluatorUserId?: number | null;
+  /** @nullable */
+  evaluatorName?: string | null;
   score: number;
   /** @nullable */
   comments?: string | null;
+  commentVisibility?: string;
   status: string;
   /** @nullable */
   submittedAt?: string | null;
@@ -320,24 +330,24 @@ export interface Evaluation {
 
 export interface EvaluationInput {
   eventId: number;
-  employeeId: number;
   criterionId: number;
   score: number;
   comments?: string;
+  commentVisibility?: string;
 }
 
 export interface EvaluationUpdate {
   score?: number;
   comments?: string;
+  commentVisibility?: string;
 }
 
 export interface Calibration {
   id: number;
   eventId: number;
-  employeeId: number;
-  employeeName?: string;
   criterionId: number;
-  criterionName?: string;
+  /** @nullable */
+  criterionName?: string | null;
   /** @nullable */
   responsibleAreaName?: string | null;
   /** @nullable */
@@ -345,16 +355,17 @@ export interface Calibration {
   calibratedScore: number;
   calibrationReason: string;
   calibratedByUserId?: number;
-  calibratedByName?: string;
+  /** @nullable */
+  calibratedByName?: string | null;
   calibratedAt?: string;
 }
 
 export interface CalibrationInput {
   eventId: number;
-  employeeId: number;
   criterionId: number;
   calibratedScore: number;
   calibrationReason: string;
+  originalAverageScore?: number;
 }
 
 export interface Absence {
@@ -488,6 +499,7 @@ export interface EventBreakdown {
 }
 
 export interface QuarterlyResult {
+  id?: number;
   employeeId: number;
   employeeName: string;
   year: number;
@@ -502,7 +514,116 @@ export interface QuarterlyResult {
   /** @nullable */
   platoonColor?: string | null;
   bonusValue: number;
+  eligible?: boolean;
+  /** @nullable */
+  eligibilityReason?: string | null;
+  /** @nullable */
+  bonusStatus?: string | null;
+  /** @nullable */
+  paymentMethod?: string | null;
+  /** @nullable */
+  paymentDueDate?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  paymentNotes?: string | null;
   eventBreakdown?: EventBreakdown[];
+}
+
+export interface BonusPaymentInput {
+  bonusStatus?: string;
+  paymentMethod?: string;
+  paymentDueDate?: string;
+  /** @nullable */
+  paidAt?: string | null;
+  paymentNotes?: string;
+}
+
+export interface EventTeamCriterion {
+  criterionId: number;
+  criterionName: string;
+  /** @nullable */
+  criterionDescription?: string | null;
+  /** @nullable */
+  responsibleAreaLabel?: string | null;
+  weight: number;
+  /** @nullable */
+  averageScore?: number | null;
+  /** @nullable */
+  calibratedScore?: number | null;
+  /** @nullable */
+  scoreUsed?: number | null;
+  /** @nullable */
+  criterionTotal?: number | null;
+  status: string;
+}
+
+export interface EventTeamParticipant {
+  employeeId: number;
+  employeeName: string;
+  functionName?: string;
+  eligible?: boolean;
+  eventScore: number;
+}
+
+export interface EventTeamResult {
+  eventId: number;
+  eventName?: string;
+  eventStatus?: string;
+  feedbackReleased?: boolean;
+  eventScore: number;
+  /** @nullable */
+  projectedPlatoon?: string | null;
+  /** @nullable */
+  projectedPlatoonColor?: string | null;
+  projectedBonus?: number;
+  totalCriteria: number;
+  evaluatedCriteria: number;
+  pendingCriteria?: number;
+  isComplete: boolean;
+  hasCalibration?: boolean;
+  criteriaDetails?: EventTeamCriterion[];
+  participants?: EventTeamParticipant[];
+}
+
+export interface EventFeedback {
+  eventId: number;
+  eventName: string;
+  eventScore: number;
+  /** @nullable */
+  projectedPlatoon?: string | null;
+  totalCriteria?: number;
+  evaluatedCriteria?: number;
+  isComplete: boolean;
+  feedbackReleased: boolean;
+  highlights?: string[];
+  attentionPoints?: string[];
+  text: string;
+}
+
+export interface QuarterEligibility {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  year: number;
+  quarter: number;
+  eligible: boolean;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  createdByUserId?: number | null;
+  /** @nullable */
+  createdByName?: string | null;
+  updatedAt?: string;
+}
+
+export interface QuarterEligibilityInput {
+  employeeId: number;
+  year: number;
+  quarter: number;
+  eligible: boolean;
+  reason?: string;
 }
 
 export interface CloseQuarterInput {
@@ -603,13 +724,11 @@ status?: string;
 
 export type GetEvaluationsParams = {
 eventId?: number;
-employeeId?: number;
 status?: string;
 };
 
 export type GetCalibrationsParams = {
 eventId?: number;
-employeeId?: number;
 };
 
 export type GetAbsencesParams = {
@@ -642,6 +761,12 @@ year: number;
 quarter: number;
 employeeId?: number;
 platoon?: string;
+};
+
+export type GetQuarterEligibilityParams = {
+year?: number;
+quarter?: number;
+employeeId?: number;
 };
 
 export type GetRankingParams = {

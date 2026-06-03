@@ -9,15 +9,17 @@
 export interface Evaluation {
   id: number;
   eventId: number;
-  employeeId: number;
-  employeeName?: string;
   criterionId: number;
-  criterionName?: string;
-  evaluatorUserId: number;
-  evaluatorName?: string;
+  /** @nullable */
+  criterionName?: string | null;
+  /** @nullable */
+  evaluatorUserId?: number | null;
+  /** @nullable */
+  evaluatorName?: string | null;
   score: number;
   /** @nullable */
   comments?: string | null;
+  commentVisibility?: string;
   status: string;
   /** @nullable */
   submittedAt?: string | null;

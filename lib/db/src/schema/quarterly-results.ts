@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, timestamp, boolean, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
@@ -17,6 +17,14 @@ export const quarterlyResultsTable = pgTable("quarterly_results", {
   platoon: text("platoon"),
   platoonColor: text("platoon_color"),
   bonusValue: numeric("bonus_value", { precision: 10, scale: 2 }).notNull().default("0"),
+  // Elegibilidade e pagamento do bônus
+  eligible: boolean("eligible").notNull().default(true),
+  eligibilityReason: text("eligibility_reason"),
+  bonusStatus: text("bonus_status").notNull().default("projected"), // projected | approved | scheduled | paid | blocked | not_eligible
+  paymentMethod: text("payment_method").notNull().default("Caju Saldo Livre"),
+  paymentDueDate: date("payment_due_date"),
+  paidAt: timestamp("paid_at"),
+  paymentNotes: text("payment_notes"),
   closedAt: timestamp("closed_at"),
   closedByUserId: integer("closed_by_user_id").references(() => usersTable.id),
 });

@@ -9,10 +9,9 @@
 export interface Calibration {
   id: number;
   eventId: number;
-  employeeId: number;
-  employeeName?: string;
   criterionId: number;
-  criterionName?: string;
+  /** @nullable */
+  criterionName?: string | null;
   /** @nullable */
   responsibleAreaName?: string | null;
   /** @nullable */
@@ -20,6 +19,7 @@ export interface Calibration {
   calibratedScore: number;
   calibrationReason: string;
   calibratedByUserId?: number;
-  calibratedByName?: string;
+  /** @nullable */
+  calibratedByName?: string | null;
   calibratedAt?: string;
 }

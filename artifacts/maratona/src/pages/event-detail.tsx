@@ -14,9 +14,10 @@ export default function EventDetailPage() {
     query: { enabled: !!id, queryKey: getGetEventQueryKey(id) },
   });
 
-  const { data: results } = useGetEventResult(id, {
+  const { data: result } = useGetEventResult(id, {
     query: { enabled: !!id, queryKey: ["event-result", id] as unknown[] },
   });
+  const participantResults = result?.participants ?? [];
 
   if (isLoading) {
     return <div className="p-6 text-center text-muted-foreground">Carregando evento...</div>;
@@ -26,7 +27,7 @@ export default function EventDetailPage() {
     return <div className="p-6 text-center text-muted-foreground">Evento não encontrado</div>;
   }
 
-  const fmt = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const fmt = (v: number) => `${v.toFixed(1)}/100`;
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -75,8 +76,8 @@ export default function EventDetailPage() {
         <Card>
           <CardContent className="pt-4">
             <div>
-              <p className="text-sm text-muted-foreground">Com Resultado</p>
-              <p className="text-3xl font-bold mt-1">{results?.filter(r => r.eventScore > 0).length ?? 0}</p>
+              <p className="text-sm text-muted-foreground">Score da Equipe</p>
+              <p className="text-3xl font-bold mt-1">{result && result.eventScore > 0 ? fmt(result.eventScore) : "—"}</p>
             </div>
           </CardContent>
         </Card>
@@ -103,34 +104,54 @@ export default function EventDetailPage() {
         </Card>
       )}
 
-      {results && results.length > 0 && (
+      {result && result.eventScore > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 size={15} /> Resultados do Evento
+              <BarChart3 size={15} /> Resultado da Equipe
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="border rounded-lg overflow-auto">
-              <table className="w-full text-sm min-w-[400px]">
-                <thead>
-                  <tr className="bg-muted/50 text-muted-foreground">
-                    <th className="px-4 py-2 text-left font-medium">Colaborador</th>
-                    <th className="px-4 py-2 text-center font-medium">Score do Evento</th>
-                    <th className="px-4 py-2 text-center font-medium">Pelotão Projetado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {[...results].sort((a, b) => b.eventScore - a.eventScore).map(r => (
-                    <tr key={r.employeeId} data-testid={`row-event-result-${r.employeeId}`} className="hover:bg-muted/30">
-                      <td className="px-4 py-2.5 font-medium">{r.employeeName}</td>
-                      <td className="px-4 py-2.5 text-center font-bold text-primary">{fmt(r.eventScore)}</td>
-                      <td className="px-4 py-2.5 text-center text-muted-foreground text-xs">{r.projectedPlatoon ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-6 flex-wrap">
+              <div>
+                <p className="text-xs text-muted-foreground">Score do Evento</p>
+                <p className="text-3xl font-bold text-primary">{fmt(result.eventScore)}</p>
+              </div>
+              {result.projectedPlatoon && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Pelotão Projetado</p>
+                  <span className="text-sm px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: (result.projectedPlatoonColor ?? "#94a3b8") + "25", color: result.projectedPlatoonColor ?? "#94a3b8" }}>
+                    {result.projectedPlatoon}
+                  </span>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-muted-foreground">Critérios avaliados</p>
+                <p className="text-lg font-semibold">{result.evaluatedCriteria}/{result.totalCriteria}</p>
+              </div>
             </div>
+            {participantResults.length > 0 && (
+              <div className="border rounded-lg overflow-auto">
+                <table className="w-full text-sm min-w-[400px]">
+                  <thead>
+                    <tr className="bg-muted/50 text-muted-foreground">
+                      <th className="px-4 py-2 text-left font-medium">Colaborador</th>
+                      <th className="px-4 py-2 text-center font-medium">Score (Equipe)</th>
+                      <th className="px-4 py-2 text-center font-medium">Elegível</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {participantResults.map(p => (
+                      <tr key={p.employeeId} data-testid={`row-event-result-${p.employeeId}`} className="hover:bg-muted/30">
+                        <td className="px-4 py-2.5 font-medium">{p.employeeName}</td>
+                        <td className="px-4 py-2.5 text-center font-bold text-primary">{fmt(p.eventScore)}</td>
+                        <td className="px-4 py-2.5 text-center text-xs text-muted-foreground">{p.eligible === false ? "Não" : "Sim"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

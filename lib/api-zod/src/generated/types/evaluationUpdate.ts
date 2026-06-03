@@ -9,4 +9,5 @@
 export interface EvaluationUpdate {
   score?: number;
   comments?: string;
+  commentVisibility?: string;
 }

@@ -8,6 +8,7 @@
 import type { EventBreakdown } from './eventBreakdown';
 
 export interface QuarterlyResult {
+  id?: number;
   employeeId: number;
   employeeName: string;
   year: number;
@@ -22,5 +23,18 @@ export interface QuarterlyResult {
   /** @nullable */
   platoonColor?: string | null;
   bonusValue: number;
+  eligible?: boolean;
+  /** @nullable */
+  eligibilityReason?: string | null;
+  /** @nullable */
+  bonusStatus?: string | null;
+  /** @nullable */
+  paymentMethod?: string | null;
+  /** @nullable */
+  paymentDueDate?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  paymentNotes?: string | null;
   eventBreakdown?: EventBreakdown[];
 }

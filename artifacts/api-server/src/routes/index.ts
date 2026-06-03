@@ -17,6 +17,8 @@ import auditRouter from "./audit.js";
 import integrationRouter from "./integration.js";
 import exportsRouter from "./exports.js";
 import myPerformanceRouter from "./my-performance.js";
+import feedbackRouter from "./feedback.js";
+import eligibilityRouter from "./eligibility.js";
 
 const router: IRouter = Router();
 
@@ -38,5 +40,7 @@ router.use(auditRouter);
 router.use(integrationRouter);
 router.use(exportsRouter);
 router.use(myPerformanceRouter);
+router.use(feedbackRouter);
+router.use(eligibilityRouter);
 
 export default router;

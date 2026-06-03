@@ -14,4 +14,7 @@ export interface EmployeeUpdate {
   department?: string;
   functionName?: string;
   active?: boolean;
+  eligibleForBonus?: boolean;
+  eligibilityStatus?: string;
+  eligibilityReason?: string;
 }

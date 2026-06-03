@@ -35,8 +35,13 @@ description: Key decisions for the full-stack Portuguese-BR performance manageme
 
 **Why:** TypeScript control-flow narrowing does not cross module-level declarations in all cases.
 
-# Business rules
-- Evaluation scores: 0–5 scale; score < 3 requires mandatory comments
-- Submitted evaluations are locked (cannot be edited without admin/rh reopen)
-- Platoon rules use 0–1 decimal range for score thresholds (e.g. 0.8 = top tier)
-- calibrationsTable requires: eventId, employeeId, criterionId, calibratedScore, calibrationReason, calibratedByUserId
+# Business rules (TEAM/EVENT-based model)
+- Evaluation is per (event, criterion, evaluator) — NO employeeId. One team score per event/criterion applies to ALL participants of that event.
+- Calibration is event-level: per (event, criterion) — NO employeeId.
+- Score scale is 1–5 (reject <1 or >5); score < 3 requires a mandatory comment.
+- Score persistence/display is on a 0–100 scale (score×weight, weights sum to 20, max 5×20=100). Do NOT multiply by 100 when formatting — values like 71 are already 0–100. Display as `N.N/100`.
+- Platoon thresholds (`minScore`/`maxScore`) are on the same 0–100 scale (e.g. Verde 70–80), NOT 0–1 decimals.
+- Submitted evaluations are locked (cannot be edited without admin/rh reopen).
+- Event feedback (GET /events/:id/feedback) is gated on event-level completion AND manual release; release endpoint allows roles admin/rh/diretoria; feedback never exposes evaluator names.
+- Bonus eligibility + payment status (Caju Saldo Livre) tracked on quarterly results; payment PATCH at /results/quarterly/:id/payment.
+- Valid roles: admin, rh, avaliador, diretoria, visualizador (there is NO "gestor" role).

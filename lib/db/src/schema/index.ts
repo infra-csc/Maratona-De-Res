@@ -8,4 +8,5 @@ export * from "./absences";
 export * from "./rules";
 export * from "./platoon-rules";
 export * from "./quarterly-results";
+export * from "./eligibility";
 export * from "./audit-logs";

@@ -8,8 +8,8 @@
 
 export interface CalibrationInput {
   eventId: number;
-  employeeId: number;
   criterionId: number;
   calibratedScore: number;
   calibrationReason: string;
+  originalAverageScore?: number;
 }

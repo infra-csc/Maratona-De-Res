@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, calibrationsTable, employeesTable, criteriaTable, usersTable, areasTable } from "@workspace/db";
+import { db, calibrationsTable, criteriaTable, usersTable, areasTable, eventsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -7,13 +7,16 @@ import { audit } from "../lib/audit.js";
 const router = Router();
 router.use(requireAuth);
 
+/**
+ * Calibração no nível do critério do evento/time (NÃO por colaborador).
+ * A nota calibrada substitui a nota original no cálculo do evento e é aplicada
+ * a todos os participantes daquele evento.
+ */
 router.get("/calibrations", async (req, res) => {
-  const { eventId, employeeId } = req.query;
+  const { eventId } = req.query;
   let query = db.select({
     id: calibrationsTable.id,
     eventId: calibrationsTable.eventId,
-    employeeId: calibrationsTable.employeeId,
-    employeeName: employeesTable.name,
     criterionId: calibrationsTable.criterionId,
     criterionName: criteriaTable.name,
     responsibleAreaName: areasTable.name,
@@ -25,7 +28,6 @@ router.get("/calibrations", async (req, res) => {
     calibratedAt: calibrationsTable.calibratedAt,
   })
   .from(calibrationsTable)
-  .leftJoin(employeesTable, eq(calibrationsTable.employeeId, employeesTable.id))
   .leftJoin(criteriaTable, eq(calibrationsTable.criterionId, criteriaTable.id))
   .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
   .leftJoin(usersTable, eq(calibrationsTable.calibratedByUserId, usersTable.id))
@@ -33,7 +35,6 @@ router.get("/calibrations", async (req, res) => {
 
   const conditions = [];
   if (eventId) conditions.push(eq(calibrationsTable.eventId, parseInt(eventId as string)));
-  if (employeeId) conditions.push(eq(calibrationsTable.employeeId, parseInt(employeeId as string)));
   if (conditions.length) query = query.where(and(...conditions));
 
   const calibrations = await query;
@@ -45,31 +46,41 @@ router.get("/calibrations", async (req, res) => {
 });
 
 router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req, res) => {
-  const { eventId, employeeId, criterionId, calibratedScore, calibrationReason } = req.body;
-  if (!eventId || !employeeId || !criterionId || calibratedScore === undefined || !calibrationReason) {
-    res.status(400).json({ error: "Campos obrigatórios" });
+  const { eventId, criterionId, calibratedScore, calibrationReason, originalAverageScore } = req.body;
+  if (!eventId || !criterionId || calibratedScore === undefined || !calibrationReason) {
+    res.status(400).json({ error: "Campos obrigatórios: eventId, criterionId, calibratedScore, calibrationReason" });
     return;
   }
+  const numScore = parseFloat(calibratedScore);
+  if (isNaN(numScore) || numScore < 1 || numScore > 5) {
+    res.status(400).json({ error: "A nota calibrada deve estar entre 1 e 5" });
+    return;
+  }
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+
   const [existing] = await db.select().from(calibrationsTable)
     .where(and(
       eq(calibrationsTable.eventId, eventId),
-      eq(calibrationsTable.employeeId, employeeId),
       eq(calibrationsTable.criterionId, criterionId),
     )).limit(1);
 
   let calibration;
   if (existing) {
     [calibration] = await db.update(calibrationsTable).set({
-      calibratedScore: String(calibratedScore),
+      calibratedScore: String(numScore),
       calibrationReason,
+      originalAverageScore: originalAverageScore !== undefined ? String(originalAverageScore) : existing.originalAverageScore,
       calibratedByUserId: req.user!.userId,
       calibratedAt: new Date(),
     }).where(eq(calibrationsTable.id, existing.id)).returning();
   } else {
     [calibration] = await db.insert(calibrationsTable).values({
-      eventId, employeeId, criterionId,
-      calibratedScore: String(calibratedScore),
+      eventId, criterionId,
+      calibratedScore: String(numScore),
       calibrationReason,
+      originalAverageScore: originalAverageScore !== undefined ? String(originalAverageScore) : null,
       calibratedByUserId: req.user!.userId,
     }).returning();
   }

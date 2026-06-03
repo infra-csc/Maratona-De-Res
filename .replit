@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "python-3.11"]
 
 [deployment]
 router = "application"
@@ -34,3 +34,6 @@ externalPort = 3000
 [userenv]
 
 [userenv.shared]
+
+[userenv.development]
+JWT_SECRET = "2996c739c14660cfc6f70a340b5eb6a65eae4b63942203f8e352565ef1b65048598d457a3b699bc5b7756f2c42c322ba"

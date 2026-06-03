@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, evaluationsTable, calibrationsTable, employeesTable, criteriaTable, usersTable, eventCriteriaTable, eventParticipantsTable, eventsTable } from "@workspace/db";
+import { db, evaluationsTable, criteriaTable, usersTable, eventsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -8,13 +8,17 @@ const router = Router();
 router.use(requireAuth);
 
 /**
+ * Avaliação por TIME do evento.
+ * A nota é por (evento, critério, avaliador) — NÃO por colaborador.
+ * O resultado do evento é aplicado a todos os participantes do time.
+ *
  * GET /evaluations
- * - admin/rh/diretoria: veem tudo (mas nunca retornam avaliadorName para visualizador/colaborador)
+ * - admin/rh/diretoria: veem tudo (mas nunca retornam avaliadorName para visualizador)
  * - avaliador: veem apenas avaliações de critérios da sua área
  * - visualizador: veem avaliações sem nome do avaliador
  */
 router.get("/evaluations", async (req, res) => {
-  const { eventId, employeeId, status } = req.query;
+  const { eventId, status } = req.query;
   const user = req.user!;
 
   let criterionIds: number[] | null = null;
@@ -32,8 +36,6 @@ router.get("/evaluations", async (req, res) => {
   let query = db.select({
     id: evaluationsTable.id,
     eventId: evaluationsTable.eventId,
-    employeeId: evaluationsTable.employeeId,
-    employeeName: employeesTable.name,
     criterionId: evaluationsTable.criterionId,
     criterionName: criteriaTable.name,
     evaluatorUserId: evaluationsTable.evaluatorUserId,
@@ -46,14 +48,12 @@ router.get("/evaluations", async (req, res) => {
     createdAt: evaluationsTable.createdAt,
   })
   .from(evaluationsTable)
-  .leftJoin(employeesTable, eq(evaluationsTable.employeeId, employeesTable.id))
   .leftJoin(criteriaTable, eq(evaluationsTable.criterionId, criteriaTable.id))
   .leftJoin(usersTable, eq(evaluationsTable.evaluatorUserId, usersTable.id))
   .$dynamic();
 
   const conditions = [];
   if (eventId) conditions.push(eq(evaluationsTable.eventId, parseInt(eventId as string)));
-  if (employeeId) conditions.push(eq(evaluationsTable.employeeId, parseInt(employeeId as string)));
   if (status) conditions.push(eq(evaluationsTable.status, status as string));
   if (criterionIds) {
     const { inArray } = await import("drizzle-orm");
@@ -74,17 +74,19 @@ router.get("/evaluations", async (req, res) => {
 
 /**
  * POST /evaluations
+ * Cria/atualiza a nota do TIME para um critério do evento.
  * avaliador só pode avaliar critérios da sua área.
+ * Escala oficial: 1 a 5 (nota 0 não é permitida).
  */
 router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req, res) => {
-  const { eventId, employeeId, criterionId, score, comments, commentVisibility } = req.body;
-  if (!eventId || !employeeId || !criterionId || score === undefined) {
-    res.status(400).json({ error: "Campos obrigatórios: eventId, employeeId, criterionId, score" });
+  const { eventId, criterionId, score, comments, commentVisibility } = req.body;
+  if (!eventId || !criterionId || score === undefined) {
+    res.status(400).json({ error: "Campos obrigatórios: eventId, criterionId, score" });
     return;
   }
   const numScore = parseFloat(score);
-  if (isNaN(numScore) || numScore < 0 || numScore > 5) {
-    res.status(400).json({ error: "score deve estar entre 0 e 5" });
+  if (isNaN(numScore) || numScore < 1 || numScore > 5) {
+    res.status(400).json({ error: "A nota deve estar entre 1 e 5 (nota 0 não é permitida na avaliação oficial)" });
     return;
   }
   if (numScore < 3 && (!comments || comments.trim().length === 0)) {
@@ -114,7 +116,6 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
   const [existing] = await db.select().from(evaluationsTable)
     .where(and(
       eq(evaluationsTable.eventId, eventId),
-      eq(evaluationsTable.employeeId, employeeId),
       eq(evaluationsTable.criterionId, criterionId),
       eq(evaluationsTable.evaluatorUserId, req.user!.userId),
     )).limit(1);
@@ -132,7 +133,7 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
     }).where(eq(evaluationsTable.id, existing.id)).returning();
   } else {
     [evaluation] = await db.insert(evaluationsTable).values({
-      eventId, employeeId, criterionId,
+      eventId, criterionId,
       evaluatorUserId: req.user!.userId,
       score: String(numScore),
       comments: comments ?? null,
@@ -167,6 +168,10 @@ router.patch("/evaluations/:id", async (req, res) => {
   }
 
   const numScore = score !== undefined ? parseFloat(score) : parseFloat(existing.score as unknown as string);
+  if (score !== undefined && (isNaN(numScore) || numScore < 1 || numScore > 5)) {
+    res.status(400).json({ error: "A nota deve estar entre 1 e 5 (nota 0 não é permitida)" });
+    return;
+  }
   const finalComments = comments !== undefined ? comments : existing.comments;
   if (numScore < 3 && (!finalComments || finalComments.trim().length === 0)) {
     res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 3" });
