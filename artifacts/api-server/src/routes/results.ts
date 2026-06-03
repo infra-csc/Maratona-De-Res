@@ -203,7 +203,7 @@ router.get("/results/quarterly", async (req, res) => {
 });
 
 router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, res) => {
-  const { year, quarter } = req.body;
+  const { year, quarter, forced, reason } = req.body;
   if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
 
   const closedEvents = await db.select().from(eventsTable)
@@ -213,6 +213,27 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
     res.status(400).json({ error: "Nenhum evento fechado neste trimestre" });
     return;
   }
+
+  // Fechamento forçado: se ainda há eventos abertos no trimestre, exige confirmação
+  // explícita (forced=true) com justificativa obrigatória.
+  const openEvents = await db.select({ id: eventsTable.id }).from(eventsTable)
+    .where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter), eq(eventsTable.status, "open")));
+
+  if (openEvents.length > 0) {
+    if (!forced) {
+      res.status(409).json({
+        error: `Há ${openEvents.length} evento(s) ainda aberto(s) neste trimestre. Para fechar mesmo assim, confirme o fechamento forçado com justificativa.`,
+        requiresForce: true,
+        openEventsCount: openEvents.length,
+      });
+      return;
+    }
+    if (!reason || !String(reason).trim()) {
+      res.status(400).json({ error: "Justificativa obrigatória para fechamento forçado." });
+      return;
+    }
+  }
+  const isForced = openEvents.length > 0 && !!forced;
 
   const closedEventIds = closedEvents.map(e => e.id);
   const platoonRules = await loadPlatoonRules();
@@ -332,8 +353,17 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
     processed++;
   }
 
-  await audit(req.user!.userId, "close_quarter", "quarterly_results", `${year}-Q${quarter}`);
-  res.json({ success: true, year, quarter, totalProcessed: processed, warnings });
+  await audit(
+    req.user!.userId,
+    isForced ? "force_close_quarter" : "close_quarter",
+    "quarterly_results",
+    `${year}-Q${quarter}`,
+    null,
+    isForced
+      ? { forced: true, reason: String(reason).trim(), openEventsCount: openEvents.length }
+      : { forced: false },
+  );
+  res.json({ success: true, year, quarter, totalProcessed: processed, warnings, forced: isForced });
 });
 
 /**

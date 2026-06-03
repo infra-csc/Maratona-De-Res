@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
   { label: "Critérios", path: "/criteria", icon: Star, roles: ["admin", "rh"] },
   { label: "Áreas", path: "/areas", icon: Building2, roles: ["admin", "rh"] },
   { label: "Usuários", path: "/users", icon: ShieldCheck, roles: ["admin", "rh"] },
-  { label: "Regras do Sistema", path: "/rules", icon: Settings, roles: ["admin"] },
+  { label: "Regras do Sistema", path: "/rules", icon: Settings, roles: ["admin", "rh"] },
   { label: "Integração", path: "/integration", icon: Database, roles: ["admin", "rh"] },
   { label: "Auditoria", path: "/audit", icon: ShieldCheck, roles: ["admin", "rh", "diretoria"] },
   { label: "Meu Desempenho", path: "/meu-desempenho", icon: TrendingUp },

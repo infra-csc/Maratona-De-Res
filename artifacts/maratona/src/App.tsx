@@ -32,7 +32,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
   const { user, isLoading } = useAuth();
   if (isLoading) {
     return (
@@ -42,6 +42,18 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     );
   }
   if (!user) return <Redirect to="/login" />;
+  if (roles && !roles.includes(user.role)) {
+    return (
+      <AppLayout>
+        <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-center">
+          <h2 className="text-xl font-semibold">Acesso negado</h2>
+          <p className="text-muted-foreground text-sm">
+            Você não tem permissão para acessar esta página.
+          </p>
+        </div>
+      </AppLayout>
+    );
+  }
   return (
     <AppLayout>
       <Component />
@@ -68,16 +80,16 @@ function AppRoutes() {
       <Route path="/events" component={() => <ProtectedRoute component={EventsPage} />} />
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />
       <Route path="/evaluations" component={() => <ProtectedRoute component={EvaluationsPage} />} />
-      <Route path="/calibrations" component={() => <ProtectedRoute component={CalibrationsPage} />} />
-      <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} />} />
-      <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} />} />
+      <Route path="/calibrations" component={() => <ProtectedRoute component={CalibrationsPage} roles={["admin", "rh", "avaliador", "diretoria"]} />} />
+      <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} roles={["admin", "rh", "avaliador"]} />} />
+      <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/ranking" component={() => <ProtectedRoute component={RankingPage} />} />
-      <Route path="/criteria" component={() => <ProtectedRoute component={CriteriaPage} />} />
-      <Route path="/areas" component={() => <ProtectedRoute component={AreasPage} />} />
-      <Route path="/users" component={() => <ProtectedRoute component={UsersPage} />} />
-      <Route path="/rules" component={() => <ProtectedRoute component={RulesPage} />} />
-      <Route path="/integration" component={() => <ProtectedRoute component={IntegrationPage} />} />
-      <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} />} />
+      <Route path="/criteria" component={() => <ProtectedRoute component={CriteriaPage} roles={["admin", "rh"]} />} />
+      <Route path="/areas" component={() => <ProtectedRoute component={AreasPage} roles={["admin", "rh"]} />} />
+      <Route path="/users" component={() => <ProtectedRoute component={UsersPage} roles={["admin", "rh"]} />} />
+      <Route path="/rules" component={() => <ProtectedRoute component={RulesPage} roles={["admin", "rh"]} />} />
+      <Route path="/integration" component={() => <ProtectedRoute component={IntegrationPage} roles={["admin", "rh"]} />} />
+      <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/meu-desempenho" component={() => <ProtectedRoute component={MyPerformancePage} />} />
       <Route component={NotFound} />
     </Switch>

@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Download, LockKeyhole, BarChart3, Wallet } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -35,6 +37,8 @@ export default function ResultsPage() {
   const [quarter, setQuarter] = useState(currentQuarter);
   const [payTarget, setPayTarget] = useState<QuarterlyResult | null>(null);
   const [payForm, setPayForm] = useState({ bonusStatus: "projected", paymentMethod: "Caju Saldo Livre", paymentNotes: "" });
+  const [forceClose, setForceClose] = useState(false);
+  const [forceReason, setForceReason] = useState("");
 
   const qKey = getGetQuarterlyResultsQueryKey({ year, quarter });
   const { data: results, isLoading } = useGetQuarterlyResults({ year, quarter }, {
@@ -46,10 +50,24 @@ export default function ResultsPage() {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: qKey });
         toast({ title: `Trimestre fechado! ${data.totalProcessed} colaborador(es) processado(s).` });
+        setForceClose(false);
+        setForceReason("");
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao fechar trimestre", description: e.message, variant: "destructive" }),
     },
   });
+
+  function handleCloseQuarter() {
+    if (forceClose && !forceReason.trim()) {
+      toast({ title: "Justificativa obrigatória para fechamento forçado", variant: "destructive" });
+      return;
+    }
+    closeMutation.mutate({
+      data: forceClose
+        ? { year, quarter, forced: true, reason: forceReason.trim() }
+        : { year, quarter },
+    });
+  }
 
   const paymentMutation = useUpdateBonusPayment({
     mutation: {
@@ -138,7 +156,7 @@ export default function ResultsPage() {
             <Download size={15} className="mr-1.5" /> Exportar
           </Button>
           {canClose && (
-            <AlertDialog>
+            <AlertDialog onOpenChange={(o) => { if (!o) { setForceClose(false); setForceReason(""); } }}>
               <AlertDialogTrigger asChild>
                 <Button data-testid="button-close-quarter" size="sm">
                   <LockKeyhole size={15} className="mr-1.5" /> Fechar Trimestre
@@ -151,11 +169,38 @@ export default function ResultsPage() {
                     Isso irá consolidar os resultados de todos os colaboradores participantes nos eventos fechados de T{quarter}/{year}, aplicando penalidades por faltas, verificando elegibilidade e classificando os pelotões. Esta ação pode ser refeita.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="space-y-3 py-1">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="force-close"
+                      data-testid="checkbox-force-close"
+                      checked={forceClose}
+                      onCheckedChange={(c) => setForceClose(c === true)}
+                      className="mt-0.5"
+                    />
+                    <Label htmlFor="force-close" className="text-sm font-normal leading-snug cursor-pointer">
+                      Forçar fechamento mesmo com eventos ainda abertos no trimestre (requer justificativa).
+                    </Label>
+                  </div>
+                  {forceClose && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="force-reason" className="text-sm">Justificativa do fechamento forçado</Label>
+                      <Textarea
+                        id="force-reason"
+                        data-testid="input-force-reason"
+                        value={forceReason}
+                        onChange={(e) => setForceReason(e.target.value)}
+                        placeholder="Descreva o motivo para fechar o trimestre com eventos em aberto..."
+                        rows={3}
+                      />
+                    </div>
+                  )}
+                </div>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => closeMutation.mutate({ data: { year, quarter } })}
-                    disabled={closeMutation.isPending}
+                    onClick={handleCloseQuarter}
+                    disabled={closeMutation.isPending || (forceClose && !forceReason.trim())}
                   >
                     {closeMutation.isPending ? "Processando..." : "Confirmar Fechamento"}
                   </AlertDialogAction>

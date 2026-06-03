@@ -2,13 +2,18 @@ import bcrypt from "bcryptjs";
 import {
   db, usersTable, areasTable, employeesTable, criteriaTable, eventsTable,
   eventParticipantsTable, eventCriteriaTable, platoonRulesTable, rulesTable,
-  evaluationsTable, calibrationsTable, absencesTable,
+  evaluationsTable, calibrationsTable, absencesTable, auditLogsTable,
+  quarterlyResultsTable, employeeEventResultsTable, employeeQuarterEligibilityTable,
 } from "@workspace/db";
 
 async function seed() {
   console.log("🌱 Iniciando seed...");
 
   // Wipe in reverse-dependency order
+  await db.delete(auditLogsTable);
+  await db.delete(employeeQuarterEligibilityTable);
+  await db.delete(employeeEventResultsTable);
+  await db.delete(quarterlyResultsTable);
   await db.delete(calibrationsTable);
   await db.delete(evaluationsTable);
   await db.delete(absencesTable);
@@ -29,6 +34,8 @@ async function seed() {
     { name: "Atendimento e Ativação", description: "Atendimento ao cliente e ativação" }, // 2
     { name: "Produção", description: "Coordenação e produção de eventos" },               // 3
     { name: "Departamento Pessoal", description: "RH e departamento pessoal" },            // 4
+    { name: "Comercial", description: "Vendas, propostas e relacionamento com clientes" },// 5
+    { name: "Almoxarifado", description: "Controle de estoque, ferramentas e materiais" },// 6
   ]).returning();
 
   console.log(`✓ ${areas.length} áreas criadas`);
@@ -41,7 +48,6 @@ async function seed() {
     { name: "Diretoria Geral", email: "diretoria@cenografica.com.br", passwordHash: hash, role: "diretoria" },
     { name: "Visualizador", email: "visualizador@cenografica.com.br", passwordHash: hash, role: "visualizador" },
     { name: "Marcos Avaliador Logística", email: "avaliador2@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[1].id },
-    { name: "Patricia RH Pessoas", email: "avaliador3@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[4].id },
   ]).returning();
 
   console.log(`✓ ${users.length} usuários criados`);
