@@ -18,7 +18,7 @@ router.get("/employees", async (req, res) => {
 });
 
 router.get("/employees/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   if (!employee) { res.status(404).json({ error: "Não encontrado" }); return; }
   res.json(employee);
@@ -40,7 +40,7 @@ router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
 });
 
 router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const { name, document, email, phone, department, functionName, active } = req.body;
   const [before] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
@@ -58,7 +58,7 @@ router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
 });
 
 router.get("/employees/:id/history", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const results = await db.select().from(quarterlyResultsTable)
     .where(eq(quarterlyResultsTable.employeeId, id))
     .orderBy(quarterlyResultsTable.year, quarterlyResultsTable.quarter);

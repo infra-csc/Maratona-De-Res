@@ -40,7 +40,7 @@ router.post("/criteria", requireRole("admin", "rh"), async (req, res) => {
 });
 
 router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const { name, description, responsibleAreaId, defaultWeight, active, displayOrder } = req.body;
   const [before] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }

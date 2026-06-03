@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, evaluationsTable, calibrationsTable, employeesTable, criteriaTable, usersTable, eventCriteriaTable, eventParticipantsTable } from "@workspace/db";
+import { db, evaluationsTable, calibrationsTable, employeesTable, criteriaTable, usersTable, eventCriteriaTable, eventParticipantsTable, eventsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -46,6 +46,22 @@ router.post("/evaluations", async (req, res) => {
     res.status(400).json({ error: "Campos obrigatórios: eventId, employeeId, criterionId, score" });
     return;
   }
+  const numScore = parseFloat(score);
+  if (isNaN(numScore) || numScore < 0 || numScore > 5) {
+    res.status(400).json({ error: "score deve estar entre 0 e 5" });
+    return;
+  }
+  if (numScore < 3 && (!comments || comments.trim().length === 0)) {
+    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 3" });
+    return;
+  }
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event || event.status === "closed") {
+    res.status(400).json({ error: "Evento fechado ou não encontrado" });
+    return;
+  }
+
   const [existing] = await db.select().from(evaluationsTable)
     .where(and(
       eq(evaluationsTable.eventId, eventId),
@@ -56,15 +72,19 @@ router.post("/evaluations", async (req, res) => {
 
   let evaluation;
   if (existing) {
+    if (existing.status === "submitted") {
+      res.status(400).json({ error: "Avaliação já submetida e bloqueada para edição" });
+      return;
+    }
     [evaluation] = await db.update(evaluationsTable).set({
-      score: String(score),
+      score: String(numScore),
       comments: comments ?? existing.comments,
     }).where(eq(evaluationsTable.id, existing.id)).returning();
   } else {
     [evaluation] = await db.insert(evaluationsTable).values({
       eventId, employeeId, criterionId,
       evaluatorUserId: req.user!.userId,
-      score: String(score),
+      score: String(numScore),
       comments: comments ?? null,
     }).returning();
   }
@@ -72,33 +92,64 @@ router.post("/evaluations", async (req, res) => {
 });
 
 router.patch("/evaluations/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const { score, comments } = req.body;
+
+  const [existing] = await db.select().from(evaluationsTable).where(eq(evaluationsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (existing.status === "submitted") {
+    res.status(400).json({ error: "Avaliação já submetida e bloqueada para edição" });
+    return;
+  }
+  if (existing.evaluatorUserId !== req.user!.userId && !["admin", "rh"].includes(req.user!.role)) {
+    res.status(403).json({ error: "Sem permissão para editar esta avaliação" });
+    return;
+  }
+
+  const numScore = score !== undefined ? parseFloat(score) : parseFloat(existing.score as unknown as string);
+  const finalComments = comments !== undefined ? comments : existing.comments;
+  if (numScore < 3 && (!finalComments || finalComments.trim().length === 0)) {
+    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 3" });
+    return;
+  }
+
   const [evaluation] = await db.update(evaluationsTable).set({
-    ...(score !== undefined && { score: String(score) }),
+    ...(score !== undefined && { score: String(numScore) }),
     ...(comments !== undefined && { comments }),
   }).where(eq(evaluationsTable.id, id)).returning();
-  if (!evaluation) { res.status(404).json({ error: "Não encontrado" }); return; }
   res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
 });
 
 router.post("/evaluations/:id/submit", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
+  const [existing] = await db.select().from(evaluationsTable).where(eq(evaluationsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (existing.evaluatorUserId !== req.user!.userId && !["admin", "rh"].includes(req.user!.role)) {
+    res.status(403).json({ error: "Sem permissão para submeter esta avaliação" });
+    return;
+  }
+  const numScore = parseFloat(existing.score as unknown as string);
+  if (numScore < 3 && (!existing.comments || existing.comments.trim().length === 0)) {
+    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 3 antes de submeter" });
+    return;
+  }
   const [evaluation] = await db.update(evaluationsTable).set({
     status: "submitted",
     submittedAt: new Date(),
   }).where(eq(evaluationsTable.id, id)).returning();
-  if (!evaluation) { res.status(404).json({ error: "Não encontrado" }); return; }
+  await audit(req.user!.userId, "submit", "evaluations", id, existing, evaluation);
   res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
 });
 
 router.post("/evaluations/:id/reopen", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
+  const [existing] = await db.select().from(evaluationsTable).where(eq(evaluationsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Não encontrado" }); return; }
   const [evaluation] = await db.update(evaluationsTable).set({
     status: "draft",
     submittedAt: null,
   }).where(eq(evaluationsTable.id, id)).returning();
-  if (!evaluation) { res.status(404).json({ error: "Não encontrado" }); return; }
+  await audit(req.user!.userId, "reopen", "evaluations", id, existing, evaluation);
   res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
 });
 

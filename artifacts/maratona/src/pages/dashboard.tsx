@@ -163,7 +163,7 @@ export default function DashboardPage() {
                   <span className="text-sm font-bold text-muted-foreground w-6 text-right">{i + 1}.</span>
                   <span className="flex-1 text-sm font-medium">{emp.employeeName}</span>
                   {emp.platoon && (
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: emp.platoonColor + "20", color: emp.platoonColor }}>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: (emp.platoonColor ?? "#94a3b8") + "20", color: emp.platoonColor ?? "#94a3b8" }}>
                       {emp.platoon}
                     </span>
                   )}

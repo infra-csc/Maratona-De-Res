@@ -53,7 +53,7 @@ router.post("/absences", requireRole("admin", "rh", "avaliador"), async (req, re
 });
 
 router.delete("/absences/:id", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   await db.delete(absencesTable).where(eq(absencesTable.id, id));
   await audit(req.user!.userId, "delete", "absences", id);
   res.status(204).end();

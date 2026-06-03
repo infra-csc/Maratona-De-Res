@@ -143,9 +143,9 @@ export default function ResultsPage() {
                 <tr key={r.employeeId} data-testid={`row-result-${r.employeeId}`} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 font-medium">{r.employeeName}</td>
                   <td className="px-4 py-3 text-center text-muted-foreground">{r.eventsCount}</td>
-                  <td className="px-4 py-3 text-center">{fmt(r.grossAverage)}</td>
+                  <td className="px-4 py-3 text-center">{fmt(r.grossAverage ?? 0)}</td>
                   <td className="px-4 py-3 text-center text-muted-foreground">{r.totalAbsences}</td>
-                  <td className="px-4 py-3 text-center text-destructive">{r.absencePenalty > 0 ? `-${fmt(r.absencePenalty)}` : "—"}</td>
+                  <td className="px-4 py-3 text-center text-destructive">{(r.absencePenalty ?? 0) > 0 ? `-${fmt(r.absencePenalty ?? 0)}` : "—"}</td>
                   <td className="px-4 py-3 text-center font-bold text-primary">{fmt(r.finalResult)}</td>
                   <td className="px-4 py-3 text-center">
                     {r.platoon ? (

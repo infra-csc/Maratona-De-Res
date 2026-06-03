@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET = process.env.JWT_SECRET || "maratona-dev-secret-2025";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
+const _JWT_SECRET: string = JWT_SECRET;
 
 export interface JwtPayload {
   userId: number;
@@ -10,11 +12,11 @@ export interface JwtPayload {
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
+  return jwt.sign(payload, _JWT_SECRET, { expiresIn: "24h" });
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  return jwt.verify(token, _JWT_SECRET) as unknown as JwtPayload;
 }
 
 declare global {

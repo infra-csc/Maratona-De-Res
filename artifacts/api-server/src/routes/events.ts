@@ -29,7 +29,7 @@ router.get("/events", async (req, res) => {
 });
 
 router.get("/events/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
 
@@ -92,7 +92,7 @@ router.post("/events", requireRole("admin", "rh", "avaliador"), async (req, res)
 });
 
 router.patch("/events/:id", requireRole("admin", "rh", "avaliador"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const { name, clientName, location, city, state, startDate, endDate, status } = req.body;
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
@@ -111,14 +111,14 @@ router.patch("/events/:id", requireRole("admin", "rh", "avaliador"), async (req,
 });
 
 router.delete("/events/:id", requireRole("admin"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   await db.delete(eventsTable).where(eq(eventsTable.id, id));
   await audit(req.user!.userId, "delete", "events", id);
   res.status(204).end();
 });
 
 router.post("/events/:id/close", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const { forced, reason } = req.body ?? {};
   const [ev] = await db.update(eventsTable).set({
     status: "closed",
@@ -131,7 +131,7 @@ router.post("/events/:id/close", requireRole("admin", "rh"), async (req, res) =>
 });
 
 router.post("/events/:id/reopen", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const [ev] = await db.update(eventsTable).set({ status: "open", forcedClosed: false, forcedCloseReason: null }).where(eq(eventsTable.id, id)).returning();
   if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
   await audit(req.user!.userId, "reopen", "events", id);
@@ -139,7 +139,7 @@ router.post("/events/:id/reopen", requireRole("admin", "rh"), async (req, res) =
 });
 
 router.get("/events/:id/participants", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const participants = await db
     .select({
       id: eventParticipantsTable.id,
@@ -157,7 +157,7 @@ router.get("/events/:id/participants", async (req, res) => {
 });
 
 router.post("/events/:id/participants", requireRole("admin", "rh", "avaliador"), async (req, res) => {
-  const eventId = parseInt(req.params.id);
+  const eventId = parseInt(req.params.id as string);
   const { employeeId, functionName, teamName } = req.body;
   if (!employeeId) { res.status(400).json({ error: "employeeId obrigatório" }); return; }
   const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
@@ -168,13 +168,13 @@ router.post("/events/:id/participants", requireRole("admin", "rh", "avaliador"),
 });
 
 router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh", "avaliador"), async (req, res) => {
-  const participantId = parseInt(req.params.participantId);
+  const participantId = parseInt(req.params.participantId as string);
   await db.delete(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId));
   res.status(204).end();
 });
 
 router.get("/events/:id/criteria", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const criteria = await db
     .select({
       id: eventCriteriaTable.id,
@@ -197,7 +197,7 @@ router.get("/events/:id/criteria", async (req, res) => {
 });
 
 router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) => {
-  const eventId = parseInt(req.params.id);
+  const eventId = parseInt(req.params.id as string);
   const { activeCriterionIds } = req.body;
   const existing = await db.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, eventId));
   for (const ec of existing) {

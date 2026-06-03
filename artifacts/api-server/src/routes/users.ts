@@ -9,7 +9,7 @@ const router = Router();
 
 router.use(requireAuth);
 
-router.get("/users", async (_req, res) => {
+router.get("/users", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
   const users = await db
     .select({
       id: usersTable.id,
@@ -26,8 +26,8 @@ router.get("/users", async (_req, res) => {
   res.json(users);
 });
 
-router.get("/users/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.get("/users/:id", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
   const [user] = await db
     .select({
       id: usersTable.id,
@@ -62,7 +62,7 @@ router.post("/users", requireRole("admin", "rh"), async (req, res) => {
 });
 
 router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const { name, email, role, areaId, active } = req.body;
   const [before] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
@@ -78,7 +78,7 @@ router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
 });
 
 router.delete("/users/:id", requireRole("admin"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   if (id === req.user!.userId) {
     res.status(400).json({ error: "Não é possível excluir seu próprio usuário" });
     return;
@@ -89,7 +89,7 @@ router.delete("/users/:id", requireRole("admin"), async (req, res) => {
 });
 
 router.post("/users/:id/reset-password", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   const { newPassword } = req.body;
   if (!newPassword) { res.status(400).json({ error: "newPassword obrigatório" }); return; }
   const passwordHash = await bcrypt.hash(newPassword, 12);
