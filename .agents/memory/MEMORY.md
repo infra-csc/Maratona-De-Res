@@ -1,4 +1,5 @@
 - [Maratona app architecture](maratona-architecture.md) — full-stack PT-BR perf management app; api at /api (port 8080), frontend at / (port 23916); vite proxies /api → localhost:8080
 - [Seed runner pattern](seed-runner.md) — no tsx in api-server devDeps; use /home/runner/workspace/scripts/node_modules/.bin/tsx src/seed.ts to run seed; seed must wipe in reverse-FK order first
 - [Calculation scale](calculation-scale.md) — score×weight directly (0-100), weights sum to 20, max=100; do NOT normalize weights; validated example: pesos=[3,3,2,3,3,3,3] notas=[4,4,4,3,2,3,5] → 71
-- [JWT_SECRET env](jwt-secret-env.md) — set via setEnvVars({values:{...}, environment:"shared"}); server throws at startup if missing; code review: ideally use Replit secrets panel instead
+- [JWT_SECRET env](jwt-secret-env.md) — store in encrypted Secrets store (requestEnvVar secret), NOT plaintext .replit; auth.ts throws at startup if missing (no fallback) so app dies on restart without it
+- [API client /api prefix](api-client-prefix.md) — generated client paths must be BARE; the single /api prefix is owned at runtime by setBaseUrl. Don't set orval output.baseUrl or openapi servers:/api or it double-prefixes → /api/api → 401
