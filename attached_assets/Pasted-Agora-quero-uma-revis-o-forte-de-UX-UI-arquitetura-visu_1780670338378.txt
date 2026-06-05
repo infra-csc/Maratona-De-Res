@@ -1,0 +1,583 @@
+Agora quero uma revisão forte de **UX/UI, arquitetura visual e experiência de uso** do app.
+
+Importante: **não quero mudar a regra de negócio principal**. A lógica do programa, critérios, pesos, avaliação por time, trimestre, pelotões, faltas, bônus, sigilo dos avaliadores e permissões deve ser mantida.
+
+O problema atual é que o app ficou **funcional, porém muito cru**, com aparência de protótipo.
+Quero elevar o app para nível de **produto SaaS premium**, com visual mais sofisticado, melhor organização da informação e experiência muito mais intuitiva.
+
+---
+
+# 1. Objetivo desta revisão
+
+O foco agora é:
+
+* melhorar o design;
+* melhorar a navegação;
+* melhorar a leitura das informações;
+* deixar a avaliação mais fluida;
+* transformar o app em algo com aparência profissional e estratégica;
+* fazer o sistema parecer realmente uma plataforma da **Maratona de Resultados**.
+
+Não quero só “embelezar”. Quero melhorar **estrutura, hierarquia visual, experiência e clareza**.
+
+---
+
+# 2. Diagnóstico do estado atual
+
+O app atual está muito básico em alguns pontos:
+
+## Dashboard
+
+* está vazio visualmente;
+* os cards são simples demais;
+* o gráfico está sem contexto;
+* não transmite inteligência operacional;
+* sobra muito espaço em branco;
+* falta visual de performance, progresso e alertas.
+
+## Eventos
+
+* a listagem está funcional, mas genérica;
+* falta riqueza visual no card do evento;
+* falta noção clara de progresso da avaliação;
+* falta hierarquia entre status, time, nota e pendências.
+
+## Colaboradores
+
+* está muito em formato de tabela pura;
+* falta resumo de desempenho, elegibilidade e histórico;
+* falta cara de gestão de performance.
+
+## Avaliação da Equipe
+
+* é a tela mais crítica;
+* os sliders estão crus e com aparência de protótipo;
+* o peso em decimal (0.15) está ruim de entender;
+* não há um bom fluxo de preenchimento;
+* a tela não valoriza os critérios;
+* não há percepção clara de avanço da avaliação;
+* não há um painel forte de resultado parcial/final;
+* a experiência não parece premium.
+
+---
+
+# 3. Diretriz geral de design
+
+Quero um visual de sistema corporativo premium, moderno e estratégico.
+
+Referência de estilo:
+
+* produto SaaS moderno;
+* visual executivo;
+* interface limpa e forte;
+* dashboard bem resolvido;
+* cards com boa profundidade;
+* tipografia elegante;
+* boa distribuição de espaço;
+* sensação de produto maduro, não de sistema improvisado.
+
+---
+
+# 4. Identidade visual desejada
+
+Manter a marca **Maratona de Resultados – Cenográfica**, mas elevar o visual.
+
+## Paleta
+
+* azul escuro / navy como base;
+* azul vivo para destaques;
+* branco e cinzas claros no conteúdo;
+* dourado para Quênia;
+* azul para Pelotão Azul;
+* verde para Pelotão Verde;
+* cinza/branco para Pelotão Branco;
+* vermelho/âmbar para alertas e pendências.
+
+## Sensação visual
+
+* moderno;
+* confiável;
+* premium;
+* performance;
+* meritocracia;
+* alta execução;
+* acompanhamento de resultado.
+
+---
+
+# 5. Revisão da navegação
+
+Melhorar a sidebar e a estrutura geral.
+
+## Sidebar
+
+* manter compacta e elegante;
+* melhorar espaçamento;
+* deixar ícones mais consistentes;
+* reforçar item ativo;
+* agrupar melhor os itens;
+* destacar módulos principais.
+
+Sugestão de agrupamento:
+
+## Gestão
+
+* Dashboard
+* Eventos
+* Avaliações
+* Calibrações
+* Resultados Trimestrais
+* Maratona / Ranking
+
+## Cadastros
+
+* Colaboradores
+* Critérios
+* Áreas
+* Usuários
+
+## Controle
+
+* Faltas
+* Regras do Sistema
+* Integração
+* Auditoria
+
+## Colaborador
+
+* Meu Desempenho
+
+---
+
+# 6. Redesign completo do Dashboard
+
+Refazer o dashboard para ocupar melhor o espaço e parecer mais estratégico.
+
+## Topo
+
+Manter filtros de Ano e Trimestre, mas melhorar o visual.
+
+Adicionar resumo principal com cards mais ricos:
+
+* Total de Eventos no trimestre
+* Eventos fechados
+* Eventos em avaliação
+* Times avaliados
+* Média geral do trimestre
+* Total projetado de bônus
+* Faltas registradas
+* Colaboradores elegíveis
+
+## Bloco de performance
+
+Criar uma área com:
+
+* distribuição por pelotão;
+* evolução trimestral;
+* ranking resumido dos melhores;
+* eventos com mais pendências;
+* próximos fechamentos;
+* indicadores de atenção.
+
+## Melhorias visuais
+
+* cards com ícones e mini tendências;
+* gráficos mais claros;
+* alertas em destaque;
+* menos vazio;
+* mais leitura executiva.
+
+---
+
+# 7. Redesign da tela de Eventos
+
+Quero que cada evento pareça importante.
+
+Substituir a listagem simples por cards de evento mais ricos.
+
+Cada card de evento deve mostrar:
+
+* nome do evento;
+* cliente;
+* cidade/UF;
+* período;
+* trimestre;
+* status;
+* quantidade de participantes;
+* nota do time, se já calculada;
+* progresso da avaliação;
+* quantidade de pendências;
+* quick actions.
+
+Quick actions:
+
+* abrir detalhes;
+* avaliar;
+* ver equipe;
+* fechar/reabrir;
+* ver feedback.
+
+Também quero filtros mais fortes:
+
+* ano;
+* trimestre;
+* status;
+* cliente;
+* cidade;
+* busca.
+
+---
+
+# 8. Redesign da tela de Colaboradores
+
+A tela de colaboradores precisa ficar mais útil e mais bonita.
+
+Além da tabela/lista, adicionar:
+
+* cards de resumo no topo;
+* total ativos;
+* elegíveis ao bônus;
+* inelegíveis;
+* com faltas no trimestre;
+* média geral do time.
+
+Cada colaborador deve ter uma visão resumida com:
+
+* nome;
+* função;
+* departamento;
+* status;
+* elegibilidade;
+* média atual do trimestre;
+* pelotão atual;
+* quantidade de eventos no trimestre.
+
+Ao abrir um colaborador, mostrar:
+
+* histórico de eventos;
+* média do trimestre;
+* faltas;
+* feedbacks liberados;
+* bônus projetado/final;
+* gráfico de evolução.
+
+---
+
+# 9. Redesign completo da tela Avaliações
+
+Essa deve ser uma das melhores telas do app.
+
+## Problema atual
+
+A tela atual com sliders simples ficou pobre demais.
+
+Quero substituir isso por uma experiência muito mais rica.
+
+## Nova abordagem
+
+A tela deve parecer uma central de avaliação do evento/time.
+
+### Estrutura da tela
+
+## Cabeçalho do evento
+
+Card superior grande com:
+
+* nome do evento;
+* cliente;
+* cidade/UF;
+* período;
+* trimestre;
+* status;
+* quantidade de participantes;
+* áreas que ainda precisam avaliar;
+* progresso geral da avaliação;
+* botão de ações.
+
+## Painel principal em 2 colunas
+
+### Coluna esquerda: Critérios de avaliação
+
+Em vez de sliders soltos, cada critério deve aparecer em um **card bem estruturado**.
+
+Cada card de critério deve mostrar:
+
+* nome do critério;
+* área responsável;
+* texto “o que é avaliado”;
+* peso oficial inteiro, ex.: 3, 2, 3;
+* status do critério;
+* nota atribuída;
+* comentários;
+* total do critério.
+
+A entrada de nota não deve depender só de slider.
+
+Melhor solução:
+
+* botões de nota 1, 2, 3, 4, 5;
+* cada botão com visual claro;
+* opção de slider apenas complementar, se quiser;
+* nota selecionada bem destacada.
+
+Para cada critério:
+
+* mostrar a régua qualitativa:
+
+  * 1 = crítico
+  * 2 = abaixo do esperado
+  * 3 = atendeu minimamente
+  * 4 = atendeu bem
+  * 5 = excelência
+
+Também incluir:
+
+* campo de comentário abaixo;
+* obrigatoriedade visual do comentário se nota menor que 3;
+* badge da área responsável;
+* total do critério calculado automaticamente.
+
+### Coluna direita: Painel fixo de resumo da avaliação
+
+Criar um painel fixo/sticky com:
+
+* status da avaliação;
+* progresso preenchido;
+* nota parcial do evento;
+* peso total considerado;
+* quantidade de critérios preenchidos;
+* quantidade pendente;
+* equipe do evento;
+* participantes;
+* impacto da nota nos pelotões;
+* ações:
+
+  * salvar rascunho
+  * enviar avaliação
+  * concluir etapa
+
+Esse painel deve ser visualmente forte.
+
+---
+
+# 10. Melhorar leitura dos pesos
+
+Não exibir pesos como decimal tipo 0.15.
+
+Sempre mostrar o peso do jeito que o negócio entende:
+
+```txt
+Peso 3
+Peso 2
+Peso 3
+```
+
+Se internamente existir cálculo percentual, ele pode continuar no código, mas a interface deve mostrar o valor inteiro oficial.
+
+---
+
+# 11. Melhorar experiência de preenchimento
+
+Quero que preencher a avaliação seja rápido e agradável.
+
+Adicionar:
+
+* animação suave ao selecionar nota;
+* atualização instantânea do total do critério;
+* atualização instantânea do resultado parcial do evento;
+* destaque visual para critérios já preenchidos;
+* aviso claro para pendências;
+* confirmação de envio;
+* alerta se tentar enviar com campos faltando.
+
+Também criar:
+
+* botão “preencher e avançar”;
+* comportamento fluido entre critérios;
+* foco automático no próximo comentário, quando necessário.
+
+---
+
+# 12. Calibração mais sofisticada
+
+A tela de calibração também precisa melhorar.
+
+Criar visual de comparação:
+
+* Nota original
+* Nota calibrada
+* Diferença
+* Motivo
+* Impacto na nota final do evento
+* Impacto no trimestre dos participantes
+
+Cada critério deve mostrar:
+
+* histórico;
+* comentários recebidos;
+* justificativa da calibração;
+* recálculo em tempo real.
+
+---
+
+# 13. Resultado visual da equipe no evento
+
+Criar uma seção visual forte chamada:
+
+```txt
+Resultado da Equipe no Evento
+```
+
+Deve mostrar:
+
+* nota final do time;
+* status;
+* pelotão projetado;
+* comparação com meta mínima;
+* barras por critério;
+* critérios mais fortes;
+* critérios mais fracos;
+* feedback resumido.
+
+Isso precisa parecer importante, não só um número solto.
+
+---
+
+# 14. Tela Meu Desempenho mais rica
+
+A tela “Meu Desempenho” deve ter cara de portal do colaborador.
+
+Mostrar:
+
+* média atual do trimestre;
+* pelotão atual;
+* bônus projetado/final;
+* eventos do trimestre;
+* histórico mensal;
+* evolução anual;
+* faltas;
+* status das avaliações;
+* feedbacks liberados.
+
+Sem mostrar nomes dos avaliadores.
+
+Adicionar uma linha do tempo ou cards de eventos recentes.
+
+---
+
+# 15. Maratona / Ranking mais impactante
+
+Essa tela precisa ser uma das mais bonitas do app.
+
+Quero:
+
+* pódio visual dos 3 melhores;
+* destaque forte para Quênia;
+* cards por pelotão;
+* ranking completo abaixo;
+* medalhas;
+* foto/avatar inicial;
+* bônus destacado;
+* quantidade de eventos;
+* média trimestral;
+* status elegível/inelegível.
+
+A tela deve transmitir claramente a ideia de “maratona”, desempenho e reconhecimento.
+
+---
+
+# 16. Estados visuais e feedbacks
+
+Padronizar estados:
+
+* Pendente
+* Em avaliação
+* Aguardando calibração
+* Calibrado
+* Fechado
+* Computado no trimestre
+
+Criar badges consistentes e bonitos.
+
+Adicionar:
+
+* skeleton loading;
+* empty state;
+* toasts;
+* confirmação em modais;
+* mensagens de sucesso e erro;
+* tooltips explicativos.
+
+---
+
+# 17. Componentes que devem ser criados/refatorados
+
+Criar ou melhorar:
+
+* EventHeaderCard
+* EventSummaryCard
+* CriteriaEvaluationCard
+* ScoreSelector
+* CommentBox
+* TeamParticipantsCard
+* EvaluationProgressCard
+* ResultHighlightCard
+* QuarterPerformanceCard
+* PlatoonBadge
+* BonusCard
+* RankingPodium
+* EmployeePerformanceCard
+* PendingAlertCard
+* FeedbackPreviewCard
+
+---
+
+# 18. Regras importantes nesta revisão
+
+Muito importante:
+
+* não quebrar a lógica de negócio;
+* não mudar a avaliação por time;
+* não remover sigilo dos avaliadores;
+* não remover filtros por trimestre/ano;
+* manter permissões por área;
+* manter cálculo de bônus e pelotões;
+* manter integração com banco;
+* não deixar nada estático ou só de fachada.
+
+O foco é:
+**refinar profundamente a interface e a experiência, sem perder a lógica já implementada.**
+
+---
+
+# 19. Critérios de aceite desta revisão visual
+
+Esta revisão só estará boa se:
+
+1. O app deixar de parecer protótipo.
+2. A tela de Avaliações ficar muito mais forte e elegante.
+3. Os sliders crus forem substituídos por uma experiência melhor.
+4. Os pesos forem exibidos como o negócio entende, não como decimal confuso.
+5. O dashboard ficar mais rico e mais estratégico.
+6. Os eventos ficarem com cards mais informativos.
+7. Os colaboradores tiverem visual mais completo.
+8. O ranking ficar bonito e digno da ideia de Maratona.
+9. O “Meu Desempenho” ficar mais profissional.
+10. A experiência inteira ficar mais premium, organizada e fácil de usar.
+
+---
+
+# 20. Prioridade de execução
+
+Faça nesta ordem:
+
+1. Redesign da tela Avaliações
+2. Redesign do Dashboard
+3. Redesign da tela Eventos
+4. Redesign da tela Colaboradores
+5. Redesign da tela Maratona / Ranking
+6. Redesign da tela Meu Desempenho
+7. Refinar componentes globais
+8. Revisar consistência visual do app inteiro
+
+Quero uma melhoria clara, visível e profissional.

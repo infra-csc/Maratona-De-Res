@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, UserCheck, UserX } from "lucide-react";
+import { Plus, Search, UserCheck, UserX, Building2, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function EmployeesPage() {
   const { user } = useAuth();
@@ -49,51 +50,57 @@ export default function EmployeesPage() {
     e.functionName.toLowerCase().includes(search.toLowerCase())
   );
 
+  const stats = {
+    total: employees?.length ?? 0,
+    ativos: employees?.filter(e => e.active).length ?? 0,
+    elegiveis: employees?.filter(e => e.eligibleForBonus !== false).length ?? 0,
+  };
+
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto bg-slate-50/30 min-h-full">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 data-testid="text-page-title" className="text-2xl font-bold">Colaboradores</h1>
-          <p className="text-muted-foreground text-sm">Cadastro de colaboradores avaliados</p>
+          <h1 data-testid="text-page-title" className="text-3xl font-bold tracking-tight">Colaboradores</h1>
+          <p className="text-muted-foreground text-sm mt-1">Gestão do time e elegibilidade da Maratona</p>
         </div>
         {canEdit && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-create-employee" size="sm">
-                <Plus size={16} className="mr-1.5" /> Novo Colaborador
+              <Button data-testid="button-create-employee" className="shadow-sm">
+                <Plus size={16} className="mr-2" /> Novo Colaborador
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
-              <DialogHeader><DialogTitle>Novo Colaborador</DialogTitle></DialogHeader>
-              <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-3 pt-2">
+              <DialogHeader><DialogTitle className="text-xl">Novo Colaborador</DialogTitle></DialogHeader>
+              <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
                 <div className="space-y-1.5">
-                  <Label>Nome Completo *</Label>
-                  <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" />
+                  <Label className="font-semibold text-slate-700">Nome Completo <span className="text-destructive">*</span></Label>
+                  <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" className="h-11" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Departamento</Label>
-                    <Input data-testid="input-employee-dept" {...register("department")} placeholder="Cenografia" />
+                    <Label className="font-semibold text-slate-700">Departamento</Label>
+                    <Input data-testid="input-employee-dept" {...register("department")} placeholder="Ex: Cenografia" className="h-11" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Função</Label>
-                    <Input data-testid="input-employee-func" {...register("functionName")} placeholder="Montador" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>E-mail</Label>
-                    <Input data-testid="input-employee-email" type="email" {...register("email")} placeholder="email@exemplo.com" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Telefone</Label>
-                    <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" />
+                    <Label className="font-semibold text-slate-700">Função</Label>
+                    <Input data-testid="input-employee-func" {...register("functionName")} placeholder="Ex: Montador" className="h-11" />
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="font-semibold text-slate-700">E-mail</Label>
+                    <Input data-testid="input-employee-email" type="email" {...register("email")} placeholder="email@exemplo.com" className="h-11" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-semibold text-slate-700">Telefone</Label>
+                    <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" className="h-11" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-4 border-t">
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                   <Button data-testid="button-submit-employee" type="submit" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? "Criando..." : "Criar"}
+                    {createMutation.isPending ? "Criando..." : "Criar Colaborador"}
                   </Button>
                 </div>
               </form>
@@ -102,24 +109,60 @@ export default function EmployeesPage() {
         )}
       </div>
 
-      <div className="flex gap-3 items-center">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+              <Users size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total de Registros</p>
+              <p className="text-2xl font-bold">{stats.total}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600 shrink-0">
+              <UserCheck size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Ativos</p>
+              <p className="text-2xl font-bold">{stats.ativos}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+              <Building2 size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Elegíveis</p>
+              <p className="text-2xl font-bold">{stats.elegiveis}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             data-testid="input-search-employees"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-            placeholder="Buscar colaborador..."
+            className="pl-10 h-11 bg-slate-50 border-transparent hover:bg-slate-100 focus:bg-white transition-colors"
+            placeholder="Buscar por nome, função ou departamento..."
           />
         </div>
-        <div className="flex rounded-md border overflow-hidden">
+        <div className="flex bg-slate-100 p-1 rounded-lg">
           {(["all", "true", "false"] as const).map(v => (
             <button
               key={v}
               data-testid={`filter-active-${v}`}
               onClick={() => setFilterActive(v)}
-              className={`px-3 py-1.5 text-sm transition-colors ${filterActive === v ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${filterActive === v ? "bg-white text-primary shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
             >
               {v === "all" ? "Todos" : v === "true" ? "Ativos" : "Inativos"}
             </button>
@@ -128,38 +171,50 @@ export default function EmployeesPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Carregando...</div>
+        <div className="text-center py-20 text-muted-foreground">Carregando colaboradores...</div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/50 text-muted-foreground">
-                <th className="px-4 py-3 text-left font-medium">Nome</th>
-                <th className="px-4 py-3 text-left font-medium">Departamento</th>
-                <th className="px-4 py-3 text-left font-medium">Função</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filtered.map(emp => (
-                <tr key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-medium">{emp.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{emp.department}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{emp.functionName}</td>
-                  <td className="px-4 py-3">
-                    {emp.active
-                      ? <Badge variant="default" className="gap-1"><UserCheck size={11} />Ativo</Badge>
-                      : <Badge variant="secondary" className="gap-1"><UserX size={11} />Inativo</Badge>
-                    }
-                  </td>
+        <Card className="border-none shadow-sm overflow-hidden bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b">
+                  <th className="px-6 py-4 text-left font-semibold text-slate-600">Colaborador</th>
+                  <th className="px-6 py-4 text-left font-semibold text-slate-600">Departamento</th>
+                  <th className="px-6 py-4 text-left font-semibold text-slate-600">Função</th>
+                  <th className="px-6 py-4 text-center font-semibold text-slate-600">Status</th>
+                  <th className="px-6 py-4 text-center font-semibold text-slate-600">Elegibilidade</th>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-10 text-muted-foreground">Nenhum colaborador encontrado</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map(emp => (
+                  <tr key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-slate-900">{emp.name}</div>
+                      {emp.email && <div className="text-xs text-slate-500 mt-0.5">{emp.email}</div>}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-slate-700">{emp.department}</td>
+                    <td className="px-6 py-4 text-slate-600">{emp.functionName}</td>
+                    <td className="px-6 py-4 text-center">
+                      {emp.active
+                        ? <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 font-semibold"><UserCheck size={12} /> Ativo</Badge>
+                        : <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200 gap-1 font-semibold"><UserX size={12} /> Inativo</Badge>
+                      }
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {emp.eligibleForBonus === false
+                        ? <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Não Elegível</Badge>
+                        : <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Elegível</Badge>
+                      }
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-16 text-muted-foreground text-base">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );
