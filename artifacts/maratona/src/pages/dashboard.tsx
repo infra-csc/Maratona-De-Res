@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useGetDashboardSummary, useGetDashboardPlatoonDistribution, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, getGetDashboardSummaryQueryKey, getGetDashboardPlatoonDistributionQueryKey } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { Calendar, Users, ClipboardList, TrendingUp, Award, AlertTriangle, Target, CheckCircle2, DollarSign, Clock } from "lucide-react";
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { CheckCircle2, Users, Trophy, DollarSign, History, AlertTriangle, Clock, ChevronRight } from "lucide-react";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 
 const currentYear = new Date().getFullYear();
 const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
+
+const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
+const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
 export default function DashboardPage() {
   const [year, setYear] = useState(currentYear);
@@ -25,16 +27,23 @@ export default function DashboardPage() {
   const fmt = (v: number) => `${v.toFixed(1)}/100`;
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+  const submitted = summary?.submittedEvaluations ?? 0;
+  const pending = summary?.pendingEvaluations ?? 0;
+  const progress = submitted + pending > 0 ? Math.round((submitted / (submitted + pending)) * 100) : 0;
+  const ghostPos = Math.max(0, progress - 7);
+
+  const platoonRanking = [...(distribution ?? [])].sort((a, b) => b.count - a.count).slice(0, 3);
+
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto bg-slate-50/30 min-h-full">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 data-testid="text-page-title" className="text-3xl font-bold text-foreground tracking-tight">Inteligência Operacional</h1>
-          <p className="text-muted-foreground text-sm mt-1">Acompanhamento estratégico da Maratona de Resultados</p>
-        </div>
-        <div className="flex gap-3 bg-white p-1.5 rounded-lg border shadow-sm">
+    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-[#f7f9fb] border-b-4 border-[#191c1e] flex flex-wrap gap-4 justify-between items-center px-6 md:px-10 py-4">
+        <h1 data-testid="text-page-title" className="text-2xl md:text-3xl italic font-black text-[#506600] uppercase tracking-tighter">
+          Painel de Controle
+        </h1>
+        <div className="flex gap-2">
           <Select value={String(year)} onValueChange={v => setYear(Number(v))}>
-            <SelectTrigger data-testid="select-year" className="w-28 border-none shadow-none bg-slate-50 font-medium">
+            <SelectTrigger data-testid="select-year" className="w-28 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -43,9 +52,8 @@ export default function DashboardPage() {
               ))}
             </SelectContent>
           </Select>
-          <div className="w-px bg-border my-1" />
           <Select value={String(quarter)} onValueChange={v => setQuarter(Number(v))}>
-            <SelectTrigger data-testid="select-quarter" className="w-32 border-none shadow-none bg-slate-50 font-medium">
+            <SelectTrigger data-testid="select-quarter" className="w-32 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -56,216 +64,199 @@ export default function DashboardPage() {
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-none shadow-md bg-gradient-to-br from-sidebar to-sidebar-accent text-white overflow-hidden relative">
-          <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4">
-            <TrendingUp size={100} />
+      <div className="p-6 md:p-10 space-y-10">
+        {/* 1. KPIs */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Média Geral */}
+          <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
+            <div className="z-10">
+              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Média Geral</p>
+              <h2 data-testid="text-quarter-avg" className="text-[40px] leading-none italic font-black mt-2">
+                {summary?.quarterAverage != null ? summary.quarterAverage.toFixed(1) : "—"}
+              </h2>
+              <p className="text-[11px] font-bold uppercase italic opacity-50 mt-1">Pontos no trimestre</p>
+            </div>
+            <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
+              <Trophy size={110} strokeWidth={1.5} />
+            </div>
+            <div className="w-full h-2 bg-[#191c1e] mt-auto" />
           </div>
-          <CardContent className="p-6 relative z-10">
-            <div className="flex items-start justify-between">
+
+          {/* Eventos */}
+          <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
+            <div className="z-10">
+              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Eventos</p>
+              <h2 data-testid="text-total-events" className="text-[40px] leading-none italic font-black mt-2">{summary?.totalEvents ?? "—"}</h2>
+              <p className="text-[11px] font-bold uppercase italic text-[#506600] mt-1 flex items-center gap-1">
+                <CheckCircle2 size={12} /> {summary?.eventsInCalibration ?? 0} Fechados
+              </p>
+            </div>
+            <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
+              <CheckCircle2 size={110} strokeWidth={1.5} />
+            </div>
+            <div className="w-full h-2 bg-[#191c1e] mt-auto" />
+          </div>
+
+          {/* Progresso de Avaliações (lime hero) */}
+          <div className={`bg-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden ${HARD_SHADOW}`}>
+            <div>
+              <p className="text-xs font-bold uppercase italic tracking-wider text-[#161e00]">Progresso de Avaliações</p>
+              <h2 data-testid="text-eval-progress" className="text-[40px] leading-none italic font-black mt-2">{progress}%</h2>
+              <p className="text-[11px] font-bold uppercase italic opacity-60 mt-1">{pending} pendentes</p>
+            </div>
+            <div className="w-full mt-auto border-2 border-[#191c1e] h-3 relative bg-[#e0e3e5]">
+              <div className="h-full bg-[#191c1e] transition-[width] duration-700" style={{ width: `${progress}%` }} />
+              <div className="absolute -top-1 -bottom-1 w-1 bg-[#506600] z-10" style={{ left: `${ghostPos}%` }} />
+            </div>
+          </div>
+
+          {/* Bônus Projetado */}
+          <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
+            <div className="z-10">
+              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Bônus Projetado</p>
+              <h2 data-testid="text-projected-bonus" className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">
+                {summary?.totalBonusPreview != null ? fmtBRL(summary.totalBonusPreview) : "—"}
+              </h2>
+              <p className="text-[11px] font-bold uppercase italic opacity-50 mt-1">Estimativa do trimestre</p>
+            </div>
+            <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
+              <DollarSign size={110} strokeWidth={1.5} />
+            </div>
+            <div className="w-full h-2 bg-[#506600] mt-auto" />
+          </div>
+        </section>
+
+        {/* 2. Evolução de Performance */}
+        {evolution && evolution.length > 0 && (
+          <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8">
+            <div className="flex flex-wrap justify-between items-end gap-3 mb-8">
               <div>
-                <p className="text-sm font-medium text-white/80 uppercase tracking-wider mb-1">Média Geral</p>
-                <p data-testid="text-quarter-avg" className="text-4xl font-black">
-                  {summary?.quarterAverage != null ? summary.quarterAverage.toFixed(1) : "—"}
-                </p>
-                <p className="text-sm text-white/70 mt-1">Pontos no trimestre</p>
+                <h3 className="text-xl md:text-2xl italic uppercase font-black">Evolução de Performance</h3>
+                <p className="text-sm text-[#444933]">Média de pontos por trimestre — {year}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Total de Eventos</p>
-                <p data-testid="text-total-events" className="text-3xl font-bold text-foreground">{summary?.totalEvents ?? "—"}</p>
-                <div className="flex gap-3 mt-2 text-xs font-medium">
-                  <span className="text-green-600 flex items-center gap-1"><CheckCircle2 size={12}/> {summary?.eventsInCalibration ?? 0} Fechados</span>
-                </div>
-              </div>
-              <div className="bg-primary/10 p-3 rounded-xl"><Calendar className="text-primary" size={24} /></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Times Avaliados</p>
-                <p data-testid="text-employees-evaluated" className="text-3xl font-bold text-foreground">{summary?.totalEmployeesEvaluated ?? "—"}</p>
-                <div className="flex gap-3 mt-2 text-xs font-medium">
-                  <span className="text-amber-600 flex items-center gap-1"><Clock size={12}/> {summary?.pendingEvaluations ?? 0} Pendentes</span>
-                </div>
-              </div>
-              <div className="bg-primary/10 p-3 rounded-xl"><Users className="text-primary" size={24} /></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Bônus Projetado</p>
-                <p data-testid="text-projected-bonus" className="text-3xl font-bold text-green-600">{summary?.totalBonusPreview ? fmtBRL(summary.totalBonusPreview) : "—"}</p>
-                <p className="text-xs text-muted-foreground mt-2 font-medium">Estimativa atual do trimestre</p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-xl"><DollarSign className="text-green-600" size={24} /></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="col-span-1 lg:col-span-2 space-y-6">
-          {evolution && evolution.length > 0 && (
-            <Card className="border-none shadow-sm bg-white">
-              <CardHeader className="pb-2 px-6 pt-6 border-b border-slate-100 mb-4">
-                <CardTitle className="text-lg font-bold">Evolução de Performance — {year}</CardTitle>
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-2">
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={evolution} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v as number).toFixed(0)}`} tick={{ fontSize: 12, fill: '#64748b' }} domain={[0, 100]} />
-                    <Tooltip 
-                      cursor={{fill: '#f1f5f9'}}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                      formatter={v => [`${(v as number).toFixed(1)} pontos`, "Média"]} 
-                    />
-                    <Bar dataKey="average" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={60} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-
-          {topEmployees && topEmployees.length > 0 && (
-            <Card className="border-none shadow-sm bg-white">
-              <CardHeader className="pb-4 px-6 pt-6 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-bold flex items-center gap-2">
-                    <Award size={20} className="text-yellow-500" />
-                    Top Performance
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-slate-100">
-                  {topEmployees.slice(0, 5).map((emp, i) => (
-                    <div key={emp.employeeId} className="flex items-center gap-4 py-4 px-6 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-sm font-bold text-slate-500 shrink-0">
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm truncate text-foreground">{emp.employeeName}</p>
-                      </div>
-                      <PlatoonBadge platoon={emp.platoon} colorHex={emp.platoonColor} className="shrink-0" />
-                      <div className="text-right shrink-0 min-w-16">
-                        <span className="text-lg font-bold text-primary">{fmt(emp.finalResult)}</span>
-                      </div>
-                    </div>
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={evolution} margin={{ top: 20, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="0" vertical={false} stroke="#e0e3e5" />
+                <XAxis dataKey="label" axisLine={{ stroke: "#191c1e", strokeWidth: 2 }} tickLine={false} tick={{ fontSize: 12, fontWeight: 700, fontStyle: "italic", fill: "#191c1e" }} dy={8} />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v as number).toFixed(0)}`} tick={{ fontSize: 11, fill: "#747a60" }} domain={[0, 100]} />
+                <Tooltip
+                  cursor={{ fill: "rgba(204,255,0,0.15)" }}
+                  contentStyle={{ borderRadius: 0, border: "2px solid #191c1e", boxShadow: "4px 4px 0 0 #191c1e", fontWeight: 700, fontStyle: "italic", textTransform: "uppercase", fontSize: 12 }}
+                  formatter={v => [`${(v as number).toFixed(1)} pts`, "Média"]}
+                />
+                <Bar dataKey="average" radius={0} maxBarSize={56} stroke="#191c1e" strokeWidth={2}>
+                  {evolution.map((_, i) => (
+                    <Cell key={i} fill={i % 2 === 0 ? "#ccff00" : "#e0e3e5"} />
                   ))}
+                </Bar>
+                <Line type="monotone" dataKey="average" stroke="#191c1e" strokeWidth={3} strokeDasharray="8 8" dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </section>
+        )}
+
+        {/* 3. Bottom grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Top Pelotões */}
+          <section className="lg:col-span-1 bg-white border-2 border-[#191c1e] p-6 flex flex-col">
+            <h3 className="text-xl italic uppercase font-black mb-6 border-b-4 border-[#506600] pb-2">Top Pelotões</h3>
+            <div className="space-y-4">
+              {platoonRanking.length === 0 && (
+                <p className="text-sm italic uppercase font-bold text-[#747a60]">Sem dados de pelotão.</p>
+              )}
+              {platoonRanking.map((p, i) => (
+                <div
+                  key={p.platoonName}
+                  className={`flex items-center gap-4 border-2 border-[#191c1e] p-4 skew-x-[-3deg] ${i === 0 ? `bg-[#ccff00] ${HARD_SHADOW}` : ""}`}
+                >
+                  <span className={`text-2xl italic font-black ${i === 0 ? "text-[#191c1e]" : "text-[#747a60] opacity-50"}`}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div className="flex-1 skew-x-[3deg]">
+                    <p className="text-sm font-black uppercase italic">{p.platoonName}</p>
+                    <p className="text-[11px] font-bold opacity-60 italic uppercase">{p.count} colaboradores · {p.percentage}%</p>
+                  </div>
+                  {i === 0
+                    ? <Trophy size={22} className="text-[#191c1e] skew-x-[3deg]" />
+                    : <span className="w-7 h-7 border-2 border-[#191c1e] skew-x-[3deg]" style={{ backgroundColor: p.color }} />}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ))}
+            </div>
+          </section>
+
+          {/* Top Performance */}
+          <section className="lg:col-span-2 bg-white border-2 border-[#191c1e] overflow-hidden flex flex-col">
+            <div className="p-6 border-b-2 border-[#191c1e] flex justify-between items-center bg-[#f2f4f6]">
+              <h3 className="text-xl italic uppercase font-black">Top Performance</h3>
+              <History size={20} className="text-[#444933]" />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#e6e8ea]">
+                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Pos</th>
+                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Colaborador</th>
+                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Pelotão</th>
+                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e] text-right">Nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(!topEmployees || topEmployees.length === 0) && (
+                    <tr><td colSpan={4} className="p-6 text-sm italic uppercase font-bold text-[#747a60] text-center">Nenhum resultado consolidado.</td></tr>
+                  )}
+                  {topEmployees?.slice(0, 6).map((emp, i) => (
+                    <tr key={emp.employeeId} className="border-b border-[#c4c9ac] hover:bg-[#f2f4f6] transition-colors">
+                      <td className="p-4 text-lg italic font-black w-12">{String(i + 1).padStart(2, "0")}</td>
+                      <td className="p-4 text-base italic font-bold uppercase">{emp.employeeName}</td>
+                      <td className="p-4"><PlatoonBadge platoon={emp.platoon} colorHex={emp.platoonColor} /></td>
+                      <td className="p-4 text-right text-lg italic font-black text-[#506600]">{fmt(emp.finalResult)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
 
-        <div className="space-y-6">
-          {distribution && distribution.length > 0 && (
-            <Card className="border-none shadow-sm bg-white">
-              <CardHeader className="pb-2 px-6 pt-6">
-                <CardTitle className="text-lg font-bold">Distribuição por Pelotão</CardTitle>
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-0">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie 
-                      data={distribution} 
-                      dataKey="count" 
-                      nameKey="platoonName" 
-                      cx="50%" 
-                      cy="50%" 
-                      innerRadius={60}
-                      outerRadius={80} 
-                      paddingAngle={2}
-                    >
-                      {distribution.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                      formatter={(v, n) => [v, n]} 
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2 mt-2">
-                  {distribution.map((d, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
-                        <span className="font-medium text-slate-700">{d.platoonName}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold">{d.count}</span>
-                        <span className="text-muted-foreground w-8 text-right">{d.percentage}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {summary?.atRiskEmployees && summary.atRiskEmployees.length > 0 && (
-            <Card className="border border-red-200 shadow-sm bg-red-50/50">
-              <CardHeader className="pb-2 px-5 pt-5">
-                <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-700 uppercase tracking-wider">
-                  <AlertTriangle size={16} />
-                  Atenção: Zona de Risco
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-5 pb-5 pt-2">
+        {/* 4. Alerts */}
+        {((summary?.atRiskEmployees && summary.atRiskEmployees.length > 0) || (summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0)) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {summary?.atRiskEmployees && summary.atRiskEmployees.length > 0 && (
+              <section className="bg-white border-2 border-[#ba1a1a] p-6">
+                <h3 className="text-sm font-black uppercase italic flex items-center gap-2 text-[#ba1a1a] mb-4">
+                  <AlertTriangle size={16} /> Zona de Risco
+                </h3>
                 <div className="space-y-2">
-                  {summary.atRiskEmployees.map((emp) => (
-                    <div key={emp.employeeId} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-red-100">
-                      <span className="text-sm font-semibold truncate flex-1 pr-2">{emp.employeeName}</span>
-                      <span className="text-sm font-black text-red-600 bg-red-50 px-2 py-0.5 rounded">{fmt(emp.currentScore ?? 0)}</span>
+                  {summary.atRiskEmployees.map(emp => (
+                    <div key={emp.employeeId} className="flex items-center justify-between p-3 border-2 border-[#ffdad6] bg-[#ffdad6]/30">
+                      <span className="text-sm font-bold italic uppercase truncate flex-1 pr-2">{emp.employeeName}</span>
+                      <span className="text-sm font-black italic text-white bg-[#ba1a1a] px-2 py-0.5">{fmt(emp.currentScore ?? 0)}</span>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </section>
+            )}
 
-          {summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0 && (
-            <Card className="border border-amber-200 shadow-sm bg-amber-50/50">
-              <CardHeader className="pb-2 px-5 pt-5">
-                <CardTitle className="text-sm font-bold flex items-center gap-2 text-amber-700 uppercase tracking-wider">
-                  <Clock size={16} />
-                  Eventos Pendentes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-5 pb-5 pt-2">
+            {summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0 && (
+              <section className="bg-white border-2 border-[#b02f00] p-6">
+                <h3 className="text-sm font-black uppercase italic flex items-center gap-2 text-[#b02f00] mb-4">
+                  <Clock size={16} /> Eventos Pendentes
+                </h3>
                 <div className="space-y-2">
-                  {summary.eventsWithPendencies.slice(0,5).map(ev => (
-                    <div key={ev.eventId} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-amber-100">
-                      <span className="text-sm font-medium truncate flex-1 pr-2">{ev.eventName}</span>
-                      <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">{ev.pendingCount} pend.</span>
+                  {summary.eventsWithPendencies.slice(0, 5).map(ev => (
+                    <div key={ev.eventId} className="flex items-center justify-between p-3 border-2 border-[#ffdbd1] bg-[#ffdbd1]/30">
+                      <span className="text-sm font-bold italic uppercase truncate flex-1 pr-2">{ev.eventName}</span>
+                      <span className="text-xs font-black italic text-white bg-[#b02f00] px-2 py-0.5 flex items-center gap-1">{ev.pendingCount} pend. <ChevronRight size={12} /></span>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </section>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Maratona de Resultados - Colaboradores</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400;1,700;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "secondary-fixed": "#ffdbd1",
+                    "surface-bright": "#f7f9fb",
+                    "on-secondary-fixed-variant": "#862200",
+                    "background": "#f7f9fb",
+                    "on-surface-variant": "#444933",
+                    "surface": "#f7f9fb",
+                    "outline": "#747a60",
+                    "on-primary-container": "#5b7300",
+                    "surface-container-low": "#f2f4f6",
+                    "primary-fixed-dim": "#abd600",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-secondary-container": "#541100",
+                    "surface-container": "#eceef0",
+                    "on-primary-fixed-variant": "#3c4d00",
+                    "surface-dim": "#d8dadc",
+                    "secondary": "#b02f00",
+                    "on-tertiary-fixed-variant": "#474747",
+                    "tertiary-fixed-dim": "#c6c6c6",
+                    "outline-variant": "#c4c9ac",
+                    "on-primary-fixed": "#161e00",
+                    "primary": "#506600",
+                    "inverse-primary": "#abd600",
+                    "on-tertiary-container": "#6b6b6b",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "surface-tint": "#506600",
+                    "surface-container-high": "#e6e8ea",
+                    "on-error": "#ffffff",
+                    "primary-fixed": "#c3f400",
+                    "surface-variant": "#e0e3e5",
+                    "primary-container": "#ccff00",
+                    "secondary-container": "#ff5722",
+                    "tertiary-container": "#ededed",
+                    "on-surface": "#191c1e",
+                    "on-tertiary-fixed": "#1b1b1b",
+                    "secondary-fixed-dim": "#ffb5a0",
+                    "surface-container-lowest": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "surface-container-highest": "#e0e3e5",
+                    "on-tertiary": "#ffffff",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-secondary-fixed": "#3b0900",
+                    "inverse-surface": "#2d3133",
+                    "on-primary": "#ffffff",
+                    "tertiary": "#5e5e5e",
+                    "on-background": "#191c1e"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "margin-mobile": "16px",
+                    "slant-offset": "12px",
+                    "gutter": "24px",
+                    "margin-desktop": "48px"
+            },
+            "fontFamily": {
+                    "body-md": ["Plus Jakarta Sans"],
+                    "headline-lg-mobile": ["Plus Jakarta Sans"],
+                    "headline-md": ["Plus Jakarta Sans"],
+                    "stats-num": ["Plus Jakarta Sans"],
+                    "body-lg": ["Plus Jakarta Sans"],
+                    "label-bold": ["Plus Jakarta Sans"],
+                    "display-hero": ["Plus Jakarta Sans"],
+                    "headline-lg": ["Plus Jakarta Sans"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["32px", {"lineHeight": "1.1", "fontWeight": "800"}],
+                    "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "stats-num": ["40px", {"lineHeight": "1", "fontWeight": "800"}],
+                    "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}],
+                    "label-bold": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "display-hero": ["72px", {"lineHeight": "1", "letterSpacing": "-0.04em", "fontWeight": "800"}],
+                    "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .kinetic-skew { clip-path: polygon(0 0, 100% 0, 98% 100%, 0% 100%); }
+        .slant-header { clip-path: polygon(0 0, 100% 0, 100% 85%, 0% 100%); }
+        .slant-tab { clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
+        .hard-shadow { box-shadow: 4px 4px 0px 0px #000000; }
+        .hard-shadow-hover:hover { box-shadow: 2px 2px 0px 0px #000000; transform: translate(2px, 2px); }
+        .track-gradient { background: linear-gradient(90deg, #ccff00 0%, #ccff00 var(--progress), #eceef0 var(--progress), #eceef0 100%); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-background min-h-screen">
+<!-- Sidebar Navigation -->
+<aside class="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-surface-container-lowest border-r-4 border-on-surface z-50">
+<div class="px-6 py-8">
+<h1 class="font-display-hero text-headline-md font-black text-on-surface italic uppercase tracking-tighter">Maratona</h1>
+<p class="font-label-bold text-label-bold uppercase italic text-on-surface-variant">Cenográfica HQ</p>
+</div>
+<nav class="flex flex-col gap-1 mt-4">
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-primary py-3 px-6 hover:bg-secondary-fixed transition-all duration-75 group" href="#">
+<span class="material-symbols-outlined">speed</span>
+<span class="font-label-bold text-label-bold uppercase italic">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-primary py-3 px-6 hover:bg-secondary-fixed transition-all duration-75 group" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-bold text-label-bold uppercase italic">Platoons</span>
+</a>
+<a class="flex items-center gap-4 bg-primary-container text-on-primary-container border-2 border-on-surface skew-x-[-3deg] ml-2 my-1 py-3 px-6 transition-all" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span class="font-label-bold text-label-bold uppercase italic">Team</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-primary py-3 px-6 hover:bg-secondary-fixed transition-all duration-75 group" href="#">
+<span class="material-symbols-outlined">trending_up</span>
+<span class="font-label-bold text-label-bold uppercase italic">Performance</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-primary py-3 px-6 hover:bg-secondary-fixed transition-all duration-75 group" href="#">
+<span class="material-symbols-outlined">workspace_premium</span>
+<span class="font-label-bold text-label-bold uppercase italic">Rewards</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-primary py-3 px-6 hover:bg-secondary-fixed transition-all duration-75 group" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-bold text-label-bold uppercase italic">Settings</span>
+</a>
+</nav>
+<div class="mt-auto p-6 flex flex-col gap-4">
+<button class="bg-primary-container border-2 border-on-surface py-3 font-label-bold text-label-bold italic uppercase tracking-widest hard-shadow hard-shadow-hover transition-all">
+                START RACE
+            </button>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-error py-3" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-bold text-label-bold uppercase italic">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 min-h-screen">
+<!-- Top Navigation Bar -->
+<header class="flex justify-between items-center px-margin-desktop py-4 w-full z-40 bg-background border-b-4 border-on-surface sticky top-0">
+<div class="flex items-center gap-8">
+<div class="md:hidden">
+<span class="material-symbols-outlined text-primary">menu</span>
+</div>
+<div class="font-display-hero text-headline-md italic font-black text-primary uppercase tracking-tighter">
+                    Maratona de Resultados
+                </div>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative hidden lg:block">
+<input class="bg-surface-container border-2 border-on-surface px-4 py-2 italic font-label-bold outline-none focus:ring-2 focus:ring-primary-container transition-all" placeholder="Buscar atleta..." type="text"/>
+<span class="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant">search</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">emoji_events</button>
+<div class="w-10 h-10 border-2 border-on-surface bg-surface-container overflow-hidden">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A professional studio headshot of a dynamic business leader with a focused expression. The person is wearing modern athletic-inspired corporate wear. The background is a clean, minimalist office space with high-contrast lighting and sharp shadows, maintaining a high-performance athletic aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzJy-EwgNRN_kVrixFer_W0_0rV2oAtCSJDc0_Zt6rw5DMzk7Xn398dGE-gapBRrVpsHqaXDfN2U-FAq4uUCOWw82cHkZb_qyrshJaryRu4lWeXrQ5Q3qWZMRLzKcWNK2lg-S6CEl9Bw6QmI6HMvEOv7XZn2ahAfGvxhxaeBXxYyxXrhmgjXHcbNk_UAXqg5ZrSPnCMyy-tbKKkK0nsH4JnGMSUp905Gy6J58qJEKWitrnKKTKBm2C7__0bymN2AQJwRVVbInpjWQ"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="p-margin-desktop space-y-12">
+<!-- Page Header -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-primary-container pl-8 py-2">
+<div>
+<h2 class="font-headline-lg text-headline-lg italic uppercase tracking-tighter text-on-surface leading-none">COLABORADORES</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant italic mt-2">Gestão do time e elegibilidade da Maratona</p>
+</div>
+<button class="bg-primary-container border-2 border-on-surface px-8 py-4 font-label-bold text-label-bold italic uppercase flex items-center gap-2 hard-shadow hard-shadow-hover transition-all active:skew-x-[-6deg]">
+<span class="material-symbols-outlined">person_add</span>
+                    Novo Colaborador
+                </button>
+</section>
+<!-- KPI Cards - Bento Grid Style -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- KPI 1 -->
+<div class="bg-surface-container-lowest border-2 border-on-surface p-8 relative overflow-hidden group">
+<div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[120px] italic">groups</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase italic">Total de Atletas</span>
+<span class="font-stats-num text-stats-num text-on-surface mt-2 italic">1,248</span>
+<div class="w-full h-1 bg-surface-container mt-4 overflow-hidden">
+<div class="h-full bg-on-surface w-full"></div>
+</div>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="bg-surface-container-lowest border-2 border-on-surface p-8 relative overflow-hidden group">
+<div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[120px] italic">bolt</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase italic">Ativos na Pista</span>
+<span class="font-stats-num text-stats-num text-primary mt-2 italic">1,180</span>
+<div class="w-full h-1 bg-surface-container mt-4 overflow-hidden">
+<div class="h-full bg-primary-container w-[94.5%]"></div>
+</div>
+</div>
+</div>
+<!-- KPI 3 -->
+<div class="bg-surface-container-lowest border-2 border-on-surface p-8 relative overflow-hidden group">
+<div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[120px] italic">verified</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase italic">Elegíveis para Bônus</span>
+<span class="font-stats-num text-stats-num text-secondary mt-2 italic">912</span>
+<div class="w-full h-1 bg-surface-container mt-4 overflow-hidden">
+<div class="h-full bg-secondary-container w-[73%]"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Data Table Section -->
+<section class="bg-surface-container-lowest border-2 border-on-surface overflow-hidden">
+<div class="bg-on-surface text-primary-container px-8 py-4 flex justify-between items-center italic">
+<h3 class="font-label-bold text-label-bold uppercase tracking-widest">Grid de Colaboradores</h3>
+<div class="flex gap-4">
+<button class="material-symbols-outlined text-body-lg">filter_list</button>
+<button class="material-symbols-outlined text-body-lg">download</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b-2 border-on-surface bg-surface-container">
+<th class="px-8 py-4 font-label-bold text-label-bold uppercase italic text-on-surface-variant">Atleta / Colaborador</th>
+<th class="px-8 py-4 font-label-bold text-label-bold uppercase italic text-on-surface-variant">Departamento</th>
+<th class="px-8 py-4 font-label-bold text-label-bold uppercase italic text-on-surface-variant">Cargo</th>
+<th class="px-8 py-4 font-label-bold text-label-bold uppercase italic text-on-surface-variant">Status</th>
+<th class="px-8 py-4 font-label-bold text-label-bold uppercase italic text-on-surface-variant">Elegibilidade</th>
+<th class="px-8 py-4 font-label-bold text-label-bold uppercase italic text-on-surface-variant text-right">Ações</th>
+</tr>
+</thead>
+<tbody class="divide-y-2 divide-surface-container">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 border-2 border-on-surface skew-x-[-4deg] overflow-hidden bg-surface-variant">
+<img alt="Colaborador avatar" class="w-full h-full object-cover" data-alt="A sharp, high-contrast portrait of a professional marathon runner with intense focus. The subject is depicted in a high-key lighting environment with dramatic black shadows. The color palette is dominated by stark whites, deep blacks, and electric yellow accents, reflecting a high-performance corporate athlete aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqr6oGalROdY2Ri7iZKXaNRV3mH66XNRTcW1F7dwqanh3EzLvw1STw5WLd3XJrfE-mPK_1P7nWwJSm7VFCcknb1CsduryzElmL12yRhmAGAvWGeoNMlEx8f1aOZ1UYz2Qd6by1YCGzKXBHsEv5qIiyFZeHtZAuwcFWx7VyD3KBmEU1xQSkOEcXMPWQA1sOHiqBjJp4TaEmHlALwoRop14MWc3fZ-a3ppl1u9TKDHzIHulvDN3zgfm8g_qrcf9YTekMmdsrXy4G3qs"/>
+</div>
+<div>
+<p class="font-label-bold text-body-md text-on-surface italic">Andre Maratona</p>
+<p class="text-label-bold text-on-surface-variant opacity-70">ID: 001248-X</p>
+</div>
+</div>
+</td>
+<td class="px-8 py-6 font-label-bold italic text-on-surface uppercase">Comercial / Vendas</td>
+<td class="px-8 py-6 font-body-md text-on-surface-variant">Executivo de Contas Senior</td>
+<td class="px-8 py-6">
+<span class="bg-primary-container text-on-primary-container px-3 py-1 border-2 border-on-surface font-label-bold text-[12px] italic uppercase skew-x-[-8deg] inline-block">Ativo</span>
+</td>
+<td class="px-8 py-6">
+<div class="flex items-center gap-2 text-primary font-label-bold italic uppercase">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                        Elegível
+                                    </div>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">more_vert</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 border-2 border-on-surface skew-x-[-4deg] overflow-hidden bg-surface-variant">
+<img alt="Colaborador avatar" class="w-full h-full object-cover" data-alt="Close up profile of a female executive in an athletic blazer, looking ahead with determination. The lighting is high-contrast with strong shadows on a minimal grey background. Electric yellow highlights are scattered in the background architecture, matching a premium performance-driven corporate brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRLv40ux-bqevaKW0sLwkO9zZ9pysAMiFWpxSWehK48jasL9idIELTuM0U2ccPAZsS_8Unj-0lI2e8rn5_XdO3DW4JzzYV4OjUX91S9oYAIsB25Z7pon4dwFpMoPkLueQMyNKvPzZWE6-pHnOOSRcvOx-CCHzjIgMAnyK3PithI-B1Z-hB2-TCgGcR1kBhbFHAhMKHbNocYHDFT872_iN8ZysjqqSRfSZ9fKKR_nt1LzSWae7H_EGMY3OeYLjZEA-z_H51bguM7qo"/>
+</div>
+<div>
+<p class="font-label-bold text-body-md text-on-surface italic">Beatriz Runner</p>
+<p class="text-label-bold text-on-surface-variant opacity-70">ID: 001355-A</p>
+</div>
+</div>
+</td>
+<td class="px-8 py-6 font-label-bold italic text-on-surface uppercase">Tecnologia</td>
+<td class="px-8 py-6 font-body-md text-on-surface-variant">Product Designer Lead</td>
+<td class="px-8 py-6">
+<span class="bg-primary-container text-on-primary-container px-3 py-1 border-2 border-on-surface font-label-bold text-[12px] italic uppercase skew-x-[-8deg] inline-block">Ativo</span>
+</td>
+<td class="px-8 py-6">
+<div class="flex items-center gap-2 text-primary font-label-bold italic uppercase">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                        Elegível
+                                    </div>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">more_vert</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 border-2 border-on-surface skew-x-[-4deg] overflow-hidden bg-surface-variant">
+<img alt="Colaborador avatar" class="w-full h-full object-cover" data-alt="Medium shot of a diverse business professional in a high-performance setting. Dramatic cinematic lighting creates sharp contrasts between the brightly lit subject and deep black background. Neon accents of yellow and orange provide kinetic energy, echoing the fast-paced marathon theme of a modern office environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDm33ywGNcx73o2cTpCNyzohxYGBO-QvcXC9E-ri5JFgcv1hY6YuLIrL8mULRIbpeZARBfsrmcUGG3w7q8jxp4cgPXqHgXjkA7YDY_IygpYh4ebtuAHFPcrrD-obQ6Xj59qaGUY8Fa-_5zK9LnYLDwPbodhqIOPtu3q_9Srb9Kss3mNQeBzfL1BXz0OmwJyCIureNEXIW3saS6vWhG3utGieuC5ysTaO0dXWcjtbi1ljp0mjYpBrsAR2JwEsaTJujiHxiGvbBljxHw"/>
+</div>
+<div>
+<p class="font-label-bold text-body-md text-on-surface italic">Carlos Lento</p>
+<p class="text-label-bold text-on-surface-variant opacity-70">ID: 000892-F</p>
+</div>
+</div>
+</td>
+<td class="px-8 py-6 font-label-bold italic text-on-surface uppercase">Operações</td>
+<td class="px-8 py-6 font-body-md text-on-surface-variant">Coordenador Logístico</td>
+<td class="px-8 py-6">
+<span class="bg-surface-dim text-on-surface-variant px-3 py-1 border-2 border-on-surface font-label-bold text-[12px] italic uppercase skew-x-[-8deg] inline-block opacity-60">Inativo</span>
+</td>
+<td class="px-8 py-6">
+<div class="flex items-center gap-2 text-on-surface-variant font-label-bold italic uppercase opacity-50">
+<span class="material-symbols-outlined text-[18px]">cancel</span>
+                                        Não Elegível
+                                    </div>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">more_vert</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 border-2 border-on-surface skew-x-[-4deg] overflow-hidden bg-surface-variant">
+<img alt="Colaborador avatar" class="w-full h-full object-cover" data-alt="A portrait of a young tech-focused professional with a sharp gaze. The image style is athletic minimalism, featuring a monochromatic grey setting with intense focused lighting. Heavy black borders and electric yellow highlights define the visual weight, perfectly matching a high-contrast athletic corporate brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGf60jRnSRYb9fPoSrpkx2cJAUkZKmQUWYUPnsDoqgaZIDlt-QamJxdgHfJ-v_R0c2VcSt7basSxm4cI5L6FTJQk6bfASHjExUdaCWtoN5RBw_1bwV1Zg71-wQr_D80jNqGV5-tPUeVP37mWgssxB1NNGAFZsG4g-Rme2k5HZc9xXUodVryi_tHHFGIbFXz19JcsIV1gFESs57IHQmv1c523wzh_QIyQC0hx6SRKSp5-db4LRBugK8hsAoho9gmeVA-miVnpSO19w"/>
+</div>
+<div>
+<p class="font-label-bold text-body-md text-on-surface italic">Daniel Speed</p>
+<p class="text-label-bold text-on-surface-variant opacity-70">ID: 001502-S</p>
+</div>
+</div>
+</td>
+<td class="px-8 py-6 font-label-bold italic text-on-surface uppercase">Marketing</td>
+<td class="px-8 py-6 font-body-md text-on-surface-variant">Analista de Growth Junior</td>
+<td class="px-8 py-6">
+<span class="bg-primary-container text-on-primary-container px-3 py-1 border-2 border-on-surface font-label-bold text-[12px] italic uppercase skew-x-[-8deg] inline-block">Ativo</span>
+</td>
+<td class="px-8 py-6">
+<div class="flex items-center gap-2 text-secondary font-label-bold italic uppercase">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+                                        Pendente
+                                    </div>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">more_vert</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-8 border-t-2 border-surface-container flex justify-between items-center bg-surface-container-lowest">
+<span class="font-label-bold text-on-surface-variant italic uppercase">Mostrando 4 de 1,248 atletas</span>
+<div class="flex gap-2">
+<button class="w-10 h-10 border-2 border-on-surface flex items-center justify-center hover:bg-primary-container transition-colors"><span class="material-symbols-outlined">chevron_left</span></button>
+<button class="w-10 h-10 border-2 border-on-surface flex items-center justify-center bg-primary-container font-label-bold italic">1</button>
+<button class="w-10 h-10 border-2 border-on-surface flex items-center justify-center hover:bg-primary-container font-label-bold italic">2</button>
+<button class="w-10 h-10 border-2 border-on-surface flex items-center justify-center hover:bg-primary-container font-label-bold italic">3</button>
+<button class="w-10 h-10 border-2 border-on-surface flex items-center justify-center hover:bg-primary-container transition-colors"><span class="material-symbols-outlined">chevron_right</span></button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Floating Action Button - Mobile Only -->
+<button class="md:hidden fixed bottom-8 right-8 bg-primary-container border-2 border-on-surface w-16 h-16 flex items-center justify-center hard-shadow z-50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-on-surface scale-125">add</span>
+</button>
+<script>
+        // Micro-interaction: Skew effect on hover for table rows
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.style.transform = 'translateX(8px)';
+                row.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.transform = 'translateX(0)';
+            });
+        });
+
+        // Atmospheric effect: Pulse for active athletes
+        const pulseAnim = () => {
+            document.querySelectorAll('.bg-primary-container').forEach(el => {
+                el.style.boxShadow = `0 0 ${Math.sin(Date.now() / 200) * 10 + 10}px rgba(204, 255, 0, 0.3)`;
+            });
+            requestAnimationFrame(pulseAnim);
+        };
+        // pulseAnim(); // Uncomment to enable subtle glow
+    </script>
+</body></html>
