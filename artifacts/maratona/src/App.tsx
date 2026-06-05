@@ -1,5 +1,5 @@
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -23,7 +23,21 @@ import AuditPage from "@/pages/audit";
 import MyPerformancePage from "@/pages/my-performance";
 import NotFound from "@/pages/not-found";
 
+function handleAuthError(error: unknown) {
+  const status = (error as { status?: number })?.status;
+  if (status === 401 && localStorage.getItem("maratona_token")) {
+    localStorage.removeItem("maratona_token");
+    localStorage.removeItem("maratona_user");
+    const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+    if (!window.location.pathname.endsWith("/login")) {
+      window.location.assign(`${base}/login`);
+    }
+  }
+}
+
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: handleAuthError }),
+  mutationCache: new MutationCache({ onError: handleAuthError }),
   defaultOptions: {
     queries: {
       retry: 1,
