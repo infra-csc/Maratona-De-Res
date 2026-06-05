@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ngTDTUVW-QPpcLGXA_Ns8"
+uri = "file://.local/exports/maratona-design-spec.md"
+type = "text"
+title = "Especificação de layout — Maratona de Resultados"
