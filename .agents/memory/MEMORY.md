@@ -3,4 +3,4 @@
 - [Calculation scale](calculation-scale.md) — score×weight directly (0-100), weights sum to 20, no normalization
 - [JWT_SECRET env](jwt-secret-env.md) — keep in encrypted Secrets store; auth.ts throws at startup if missing (no fallback)
 - [API client /api prefix](api-client-prefix.md) — generated paths must be BARE; single /api prefix owned by runtime setBaseUrl, else double-prefix → 401
-- [Maratona auth 401 / empty data](maratona-auth-401.md) — guard checks cached user not JWT expiry → expired token renders empty pages; 401 handling lives in QueryClient + package fetch, not the dead artifact-local custom-fetch
+- [Maratona auth 401 / empty data](maratona-auth-401.md) — expired JWT renders empty pages (guard ignores expiry); 401 handling belongs in QueryClient/package fetch
