@@ -1,17 +1,22 @@
 import { useState } from "react";
-import { useGetEmployees, useCreateEmployee, useUpdateEmployee, getGetEmployeesQueryKey } from "@workspace/api-client-react";
+import { useGetEmployees, useCreateEmployee, getGetEmployeesQueryKey } from "@workspace/api-client-react";
 import type { EmployeeInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, UserCheck, UserX, Building2, Users } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent } from "@/components/ui/card";
+
+const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
+const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
+}
 
 export default function EmployeesPage() {
   const { user } = useAuth();
@@ -55,167 +60,200 @@ export default function EmployeesPage() {
     ativos: employees?.filter(e => e.active).length ?? 0,
     elegiveis: employees?.filter(e => e.eligibleForBonus !== false).length ?? 0,
   };
+  const pct = (n: number) => (stats.total > 0 ? Math.round((n / stats.total) * 100) : 0);
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto bg-slate-50/30 min-h-full">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 data-testid="text-page-title" className="text-3xl font-bold tracking-tight">Colaboradores</h1>
-          <p className="text-muted-foreground text-sm mt-1">Gestão do time e elegibilidade da Maratona</p>
-        </div>
-        {canEdit && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-employee" className="shadow-sm">
-                <Plus size={16} className="mr-2" /> Novo Colaborador
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader><DialogTitle className="text-xl">Novo Colaborador</DialogTitle></DialogHeader>
-              <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
-                <div className="space-y-1.5">
-                  <Label className="font-semibold text-slate-700">Nome Completo <span className="text-destructive">*</span></Label>
-                  <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" className="h-11" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <div className="p-6 md:p-10 space-y-10">
+        {/* Page header */}
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
+          <div>
+            <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">Colaboradores</h1>
+            <p className="text-base md:text-lg text-[#444933] italic mt-2">Gestão do time e elegibilidade da Maratona</p>
+          </div>
+          {canEdit && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <button
+                  data-testid="button-create-employee"
+                  className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                >
+                  <Plus size={18} /> Novo Colaborador
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Colaborador</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
                   <div className="space-y-1.5">
-                    <Label className="font-semibold text-slate-700">Departamento</Label>
-                    <Input data-testid="input-employee-dept" {...register("department")} placeholder="Ex: Cenografia" className="h-11" />
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
+                    <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-none border-2 border-[#191c1e]" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="font-semibold text-slate-700">Função</Label>
-                    <Input data-testid="input-employee-func" {...register("functionName")} placeholder="Ex: Montador" className="h-11" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Departamento</Label>
+                      <Input data-testid="input-employee-dept" {...register("department")} placeholder="Ex: Cenografia" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função</Label>
+                      <Input data-testid="input-employee-func" {...register("functionName")} placeholder="Ex: Montador" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="font-semibold text-slate-700">E-mail</Label>
-                    <Input data-testid="input-employee-email" type="email" {...register("email")} placeholder="email@exemplo.com" className="h-11" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">E-mail</Label>
+                      <Input data-testid="input-employee-email" type="email" {...register("email")} placeholder="email@exemplo.com" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Telefone</Label>
+                      <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="font-semibold text-slate-700">Telefone</Label>
-                    <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" className="h-11" />
+                  <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+                    <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
+                    <button
+                      data-testid="button-submit-employee"
+                      type="submit"
+                      disabled={createMutation.isPending}
+                      className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                    >
+                      {createMutation.isPending ? "Criando..." : "Criar Colaborador"}
+                    </button>
                   </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-4 border-t">
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                  <Button data-testid="button-submit-employee" type="submit" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? "Criando..." : "Criar Colaborador"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </section>
+
+        {/* KPIs */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Total */}
+          <div className="bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
+              <Users size={120} strokeWidth={1.5} />
+            </div>
+            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Total de Registros</span>
+            <p data-testid="stat-total" className="text-[40px] leading-none italic font-black mt-2">{stats.total}</p>
+            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#191c1e]" style={{ width: "100%" }} /></div>
+          </div>
+          {/* Ativos */}
+          <div className={`bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group ${HARD_SHADOW}`}>
+            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
+              <Zap size={120} strokeWidth={1.5} />
+            </div>
+            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Ativos</span>
+            <p data-testid="stat-ativos" className="text-[40px] leading-none italic font-black mt-2 text-[#506600]">{stats.ativos}</p>
+            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#ccff00]" style={{ width: `${pct(stats.ativos)}%` }} /></div>
+          </div>
+          {/* Elegíveis */}
+          <div className="bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
+              <Building2 size={120} strokeWidth={1.5} />
+            </div>
+            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Elegíveis para Bônus</span>
+            <p data-testid="stat-elegiveis" className="text-[40px] leading-none italic font-black mt-2 text-[#b02f00]">{stats.elegiveis}</p>
+            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#ff5722]" style={{ width: `${pct(stats.elegiveis)}%` }} /></div>
+          </div>
+        </section>
+
+        {/* Search + filter */}
+        <section className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+            <Input
+              data-testid="input-search-employees"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
+              placeholder="Buscar por nome, função ou departamento..."
+            />
+          </div>
+          <div className="flex border-2 border-[#191c1e] bg-white">
+            {(["all", "true", "false"] as const).map(v => (
+              <button
+                key={v}
+                data-testid={`filter-active-${v}`}
+                onClick={() => setFilterActive(v)}
+                className={`px-5 py-2.5 text-xs font-bold italic uppercase tracking-wider transition-all ${filterActive === v ? "bg-[#191c1e] text-[#ccff00]" : "text-[#444933] hover:bg-[#eceef0]"}`}
+              >
+                {v === "all" ? "Todos" : v === "true" ? "Ativos" : "Inativos"}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Table */}
+        {isLoading ? (
+          <div className="text-center py-20 italic uppercase font-bold text-[#747a60]">Carregando colaboradores...</div>
+        ) : (
+          <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex justify-between items-center italic">
+              <h3 className="text-xs font-bold uppercase tracking-widest">Grid de Colaboradores</h3>
+              <Filter size={18} />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Atleta / Colaborador</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Departamento</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Cargo</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Status</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Elegibilidade</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y-2 divide-[#eceef0]">
+                  {filtered.map(emp => (
+                    <tr key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-11 h-11 border-2 border-[#191c1e] skew-x-[-4deg] bg-[#e0e3e5] flex items-center justify-center shrink-0">
+                            <span className="skew-x-[4deg] text-sm font-black italic">{initials(emp.name)}</span>
+                          </div>
+                          <div>
+                            <p className="font-bold italic text-[#191c1e]">{emp.name}</p>
+                            {emp.email && <p className="text-xs text-[#747a60] mt-0.5">{emp.email}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-bold italic uppercase text-sm">{emp.department}</td>
+                      <td className="px-6 py-4 text-[#444933]">{emp.functionName}</td>
+                      <td className="px-6 py-4 text-center">
+                        {emp.active ? (
+                          <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
+                            <span className="inline-block skew-x-[8deg]">Ativo</span>
+                          </span>
+                        ) : (
+                          <span className="bg-[#d8dadc] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block opacity-70">
+                            <span className="inline-block skew-x-[8deg]">Inativo</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-1.5 font-bold italic uppercase text-sm">
+                          {emp.eligibleForBonus === false ? (
+                            <span className="flex items-center gap-1.5 text-[#747a60] opacity-70"><XCircle size={16} /> Não Elegível</span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 text-[#506600]"><CheckCircle2 size={16} /> Elegível</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-6 py-4 border-t-2 border-[#eceef0] flex justify-between items-center">
+              <span className="text-xs font-bold italic uppercase text-[#747a60]">Mostrando {filtered.length} de {stats.total} colaboradores</span>
+            </div>
+          </section>
         )}
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-              <Users size={24} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total de Registros</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600 shrink-0">
-              <UserCheck size={24} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Ativos</p>
-              <p className="text-2xl font-bold">{stats.ativos}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
-              <Building2 size={24} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Elegíveis</p>
-              <p className="text-2xl font-bold">{stats.elegiveis}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-center">
-        <div className="relative flex-1 w-full">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            data-testid="input-search-employees"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-10 h-11 bg-slate-50 border-transparent hover:bg-slate-100 focus:bg-white transition-colors"
-            placeholder="Buscar por nome, função ou departamento..."
-          />
-        </div>
-        <div className="flex bg-slate-100 p-1 rounded-lg">
-          {(["all", "true", "false"] as const).map(v => (
-            <button
-              key={v}
-              data-testid={`filter-active-${v}`}
-              onClick={() => setFilterActive(v)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${filterActive === v ? "bg-white text-primary shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
-            >
-              {v === "all" ? "Todos" : v === "true" ? "Ativos" : "Inativos"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="text-center py-20 text-muted-foreground">Carregando colaboradores...</div>
-      ) : (
-        <Card className="border-none shadow-sm overflow-hidden bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b">
-                  <th className="px-6 py-4 text-left font-semibold text-slate-600">Colaborador</th>
-                  <th className="px-6 py-4 text-left font-semibold text-slate-600">Departamento</th>
-                  <th className="px-6 py-4 text-left font-semibold text-slate-600">Função</th>
-                  <th className="px-6 py-4 text-center font-semibold text-slate-600">Status</th>
-                  <th className="px-6 py-4 text-center font-semibold text-slate-600">Elegibilidade</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map(emp => (
-                  <tr key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{emp.name}</div>
-                      {emp.email && <div className="text-xs text-slate-500 mt-0.5">{emp.email}</div>}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-slate-700">{emp.department}</td>
-                    <td className="px-6 py-4 text-slate-600">{emp.functionName}</td>
-                    <td className="px-6 py-4 text-center">
-                      {emp.active
-                        ? <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 font-semibold"><UserCheck size={12} /> Ativo</Badge>
-                        : <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200 gap-1 font-semibold"><UserX size={12} /> Inativo</Badge>
-                      }
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {emp.eligibleForBonus === false
-                        ? <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Não Elegível</Badge>
-                        : <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Elegível</Badge>
-                      }
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-16 text-muted-foreground text-base">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
     </div>
   );
 }
