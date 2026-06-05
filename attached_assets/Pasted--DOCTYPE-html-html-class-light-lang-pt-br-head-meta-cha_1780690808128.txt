@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cenográfica | Critérios de Performance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400;1,700;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .kinetic-skew { clip-path: polygon(0 0, 100% 0, 98% 100%, 0% 100%); }
+        .slant-card { transform: skewX(-1deg); }
+        .hard-shadow { box-shadow: 4px 4px 0px 0px #CCFF00; }
+        .hard-shadow-black { box-shadow: 4px 4px 0px 0px #000000; }
+        .track-bg { background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px); }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#f7f9fb",
+                      "on-error-container": "#93000a",
+                      "error-container": "#ffdad6",
+                      "secondary-container": "#ff5722",
+                      "surface-dim": "#d8dadc",
+                      "primary": "#506600",
+                      "on-primary-container": "#5b7300",
+                      "tertiary": "#5e5e5e",
+                      "surface": "#f7f9fb",
+                      "on-surface-variant": "#444933",
+                      "on-primary-fixed-variant": "#3c4d00",
+                      "primary-container": "#ccff00",
+                      "secondary": "#b02f00",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-fixed": "#ffdbd1",
+                      "secondary-fixed-dim": "#ffb5a0",
+                      "surface-variant": "#e0e3e5",
+                      "surface-container-high": "#e6e8ea",
+                      "on-tertiary-fixed-variant": "#474747",
+                      "on-secondary-fixed": "#3b0900",
+                      "inverse-surface": "#2d3133",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed-dim": "#c6c6c6",
+                      "surface-container-low": "#f2f4f6",
+                      "on-tertiary-fixed": "#1b1b1b",
+                      "on-tertiary-container": "#6b6b6b",
+                      "on-secondary-container": "#541100",
+                      "outline": "#747a60",
+                      "outline-variant": "#c4c9ac",
+                      "inverse-on-surface": "#eff1f3",
+                      "on-background": "#191c1e",
+                      "on-primary": "#ffffff",
+                      "surface-container-highest": "#e0e3e5",
+                      "surface-container": "#eceef0",
+                      "surface-tint": "#506600",
+                      "inverse-primary": "#abd600",
+                      "tertiary-fixed": "#e2e2e2",
+                      "primary-fixed": "#c3f400",
+                      "primary-fixed-dim": "#abd600",
+                      "on-primary-fixed": "#161e00",
+                      "on-secondary": "#ffffff",
+                      "on-surface": "#191c1e",
+                      "on-secondary-fixed-variant": "#862200",
+                      "error": "#ba1a1a",
+                      "background": "#f7f9fb",
+                      "tertiary-container": "#ededed",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "slant-offset": "12px",
+                      "gutter": "24px",
+                      "unit": "4px",
+                      "margin-desktop": "48px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "label-bold": ["Plus Jakarta Sans"],
+                      "stats-num": ["Plus Jakarta Sans"],
+                      "headline-lg": ["Plus Jakarta Sans"],
+                      "display-hero": ["Plus Jakarta Sans"],
+                      "headline-md": ["Plus Jakarta Sans"],
+                      "headline-lg-mobile": ["Plus Jakarta Sans"],
+                      "body-md": ["Plus Jakarta Sans"],
+                      "body-lg": ["Plus Jakarta Sans"]
+              },
+              "fontSize": {
+                      "label-bold": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "stats-num": ["40px", {"lineHeight": "1", "fontWeight": "800"}],
+                      "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "display-hero": ["72px", {"lineHeight": "1", "letterSpacing": "-0.04em", "fontWeight": "800"}],
+                      "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                      "headline-lg-mobile": ["32px", {"lineHeight": "1.1", "fontWeight": "800"}],
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-surface-bright min-h-screen">
+<!-- TopNavBar Shell -->
+<header class="bg-surface dark:bg-inverse-surface border-b-2 border-on-background dark:border-on-surface shadow-[4px_4px_0px_0px_rgba(204,255,0,1)] flex justify-between items-center px-margin-desktop py-4 w-full sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<h1 class="font-headline-md text-headline-md italic font-black text-primary dark:text-primary-fixed uppercase tracking-tighter">Cenográfica</h1>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-on-surface-variant dark:text-surface-variant font-label-bold text-label-bold italic uppercase hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 px-2 py-1" href="#">Dashboard</a>
+<a class="text-on-surface-variant dark:text-surface-variant font-label-bold text-label-bold italic uppercase hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 px-2 py-1" href="#">Platoon</a>
+<a class="text-primary dark:text-primary-fixed font-bold italic font-label-bold text-label-bold uppercase border-b-2 border-primary-container" href="#">Critérios</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-low border-2 border-on-background px-3 py-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 font-label-bold text-label-bold uppercase italic w-40" placeholder="BUSCAR CRITÉRIO..." type="text"/>
+</div>
+<button class="material-symbols-outlined p-2 text-on-surface hover:bg-primary-container transition-all" data-icon="notifications">notifications</button>
+<div class="w-10 h-10 border-2 border-on-background bg-secondary-container overflow-hidden">
+<img alt="User profile photo" data-alt="A professional high-performance athlete portrait rendered in a sharp, high-contrast graphic style. The lighting is dramatic and focused, highlighting a determined expression. The color palette features deep forest greens, electric yellows, and charcoal blacks, fitting a modern athletic performance management platform's branding." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBl41rzRE9g7I44uLSRt1QycCteflthC4h4IFh1Lv1wVsFzWOaEtKgtBxfwlQJ4yAM6SXU-j9Uya2QY0dXN0jQO4ADma9butHMLh2arOiDbA8H-_oQxjGFMKQYybsrRDmto_zvSukXf2XlX2rm1rqGK-zmWVfkSV-2coKnPWV8bDzXkwNb8bbRWqXzX8EABYpv4GR3U3qMLAnKIbN-Q63YKFH38zx2zK-Bbke_gAYDkRNqKLK2ariWeG4uyJZSrhsDX-IxoVJ35EE"/>
+</div>
+</div>
+</header>
+<div class="flex">
+<!-- SideNavBar Shell -->
+<aside class="h-screen w-64 fixed left-0 top-0 pt-24 bg-surface-container-lowest dark:bg-surface-container-highest border-r-3 border-on-background dark:border-on-surface flex flex-col h-full p-gutter gap-4 hidden lg:flex">
+<div class="mb-6 px-4">
+<h2 class="font-headline-lg text-headline-lg italic font-black text-on-background dark:text-on-surface uppercase tracking-tighter leading-none">Maratona</h2>
+<p class="font-label-bold text-label-bold text-primary italic uppercase">Resultados</p>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase hover:bg-surface-container-high dark:hover:bg-surface-dim transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span> Dashboard
+                </a>
+<a class="bg-primary-container text-on-primary-fixed border-2 border-on-background -skew-x-6 px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span> Critérios
+                </a>
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase hover:bg-surface-container-high dark:hover:bg-surface-dim transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span> Pelotão
+                </a>
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase hover:bg-surface-container-high dark:hover:bg-surface-dim transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="leaderboard">leaderboard</span> Performance
+                </a>
+</nav>
+<button class="bg-primary-container text-on-primary-fixed font-black italic uppercase text-label-bold border-2 border-on-background py-3 -skew-x-12 hover:bg-on-primary-container hover:text-primary-container transition-all active:translate-y-1">
+                INICIAR CORRIDA
+            </button>
+<div class="mt-auto flex flex-col gap-2 pb-8">
+<a class="text-on-surface-variant px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase transition-all" href="#"><span class="material-symbols-outlined" data-icon="help">help</span> Ajuda</a>
+<a class="text-on-surface-variant px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase transition-all" href="#"><span class="material-symbols-outlined" data-icon="logout">logout</span> Sair</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="lg:ml-64 flex-1 p-margin-desktop min-h-screen">
+<!-- Header Section with Kinetic Energy -->
+<div class="mb-12 relative">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<span class="bg-primary-container text-on-primary-fixed font-label-bold text-label-bold italic uppercase px-3 py-1 border-2 border-on-background mb-4 inline-block -skew-x-6">Configuração de Performance</span>
+<h2 class="font-headline-lg text-headline-lg italic font-black uppercase tracking-tighter text-on-background">Critérios de Avaliação</h2>
+</div>
+<!-- Metric Card: Soma dos Pesos -->
+<div class="bg-surface-container-lowest border-3 border-on-background p-6 hard-shadow relative -skew-x-3 overflow-hidden">
+<div class="absolute top-0 right-0 p-1 bg-on-background text-primary-container">
+<span class="material-symbols-outlined text-[16px]" data-icon="bolt">bolt</span>
+</div>
+<p class="font-label-bold text-label-bold italic uppercase text-on-surface-variant mb-1">Soma dos Pesos</p>
+<div class="flex items-baseline gap-2">
+<span class="font-stats-num text-stats-num text-on-background" id="totalWeight">18</span>
+<span class="font-headline-md text-headline-md text-on-surface-variant italic">/ 20</span>
+</div>
+<!-- Progress Track -->
+<div class="w-full h-3 bg-surface-container-high mt-4 border border-on-background">
+<div class="h-full bg-primary-container border-r-2 border-on-background transition-all duration-500" id="weightTrack" style="width: 90%"></div>
+</div>
+<p class="font-label-bold text-[10px] mt-2 text-secondary italic" id="weightWarning">FALTAM 2 PONTOS PARA A META</p>
+</div>
+</div>
+</div>
+<!-- Bento Grid - Table Container -->
+<div class="grid grid-cols-1 gap-gutter">
+<div class="bg-surface-container-lowest border-2 border-on-background overflow-hidden hard-shadow-black">
+<!-- Table Header -->
+<div class="grid grid-cols-12 gap-4 bg-on-background text-primary-container p-4 font-label-bold text-label-bold italic uppercase">
+<div class="col-span-1">ID</div>
+<div class="col-span-4">Nome do Critério</div>
+<div class="col-span-3">Descrição</div>
+<div class="col-span-2 text-center">Peso</div>
+<div class="col-span-2 text-right px-4">Status</div>
+</div>
+<!-- Table Rows -->
+<div class="divide-y-2 divide-on-background track-bg">
+<!-- Row 1 -->
+<div class="grid grid-cols-12 gap-4 p-4 items-center hover:bg-primary-container/10 transition-colors group">
+<div class="col-span-1 font-stats-num text-body-lg text-on-surface-variant">#01</div>
+<div class="col-span-4">
+<span class="font-headline-md text-body-lg uppercase font-black italic text-on-background group-hover:text-primary transition-colors">Entrega Técnica</span>
+</div>
+<div class="col-span-3 font-body-md text-body-md text-on-surface-variant leading-tight">Qualidade e precisão dos artefatos produzidos pela squad.</div>
+<div class="col-span-2 flex justify-center">
+<div class="relative w-20">
+<input class="w-full bg-transparent border-2 border-on-background px-2 py-1 font-stats-num text-headline-md text-center focus:ring-0 focus:border-primary focus:bg-primary-container/20 transition-all weight-input" max="20" min="0" type="number" value="8"/>
+</div>
+</div>
+<div class="col-span-2 flex justify-end px-4">
+<button class="status-toggle group/btn relative inline-flex h-8 w-16 items-center border-2 border-on-background bg-surface-variant transition-colors active" onclick="toggleStatus(this)">
+<span class="translate-x-8 inline-block h-5 w-5 bg-on-background transition-transform group-[.active]/btn:bg-primary-container"></span>
+</button>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="grid grid-cols-12 gap-4 p-4 items-center hover:bg-primary-container/10 transition-colors group">
+<div class="col-span-1 font-stats-num text-body-lg text-on-surface-variant">#02</div>
+<div class="col-span-4">
+<span class="font-headline-md text-body-lg uppercase font-black italic text-on-background group-hover:text-primary transition-colors">Velocidade (Pace)</span>
+</div>
+<div class="col-span-3 font-body-md text-body-md text-on-surface-variant leading-tight">Cumprimento dos prazos e agilidade na resolução de bloqueios.</div>
+<div class="col-span-2 flex justify-center">
+<div class="relative w-20">
+<input class="w-full bg-transparent border-2 border-on-background px-2 py-1 font-stats-num text-headline-md text-center focus:ring-0 focus:border-primary weight-input" max="20" min="0" type="number" value="5"/>
+</div>
+</div>
+<div class="col-span-2 flex justify-end px-4">
+<button class="status-toggle group/btn relative inline-flex h-8 w-16 items-center border-2 border-on-background bg-surface-variant transition-colors active" onclick="toggleStatus(this)">
+<span class="translate-x-8 inline-block h-5 w-5 bg-on-background transition-transform group-[.active]/btn:bg-primary-container"></span>
+</button>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="grid grid-cols-12 gap-4 p-4 items-center hover:bg-primary-container/10 transition-colors group">
+<div class="col-span-1 font-stats-num text-body-lg text-on-surface-variant">#03</div>
+<div class="col-span-4">
+<span class="font-headline-md text-body-lg uppercase font-black italic text-on-background group-hover:text-primary transition-colors">Inovação Aplicada</span>
+</div>
+<div class="col-span-3 font-body-md text-body-md text-on-surface-variant leading-tight">Sugestões de melhorias que resultaram em economia de recursos.</div>
+<div class="col-span-2 flex justify-center">
+<div class="relative w-20">
+<input class="w-full bg-transparent border-2 border-on-background px-2 py-1 font-stats-num text-headline-md text-center focus:ring-0 focus:border-primary weight-input" max="20" min="0" type="number" value="5"/>
+</div>
+</div>
+<div class="col-span-2 flex justify-end px-4">
+<button class="status-toggle group/btn relative inline-flex h-8 w-16 items-center border-2 border-on-background bg-surface-variant transition-colors active" onclick="toggleStatus(this)">
+<span class="translate-x-8 inline-block h-5 w-5 bg-on-background transition-transform group-[.active]/btn:bg-primary-container"></span>
+</button>
+</div>
+</div>
+<!-- Row 4 (Inactive Example) -->
+<div class="grid grid-cols-12 gap-4 p-4 items-center opacity-60 hover:opacity-100 transition-all group">
+<div class="col-span-1 font-stats-num text-body-lg text-on-surface-variant">#04</div>
+<div class="col-span-4">
+<span class="font-headline-md text-body-lg uppercase font-black italic text-on-background">Cultura do Sucesso</span>
+</div>
+<div class="col-span-3 font-body-md text-body-md text-on-surface-variant leading-tight">Engajamento com os ritos e celebrações da equipe.</div>
+<div class="col-span-2 flex justify-center">
+<div class="relative w-20">
+<input class="w-full bg-surface-variant border-2 border-on-background px-2 py-1 font-stats-num text-headline-md text-center focus:ring-0 weight-input" max="20" min="0" type="number" value="0"/>
+</div>
+</div>
+<div class="col-span-2 flex justify-end px-4">
+<button class="status-toggle group/btn relative inline-flex h-8 w-16 items-center border-2 border-on-background bg-surface-variant transition-colors" onclick="toggleStatus(this)">
+<span class="translate-x-1 inline-block h-5 w-5 bg-on-background transition-transform group-[.active]/btn:bg-primary-container group-[.active]/btn:translate-x-8"></span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footer / Add Action -->
+<div class="p-6 bg-surface-container-low flex justify-between items-center border-t-2 border-on-background">
+<button class="flex items-center gap-2 font-label-bold text-label-bold italic uppercase text-on-background hover:text-primary transition-colors group">
+<span class="material-symbols-outlined border-2 border-on-background p-1 group-hover:bg-primary-container" data-icon="add">add</span>
+                            Adicionar Novo Critério
+                        </button>
+<div class="flex gap-4">
+<button class="px-6 py-2 border-2 border-on-background font-label-bold text-label-bold italic uppercase hover:bg-surface-variant transition-all">Descartar</button>
+<button class="px-8 py-2 bg-on-background text-primary-container font-black italic uppercase text-label-bold border-2 border-on-background -skew-x-6 hover:bg-primary hover:text-white transition-all hard-shadow">Salvar Alterações</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Contextual Performance Tips (Kinetic Diagonals) -->
+<div class="mt-16 grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div class="relative bg-secondary-container border-2 border-on-background p-8 -rotate-1 group hover:-rotate-0 transition-transform cursor-pointer">
+<div class="absolute -top-4 -left-4 bg-on-background p-2 -rotate-12">
+<span class="material-symbols-outlined text-primary-container" data-icon="lightbulb">lightbulb</span>
+</div>
+<h3 class="font-headline-md text-headline-md italic uppercase font-black text-on-secondary-container mb-2">Equilíbrio de Carga</h3>
+<p class="font-body-md text-body-md text-on-secondary-container">Lembre-se: O peso total deve somar exatamente 20 pontos para garantir que o algoritmo de performance calcule as metas de forma precisa. Critérios com peso zero não afetam a média geral.</p>
+</div>
+<div class="relative bg-primary-container border-2 border-on-background p-8 rotate-1 group hover:rotate-0 transition-transform cursor-pointer">
+<div class="absolute -top-4 -right-4 bg-on-background p-2 rotate-12">
+<span class="material-symbols-outlined text-primary-container" data-icon="trending_up">trending_up</span>
+</div>
+<h3 class="font-headline-md text-headline-md italic uppercase font-black text-on-primary-container mb-2">Métricas Dinâmicas</h3>
+<p class="font-body-md text-body-md text-on-primary-container">Inative critérios temporariamente para testes A/B na squad. O histórico de dados é preservado mesmo se o critério estiver desabilitado no momento da corrida.</p>
+</div>
+</div>
+</main>
+</div>
+<script>
+        function toggleStatus(btn) {
+            btn.classList.toggle('active');
+            const dot = btn.querySelector('span');
+            const row = btn.closest('.grid');
+            if(btn.classList.contains('active')) {
+                dot.classList.add('translate-x-8');
+                dot.classList.remove('translate-x-1');
+                row.classList.remove('opacity-60');
+            } else {
+                dot.classList.remove('translate-x-8');
+                dot.classList.add('translate-x-1');
+                row.classList.add('opacity-60');
+            }
+            updateTotal();
+        }
+
+        function updateTotal() {
+            const inputs = document.querySelectorAll('.weight-input');
+            let total = 0;
+            inputs.forEach(input => {
+                const row = input.closest('.grid');
+                const btn = row.querySelector('.status-toggle');
+                if(btn.classList.contains('active')) {
+                    total += parseInt(input.value) || 0;
+                }
+            });
+
+            const display = document.getElementById('totalWeight');
+            const track = document.getElementById('weightTrack');
+            const warning = document.getElementById('weightWarning');
+            
+            display.innerText = total;
+            const percentage = Math.min((total / 20) * 100, 100);
+            track.style.width = percentage + '%';
+
+            if(total === 20) {
+                warning.innerText = "META ATINGIDA! PESO IDEAL";
+                warning.className = "font-label-bold text-[10px] mt-2 text-primary italic";
+                track.classList.replace('bg-primary-container', 'bg-primary-container');
+            } else if (total > 20) {
+                warning.innerText = "LIMITE EXCEDIDO (" + (total - 20) + " pts acima)";
+                warning.className = "font-label-bold text-[10px] mt-2 text-error italic";
+                track.classList.replace('bg-primary-container', 'bg-error');
+            } else {
+                warning.innerText = "FALTAM " + (20 - total) + " PONTOS PARA A META";
+                warning.className = "font-label-bold text-[10px] mt-2 text-secondary italic";
+                track.classList.replace('bg-error', 'bg-primary-container');
+            }
+        }
+
+        // Initialize inputs
+        document.querySelectorAll('.weight-input').forEach(input => {
+            input.addEventListener('input', updateTotal);
+        });
+        
+        // Initial run
+        updateTotal();
+    </script>
+</body></html>

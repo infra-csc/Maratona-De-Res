@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .kinetic-skew {
+            clip-path: polygon(0 0, 100% 0, 100% 95%, 0 100%);
+        }
+        .kinetic-skew-reverse {
+            clip-path: polygon(0 5%, 100% 0, 100% 100%, 0 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hard-shadow {
+            box-shadow: 4px 4px 0px 0px rgba(204, 255, 0, 1);
+        }
+        .hard-shadow-black {
+            box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f7f9fb;
+        }
+        /* Custom scrollbar for athletic feel */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #eceef0; }
+        ::-webkit-scrollbar-thumb { background: #506600; border-radius: 0; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#f7f9fb",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#ff5722",
+                        "surface-dim": "#d8dadc",
+                        "primary": "#506600",
+                        "on-primary-container": "#5b7300",
+                        "tertiary": "#5e5e5e",
+                        "surface": "#f7f9fb",
+                        "on-surface-variant": "#444933",
+                        "on-primary-fixed-variant": "#3c4d00",
+                        "primary-container": "#ccff00",
+                        "secondary": "#b02f00",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed": "#ffdbd1",
+                        "secondary-fixed-dim": "#ffb5a0",
+                        "surface-variant": "#e0e3e5",
+                        "surface-container-high": "#e6e8ea",
+                        "on-tertiary-fixed-variant": "#474747",
+                        "on-secondary-fixed": "#3b0900",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "surface-container-low": "#f2f4f6",
+                        "on-tertiary-fixed": "#1b1b1b",
+                        "on-tertiary-container": "#6b6b6b",
+                        "on-secondary-container": "#541100",
+                        "outline": "#747a60",
+                        "outline-variant": "#c4c9ac",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-background": "#191c1e",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e0e3e5",
+                        "surface-container": "#eceef0",
+                        "surface-tint": "#506600",
+                        "inverse-primary": "#abd600",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary-fixed": "#c3f400",
+                        "primary-fixed-dim": "#abd600",
+                        "on-primary-fixed": "#161e00",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#191c1e",
+                        "on-secondary-fixed-variant": "#862200",
+                        "error": "#ba1a1a",
+                        "background": "#f7f9fb",
+                        "tertiary-container": "#ededed",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "slant-offset": "12px",
+                        "gutter": "24px",
+                        "unit": "4px",
+                        "margin-desktop": "48px",
+                        "margin-mobile": "16px"
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex overflow-x-hidden">
+<!-- SideNavBar (The Anchor) -->
+<aside class="hidden md:flex h-screen w-64 fixed left-0 top-0 bg-surface-container-lowest border-r-3 border-on-background flex-col p-gutter gap-4 z-50">
+<div class="flex flex-col gap-1 mb-8">
+<h1 class="font-black text-[48px] leading-[1.1] tracking-[-0.02em] italic text-on-background uppercase">Maratona</h1>
+<p class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase text-primary">Resultados</p>
+</div>
+<nav class="flex flex-col gap-4 flex-grow">
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Dashboard</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Platoon</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="leaderboard">leaderboard</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Performance</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="military_tech">military_tech</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Rewards</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined" data-icon="group_add">group_add</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Team</span>
+</a>
+<a class="bg-primary-container text-on-primary-fixed border-2 border-on-background -skew-x-6 px-4 py-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" data-icon="settings" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Settings</span>
+</a>
+</nav>
+<button class="bg-primary-container text-on-primary-fixed border-2 border-on-background font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase py-3 hover:-skew-x-3 transition-all hard-shadow-black">
+            START RACE
+        </button>
+<div class="mt-auto flex flex-col gap-2 pt-4 border-t border-outline-variant">
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Help</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-bold text-[14px] leading-[1] tracking-[0.05em] italic uppercase">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-grow md:ml-64 w-full">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-margin-desktop py-4 w-full sticky top-0 z-40 bg-surface border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(204,255,0,1)]">
+<div class="flex items-center gap-8">
+<span class="font-black text-[24px] leading-[1.2] italic uppercase text-primary">Cenográfica</span>
+<div class="hidden lg:flex items-center bg-surface-container-low border-2 border-on-background px-4 py-1 -skew-x-6">
+<span class="material-symbols-outlined text-on-surface-variant mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 font-bold text-[14px] italic uppercase w-64" placeholder="BUSCAR REGRA..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="material-symbols-outlined text-on-surface hover:text-primary transition-colors" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-on-surface hover:text-primary transition-colors" data-icon="bolt">bolt</button>
+<div class="w-10 h-10 border-2 border-on-background overflow-hidden -skew-x-6">
+<img alt="User profile photo" class="w-full h-full object-cover skew-x-6 scale-125" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqlOwe-JIiHJ6zDkEphndg0uRjT2wENDSoCaHidCHNX2l5uwy_U3K_uT354Ppidm8eEkvku_WTEtBxjPO3GWbogJ4fwvsq6s0vQQrHohRaidIboVtS5yqiU0JxfubD4pur9R62bmuE_uCiIwqNoLv9djra6mByPpd-Bk2w-XvKsLvRh34aLwjthw-_Jpl7B3uQDvzeA1SdqfV5IIzmwnx4fJTas6-krTj0uaoFReSAPQNVPtzHNwPfg4J2dnUz4CAzkVYR3vczmdI"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="p-margin-desktop space-y-12 max-w-7xl mx-auto">
+<!-- Hero Header -->
+<section class="relative">
+<div class="absolute -top-12 -left-12 w-32 h-32 bg-primary-container opacity-20 -skew-x-12 -z-10"></div>
+<h2 class="font-black text-[72px] leading-[1] tracking-[-0.04em] italic uppercase mb-2">Regras do Sistema</h2>
+<p class="font-medium text-[18px] leading-[1.5] max-w-2xl text-on-surface-variant">
+                    Defina os limites de performance e as bonificações financeiras para os pelotões. 
+                    A agressividade das regras dita o ritmo da corrida.
+                </p>
+</section>
+<!-- Global Settings Bento Grid -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Calculation Logic Card -->
+<div class="lg:col-span-2 bg-white border-3 border-on-background p-8 relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary-container -mr-8 -mt-8 -rotate-45"></div>
+<div class="flex items-center gap-4 mb-6">
+<span class="material-symbols-outlined text-primary text-4xl" data-icon="calculate">calculate</span>
+<h3 class="font-bold text-[24px] leading-[1.2] italic uppercase">Cálculo de Bônus</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="space-y-4">
+<label class="block font-bold text-[14px] leading-[1] italic uppercase text-on-surface-variant">Base de Cálculo</label>
+<select class="w-full border-2 border-on-background p-3 font-bold italic uppercase focus:ring-primary focus:border-primary">
+<option>LUCRO LÍQUIDO OPERACIONAL</option>
+<option>FATURAMENTO BRUTO</option>
+<option>MARGEM DE CONTRIBUIÇÃO</option>
+</select>
+</div>
+<div class="space-y-4">
+<label class="block font-bold text-[14px] leading-[1] italic uppercase text-on-surface-variant">Frequência de Fechamento</label>
+<div class="flex gap-2">
+<button class="flex-1 border-2 border-on-background bg-primary-container p-2 font-bold italic uppercase text-[12px]">Mensal</button>
+<button class="flex-1 border-2 border-on-background bg-white p-2 font-bold italic uppercase text-[12px] hover:bg-surface-container-low">Trimestral</button>
+<button class="flex-1 border-2 border-on-background bg-white p-2 font-bold italic uppercase text-[12px] hover:bg-surface-container-low">Anual</button>
+</div>
+</div>
+</div>
+<div class="mt-8 p-4 bg-surface-container-low border-l-4 border-primary italic font-medium text-[16px]">
+                        "O bônus é calculado sobre o atingimento individual somado à performance coletiva do pelotão."
+                    </div>
+</div>
+<!-- Platoon Limits Card -->
+<div class="bg-on-background text-white border-3 border-on-background p-8 hard-shadow flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-[24px] leading-[1.2] italic uppercase mb-6 text-primary-container">Limites de Pelotão</h3>
+<div class="space-y-6">
+<div class="flex justify-between items-end border-b border-white/20 pb-2">
+<span class="font-bold text-[14px] italic uppercase opacity-70">Mínimo de Atletas</span>
+<span class="font-black text-[32px] italic leading-none">05</span>
+</div>
+<div class="flex justify-between items-end border-b border-white/20 pb-2">
+<span class="font-bold text-[14px] italic uppercase opacity-70">Máximo de Atletas</span>
+<span class="font-black text-[32px] italic leading-none">24</span>
+</div>
+</div>
+</div>
+<button class="mt-8 border-2 border-primary-container text-primary-container font-black italic uppercase py-3 hover:bg-primary-container hover:text-on-background transition-colors">
+                        AJUSTAR CAPACIDADE
+                    </button>
+</div>
+</section>
+<!-- Table Section: Platoon Thresholds -->
+<section class="space-y-6">
+<div class="flex justify-between items-end">
+<h3 class="font-black text-[40px] leading-[1] italic uppercase underline decoration-primary-container decoration-8 underline-offset-4">Limites e Faixas</h3>
+<button class="bg-on-background text-white font-bold italic uppercase px-6 py-2 -skew-x-12 hover:bg-primary hover:text-white transition-all">
+                        ADICIONAR FAIXA
+                    </button>
+</div>
+<div class="border-3 border-on-background bg-white overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-on-background text-white italic uppercase font-bold text-[14px]">
+<th class="p-4 border-r border-white/10">Pelotão</th>
+<th class="p-4 border-r border-white/10">Performance Mín (%)</th>
+<th class="p-4 border-r border-white/10">Multiplicador R$</th>
+<th class="p-4 border-r border-white/10">Status de Acesso</th>
+<th class="p-4 text-center">Ações</th>
+</tr>
+</thead>
+<tbody class="font-bold italic uppercase text-[14px]">
+<tr class="border-b-2 border-on-background hover:bg-primary-container/10 transition-colors">
+<td class="p-4 border-r-2 border-on-background">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 bg-yellow-400 border border-on-background"></div>
+                                        ELITE (QUÊNIA)
+                                    </div>
+</td>
+<td class="p-4 border-r-2 border-on-background">
+<input class="w-20 bg-transparent border-none focus:ring-2 focus:ring-primary p-1" type="number" value="110"/> %
+                                </td>
+<td class="p-4 border-r-2 border-on-background text-primary">
+                                    x 2.5
+                                </td>
+<td class="p-4 border-r-2 border-on-background">
+<span class="bg-primary-container px-3 py-1 border border-on-background text-[11px]">MASTER ACCESS</span>
+</td>
+<td class="p-4 text-center">
+<div class="flex justify-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary" data-icon="edit">edit</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-error" data-icon="delete">delete</button>
+</div>
+</td>
+</tr>
+<tr class="border-b-2 border-on-background hover:bg-primary-container/10 transition-colors">
+<td class="p-4 border-r-2 border-on-background">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 bg-blue-500 border border-on-background"></div>
+                                        AVANÇADO (BERLIM)
+                                    </div>
+</td>
+<td class="p-4 border-r-2 border-on-background">
+<input class="w-20 bg-transparent border-none focus:ring-2 focus:ring-primary p-1" type="number" value="100"/> %
+                                </td>
+<td class="p-4 border-r-2 border-on-background text-primary">
+                                    x 1.8
+                                </td>
+<td class="p-4 border-r-2 border-on-background">
+<span class="bg-surface-variant px-3 py-1 border border-on-background text-[11px]">STANDARD</span>
+</td>
+<td class="p-4 text-center">
+<div class="flex justify-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary" data-icon="edit">edit</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-error" data-icon="delete">delete</button>
+</div>
+</td>
+</tr>
+<tr class="bg-surface-container-low/50">
+<td class="p-4 border-r-2 border-on-background">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 bg-gray-400 border border-on-background"></div>
+                                        INICIANTE (TREINO)
+                                    </div>
+</td>
+<td class="p-4 border-r-2 border-on-background">
+<input class="w-20 bg-transparent border-none focus:ring-2 focus:ring-primary p-1" type="number" value="85"/> %
+                                </td>
+<td class="p-4 border-r-2 border-on-background text-primary">
+                                    x 1.0
+                                </td>
+<td class="p-4 border-r-2 border-on-background">
+<span class="bg-surface-variant px-3 py-1 border border-on-background text-[11px]">READ ONLY</span>
+</td>
+<td class="p-4 text-center">
+<div class="flex justify-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary" data-icon="edit">edit</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-error" data-icon="delete">delete</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Bottom Action Bar -->
+<section class="flex flex-col md:flex-row gap-gutter items-center justify-between pt-12 border-t-4 border-on-background">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary" data-icon="history">history</span>
+<p class="font-bold italic text-[14px] uppercase text-on-surface-variant">Última alteração: 12 Out 2023 por Diretor Técnico</p>
+</div>
+<div class="flex gap-4 w-full md:w-auto">
+<button class="flex-1 md:flex-none border-3 border-on-background bg-white font-black italic uppercase px-12 py-4 hover:bg-surface-variant transition-all active:translate-y-1">
+                        CANCELAR
+                    </button>
+<button class="flex-1 md:flex-none bg-primary-container border-3 border-on-background font-black italic uppercase px-12 py-4 hard-shadow-black hover:-translate-y-1 hover:-translate-x-1 transition-all active:translate-y-0.5 active:translate-x-0.5">
+                        SALVAR REGRAS
+                    </button>
+</div>
+</section>
+</div>
+</main>
+<!-- Background Decorative Elements -->
+<div class="fixed top-0 right-0 -z-20 w-1/2 h-full opacity-[0.03] pointer-events-none">
+<div class="absolute inset-0 bg-[radial-gradient(#506600_2px,transparent_2px)] [background-size:32px_32px]"></div>
+</div>
+<script>
+        // Micro-interaction for table rows
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.style.transform = 'skewX(-1deg)';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.transform = 'skewX(0deg)';
+            });
+        });
+
+        // Search bar focus effect
+        const searchInput = document.querySelector('input[type="text"]');
+        if(searchInput) {
+            searchInput.addEventListener('focus', () => {
+                searchInput.parentElement.classList.add('hard-shadow');
+                searchInput.parentElement.style.borderColor = '#506600';
+            });
+            searchInput.addEventListener('blur', () => {
+                searchInput.parentElement.classList.remove('hard-shadow');
+                searchInput.parentElement.style.borderColor = '#191c1e';
+            });
+        }
+    </script>
+</body></html>

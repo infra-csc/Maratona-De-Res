@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ranking | Cenográfica Maratona</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400;1,700;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .kinetic-skew {
+            clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%);
+        }
+        .parallelogram {
+            transform: skewX(-6deg);
+        }
+        .parallelogram-content {
+            transform: skewX(6deg);
+        }
+        .hard-shadow {
+            box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+        }
+        .hard-shadow-yellow {
+            box-shadow: 6px 6px 0px 0px #CCFF00;
+        }
+        body {
+            background-color: #f7f9fb;
+            overflow-x: hidden;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#f7f9fb",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#ff5722",
+                        "surface-dim": "#d8dadc",
+                        "primary": "#506600",
+                        "on-primary-container": "#5b7300",
+                        "tertiary": "#5e5e5e",
+                        "surface": "#f7f9fb",
+                        "on-surface-variant": "#444933",
+                        "on-primary-fixed-variant": "#3c4d00",
+                        "primary-container": "#ccff00",
+                        "secondary": "#b02f00",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed": "#ffdbd1",
+                        "secondary-fixed-dim": "#ffb5a0",
+                        "surface-variant": "#e0e3e5",
+                        "surface-container-high": "#e6e8ea",
+                        "on-tertiary-fixed-variant": "#474747",
+                        "on-secondary-fixed": "#3b0900",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "surface-container-low": "#f2f4f6",
+                        "on-tertiary-fixed": "#1b1b1b",
+                        "on-tertiary-container": "#6b6b6b",
+                        "on-secondary-container": "#541100",
+                        "outline": "#747a60",
+                        "outline-variant": "#c4c9ac",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-background": "#191c1e",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e0e3e5",
+                        "surface-container": "#eceef0",
+                        "surface-tint": "#506600",
+                        "inverse-primary": "#abd600",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary-fixed": "#c3f400",
+                        "primary-fixed-dim": "#abd600",
+                        "on-primary-fixed": "#161e00",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#191c1e",
+                        "on-secondary-fixed-variant": "#862200",
+                        "error": "#ba1a1a",
+                        "background": "#f7f9fb",
+                        "tertiary-container": "#ededed",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "slant-offset": "12px",
+                        "gutter": "24px",
+                        "unit": "4px",
+                        "margin-desktop": "48px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "label-bold": ["Plus Jakarta Sans"],
+                        "stats-num": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "display-hero": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-body-md text-on-background">
+<!-- TopNavBar (Shared) -->
+<header class="bg-surface text-primary-container font-headline-md text-headline-md italic uppercase w-full top-0 border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(204,255,0,1)] flex justify-between items-center px-margin-desktop py-4 w-full sticky top-0 z-50">
+<div class="font-headline-md text-headline-md italic font-black text-primary">Cenográfica</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-8">
+<a class="text-on-surface-variant hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 active:translate-y-0.5 active:translate-x-0.5 transition-all" href="#">Dashboard</a>
+<a class="text-primary font-bold italic transition-colors duration-150" href="#">Performance</a>
+<a class="text-on-surface-variant hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 active:translate-y-0.5 active:translate-x-0.5 transition-all" href="#">Rewards</a>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined cursor-pointer" data-icon="bolt">bolt</span>
+<div class="w-10 h-10 border-2 border-on-background overflow-hidden -skew-x-6">
+<img alt="User profile photo" class="w-full h-full object-cover skew-x-6" data-alt="A professional headshot of a corporate high-performer with a focused expression, set against a vibrant and clean athletic background. The lighting is crisp and modern, featuring high-contrast shadows that emphasize determination and speed. The overall aesthetic is energetic and minimalist, aligned with the Maratona brand colors of electric yellow and white." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJi41YhqDPrXLZRcbD2200Lk8DnS8KEex-khPJs11x3vg4YZRFxjWgJU1WYxCO_Z-acbuukLkdPCMzAJH0eSf1Ax-3tVIQ0Yr75G27JWz3UpkUTyhsaI6aBnmEZq_Gg3fQ42w1lD7eszgxRR6Y-HDHnwLzsDx0Rjv_QJ0zSg8IaWVVdW6fmkICAjWDv3_AyB7fIcxacQHRBZR0AOwZF0qbvZ767_JP1pi7lx8hgfzrT-U4p9xEmp9pTLCFISl-3cC7DgeVzW6eaLE"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex">
+<!-- SideNavBar (Shared) -->
+<nav class="hidden md:flex bg-surface-container-lowest text-primary font-label-bold text-label-bold italic uppercase h-screen w-64 fixed left-0 top-0 border-r-3 border-on-background flex flex-col p-gutter gap-4 z-40 mt-20">
+<div class="mb-8">
+<div class="font-headline-lg text-headline-lg italic font-black text-on-background">Maratona</div>
+<div class="text-primary-container bg-on-background inline-block px-2 py-0.5">Resultados</div>
+</div>
+<div class="flex flex-col gap-2">
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span> Dashboard
+                </a>
+<a class="bg-primary-container text-on-primary-fixed border-2 border-on-background -skew-x-6 px-4 py-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" data-icon="leaderboard" data-weight="fill" style="font-variation-settings: 'FILL' 1;">leaderboard</span> Performance
+                </a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span> Platoon
+                </a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="military_tech">military_tech</span> Rewards
+                </a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="group_add">group_add</span> Team
+                </a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span> Settings
+                </a>
+</div>
+<button class="mt-auto bg-primary-container text-on-primary-fixed border-2 border-on-background font-black italic -skew-x-6 py-4 px-2 hover:bg-on-background hover:text-primary-container transition-all">
+                START RACE
+            </button>
+<div class="mt-8 border-t-2 border-outline-variant pt-4 flex flex-col gap-2">
+<a class="text-on-surface-variant flex items-center gap-3 px-4" href="#"><span class="material-symbols-outlined" data-icon="help">help</span> Help</a>
+<a class="text-on-surface-variant flex items-center gap-3 px-4" href="#"><span class="material-symbols-outlined" data-icon="logout">logout</span> Logout</a>
+</div>
+</nav>
+<!-- Main Content (Canvas) -->
+<main class="flex-1 md:ml-64 p-margin-mobile md:p-margin-desktop min-h-screen">
+<!-- Hero Section / Header -->
+<section class="mb-12">
+<div class="flex flex-col md:flex-row justify-between items-end gap-6 border-b-4 border-on-background pb-8">
+<div>
+<h1 class="font-display-hero text-display-hero italic uppercase leading-none">THE RANKING</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-xl mt-4">Velocidade, consistência e estratégia. O pelotão de frente define o ritmo da Cenográfica. Quem está liderando a corrida hoje?</p>
+</div>
+<div class="flex gap-4">
+<div class="bg-primary-container border-2 border-on-background p-4 -skew-x-6 hard-shadow">
+<div class="skew-x-6">
+<span class="font-label-bold text-label-bold uppercase block">Pace Geral</span>
+<span class="font-stats-num text-stats-num block text-on-background">+14.2%</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border-2 border-on-background p-4 -skew-x-6">
+<div class="skew-x-6">
+<span class="font-label-bold text-label-bold uppercase block text-on-surface-variant">Active Runners</span>
+<span class="font-stats-num text-stats-num block text-on-background">128</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Top 3 High Contrast Podium -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 items-end">
+<!-- Rank 2 -->
+<div class="order-2 md:order-1 bg-surface-container-lowest border-2 border-on-background p-8 -skew-x-3 transition-transform hover:-translate-y-2">
+<div class="skew-x-3 flex flex-col items-center text-center">
+<div class="text-on-surface-variant font-black italic text-4xl mb-4">#02</div>
+<div class="relative mb-6">
+<div class="w-24 h-24 border-3 border-on-background overflow-hidden -skew-x-6">
+<img alt="Runner profile" class="w-full h-full object-cover skew-x-6" data-alt="A dynamic portrait of a marathon runner in a high-tech athletic uniform, conveying speed and determination. The background is a crisp urban setting with architectural lines. The lighting is bold and directional, reflecting a professional high-performance environment using electric yellow and stark white tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3dOPJKXy3GlmPND9REQIF74cBEvqPTxUPg2bowW6_F5kk-bkaKNpoTnv-xL_lwVVmqN51mzc0mW5MlKiP5oZQdZrZmrL8b6VdbDrYUzRey8voErqsRLPzu1E9wElZql05JaGTNEpSyyi-hVVvfzbXHdEdzbw2BlCi4WH32NBVBr0TyJCSuEy7dGCDuhQmOI2ri04MzQR58n_bn3c14BwVT3TGz-bPampBJR2XBUq4vqGgJeiZX7OMVpSWEdocyglBlvt-MPcpq-Y"/>
+</div>
+<div class="absolute -bottom-2 -right-2 bg-[#0055A4] text-white font-black italic px-3 py-1 border-2 border-on-background -skew-x-12">AZUL</div>
+</div>
+<h3 class="font-headline-md text-headline-md italic uppercase">Ricardo Santos</h3>
+<p class="font-stats-num text-stats-num text-primary mt-2">2,840 <span class="text-sm">pts</span></p>
+<div class="w-full h-2 bg-surface-variant mt-4">
+<div class="h-full bg-primary" style="width: 88%"></div>
+</div>
+</div>
+</div>
+<!-- Rank 1 (The Leader) -->
+<div class="order-1 md:order-2 bg-primary-container border-4 border-on-background p-10 -skew-x-6 hard-shadow-yellow transition-transform hover:-translate-y-4 relative z-10">
+<div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-on-background text-primary-container px-6 py-2 italic font-black text-xl border-2 border-primary-container -skew-x-12">
+                        LÍDER DA PROVA
+                    </div>
+<div class="skew-x-6 flex flex-col items-center text-center">
+<div class="text-on-background font-black italic text-6xl mb-4">#01</div>
+<div class="relative mb-6">
+<div class="w-32 h-32 border-4 border-on-background overflow-hidden -skew-x-12">
+<img alt="Runner profile" class="w-full h-full object-cover skew-x-12" data-alt="A powerful and cinematic portrait of a top-tier athlete at the peak of their performance. The athlete wears a sleek, futuristic vest in charcoal and electric yellow. The setting is a minimalist stadium tunnel with dramatic lighting that highlights strength and focus. The visual style is aggressive and modern." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBy2Aha7WD_oXbDC3o5vgesHhOR5Aa1g4FUfqZ5SsQ6W79eu3QJx5nRWu5i1Flr-sseEsevhkCsOQ23ui9_jhIOvUqVrvWQhr0h7qqwTooOfdrCetxko67teOP6UNljrQPL1AP8ieUc1iESUwO1nI4BctCGzD9ANw4q3plx-rSsyNB0qe3wgmobRky3eTLwEv75tOc72F3lrBSAY_Em_lsJ41Nx91HCP0yD67YVMbFggdPt5JyrJ2cOIVJJGPP0Ca3upXrJU4JkEpQ"/>
+</div>
+<div class="absolute -bottom-3 -right-3 bg-primary text-primary-container font-black italic text-xl px-4 py-1 border-3 border-on-background -skew-x-12">QUÊNIA</div>
+</div>
+<h3 class="font-headline-lg text-headline-md italic uppercase text-on-background">Beatriz Oliveira</h3>
+<p class="font-stats-num text-stats-num text-on-background mt-2">3,120 <span class="text-lg">pts</span></p>
+<div class="w-full h-4 bg-on-background/20 mt-6 relative">
+<div class="h-full bg-on-background" style="width: 95%"></div>
+<div class="absolute top-0 right-[5%] h-full w-1 bg-primary-container"></div>
+</div>
+</div>
+</div>
+<!-- Rank 3 -->
+<div class="order-3 bg-surface-container-lowest border-2 border-on-background p-8 -skew-x-3 transition-transform hover:-translate-y-2">
+<div class="skew-x-3 flex flex-col items-center text-center">
+<div class="text-on-surface-variant font-black italic text-4xl mb-4">#03</div>
+<div class="relative mb-6">
+<div class="w-24 h-24 border-3 border-on-background overflow-hidden -skew-x-6">
+<img alt="Runner profile" class="w-full h-full object-cover skew-x-6" data-alt="An inspiring close-up of a diverse professional athlete looking forward with intense focus. The background features blurred race track lines in high-contrast black and white. Soft light-mode colors dominate the scene, punctuated by a signature vibrant red and electric yellow palette from the Maratona design system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7tylqsQXLRBnvos-oRG4u15zuMYeN_4EEqawAZL3x8ugv2ht8J3PicpWgXjPV2VbGUNywt4Yojka3ONJEprgOz4qIoTns2UaA8Q6N56Qto3WYyjQU54-ja1cidAoMuaeQwuA_Z8ds2t_c-dls2SkpyTd4hErWovk0a9XYTiSPSJ6EgfhmfUZ-AEcbGY-HMdNwxeGdChc1Z4zpl9GbHN3F6NMPtmcMsXEPj8vnlT2xWzFucAu25W03DCPXns9wjtZdZGm2B6XqUeg"/>
+</div>
+<div class="absolute -bottom-2 -right-2 bg-[#008F4C] text-white font-black italic px-3 py-1 border-2 border-on-background -skew-x-12">VERDE</div>
+</div>
+<h3 class="font-headline-md text-headline-md italic uppercase">Lucas Mendes</h3>
+<p class="font-stats-num text-stats-num text-primary mt-2">2,510 <span class="text-sm">pts</span></p>
+<div class="w-full h-2 bg-surface-variant mt-4">
+<div class="h-full bg-primary" style="width: 75%"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Detailed Leaderboard List -->
+<section class="mb-24">
+<div class="flex items-center justify-between mb-8">
+<h2 class="font-headline-md text-headline-md italic uppercase flex items-center gap-3">
+<span class="w-3 h-8 bg-primary inline-block -skew-x-12"></span>
+                        O Pelotão de Elite
+                    </h2>
+<div class="flex gap-2">
+<button class="border-2 border-on-background px-4 py-2 font-black italic text-xs -skew-x-6 bg-primary-container">TODOS</button>
+<button class="border-2 border-on-background px-4 py-2 font-black italic text-xs -skew-x-6 hover:bg-surface-variant transition-colors">QUÊNIA</button>
+<button class="border-2 border-on-background px-4 py-2 font-black italic text-xs -skew-x-6 hover:bg-surface-variant transition-colors">AZUL</button>
+<button class="border-2 border-on-background px-4 py-2 font-black italic text-xs -skew-x-6 hover:bg-surface-variant transition-colors">VERDE</button>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Table Header -->
+<div class="hidden md:grid grid-cols-12 gap-4 px-8 font-label-bold text-label-bold uppercase text-on-surface-variant italic">
+<div class="col-span-1">Pos</div>
+<div class="col-span-4">Colaborador</div>
+<div class="col-span-2 text-center">Pelotão</div>
+<div class="col-span-3">Progresso da Meta</div>
+<div class="col-span-2 text-right">Pontuação</div>
+</div>
+<!-- Rank Item 4 -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-surface-container-lowest border-2 border-on-background p-4 md:px-8 hover:bg-surface-container transition-all group">
+<div class="col-span-1 font-black italic text-2xl group-hover:text-primary transition-colors">04</div>
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-12 h-12 border-2 border-on-background -skew-x-6 overflow-hidden">
+<img alt="User" class="w-full h-full object-cover skew-x-6" data-alt="A vibrant professional portrait of a business team leader with a dynamic athletic background. High-key lighting highlights the facial features with high clarity. The overall color scheme focuses on charcoal, white, and intense electric yellow, reflecting the Kinetic Minimalism style of the Cenográfica brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBF2PzuFvvpgete5LAZxlHfB0H94gtZ4coj6Jg5lUMja2CrRAxDIiLVbrmoc7u4jChRScA8I1PbHF4EsOazH1y_THSbYjCpgFYYKauhzsK4Dh6a6mERxNjQSScFvPAOFLKuRIDgbsw5XhRh3Zgek7G5WpWa3wC_RzJUDi1m7Oe6IoYmQvumYsRtZ2DjUutp5jbs4tn1zKhYbuxzK8zRSDf-IZEkpZkoo9E-AlX8DhssPfqNbqbLTSmnkNbYZSFiHC6JHIeM6ZR8QfM"/>
+</div>
+<span class="font-headline-md text-body-lg italic uppercase">Mariana Costa</span>
+</div>
+<div class="col-span-2 flex justify-center">
+<span class="bg-[#B0B0B0] text-on-background px-3 py-0.5 border-2 border-on-background -skew-x-12 font-black italic text-xs">BRANCO-CINZA</span>
+</div>
+<div class="col-span-3 flex items-center gap-3">
+<div class="flex-1 h-3 bg-surface-variant relative">
+<div class="h-full bg-primary" style="width: 68%"></div>
+<div class="absolute top-0 right-[40%] h-full w-0.5 bg-on-background" title="Ghost Runner Marker"></div>
+</div>
+<span class="font-label-bold text-xs">68%</span>
+</div>
+<div class="col-span-2 text-right">
+<span class="font-stats-num text-headline-md text-on-background">2,420</span>
+</div>
+</div>
+<!-- Rank Item 5 -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-surface-container-lowest border-2 border-on-background p-4 md:px-8 hover:bg-surface-container transition-all group">
+<div class="col-span-1 font-black italic text-2xl group-hover:text-primary transition-colors">05</div>
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-12 h-12 border-2 border-on-background -skew-x-6 overflow-hidden">
+<img alt="User" class="w-full h-full object-cover skew-x-6" data-alt="A portrait of a highly focused corporate executive with an athletic energy, set against a background of dynamic slanted lines. The lighting is sharp and modern, following a light-mode aesthetic. The visual theme is consistent with high-performance sports, using a professional palette of deep greys and bright yellow." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdLlXWS_DpjwQErPIwyK5hDrGIE4XF-u1eJ0EnZkQP0PLdz1Ixb4ZcJjU6_HjmBNyy5YveMTroCIfCRav-ibRCelAOI2upVr2Qj7ZT3F67SgGgndU5edVCjzyMs8t3Okb7RdW3mrj2US1YLS5BvOA6f_5m6e8o8RLV5K0hkyoxlfYh0oPZQAheiANmzOkRct1fGB0qhrwGx_W3DhtGrcdk8S17KZ5wpLEYMu-YY811_gkCDvThRjNXD9ewNDPmt8JjcFDRjPqWH7s"/>
+</div>
+<span class="font-headline-md text-body-lg italic uppercase">Felipe Barbosa</span>
+</div>
+<div class="col-span-2 flex justify-center">
+<span class="bg-[#008F4C] text-white px-3 py-0.5 border-2 border-on-background -skew-x-12 font-black italic text-xs">VERDE</span>
+</div>
+<div class="col-span-3 flex items-center gap-3">
+<div class="flex-1 h-3 bg-surface-variant relative">
+<div class="h-full bg-primary" style="width: 62%"></div>
+<div class="absolute top-0 right-[25%] h-full w-0.5 bg-on-background" title="Ghost Runner Marker"></div>
+</div>
+<span class="font-label-bold text-xs">62%</span>
+</div>
+<div class="col-span-2 text-right">
+<span class="font-stats-num text-headline-md text-on-background">2,315</span>
+</div>
+</div>
+<!-- Rank Item 6 -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-surface-container-lowest border-2 border-on-background p-4 md:px-8 hover:bg-surface-container transition-all group">
+<div class="col-span-1 font-black italic text-2xl group-hover:text-primary transition-colors">06</div>
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-12 h-12 border-2 border-on-background -skew-x-6 overflow-hidden">
+<img alt="User" class="w-full h-full object-cover skew-x-6" data-alt="Close up portrait of a professional athlete with a determined look, representing a corporate team leader. The lighting is high-contrast, creating deep shadows and bright highlights that emphasize a fast-paced environment. The color palette follows the Maratona design system with electric yellow and clean white backgrounds." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNya2709vC0CPcU_zKMxSwZoA1hfFmgUeDddeM0nzm9lEeNvuG8EQ2ThKmfbTWFqsr1ErpPY2WeFfPSgRG87Ik85hTTBtbfE9ikQk0nwEL84Zt8BNg6XxMaanMAbdJPsB7bbeI4mahDU631WkDKKtG_nJGRAN2VjhE1RSgWUemBeKt4ExvvgEgtz6QuVmNf_1EsjtvHyp8cJSnnimqsP7xJGe0qjq2U0AUGadRLSkxjyj2i_k987tmG68Lq-KEUvkFYbZLr-rkA6g"/>
+</div>
+<span class="font-headline-md text-body-lg italic uppercase">Juliana Rocha</span>
+</div>
+<div class="col-span-2 flex justify-center">
+<span class="bg-[#0055A4] text-white px-3 py-0.5 border-2 border-on-background -skew-x-12 font-black italic text-xs">AZUL</span>
+</div>
+<div class="col-span-3 flex items-center gap-3">
+<div class="flex-1 h-3 bg-surface-variant relative">
+<div class="h-full bg-primary" style="width: 59%"></div>
+<div class="absolute top-0 right-[35%] h-full w-0.5 bg-on-background" title="Ghost Runner Marker"></div>
+</div>
+<span class="font-label-bold text-xs">59%</span>
+</div>
+<div class="col-span-2 text-right">
+<span class="font-stats-num text-headline-md text-on-background">2,180</span>
+</div>
+</div>
+</div>
+<!-- Pagination/Load More -->
+<div class="mt-12 flex justify-center">
+<button class="bg-on-background text-primary-container px-12 py-4 italic font-black text-xl -skew-x-6 hard-shadow-yellow hover:translate-y-1 hover:translate-x-1 transition-all">
+                        LOAD MORE RUNNERS
+                    </button>
+</div>
+</section>
+</main>
+</div>
+<!-- Background Decoration -->
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 opacity-5">
+<div class="absolute top-0 right-0 w-1/2 h-full bg-primary-container -skew-x-12 translate-x-1/2"></div>
+</div>
+<script>
+        // Micro-interaction for hover effects on leaderboard items
+        document.querySelectorAll('.grid.items-center').forEach(item => {
+            item.addEventListener('mouseenter', () => {
+                item.style.transform = 'skewX(-2deg) scale(1.01)';
+            });
+            item.addEventListener('mouseleave', () => {
+                item.style.transform = 'none';
+            });
+        });
+
+        // Add ghost runner movement animation
+        const ghosts = document.querySelectorAll('[title="Ghost Runner Marker"]');
+        ghosts.forEach(ghost => {
+            setInterval(() => {
+                const shift = (Math.random() - 0.5) * 2;
+                ghost.style.transform = `translateX(${shift}px)`;
+            }, 1000);
+        });
+    </script>
+</body></html>

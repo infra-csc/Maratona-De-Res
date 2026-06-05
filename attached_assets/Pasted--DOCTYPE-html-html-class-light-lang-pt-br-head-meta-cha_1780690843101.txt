@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Áreas &amp; Departamentos | Cenográfica</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400;1,700;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#f7f9fb",
+                    "on-error-container": "#93000a",
+                    "error-container": "#ffdad6",
+                    "secondary-container": "#ff5722",
+                    "surface-dim": "#d8dadc",
+                    "primary": "#506600",
+                    "on-primary-container": "#5b7300",
+                    "tertiary": "#5e5e5e",
+                    "surface": "#f7f9fb",
+                    "on-surface-variant": "#444933",
+                    "on-primary-fixed-variant": "#3c4d00",
+                    "primary-container": "#ccff00",
+                    "secondary": "#b02f00",
+                    "surface-container-lowest": "#ffffff",
+                    "secondary-fixed": "#ffdbd1",
+                    "secondary-fixed-dim": "#ffb5a0",
+                    "surface-variant": "#e0e3e5",
+                    "surface-container-high": "#e6e8ea",
+                    "on-tertiary-fixed-variant": "#474747",
+                    "on-secondary-fixed": "#3b0900",
+                    "inverse-surface": "#2d3133",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed-dim": "#c6c6c6",
+                    "surface-container-low": "#f2f4f6",
+                    "on-tertiary-fixed": "#1b1b1b",
+                    "on-tertiary-container": "#6b6b6b",
+                    "on-secondary-container": "#541100",
+                    "outline": "#747a60",
+                    "outline-variant": "#c4c9ac",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-background": "#191c1e",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e0e3e5",
+                    "surface-container": "#eceef0",
+                    "surface-tint": "#506600",
+                    "inverse-primary": "#abd600",
+                    "tertiary-fixed": "#e2e2e2",
+                    "primary-fixed": "#c3f400",
+                    "primary-fixed-dim": "#abd600",
+                    "on-primary-fixed": "#161e00",
+                    "on-secondary": "#ffffff",
+                    "on-surface": "#191c1e",
+                    "on-secondary-fixed-variant": "#862200",
+                    "error": "#ba1a1a",
+                    "background": "#f7f9fb",
+                    "tertiary-container": "#ededed",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "slant-offset": "12px",
+                    "gutter": "24px",
+                    "unit": "4px",
+                    "margin-desktop": "48px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "label-bold": ["Plus Jakarta Sans"],
+                    "stats-num": ["Plus Jakarta Sans"],
+                    "headline-lg": ["Plus Jakarta Sans"],
+                    "display-hero": ["Plus Jakarta Sans"],
+                    "headline-md": ["Plus Jakarta Sans"],
+                    "headline-lg-mobile": ["Plus Jakarta Sans"],
+                    "body-md": ["Plus Jakarta Sans"],
+                    "body-lg": ["Plus Jakarta Sans"]
+            },
+            "fontSize": {
+                    "label-bold": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "stats-num": ["40px", {"lineHeight": "1", "fontWeight": "800"}],
+                    "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "display-hero": ["72px", {"lineHeight": "1", "letterSpacing": "-0.04em", "fontWeight": "800"}],
+                    "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["32px", {"lineHeight": "1.1", "fontWeight": "800"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .kinetic-skew {
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 8px));
+        }
+        .kinetic-skew-reverse {
+            clip-path: polygon(0 8px, 100% 0, 100% 100%, 0 100%);
+        }
+        .parallelogram-btn {
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-switch {
+            background-color: #ccff00;
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface w-full top-0 border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(204,255,0,1)] flex justify-between items-center px-margin-desktop py-4 sticky z-50">
+<div class="flex items-center gap-8">
+<h1 class="font-headline-md text-headline-md italic font-black text-primary">CENOGRÁFICA</h1>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 font-label-bold text-label-bold italic uppercase px-3 py-1" href="#">Dashboard</a>
+<a class="text-primary font-bold italic font-label-bold text-label-bold uppercase px-3 py-1 border-b-2 border-primary" href="#">Áreas</a>
+<a class="text-on-surface-variant hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 font-label-bold text-label-bold italic uppercase px-3 py-1" href="#">Equipes</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all active:scale-95">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all active:scale-95">bolt</button>
+<div class="w-10 h-10 border-2 border-on-background overflow-hidden -skew-x-6">
+<img alt="User profile photo" class="w-full h-full object-cover skew-x-6 scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANsmaQT6S03dyI79V8S7nqczQcLy6OgFQgZYCTgYjj5YX2lGiHy_kzVIs5MvB2V2-dNvl3edcI6HvdmWwHvZwRBkHxtxZ_FssYJylz56MRndZNceKQKctEIkfSUPHpZYBUdslVJGAQYnBACzp36QwWoQoiwLT_tMro4xYJO54c964AHKdCpfTAU0pvmOT5PMJEYyE62Ghcw0cGohNu1u8N1UxTv4SVtHtkCepTxECj8douA_STT5M31FGtGx1C4Y7MxHB9Ang020s"/>
+</div>
+</div>
+</header>
+<div class="flex min-h-screen">
+<!-- SideNavBar (Desktop Only) -->
+<aside class="hidden md:flex h-screen w-64 fixed left-0 top-0 bg-surface-container-lowest border-r-3 border-on-background flex-col p-gutter gap-4 z-40 pt-24">
+<div class="mb-8">
+<h2 class="font-headline-lg text-headline-lg italic font-black text-on-background">MARATONA</h2>
+<p class="font-label-bold text-label-bold italic uppercase text-secondary">Resultados</p>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="text-on-surface-variant hover:bg-surface-container-high transition-all hover:-skew-x-3 px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">dashboard</span> Dashboard
+                </a>
+<a class="bg-primary-container text-on-primary-fixed border-2 border-on-background -skew-x-6 px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">groups</span> Áreas
+                </a>
+<a class="text-on-surface-variant hover:bg-surface-container-high transition-all hover:-skew-x-3 px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">leaderboard</span> Performance
+                </a>
+<a class="text-on-surface-variant hover:bg-surface-container-high transition-all hover:-skew-x-3 px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">military_tech</span> Rewards
+                </a>
+</nav>
+<div class="mt-auto flex flex-col gap-2 border-t-2 border-on-background pt-4">
+<button class="bg-primary-container text-on-primary-fixed border-2 border-on-background font-black italic px-4 py-3 parallelogram-btn hover:translate-x-1 transition-transform">
+                    START RACE
+                </button>
+<a class="text-on-surface-variant px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">help</span> Help
+                </a>
+<a class="text-on-surface-variant px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">logout</span> Logout
+                </a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 md:ml-64 p-margin-mobile md:p-margin-desktop bg-surface-bright">
+<!-- Page Header -->
+<section class="mb-12 relative">
+<div class="absolute -left-12 top-0 w-2 h-full bg-primary-container -skew-x-12"></div>
+<h3 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg italic font-black uppercase tracking-tighter">
+                    ÁREAS &amp; <span class="text-primary">DEPARTAMENTOS</span>
+</h3>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-2 max-w-2xl">
+                    Gerencie as unidades organizacionais, monitore o ritmo de cada pelotão e ajuste a carga de performance em tempo real.
+                </p>
+</section>
+<!-- Filters / Actions Row -->
+<div class="flex flex-col md:flex-row gap-4 mb-10 items-center justify-between">
+<div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+<button class="px-6 py-2 bg-on-background text-surface-container-lowest font-label-bold text-label-bold italic uppercase -skew-x-6 border-2 border-on-background">Todos</button>
+<button class="px-6 py-2 bg-surface border-2 border-on-background text-on-background font-label-bold text-label-bold italic uppercase -skew-x-6 hover:bg-primary-container transition-all">Ativos</button>
+<button class="px-6 py-2 bg-surface border-2 border-on-background text-on-background font-label-bold text-label-bold italic uppercase -skew-x-6 hover:bg-primary-container transition-all">Inativos</button>
+</div>
+<div class="relative w-full md:w-80">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface border-2 border-on-background focus:ring-0 focus:border-primary-container font-label-bold italic uppercase" placeholder="BUSCAR DEPARTAMENTO..." type="text"/>
+</div>
+</div>
+<!-- Bento Grid of Organizational Units -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<!-- Card 1: Vendas -->
+<article class="bg-surface-container-lowest border-2 border-on-background shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] group hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_rgba(204,255,0,1)] transition-all flex flex-col">
+<div class="p-6 flex flex-col h-full">
+<div class="flex justify-between items-start mb-6">
+<div class="w-14 h-14 bg-primary-container border-2 border-on-background flex items-center justify-center -skew-x-6">
+<span class="material-symbols-outlined text-on-background text-3xl">trending_up</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-bold text-label-bold italic uppercase text-primary">Status</span>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-variant border-2 border-on-background peer-focus:outline-none rounded-none transition-all peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-on-background after:border-on-background after:border after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+</label>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md italic font-black uppercase mb-2">Pelotão de Vendas</h4>
+<p class="text-on-surface-variant font-body-md mb-6 flex-grow">Foco em expansão agressiva de mercado e retenção de contas estratégicas (Key Accounts).</p>
+<div class="border-t-2 border-on-background pt-4 mt-auto">
+<div class="flex justify-between text-label-bold font-label-bold italic uppercase mb-2">
+<span>Ritmo Atual</span>
+<span class="text-primary">94%</span>
+</div>
+<div class="h-4 bg-surface-variant border-2 border-on-background relative">
+<div class="absolute top-0 left-0 h-full bg-primary-container transition-all duration-1000" style="width: 94%;"></div>
+<div class="absolute top-0 left-[85%] h-full w-0.5 bg-on-background" title="Meta Base"></div>
+</div>
+<div class="flex justify-between mt-4">
+<div class="flex -space-x-2">
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-on-background bg-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyz4cw8agI6TenCT_m8p2H79xpCBh9kOCdNpsEsRKSSTesOfAzTgLvLpb1vHbITg4_syqW4oSQDzCXJUuwXEiAYYyj8WDVWit51N3MRmy9MlKPog6GFLXzpSNQnrGXhXABSN3YzYOT-HZ8M2p8-eVo5eC19-XLiBit86EKE4H6lPPyJzTTsti-0Byx1TRksJsFzDzIzvSucT9ZCeLyw_4UjP0Toynl9ZjhgwyzH97l0HcZecHFJgwbhg9MH3slb3vFH6uHoBDPZpQ"/>
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-on-background bg-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6GVelratVXap8DgUP_aANVkdHl7kfotNvn1PRP6JXo8OeAdXrXoDET_LeJ6-UaBmliaWUWtf9-GRC3VkVmX3srjTyivYGud3YBSl3vlAT_Bdce1wjmblfLK3mpyAwah1VXfggUc4wGWO1XizTSag3N1HdTQKzn8JMT2bI50ZaImbtKDmQIcTLPM0dUqITP-OaRmWB1iRRB2DaxyLsLrHRV_cd5e9YSvfKOFTuwJbDIsfVbGdcGThTzwZDNOxXr0UeDdU3jtnFcBo"/>
+<div class="w-8 h-8 rounded-full border-2 border-on-background bg-primary-container flex items-center justify-center text-[10px] font-bold">+12</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary material-symbols-outlined">settings</button>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 2: Marketing -->
+<article class="bg-surface-container-lowest border-2 border-on-background shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] group hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_rgba(204,255,0,1)] transition-all flex flex-col">
+<div class="p-6 flex flex-col h-full">
+<div class="flex justify-between items-start mb-6">
+<div class="w-14 h-14 bg-secondary-container border-2 border-on-background flex items-center justify-center -skew-x-6">
+<span class="material-symbols-outlined text-on-surface text-3xl" style="color: white;">campaign</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-bold text-label-bold italic uppercase text-primary">Status</span>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-variant border-2 border-on-background peer-focus:outline-none rounded-none transition-all peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-on-background after:border-on-background after:border after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+</label>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md italic font-black uppercase mb-2">Comunicação &amp; Brand</h4>
+<p class="text-on-surface-variant font-body-md mb-6 flex-grow">Engajamento de marca, performance digital e criação de narrativas de alta tração.</p>
+<div class="border-t-2 border-on-background pt-4 mt-auto">
+<div class="flex justify-between text-label-bold font-label-bold italic uppercase mb-2">
+<span>Ritmo Atual</span>
+<span class="text-secondary">78%</span>
+</div>
+<div class="h-4 bg-surface-variant border-2 border-on-background relative">
+<div class="absolute top-0 left-0 h-full bg-secondary-container transition-all duration-1000" style="width: 78%;"></div>
+<div class="absolute top-0 left-[90%] h-full w-0.5 bg-on-background" title="Meta Base"></div>
+</div>
+<div class="flex justify-between mt-4">
+<div class="flex -space-x-2">
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-on-background bg-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAour4dJEagbGJA0Td0CEsXAV8jg0wA64LIT2BA33u-_kyMua1Swrp2Xc5WrFEbI30cWAcgkBg1AaBesQnZtPBpwpNDqCck9QU5CKdHhDj60YgvzgSIycVfRPfKWuwH0xfzW5g7pHMCk2shZnNkUu0RhrLJ5ulLGGqmCIprEh51xfoeM_eFlhP7_WZg8b7mboGpRv0pFrApsHrMLXXXrj2mja0PXHpIvcJfU2YdOZWrv3lDGIQ2ODNmZOEQ0CiOt8uytLRJsAMc7KE"/>
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-on-background bg-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCL02vQRE5IxFCngfL5tAguH6HraDyeVRs2Alq000ZgNBpm59luhQXdiKDM6BcdNsxrHXVTbhqvuGD69GnBI3IKeMW1BaYqEpT_lr0Rc0HUI6hnYAK-ELGEeaAQyd4MK7xYjBqqgnpDBDLbpvje94adlfUxL-tuwnJcbO_rzwSR56cU5ATn_b_1OUMIB-fjzL4_aBUAF4TKb4vk5c4j2ZlbH69dR3FIAker49KKnU8b-88vaFQLLI5Ei-WJQpBtUS6BhVqTgQNjGok"/>
+<div class="w-8 h-8 rounded-full border-2 border-on-background bg-primary-container flex items-center justify-center text-[10px] font-bold">+5</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary material-symbols-outlined">settings</button>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 3: Tecnologia -->
+<article class="bg-surface-container-lowest border-2 border-on-background shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] group hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_rgba(204,255,0,1)] transition-all flex flex-col">
+<div class="p-6 flex flex-col h-full">
+<div class="flex justify-between items-start mb-6">
+<div class="w-14 h-14 bg-on-background border-2 border-on-background flex items-center justify-center -skew-x-6">
+<span class="material-symbols-outlined text-primary-container text-3xl">terminal</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-bold text-label-bold italic uppercase text-primary">Status</span>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-variant border-2 border-on-background peer-focus:outline-none rounded-none transition-all peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-on-background after:border-on-background after:border after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+</label>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md italic font-black uppercase mb-2">Engenharia Core</h4>
+<p class="text-on-surface-variant font-body-md mb-6 flex-grow">Sustentação de infraestrutura crítica e desenvolvimento de novas features de aceleração.</p>
+<div class="border-t-2 border-on-background pt-4 mt-auto">
+<div class="flex justify-between text-label-bold font-label-bold italic uppercase mb-2">
+<span>Ritmo Atual</span>
+<span class="text-primary">99%</span>
+</div>
+<div class="h-4 bg-surface-variant border-2 border-on-background relative">
+<div class="absolute top-0 left-0 h-full bg-primary-container transition-all duration-1000" style="width: 99%;"></div>
+<div class="absolute top-0 left-[80%] h-full w-0.5 bg-on-background" title="Meta Base"></div>
+</div>
+<div class="flex justify-between mt-4">
+<div class="flex -space-x-2">
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-on-background bg-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDJE9aPFqTSv-fHWMytl0HBVM4WnGtYPbKN34IOqihnzwYeUs_oSY3mmHIERAgAHkqb0KBqlocJClppWmDdKkaOGSgWTSJfx2tODMMGXh4N0Dn0baEJmowToJEMHhzAekxVADgdSAX5gAlfA58jB-UEYYDNNBZ79yq8KdsS5mslR37nxBWQGb0IRzgJ4r1VR_r6sPOTb5azXuZWFOv6Yf2KumBpUczQrtymkOpYkiQFMXxNgQruGHrptYuKzyqyQ9M2IktVbucNWQ"/>
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-on-background bg-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsixiV4uDdvoAN2NuS-d0L6anvjFXYwR2jwhTnioa1XYonbbf0_84rkFaKHQIeXJRjA0qLJtAKA2jfQhfPFO-MJyVH8Wu2kU7UlyBDsZ4uuQ6v-EJv_qp7FGJqcarNUJ2WlEUEkHn6Nuz3xE2mz8RhtHnM9O26RI6NmNjT6EKCr8JVasXWqLLgrKq4uVplSLtJVcbu0m8qNgge2QMn42VjK7noR-ULif7U6aYqkV4YQjYmCOtVF2pk7EZuJIONguLi7ai5GnMTLRk"/>
+<div class="w-8 h-8 rounded-full border-2 border-on-background bg-primary-container flex items-center justify-center text-[10px] font-bold">+28</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary material-symbols-outlined">settings</button>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 4: RH (Inactive State) -->
+<article class="bg-surface-variant/30 border-2 border-dashed border-on-surface-variant/50 transition-all flex flex-col grayscale opacity-70 hover:grayscale-0 hover:opacity-100 hover:border-solid hover:border-on-background group">
+<div class="p-6 flex flex-col h-full">
+<div class="flex justify-between items-start mb-6">
+<div class="w-14 h-14 bg-surface-variant border-2 border-on-background flex items-center justify-center -skew-x-6">
+<span class="material-symbols-outlined text-on-surface-variant text-3xl">diversity_3</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-bold text-label-bold italic uppercase text-on-surface-variant">Inativo</span>
+<label class="relative inline-flex items-center cursor-pointer mt-1">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-variant border-2 border-on-background peer-focus:outline-none rounded-none transition-all peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-on-background after:border-on-background after:border after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+</label>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md italic font-black uppercase mb-2">Talentos &amp; Cultura</h4>
+<p class="text-on-surface-variant font-body-md mb-6 flex-grow">Pipeline de contratação, onboarding e manutenção da cultura de alta performance.</p>
+<div class="border-t-2 border-on-background pt-4 mt-auto">
+<div class="flex justify-center py-2">
+<button class="font-label-bold text-label-bold italic uppercase underline hover:text-primary transition-all">Reativar Unidade</button>
+</div>
+</div>
+</div>
+</article>
+<!-- Add New Unit Card -->
+<article class="border-4 border-dashed border-primary-container hover:bg-primary-container/10 transition-all flex flex-col cursor-pointer group p-6 min-h-[320px] justify-center items-center">
+<div class="w-20 h-20 rounded-full border-2 border-on-background flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-4xl">add</span>
+</div>
+<span class="font-headline-md text-headline-md italic font-black uppercase">Nova Área</span>
+<span class="font-label-bold text-label-bold italic uppercase text-primary mt-2">Adicionar Pelotão</span>
+</article>
+</div>
+<!-- Stats Highlight Bar -->
+<section class="mt-16 grid grid-cols-1 md:grid-cols-4 gap-0 border-4 border-on-background">
+<div class="p-6 bg-primary-container border-b-4 md:border-b-0 md:border-r-4 border-on-background">
+<span class="font-label-bold text-label-bold italic uppercase">Total Áreas</span>
+<div class="font-stats-num text-stats-num italic mt-2">12</div>
+</div>
+<div class="p-6 bg-surface border-b-4 md:border-b-0 md:border-r-4 border-on-background">
+<span class="font-label-bold text-label-bold italic uppercase">Colaboradores</span>
+<div class="font-stats-num text-stats-num italic mt-2">452</div>
+</div>
+<div class="p-6 bg-surface border-b-4 md:border-b-0 md:border-r-4 border-on-background">
+<span class="font-label-bold text-label-bold italic uppercase">Pace Global</span>
+<div class="font-stats-num text-stats-num italic mt-2">88%</div>
+</div>
+<div class="p-6 bg-secondary-container">
+<span class="font-label-bold text-label-bold italic uppercase text-surface">Gargalos</span>
+<div class="font-stats-num text-stats-num italic mt-2 text-surface">02</div>
+</div>
+</section>
+</main>
+</div>
+<!-- Floating Action Button -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-primary-container border-4 border-on-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all z-50">
+<span class="material-symbols-outlined text-3xl font-black">add</span>
+</button>
+<!-- Mobile Bottom Nav -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface border-t-2 border-on-background flex justify-around items-center py-3 z-50 px-4">
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-label-bold italic uppercase">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-[10px] font-label-bold italic uppercase">Áreas</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="text-[10px] font-label-bold italic uppercase">Status</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-label-bold italic uppercase">Ajustes</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction for Progress Bars on load
+        window.addEventListener('load', () => {
+            const progressBars = document.querySelectorAll('.bg-primary-container, .bg-secondary-container');
+            progressBars.forEach(bar => {
+                const targetWidth = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = targetWidth;
+                }, 300);
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cenográfica | Acessos &amp; Permissões</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400;1,700;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#f7f9fb",
+                      "on-error-container": "#93000a",
+                      "error-container": "#ffdad6",
+                      "secondary-container": "#ff5722",
+                      "surface-dim": "#d8dadc",
+                      "primary": "#506600",
+                      "on-primary-container": "#5b7300",
+                      "tertiary": "#5e5e5e",
+                      "surface": "#f7f9fb",
+                      "on-surface-variant": "#444933",
+                      "on-primary-fixed-variant": "#3c4d00",
+                      "primary-container": "#ccff00",
+                      "secondary": "#b02f00",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-fixed": "#ffdbd1",
+                      "secondary-fixed-dim": "#ffb5a0",
+                      "surface-variant": "#e0e3e5",
+                      "surface-container-high": "#e6e8ea",
+                      "on-tertiary-fixed-variant": "#474747",
+                      "on-secondary-fixed": "#3b0900",
+                      "inverse-surface": "#2d3133",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed-dim": "#c6c6c6",
+                      "surface-container-low": "#f2f4f6",
+                      "on-tertiary-fixed": "#1b1b1b",
+                      "on-tertiary-container": "#6b6b6b",
+                      "on-secondary-container": "#541100",
+                      "outline": "#747a60",
+                      "outline-variant": "#c4c9ac",
+                      "inverse-on-surface": "#eff1f3",
+                      "on-background": "#191c1e",
+                      "on-primary": "#ffffff",
+                      "surface-container-highest": "#e0e3e5",
+                      "surface-container": "#eceef0",
+                      "surface-tint": "#506600",
+                      "inverse-primary": "#abd600",
+                      "tertiary-fixed": "#e2e2e2",
+                      "primary-fixed": "#c3f400",
+                      "primary-fixed-dim": "#abd600",
+                      "on-primary-fixed": "#161e00",
+                      "on-secondary": "#ffffff",
+                      "on-surface": "#191c1e",
+                      "on-secondary-fixed-variant": "#862200",
+                      "error": "#ba1a1a",
+                      "background": "#f7f9fb",
+                      "tertiary-container": "#ededed",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "slant-offset": "12px",
+                      "gutter": "24px",
+                      "unit": "4px",
+                      "margin-desktop": "48px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "label-bold": ["Plus Jakarta Sans"],
+                      "stats-num": ["Plus Jakarta Sans"],
+                      "headline-lg": ["Plus Jakarta Sans"],
+                      "display-hero": ["Plus Jakarta Sans"],
+                      "headline-md": ["Plus Jakarta Sans"],
+                      "headline-lg-mobile": ["Plus Jakarta Sans"],
+                      "body-md": ["Plus Jakarta Sans"],
+                      "body-lg": ["Plus Jakarta Sans"]
+              },
+              "fontSize": {
+                      "label-bold": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "stats-num": ["40px", {"lineHeight": "1", "fontWeight": "800"}],
+                      "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "display-hero": ["72px", {"lineHeight": "1", "letterSpacing": "-0.04em", "fontWeight": "800"}],
+                      "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                      "headline-lg-mobile": ["32px", {"lineHeight": "1.1", "fontWeight": "800"}],
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .kinetic-skew {
+            clip-path: polygon(0 0, 100% 0, 100% 90%, 0 100%);
+        }
+        .kinetic-skew-reverse {
+            clip-path: polygon(0 10%, 100% 0, 100% 100%, 0 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .hard-shadow {
+            box-shadow: 4px 4px 0px 0px #000000;
+        }
+        .hard-shadow-yellow {
+            box-shadow: 4px 4px 0px 0px #ccff00;
+        }
+        .btn-parallelogram {
+            transform: skew(-10deg);
+        }
+        .btn-parallelogram > span {
+            transform: skew(10deg);
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-x-hidden">
+<!-- Sidebar Navigation -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface-container-lowest border-r-3 border-on-background z-50 hidden md:flex flex-col p-gutter gap-4">
+<div class="mb-8">
+<h1 class="font-headline-lg text-headline-lg italic font-black text-on-background">Maratona</h1>
+<p class="font-label-bold text-label-bold italic uppercase text-primary">Resultados</p>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-bold text-label-bold italic uppercase">Dashboard</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-bold text-label-bold italic uppercase">Platoon</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-label-bold text-label-bold italic uppercase">Performance</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">military_tech</span>
+<span class="font-label-bold text-label-bold italic uppercase">Rewards</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">group_add</span>
+<span class="font-label-bold text-label-bold italic uppercase">Team</span>
+</a>
+<a class="bg-primary-container text-on-primary-fixed border-2 border-on-background -skew-x-6 px-4 py-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-bold text-label-bold italic uppercase">Settings</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-2">
+<button class="bg-primary-container text-on-primary-fixed border-2 border-on-background font-label-bold text-label-bold italic uppercase py-3 -skew-x-6 hard-shadow active:translate-y-0.5 active:translate-x-0.5 transition-all">
+                START RACE
+            </button>
+<hr class="border-on-background/10 my-4"/>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-bold text-label-bold italic uppercase">Help</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-bold text-label-bold italic uppercase">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="md:ml-64 min-h-screen flex flex-col">
+<!-- Top Navigation -->
+<header class="w-full sticky top-0 z-40 flex justify-between items-center px-margin-desktop py-4 bg-surface border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(204,255,0,1)]">
+<div class="flex items-center gap-6">
+<h2 class="font-headline-md text-headline-md italic uppercase font-black text-primary">Cenográfica</h2>
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="bg-surface-container border-2 border-on-background pl-10 pr-4 py-1 font-label-bold italic focus:ring-primary-container focus:border-primary-container" placeholder="Search athletes..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-primary-container transition-colors duration-150 active:translate-y-0.5">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 hover:bg-primary-container transition-colors duration-150 active:translate-y-0.5">
+<span class="material-symbols-outlined">bolt</span>
+</button>
+<div class="w-10 h-10 border-2 border-on-background bg-secondary-container overflow-hidden">
+<img alt="User profile photo" class="w-full h-full object-cover" data-alt="A professional headshot of a dynamic business leader with sharp lighting and a high-contrast aesthetic. The background is a clean, modern workspace with architectural elements. The image uses a cool-toned color grade with vibrant yellow accents to match the athletic, high-performance brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuASW75yscoLnxE6P0L9U9Bi347GMaiURsogqi-QWSSAitsUwQsbo2BSo2KV_eQFQjX-W-KvhzxEcEKD5rLgm0_Dx7lZvJ93acjtxARHsfa2a7_BaE6Hj7vTaLbOtCDtOWt4b1z7q-cgt54ADRCKsb2CuSs9AfBCRjmPKh617mUg7-KFgYxBJRxf1dBm2WGVvv1GvZTVHDtG6VSGvKZbFuopza2QOa-HOg_bwwm69zgT7wHDTVk4Wo0739EIenMlbwURDN1rZfbK_7g"/>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="p-gutter md:p-margin-desktop flex flex-col gap-12">
+<!-- Page Hero Section -->
+<section class="relative">
+<div class="absolute -top-6 -left-6 w-24 h-24 bg-primary-container -z-10 -skew-x-12 opacity-50"></div>
+<h3 class="font-display-hero text-display-hero italic uppercase leading-none tracking-tighter">Acessos &amp;<br/><span class="text-primary-container bg-on-background px-4 inline-block -skew-x-6">Permissões</span></h3>
+<p class="font-body-lg text-body-lg mt-4 max-w-2xl text-on-surface-variant italic">Gerencie a elite. Configure níveis de acesso, monitore permissões e garanta que cada membro da equipe esteja no rastro certo.</p>
+</section>
+<!-- Stats Bar -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-gutter">
+<div class="bg-surface-container-lowest p-6 border-3 border-on-background hard-shadow-yellow relative overflow-hidden">
+<div class="absolute top-0 right-0 w-12 h-12 bg-primary-container/20 -skew-x-12 translate-x-4 -translate-y-4"></div>
+<p class="font-label-bold text-label-bold uppercase text-on-surface-variant">Total Users</p>
+<p class="font-stats-num text-stats-num mt-2">128</p>
+</div>
+<div class="bg-surface-container-lowest p-6 border-3 border-on-background hard-shadow relative overflow-hidden">
+<p class="font-label-bold text-label-bold uppercase text-on-surface-variant">Active Now</p>
+<p class="font-stats-num text-stats-num mt-2 text-primary">42</p>
+</div>
+<div class="bg-surface-container-lowest p-6 border-3 border-on-background hard-shadow relative overflow-hidden">
+<p class="font-label-bold text-label-bold uppercase text-on-surface-variant">Admin Level</p>
+<p class="font-stats-num text-stats-num mt-2">08</p>
+</div>
+<div class="bg-surface-container-lowest p-6 border-3 border-on-background hard-shadow relative overflow-hidden">
+<p class="font-label-bold text-label-bold uppercase text-on-surface-variant">Pending Reset</p>
+<p class="font-stats-num text-stats-num mt-2 text-secondary">03</p>
+</div>
+</section>
+<!-- Table & Actions -->
+<section class="flex flex-col gap-6">
+<div class="flex justify-between items-end flex-wrap gap-4">
+<div class="flex gap-2">
+<button class="bg-on-background text-primary-container font-label-bold text-label-bold italic uppercase px-6 py-2 -skew-x-6 hover:bg-primary transition-all">
+                            Filter: All Roles
+                        </button>
+<button class="border-2 border-on-background font-label-bold text-label-bold italic uppercase px-6 py-2 -skew-x-6 hover:bg-surface-variant transition-all">
+                            Sort: Name
+                        </button>
+</div>
+<button class="bg-primary-container text-on-background font-headline-md text-headline-md italic font-black px-8 py-3 -skew-x-6 border-2 border-on-background hard-shadow hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all">
+                        + NEW ATHLETE
+                    </button>
+</div>
+<div class="bg-surface-container-lowest border-3 border-on-background overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-on-background text-primary-fixed border-b-2 border-on-background">
+<th class="p-4 font-label-bold text-label-bold uppercase italic">Athlete</th>
+<th class="p-4 font-label-bold text-label-bold uppercase italic">Profile Badge</th>
+<th class="p-4 font-label-bold text-label-bold uppercase italic">Status</th>
+<th class="p-4 font-label-bold text-label-bold uppercase italic">Last Sprint</th>
+<th class="p-4 font-label-bold text-label-bold uppercase italic text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y-2 divide-on-background/10">
+<!-- Row 1 -->
+<tr class="hover:bg-primary-container/5 transition-colors group">
+<td class="p-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 border-2 border-on-background bg-surface-variant">
+<img alt="Athlete avatar" class="w-full h-full object-cover" data-alt="A portrait of a focused female corporate professional with intense, competitive energy. The lighting is high-contrast, dramatic, and edgy, reflecting an athletic performance brand style. The background is a minimalist, modern office space with bold architectural lines and a lime-green color accent." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAX1Ii7dd6nshOC2ixRYPZEieHpdo_Hh8heuH9NkKR8Gtkd8K7JDZiDdoAw0K3_6iJR3Z402HJzC0SV04zx_yvENBP-BmCP--W0hLR8oNWB9AApPPD65y6vaJCN6hCQYy_U7RFABRfM55E24Ngwu8CbNm_Gl2lvz18tqkK4WksInoYZzwg5eB95dxGzrA4lUHmk0_HeYxLe4oUROHPozIx-QVvhXN89yKUFIcsXSGj6wM_DpfS1ZvZgLhtxWXWN-2hDlJi8DQf1CHw"/>
+</div>
+<div>
+<p class="font-label-bold text-body-md font-bold uppercase italic">Renata Mendes</p>
+<p class="text-on-surface-variant text-xs font-mono">renata.m@cenografica.com</p>
+</div>
+</div>
+</td>
+<td class="p-4">
+<span class="bg-primary-container text-on-primary-fixed text-[10px] font-black italic uppercase px-3 py-1 border-2 border-on-background -skew-x-6">ADMIN</span>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 bg-primary"></div>
+<span class="font-label-bold text-xs italic uppercase">In Track</span>
+</div>
+</td>
+<td class="p-4 font-label-bold text-sm italic">2 hours ago</td>
+<td class="p-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 border-2 border-on-background hover:bg-secondary-container transition-all" title="Reset Password">
+<span class="material-symbols-outlined">lock_reset</span>
+</button>
+<button class="p-2 border-2 border-on-background hover:bg-primary-container transition-all" title="Edit Permissions">
+<span class="material-symbols-outlined">edit_square</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-primary-container/5 transition-colors group">
+<td class="p-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 border-2 border-on-background bg-surface-variant">
+<img alt="Athlete avatar" class="w-full h-full object-cover" data-alt="A close-up portrait of a determined male professional, looking forward with confidence. High-key lighting highlights facial features against a clean, technical background. The image has a sharp, pop-art kinetic aesthetic with subtle neon yellow light flares." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBQpglYLb9YR2UCaogdhEqPwxA2t4_4UBNEhbUHvPmtI7icr8B4uuJapF-26bjEsgBnWt4jn5eci6QALEaPqFomdJYKEg3UDSBNo7X6ST4AzuB7luZXnBfbC5zQ-equpJF2G_GZ3LYcYiHxsOm5pjMpAzWH2kuBg7eNA1YZcxuz-ccbzdtWPqDQYxGVGbTH5DfzbsEmt65JGfZ424VcIceYSDN4oGkaKrppEQeGzKTlm0HBJY1TFrh0HGQU_udUw4nGdnfPRKC0Ok"/>
+</div>
+<div>
+<p class="font-label-bold text-body-md font-bold uppercase italic">Thiago Silva</p>
+<p class="text-on-surface-variant text-xs font-mono">thiago.s@cenografica.com</p>
+</div>
+</div>
+</td>
+<td class="p-4">
+<span class="bg-surface-variant text-on-surface text-[10px] font-black italic uppercase px-3 py-1 border-2 border-on-background -skew-x-6">RH ELITE</span>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<div class="w-2 h-2 bg-surface-variant"></div>
+<span class="font-label-bold text-xs italic uppercase">Resting</span>
+</div>
+</td>
+<td class="p-4 font-label-bold text-sm italic">Yesterday</td>
+<td class="p-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 border-2 border-on-background hover:bg-secondary-container transition-all" title="Reset Password">
+<span class="material-symbols-outlined">lock_reset</span>
+</button>
+<button class="p-2 border-2 border-on-background hover:bg-primary-container transition-all" title="Edit Permissions">
+<span class="material-symbols-outlined">edit_square</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-primary-container/5 transition-colors group">
+<td class="p-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 border-2 border-on-background bg-surface-variant">
+<img alt="Athlete avatar" class="w-full h-full object-cover" data-alt="A portrait of a vibrant, energetic woman with a bright smile, captured in a modern, light-filled environment. The composition is dynamic and aggressive, using diagonal lines in the background. Colors are punchy with deep blacks and electric yellow highlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcVxStnOKadXFsy4eLhHx8CGVIQmCdSw7wBv5n93YXRSbAx3EESQkZBXDswOodlcCgYSguJU-_FhRMGUpLm9HW-I4DuD2uS-n7_SeUMhxqU_b_o4B7nHGvu9Tl7mW0IPKb9r-wFriAcLo_gO7KVZDyR7vHH7hUW-uFujhgJlME4LVHuAA-E3w0YlMflEckCBn5UcgjAqMLQcFqN_j-Z-1gsti6pBWsezId2UZkHVr6t2gw0Jc73QeJDQ05xuaHNTCubSPlFpOIijM"/>
+</div>
+<div>
+<p class="font-label-bold text-body-md font-bold uppercase italic">Ana Paula</p>
+<p class="text-on-surface-variant text-xs font-mono">ana.p@cenografica.com</p>
+</div>
+</div>
+</td>
+<td class="p-4">
+<span class="bg-secondary-container text-white text-[10px] font-black italic uppercase px-3 py-1 border-2 border-on-background -skew-x-6">STRATEGY</span>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2 text-secondary">
+<div class="w-2 h-2 bg-secondary animate-pulse"></div>
+<span class="font-label-bold text-xs italic uppercase">Sprint Required</span>
+</div>
+</td>
+<td class="p-4 font-label-bold text-sm italic">5 mins ago</td>
+<td class="p-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 border-2 border-on-background hover:bg-secondary-container transition-all" title="Reset Password">
+<span class="material-symbols-outlined">lock_reset</span>
+</button>
+<button class="p-2 border-2 border-on-background hover:bg-primary-container transition-all" title="Edit Permissions">
+<span class="material-symbols-outlined">edit_square</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination Footer -->
+<div class="bg-surface-container flex justify-between items-center p-4 border-t-2 border-on-background">
+<p class="font-label-bold text-xs italic uppercase">Showing 1-10 of 128 athletes</p>
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center border-2 border-on-background hover:bg-primary-container transition-all">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center border-2 border-on-background bg-on-background text-primary-container font-black italic">1</button>
+<button class="w-8 h-8 flex items-center justify-center border-2 border-on-background hover:bg-primary-container transition-all font-black italic">2</button>
+<button class="w-8 h-8 flex items-center justify-center border-2 border-on-background hover:bg-primary-container transition-all">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Kinetic Section Break -->
+<section class="mt-8 relative h-48 bg-on-background -mx-margin-desktop overflow-hidden">
+<div class="absolute inset-0 kinetic-skew bg-primary-container"></div>
+<div class="relative z-10 flex flex-col items-center justify-center h-full">
+<h4 class="font-display-hero text-headline-lg-mobile md:text-headline-lg text-on-background italic font-black text-center">PUSH THE LIMITS</h4>
+<p class="font-label-bold text-label-bold italic uppercase tracking-[0.5em] mt-2">Team management at full speed</p>
+</div>
+</section>
+<!-- Access Matrix (Secondary View) -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-gutter">
+<div class="bg-surface-container-lowest border-3 border-on-background p-gutter flex flex-col gap-4">
+<h5 class="font-headline-md text-headline-md italic uppercase">Permission Matrix</h5>
+<div class="flex flex-col gap-3">
+<div class="flex justify-between items-center p-3 border-2 border-on-background hover:translate-x-2 transition-transform cursor-pointer">
+<span class="font-label-bold italic uppercase">Financial Dashboard</span>
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex justify-between items-center p-3 border-2 border-on-background hover:translate-x-2 transition-transform cursor-pointer">
+<span class="font-label-bold italic uppercase">Athlete Registration</span>
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex justify-between items-center p-3 border-2 border-on-background hover:translate-x-2 transition-transform cursor-pointer opacity-50">
+<span class="font-label-bold italic uppercase">Global System Settings</span>
+<span class="material-symbols-outlined text-error">cancel</span>
+</div>
+</div>
+<button class="mt-4 border-2 border-on-background font-label-bold text-label-bold italic uppercase py-3 hover:bg-on-background hover:text-white transition-all">
+                        AUDIT ALL LOGS
+                    </button>
+</div>
+<div class="bg-primary-container border-3 border-on-background p-gutter flex flex-col gap-4 relative overflow-hidden">
+<div class="absolute -right-12 -bottom-12 w-48 h-48 bg-on-background opacity-5 -rotate-12"></div>
+<h5 class="font-headline-md text-headline-md italic uppercase text-on-background">Sprint Reset Protocol</h5>
+<p class="font-body-md italic font-bold">Initiate a global password reset for all athletes in the 'Kenya Platoon'. This action cannot be undone.</p>
+<div class="mt-auto flex flex-col gap-3">
+<input class="bg-white/50 border-2 border-on-background px-4 py-2 font-mono text-center focus:ring-on-background" placeholder="CONFIRM MASTER KEY" type="password"/>
+<button class="bg-secondary text-white font-headline-md italic px-6 py-3 border-2 border-on-background hard-shadow active:translate-y-1 transition-all">
+                            INITIALIZE RESET
+                        </button>
+</div>
+</div>
+</section>
+</div>
+<!-- Footer -->
+<footer class="mt-auto py-8 px-margin-desktop bg-surface-container border-t-3 border-on-background flex flex-col md:flex-row justify-between items-center gap-6">
+<div>
+<span class="font-headline-md text-headline-md italic font-black">Cenográfica</span>
+<p class="font-label-bold text-xs uppercase opacity-50">© 2024 Performance Engine. All Rights Reserved.</p>
+</div>
+<div class="flex gap-8">
+<a class="font-label-bold text-label-bold italic uppercase hover:text-primary transition-colors underline decoration-2 underline-offset-4" href="#">Legal</a>
+<a class="font-label-bold text-label-bold italic uppercase hover:text-primary transition-colors underline decoration-2 underline-offset-4" href="#">Privacy</a>
+<a class="font-label-bold text-label-bold italic uppercase hover:text-primary transition-colors underline decoration-2 underline-offset-4" href="#">Support</a>
+</div>
+</footer>
+</main>
+<!-- Mobile Bottom Navigation Shell -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t-2 border-on-background flex justify-around items-center h-16 z-50 px-4">
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-bold italic uppercase">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-[10px] font-bold italic uppercase">Team</span>
+</a>
+<a class="flex flex-col items-center gap-1 bg-primary-container text-on-primary-fixed -mt-8 w-14 h-14 border-2 border-on-background flex items-center justify-center -rotate-12 shadow-md" href="#">
+<span class="material-symbols-outlined text-2xl rotate-12">bolt</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary font-bold italic" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold italic uppercase">Users</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-bold italic uppercase">Profile</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction: Mouse parallax on cards
+        document.querySelectorAll('.hard-shadow-yellow, .hard-shadow').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const rotateX = (y - centerY) / 20;
+                const rotateY = (centerX - x) / 20;
+                
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+            });
+        });
+
+        // Atmospheric effect: Scroll progress runner
+        const runnerMarker = document.createElement('div');
+        runnerMarker.style.cssText = 'position: fixed; top: 0; left: 0; height: 4px; background: #ccff00; z-index: 100; transition: width 0.1s linear; box-shadow: 0 0 10px #ccff00;';
+        document.body.appendChild(runnerMarker);
+
+        window.addEventListener('scroll', () => {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            runnerMarker.style.width = scrolled + "%";
+        });
+    </script>
+</body></html>

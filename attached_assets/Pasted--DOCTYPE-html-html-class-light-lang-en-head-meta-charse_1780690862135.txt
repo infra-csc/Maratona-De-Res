@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cenográfica | Calibrações</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400;1,700;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#f7f9fb",
+                    "on-error-container": "#93000a",
+                    "error-container": "#ffdad6",
+                    "secondary-container": "#ff5722",
+                    "surface-dim": "#d8dadc",
+                    "primary": "#506600",
+                    "on-primary-container": "#5b7300",
+                    "tertiary": "#5e5e5e",
+                    "surface": "#f7f9fb",
+                    "on-surface-variant": "#444933",
+                    "on-primary-fixed-variant": "#3c4d00",
+                    "primary-container": "#ccff00",
+                    "secondary": "#b02f00",
+                    "surface-container-lowest": "#ffffff",
+                    "secondary-fixed": "#ffdbd1",
+                    "secondary-fixed-dim": "#ffb5a0",
+                    "surface-variant": "#e0e3e5",
+                    "surface-container-high": "#e6e8ea",
+                    "on-tertiary-fixed-variant": "#474747",
+                    "on-secondary-fixed": "#3b0900",
+                    "inverse-surface": "#2d3133",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed-dim": "#c6c6c6",
+                    "surface-container-low": "#f2f4f6",
+                    "on-tertiary-fixed": "#1b1b1b",
+                    "on-tertiary-container": "#6b6b6b",
+                    "on-secondary-container": "#541100",
+                    "outline": "#747a60",
+                    "outline-variant": "#c4c9ac",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-background": "#191c1e",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e0e3e5",
+                    "surface-container": "#eceef0",
+                    "surface-tint": "#506600",
+                    "inverse-primary": "#abd600",
+                    "tertiary-fixed": "#e2e2e2",
+                    "primary-fixed": "#c3f400",
+                    "primary-fixed-dim": "#abd600",
+                    "on-primary-fixed": "#161e00",
+                    "on-secondary": "#ffffff",
+                    "on-surface": "#191c1e",
+                    "on-secondary-fixed-variant": "#862200",
+                    "error": "#ba1a1a",
+                    "background": "#f7f9fb",
+                    "tertiary-container": "#ededed",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "slant-offset": "12px",
+                    "gutter": "24px",
+                    "unit": "4px",
+                    "margin-desktop": "48px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "label-bold": ["Plus Jakarta Sans"],
+                    "stats-num": ["Plus Jakarta Sans"],
+                    "headline-lg": ["Plus Jakarta Sans"],
+                    "display-hero": ["Plus Jakarta Sans"],
+                    "headline-md": ["Plus Jakarta Sans"],
+                    "headline-lg-mobile": ["Plus Jakarta Sans"],
+                    "body-md": ["Plus Jakarta Sans"],
+                    "body-lg": ["Plus Jakarta Sans"]
+            },
+            "fontSize": {
+                    "label-bold": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "stats-num": ["40px", {"lineHeight": "1", "fontWeight": "800"}],
+                    "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "display-hero": ["72px", {"lineHeight": "1", "letterSpacing": "-0.04em", "fontWeight": "800"}],
+                    "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["32px", {"lineHeight": "1.1", "fontWeight": "800"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .kinetic-skew {
+            clip-path: polygon(0 0, 100% 0, 100% 90%, 0 100%);
+        }
+        .parallelogram {
+            transform: skewX(-6deg);
+        }
+        .parallelogram-content {
+            transform: skewX(6deg);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-inverse-surface text-primary-container dark:text-primary-fixed font-headline-md text-headline-md italic uppercase w-full top-0 border-b-2 border-on-background dark:border-on-surface shadow-[4px_4px_0px_0px_rgba(204,255,0,1)] flex justify-between items-center px-margin-desktop py-4 sticky z-50">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md italic font-black text-primary dark:text-primary-fixed">Cenográfica</span>
+<div class="hidden md:flex gap-6 items-center">
+<nav class="flex gap-6">
+<a class="text-on-surface-variant dark:text-surface-variant hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 px-3 py-1" href="#">OVERVIEW</a>
+<a class="text-primary dark:text-primary-fixed font-bold italic border-b-4 border-primary-container" href="#">CALIBRATIONS</a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 px-3 py-1" href="#">ANALYTICS</a>
+</nav>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<input class="bg-surface-container-low border-2 border-on-background px-4 py-2 text-label-bold font-label-bold focus:ring-0 focus:border-primary-container outline-none parallelogram" placeholder="SEARCH PLATOON..." type="text"/>
+</div>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">bolt</span>
+<img alt="User profile photo" class="w-10 h-10 border-2 border-on-background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3Xv0PpSekE7ooBSTkOJncBMJUTLq4Th7DWdgZSlqDwHfalry07HtuHVM4ZydY9wvkUmtjnAeRajHflErunabTpeO6Euqr6deQmGDwUHJkGq4Cnjk7VM1oZaj8VHjS2kNVgv62kg6KWHH4NyFFve2lX1RWUW2SZKjnnzYJq6hIGnghicxgV2w-dk9_yTKBTsXUSbkrhzSYxoujkPQsOK_xxqRnvPqHEGeO8ueE3dUi1Ul9yzuw_LehwkdX5EKNQRM2teqU0GOT5-I"/>
+</div>
+</header>
+<div class="flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="hidden lg:flex flex-col h-screen w-64 fixed left-0 top-0 bg-surface-container-lowest dark:bg-surface-container-highest border-r-3 border-on-background dark:border-on-surface p-gutter gap-4 z-40 pt-24">
+<div class="mb-6">
+<h1 class="font-headline-lg text-headline-lg italic font-black text-on-background dark:text-on-surface">Maratona</h1>
+<p class="font-label-bold text-label-bold italic uppercase opacity-70">Resultados</p>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-bold text-label-bold italic uppercase">Dashboard</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-bold text-label-bold italic uppercase">Platoon</span>
+</a>
+<a class="bg-primary-container text-on-primary-fixed border-2 border-on-background -skew-x-6 px-4 py-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-label-bold text-label-bold italic uppercase">Performance</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">military_tech</span>
+<span class="font-label-bold text-label-bold italic uppercase">Rewards</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">group_add</span>
+<span class="font-label-bold text-label-bold italic uppercase">Team</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary dark:text-surface-variant px-4 py-2 flex items-center gap-3 hover:-skew-x-3 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-bold text-label-bold italic uppercase">Settings</span>
+</a>
+</nav>
+<button class="mt-auto bg-primary-container border-2 border-on-background py-3 font-label-bold text-label-bold italic -skew-x-6 active:translate-y-0.5 active:translate-x-0.5 transition-all">
+                START RACE
+            </button>
+<div class="mt-4 pt-4 border-t border-outline-variant flex flex-col gap-2">
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">help</span> Help
+                </a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 font-label-bold text-label-bold italic uppercase" href="#">
+<span class="material-symbols-outlined">logout</span> Logout
+                </a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="lg:ml-64 w-full p-margin-mobile md:p-margin-desktop bg-surface-bright min-h-screen">
+<!-- Hero Header Section -->
+<section class="mb-12 relative">
+<div class="bg-on-background text-white p-8 -skew-x-2 shadow-[8px_8px_0px_0px_#CCFF00]">
+<div class="skew-x-2">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+<div>
+<h2 class="font-headline-lg text-headline-lg italic uppercase mb-2">Technical Calibrations</h2>
+<p class="font-body-lg text-body-lg opacity-80 max-w-2xl">Refine performance scores to eliminate systemic bias and align results with elite platoon standards. Precision is the difference between a finisher and a champion.</p>
+</div>
+<div class="bg-primary-container text-on-primary-fixed p-4 border-2 border-white parallelogram shrink-0">
+<div class="parallelogram-content flex items-center gap-3">
+<span class="material-symbols-outlined text-4xl">tune</span>
+<div>
+<p class="font-label-bold text-label-bold uppercase">Pending Actions</p>
+<p class="font-stats-num text-stats-num">14</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Event Selector & Filters -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter mb-12">
+<div class="md:col-span-8 bg-white border-3 border-on-background p-6 relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-full bg-surface-container opacity-20 -skew-x-12 translate-x-16"></div>
+<h3 class="font-label-bold text-label-bold uppercase mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">event</span> Active Race Selection
+                    </h3>
+<div class="flex flex-wrap gap-4">
+<button class="bg-primary-container border-2 border-on-background px-6 py-3 font-label-bold text-label-bold italic -skew-x-6 hover:shadow-[4px_4px_0px_0px_#000000] transition-all">
+                            Q3 PERFORMANCE SPRINT
+                        </button>
+<button class="bg-white border-2 border-on-background px-6 py-3 font-label-bold text-label-bold italic -skew-x-6 hover:bg-surface-container-high transition-all">
+                            ANNUAL MARATHON 2024
+                        </button>
+<button class="bg-white border-2 border-on-background px-6 py-3 font-label-bold text-label-bold italic -skew-x-6 hover:bg-surface-container-high transition-all opacity-50">
+                            REGIONAL TRIATHLON
+                        </button>
+</div>
+</div>
+<div class="md:col-span-4 bg-white border-3 border-on-background p-6">
+<h3 class="font-label-bold text-label-bold uppercase mb-4">Quick View Filter</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between border-b-2 border-surface-variant pb-2">
+<span class="font-label-bold">Deviated Scores</span>
+<span class="bg-secondary text-white px-2 font-label-bold italic">8 CRITICAL</span>
+</div>
+<div class="flex items-center justify-between border-b-2 border-surface-variant pb-2">
+<span class="font-label-bold">Calibration Ratio</span>
+<span class="font-label-bold italic text-primary">0.92 PACE</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Comparison Table / Bento Grid -->
+<div class="space-y-6">
+<div class="flex justify-between items-center px-2">
+<h3 class="font-headline-md text-headline-md italic uppercase">Athlete Adjustments</h3>
+<div class="flex gap-4">
+<span class="flex items-center gap-1 font-label-bold text-xs uppercase opacity-60">
+<div class="w-3 h-3 bg-surface-variant border border-on-background"></div> Original
+                        </span>
+<span class="flex items-center gap-1 font-label-bold text-xs uppercase text-primary">
+<div class="w-3 h-3 bg-primary-container border border-on-background"></div> Calibrated
+                        </span>
+</div>
+</div>
+<!-- Calibration Row 1 -->
+<div class="bg-white border-3 border-on-background grid grid-cols-1 lg:grid-cols-12 overflow-hidden transition-all hover:translate-x-1 hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] group">
+<div class="lg:col-span-3 p-6 border-b lg:border-b-0 lg:border-r-3 border-on-background flex items-center gap-4">
+<div class="relative">
+<img alt="Athlete photo" class="w-16 h-16 border-3 border-on-background grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiETiWoI9UYdQU5RA4sTmKGwLihr55J7uyPjYv4L6VA7emFJYLc5rwW6YTjUMX176eVyTU8g2tCNRabl_dI8TnmEinfPTLCD81r3503f0BDtB-TD-AgUCQlCrJsfyOCK60ABYQ0B28_YSQ_4_2gq_z78_ZF1LF6Arzc5m0XGcij6qEmVduCP5dfHSaEePq2oWQcB6tzOc2B8NirONeiubcc3aJ8ktHxmgRO0uUcSJLU0gFqobdjGVLHPXD5PBiTvD6cMgz0KyZXFI"/>
+<div class="absolute -bottom-2 -right-2 bg-on-background text-white p-1">
+<span class="material-symbols-outlined text-sm">verified</span>
+</div>
+</div>
+<div>
+<h4 class="font-label-bold text-label-bold uppercase">Elena Vance</h4>
+<p class="text-xs font-bold italic opacity-50">LEAD NAVIGATOR</p>
+</div>
+</div>
+<div class="lg:col-span-4 p-6 flex items-center justify-around bg-surface-bright">
+<div class="text-center">
+<p class="text-xs font-label-bold uppercase opacity-60 mb-1">ORIGINAL</p>
+<p class="font-stats-num text-3xl opacity-50">84.2</p>
+</div>
+<span class="material-symbols-outlined text-primary text-3xl">double_arrow</span>
+<div class="text-center">
+<p class="text-xs font-label-bold uppercase text-primary mb-1">CALIBRATED</p>
+<p class="font-stats-num text-4xl text-primary">91.5</p>
+</div>
+</div>
+<div class="lg:col-span-5 p-6 flex flex-col justify-center gap-2">
+<p class="text-xs font-label-bold uppercase text-on-surface-variant">Calibration Justification:</p>
+<div class="bg-primary-container/10 border-l-4 border-primary p-3 italic font-body-md text-sm">
+                            "Performance data was skewed by Q3 infrastructure downtime. Normalizing for operational delays reveals top-tier efficiency metrics across all sub-marathons."
+                        </div>
+</div>
+</div>
+<!-- Calibration Row 2 -->
+<div class="bg-white border-3 border-on-background grid grid-cols-1 lg:grid-cols-12 overflow-hidden transition-all hover:translate-x-1 hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] group">
+<div class="lg:col-span-3 p-6 border-b lg:border-b-0 lg:border-r-3 border-on-background flex items-center gap-4">
+<div class="relative">
+<img alt="Athlete photo" class="w-16 h-16 border-3 border-on-background grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9mCcuy6pPUjIbWdxxcuYI8ZD2CqlxPibryToVGQ_h-9BhoxPifJmd5NfGsbx_bxwZbIoBFtF0AGJPjGtZS9x7A_ZQPmLNhBgh4cI2-y4yANvIlzIQS3WMar75GVJkgvCGoExU3E-PF0RBVYPwmq1ZDT18N8kgg23jdb3IEpEPlMjljnUlTl0TmKdkRjFhEi51oNrQBV3AHg2ZT-xR638xa3-tV2ukK_HOM-ONZJbPsjhXDNPHy47SslUAmp-dvW7_1GT0ET0Yxho"/>
+</div>
+<div>
+<h4 class="font-label-bold text-label-bold uppercase">Marcus Thorne</h4>
+<p class="text-xs font-bold italic opacity-50">PLATOON CAPTAIN</p>
+</div>
+</div>
+<div class="lg:col-span-4 p-6 flex items-center justify-around bg-surface-bright">
+<div class="text-center">
+<p class="text-xs font-label-bold uppercase opacity-60 mb-1">ORIGINAL</p>
+<p class="font-stats-num text-3xl opacity-50">95.0</p>
+</div>
+<span class="material-symbols-outlined text-secondary text-3xl">double_arrow</span>
+<div class="text-center">
+<p class="text-xs font-label-bold uppercase text-secondary mb-1">CALIBRATED</p>
+<p class="font-stats-num text-4xl text-secondary">88.2</p>
+</div>
+</div>
+<div class="lg:col-span-5 p-6 flex flex-col justify-center gap-2">
+<p class="text-xs font-label-bold uppercase text-on-surface-variant">Calibration Justification:</p>
+<div class="bg-secondary/10 border-l-4 border-secondary p-3 italic font-body-md text-sm">
+                            "Score inflation detected due to outlier 'Hero Project' weight. Adjustment balances contribution across the full season sprint cycle for accurate platoon scaling."
+                        </div>
+</div>
+</div>
+<!-- Calibration Row 3 (Input Mode) -->
+<div class="bg-surface-container-high border-3 border-dashed border-on-background p-8 flex flex-col items-center justify-center gap-4 text-center">
+<span class="material-symbols-outlined text-5xl text-on-surface-variant">person_add</span>
+<div>
+<h4 class="font-headline-md text-headline-md italic uppercase">Add Calibration Entry</h4>
+<p class="font-body-md opacity-60">Select an athlete to perform a technical adjustment</p>
+</div>
+<button class="bg-on-background text-white px-8 py-3 font-label-bold text-label-bold italic -skew-x-6 hover:bg-primary hover:text-white transition-all">
+                        SEARCH DIRECTORY
+                    </button>
+</div>
+</div>
+<!-- Footer Stats Section -->
+<section class="mt-24 mb-12">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="bg-white border-2 border-on-background p-6 -skew-x-2">
+<div class="skew-x-2">
+<h5 class="text-xs font-label-bold uppercase mb-4 opacity-50">System Confidence</h5>
+<div class="flex items-end gap-2">
+<span class="font-stats-num text-5xl">98.4</span>
+<span class="font-label-bold italic text-primary pb-2 uppercase">% ULTRA</span>
+</div>
+<div class="w-full bg-surface-variant h-2 mt-4">
+<div class="bg-primary-container h-full w-[98.4%] relative">
+<div class="absolute right-0 top-0 h-full w-1 bg-on-background"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-white border-2 border-on-background p-6 -skew-x-2">
+<div class="skew-x-2">
+<h5 class="text-xs font-label-bold uppercase mb-4 opacity-50">Calibration Velocity</h5>
+<div class="flex items-end gap-2">
+<span class="font-stats-num text-5xl">1.2</span>
+<span class="font-label-bold italic text-on-surface-variant pb-2 uppercase">HRS / ADJ</span>
+</div>
+<div class="flex gap-1 mt-4">
+<div class="h-4 w-2 bg-primary-container"></div>
+<div class="h-6 w-2 bg-primary-container"></div>
+<div class="h-3 w-2 bg-primary-container"></div>
+<div class="h-8 w-2 bg-primary-container"></div>
+<div class="h-5 w-2 bg-primary-container"></div>
+<div class="h-9 w-2 bg-primary-container"></div>
+<div class="h-7 w-2 bg-primary"></div>
+</div>
+</div>
+</div>
+<div class="bg-primary-container border-2 border-on-background p-6 -skew-x-2 shadow-[4px_4px_0px_0px_#000000]">
+<div class="skew-x-2">
+<h5 class="text-xs font-label-bold uppercase mb-4 text-on-primary-fixed opacity-70">Review Protocol</h5>
+<p class="font-label-bold text-label-bold italic uppercase leading-tight">All technical adjustments require Platoon Commander secondary sign-off.</p>
+<button class="mt-4 w-full bg-on-background text-white py-2 font-label-bold text-xs italic uppercase">View Protocol PDF</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- Mobile Bottom NavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-lowest border-t-2 border-on-background flex justify-around items-center py-3 z-50 px-4">
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-label-bold">DASH</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-[10px] font-label-bold">TEAM</span>
+</a>
+<div class="relative -top-8">
+<button class="bg-primary-container border-2 border-on-background p-4 parallelogram shadow-[4px_4px_0px_0px_#000000] active:translate-y-1 transition-all">
+<span class="material-symbols-outlined parallelogram-content font-bold">bolt</span>
+</button>
+</div>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined font-variation-settings: 'FILL' 1;">leaderboard</span>
+<span class="text-[10px] font-label-bold">PERF</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-label-bold">SET</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for rows
+        document.querySelectorAll('.group').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.classList.add('bg-primary-container/5');
+            });
+            row.addEventListener('mouseleave', () => {
+                row.classList.remove('bg-primary-container/5');
+            });
+        });
+    </script>
+</body></html>
