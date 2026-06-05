@@ -130,7 +130,7 @@ export function Sidebar() {
                       )}
                     >
                       <Icon size={18} className="shrink-0" />
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsed && <span className="whitespace-nowrap pr-1.5">{item.label}</span>}
                     </Link>
                   );
                 })}
