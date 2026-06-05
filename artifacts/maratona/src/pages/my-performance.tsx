@@ -371,7 +371,7 @@ export default function MyPerformancePage() {
           {/* Privacy note */}
           <div className="bg-slate-100 rounded-lg p-4 text-center mt-8 border border-slate-200">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-              🔒 Sigilo de Avaliação
+              Sigilo de Avaliação
             </p>
             <p className="text-xs text-slate-600 font-medium mt-1">
               Para garantir imparcialidade, as notas e comentários exibidos são consolidados. A identidade dos avaliadores é estritamente confidencial.
