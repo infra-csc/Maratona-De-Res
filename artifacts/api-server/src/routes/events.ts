@@ -181,7 +181,7 @@ router.delete("/events/:id", requireRole("admin"), async (req, res) => {
   res.status(204).end();
 });
 
-router.post("/events/:id/close", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events/:id/close", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { forced, reason } = req.body ?? {};
   const [ev] = await db.update(eventsTable).set({

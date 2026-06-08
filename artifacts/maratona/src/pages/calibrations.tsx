@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, getGetCalibrationsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, Check, Info, Save, CheckCircle } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock } from "lucide-react";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const currentYear = new Date().getFullYear();
@@ -28,6 +30,8 @@ function statusChip(status: string): { label: string; cls: string } {
 
 export default function CalibrationsPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canFinalize = ["admin", "rh", "diretoria"].includes(user?.role ?? "");
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
@@ -84,6 +88,45 @@ export default function CalibrationsPage() {
   const bulkMutation = useCreateCalibration();
   const [savingAll, setSavingAll] = useState(false);
 
+  // Finalização do evento (fechar + liberar notas aos funcionários).
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const fbQKey = ["event-feedback", selectedEventId] as unknown[];
+  const { data: feedback } = useGetEventFeedback(selectedEventId!, {
+    query: { enabled: !!selectedEventId, queryKey: fbQKey },
+  });
+  const closeMutation = useCloseEvent();
+  const releaseMutation = useReleaseEventFeedback();
+  const finalizing = closeMutation.isPending || releaseMutation.isPending;
+
+  async function handleFinalize() {
+    if (!selectedEventId) return;
+    let closed = false;
+    try {
+      await closeMutation.mutateAsync({ id: selectedEventId, data: {} });
+      closed = true;
+      await releaseMutation.mutateAsync({ id: selectedEventId });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey({ year: currentYear }) });
+      qc.invalidateQueries({ queryKey: fbQKey });
+      setFinalizeOpen(false);
+      toast({ title: "Evento finalizado", description: "As notas foram liberadas para os funcionários." });
+    } catch (e) {
+      const msg = (e as { message?: string })?.message;
+      // Sempre atualiza o estado: o fechamento pode ter sido aplicado mesmo que
+      // a liberação tenha falhado.
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey({ year: currentYear }) });
+      qc.invalidateQueries({ queryKey: fbQKey });
+      if (closed) {
+        toast({
+          title: "Evento fechado, mas notas não liberadas",
+          description: msg ? `${msg} Tente liberar novamente.` : "Não foi possível liberar as notas. Tente novamente.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Não foi possível finalizar", description: msg, variant: "destructive" });
+      }
+    }
+  }
+
   function getAreaScores(critId: number) {
     return (evaluations ?? [])
       .filter(e => e.criterionId === critId && e.status === "submitted")
@@ -135,6 +178,18 @@ export default function CalibrationsPage() {
     return score;
   }
   const fillableCount = activeCriteria.filter(c => pendingScore(c.criterionId) != null).length;
+
+  // Pronto para finalizar: todos os critérios com nota da área já foram calibrados.
+  const scoredCriteria = activeCriteria.filter(c => getAvgScore(c.criterionId) != null);
+  const allCalibrated = scoredCriteria.length > 0 && scoredCriteria.every(c => getCalibration(c.criterionId));
+  const alreadyReleased = !!feedback?.feedbackReleased;
+  // Recuperação de falha parcial: evento já fechado, porém notas ainda não liberadas.
+  const alreadyClosed = pickedEvent?.status === "closed";
+  // O backend só libera o feedback se TODAS as avaliações foram concluídas
+  // (feedback.isComplete). Espelhamos essa exigência aqui para não oferecer o
+  // fechamento e depois falhar com erro 400.
+  const evaluationsComplete = !!feedback?.isComplete;
+  const readyToFinalize = allCalibrated && evaluationsComplete && canFinalize;
 
   // Grava TODAS as calibrações preenchidas de uma vez (a diretoria preenche tudo
   // e salva em um clique, em vez de critério por critério).
@@ -430,6 +485,60 @@ export default function CalibrationsPage() {
                 </article>
               );
             })}
+
+            {/* Finalização — aparece apenas quando todas as calibrações estão salvas */}
+            {scoredCriteria.length > 0 && (
+              alreadyReleased ? (
+                <div className="bg-[#506600] text-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[6px_6px_0px_0px_#191c1e]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CheckCircle size={26} className="shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-base font-black italic uppercase tracking-tight leading-tight">Evento finalizado</p>
+                      <p className="text-xs font-bold italic uppercase text-[#ccff00]/70 leading-tight">As notas já foram liberadas para os funcionários.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : readyToFinalize ? (
+                <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[6px_6px_0px_0px_#ccff00]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CheckCircle size={26} className="text-[#ccff00] shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-base font-black italic uppercase tracking-tight leading-tight">{alreadyClosed ? "Evento fechado — notas não liberadas" : "Todas as calibrações salvas"}</p>
+                      <p className="text-xs font-bold italic uppercase text-white/60 leading-tight">{alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}</p>
+                    </div>
+                  </div>
+                  <button
+                    data-testid="button-open-finalize"
+                    type="button"
+                    onClick={() => setFinalizeOpen(true)}
+                    className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 transition-all hover:bg-white hover:border-white"
+                  >
+                    <Flag size={16} /> {alreadyClosed ? "Liberar Notas" : "Fechar Evento e Liberar Notas"}
+                  </button>
+                </div>
+              ) : allCalibrated && !evaluationsComplete ? (
+                <div className="bg-white border-2 border-[#191c1e] p-5 flex items-center gap-3 text-[#444933]">
+                  <AlertTriangle size={20} className="shrink-0 text-[#ff5722]" />
+                  <p className="text-xs font-bold italic uppercase tracking-wide leading-tight">
+                    Calibrações concluídas, mas ainda há avaliações pendentes. O evento só pode ser fechado após todas as avaliações serem enviadas.
+                  </p>
+                </div>
+              ) : allCalibrated && !canFinalize ? (
+                <div className="bg-white border-2 border-dashed border-[#191c1e] p-5 flex items-center gap-3 text-[#444933]">
+                  <Lock size={20} className="shrink-0 text-[#747a60]" />
+                  <p className="text-xs font-bold italic uppercase tracking-wide leading-tight">
+                    Calibrações concluídas. O fechamento do evento é feito pela diretoria ou pelo RH.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white border-2 border-dashed border-[#191c1e] p-5 flex items-center gap-3 text-[#444933]">
+                  <Info size={20} className="shrink-0 text-[#747a60]" />
+                  <p className="text-xs font-bold italic uppercase tracking-wide leading-tight">
+                    Calibre todos os critérios para liberar o fechamento do evento.
+                  </p>
+                </div>
+              )
+            )}
           </section>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center bg-white border-2 border-dashed border-[#191c1e]">
@@ -441,6 +550,87 @@ export default function CalibrationsPage() {
           </div>
         )}
       </div>
+
+      {/* Modal explicativo de finalização do evento */}
+      <Dialog open={finalizeOpen} onOpenChange={(o) => { if (!finalizing) setFinalizeOpen(o); }}>
+        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] p-0 gap-0 shadow-[8px_8px_0px_0px_#ccff00]">
+          <DialogHeader className="bg-[#191c1e] text-white p-5 space-y-1 text-left">
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tight flex items-center gap-2">
+              <Flag size={20} className="text-[#ccff00]" /> Finalizar Evento
+            </DialogTitle>
+            <p className="text-xs font-bold italic uppercase text-white/60">{pickedEvent?.name}</p>
+          </DialogHeader>
+
+          <div className="p-5 space-y-4 max-h-[55vh] overflow-y-auto">
+            {/* Resumo: como foi o evento */}
+            <div className="flex items-stretch gap-3">
+              <div className="flex-1 border-2 border-[#191c1e] p-4 flex flex-col justify-center">
+                <span className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota Final da Equipe</span>
+                <span className="text-3xl font-black italic text-[#506600] leading-none mt-1">
+                  {feedback ? feedback.eventScore.toFixed(1) : "—"}<span className="text-sm text-[#747a60]">/100</span>
+                </span>
+              </div>
+              {feedback?.projectedPlatoon && (
+                <div className="flex-1 border-2 border-[#191c1e] bg-[#f2f4f6] p-4 flex flex-col justify-center">
+                  <span className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Pelotão</span>
+                  <span className="text-lg font-black italic uppercase text-[#191c1e] leading-tight mt-1 flex items-center gap-1.5">
+                    <Trophy size={16} className="text-[#506600]" /> {feedback.projectedPlatoon}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {feedback && feedback.highlights && feedback.highlights.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><CheckCircle size={13} className="text-[#506600]" /> Destaques</p>
+                <ul className="space-y-1">
+                  {feedback.highlights.map((h, i) => (
+                    <li key={i} className="text-sm italic text-[#191c1e] border-l-4 border-[#506600] pl-2.5 py-0.5">{h}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {feedback && feedback.attentionPoints && feedback.attentionPoints.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><AlertTriangle size={13} className="text-[#ff5722]" /> Pontos de Atenção</p>
+                <ul className="space-y-1">
+                  {feedback.attentionPoints.map((a, i) => (
+                    <li key={i} className="text-sm italic text-[#191c1e] border-l-4 border-[#ff5722] pl-2.5 py-0.5">{a}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="bg-[#fff8e1] border-2 border-[#191c1e] p-3 flex items-start gap-2">
+              <Lock size={15} className="text-[#b02f00] shrink-0 mt-0.5" />
+              <p className="text-xs italic font-bold text-[#444933] leading-snug">
+                Ao finalizar, o evento será <strong>fechado</strong> e estas notas ficarão <strong>visíveis para os funcionários</strong>. Essa ação encerra a calibração do evento.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 p-5 border-t-2 border-[#191c1e] bg-[#f7f9fb]">
+            <button
+              type="button"
+              disabled={finalizing}
+              onClick={() => setFinalizeOpen(false)}
+              className="px-5 py-2.5 border-2 border-[#191c1e] bg-white font-bold text-sm italic uppercase tracking-wider disabled:opacity-50 transition-all enabled:hover:bg-[#eceef0]"
+            >
+              Cancelar
+            </button>
+            <button
+              data-testid="button-confirm-finalize"
+              type="button"
+              disabled={finalizing}
+              onClick={handleFinalize}
+              className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-2.5 font-black text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
+            >
+              <Send size={16} /> {finalizing ? "Finalizando..." : alreadyClosed ? "Liberar Notas" : "Finalizar e Liberar"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
