@@ -2166,7 +2166,7 @@ components:
 
     Absence:
       type: object
-      required: [id, employeeId, date, year, quarter, quantity]
+      required: [id, employeeId, date, year, quarter, quantity, penaltyType, points]
       properties:
         id:
           type: integer
@@ -2178,6 +2178,10 @@ components:
           type: ["integer", "null"]
         eventName:
           type: ["string", "null"]
+        penaltyType:
+          type: string
+        points:
+          type: integer
         date:
           type: string
         year:
@@ -2195,12 +2199,15 @@ components:
 
     AbsenceInput:
       type: object
-      required: [employeeId, date, year, quarter]
+      required: [employeeId, eventId, penaltyType, date, year, quarter]
       properties:
         employeeId:
           type: integer
         eventId:
           type: integer
+        penaltyType:
+          type: string
+          enum: [falta, atraso_30, atraso_60]
         date:
           type: string
         year:

@@ -273,6 +273,8 @@ async function seed() {
   await db.insert(absencesTable).values({
     employeeId: employees[4].id,
     eventId: closedEvents[0]?.id ?? null,
+    penaltyType: "falta",
+    points: 50,
     date: `${year}-${String(monthBase).padStart(2, "0")}-11`,
     year,
     quarter,

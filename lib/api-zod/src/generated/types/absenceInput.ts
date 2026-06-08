@@ -5,10 +5,12 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { AbsenceInputPenaltyType } from './absenceInputPenaltyType';
 
 export interface AbsenceInput {
   employeeId: number;
-  eventId?: number;
+  eventId: number;
+  penaltyType: AbsenceInputPenaltyType;
   date: string;
   year: number;
   quarter: number;

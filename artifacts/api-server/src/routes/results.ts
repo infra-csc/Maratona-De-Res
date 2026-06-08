@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { calculateEventResult, calculateQuarterGrossAverage, calculateAbsencePenalty, calculateQuarterFinalResult, getPlatoonByScore, validateCalculationExample } from "../lib/calculations.js";
+import { calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore, validateCalculationExample } from "../lib/calculations.js";
 import { audit } from "../lib/audit.js";
 
 const router = Router();
@@ -238,9 +238,6 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
   const closedEventIds = closedEvents.map(e => e.id);
   const platoonRules = await loadPlatoonRules();
 
-  const penaltyRuleRow = await db.select().from(rulesTable).where(eq(rulesTable.key, "absence_penalty_per_absence")).limit(1);
-  const penaltyPerAbsence = penaltyRuleRow[0] ? parseFloat(penaltyRuleRow[0].value) : 50;
-
   // 1. Calcula a nota do TIME de cada evento (uma vez por evento) e grava o
   //    resultado por colaborador participante (mesma nota para todos do time).
   const eventScoreById = new Map<number, number>();
@@ -301,7 +298,7 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
     const totalAbsences = absenceRows.reduce((s, a) => s + a.quantity, 0);
 
     const grossAverage = calculateQuarterGrossAverage(eventScores);
-    const absencePenalty = calculateAbsencePenalty(totalAbsences, penaltyPerAbsence);
+    const absencePenalty = absenceRows.reduce((s, a) => s + a.points * a.quantity, 0);
     const finalResult = calculateQuarterFinalResult(grossAverage, absencePenalty);
     const platoon = getPlatoonByScore(finalResult, platoonRules);
 

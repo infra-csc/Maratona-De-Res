@@ -396,6 +396,8 @@ export interface Absence {
   eventId?: number | null;
   /** @nullable */
   eventName?: string | null;
+  penaltyType: string;
+  points: number;
   date: string;
   year: number;
   quarter: number;
@@ -406,9 +408,19 @@ export interface Absence {
   createdAt?: string;
 }
 
+export type AbsenceInputPenaltyType = typeof AbsenceInputPenaltyType[keyof typeof AbsenceInputPenaltyType];
+
+
+export const AbsenceInputPenaltyType = {
+  falta: 'falta',
+  atraso_30: 'atraso_30',
+  atraso_60: 'atraso_60',
+} as const;
+
 export interface AbsenceInput {
   employeeId: number;
-  eventId?: number;
+  eventId: number;
+  penaltyType: AbsenceInputPenaltyType;
   date: string;
   year: number;
   quarter: number;

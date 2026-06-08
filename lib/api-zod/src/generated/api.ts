@@ -1077,6 +1077,8 @@ export const GetAbsencesResponseItem = zod.object({
   "employeeName": zod.string().optional(),
   "eventId": zod.number().nullish(),
   "eventName": zod.string().nullish(),
+  "penaltyType": zod.string(),
+  "points": zod.number(),
   "date": zod.string(),
   "year": zod.number(),
   "quarter": zod.number(),
@@ -1093,7 +1095,8 @@ export const GetAbsencesResponse = zod.array(GetAbsencesResponseItem)
  */
 export const CreateAbsenceBody = zod.object({
   "employeeId": zod.number(),
-  "eventId": zod.number().optional(),
+  "eventId": zod.number(),
+  "penaltyType": zod.enum(['falta', 'atraso_30', 'atraso_60']),
   "date": zod.string(),
   "year": zod.number(),
   "quarter": zod.number(),

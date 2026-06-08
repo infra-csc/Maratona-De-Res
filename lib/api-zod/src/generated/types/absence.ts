@@ -14,6 +14,8 @@ export interface Absence {
   eventId?: number | null;
   /** @nullable */
   eventName?: string | null;
+  penaltyType: string;
+  points: number;
   date: string;
   year: number;
   quarter: number;

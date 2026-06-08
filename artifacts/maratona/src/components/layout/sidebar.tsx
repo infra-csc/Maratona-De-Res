@@ -46,7 +46,7 @@ const navGroups: NavGroup[] = [
   {
     name: "Controle",
     items: [
-      { label: "Faltas", path: "/absences", icon: UserCheck, roles: ["admin", "rh", "avaliador"] },
+      { label: "Penalidades", path: "/absences", icon: UserCheck, roles: ["admin", "rh", "diretoria"] },
       { label: "Regras do Sistema", path: "/rules", icon: Settings, roles: ["admin", "rh"] },
       { label: "Integração", path: "/integration", icon: Database, roles: ["admin", "rh"] },
       { label: "Auditoria", path: "/audit", icon: FolderLock, roles: ["admin", "rh"] },

@@ -123,6 +123,9 @@ router.get("/exports/absences", async (req, res) => {
   const results = await db
     .select({
       "Nome": employeesTable.name,
+      "Penalidade": absencesTable.penaltyType,
+      "Evento": eventsTable.name,
+      "Pontos": absencesTable.points,
       "Data": absencesTable.date,
       "Ano": absencesTable.year,
       "Trimestre": absencesTable.quarter,
@@ -131,11 +134,12 @@ router.get("/exports/absences", async (req, res) => {
     })
     .from(absencesTable)
     .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
+    .leftJoin(eventsTable, eq(absencesTable.eventId, eventsTable.id))
     .where(whereClause)
     .orderBy(absencesTable.date);
 
   const suffix = year && quarter ? `-Q${quarter}-${year}` : "";
-  res.json({ filename: `faltas${suffix}.csv`, data: toCsv(results as never) });
+  res.json({ filename: `penalidades${suffix}.csv`, data: toCsv(results as never) });
 });
 
 router.get("/exports/pending-evaluations", requireRole("admin", "rh", "diretoria"), async (_req, res) => {

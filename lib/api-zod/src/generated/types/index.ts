@@ -8,6 +8,7 @@
 
 export * from './absence';
 export * from './absenceInput';
+export * from './absenceInputPenaltyType';
 export * from './area';
 export * from './areaInput';
 export * from './areaUpdate';

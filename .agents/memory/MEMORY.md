@@ -11,3 +11,4 @@
 - [Maratona auth 401 / empty data](maratona-auth-401.md) — expired JWT renders empty pages (guard ignores expiry); 401 handling belongs in QueryClient/package fetch
 
 - [Criteria weight freeze](criteria-weight-freeze.md) — evaluated event => weights frozen (fill null override from defaultWeight) + criteria edit/reopen blocked 409; freeze on confirm AND first evaluation
+- [Penalties model](penalties-model.md) — "Faltas"→"Penalidades" (route/table stay /absences); rows snapshot own points; quarter-close = sum(points*quantity); catalog server-authoritative
