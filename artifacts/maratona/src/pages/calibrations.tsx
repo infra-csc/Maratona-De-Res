@@ -564,7 +564,7 @@ export default function CalibrationsPage() {
 
       {/* Modal explicativo de finalização do evento */}
       <Dialog open={finalizeOpen} onOpenChange={(o) => { if (!finalizing) setFinalizeOpen(o); }}>
-        <DialogContent className="max-w-2xl rounded-none border-2 border-[#191c1e] p-0 gap-0 shadow-[8px_8px_0px_0px_#ccff00]">
+        <DialogContent className="max-w-3xl rounded-none border-2 border-[#191c1e] p-0 gap-0 shadow-[8px_8px_0px_0px_#ccff00]">
           <DialogHeader className="bg-[#191c1e] text-white p-5 space-y-1 text-left">
             <DialogTitle className="text-xl font-black italic uppercase tracking-tight flex items-center gap-2">
               <Flag size={20} className="text-[#ccff00]" /> Finalizar Evento
@@ -594,38 +594,50 @@ export default function CalibrationsPage() {
             {scoredCriteria.length > 0 && (
               <div>
                 <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><SlidersHorizontal size={13} className="text-[#506600]" /> Notas Finais por Critério</p>
-                <div className="border-2 border-[#191c1e]">
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-1.5 bg-[#191c1e] text-white text-[9px] font-bold uppercase italic tracking-wider">
-                    <span>Critério</span>
-                    <span className="text-center">Peso</span>
-                    <span className="text-right">Original → Calibrada = Final</span>
-                  </div>
+                <div className="border-2 border-[#191c1e] divide-y-2 divide-[#191c1e]">
                   {scoredCriteria.map((c, i) => {
                     const avg = getAvgScore(c.criterionId);
                     const cal = getCalibration(c.criterionId);
                     const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
                     const finalVal = calVal ?? avg;
                     const peso = c.weightOverride ?? c.originalWeight ?? 0;
+                    const scores = getAreaScores(c.criterionId);
                     return (
-                      <div key={c.criterionId} className={`grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-2 items-center ${i % 2 ? "bg-[#f7f9fb]" : "bg-white"}`} data-testid={`finalize-criterion-${c.criterionId}`}>
-                        <span className="text-xs font-bold italic uppercase text-[#191c1e] truncate pr-2">{c.criterionName}</span>
-                        <span className="text-xs font-black italic text-[#444933] text-center tabular-nums shrink-0">{peso}</span>
-                        <span className="flex items-center gap-1.5 justify-end text-xs font-black italic shrink-0">
-                          <span className={calVal != null ? "text-[#c4c9ac] line-through" : "text-[#444933]"}>{avg != null ? avg.toFixed(2) : "—"}</span>
-                          {calVal != null && (
-                            <>
-                              <span className="text-[#747a60]">→</span>
-                              <span className="text-[#a06a00]">{calVal.toFixed(2)}</span>
-                            </>
-                          )}
-                          <span className="text-[#747a60]">=</span>
-                          <span className="text-[#506600] bg-[#eef3da] border border-[#191c1e] px-1.5">{finalVal != null ? finalVal.toFixed(2) : "—"}</span>
-                        </span>
+                      <div key={c.criterionId} className={`px-3 py-2 ${i % 2 ? "bg-[#f7f9fb]" : "bg-white"}`} data-testid={`finalize-criterion-${c.criterionId}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs font-black italic uppercase text-[#191c1e] truncate">{c.criterionName}</span>
+                            <span className="text-[9px] font-bold italic uppercase text-[#747a60] border border-[#c4c9ac] px-1 shrink-0">Peso {peso}</span>
+                            {c.responsibleAreaName && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#191c1e] px-1 shrink-0"><Building2 size={10} /> {c.responsibleAreaName}</span>
+                            )}
+                          </div>
+                          <span className="flex items-center gap-1.5 justify-end text-xs font-black italic shrink-0">
+                            <span className={calVal != null ? "text-[#c4c9ac] line-through" : "text-[#444933]"}>{avg != null ? avg.toFixed(2) : "—"}</span>
+                            {calVal != null && (
+                              <>
+                                <span className="text-[#747a60]">→</span>
+                                <span className="text-[#a06a00]">{calVal.toFixed(2)}</span>
+                              </>
+                            )}
+                            <span className="text-[#747a60]">=</span>
+                            <span className="text-[#506600] bg-[#eef3da] border border-[#191c1e] px-1.5">{finalVal != null ? finalVal.toFixed(2) : "—"}</span>
+                          </span>
+                        </div>
+                        {scores.length > 0 && (
+                          <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1">
+                            {scores.map((s, j) => (
+                              <span key={j} className="text-[10px] italic text-[#444933]">
+                                {s.name} <strong className="not-italic text-[#191c1e]">{s.score.toFixed(1)}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-                <p className="text-[10px] italic text-[#747a60] mt-1.5">Cada critério usa a nota calibrada quando há calibragem; caso contrário, a média original da área.</p>
+                <p className="text-[10px] italic text-[#747a60] mt-1.5">Original = média da área · Calibrada = ajuste do gestor · Final = nota usada (calibrada quando houver, senão a média).</p>
               </div>
             )}
 
