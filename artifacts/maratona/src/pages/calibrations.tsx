@@ -354,7 +354,7 @@ export default function CalibrationsPage() {
               </div>
             )}
 
-            {activeCriteria.length > 0 && (
+            {activeCriteria.length > 0 && !alreadyReleased && (
               <div className="sticky top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
                 <div className="flex items-center gap-3 min-w-0">
                   <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
@@ -459,7 +459,8 @@ export default function CalibrationsPage() {
                             value={scoreVal}
                             onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
                             placeholder="—"
-                            className="h-11 mt-1 rounded-none border-2 border-[#191c1e] text-lg font-black italic"
+                            disabled={alreadyReleased}
+                            className="h-11 mt-1 rounded-none border-2 border-[#191c1e] text-lg font-black italic disabled:opacity-60 disabled:bg-[#eceef0]"
                           />
                         </div>
                         <div className="flex-1">
@@ -470,21 +471,24 @@ export default function CalibrationsPage() {
                             onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
                             placeholder="Por que a nota original foi alterada?"
                             rows={2}
-                            className="mt-1 rounded-none border-2 border-[#191c1e] resize-none"
+                            disabled={alreadyReleased}
+                            className="mt-1 rounded-none border-2 border-[#191c1e] resize-none disabled:opacity-60 disabled:bg-[#eceef0]"
                           />
                         </div>
                       </div>
-                      <div className="mt-3 flex items-center justify-end">
-                        <button
-                          data-testid={`button-save-cal-${c.criterionId}`}
-                          type="button"
-                          disabled={isSaving || savingAll}
-                          onClick={() => saveCalibration(c.criterionId)}
-                          className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
-                        >
-                          <Save size={16} /> {isSaving ? "Salvando..." : cal ? "Atualizar Calibração" : "Salvar Calibração"}
-                        </button>
-                      </div>
+                      {!alreadyReleased && (
+                        <div className="mt-3 flex items-center justify-end">
+                          <button
+                            data-testid={`button-save-cal-${c.criterionId}`}
+                            type="button"
+                            disabled={isSaving || savingAll}
+                            onClick={() => saveCalibration(c.criterionId)}
+                            className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
+                          >
+                            <Save size={16} /> {isSaving ? "Salvando..." : cal ? "Atualizar Calibração" : "Salvar Calibração"}
+                          </button>
+                        </div>
+                      )}
                       {cal && (
                         <div className="mt-3 text-xs italic text-[#444933] bg-[#f2f4f6] border-l-4 border-[#ff5722] p-3 relative">
                           <AlertCircle size={12} className="text-[#ff5722] absolute top-2 right-2" />

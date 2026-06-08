@@ -60,6 +60,10 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
 
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  if (event.feedbackReleased) {
+    res.status(409).json({ error: "Evento finalizado: as notas já foram liberadas e não podem mais ser alteradas." });
+    return;
+  }
 
   const [existing] = await db.select().from(calibrationsTable)
     .where(and(
