@@ -82,10 +82,10 @@ export default function EventDetailPage() {
                     <div className="p-1.5 bg-white border-2 border-[#191c1e] text-[#506600]"><Calendar size={14} /></div>
                     <span>{new Date(event.startDate).toLocaleDateString('pt-BR')} — {new Date(event.endDate).toLocaleDateString('pt-BR')}</span>
                   </div>
-                  {event.city && (
+                  {(event.city || event.location) && (
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-white border-2 border-[#191c1e] text-[#506600]"><MapPin size={14} /></div>
-                      <span>{event.city}, {event.state}</span>
+                      <span>{event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : event.location}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">

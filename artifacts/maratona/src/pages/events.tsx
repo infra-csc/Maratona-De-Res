@@ -70,7 +70,7 @@ export default function EventsPage() {
   });
 
   const filtered = (events ?? []).filter(ev => {
-    const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchQuarter = filterQuarter === "all" || ev.quarter === Number(filterQuarter);
     return matchSearch && matchQuarter;
   });
@@ -263,7 +263,7 @@ export default function EventsPage() {
                       </div>
                       <div className="flex items-center gap-2 truncate">
                         <MapPin size={14} className="text-[#747a60] shrink-0" />
-                        <span className="truncate">{ev.city ? `${ev.city}, ${ev.state}` : "Local não definido"}</span>
+                        <span className="truncate">{ev.city ? `${ev.city}${ev.state ? `, ${ev.state}` : ""}` : (ev.location || "Local não definido")}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Users size={14} className="text-[#747a60] shrink-0" />
