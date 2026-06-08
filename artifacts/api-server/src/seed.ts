@@ -36,6 +36,9 @@ async function seed() {
     { name: "Departamento Pessoal", description: "RH e departamento pessoal" },            // 4
     { name: "Comercial", description: "Vendas, propostas e relacionamento com clientes" },// 5
     { name: "Almoxarifado", description: "Controle de estoque, ferramentas e materiais" },// 6
+    { name: "Ferramentas e case", description: "Controle e retorno de ferramentas e cases" }, // 7
+    { name: "Atendimento", description: "Atendimento ao cliente" },                        // 8
+    { name: "Ativação", description: "Ativação de marca e experiência" },                  // 9
   ]).returning();
 
   console.log(`✓ ${areas.length} áreas criadas`);
@@ -88,24 +91,24 @@ async function seed() {
     {
       name: "Ferramentas & Case",
       description: "Todas as ferramentas e cases devem retornar à base corretamente, sem perdas ou danos.",
-      responsibleAreaId: areas[0].id, // Cenografia
-      responsibleAreaLabel: "Cenografia",
+      responsibleAreaId: areas[7].id, // Ferramentas e case
+      responsibleAreaLabel: "Ferramentas e case",
       defaultWeight: "2",
       displayOrder: 2,
     },
     {
       name: "Qualidade da Entrega",
       description: "Avalia acabamento, materiais em bom estado, qualidade visual e satisfação na ativação/atendimento.",
-      responsibleAreaId: areas[2].id, // Atendimento e Ativação
-      responsibleAreaLabel: "Atendimento e Ativação",
+      responsibleAreaId: areas[8].id, // Atendimento
+      responsibleAreaLabel: "Atendimento",
       defaultWeight: "3",
       displayOrder: 3,
     },
     {
       name: "Obrigações Estruturais",
       description: "Avalia o cumprimento das obrigações estruturais da montagem, conforme alinhamento dos produtores de cenografia e supervisão.",
-      responsibleAreaId: areas[3].id, // Produção
-      responsibleAreaLabel: "Produtores de Cenografia / Sup. Ceno",
+      responsibleAreaId: areas[0].id, // Cenografia
+      responsibleAreaLabel: "Cenografia",
       defaultWeight: "3",
       displayOrder: 4,
     },
@@ -128,8 +131,8 @@ async function seed() {
     {
       name: "Conduta e Comportamento",
       description: "Avalia uso de uniforme, EPI, envio de comprovações e fotos, horários na arena, comportamento profissional e cuidado com ferramentas.",
-      responsibleAreaId: areas[4].id, // Departamento Pessoal
-      responsibleAreaLabel: "Produtores locais e Departamento Pessoal",
+      responsibleAreaId: areas[0].id, // Cenografia
+      responsibleAreaLabel: "Cenografia",
       defaultWeight: "3",
       displayOrder: 7,
     },
