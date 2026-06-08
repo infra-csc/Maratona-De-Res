@@ -2,11 +2,14 @@ import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { useGetEvent, useGetEventResult, useUpdateEventCriteria, useConfirmEventCriteria, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,6 +34,7 @@ export default function EventDetailPage() {
   const canManage = !!user && ["admin", "rh"].includes(user.role);
 
   const [config, setConfig] = useState<{ criterionId: number; active: boolean; weight: number }[]>([]);
+  const [pendingRemoval, setPendingRemoval] = useState<number | null>(null);
   useEffect(() => {
     if (event?.criteria) {
       setConfig(event.criteria.map(c => ({
@@ -248,14 +252,28 @@ export default function EventDetailPage() {
                         />
                       </div>
                       <div className="flex items-center gap-2 min-w-[110px] justify-end">
-                        <span className={`text-[10px] font-bold uppercase italic ${item.active ? "text-[#506600]" : "text-[#747a60]"}`}>{item.active ? "Ativo" : "Inativo"}</span>
-                        <Switch
-                          data-testid={`switch-event-criterion-${item.criterionId}`}
-                          checked={item.active}
-                          disabled={criteriaConfirmed}
-                          onCheckedChange={v => setCriterionActive(item.criterionId, v)}
-                          className="data-[state=checked]:bg-[#506600]"
-                        />
+                        {item.active ? (
+                          <button
+                            type="button"
+                            data-testid={`button-remove-event-criterion-${item.criterionId}`}
+                            disabled={criteriaConfirmed}
+                            onClick={() => setPendingRemoval(item.criterionId)}
+                            title="Remover critério"
+                            className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            data-testid={`button-restore-event-criterion-${item.criterionId}`}
+                            disabled={criteriaConfirmed}
+                            onClick={() => setCriterionActive(item.criterionId, true)}
+                            className="h-9 px-3 flex items-center gap-1.5 border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-[11px] font-bold italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                          >
+                            <RotateCcw size={14} /> Reativar
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -268,6 +286,27 @@ export default function EventDetailPage() {
               {!sumValid && !criteriaConfirmed && (
                 <p className="text-xs font-bold italic uppercase text-[#ba1a1a] text-right">Ajuste os pesos para somar exatamente 20 antes de salvar ou confirmar.</p>
               )}
+
+              <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
+                <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover critério?</AlertDialogTitle>
+                    <AlertDialogDescription className="italic text-[#444933]">
+                      O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? ""}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>20</strong> antes de salvar ou confirmar.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-remove-criterion" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      data-testid="button-confirm-remove-criterion"
+                      onClick={() => { if (pendingRemoval !== null) setCriterionActive(pendingRemoval, false); setPendingRemoval(null); }}
+                      className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
+                    >
+                      <Trash2 size={16} className="mr-1.5" /> Remover
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
                 {!criteriaConfirmed ? (
