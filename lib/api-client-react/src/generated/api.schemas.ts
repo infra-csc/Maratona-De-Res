@@ -148,6 +148,9 @@ export interface Event {
   evaluationProgress?: number;
   /** @nullable */
   averageScore?: number | null;
+  /** @nullable */
+  teamScore?: number | null;
+  hasCalibration?: boolean;
   criteriaConfirmed?: boolean;
   createdAt?: string;
 }

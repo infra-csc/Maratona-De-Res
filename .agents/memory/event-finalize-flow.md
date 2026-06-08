@@ -26,3 +26,17 @@ event is already closed.
 runs calibration + finalization end-to-end; if any one of those three routes
 omits diretoria, the finalize flow breaks mid-way for them. Keep the three in
 lockstep when changing roles.
+
+**"Concluded" signal = `event.status === "closed"`**, NOT the presence of any
+calibration. A single calibrated criterion does not make an event final, and an
+event can be force-closed without calibration. UI that distinguishes
+provisional vs final score (e.g. events list card) must key the final/concluded
+state off `status === "closed"`; use `hasCalibration` only to refine wording.
+
+**Team-score parity:** the events list (`GET /events`) computes `teamScore` +
+`hasCalibration` in-memory (bulk `inArray` fetch, no per-event N+1) and MUST
+mirror `computeEventTeamResult` semantics: active criteria only, weight =
+`weightOverride ?? defaultWeight`, submitted evals only, calibration overrides
+the average, `teamScore` is null when no criterion has a usable score. **Why:**
+two code paths produce the same number; if they drift, the card and the detail
+page disagree. Prefer extracting a shared helper if a third consumer appears.

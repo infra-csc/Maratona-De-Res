@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
-import { convertScoreToPercentage } from "../lib/calculations.js";
+import { convertScoreToPercentage, calculateEventResult } from "../lib/calculations.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -18,19 +18,54 @@ router.get("/events", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
   const events = await query.orderBy(eventsTable.startDate);
 
-  const enriched = await Promise.all(events.map(async (ev) => {
-    const participants = await db.select().from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, ev.id));
-    const submittedEvals = await db.select().from(evaluationsTable)
-      .where(and(eq(evaluationsTable.eventId, ev.id), eq(evaluationsTable.status, "submitted")));
-    const totalEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, ev.id));
-    const progress = totalEvals.length > 0 ? submittedEvals.length / totalEvals.length : 0;
-    const scored = submittedEvals.filter(e => e.score != null);
+  if (events.length === 0) { res.json([]); return; }
+  const eventIds = events.map(e => e.id);
+
+  // Busca em lote para evitar N+1 (uma query por relação, não por evento).
+  const [participants, evals, eventCriteriaRows, calibrations] = await Promise.all([
+    db.select({ eventId: eventParticipantsTable.eventId })
+      .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
+    db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status })
+      .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
+    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight })
+      .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id)).where(inArray(eventCriteriaTable.eventId, eventIds)),
+    db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
+      .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
+  ]);
+
+  const enriched = events.map((ev) => {
+    const participantCount = participants.filter(p => p.eventId === ev.id).length;
+    const evEvals = evals.filter(e => e.eventId === ev.id);
+    const submitted = evEvals.filter(e => e.status === "submitted");
+    const progress = evEvals.length > 0 ? submitted.length / evEvals.length : 0;
+    const scored = submitted.filter(e => e.score != null);
     const avgRaw = scored.length > 0
       ? scored.reduce((s, e) => s + parseFloat(e.score as unknown as string), 0) / scored.length
       : null;
     const averageScore = avgRaw != null ? convertScoreToPercentage(avgRaw) : null;
-    return { ...ev, participantCount: participants.length, evaluationProgress: progress, averageScore };
-  }));
+
+    // Nota do time (mesma lógica de computeEventTeamResult): por critério ativo,
+    // média das avaliações submetidas, substituída pela calibração quando existe.
+    const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active);
+    const evCals = calibrations.filter(c => c.eventId === ev.id);
+    let evaluatedCriteria = 0;
+    let hasCalibration = false;
+    const criteriaForCalc = activeCriteria.map((c) => {
+      const weight = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
+      const critScores = submitted
+        .filter(e => e.criterionId === c.criterionId && e.score != null)
+        .map(e => parseFloat(e.score as unknown as string));
+      const avgScore = critScores.length > 0 ? critScores.reduce((a, b) => a + b, 0) / critScores.length : null;
+      const cal = evCals.find(x => x.criterionId === c.criterionId);
+      const calibratedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+      if (calibratedScore !== null) hasCalibration = true;
+      if (calibratedScore !== null || avgScore !== null) evaluatedCriteria++;
+      return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore };
+    });
+    const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
+
+    return { ...ev, participantCount, evaluationProgress: progress, averageScore, teamScore, hasCalibration };
+  });
   res.json(enriched);
 });
 

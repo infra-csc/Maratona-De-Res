@@ -1874,6 +1874,10 @@ components:
           type: number
         averageScore:
           type: ["number", "null"]
+        teamScore:
+          type: ["number", "null"]
+        hasCalibration:
+          type: boolean
         criteriaConfirmed:
           type: boolean
         createdAt:

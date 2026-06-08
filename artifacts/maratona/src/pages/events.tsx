@@ -134,6 +134,9 @@ export default function EventsPage() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {filtered.map(ev => {
               const progress = ev.evaluationProgress ?? 0;
+              const score = ev.teamScore ?? ev.averageScore ?? null;
+              const calibrated = ev.hasCalibration ?? false;
+              const concluded = ev.status === "closed";
               return (
                 <div key={ev.id} data-testid={`card-event-${ev.id}`} className={`bg-white border-2 border-[#191c1e] flex flex-col ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}>
                   <div className="p-5 flex-1">
@@ -149,15 +152,25 @@ export default function EventsPage() {
                           <span className="bg-[#191c1e] text-[#ccff00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
                             <span className="inline-block skew-x-[8deg]">T{ev.quarter}/{ev.year}</span>
                           </span>
+                          {concluded ? (
+                            <span className="bg-[#506600] text-white px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
+                              <span className="inline-block skew-x-[8deg]">Evento Concluído</span>
+                            </span>
+                          ) : score != null ? (
+                            <span className="bg-[#ffb5a0] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
+                              <span className="inline-block skew-x-[8deg]">Score Provisório</span>
+                            </span>
+                          ) : null}
                         </div>
                         <Link href={`/events/${ev.id}`} className="font-black text-xl italic uppercase tracking-tight text-[#191c1e] hover:text-[#506600] transition-colors leading-tight line-clamp-1 pr-1.5">{ev.name}</Link>
                         {ev.clientName && <p className="text-sm font-bold italic uppercase text-[#747a60] mt-1 truncate pr-1.5">{ev.clientName}</p>}
                       </div>
 
-                      {ev.averageScore != null && (
-                        <div className="bg-[#ccff00] border-2 border-[#191c1e] p-2 text-center min-w-[72px] shrink-0">
-                          <span className="block text-[10px] uppercase font-bold italic text-[#161e00] mb-0.5">Score</span>
-                          <span className="text-2xl font-black italic text-[#191c1e] leading-none">{ev.averageScore.toFixed(0)}</span>
+                      {score != null && (
+                        <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[78px] shrink-0 ${concluded ? "bg-[#ccff00]" : "bg-white"}`}>
+                          <span className="block text-[10px] uppercase font-bold italic text-[#161e00] mb-0.5">{concluded ? "Score Final" : "Provisório"}</span>
+                          <span className="text-2xl font-black italic text-[#191c1e] leading-none">{score.toFixed(0)}</span>
+                          <span className={`block text-[8px] uppercase font-bold italic mt-0.5 leading-none ${concluded ? "text-[#506600]" : "text-[#a06a00]"}`}>{concluded ? (calibrated ? "Pós-calibração" : "Evento fechado") : (calibrated ? "Calibração parcial" : "Sem calibração")}</span>
                         </div>
                       )}
                     </div>

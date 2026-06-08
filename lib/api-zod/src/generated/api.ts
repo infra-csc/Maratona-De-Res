@@ -384,6 +384,8 @@ export const GetEventsResponseItem = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "teamScore": zod.number().nullish(),
+  "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -528,6 +530,8 @@ export const UpdateEventResponse = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "teamScore": zod.number().nullish(),
+  "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -571,6 +575,8 @@ export const CloseEventResponse = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "teamScore": zod.number().nullish(),
+  "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -601,6 +607,8 @@ export const ReopenEventResponse = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "teamScore": zod.number().nullish(),
+  "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
