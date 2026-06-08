@@ -1811,6 +1811,8 @@ components:
           type: ["string", "null"]
         criteriaConfirmed:
           type: boolean
+        hasEvaluations:
+          type: boolean
         participants:
           type: array
           items:

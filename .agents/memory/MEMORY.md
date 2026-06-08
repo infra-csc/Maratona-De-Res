@@ -6,3 +6,5 @@
 - [Criteria weight validation](criteria-weight-validation.md) — per-event active weights must sum to 20 (tol 0.01, mirror front/back); validate merged persisted sum; HR confirm gates avaliador evaluations
 - [External API sync](integration-external-sync.md) — sync pulls employees/events/participations from external app via EXTERNAL_API_URL+TOKEN; contract the other app must expose
 - [Maratona auth 401 / empty data](maratona-auth-401.md) — expired JWT renders empty pages (guard ignores expiry); 401 handling belongs in QueryClient/package fetch
+
+- [Criteria weight freeze](criteria-weight-freeze.md) — evaluated event => weights frozen (fill null override from defaultWeight) + criteria edit/reopen blocked 409; freeze on confirm AND first evaluation

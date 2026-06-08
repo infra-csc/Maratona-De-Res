@@ -1,11 +1,31 @@
 import { Router } from "express";
-import { db, evaluationsTable, criteriaTable, usersTable, eventsTable } from "@workspace/db";
+import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * Freeze each active criterion's effective weight for an event so that later
+ * edits to a global criterion's default weight can never alter an event that
+ * already has evaluations. Idempotent: only fills null overrides.
+ */
+async function freezeEventCriteriaWeights(eventId: number) {
+  const rows = await db
+    .select({ id: eventCriteriaTable.id, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .where(eq(eventCriteriaTable.eventId, eventId));
+  for (const r of rows) {
+    if (r.active && r.weightOverride == null) {
+      await db.update(eventCriteriaTable)
+        .set({ weightOverride: String(parseFloat(r.defaultWeight ?? "0")) })
+        .where(eq(eventCriteriaTable.id, r.id));
+    }
+  }
+}
 
 /**
  * Avaliação por TIME do evento.
@@ -136,6 +156,9 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
       commentVisibility: commentVisibility ?? existing.commentVisibility,
     }).where(eq(evaluationsTable.id, existing.id)).returning();
   } else {
+    // First evaluation for this (event, criterion, evaluator): freeze the
+    // event's criteria weights so they can never drift once evaluations exist.
+    await freezeEventCriteriaWeights(eventId);
     [evaluation] = await db.insert(evaluationsTable).values({
       eventId, criterionId,
       evaluatorUserId: req.user!.userId,

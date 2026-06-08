@@ -88,6 +88,8 @@ export default function EventDetailPage() {
   const activeSum = config.filter(c => c.active).reduce((s, c) => s + (Number(c.weight) || 0), 0);
   const sumValid = Math.abs(activeSum - 20) <= 0.01;
   const criteriaConfirmed = event.criteriaConfirmed ?? false;
+  const hasEvaluations = event.hasEvaluations ?? false;
+  const editLocked = criteriaConfirmed || hasEvaluations;
 
   const setCriterionActive = (criterionId: number, active: boolean) =>
     setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, active } : c)));
@@ -222,6 +224,12 @@ export default function EventDetailPage() {
                 Revise os critérios deste evento. Desative os que não se aplicam e redistribua os pesos — a soma dos ativos deve ser <strong>20</strong>. As áreas só podem avaliar após a confirmação do RH.
               </p>
 
+              {hasEvaluations && (
+                <div data-testid="notice-criteria-locked" className="flex items-center gap-2 bg-[#fff4e5] border-2 border-[#ff5722] text-[#7a2e00] px-4 py-3 text-xs font-bold italic uppercase">
+                  <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. Os critérios e pesos estão bloqueados e não podem mais ser alterados.
+                </div>
+              )}
+
               <div className="flex items-center justify-between bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
                 <span className="text-xs font-bold italic uppercase text-[#444933]">Soma dos Pesos Ativos</span>
                 <span data-testid="text-criteria-sum" className={`text-2xl font-black italic ${sumValid ? "text-[#506600]" : "text-[#ba1a1a]"}`}>
@@ -246,7 +254,7 @@ export default function EventDetailPage() {
                           min="0"
                           step="1"
                           value={item.active ? item.weight : 0}
-                          disabled={!item.active || criteriaConfirmed}
+                          disabled={!item.active || editLocked}
                           onChange={e => setCriterionWeight(item.criterionId, Number(e.target.value))}
                           className="w-20 h-10 rounded-none border-2 border-[#191c1e] text-center font-black italic disabled:opacity-50"
                         />
@@ -256,7 +264,7 @@ export default function EventDetailPage() {
                           <button
                             type="button"
                             data-testid={`button-remove-event-criterion-${item.criterionId}`}
-                            disabled={criteriaConfirmed}
+                            disabled={editLocked}
                             onClick={() => setPendingRemoval(item.criterionId)}
                             title="Remover critério"
                             className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
@@ -267,7 +275,7 @@ export default function EventDetailPage() {
                           <button
                             type="button"
                             data-testid={`button-restore-event-criterion-${item.criterionId}`}
-                            disabled={criteriaConfirmed}
+                            disabled={editLocked}
                             onClick={() => setCriterionActive(item.criterionId, true)}
                             className="h-9 px-3 flex items-center gap-1.5 border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-[11px] font-bold italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                           >
@@ -309,7 +317,11 @@ export default function EventDetailPage() {
               </AlertDialog>
 
               <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-                {!criteriaConfirmed ? (
+                {hasEvaluations ? (
+                  <span data-testid="text-criteria-locked" className="flex items-center gap-2 text-xs font-bold italic uppercase text-[#747a60] bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+                    <Lock size={14} /> Critérios bloqueados — avaliações já registradas
+                  </span>
+                ) : !criteriaConfirmed ? (
                   <>
                     <button
                       data-testid="button-save-criteria"

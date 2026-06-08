@@ -73,7 +73,17 @@ async function loadEventDetail(id: number) {
     return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0 };
   });
 
-  return { ...ev, participants, criteria: enrichedCriteria, evaluationMatrix: [], results: [] };
+  const hasEvaluations = await eventHasEvaluations(id);
+
+  return { ...ev, participants, criteria: enrichedCriteria, hasEvaluations, evaluationMatrix: [], results: [] };
+}
+
+async function eventHasEvaluations(eventId: number) {
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(evaluationsTable)
+    .where(eq(evaluationsTable.eventId, eventId));
+  return Number(count) > 0;
 }
 
 router.get("/events/:id", async (req, res) => {
@@ -220,6 +230,11 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
     return;
   }
 
+  if (await eventHasEvaluations(eventId)) {
+    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem mais ser alterados." });
+    return;
+  }
+
   const existing = await db
     .select({
       id: eventCriteriaTable.id,
@@ -291,9 +306,14 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
 
+  if (!confirmed && await eventHasEvaluations(id)) {
+    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem ser reabertos para edição." });
+    return;
+  }
+
   if (confirmed) {
     const rows = await db
-      .select({ active: eventCriteriaTable.active, originalWeight: criteriaTable.defaultWeight, weightOverride: eventCriteriaTable.weightOverride })
+      .select({ id: eventCriteriaTable.id, active: eventCriteriaTable.active, originalWeight: criteriaTable.defaultWeight, weightOverride: eventCriteriaTable.weightOverride })
       .from(eventCriteriaTable)
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
       .where(eq(eventCriteriaTable.eventId, id));
@@ -301,6 +321,15 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
     if (Math.abs(sum - TARGET_WEIGHT) > 0.01) {
       res.status(400).json({ error: `Ajuste os pesos para somar ${TARGET_WEIGHT} antes de confirmar (atual: ${Math.round(sum * 100) / 100})` });
       return;
+    }
+    // Freeze each active criterion's effective weight so that later edits to the
+    // global default weight can never alter an event locked for evaluation.
+    for (const r of rows) {
+      if (r.active && r.weightOverride == null) {
+        await db.update(eventCriteriaTable)
+          .set({ weightOverride: String(parseFloat(r.originalWeight ?? "0")) })
+          .where(eq(eventCriteriaTable.id, r.id));
+      }
     }
   }
 

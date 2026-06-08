@@ -236,6 +236,7 @@ export interface EventDetail {
   /** @nullable */
   forcedCloseReason?: string | null;
   criteriaConfirmed?: boolean;
+  hasEvaluations?: boolean;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   evaluationMatrix?: EvaluationMatrixRow[];

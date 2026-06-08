@@ -405,6 +405,7 @@ export const GetEventResponse = zod.object({
   "forcedClosed": zod.boolean().optional(),
   "forcedCloseReason": zod.string().nullish(),
   "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -778,6 +779,7 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "forcedClosed": zod.boolean().optional(),
   "forcedCloseReason": zod.string().nullish(),
   "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
