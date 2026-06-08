@@ -31,14 +31,10 @@ async function seed() {
   const areas = await db.insert(areasTable).values([
     { name: "Cenografia", description: "Equipe de cenografia e montagem" },               // 0
     { name: "Logística", description: "Transporte e logística operacional" },              // 1
-    { name: "Atendimento e Ativação", description: "Atendimento ao cliente e ativação" }, // 2
-    { name: "Produção", description: "Coordenação e produção de eventos" },               // 3
-    { name: "Departamento Pessoal", description: "RH e departamento pessoal" },            // 4
-    { name: "Comercial", description: "Vendas, propostas e relacionamento com clientes" },// 5
-    { name: "Almoxarifado", description: "Controle de estoque, ferramentas e materiais" },// 6
-    { name: "Ferramentas e case", description: "Controle e retorno de ferramentas e cases" }, // 7
-    { name: "Atendimento", description: "Atendimento ao cliente" },                        // 8
-    { name: "Ativação", description: "Ativação de marca e experiência" },                  // 9
+    { name: "Produção", description: "Coordenação e produção de eventos" },               // 2
+    { name: "Ferramentas e case", description: "Controle e retorno de ferramentas e cases" }, // 3
+    { name: "Atendimento", description: "Atendimento ao cliente" },                        // 4
+    { name: "Ativação", description: "Ativação de marca e experiência" },                  // 5
   ]).returning();
 
   console.log(`✓ ${areas.length} áreas criadas`);
@@ -46,16 +42,15 @@ async function seed() {
   const hash = await bcrypt.hash("123456", 12);
   const users = await db.insert(usersTable).values([
     { name: "Admin Sistema", email: "admin@cenografica.com.br", passwordHash: hash, role: "admin" },
-    { name: "Ana Paula RH", email: "rh@cenografica.com.br", passwordHash: hash, role: "rh", areaId: areas[4].id },
+    { name: "Ana Paula RH", email: "rh@cenografica.com.br", passwordHash: hash, role: "rh" },
     { name: "Carlos Avaliador", email: "avaliador@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[0].id },
     { name: "Diretoria Geral", email: "diretoria@cenografica.com.br", passwordHash: hash, role: "diretoria" },
     { name: "Visualizador", email: "visualizador@cenografica.com.br", passwordHash: hash, role: "visualizador" },
     { name: "Marcos Avaliador Logística", email: "avaliador2@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[1].id },
-    { name: "Avaliador Atendimento e Ativação", email: "avaliador.atendimento@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[2].id },
-    { name: "Avaliador Produção", email: "avaliador.producao@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[3].id },
-    { name: "Avaliador Departamento Pessoal", email: "avaliador.dp@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[4].id },
-    { name: "Avaliador Comercial", email: "avaliador.comercial@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[5].id },
-    { name: "Avaliador Almoxarifado", email: "avaliador.almoxarifado@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[6].id },
+    { name: "Avaliador Atendimento", email: "avaliador.atendimento@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[4].id },
+    { name: "Avaliador Produção", email: "avaliador.producao@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[2].id },
+    { name: "Avaliador Ferramentas e case", email: "avaliador.ferramentas@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[3].id },
+    { name: "Avaliador Ativação", email: "avaliador.ativacao@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[5].id },
   ]).returning();
 
   console.log(`✓ ${users.length} usuários criados`);
@@ -91,7 +86,7 @@ async function seed() {
     {
       name: "Ferramentas & Case",
       description: "Todas as ferramentas e cases devem retornar à base corretamente, sem perdas ou danos.",
-      responsibleAreaId: areas[7].id, // Ferramentas e case
+      responsibleAreaId: areas[3].id, // Ferramentas e case
       responsibleAreaLabel: "Ferramentas e case",
       defaultWeight: "2",
       displayOrder: 2,
@@ -99,7 +94,7 @@ async function seed() {
     {
       name: "Qualidade da Entrega",
       description: "Avalia acabamento, materiais em bom estado, qualidade visual e satisfação na ativação/atendimento.",
-      responsibleAreaId: areas[8].id, // Atendimento
+      responsibleAreaId: areas[4].id, // Atendimento
       responsibleAreaLabel: "Atendimento",
       defaultWeight: "3",
       displayOrder: 3,
@@ -123,7 +118,7 @@ async function seed() {
     {
       name: "Prazo de Entrega",
       description: "Avalia se as entregas ocorreram dentro do cronograma, sem atrasos e sem custos adicionais de mão de obra.",
-      responsibleAreaId: areas[3].id, // Produção
+      responsibleAreaId: areas[2].id, // Produção
       responsibleAreaLabel: "Produção",
       defaultWeight: "3",
       displayOrder: 6,
