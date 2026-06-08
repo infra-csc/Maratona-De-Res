@@ -229,17 +229,17 @@ export default function EventDetailPage() {
 
                 <div className="flex flex-wrap items-center gap-5 text-sm font-bold italic text-[#444933]">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-white border-2 border-[#191c1e] text-[#506600]"><Calendar size={14} /></div>
+                    <Calendar size={16} className="text-[#506600]" />
                     <span>{new Date(event.startDate).toLocaleDateString('pt-BR')} — {new Date(event.endDate).toLocaleDateString('pt-BR')}</span>
                   </div>
                   {(event.city || event.location) && (
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-white border-2 border-[#191c1e] text-[#506600]"><MapPin size={14} /></div>
+                      <MapPin size={16} className="text-[#506600]" />
                       <span>{event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : event.location}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-white border-2 border-[#191c1e] text-[#506600]"><CheckCircle2 size={14} /></div>
+                    <CheckCircle2 size={16} className="text-[#506600]" />
                     <span className={evaluationProgress === 100 ? "text-[#506600] font-black" : ""}>{evaluationProgress}% Avaliado</span>
                   </div>
                 </div>
