@@ -417,9 +417,9 @@ export default function CalibrationsPage() {
                         <>
                           <div className="flex flex-wrap gap-2">
                             {areaScores.map((s, i) => (
-                              <div key={i} className="flex items-center gap-2 border-2 border-[#191c1e] bg-white pl-2.5 pr-1.5 py-1">
-                                <span className="text-[11px] font-bold italic uppercase text-[#444933] truncate max-w-[140px]">{s.name}</span>
-                                <span className="text-sm font-black italic text-[#191c1e] bg-[#eceef0] border-l-2 border-[#191c1e] px-2 leading-6">{s.score.toFixed(1)}</span>
+                              <div key={i} className="flex items-center gap-2 border-2 border-[#191c1e] bg-white pl-2.5 pr-1.5 py-1 max-w-full">
+                                <span className="text-[11px] font-bold italic uppercase text-[#444933] break-words min-w-0">{s.name}</span>
+                                <span className="text-sm font-black italic text-[#191c1e] bg-[#eceef0] border-l-2 border-[#191c1e] px-2 leading-6 shrink-0">{s.score.toFixed(1)}</span>
                               </div>
                             ))}
                           </div>
