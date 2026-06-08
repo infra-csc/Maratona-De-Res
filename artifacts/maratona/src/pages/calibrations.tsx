@@ -625,10 +625,10 @@ export default function CalibrationsPage() {
                           </span>
                         </div>
                         {scores.length > 0 && (
-                          <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1">
+                          <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1.5">
                             {scores.map((s, j) => (
-                              <span key={j} className="text-[10px] italic text-[#444933]">
-                                {s.name} <strong className="not-italic text-[#191c1e]">{s.score.toFixed(1)}</strong>
+                              <span key={j} className="inline-flex items-center gap-1 text-[10px] italic text-[#444933]">
+                                {s.name}<strong className="not-italic text-[#191c1e] bg-[#eceef0] border border-[#c4c9ac] px-1 leading-tight">{s.score.toFixed(1)}</strong>
                               </span>
                             ))}
                           </div>
@@ -636,6 +636,21 @@ export default function CalibrationsPage() {
                       </div>
                     );
                   })}
+                  {(() => {
+                    const totalWeighted = scoredCriteria.reduce((acc, c) => {
+                      const cal = getCalibration(c.criterionId);
+                      const calV = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+                      const final = calV ?? getAvgScore(c.criterionId) ?? 0;
+                      const p = c.weightOverride ?? c.originalWeight ?? 0;
+                      return acc + final * p;
+                    }, 0);
+                    return (
+                      <div className="flex items-center justify-between gap-3 px-3 py-2 bg-[#191c1e] text-white" data-testid="finalize-weighted-total">
+                        <span className="text-[10px] font-bold uppercase italic tracking-wider">Soma ponderada (nota × peso)</span>
+                        <span className="text-base font-black italic text-[#ccff00]">{totalWeighted.toFixed(1)}<span className="text-white/50 text-xs">/100</span></span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <p className="text-[10px] italic text-[#747a60] mt-1.5">Original = média da área · Calibrada = ajuste do gestor · Final = nota usada (calibrada quando houver, senão a média).</p>
               </div>
