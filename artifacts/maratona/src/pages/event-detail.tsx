@@ -174,6 +174,22 @@ export default function EventDetailPage() {
     if (sumValid) handleSaveCriteria();
     if (assignmentsDirty) handleSaveAssignments();
   };
+  // Salva quaisquer pesos/avaliadores pendentes e SÓ ENTÃO confirma, em um clique.
+  // Evita o estado em que tudo está preenchido mas o botão fica travado por não ter salvo.
+  const handleConfirmAndRelease = async () => {
+    try {
+      if (sumValid) {
+        await updateCriteria.mutateAsync({ id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
+      }
+      if (assignmentsDirty) {
+        await updateAssignments.mutateAsync({ id, data: { assignments: assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserId: assignments[a.areaId] ?? null })) } });
+      }
+      await confirmCriteria.mutateAsync({ id, data: { confirmed: true } });
+    } catch {
+      // erros já são exibidos via toasts de onError de cada mutation
+    }
+  };
+  const confirmBusy = updateCriteria.isPending || updateAssignments.isPending || confirmCriteria.isPending;
 
   const overview: { label: string; value: string }[] = [
     { label: "Status", value: event.status },
@@ -580,12 +596,12 @@ export default function EventDetailPage() {
                     </button>
                     <button
                       data-testid="button-confirm-criteria"
-                      onClick={() => handleConfirmCriteria(true)}
-                      disabled={!sumValid || !allAssigned || assignmentsDirty || confirmCriteria.isPending}
-                      title={!allAssigned ? "Atribua um avaliador para todas as áreas antes de liberar" : assignmentsDirty ? "Salve as atribuições antes de liberar" : undefined}
+                      onClick={handleConfirmAndRelease}
+                      disabled={!sumValid || !allAssigned || confirmBusy}
+                      title={!sumValid ? "A soma dos pesos ativos precisa ser 20" : !allAssigned ? "Atribua um avaliador para todas as áreas antes de liberar" : undefined}
                       className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${HARD_SHADOW}`}
                     >
-                      <CheckCircle2 size={16} /> Confirmar e Liberar Avaliação
+                      <CheckCircle2 size={16} /> {confirmBusy ? "Confirmando..." : "Confirmar e Liberar Avaliação"}
                     </button>
                   </>
                 ) : (
