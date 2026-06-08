@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks } from "lucide-react";
+import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { cn, formatEventSubtitle } from "@/lib/utils";
@@ -250,6 +250,12 @@ export default function EvaluationsPage() {
     if (draft) return { state: "draft", who: draft.evaluatorName ?? null };
     return { state: "pending", who: null };
   }
+
+  // Avaliador responsável atribuído a cada área (evento → área → avaliador),
+  // para exibir "quem é o responsável" em cada quesito, mesmo sem nota ainda.
+  const evaluatorByAreaId = new Map(
+    (selectedEventDetail?.areaAssignments ?? []).map(a => [a.areaId, a.evaluatorName ?? null] as const)
+  );
 
   const areaGroups = Object.values(
     activeCriteria.reduce((acc, c) => {
@@ -552,11 +558,14 @@ export default function EvaluationsPage() {
                             <ul>
                               {g.criteria.map(c => {
                                 const st = criterionStatus(c.criterionId);
+                                const responsible = (c.responsibleAreaId != null ? evaluatorByAreaId.get(c.responsibleAreaId) : null) ?? st.who;
                                 return (
                                   <li key={c.criterionId} data-testid={`status-crit-${c.criterionId}`} className="flex items-center justify-between gap-3 px-5 py-3 border-t-2 border-[#eceef0] first:border-t-0">
                                     <span className="font-bold italic text-[#191c1e] min-w-0 truncate">{c.criterionName}</span>
                                     <span className="shrink-0 flex items-center gap-2">
-                                      {st.who && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate max-w-[140px] hidden sm:inline">{st.who}</span>}
+                                      <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] truncate max-w-[160px] hidden sm:inline-flex items-center gap-1">
+                                        <User size={11} className="shrink-0" /> {responsible ?? "Sem responsável"}
+                                      </span>
                                       {st.state === "submitted" ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1"><CheckCircle size={12} /> Preenchido</span>
                                       ) : st.state === "draft" ? (
