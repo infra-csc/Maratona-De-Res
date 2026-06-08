@@ -44,6 +44,7 @@ import type {
   EvaluationInput,
   EvaluationUpdate,
   Event,
+  EventAssignmentsUpdate,
   EventCriteriaConfirm,
   EventCriteriaUpdate,
   EventCriterion,
@@ -2623,6 +2624,78 @@ export const useUpdateEventCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateEventCriteriaMutationOptions(options));
+    }
+
+export const getUpdateEventAssignmentsUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/assignments`
+}
+
+/**
+ * @summary Set per-area evaluator assignments for an event
+ */
+export const updateEventAssignments = async (id: number,
+    eventAssignmentsUpdate: EventAssignmentsUpdate, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getUpdateEventAssignmentsUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eventAssignmentsUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateEventAssignmentsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventAssignments>>, TError,{id: number;data: BodyType<EventAssignmentsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEventAssignments>>, TError,{id: number;data: BodyType<EventAssignmentsUpdate>}, TContext> => {
+
+const mutationKey = ['updateEventAssignments'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEventAssignments>>, {id: number;data: BodyType<EventAssignmentsUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateEventAssignments(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEventAssignmentsMutationResult = NonNullable<Awaited<ReturnType<typeof updateEventAssignments>>>
+    export type UpdateEventAssignmentsMutationBody = BodyType<EventAssignmentsUpdate>
+    export type UpdateEventAssignmentsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set per-area evaluator assignments for an event
+ */
+export const useUpdateEventAssignments = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventAssignments>>, TError,{id: number;data: BodyType<EventAssignmentsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEventAssignments>>,
+        TError,
+        {id: number;data: BodyType<EventAssignmentsUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateEventAssignmentsMutationOptions(options));
     }
 
 export const getConfirmEventCriteriaUrl = (id: number,) => {

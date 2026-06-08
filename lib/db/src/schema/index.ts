@@ -3,6 +3,7 @@ export * from "./areas";
 export * from "./employees";
 export * from "./events";
 export * from "./criteria";
+export * from "./event-assignments";
 export * from "./evaluations";
 export * from "./absences";
 export * from "./rules";

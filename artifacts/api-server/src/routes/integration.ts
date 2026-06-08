@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, eventsTable, employeesTable, eventParticipantsTable } from "@workspace/db";
-import { isNotNull } from "drizzle-orm";
+import { db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable, eventCriteriaTable } from "@workspace/db";
+import { isNotNull, inArray, eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -234,6 +234,30 @@ router.post("/integration/sync", async (req, res) => {
             set: fields,
           });
         participantsSync++;
+      }
+
+      // Vincular os critérios padrão aos eventos sincronizados (igual à criação
+      // manual de evento). Só anexa em eventos que ainda não têm critérios — assim
+      // a re-sincronização não sobrescreve a configuração feita pelo RH.
+      const syncedEventIds = Array.from(evMap.values());
+      if (syncedEventIds.length > 0) {
+        const activeCriteria = await tx.select().from(criteriaTable).where(eq(criteriaTable.active, true));
+        if (activeCriteria.length > 0) {
+          const withCriteria = await tx
+            .select({ eventId: eventCriteriaTable.eventId })
+            .from(eventCriteriaTable)
+            .where(inArray(eventCriteriaTable.eventId, syncedEventIds));
+          const alreadyConfigured = new Set(withCriteria.map(r => r.eventId));
+          const toSeed = syncedEventIds.filter(id => !alreadyConfigured.has(id));
+          if (toSeed.length > 0) {
+            await tx.insert(eventCriteriaTable).values(
+              toSeed.flatMap(eventId =>
+                activeCriteria.map(c => ({ eventId, criterionId: c.id, active: true })),
+              ),
+            );
+            log(`Critérios padrão vinculados a ${toSeed.length} novo(s) evento(s).`);
+          }
+        }
       }
     });
 

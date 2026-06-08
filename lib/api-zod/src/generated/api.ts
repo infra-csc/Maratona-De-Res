@@ -451,6 +451,14 @@ export const GetEventResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional()
 })).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.number(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
   "evaluationMatrix": zod.array(zod.object({
   "employeeId": zod.number(),
   "employeeName": zod.string(),
@@ -478,7 +486,8 @@ export const GetEventResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weightedContribution": zod.number().nullish()
 })).optional()
-})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional()
 })
 
 
@@ -780,6 +789,98 @@ export const UpdateEventCriteriaResponse = zod.array(UpdateEventCriteriaResponse
 
 
 /**
+ * @summary Set per-area evaluator assignments for an event
+ */
+export const UpdateEventAssignmentsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateEventAssignmentsBody = zod.object({
+  "assignments": zod.array(zod.object({
+  "areaId": zod.number(),
+  "evaluatorUserId": zod.number().nullish()
+}))
+})
+
+export const UpdateEventAssignmentsResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "year": zod.number(),
+  "quarter": zod.number(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "participants": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional()
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "responsibleAreaId": zod.number().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.number(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "eventId": zod.number(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional()
+})
+
+
+/**
  * @summary Confirm event criteria and unlock evaluation
  */
 export const ConfirmEventCriteriaParams = zod.object({
@@ -828,6 +929,14 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional()
 })).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.number(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
   "evaluationMatrix": zod.array(zod.object({
   "employeeId": zod.number(),
   "employeeName": zod.string(),
@@ -855,7 +964,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weightedContribution": zod.number().nullish()
 })).optional()
-})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional()
 })
 
 

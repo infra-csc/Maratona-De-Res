@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -78,7 +78,45 @@ async function loadEventDetail(id: number) {
 
   const hasEvaluations = await eventHasEvaluations(id);
 
-  return { ...ev, participants, criteria: enrichedCriteria, hasEvaluations, evaluationMatrix: [], results: [] };
+  // Non-confidential progress: share of evaluations already submitted for this
+  // event. Mirrors the /events list metric so both views agree.
+  const allEvals = await db.select({ status: evaluationsTable.status }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
+  const submittedCount = allEvals.filter(e => e.status === "submitted").length;
+  const evaluationProgress = allEvals.length > 0 ? submittedCount / allEvals.length : 0;
+
+  const areaAssignments = await db
+    .select({
+      id: eventAreaAssignmentsTable.id,
+      eventId: eventAreaAssignmentsTable.eventId,
+      areaId: eventAreaAssignmentsTable.areaId,
+      areaName: areasTable.name,
+      evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId,
+      evaluatorName: usersTable.name,
+    })
+    .from(eventAreaAssignmentsTable)
+    .leftJoin(areasTable, eq(eventAreaAssignmentsTable.areaId, areasTable.id))
+    .leftJoin(usersTable, eq(eventAreaAssignmentsTable.evaluatorUserId, usersTable.id))
+    .where(eq(eventAreaAssignmentsTable.eventId, id));
+
+  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [] };
+}
+
+/**
+ * Distinct areas that have at least one ACTIVE criterion for this event.
+ * These are the areas that MUST have an evaluator assigned before release.
+ */
+async function areasNeedingAssignment(eventId: number): Promise<{ areaId: number; areaName: string | null }[]> {
+  const rows = await db
+    .select({ areaId: criteriaTable.responsibleAreaId, areaName: areasTable.name })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
+  const seen = new Map<number, string | null>();
+  for (const r of rows) {
+    if (r.areaId != null && !seen.has(r.areaId)) seen.set(r.areaId, r.areaName);
+  }
+  return Array.from(seen.entries()).map(([areaId, areaName]) => ({ areaId, areaName }));
 }
 
 async function eventHasEvaluations(eventId: number) {
@@ -306,6 +344,56 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
   }));
 });
 
+/**
+ * PUT /events/:id/assignments
+ * RH define, por área, qual avaliador dará a nota daquela área NESTE evento.
+ * Body: { assignments: [{ areaId, evaluatorUserId }] }
+ * Upsert por (eventId, areaId). evaluatorUserId null/0 remove a atribuição da área.
+ */
+router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (await eventHasEvaluations(eventId)) {
+    res.status(409).json({ error: "Este evento já possui avaliações. As atribuições não podem mais ser alteradas." });
+    return;
+  }
+
+  const items = (req.body?.assignments ?? []) as { areaId: number; evaluatorUserId: number | null }[];
+  if (!Array.isArray(items)) {
+    res.status(400).json({ error: "Envie a lista de atribuições (assignments)" });
+    return;
+  }
+
+  for (const item of items) {
+    const areaId = Number(item.areaId);
+    if (!areaId) continue;
+    const userId = item.evaluatorUserId ? Number(item.evaluatorUserId) : null;
+
+    if (userId == null) {
+      await db.delete(eventAreaAssignmentsTable)
+        .where(and(eq(eventAreaAssignmentsTable.eventId, eventId), eq(eventAreaAssignmentsTable.areaId, areaId)));
+      continue;
+    }
+
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!target || target.role !== "avaliador") {
+      res.status(400).json({ error: "O avaliador atribuído deve ser um usuário com papel de avaliador" });
+      return;
+    }
+
+    await db.insert(eventAreaAssignmentsTable)
+      .values({ eventId, areaId, evaluatorUserId: userId })
+      .onConflictDoUpdate({
+        target: [eventAreaAssignmentsTable.eventId, eventAreaAssignmentsTable.areaId],
+        set: { evaluatorUserId: userId },
+      });
+  }
+
+  await audit(req.user!.userId, "set_assignments", "events", eventId, null, { assignments: items });
+  res.json(await loadEventDetail(eventId));
+});
+
 router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const confirmed = req.body?.confirmed !== false;
@@ -328,6 +416,22 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
       res.status(400).json({ error: `Ajuste os pesos para somar ${TARGET_WEIGHT} antes de confirmar (atual: ${Math.round(sum * 100) / 100})` });
       return;
     }
+
+    // Atribuição obrigatória: toda área com critério ativo precisa ter um avaliador
+    // definido pelo RH antes de liberar a avaliação do evento.
+    const needAssign = await areasNeedingAssignment(id);
+    const assigned = await db
+      .select({ areaId: eventAreaAssignmentsTable.areaId })
+      .from(eventAreaAssignmentsTable)
+      .where(eq(eventAreaAssignmentsTable.eventId, id));
+    const assignedAreaIds = new Set(assigned.map(a => a.areaId));
+    const missing = needAssign.filter(a => !assignedAreaIds.has(a.areaId));
+    if (missing.length > 0) {
+      const names = missing.map(a => a.areaName ?? `área ${a.areaId}`).join(", ");
+      res.status(400).json({ error: `Defina um avaliador para todas as áreas antes de liberar. Áreas sem avaliador: ${names}` });
+      return;
+    }
+
     // Freeze each active criterion's effective weight so that later edits to the
     // global default weight can never alter an event locked for evaluation.
     for (const r of rows) {

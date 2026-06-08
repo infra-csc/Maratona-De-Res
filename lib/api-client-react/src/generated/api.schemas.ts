@@ -180,6 +180,17 @@ export interface EventCriterion {
   weight?: number;
 }
 
+export interface EventAreaAssignment {
+  id: number;
+  eventId: number;
+  areaId: number;
+  /** @nullable */
+  areaName?: string | null;
+  evaluatorUserId: number;
+  /** @nullable */
+  evaluatorName?: string | null;
+}
+
 export interface EvaluationMatrixCell {
   criterionId: number;
   criterionName: string;
@@ -245,8 +256,10 @@ export interface EventDetail {
   hasEvaluations?: boolean;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
+  areaAssignments?: EventAreaAssignment[];
   evaluationMatrix?: EvaluationMatrixRow[];
   results?: EmployeeEventResult[];
+  evaluationProgress?: number;
 }
 
 export interface EventInput {
@@ -327,6 +340,16 @@ export interface EventCriteriaUpdate {
 
 export interface EventCriteriaConfirm {
   confirmed: boolean;
+}
+
+export type EventAssignmentsUpdateAssignmentsItem = {
+  areaId: number;
+  /** @nullable */
+  evaluatorUserId?: number | null;
+};
+
+export interface EventAssignmentsUpdate {
+  assignments: EventAssignmentsUpdateAssignmentsItem[];
 }
 
 export interface Evaluation {

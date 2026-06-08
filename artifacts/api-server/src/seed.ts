@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { isNotNull, eq, sql } from "drizzle-orm";
 import {
   db, usersTable, areasTable, employeesTable, criteriaTable, eventsTable,
   eventParticipantsTable, eventCriteriaTable, platoonRulesTable, rulesTable,
@@ -8,6 +9,28 @@ import {
 
 async function seed() {
   console.log("🌱 Iniciando seed...");
+
+  // GUARD: nunca apagar dados vindos da integração (ERP).
+  // Eventos sincronizados têm external_id e colaboradores têm source_type = 'erp'.
+  // Esses dados precisam ser preservados — a sincronização apenas incrementa.
+  // Para forçar uma reinicialização total (perdendo a integração), rode com FORCE_SEED=1.
+  const [{ extEvents }] = await db
+    .select({ extEvents: sql<number>`count(*)` })
+    .from(eventsTable)
+    .where(isNotNull(eventsTable.externalId));
+  const [{ erpEmployees }] = await db
+    .select({ erpEmployees: sql<number>`count(*)` })
+    .from(employeesTable)
+    .where(eq(employeesTable.sourceType, "erp"));
+  const hasIntegrationData = Number(extEvents) > 0 || Number(erpEmployees) > 0;
+
+  if (hasIntegrationData && process.env.FORCE_SEED !== "1") {
+    console.log(
+      `\n⛔ Seed cancelado: há dados da integração no banco (${extEvents} eventos, ${erpEmployees} colaboradores ERP).\n` +
+      "   Esses dados não serão apagados. Para reiniciar mesmo assim (perdendo a integração), rode com FORCE_SEED=1.",
+    );
+    return;
+  }
 
   // Wipe in reverse-dependency order
   await db.delete(auditLogsTable);

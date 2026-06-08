@@ -1,11 +1,36 @@
 import { Router } from "express";
-import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable } from "@workspace/db";
+import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * Per-event assignment check: is `userId` the RH-designated evaluator for the
+ * area that owns `criterionId`, in this specific event? This REPLACES the old
+ * "criterion area == user's fixed profile area" rule. Multiple users can belong
+ * to an area, but only the one RH assigned for the event may score it.
+ */
+async function isAssignedForCriterion(eventId: number, criterionId: number, userId: number): Promise<boolean> {
+  const [crit] = await db
+    .select({ areaId: criteriaTable.responsibleAreaId })
+    .from(criteriaTable)
+    .where(eq(criteriaTable.id, criterionId))
+    .limit(1);
+  if (!crit || crit.areaId == null) return false;
+  const [assignment] = await db
+    .select({ id: eventAreaAssignmentsTable.id })
+    .from(eventAreaAssignmentsTable)
+    .where(and(
+      eq(eventAreaAssignmentsTable.eventId, eventId),
+      eq(eventAreaAssignmentsTable.areaId, crit.areaId),
+      eq(eventAreaAssignmentsTable.evaluatorUserId, userId),
+    ))
+    .limit(1);
+  return !!assignment;
+}
 
 /**
  * Freeze each active criterion's effective weight for an event so that later
@@ -41,24 +66,6 @@ router.get("/evaluations", async (req, res) => {
   const { eventId, status } = req.query;
   const user = req.user!;
 
-  let criterionIds: number[] | null = null;
-  if (user.role === "avaliador") {
-    // An avaliador without an area has no criteria to see — never fall through
-    // to the unfiltered query (that would expose every team's evaluations).
-    if (!user.areaId) {
-      res.json([]);
-      return;
-    }
-    const areaCriteria = await db.select({ id: criteriaTable.id })
-      .from(criteriaTable)
-      .where(eq(criteriaTable.responsibleAreaId, user.areaId));
-    criterionIds = areaCriteria.map(c => c.id);
-    if (criterionIds.length === 0) {
-      res.json([]);
-      return;
-    }
-  }
-
   let query = db.select({
     id: evaluationsTable.id,
     eventId: evaluationsTable.eventId,
@@ -78,13 +85,19 @@ router.get("/evaluations", async (req, res) => {
   .leftJoin(usersTable, eq(evaluationsTable.evaluatorUserId, usersTable.id))
   .$dynamic();
 
+  // Avaliador: só enxerga avaliações das áreas em que FOI DESIGNADO neste evento.
+  // O escopo agora é por atribuição evento→área→avaliador, não pela área fixa do perfil.
+  if (user.role === "avaliador") {
+    query = query.innerJoin(eventAreaAssignmentsTable, and(
+      eq(eventAreaAssignmentsTable.eventId, evaluationsTable.eventId),
+      eq(eventAreaAssignmentsTable.areaId, criteriaTable.responsibleAreaId),
+      eq(eventAreaAssignmentsTable.evaluatorUserId, user.userId),
+    ));
+  }
+
   const conditions = [];
   if (eventId) conditions.push(eq(evaluationsTable.eventId, parseInt(eventId as string)));
   if (status) conditions.push(eq(evaluationsTable.status, status as string));
-  if (criterionIds) {
-    const { inArray } = await import("drizzle-orm");
-    conditions.push(inArray(evaluationsTable.criterionId, criterionIds));
-  }
   if (conditions.length) query = query.where(and(...conditions));
 
   const evaluations = await query;
@@ -120,15 +133,11 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
     return;
   }
 
-  // Avaliador só pode avaliar critérios da sua própria área
+  // Avaliador só pode avaliar áreas para as quais foi designado NESTE evento.
   if (req.user!.role === "avaliador") {
-    if (!req.user!.areaId) {
-      res.status(403).json({ error: "Avaliador sem área definida — contate o administrador" });
-      return;
-    }
-    const [criterion] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, criterionId)).limit(1);
-    if (!criterion || criterion.responsibleAreaId !== req.user!.areaId) {
-      res.status(403).json({ error: "Você só pode avaliar quesitos da sua área de responsabilidade" });
+    const allowed = await isAssignedForCriterion(eventId, criterionId, req.user!.userId);
+    if (!allowed) {
+      res.status(403).json({ error: "Você não é o avaliador designado para esta área neste evento" });
       return;
     }
   }
@@ -191,11 +200,11 @@ router.patch("/evaluations/:id", async (req, res) => {
     return;
   }
 
-  // Avaliador só pode editar critérios da sua área
-  if (req.user!.role === "avaliador" && req.user!.areaId) {
-    const [criterion] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, existing.criterionId)).limit(1);
-    if (!criterion || criterion.responsibleAreaId !== req.user!.areaId) {
-      res.status(403).json({ error: "Você só pode editar quesitos da sua área de responsabilidade" });
+  // Avaliador só pode editar áreas para as quais foi designado NESTE evento.
+  if (req.user!.role === "avaliador") {
+    const allowed = await isAssignedForCriterion(existing.eventId, existing.criterionId, req.user!.userId);
+    if (!allowed) {
+      res.status(403).json({ error: "Você não é o avaliador designado para esta área neste evento" });
       return;
     }
   }
@@ -227,11 +236,11 @@ router.post("/evaluations/:id/submit", async (req, res) => {
     res.status(403).json({ error: "Sem permissão para submeter esta avaliação" });
     return;
   }
-  // Avaliador só pode submeter critérios da sua área
-  if (req.user!.role === "avaliador" && req.user!.areaId) {
-    const [criterion] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, existing.criterionId)).limit(1);
-    if (!criterion || criterion.responsibleAreaId !== req.user!.areaId) {
-      res.status(403).json({ error: "Você só pode submeter avaliações da sua área de responsabilidade" });
+  // Avaliador só pode submeter áreas para as quais foi designado NESTE evento.
+  if (req.user!.role === "avaliador") {
+    const allowed = await isAssignedForCriterion(existing.eventId, existing.criterionId, req.user!.userId);
+    if (!allowed) {
+      res.status(403).json({ error: "Você não é o avaliador designado para esta área neste evento" });
       return;
     }
   }

@@ -7,6 +7,7 @@
  */
 import type { EmployeeEventResult } from './employeeEventResult';
 import type { EvaluationMatrixRow } from './evaluationMatrixRow';
+import type { EventAreaAssignment } from './eventAreaAssignment';
 import type { EventCriterion } from './eventCriterion';
 import type { EventParticipant } from './eventParticipant';
 
@@ -33,6 +34,8 @@ export interface EventDetail {
   hasEvaluations?: boolean;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
+  areaAssignments?: EventAreaAssignment[];
   evaluationMatrix?: EvaluationMatrixRow[];
   results?: EmployeeEventResult[];
+  evaluationProgress?: number;
 }

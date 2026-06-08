@@ -1,8 +1,8 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useUpdateEventCriteria, useConfirmEventCriteria, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useGetUsers, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw, UserCheck, ClipboardList } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,25 @@ export default function EventDetailPage() {
     },
   });
 
+  const { data: usersList } = useGetUsers({ query: { enabled: canManage, queryKey: ["users"] as unknown[] } });
+  const evaluators = (usersList ?? []).filter(u => u.role === "avaliador" && u.active);
+
+  const [assignments, setAssignments] = useState<Record<number, number | null>>({});
+  useEffect(() => {
+    if (event?.areaAssignments) {
+      const map: Record<number, number | null> = {};
+      for (const a of event.areaAssignments) map[a.areaId] = a.evaluatorUserId;
+      setAssignments(map);
+    }
+  }, [event?.areaAssignments]);
+
+  const updateAssignments = useUpdateEventAssignments({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Avaliadores atribuídos" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="bg-[#f7f9fb] min-h-full p-6 md:p-10 max-w-6xl mx-auto space-y-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -100,9 +119,32 @@ export default function EventDetailPage() {
   const handleSaveCriteria = () =>
     updateCriteria.mutate({ id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
   const handleConfirmCriteria = (value: boolean) => confirmCriteria.mutate({ id, data: { confirmed: value } });
-  const matrixCells = (event.evaluationMatrix ?? []).flatMap(row => row.criteria ?? []);
-  const filledCells = matrixCells.filter(c => c.averageScore != null || (c.status && c.status !== "pendente")).length;
-  const evaluationProgress = matrixCells.length > 0 ? Math.round((filledCells / matrixCells.length) * 100) : 0;
+  const evaluationProgress = Math.round((event.evaluationProgress ?? 0) * 100);
+
+  // Áreas que precisam de um avaliador atribuído: toda área responsável por um
+  // critério ativo (espelha a regra do backend em areasNeedingAssignment).
+  const assignAreas = Array.from(
+    new Map(
+      (event.criteria ?? [])
+        .filter(c => c.active && c.responsibleAreaId != null)
+        .map(c => [c.responsibleAreaId as number, c.responsibleAreaName ?? `Área ${c.responsibleAreaId}`] as [number, string])
+    ).entries()
+  ).map(([areaId, areaName]) => ({ areaId, areaName }));
+  const allAssigned = assignAreas.every(a => !!assignments[a.areaId]);
+  const assignmentsDirty = assignAreas.some(a => (assignments[a.areaId] ?? null) !== (event.areaAssignments?.find(x => x.areaId === a.areaId)?.evaluatorUserId ?? null));
+  const setAreaEvaluator = (areaId: number, userId: number | null) =>
+    setAssignments(prev => ({ ...prev, [areaId]: userId }));
+  const handleSaveAssignments = () =>
+    updateAssignments.mutate({ id, data: { assignments: assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserId: assignments[a.areaId] ?? null })) } });
+
+  const overview: { label: string; value: string }[] = [
+    { label: "Status", value: event.status },
+    { label: "Período", value: `${new Date(event.startDate).toLocaleDateString('pt-BR')} — ${new Date(event.endDate).toLocaleDateString('pt-BR')}` },
+    { label: "Local", value: event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : (event.location ?? "—") },
+    { label: "Cliente", value: event.clientName ?? "—" },
+    { label: "Participantes", value: String(event.participants?.length ?? 0) },
+    { label: "Progresso", value: `${evaluationProgress}% avaliado` },
+  ];
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -201,6 +243,106 @@ export default function EventDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Visão Geral */}
+        <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+          <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+            <ClipboardList size={18} />
+            <span className="font-black uppercase tracking-tight">Visão Geral</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 divide-x-2 divide-y-2 divide-[#eceef0] border-t-0">
+            {overview.map(item => (
+              <div key={item.label} data-testid={`overview-${item.label.toLowerCase()}`} className="p-5">
+                <p className="text-[10px] font-bold italic uppercase tracking-wider text-[#747a60] mb-1">{item.label}</p>
+                <p className="font-black italic uppercase text-sm text-[#191c1e] break-words">{item.value}</p>
+              </div>
+            ))}
+            {canViewResult && (
+              <div data-testid="overview-score" className="p-5 bg-[#ccff00]/20">
+                <p className="text-[10px] font-bold italic uppercase tracking-wider text-[#506600] mb-1">Score da Equipe</p>
+                <p className="font-black italic uppercase text-sm text-[#161e00]">
+                  {result && result.eventScore > 0 ? `${fmt(result.eventScore)} / 100` : "Sem nota ainda"}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* HR per-area evaluator assignment */}
+        {canManage && (
+          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
+              <div className="flex items-center gap-2">
+                <UserCheck size={18} />
+                <span className="font-black uppercase tracking-tight">Avaliadores por Área (RH)</span>
+              </div>
+              {allAssigned ? (
+                <span data-testid="badge-assignments-complete" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
+                  <CheckCircle2 size={12} /> Todas as Áreas Atribuídas
+                </span>
+              ) : (
+                <span data-testid="badge-assignments-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
+                  <AlertCircle size={12} /> Atribuição Pendente
+                </span>
+              )}
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm italic text-[#444933]">
+                Defina, para cada área responsável por um critério ativo, qual avaliador dará a nota daquela área <strong>neste evento</strong>. A atribuição é obrigatória antes de liberar a avaliação.
+              </p>
+
+              {hasEvaluations && (
+                <div data-testid="notice-assignments-locked" className="flex items-center gap-2 bg-[#fff4e5] border-2 border-[#ff5722] text-[#7a2e00] px-4 py-3 text-xs font-bold italic uppercase">
+                  <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. As atribuições estão bloqueadas.
+                </div>
+              )}
+
+              <div className="divide-y-2 divide-[#eceef0] border-2 border-[#191c1e]">
+                {assignAreas.map(area => (
+                  <div key={area.areaId} data-testid={`row-assignment-${area.areaId}`} className="flex flex-wrap items-center gap-4 p-4 bg-white">
+                    <div className="flex-1 min-w-[180px]">
+                      <p className="font-black italic uppercase text-sm text-[#191c1e]">{area.areaName}</p>
+                      {!assignments[area.areaId] && <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador</p>}
+                    </div>
+                    <select
+                      data-testid={`select-assignment-${area.areaId}`}
+                      value={assignments[area.areaId] ?? ""}
+                      disabled={hasEvaluations}
+                      onChange={e => setAreaEvaluator(area.areaId, e.target.value ? Number(e.target.value) : null)}
+                      className="h-10 min-w-[220px] rounded-none border-2 border-[#191c1e] bg-white px-3 font-bold italic uppercase text-xs disabled:opacity-50"
+                    >
+                      <option value="">— Selecione um avaliador —</option>
+                      {evaluators.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}{u.areaName ? ` (${u.areaName})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                {assignAreas.length === 0 && (
+                  <div className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhuma área com critério ativo para atribuir.</div>
+                )}
+              </div>
+
+              {evaluators.length === 0 && assignAreas.length > 0 && (
+                <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Nenhum usuário com papel de avaliador cadastrado. Crie avaliadores em Usuários antes de atribuir.</p>
+              )}
+
+              {assignAreas.length > 0 && !hasEvaluations && (
+                <div className="flex items-center justify-end pt-1">
+                  <button
+                    data-testid="button-save-assignments"
+                    onClick={handleSaveAssignments}
+                    disabled={!assignmentsDirty || updateAssignments.isPending}
+                    className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:translate-y-[1px] transition-all"
+                  >
+                    <Save size={16} /> {updateAssignments.isPending ? "Salvando..." : "Salvar Atribuições"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* HR criteria configuration + confirmation gate */}
         {canManage && (
@@ -336,7 +478,8 @@ export default function EventDetailPage() {
                     <button
                       data-testid="button-confirm-criteria"
                       onClick={() => handleConfirmCriteria(true)}
-                      disabled={!sumValid || confirmCriteria.isPending}
+                      disabled={!sumValid || !allAssigned || assignmentsDirty || confirmCriteria.isPending}
+                      title={!allAssigned ? "Atribua um avaliador para todas as áreas antes de liberar" : assignmentsDirty ? "Salve as atribuições antes de liberar" : undefined}
                       className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${HARD_SHADOW}`}
                     >
                       <CheckCircle2 size={16} /> Confirmar e Liberar Avaliação

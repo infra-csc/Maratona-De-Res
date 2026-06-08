@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey, exportPendingEvaluations, getEventCriteria } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -38,10 +38,9 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
 }
 
 function EvaluatorEventCard({
-  event, userAreaId, userId, selected, onSelect,
+  event, userId, selected, onSelect,
 }: {
   event: { id: number; name: string; clientName?: string | null; city?: string | null; state?: string | null; quarter: number; year: number };
-  userAreaId: number | null;
   userId: number | undefined;
   selected: boolean;
   onSelect: () => void;
@@ -49,13 +48,20 @@ function EvaluatorEventCard({
   const { data: criteria } = useGetEventCriteria(event.id, {
     query: { queryKey: ["event-criteria", event.id] as unknown[] },
   });
+  const { data: detail } = useGetEvent(event.id, {
+    query: { queryKey: getGetEventQueryKey(event.id) },
+  });
   const { data: evals } = useGetEvaluations(
     { eventId: event.id },
     { query: { queryKey: getGetEvaluationsQueryKey({ eventId: event.id }) } },
   );
 
+  // Esta avaliação é por atribuição evento→área→avaliador, não pela área do perfil.
+  const myAreaIds = new Set(
+    (detail?.areaAssignments ?? []).filter(a => a.evaluatorUserId === userId).map(a => a.areaId),
+  );
   const myCriteria = (criteria ?? []).filter(
-    c => c.active && userAreaId != null && c.responsibleAreaId === userAreaId,
+    c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
   );
   // Only events that actually have criteria for this avaliador's area are theirs to do.
   if (myCriteria.length === 0) return null;
@@ -134,6 +140,10 @@ export default function EvaluationsPage() {
     query: { enabled: !!selectedEventId, queryKey: ["event-criteria", selectedEventId] as unknown[] },
   });
 
+  const { data: selectedEventDetail } = useGetEvent(selectedEventId!, {
+    query: { enabled: !!selectedEventId, queryKey: getGetEventQueryKey(selectedEventId ?? 0) },
+  });
+
   const evalsQKey = getGetEvaluationsQueryKey({ eventId: selectedEventId ?? undefined });
   const { data: evaluations } = useGetEvaluations(
     { eventId: selectedEventId ?? undefined },
@@ -187,12 +197,25 @@ export default function EvaluationsPage() {
         }))
       : [],
   });
+  const evaluatorEventDetailQueries = useQueries({
+    queries: isEvaluator
+      ? configuredEvents.map(ev => ({
+          queryKey: getGetEventQueryKey(ev.id),
+          queryFn: () => getEvent(ev.id),
+        }))
+      : [],
+  });
   const relevantEvaluatorEvents = isEvaluator
-    ? configuredEvents.filter((_, i) =>
-        (evaluatorCriteriaQueries[i]?.data ?? []).some(
-          c => c.active && user?.areaId != null && c.responsibleAreaId === user.areaId,
-        ),
-      )
+    ? configuredEvents.filter((_, i) => {
+        const myAreaIds = new Set(
+          (evaluatorEventDetailQueries[i]?.data?.areaAssignments ?? [])
+            .filter(a => a.evaluatorUserId === user?.id)
+            .map(a => a.areaId),
+        );
+        return (evaluatorCriteriaQueries[i]?.data ?? []).some(
+          c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
+        );
+      })
     : [];
 
   // If the selected event stops being selectable (closed or criteria unconfirmed
@@ -209,8 +232,14 @@ export default function EvaluationsPage() {
   const currentEvent = events?.find(e => e.id === selectedEventId);
   const criteriaLocked = currentEvent ? !currentEvent.criteriaConfirmed : false;
 
-  // Avaliadores only see/evaluate the criteria assigned to their own area.
-  const myCriteria = activeCriteria.filter(c => user?.areaId != null && c.responsibleAreaId === user.areaId);
+  // Avaliadores only see/evaluate the areas assigned to them FOR THIS EVENT
+  // (atribuição evento→área→avaliador), not the fixed profile area.
+  const myAssignedAreaIds = new Set(
+    (selectedEventDetail?.areaAssignments ?? [])
+      .filter(a => a.evaluatorUserId === user?.id)
+      .map(a => a.areaId),
+  );
+  const myCriteria = activeCriteria.filter(c => c.responsibleAreaId != null && myAssignedAreaIds.has(c.responsibleAreaId));
 
   // Manager-only oversight: per-criterion submission status ("quem preencheu / quem falta").
   function criterionStatus(criterionId: number): { state: "submitted" | "draft" | "pending"; who: string | null } {
@@ -416,7 +445,6 @@ export default function EvaluationsPage() {
                   <EvaluatorEventCard
                     key={ev.id}
                     event={ev}
-                    userAreaId={user?.areaId ?? null}
                     userId={user?.id}
                     selected={selectedEventId === ev.id}
                     onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); }}

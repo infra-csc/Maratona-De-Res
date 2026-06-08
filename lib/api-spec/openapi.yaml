@@ -673,6 +673,31 @@ paths:
                 items:
                   $ref: "#/components/schemas/EventCriterion"
 
+  /events/{id}/assignments:
+    put:
+      operationId: updateEventAssignments
+      tags: [events]
+      summary: Set per-area evaluator assignments for an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventAssignmentsUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+
   /events/{id}/criteria/confirm:
     post:
       operationId: confirmEventCriteria
@@ -1847,6 +1872,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EventCriterion"
+        areaAssignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventAreaAssignment"
         evaluationMatrix:
           type: array
           items:
@@ -1855,6 +1884,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EmployeeEventResult"
+        evaluationProgress:
+          type: number
 
     EventInput:
       type: object
@@ -2039,6 +2070,38 @@ components:
       properties:
         confirmed:
           type: boolean
+
+    EventAreaAssignment:
+      type: object
+      required: [id, eventId, areaId, evaluatorUserId]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        areaId:
+          type: integer
+        areaName:
+          type: ["string", "null"]
+        evaluatorUserId:
+          type: integer
+        evaluatorName:
+          type: ["string", "null"]
+
+    EventAssignmentsUpdate:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          items:
+            type: object
+            required: [areaId]
+            properties:
+              areaId:
+                type: integer
+              evaluatorUserId:
+                type: ["integer", "null"]
 
     Evaluation:
       type: object
