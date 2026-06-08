@@ -254,14 +254,23 @@ export default function EventDetailPage() {
                 </div>
               </div>
 
-              {result && result.eventScore > 0 && (
+              {result && result.eventScore > 0 && (() => {
+                const concluded = event.status === "closed";
+                const calibrated = (result.criteriaDetails ?? []).some(c => c.calibratedScore != null);
+                return (
                 <div className="shrink-0 bg-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col items-center justify-center min-w-[160px] -skew-x-6">
                   <div className="skew-x-6 flex flex-col items-center">
-                    <span className="text-[10px] font-black italic uppercase tracking-widest text-[#161e00] mb-1">Score Equipe</span>
+                    <span className="text-[10px] font-black italic uppercase tracking-widest text-[#161e00] mb-1">{concluded ? "Score Final" : "Score Provisório"}</span>
                     <div className="flex items-baseline gap-1">
                       <span className="text-5xl font-black italic text-[#161e00] leading-none">{fmt(result.eventScore)}</span>
                       <span className="text-sm font-black italic text-[#506600]">/100</span>
                     </div>
+                    {!concluded && (
+                      <span className="mt-2 inline-flex items-center gap-1 bg-[#191c1e] text-[#ffb300] text-[9px] font-black italic uppercase tracking-wider px-2 py-1" data-testid="badge-calibration-pending">
+                        <AlertCircle size={11} />
+                        {calibrated ? "Calibragem parcial" : "Aguardando calibragem"}
+                      </span>
+                    )}
                     {result.projectedPlatoon && (
                       <div className="mt-3">
                         <PlatoonBadge platoon={result.projectedPlatoon} colorHex={result.projectedPlatoonColor} />
@@ -269,7 +278,8 @@ export default function EventDetailPage() {
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </section>
