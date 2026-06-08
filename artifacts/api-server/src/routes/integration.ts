@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, eventsTable, employeesTable, eventParticipantsTable, eventCriteriaTable, criteriaTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, eventsTable, employeesTable, eventParticipantsTable } from "@workspace/db";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -8,23 +8,215 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireRole("admin", "rh"));
 
+const EXTERNAL_API_URL = process.env.EXTERNAL_API_URL;
+const EXTERNAL_API_TOKEN = process.env.EXTERNAL_API_TOKEN;
+
+let lastSyncAt: string | null = null;
+let lastLogs: string[] = [];
+let syncing = false;
+
+function isConfigured() {
+  return !!(EXTERNAL_API_URL && EXTERNAL_API_TOKEN);
+}
+
+async function extFetch<T>(path: string): Promise<T> {
+  const base = (EXTERNAL_API_URL ?? "").replace(/\/+$/, "");
+  const r = await fetch(`${base}${path}`, {
+    headers: { Authorization: `Bearer ${EXTERNAL_API_TOKEN}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status} ao acessar ${path}`);
+  return r.json() as Promise<T>;
+}
+
+function normalizeDate(s?: string): string {
+  if (s) { const d = new Date(s); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); }
+  return new Date().toISOString().slice(0, 10);
+}
+
+function deriveYearQuarter(dateStr?: string) {
+  const parsed = dateStr ? new Date(dateStr) : new Date();
+  const d = isNaN(parsed.getTime()) ? new Date() : parsed;
+  return { year: d.getUTCFullYear(), quarter: Math.ceil((d.getUTCMonth() + 1) / 3) };
+}
+
+type ExtEmployee = {
+  externalId?: string | number; id?: string | number; name: string;
+  document?: string; email?: string; phone?: string;
+  department?: string; functionName?: string; function?: string; active?: boolean;
+};
+type ExtEvent = {
+  externalId?: string | number; id?: string | number; name: string;
+  clientName?: string; client?: string; location?: string; city?: string; state?: string;
+  startDate?: string; endDate?: string; year?: number; quarter?: number;
+};
+type ExtParticipation = {
+  eventExternalId?: string | number; eventId?: string | number;
+  employeeExternalId?: string | number; employeeId?: string | number;
+  functionName?: string; function?: string; teamName?: string; team?: string; confirmed?: boolean;
+};
+
 router.get("/integration/status", async (_req, res) => {
-  const eventsCount = await db.select().from(eventsTable);
-  const employeesCount = await db.select().from(employeesTable);
-  const participantsCount = await db.select().from(eventParticipantsTable);
+  const [eventsCount, employeesCount, participantsCount] = await Promise.all([
+    db.select().from(eventsTable),
+    db.select().from(employeesTable),
+    db.select().from(eventParticipantsTable),
+  ]);
 
   res.json({
-    configured: true,
-    lastSync: null,
+    configured: isConfigured(),
+    lastSync: lastSyncAt,
     eventsImported: eventsCount.length,
     employeesImported: employeesCount.length,
     participantsImported: participantsCount.length,
-    logs: [],
+    logs: lastLogs,
   });
 });
 
 router.post("/integration/sync", async (req, res) => {
-  res.json({ success: true, message: "Sincronização concluída", eventsSync: 0, employeesSync: 0, participantsSync: 0 });
+  if (!isConfigured()) {
+    res.status(400).json({
+      success: false,
+      message: "Integração não configurada. Defina EXTERNAL_API_URL e EXTERNAL_API_TOKEN.",
+      eventsSync: 0, employeesSync: 0, participantsSync: 0,
+    });
+    return;
+  }
+
+  if (syncing) {
+    res.status(409).json({
+      success: false,
+      message: "Sincronização já em andamento. Aguarde a conclusão.",
+      eventsSync: 0, employeesSync: 0, participantsSync: 0,
+    });
+    return;
+  }
+
+  const logs: string[] = [];
+  const log = (m: string) => logs.push(m);
+  let employeesSync = 0, eventsSync = 0, participantsSync = 0;
+  syncing = true;
+
+  try {
+    log(`Conectando em ${EXTERNAL_API_URL} ...`);
+    const [rawEmployees, rawEvents, rawParticipations] = await Promise.all([
+      extFetch<unknown>("/api/integration/employees"),
+      extFetch<unknown>("/api/integration/events"),
+      extFetch<unknown>("/api/integration/participations"),
+    ]);
+
+    if (!Array.isArray(rawEmployees)) throw new Error("Resposta inválida em /employees (esperado um array).");
+    if (!Array.isArray(rawEvents)) throw new Error("Resposta inválida em /events (esperado um array).");
+    if (!Array.isArray(rawParticipations)) throw new Error("Resposta inválida em /participations (esperado um array).");
+
+    const extEmployees = rawEmployees as ExtEmployee[];
+    const extEvents = rawEvents as ExtEvent[];
+    const extParticipations = rawParticipations as ExtParticipation[];
+    log(`Recebidos: ${extEmployees.length} colaboradores, ${extEvents.length} eventos, ${extParticipations.length} participações.`);
+
+    await db.transaction(async (tx) => {
+      // Colaboradores — upsert por externalId
+      for (const e of extEmployees) {
+        const externalId = e.externalId != null ? String(e.externalId) : (e.id != null ? String(e.id) : null);
+        if (!externalId || !e.name) continue;
+        const fields = {
+          name: e.name,
+          document: e.document ?? null,
+          email: e.email ?? null,
+          phone: e.phone ?? null,
+          department: e.department || "Geral",
+          functionName: e.functionName || e.function || "Colaborador",
+          active: e.active ?? true,
+        };
+        const existing = await tx.select().from(employeesTable).where(eq(employeesTable.externalId, externalId)).limit(1);
+        if (existing.length) {
+          await tx.update(employeesTable).set(fields).where(eq(employeesTable.id, existing[0]!.id));
+        } else {
+          await tx.insert(employeesTable).values({ externalId, sourceType: "erp", ...fields });
+        }
+        employeesSync++;
+      }
+
+      // Eventos — upsert por externalId
+      for (const ev of extEvents) {
+        const externalId = ev.externalId != null ? String(ev.externalId) : (ev.id != null ? String(ev.id) : null);
+        if (!externalId || !ev.name) continue;
+        const startDate = normalizeDate(ev.startDate);
+        const endDate = ev.endDate ? normalizeDate(ev.endDate) : startDate;
+        const yq = deriveYearQuarter(ev.startDate);
+        const fields = {
+          name: ev.name,
+          clientName: ev.clientName ?? ev.client ?? null,
+          location: ev.location ?? null,
+          city: ev.city ?? null,
+          state: ev.state ?? null,
+          startDate,
+          endDate,
+          year: ev.year ?? yq.year,
+          quarter: ev.quarter ?? yq.quarter,
+        };
+        const existing = await tx.select().from(eventsTable).where(eq(eventsTable.externalId, externalId)).limit(1);
+        if (existing.length) {
+          await tx.update(eventsTable).set(fields).where(eq(eventsTable.id, existing[0]!.id));
+        } else {
+          await tx.insert(eventsTable).values({ externalId, ...fields });
+        }
+        eventsSync++;
+      }
+
+      // Mapas externalId -> id local
+      const allEmployees = await tx.select().from(employeesTable).where(isNotNull(employeesTable.externalId));
+      const empMap = new Map(allEmployees.map(e => [e.externalId!, e.id]));
+      const allEvents = await tx.select().from(eventsTable).where(isNotNull(eventsTable.externalId));
+      const evMap = new Map(allEvents.map(e => [e.externalId!, e.id]));
+
+      // Participações — upsert por (eventId, employeeId)
+      for (const p of extParticipations) {
+        const evExt = p.eventExternalId != null ? String(p.eventExternalId) : (p.eventId != null ? String(p.eventId) : null);
+        const empExt = p.employeeExternalId != null ? String(p.employeeExternalId) : (p.employeeId != null ? String(p.employeeId) : null);
+        if (!evExt || !empExt) continue;
+        const eventId = evMap.get(evExt);
+        const employeeId = empMap.get(empExt);
+        if (!eventId || !employeeId) {
+          log(`Participação ignorada (evento "${evExt}" ou colaborador "${empExt}" não encontrado).`);
+          continue;
+        }
+        const fields = {
+          functionName: p.functionName ?? p.function ?? null,
+          teamName: p.teamName ?? p.team ?? null,
+          confirmed: p.confirmed ?? true,
+        };
+        const existing = await tx.select().from(eventParticipantsTable)
+          .where(and(eq(eventParticipantsTable.eventId, eventId), eq(eventParticipantsTable.employeeId, employeeId)))
+          .limit(1);
+        if (existing.length) {
+          await tx.update(eventParticipantsTable).set(fields).where(eq(eventParticipantsTable.id, existing[0]!.id));
+        } else {
+          await tx.insert(eventParticipantsTable).values({ eventId, employeeId, ...fields });
+        }
+        participantsSync++;
+      }
+    });
+
+    const message = `Sincronização concluída: ${employeesSync} colaboradores, ${eventsSync} eventos, ${participantsSync} participações.`;
+    log(message);
+    lastSyncAt = new Date().toISOString();
+    lastLogs = logs;
+    await audit(req.user!.userId, "sync_integration", "integration", undefined, null, { employeesSync, eventsSync, participantsSync });
+    res.json({ success: true, message, eventsSync, employeesSync, participantsSync });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log(`ERRO: ${msg}`);
+    lastSyncAt = new Date().toISOString();
+    lastLogs = logs;
+    res.status(502).json({
+      success: false,
+      message: `Falha na sincronização: ${msg}`,
+      eventsSync, employeesSync, participantsSync,
+    });
+  } finally {
+    syncing = false;
+  }
 });
 
 router.post("/integration/import/employees", async (req, res) => {
@@ -61,11 +253,11 @@ router.post("/integration/import/employees", async (req, res) => {
   res.json({ success: true, inserted, errors });
 });
 
-router.post("/integration/import/events", async (req, res) => {
+router.post("/integration/import/events", async (_req, res) => {
   res.json({ success: true, inserted: 0, errors: [] });
 });
 
-router.post("/integration/import/participants", async (req, res) => {
+router.post("/integration/import/participants", async (_req, res) => {
   res.json({ success: true, inserted: 0, errors: [] });
 });
 

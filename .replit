@@ -34,5 +34,6 @@ externalPort = 3000
 [userenv]
 
 [userenv.shared]
+EXTERNAL_API_URL = "https://logistica-interna.replit.app"
 
 [userenv.development]
