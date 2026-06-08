@@ -48,6 +48,7 @@ import type {
   EventCriteriaConfirm,
   EventCriteriaUpdate,
   EventCriterion,
+  EventCriterionDuplicate,
   EventDetail,
   EventFeedback,
   EventInput,
@@ -2768,6 +2769,150 @@ export const useConfirmEventCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConfirmEventCriteriaMutationOptions(options));
+    }
+
+export const getDuplicateEventCriterionUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/duplicate`
+}
+
+/**
+ * @summary Duplicate a criterion within an event with a custom name
+ */
+export const duplicateEventCriterion = async (id: number,
+    eventCriterionDuplicate: EventCriterionDuplicate, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getDuplicateEventCriterionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eventCriterionDuplicate,)
+  }
+);}
+
+
+
+
+export const getDuplicateEventCriterionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateEventCriterion>>, TError,{id: number;data: BodyType<EventCriterionDuplicate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof duplicateEventCriterion>>, TError,{id: number;data: BodyType<EventCriterionDuplicate>}, TContext> => {
+
+const mutationKey = ['duplicateEventCriterion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof duplicateEventCriterion>>, {id: number;data: BodyType<EventCriterionDuplicate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  duplicateEventCriterion(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DuplicateEventCriterionMutationResult = NonNullable<Awaited<ReturnType<typeof duplicateEventCriterion>>>
+    export type DuplicateEventCriterionMutationBody = BodyType<EventCriterionDuplicate>
+    export type DuplicateEventCriterionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Duplicate a criterion within an event with a custom name
+ */
+export const useDuplicateEventCriterion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateEventCriterion>>, TError,{id: number;data: BodyType<EventCriterionDuplicate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof duplicateEventCriterion>>,
+        TError,
+        {id: number;data: BodyType<EventCriterionDuplicate>},
+        TContext
+      > => {
+      return useMutation(getDuplicateEventCriterionMutationOptions(options));
+    }
+
+export const getDeleteEventCriterionUrl = (id: number,
+    eventCriterionId: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/${eventCriterionId}`
+}
+
+/**
+ * @summary Delete a duplicated (event-scoped) criterion from an event
+ */
+export const deleteEventCriterion = async (id: number,
+    eventCriterionId: number, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getDeleteEventCriterionUrl(id,eventCriterionId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteEventCriterionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEventCriterion>>, TError,{id: number;eventCriterionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEventCriterion>>, TError,{id: number;eventCriterionId: number}, TContext> => {
+
+const mutationKey = ['deleteEventCriterion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEventCriterion>>, {id: number;eventCriterionId: number}> = (props) => {
+          const {id,eventCriterionId} = props ?? {};
+
+          return  deleteEventCriterion(id,eventCriterionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteEventCriterionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteEventCriterion>>>
+
+    export type DeleteEventCriterionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a duplicated (event-scoped) criterion from an event
+ */
+export const useDeleteEventCriterion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEventCriterion>>, TError,{id: number;eventCriterionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteEventCriterion>>,
+        TError,
+        {id: number;eventCriterionId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteEventCriterionMutationOptions(options));
     }
 
 export const getGetCriteriaUrl = () => {

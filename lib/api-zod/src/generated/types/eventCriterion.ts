@@ -21,4 +21,5 @@ export interface EventCriterion {
   weightOverride?: number | null;
   normalizedWeight: number;
   weight?: number;
+  eventScoped?: boolean;
 }

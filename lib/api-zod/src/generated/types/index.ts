@@ -45,6 +45,7 @@ export * from './eventCriteriaConfirm';
 export * from './eventCriteriaUpdate';
 export * from './eventCriteriaUpdateCriteriaItem';
 export * from './eventCriterion';
+export * from './eventCriterionDuplicate';
 export * from './eventDetail';
 export * from './eventFeedback';
 export * from './eventInput';

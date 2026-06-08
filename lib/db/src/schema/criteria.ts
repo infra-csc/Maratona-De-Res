@@ -13,6 +13,10 @@ export const criteriaTable = pgTable("criteria", {
   defaultWeight: numeric("default_weight", { precision: 5, scale: 2 }).notNull().default("1"),
   active: boolean("active").notNull().default(true),
   displayOrder: integer("display_order").notNull().default(0),
+  // Critério criado como cópia (duplicado) dentro de um evento específico.
+  // Não aparece na lista global de critérios nem é anexado automaticamente a
+  // outros eventos na sincronização.
+  eventScoped: boolean("event_scoped").notNull().default(false),
 });
 
 export const eventCriteriaTable = pgTable("event_criteria", {

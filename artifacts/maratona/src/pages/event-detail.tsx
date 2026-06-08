@@ -1,8 +1,8 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useGetUsers, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw, UserCheck, ClipboardList } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw, UserCheck, ClipboardList, Copy, Check } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { Input } from "@/components/ui/input";
@@ -35,14 +35,19 @@ export default function EventDetailPage() {
   const qc = useQueryClient();
   const canManage = !!user && ["admin", "rh"].includes(user.role);
 
-  const [config, setConfig] = useState<{ criterionId: number; active: boolean; weight: number }[]>([]);
+  const [config, setConfig] = useState<{ id: number; criterionId: number; active: boolean; weight: number; name: string; eventScoped: boolean }[]>([]);
   const [pendingRemoval, setPendingRemoval] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState<Record<number, string>>({});
   useEffect(() => {
     if (event?.criteria) {
       setConfig(event.criteria.map(c => ({
+        id: c.id,
         criterionId: c.criterionId,
         active: c.active,
         weight: c.weightOverride ?? c.originalWeight ?? 0,
+        name: c.criterionName ?? `Critério ${c.criterionId}`,
+        eventScoped: c.eventScoped ?? false,
       })));
     }
   }, [event?.criteria]);
@@ -60,8 +65,29 @@ export default function EventDetailPage() {
     },
   });
 
+  const duplicateCriterion = useDuplicateEventCriterion({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Quesito duplicado" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao duplicar", description: e.message, variant: "destructive" }),
+    },
+  });
+  const deleteCriterion = useDeleteEventCriterion({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Quesito excluído" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" }),
+    },
+  });
+  const renameCriterion = useUpdateCriterion({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Nome atualizado" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao renomear", description: e.message, variant: "destructive" }),
+    },
+  });
+
   const { data: usersList } = useGetUsers({ query: { enabled: canManage, queryKey: ["users"] as unknown[] } });
   const evaluators = (usersList ?? []).filter(u => u.role === "avaliador" && u.active);
+  // Apenas avaliadores RELACIONADOS à área aparecem no seletor daquela área.
+  const evaluatorsForArea = (areaId: number) => evaluators.filter(u => u.areaId === areaId);
 
   const [assignments, setAssignments] = useState<Record<number, number | null>>({});
   useEffect(() => {
@@ -119,6 +145,14 @@ export default function EventDetailPage() {
   const handleSaveCriteria = () =>
     updateCriteria.mutate({ id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
   const handleConfirmCriteria = (value: boolean) => confirmCriteria.mutate({ id, data: { confirmed: value } });
+  const handleDuplicate = (criterionId: number, baseName: string) =>
+    duplicateCriterion.mutate({ id, data: { sourceCriterionId: criterionId, name: `${baseName} (cópia)` } });
+  const handleRename = (criterionId: number) => {
+    const name = (editingName[criterionId] ?? "").trim();
+    if (!name) return;
+    renameCriterion.mutate({ id: criterionId, data: { name } });
+    setEditingName(prev => { const n = { ...prev }; delete n[criterionId]; return n; });
+  };
   const evaluationProgress = Math.round((event.evaluationProgress ?? 0) * 100);
 
   // Áreas que precisam de um avaliador atribuído: toda área responsável por um
@@ -299,33 +333,40 @@ export default function EventDetailPage() {
               )}
 
               <div className="divide-y-2 divide-[#eceef0] border-2 border-[#191c1e]">
-                {assignAreas.map(area => (
-                  <div key={area.areaId} data-testid={`row-assignment-${area.areaId}`} className="flex flex-wrap items-center gap-4 p-4 bg-white">
-                    <div className="flex-1 min-w-[180px]">
-                      <p className="font-black italic uppercase text-sm text-[#191c1e]">{area.areaName}</p>
-                      {!assignments[area.areaId] && <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador</p>}
+                {assignAreas.map(area => {
+                  const areaEvaluators = evaluatorsForArea(area.areaId);
+                  return (
+                    <div key={area.areaId} data-testid={`row-assignment-${area.areaId}`} className="flex flex-wrap items-center gap-4 p-4 bg-white">
+                      <div className="flex-1 min-w-[180px]">
+                        <p className="font-black italic uppercase text-sm text-[#191c1e]">{area.areaName}</p>
+                        {areaEvaluators.length === 0 ? (
+                          <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
+                        ) : !assignments[area.areaId] ? (
+                          <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador</p>
+                        ) : null}
+                      </div>
+                      <select
+                        data-testid={`select-assignment-${area.areaId}`}
+                        value={assignments[area.areaId] ?? ""}
+                        disabled={hasEvaluations || areaEvaluators.length === 0}
+                        onChange={e => setAreaEvaluator(area.areaId, e.target.value ? Number(e.target.value) : null)}
+                        className="h-10 min-w-[220px] rounded-none border-2 border-[#191c1e] bg-white px-3 font-bold italic uppercase text-xs disabled:opacity-50"
+                      >
+                        <option value="">{areaEvaluators.length === 0 ? "— Nenhum avaliador desta área —" : "— Selecione um avaliador —"}</option>
+                        {areaEvaluators.map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
                     </div>
-                    <select
-                      data-testid={`select-assignment-${area.areaId}`}
-                      value={assignments[area.areaId] ?? ""}
-                      disabled={hasEvaluations}
-                      onChange={e => setAreaEvaluator(area.areaId, e.target.value ? Number(e.target.value) : null)}
-                      className="h-10 min-w-[220px] rounded-none border-2 border-[#191c1e] bg-white px-3 font-bold italic uppercase text-xs disabled:opacity-50"
-                    >
-                      <option value="">— Selecione um avaliador —</option>
-                      {evaluators.map(u => (
-                        <option key={u.id} value={u.id}>{u.name}{u.areaName ? ` (${u.areaName})` : ""}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                  );
+                })}
                 {assignAreas.length === 0 && (
                   <div className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhuma área com critério ativo para atribuir.</div>
                 )}
               </div>
 
-              {evaluators.length === 0 && assignAreas.length > 0 && (
-                <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Nenhum usuário com papel de avaliador cadastrado. Crie avaliadores em Usuários antes de atribuir.</p>
+              {assignAreas.some(a => evaluatorsForArea(a.areaId).length === 0) && (
+                <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Há áreas sem nenhum avaliador vinculado. Cadastre avaliadores nessas áreas (em Usuários) para poder atribuí-los.</p>
               )}
 
               {assignAreas.length > 0 && !hasEvaluations && (
@@ -384,10 +425,38 @@ export default function EventDetailPage() {
               <div className="divide-y-2 divide-[#eceef0] border-2 border-[#191c1e]">
                 {config.map(item => {
                   const meta = critMeta.get(item.criterionId);
+                  const isEditingName = editingName[item.criterionId] !== undefined;
                   return (
                     <div key={item.criterionId} data-testid={`row-event-criterion-${item.criterionId}`} className={`flex flex-wrap items-center gap-4 p-4 ${!item.active ? "opacity-60 bg-[#f7f9fb]" : "bg-white"}`}>
                       <div className="flex-1 min-w-[180px]">
-                        <p className="font-black italic uppercase text-sm text-[#191c1e]">{meta?.criterionName ?? `Critério ${item.criterionId}`}</p>
+                        {isEditingName ? (
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              data-testid={`input-event-criterion-name-${item.criterionId}`}
+                              value={editingName[item.criterionId]}
+                              autoFocus
+                              onChange={e => setEditingName(prev => ({ ...prev, [item.criterionId]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === "Enter") handleRename(item.criterionId); if (e.key === "Escape") setEditingName(prev => { const n = { ...prev }; delete n[item.criterionId]; return n; }); }}
+                              className="h-9 rounded-none border-2 border-[#191c1e] font-black italic text-sm"
+                            />
+                            <button
+                              type="button"
+                              data-testid={`button-save-name-${item.criterionId}`}
+                              onClick={() => handleRename(item.criterionId)}
+                              title="Salvar nome"
+                              className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] hover:translate-y-[1px] transition-all"
+                            >
+                              <Check size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <p className="font-black italic uppercase text-sm text-[#191c1e]">{meta?.criterionName ?? item.name}</p>
+                            {item.eventScoped && (
+                              <span className="bg-[#191c1e] text-[#ccff00] px-1.5 py-0.5 text-[9px] font-black italic uppercase">Cópia</span>
+                            )}
+                          </div>
+                        )}
                         {meta?.responsibleAreaName && <p className="text-[10px] font-bold italic uppercase text-[#747a60]">{meta.responsibleAreaName}</p>}
                       </div>
                       <div className="flex items-center gap-2">
@@ -403,8 +472,40 @@ export default function EventDetailPage() {
                           className="w-20 h-10 rounded-none border-2 border-[#191c1e] text-center font-black italic disabled:opacity-50"
                         />
                       </div>
-                      <div className="flex items-center gap-2 min-w-[110px] justify-end">
-                        {item.active ? (
+                      <div className="flex items-center gap-2 min-w-[150px] justify-end">
+                        {!editLocked && item.eventScoped && !isEditingName && (
+                          <button
+                            type="button"
+                            data-testid={`button-rename-event-criterion-${item.criterionId}`}
+                            onClick={() => setEditingName(prev => ({ ...prev, [item.criterionId]: item.name }))}
+                            title="Renomear cópia"
+                            className="h-9 px-3 flex items-center gap-1.5 border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-[11px] font-bold italic uppercase transition-all"
+                          >
+                            Renomear
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          data-testid={`button-duplicate-event-criterion-${item.criterionId}`}
+                          disabled={editLocked || duplicateCriterion.isPending}
+                          onClick={() => handleDuplicate(item.criterionId, item.name)}
+                          title="Duplicar quesito"
+                          className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          <Copy size={16} />
+                        </button>
+                        {item.eventScoped ? (
+                          <button
+                            type="button"
+                            data-testid={`button-delete-event-criterion-${item.criterionId}`}
+                            disabled={editLocked || deleteCriterion.isPending}
+                            onClick={() => setPendingDelete(item.id)}
+                            title="Excluir cópia"
+                            className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        ) : item.active ? (
                           <button
                             type="button"
                             data-testid={`button-remove-event-criterion-${item.criterionId}`}
@@ -455,6 +556,27 @@ export default function EventDetailPage() {
                       className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
                     >
                       <Trash2 size={16} className="mr-1.5" /> Remover
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog open={pendingDelete !== null} onOpenChange={o => { if (!o) setPendingDelete(null); }}>
+                <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="italic uppercase font-black tracking-tight">Excluir cópia?</AlertDialogTitle>
+                    <AlertDialogDescription className="italic text-[#444933]">
+                      Esta cópia será <strong>removida permanentemente</strong> deste evento. Caso ela esteja ativa, lembre-se de redistribuir o peso entre os critérios restantes para que a soma volte a <strong>20</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-delete-criterion" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      data-testid="button-confirm-delete-criterion"
+                      onClick={() => { if (pendingDelete !== null) deleteCriterion.mutate({ id, eventCriterionId: pendingDelete }); setPendingDelete(null); }}
+                      className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
+                    >
+                      <Trash2 size={16} className="mr-1.5" /> Excluir
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

@@ -63,6 +63,7 @@ async function loadEventDetail(id: number) {
       active: eventCriteriaTable.active,
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
+      eventScoped: criteriaTable.eventScoped,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -145,7 +146,7 @@ router.post("/events", requireRole("admin", "rh"), async (req, res) => {
     state: state ?? null, startDate, endDate, year, quarter,
   }).returning();
 
-  const allCriteria = await db.select().from(criteriaTable).where(eq(criteriaTable.active, true));
+  const allCriteria = await db.select().from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
   if (allCriteria.length > 0) {
     await db.insert(eventCriteriaTable).values(allCriteria.map(c => ({ eventId: ev.id, criterionId: c.id, active: true })));
   }
@@ -249,6 +250,7 @@ router.get("/events/:id/criteria", async (req, res) => {
       active: eventCriteriaTable.active,
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
+      eventScoped: criteriaTable.eventScoped,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -342,6 +344,83 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
       weight: c.active ? parseFloat(c.weightOverride ?? c.originalWeight ?? "1") : 0,
     };
   }));
+});
+
+/**
+ * POST /events/:id/criteria/duplicate
+ * RH duplica um quesito (critério) DENTRO de um evento, dando um nome próprio à
+ * cópia. A cópia é um critério com escopo de evento (eventScoped): não aparece na
+ * lista global de critérios nem é anexado a outros eventos na sincronização.
+ * Tem seu próprio criterionId, então é avaliada e pontuada de forma independente.
+ * Body: { sourceCriterionId, name }
+ */
+router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (await eventHasEvaluations(eventId)) {
+    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem mais ser alterados." });
+    return;
+  }
+
+  const sourceCriterionId = Number(req.body?.sourceCriterionId);
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  if (!sourceCriterionId) { res.status(400).json({ error: "Informe o critério de origem (sourceCriterionId)" }); return; }
+
+  const [link] = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, sourceCriterionId)))
+    .limit(1);
+  if (!link) { res.status(404).json({ error: "Critério de origem não está vinculado a este evento" }); return; }
+
+  const [source] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, sourceCriterionId)).limit(1);
+  if (!source) { res.status(404).json({ error: "Critério de origem não encontrado" }); return; }
+
+  const [copy] = await db.insert(criteriaTable).values({
+    name: name || `${source.name} (cópia)`,
+    description: source.description,
+    responsibleAreaId: source.responsibleAreaId,
+    responsibleAreaLabel: source.responsibleAreaLabel,
+    defaultWeight: source.defaultWeight,
+    active: true,
+    displayOrder: source.displayOrder,
+    eventScoped: true,
+  }).returning();
+
+  // Começa com peso 0 para não quebrar a soma de 20; o RH redistribui depois.
+  await db.insert(eventCriteriaTable).values({ eventId, criterionId: copy.id, active: true, weightOverride: "0" });
+
+  await audit(req.user!.userId, "duplicate", "criteria", copy.id, null, { eventId, sourceCriterionId, name: copy.name });
+  res.status(201).json(await loadEventDetail(eventId));
+});
+
+/**
+ * DELETE /events/:id/criteria/:eventCriterionId
+ * Exclui um quesito DUPLICADO (eventScoped) de um evento. Critérios padrão não
+ * podem ser excluídos — apenas desativados pela tela de configuração.
+ */
+router.delete("/events/:id/criteria/:eventCriterionId", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const ecId = parseInt(req.params.eventCriterionId as string);
+  if (await eventHasEvaluations(eventId)) {
+    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem mais ser alterados." });
+    return;
+  }
+
+  const [link] = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.id, ecId), eq(eventCriteriaTable.eventId, eventId)))
+    .limit(1);
+  if (!link) { res.status(404).json({ error: "Critério do evento não encontrado" }); return; }
+
+  const [crit] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, link.criterionId)).limit(1);
+  if (!crit?.eventScoped) {
+    res.status(400).json({ error: "Apenas quesitos duplicados podem ser excluídos. Desative o critério padrão." });
+    return;
+  }
+
+  await db.delete(eventCriteriaTable).where(eq(eventCriteriaTable.id, ecId));
+  await db.delete(criteriaTable).where(eq(criteriaTable.id, link.criterionId));
+  await audit(req.user!.userId, "delete", "criteria", link.criterionId, crit, null);
+  res.json(await loadEventDetail(eventId));
 });
 
 /**

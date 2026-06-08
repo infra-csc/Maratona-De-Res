@@ -21,6 +21,7 @@ router.get("/criteria", async (_req, res) => {
     })
     .from(criteriaTable)
     .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
+    .where(eq(criteriaTable.eventScoped, false))
     .orderBy(criteriaTable.displayOrder, criteriaTable.name);
   res.json(criteria.map(c => ({ ...c, defaultWeight: parseFloat(c.defaultWeight as unknown as string) })));
 });

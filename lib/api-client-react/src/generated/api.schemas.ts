@@ -178,6 +178,7 @@ export interface EventCriterion {
   weightOverride?: number | null;
   normalizedWeight: number;
   weight?: number;
+  eventScoped?: boolean;
 }
 
 export interface EventAreaAssignment {
@@ -340,6 +341,11 @@ export interface EventCriteriaUpdate {
 
 export interface EventCriteriaConfirm {
   confirmed: boolean;
+}
+
+export interface EventCriterionDuplicate {
+  sourceCriterionId: number;
+  name?: string;
 }
 
 export type EventAssignmentsUpdateAssignmentsItem = {

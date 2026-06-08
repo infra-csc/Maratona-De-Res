@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable, eventCriteriaTable } from "@workspace/db";
-import { isNotNull, inArray, eq } from "drizzle-orm";
+import { isNotNull, inArray, eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -241,7 +241,7 @@ router.post("/integration/sync", async (req, res) => {
       // a re-sincronização não sobrescreve a configuração feita pelo RH.
       const syncedEventIds = Array.from(evMap.values());
       if (syncedEventIds.length > 0) {
-        const activeCriteria = await tx.select().from(criteriaTable).where(eq(criteriaTable.active, true));
+        const activeCriteria = await tx.select().from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
         if (activeCriteria.length > 0) {
           const withCriteria = await tx
             .select({ eventId: eventCriteriaTable.eventId })

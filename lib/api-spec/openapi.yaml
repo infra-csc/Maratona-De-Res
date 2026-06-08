@@ -723,6 +723,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventDetail"
 
+  /events/{id}/criteria/duplicate:
+    post:
+      operationId: duplicateEventCriterion
+      tags: [events]
+      summary: Duplicate a criterion within an event with a custom name
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCriterionDuplicate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+
+  /events/{id}/criteria/{eventCriterionId}:
+    delete:
+      operationId: deleteEventCriterion
+      tags: [events]
+      summary: Delete a duplicated (event-scoped) criterion from an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: eventCriterionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+
   /criteria:
     get:
       operationId: getCriteria
@@ -2046,6 +2095,8 @@ components:
           type: number
         weight:
           type: number
+        eventScoped:
+          type: boolean
 
     EventCriteriaUpdate:
       type: object
@@ -2070,6 +2121,15 @@ components:
       properties:
         confirmed:
           type: boolean
+
+    EventCriterionDuplicate:
+      type: object
+      required: [sourceCriterionId]
+      properties:
+        sourceCriterionId:
+          type: integer
+        name:
+          type: string
 
     EventAreaAssignment:
       type: object

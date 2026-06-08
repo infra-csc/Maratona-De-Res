@@ -449,7 +449,8 @@ export const GetEventResponse = zod.object({
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
-  "weight": zod.number().optional()
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -752,7 +753,8 @@ export const GetEventCriteriaResponseItem = zod.object({
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
-  "weight": zod.number().optional()
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional()
 })
 export const GetEventCriteriaResponse = zod.array(GetEventCriteriaResponseItem)
 
@@ -783,7 +785,8 @@ export const UpdateEventCriteriaResponseItem = zod.object({
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
-  "weight": zod.number().optional()
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional()
 })
 export const UpdateEventCriteriaResponse = zod.array(UpdateEventCriteriaResponseItem)
 
@@ -838,7 +841,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
-  "weight": zod.number().optional()
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -927,7 +931,108 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
-  "weight": zod.number().optional()
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.number(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "eventId": zod.number(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional()
+})
+
+
+/**
+ * @summary Duplicate a criterion within an event with a custom name
+ */
+export const DuplicateEventCriterionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DuplicateEventCriterionBody = zod.object({
+  "sourceCriterionId": zod.number(),
+  "name": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete a duplicated (event-scoped) criterion from an event
+ */
+export const DeleteEventCriterionParams = zod.object({
+  "id": zod.coerce.number(),
+  "eventCriterionId": zod.coerce.number()
+})
+
+export const DeleteEventCriterionResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "year": zod.number(),
+  "quarter": zod.number(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "participants": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional()
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "responsibleAreaId": zod.number().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
