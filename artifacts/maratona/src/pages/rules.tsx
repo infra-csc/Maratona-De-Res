@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useGetRules, useUpdateRule, useGetPlatoonRules, useUpdatePlatoonRule, getGetRulesQueryKey, getGetPlatoonRulesQueryKey } from "@workspace/api-client-react";
+import { useGetRules, useUpdateRule, useGetPlatoonRules, useUpdatePlatoonRule, useCreatePlatoonRule, getGetRulesQueryKey, getGetPlatoonRulesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Calculator, CircleDollarSign } from "lucide-react";
+import { Save, Calculator, CircleDollarSign, Plus } from "lucide-react";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -41,6 +41,35 @@ export default function RulesPage() {
     },
   });
 
+  const [newPlatoon, setNewPlatoon] = useState({ name: "", color: "#94a3b8", minScore: "", maxScore: "", bonusValue: "" });
+
+  const createPlatoonMutation = useCreatePlatoonRule({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: platoonQKey });
+        toast({ title: "Pelotão adicionado com sucesso" });
+        setNewPlatoon({ name: "", color: "#94a3b8", minScore: "", maxScore: "", bonusValue: "" });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao adicionar pelotão", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  function handleCreatePlatoon() {
+    if (!newPlatoon.name.trim() || newPlatoon.minScore === "" || newPlatoon.maxScore === "") {
+      toast({ title: "Preencha nome, mínimo e máximo", variant: "destructive" });
+      return;
+    }
+    createPlatoonMutation.mutate({
+      data: {
+        name: newPlatoon.name.trim(),
+        color: newPlatoon.color,
+        minScore: parseFloat(newPlatoon.minScore),
+        maxScore: parseFloat(newPlatoon.maxScore),
+        bonusValue: parseFloat(newPlatoon.bonusValue || "0"),
+      },
+    });
+  }
+
   function getRuleValue(key: string, defaultVal: string) {
     return ruleValues[key] ?? defaultVal;
   }
@@ -73,7 +102,6 @@ export default function RulesPage() {
                 <div key={rule.key} data-testid={`row-rule-${rule.key}`} className="bg-[#f2f4f6] p-5 border-2 border-[#191c1e] flex flex-col gap-3">
                   <div>
                     <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e]">{rule.description}</p>
-                    <p className="text-[10px] uppercase font-bold text-[#747a60] mt-1 tracking-widest">{rule.key}</p>
                   </div>
                   <div className="flex gap-2 mt-auto">
                     <Input
@@ -174,6 +202,76 @@ export default function RulesPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Adicionar novo pelotão */}
+          <div className="border-t-2 border-[#191c1e] p-6 bg-[#f7f9fb]">
+            <h4 className="text-sm font-black uppercase italic tracking-tight mb-4 flex items-center gap-2">
+              <Plus size={16} /> Adicionar Pelotão
+            </h4>
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Nome</label>
+                <Input
+                  data-testid="input-new-platoon-name"
+                  value={newPlatoon.name}
+                  onChange={e => setNewPlatoon(v => ({ ...v, name: e.target.value }))}
+                  className="h-11 w-44 rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                  placeholder="Ex.: Elite"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Cor</label>
+                <input
+                  data-testid="input-new-platoon-color"
+                  type="color"
+                  value={newPlatoon.color}
+                  onChange={e => setNewPlatoon(v => ({ ...v, color: e.target.value }))}
+                  className="h-11 w-14 border-2 border-[#191c1e] bg-white p-1 cursor-pointer"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Mínimo</label>
+                <Input
+                  data-testid="input-new-platoon-min"
+                  type="number" min="0" max="100" step="1"
+                  value={newPlatoon.minScore}
+                  onChange={e => setNewPlatoon(v => ({ ...v, minScore: e.target.value }))}
+                  className="h-11 w-24 text-center font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Máximo</label>
+                <Input
+                  data-testid="input-new-platoon-max"
+                  type="number" min="0" max="100" step="1"
+                  value={newPlatoon.maxScore}
+                  onChange={e => setNewPlatoon(v => ({ ...v, maxScore: e.target.value }))}
+                  className="h-11 w-24 text-center font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Bônus (R$)</label>
+                <Input
+                  data-testid="input-new-platoon-bonus"
+                  type="number" min="0" step="10"
+                  value={newPlatoon.bonusValue}
+                  onChange={e => setNewPlatoon(v => ({ ...v, bonusValue: e.target.value }))}
+                  className="h-11 w-28 text-right font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                />
+              </div>
+              <button
+                data-testid="button-add-platoon"
+                className={`h-11 px-5 flex items-center bg-[#ccff00] border-2 border-[#191c1e] font-bold text-sm italic uppercase disabled:opacity-40 disabled:pointer-events-none ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                disabled={createPlatoonMutation.isPending}
+                onClick={handleCreatePlatoon}
+              >
+                <Plus size={16} className="mr-1.5" /> Adicionar
+              </button>
+            </div>
+            <p className="text-[11px] text-[#747a60] italic mt-3 max-w-2xl">
+              As faixas devem cobrir de 0 a 100 sem lacunas ou sobreposições. Ajuste os limites dos pelotões existentes antes de adicionar um novo.
+            </p>
           </div>
         </section>
       </div>

@@ -12,7 +12,7 @@ router.get("/rules", async (_req, res) => {
   res.json(rules);
 });
 
-router.patch("/rules/:key", requireRole("admin", "rh"), async (req, res) => {
+router.patch("/rules/:key", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const key = req.params.key as string;
   const { value } = req.body;
   if (value === undefined) { res.status(400).json({ error: "value obrigatório" }); return; }
@@ -67,7 +67,7 @@ function validatePlatoonRanges(ranges: RangeRow[]): string | null {
   return null;
 }
 
-router.post("/platoon-rules", requireRole("admin", "rh"), async (req, res) => {
+router.post("/platoon-rules", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, description, displayOrder } = req.body;
   if (!name || minScore === undefined || maxScore === undefined) {
     res.status(400).json({ error: "Campos obrigatórios: name, minScore, maxScore" });
@@ -103,7 +103,7 @@ router.post("/platoon-rules", requireRole("admin", "rh"), async (req, res) => {
   res.status(201).json({ ...rule, minScore: parseFloat(rule.minScore as unknown as string), maxScore: parseFloat(rule.maxScore as unknown as string), bonusValue: parseFloat(rule.bonusValue as unknown as string) });
 });
 
-router.patch("/platoon-rules/:id", requireRole("admin", "rh"), async (req, res) => {
+router.patch("/platoon-rules/:id", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, description, active, displayOrder } = req.body;
   const [before] = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.id, id)).limit(1);
