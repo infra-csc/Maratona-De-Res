@@ -261,9 +261,9 @@ export default function EventsPage() {
                         <Calendar size={14} className="text-[#747a60] shrink-0" />
                         <span className="truncate">{new Date(ev.startDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})} — {new Date(ev.endDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}</span>
                       </div>
-                      <div className="flex items-center gap-2 truncate">
+                      <div className="flex items-center gap-2">
                         <MapPin size={14} className="text-[#747a60] shrink-0" />
-                        <span className="truncate">{ev.city ? `${ev.city}${ev.state ? `, ${ev.state}` : ""}` : (ev.location || "Local não definido")}</span>
+                        <span>{ev.city ? `${ev.city}${ev.state ? `, ${ev.state}` : ""}` : (ev.location || "Local não definido")}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Users size={14} className="text-[#747a60] shrink-0" />
