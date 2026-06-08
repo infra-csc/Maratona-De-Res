@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { AbsenceKind } from './absenceKind';
 
 export interface Absence {
   id: number;
@@ -15,6 +16,7 @@ export interface Absence {
   /** @nullable */
   eventName?: string | null;
   penaltyType: string;
+  kind?: AbsenceKind;
   points: number;
   date: string;
   year: number;

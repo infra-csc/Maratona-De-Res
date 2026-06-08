@@ -1301,6 +1301,7 @@ export const GetAbsencesResponseItem = zod.object({
   "eventId": zod.number().nullish(),
   "eventName": zod.string().nullish(),
   "penaltyType": zod.string(),
+  "kind": zod.enum(['penalty', 'merit']).optional(),
   "points": zod.number(),
   "date": zod.string(),
   "year": zod.number(),
@@ -1316,14 +1317,17 @@ export const GetAbsencesResponse = zod.array(GetAbsencesResponseItem)
 /**
  * @summary Register absence
  */
+
+
+
 export const CreateAbsenceBody = zod.object({
   "employeeId": zod.number(),
-  "eventId": zod.number(),
-  "penaltyType": zod.enum(['falta', 'atraso_30', 'atraso_60']),
+  "eventId": zod.number().nullish(),
+  "penaltyType": zod.enum(['falta', 'atraso_30', 'atraso_60', 'merito_galpao', 'merito_evento']),
   "date": zod.string(),
   "year": zod.number(),
   "quarter": zod.number(),
-  "quantity": zod.number().optional(),
+  "quantity": zod.number().min(1).optional(),
   "reason": zod.string().optional()
 })
 
@@ -1710,6 +1714,75 @@ export const GetRankingResponseItem = zod.object({
   "absences": zod.number()
 })
 export const GetRankingResponse = zod.array(GetRankingResponseItem)
+
+
+/**
+ * @summary Ranking detail for an employee (drill-down)
+ */
+export const GetRankingDetailQueryParams = zod.object({
+  "employeeId": zod.coerce.number(),
+  "year": zod.coerce.number().optional(),
+  "quarter": zod.coerce.number().optional()
+})
+
+export const GetRankingDetailResponse = zod.object({
+  "employee": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "department": zod.string().nullish(),
+  "functionName": zod.string().nullish()
+}),
+  "period": zod.object({
+  "year": zod.number(),
+  "quarter": zod.number()
+}),
+  "summary": zod.object({
+  "finalResult": zod.number().nullish(),
+  "grossAverage": zod.number().nullish(),
+  "penaltyPoints": zod.number(),
+  "meritPoints": zod.number(),
+  "platoon": zod.string().nullish(),
+  "platoonColor": zod.string().nullish(),
+  "bonusValue": zod.number().nullish(),
+  "eventsCount": zod.number(),
+  "isQuarterClosed": zod.boolean()
+}),
+  "events": zod.array(zod.object({
+  "eventId": zod.number(),
+  "eventName": zod.string(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
+  "status": zod.string().nullish(),
+  "eventScore": zod.number(),
+  "platoon": zod.string().nullish(),
+  "platoonColor": zod.string().nullish(),
+  "evaluatedCriteria": zod.number(),
+  "totalCriteria": zod.number()
+})),
+  "penalties": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "label": zod.string(),
+  "points": zod.number(),
+  "quantity": zod.number(),
+  "total": zod.number(),
+  "date": zod.string(),
+  "reason": zod.string().nullish(),
+  "eventName": zod.string().nullish()
+})),
+  "merits": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "label": zod.string(),
+  "points": zod.number(),
+  "quantity": zod.number(),
+  "total": zod.number(),
+  "date": zod.string(),
+  "reason": zod.string().nullish(),
+  "eventName": zod.string().nullish()
+}))
+})
 
 
 /**

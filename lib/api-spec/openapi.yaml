@@ -1383,6 +1383,33 @@ paths:
                 items:
                   $ref: "#/components/schemas/RankingEntry"
 
+  /ranking-detail:
+    get:
+      operationId: getRankingDetail
+      tags: [ranking]
+      summary: Ranking detail for an employee (drill-down)
+      parameters:
+        - name: employeeId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankingDetail"
+
   /audit-logs:
     get:
       operationId: getAuditLogs
@@ -2307,6 +2334,9 @@ components:
           type: ["string", "null"]
         penaltyType:
           type: string
+        kind:
+          type: string
+          enum: [penalty, merit]
         points:
           type: integer
         date:
@@ -2326,15 +2356,15 @@ components:
 
     AbsenceInput:
       type: object
-      required: [employeeId, eventId, penaltyType, date, year, quarter]
+      required: [employeeId, penaltyType, date, year, quarter]
       properties:
         employeeId:
           type: integer
         eventId:
-          type: integer
+          type: ["integer", "null"]
         penaltyType:
           type: string
-          enum: [falta, atraso_30, atraso_60]
+          enum: [falta, atraso_30, atraso_60, merito_galpao, merito_evento]
         date:
           type: string
         year:
@@ -2343,6 +2373,7 @@ components:
           type: integer
         quantity:
           type: integer
+          minimum: 1
         reason:
           type: string
 
@@ -2839,6 +2870,115 @@ components:
           type: integer
         absences:
           type: integer
+
+    RankingDetailEvent:
+      type: object
+      required: [eventId, eventName, eventScore, evaluatedCriteria, totalCriteria]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        startDate:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+        eventScore:
+          type: number
+        platoon:
+          type: ["string", "null"]
+        platoonColor:
+          type: ["string", "null"]
+        evaluatedCriteria:
+          type: integer
+        totalCriteria:
+          type: integer
+
+    RankingDetailRow:
+      type: object
+      required: [id, type, label, points, quantity, total, date]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        label:
+          type: string
+        points:
+          type: integer
+        quantity:
+          type: integer
+        total:
+          type: integer
+        date:
+          type: string
+        reason:
+          type: ["string", "null"]
+        eventName:
+          type: ["string", "null"]
+
+    RankingDetail:
+      type: object
+      required: [employee, period, summary, events, penalties, merits]
+      properties:
+        employee:
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            department:
+              type: ["string", "null"]
+            functionName:
+              type: ["string", "null"]
+        period:
+          type: object
+          required: [year, quarter]
+          properties:
+            year:
+              type: integer
+            quarter:
+              type: integer
+        summary:
+          type: object
+          required: [penaltyPoints, meritPoints, eventsCount, isQuarterClosed]
+          properties:
+            finalResult:
+              type: ["number", "null"]
+            grossAverage:
+              type: ["number", "null"]
+            penaltyPoints:
+              type: number
+            meritPoints:
+              type: number
+            platoon:
+              type: ["string", "null"]
+            platoonColor:
+              type: ["string", "null"]
+            bonusValue:
+              type: ["number", "null"]
+            eventsCount:
+              type: integer
+            isQuarterClosed:
+              type: boolean
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingDetailEvent"
+        penalties:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingDetailRow"
+        merits:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingDetailRow"
 
     AuditLog:
       type: object

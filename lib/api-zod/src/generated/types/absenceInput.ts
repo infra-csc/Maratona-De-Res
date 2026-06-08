@@ -9,11 +9,13 @@ import type { AbsenceInputPenaltyType } from './absenceInputPenaltyType';
 
 export interface AbsenceInput {
   employeeId: number;
-  eventId: number;
+  /** @nullable */
+  eventId?: number | null;
   penaltyType: AbsenceInputPenaltyType;
   date: string;
   year: number;
   quarter: number;
+  /** @minimum 1 */
   quantity?: number;
   reason?: string;
 }

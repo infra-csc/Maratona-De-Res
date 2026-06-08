@@ -10,6 +10,7 @@ export const absencesTable = pgTable("absences", {
   employeeId: integer("employee_id").notNull().references(() => employeesTable.id),
   eventId: integer("event_id").references(() => eventsTable.id),
   penaltyType: text("penalty_type").notNull().default("falta"),
+  kind: text("kind").notNull().default("penalty"),
   points: integer("points").notNull().default(0),
   date: date("date").notNull(),
   year: integer("year").notNull(),

@@ -193,11 +193,16 @@ export async function recomputeQuarterResults(year: number, quarter: number, use
 
       const absenceRows = await db.select().from(absencesTable)
         .where(and(eq(absencesTable.employeeId, employeeId), eq(absencesTable.year, year), eq(absencesTable.quarter, quarter)));
-      const totalAbsences = absenceRows.reduce((s, a) => s + a.quantity, 0);
+      const penaltyRows = absenceRows.filter(a => a.kind !== "merit");
+      const meritRows = absenceRows.filter(a => a.kind === "merit");
+      const totalAbsences = penaltyRows.reduce((s, a) => s + a.quantity, 0);
 
       const grossAverage = calculateQuarterGrossAverage(eventScores);
-      const absencePenalty = absenceRows.reduce((s, a) => s + a.points * a.quantity, 0);
-      const finalResult = calculateQuarterFinalResult(grossAverage, absencePenalty);
+      const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
+      const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
+      const absencePenalty = penaltyPoints;
+      // Méritos somam, penalidades subtraem; resultado final fica travado entre 0 e 100.
+      const finalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints);
       const platoon = getPlatoonByScore(finalResult, platoonRules);
 
       const [quarterElig] = await db.select().from(employeeQuarterEligibilityTable)

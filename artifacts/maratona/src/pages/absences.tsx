@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, UserMinus, Download, Search, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, UserMinus, Download, Search, AlertTriangle, Award } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const currentYear = new Date().getFullYear();
@@ -17,12 +17,16 @@ const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
-const PENALTY_OPTIONS: { value: string; label: string; hint: string }[] = [
-  { value: "falta", label: "Falta", hint: "regra do sistema" },
-  { value: "atraso_30", label: "Atraso (30 min)", hint: "50 pts" },
-  { value: "atraso_60", label: "Atraso (1 hora)", hint: "100 pts" },
+type EntryKind = "penalty" | "merit";
+const ENTRY_OPTIONS: { value: string; label: string; hint: string; kind: EntryKind }[] = [
+  { value: "falta", label: "Falta", hint: "regra do sistema", kind: "penalty" },
+  { value: "atraso_30", label: "Atraso (30 min)", hint: "−50 pts", kind: "penalty" },
+  { value: "atraso_60", label: "Atraso (1 hora)", hint: "−100 pts", kind: "penalty" },
+  { value: "merito_galpao", label: "Mérito Galpão", hint: "+50 pts", kind: "merit" },
+  { value: "merito_evento", label: "Mérito Evento", hint: "+25 pts", kind: "merit" },
 ];
-const penaltyLabel = (t: string) => PENALTY_OPTIONS.find(o => o.value === t)?.label ?? t;
+const penaltyLabel = (t: string) => ENTRY_OPTIONS.find(o => o.value === t)?.label ?? t;
+const optionKind = (t: string): EntryKind => ENTRY_OPTIONS.find(o => o.value === t)?.kind ?? "penalty";
 
 export default function AbsencesPage() {
   const { user } = useAuth();
@@ -47,7 +51,7 @@ export default function AbsencesPage() {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Penalidade registrada com sucesso" });
+        toast({ title: "Lançamento registrado com sucesso" });
         setOpen(false);
         reset({ year: currentYear, quarter: currentQuarter, quantity: 1, penaltyType: "atraso_30" });
       },
@@ -81,8 +85,10 @@ export default function AbsencesPage() {
     search === "" || (a.employeeName ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalCount = filteredAbsences.reduce((acc, curr) => acc + curr.quantity, 0);
-  const totalPoints = filteredAbsences.reduce((acc, curr) => acc + curr.points * curr.quantity, 0);
+  const penaltyRows = filteredAbsences.filter(a => a.kind !== "merit");
+  const meritRows = filteredAbsences.filter(a => a.kind === "merit");
+  const totalPenaltyPoints = penaltyRows.reduce((acc, curr) => acc + curr.points * curr.quantity, 0);
+  const totalMeritPoints = meritRows.reduce((acc, curr) => acc + curr.points * curr.quantity, 0);
 
   function handleEventChange(v: string) {
     setValue("eventId", Number(v));
@@ -104,9 +110,9 @@ export default function AbsencesPage() {
             </div>
             <div>
               <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-                Controle de <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Penalidades</span>
+                Penalidades e <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Méritos</span>
               </h1>
-              <p className="text-base text-[#444933] italic mt-2">Lançamento de penalidades por evento que impactam diretamente no cálculo do bônus.</p>
+              <p className="text-base text-[#444933] italic mt-2">Penalidades descontam e méritos somam pontos na nota final do colaborador.</p>
             </div>
           </div>
 
@@ -151,36 +157,41 @@ export default function AbsencesPage() {
                     data-testid="button-register-absence"
                     className={`bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
                   >
-                    <Plus size={16} /> Lançar Penalidade
+                    <Plus size={16} /> Novo Lançamento
                   </button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
                   <DialogHeader>
-                    <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2 text-[#ba1a1a]">
-                      <AlertTriangle size={22} /> Registrar Penalidade
+                    <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2 text-[#191c1e]">
+                      <AlertTriangle size={22} /> Registrar Lançamento
                     </DialogTitle>
                   </DialogHeader>
                   <form
                     onSubmit={handleSubmit(d => createMutation.mutate({
-                      data: { ...d, employeeId: Number(d.employeeId), eventId: Number(d.eventId), year: Number(d.year), quarter: Number(d.quarter), quantity: Number(d.quantity) },
+                      data: { ...d, employeeId: Number(d.employeeId), eventId: d.eventId ? Number(d.eventId) : null, year: Number(d.year), quarter: Number(d.quarter), quantity: Number(d.quantity) },
                     }))}
                     className="space-y-4 pt-4"
                   >
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Penalidade <span className="text-[#ba1a1a]">*</span></Label>
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo de Lançamento <span className="text-[#ba1a1a]">*</span></Label>
                       <Select defaultValue="atraso_30" onValueChange={v => setValue("penaltyType", v as AbsenceInput["penaltyType"])}>
                         <SelectTrigger data-testid="select-penalty-type" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
                           <SelectValue placeholder="Selecione o tipo..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {PENALTY_OPTIONS.map(o => (
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase italic text-[#ba1a1a] tracking-wider">Penalidades (−)</div>
+                          {ENTRY_OPTIONS.filter(o => o.kind === "penalty").map(o => (
+                            <SelectItem key={o.value} value={o.value}>{o.label} — {o.hint}</SelectItem>
+                          ))}
+                          <div className="px-2 py-1 mt-1 text-[10px] font-bold uppercase italic text-[#506600] tracking-wider">Méritos (+)</div>
+                          {ENTRY_OPTIONS.filter(o => o.kind === "merit").map(o => (
                             <SelectItem key={o.value} value={o.value}>{o.label} — {o.hint}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento <span className="text-[#ba1a1a]">*</span></Label>
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento <span className="text-[#747a60] not-italic normal-case">(opcional p/ mérito galpão e falta no ciclo)</span></Label>
                       <Select onValueChange={handleEventChange}>
                         <SelectTrigger data-testid="select-penalty-event" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
                           <SelectValue placeholder="Selecione o evento..." />
@@ -250,11 +261,11 @@ export default function AbsencesPage() {
               placeholder="Buscar colaborador..."
             />
           </div>
-          <div className={`bg-white text-[#191c1e] px-5 py-3 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 shrink-0 ${HARD_SHADOW}`}>
-            Total no período: <span className="text-base not-italic">{totalCount}</span> penalidades
-          </div>
           <div className={`bg-[#ff5722] text-white px-5 py-3 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 shrink-0 ${HARD_SHADOW}`}>
-            <AlertTriangle size={16} /> Desconto: <span className="text-base not-italic">{totalPoints}</span> pts
+            <AlertTriangle size={16} /> Desconto: <span className="text-base not-italic">-{totalPenaltyPoints}</span> pts
+          </div>
+          <div className={`bg-[#ccff00] text-[#191c1e] px-5 py-3 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 shrink-0 ${HARD_SHADOW}`}>
+            <Award size={16} /> Bônus: <span className="text-base not-italic">+{totalMeritPoints}</span> pts
           </div>
         </div>
 
@@ -264,14 +275,14 @@ export default function AbsencesPage() {
           <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
             <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
               <UserMinus size={18} />
-              <span className="font-black uppercase tracking-tight">Registros de Penalidades</span>
+              <span className="font-black uppercase tracking-tight">Registros de Penalidades e Méritos</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Colaborador</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Penalidade</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Lançamento</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Evento</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Data</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Qtd</th>
@@ -281,11 +292,14 @@ export default function AbsencesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
-                  {filteredAbsences.map(a => (
+                  {filteredAbsences.map(a => {
+                    const isMerit = a.kind === "merit";
+                    return (
                     <tr key={a.id} data-testid={`row-absence-${a.id}`} className="hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group">
                       <td className="px-6 py-4 font-black italic uppercase text-sm text-[#191c1e]">{a.employeeName}</td>
                       <td className="px-6 py-4">
-                        <span className="inline-block bg-[#191c1e] text-[#ccff00] font-black px-3 py-1 border-2 border-[#191c1e] text-[11px] uppercase italic">
+                        <span className={`inline-flex items-center gap-1 font-black px-3 py-1 border-2 border-[#191c1e] text-[11px] uppercase italic ${isMerit ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#191c1e] text-[#ccff00]"}`}>
+                          {isMerit ? <Award size={12} /> : <AlertTriangle size={12} />}
                           {penaltyLabel(a.penaltyType)}
                         </span>
                       </td>
@@ -297,8 +311,8 @@ export default function AbsencesPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="inline-block bg-[#ff5722] text-white font-black px-3 py-1 border-2 border-[#191c1e] text-xs">
-                          -{a.points * a.quantity}
+                        <span className={`inline-block font-black px-3 py-1 border-2 border-[#191c1e] text-xs ${isMerit ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#ff5722] text-white"}`}>
+                          {isMerit ? "+" : "-"}{a.points * a.quantity}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm font-bold italic text-[#747a60] uppercase tracking-tight max-w-xs truncate">{a.reason || "Sem justificativa"}</td>
@@ -314,9 +328,10 @@ export default function AbsencesPage() {
                         </td>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                   {filteredAbsences.length === 0 && (
-                    <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhuma penalidade registrada no período.</td></tr>
+                    <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum lançamento registrado no período.</td></tr>
                   )}
                 </tbody>
               </table>

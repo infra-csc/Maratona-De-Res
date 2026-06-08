@@ -74,6 +74,7 @@ import type {
   GetEventsParams,
   GetQuarterEligibilityParams,
   GetQuarterlyResultsParams,
+  GetRankingDetailParams,
   GetRankingParams,
   HealthStatus,
   ImpersonateInput,
@@ -89,6 +90,7 @@ import type {
   QuarterEligibilityInput,
   QuarterlyEvolution,
   QuarterlyResult,
+  RankingDetail,
   RankingEntry,
   ResetPasswordInput,
   Rule,
@@ -5111,6 +5113,90 @@ export function useGetRanking<TData = Awaited<ReturnType<typeof getRanking>>, TE
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRankingQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRankingDetailUrl = (params: GetRankingDetailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/ranking-detail?${stringifiedParams}` : `/ranking-detail`
+}
+
+/**
+ * @summary Ranking detail for an employee (drill-down)
+ */
+export const getRankingDetail = async (params: GetRankingDetailParams, options?: RequestInit): Promise<RankingDetail> => {
+
+  return customFetch<RankingDetail>(getGetRankingDetailUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRankingDetailQueryKey = (params?: GetRankingDetailParams,) => {
+    return [
+    `/ranking-detail`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetRankingDetailQueryOptions = <TData = Awaited<ReturnType<typeof getRankingDetail>>, TError = ErrorType<unknown>>(params: GetRankingDetailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRankingDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRankingDetailQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRankingDetail>>> = ({ signal }) => getRankingDetail(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRankingDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRankingDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getRankingDetail>>>
+export type GetRankingDetailQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Ranking detail for an employee (drill-down)
+ */
+
+export function useGetRankingDetail<TData = Awaited<ReturnType<typeof getRankingDetail>>, TError = ErrorType<unknown>>(
+ params: GetRankingDetailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRankingDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRankingDetailQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

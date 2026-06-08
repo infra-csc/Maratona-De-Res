@@ -13,4 +13,6 @@ export const AbsenceInputPenaltyType = {
   falta: 'falta',
   atraso_30: 'atraso_30',
   atraso_60: 'atraso_60',
+  merito_galpao: 'merito_galpao',
+  merito_evento: 'merito_evento',
 } as const;

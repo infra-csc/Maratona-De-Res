@@ -423,6 +423,14 @@ export interface CalibrationInput {
   originalAverageScore?: number;
 }
 
+export type AbsenceKind = typeof AbsenceKind[keyof typeof AbsenceKind];
+
+
+export const AbsenceKind = {
+  penalty: 'penalty',
+  merit: 'merit',
+} as const;
+
 export interface Absence {
   id: number;
   employeeId: number;
@@ -432,6 +440,7 @@ export interface Absence {
   /** @nullable */
   eventName?: string | null;
   penaltyType: string;
+  kind?: AbsenceKind;
   points: number;
   date: string;
   year: number;
@@ -450,15 +459,19 @@ export const AbsenceInputPenaltyType = {
   falta: 'falta',
   atraso_30: 'atraso_30',
   atraso_60: 'atraso_60',
+  merito_galpao: 'merito_galpao',
+  merito_evento: 'merito_evento',
 } as const;
 
 export interface AbsenceInput {
   employeeId: number;
-  eventId: number;
+  /** @nullable */
+  eventId?: number | null;
   penaltyType: AbsenceInputPenaltyType;
   date: string;
   year: number;
   quarter: number;
+  /** @minimum 1 */
   quantity?: number;
   reason?: string;
 }
@@ -722,6 +735,80 @@ export interface RankingEntry {
   absences: number;
 }
 
+export interface RankingDetailEvent {
+  eventId: number;
+  eventName: string;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  state?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  status?: string | null;
+  eventScore: number;
+  /** @nullable */
+  platoon?: string | null;
+  /** @nullable */
+  platoonColor?: string | null;
+  evaluatedCriteria: number;
+  totalCriteria: number;
+}
+
+export interface RankingDetailRow {
+  id: number;
+  type: string;
+  label: string;
+  points: number;
+  quantity: number;
+  total: number;
+  date: string;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  eventName?: string | null;
+}
+
+export type RankingDetailEmployee = {
+  id: number;
+  name: string;
+  /** @nullable */
+  department?: string | null;
+  /** @nullable */
+  functionName?: string | null;
+};
+
+export type RankingDetailPeriod = {
+  year: number;
+  quarter: number;
+};
+
+export type RankingDetailSummary = {
+  /** @nullable */
+  finalResult?: number | null;
+  /** @nullable */
+  grossAverage?: number | null;
+  penaltyPoints: number;
+  meritPoints: number;
+  /** @nullable */
+  platoon?: string | null;
+  /** @nullable */
+  platoonColor?: string | null;
+  /** @nullable */
+  bonusValue?: number | null;
+  eventsCount: number;
+  isQuarterClosed: boolean;
+};
+
+export interface RankingDetail {
+  employee: RankingDetailEmployee;
+  period: RankingDetailPeriod;
+  summary: RankingDetailSummary;
+  events: RankingDetailEvent[];
+  penalties: RankingDetailRow[];
+  merits: RankingDetailRow[];
+}
+
 export interface AuditLog {
   id: number;
   /** @nullable */
@@ -840,6 +927,12 @@ export type GetRankingParams = {
 year: number;
 quarter: number;
 search?: string;
+};
+
+export type GetRankingDetailParams = {
+employeeId: number;
+year?: number;
+quarter?: number;
 };
 
 export type GetAuditLogsParams = {
