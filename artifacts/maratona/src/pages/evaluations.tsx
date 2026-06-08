@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User } from "lucide-react";
+import { CheckCircle, Clock, Send, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { cn, formatEventSubtitle } from "@/lib/utils";
@@ -171,12 +172,6 @@ export default function EvaluationsPage() {
     },
   });
 
-  const releaseMutation = useReleaseEventFeedback({
-    mutation: {
-      onSuccess: () => toast({ title: "Feedback liberado para a equipe" }),
-      onError: (e: { message?: string }) => toast({ title: "Erro ao liberar feedback", description: e.message, variant: "destructive" }),
-    },
-  });
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
   const openEvents = (events ?? []).filter(e => e.status === "open");
@@ -818,15 +813,21 @@ export default function EvaluationsPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <p className="text-xs text-[#747a60] italic">O evento está fechado. Libere o feedback consolidado para que a equipe possa visualizar no painel "Meu Desempenho".</p>
-                        <button
-                          data-testid="button-release-feedback"
-                          onClick={() => releaseMutation.mutate({ id: selectedEventId })}
-                          disabled={releaseMutation.isPending}
-                          className="w-full bg-[#ff5722] text-white border-2 border-[#191c1e] py-3 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 transition-all hover:bg-[#b02f00]"
+                        <div className="flex items-center gap-2 text-sm text-[#506600] font-bold italic uppercase">
+                          <CheckCircle size={16} /> Liberado para calibragem
+                        </div>
+                        <p className="text-xs text-[#747a60] italic">
+                          {eventResult?.hasCalibration
+                            ? "Todas as avaliações foram concluídas e a calibragem já está em andamento. Acesse a tela de Calibrações para revisar e finalizar as notas da equipe."
+                            : "Todas as avaliações foram concluídas. O evento foi liberado para calibragem — acesse a tela de Calibrações para ajustar as notas antes de liberar o feedback à equipe."}
+                        </p>
+                        <Link
+                          href="/calibrations"
+                          data-testid="link-go-to-calibrations"
+                          className="w-full bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] py-3 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:bg-[#2a2f33]"
                         >
-                          <MessageSquareShare size={15} /> Liberar Feedback
-                        </button>
+                          <SlidersHorizontal size={15} /> Ir para Calibrações <ArrowRight size={15} />
+                        </Link>
                       </div>
                     )}
                   </div>
