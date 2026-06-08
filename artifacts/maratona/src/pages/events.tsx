@@ -244,8 +244,8 @@ export default function EventsPage() {
                             <span className="inline-block skew-x-[8deg]">T{ev.quarter}/{ev.year}</span>
                           </span>
                         </div>
-                        <Link href={`/events/${ev.id}`} className="font-black text-xl italic uppercase tracking-tight text-[#191c1e] hover:text-[#506600] transition-colors leading-tight line-clamp-1">{ev.name}</Link>
-                        {ev.clientName && <p className="text-sm font-bold italic uppercase text-[#747a60] mt-1 truncate">{ev.clientName}</p>}
+                        <Link href={`/events/${ev.id}`} className="font-black text-xl italic uppercase tracking-tight text-[#191c1e] hover:text-[#506600] transition-colors leading-tight line-clamp-1 pr-1.5">{ev.name}</Link>
+                        {ev.clientName && <p className="text-sm font-bold italic uppercase text-[#747a60] mt-1 truncate pr-1.5">{ev.clientName}</p>}
                       </div>
 
                       {ev.averageScore != null && (
