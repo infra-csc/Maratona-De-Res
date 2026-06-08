@@ -897,7 +897,7 @@ export const UpdateCriterionParams = zod.object({
 export const UpdateCriterionBody = zod.object({
   "name": zod.string().optional(),
   "description": zod.string().optional(),
-  "responsibleAreaId": zod.number().optional(),
+  "responsibleAreaId": zod.number().nullish(),
   "defaultWeight": zod.number().optional(),
   "active": zod.boolean().optional(),
   "displayOrder": zod.number().optional()

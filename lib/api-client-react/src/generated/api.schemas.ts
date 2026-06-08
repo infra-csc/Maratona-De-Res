@@ -308,7 +308,8 @@ export interface CriterionInput {
 export interface CriterionUpdate {
   name?: string;
   description?: string;
-  responsibleAreaId?: number;
+  /** @nullable */
+  responsibleAreaId?: number | null;
   defaultWeight?: number;
   active?: boolean;
   displayOrder?: number;

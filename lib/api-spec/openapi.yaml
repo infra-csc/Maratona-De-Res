@@ -1981,7 +1981,7 @@ components:
         description:
           type: string
         responsibleAreaId:
-          type: integer
+          type: ["integer", "null"]
         defaultWeight:
           type: number
         active:

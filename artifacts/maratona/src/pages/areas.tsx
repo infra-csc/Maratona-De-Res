@@ -1,14 +1,28 @@
 import { useState } from "react";
-import { useGetAreas, useCreateArea, useUpdateArea, getGetAreasQueryKey } from "@workspace/api-client-react";
-import type { AreaInput } from "@workspace/api-client-react";
+import {
+  useGetAreas,
+  useCreateArea,
+  useUpdateArea,
+  useGetCriteria,
+  useUpdateCriterion,
+  useGetUsers,
+  useUpdateUser,
+  getGetAreasQueryKey,
+  getGetCriteriaQueryKey,
+  getGetUsersQueryKey,
+} from "@workspace/api-client-react";
+import type { AreaInput, Area } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, LayoutGrid, Settings } from "lucide-react";
+import { Plus, Search, Building2, LayoutGrid, Settings, ListChecks, Users, ArrowRightLeft } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -20,9 +34,15 @@ export default function AreasPage() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "true" | "false">("all");
+  const [manageArea, setManageArea] = useState<Area | null>(null);
 
   const qKey = getGetAreasQueryKey();
+  const criteriaKey = getGetCriteriaQueryKey();
+  const usersKey = getGetUsersQueryKey();
+
   const { data: areas, isLoading } = useGetAreas({ query: { queryKey: qKey } });
+  const { data: criteria } = useGetCriteria({ query: { queryKey: criteriaKey } });
+  const { data: users } = useGetUsers({ query: { queryKey: usersKey } });
 
   const { register, handleSubmit, reset } = useForm<AreaInput>();
 
@@ -44,6 +64,20 @@ export default function AreasPage() {
     },
   });
 
+  const updateCriterionMutation = useUpdateCriterion({
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: criteriaKey }),
+      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const updateUserMutation = useUpdateUser({
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: usersKey }),
+      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    },
+  });
+
   const filtered = (areas ?? []).filter(a => {
     const matchSearch =
       a.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -51,6 +85,17 @@ export default function AreasPage() {
     const matchActive = filterActive === "all" || (filterActive === "true" ? a.active : !a.active);
     return matchSearch && matchActive;
   });
+
+  const criteriaFor = (areaId: number) => (criteria ?? []).filter(c => c.responsibleAreaId === areaId);
+  const usersFor = (areaId: number) => (users ?? []).filter(u => u.areaId === areaId);
+
+  function toggleCriterion(criterionId: number, belongs: boolean, areaId: number) {
+    updateCriterionMutation.mutate({ id: criterionId, data: { responsibleAreaId: belongs ? null : areaId } });
+  }
+
+  function toggleUser(userId: number, belongs: boolean, areaId: number) {
+    updateUserMutation.mutate({ id: userId, data: { areaId: belongs ? null : areaId } });
+  }
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -62,7 +107,7 @@ export default function AreasPage() {
               Áreas &amp; <span className="text-[#506600]">Departamentos</span>
             </h1>
             <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-2xl">
-              Gerencie as unidades organizacionais para organizar os responsáveis por critérios.
+              Gerencie as unidades organizacionais e relacione os critérios e usuários de cada área.
             </p>
           </div>
 
@@ -142,7 +187,10 @@ export default function AreasPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map(a => (
+            {filtered.map(a => {
+              const critCount = criteriaFor(a.id).length;
+              const userCount = usersFor(a.id).length;
+              return (
               <article
                 key={a.id}
                 data-testid={`card-area-${a.id}`}
@@ -164,9 +212,19 @@ export default function AreasPage() {
                   </div>
 
                   <h3 className="text-2xl italic font-black uppercase tracking-tight mb-2 line-clamp-1">{a.name}</h3>
-                  <p className="text-[#444933] italic mb-6 flex-grow min-h-[48px] line-clamp-3">
+                  <p className="text-[#444933] italic mb-5 flex-grow min-h-[48px] line-clamp-3">
                     {a.description || "Nenhuma descrição fornecida."}
                   </p>
+
+                  {/* Relationship counts */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <span data-testid={`count-criteria-${a.id}`} className="flex items-center gap-1.5 bg-[#eceef0] border-2 border-[#191c1e] px-2.5 py-1 font-bold text-[11px] italic uppercase text-[#444933]">
+                      <ListChecks size={13} /> {critCount} {critCount === 1 ? "Critério" : "Critérios"}
+                    </span>
+                    <span data-testid={`count-users-${a.id}`} className="flex items-center gap-1.5 bg-[#eceef0] border-2 border-[#191c1e] px-2.5 py-1 font-bold text-[11px] italic uppercase text-[#444933]">
+                      <Users size={13} /> {userCount} {userCount === 1 ? "Usuário" : "Usuários"}
+                    </span>
+                  </div>
 
                   <div className="border-t-2 border-[#191c1e] pt-4 mt-auto flex items-center justify-between">
                     {a.active ? (
@@ -178,14 +236,142 @@ export default function AreasPage() {
                         <span className="inline-block skew-x-[8deg]">Inativa</span>
                       </span>
                     )}
-                    <Settings size={20} className="text-[#747a60]" />
+                    <button
+                      data-testid={`button-manage-area-${a.id}`}
+                      onClick={() => setManageArea(a)}
+                      title="Relacionar critérios e usuários"
+                      className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ccff00] transition-all"
+                    >
+                      <Settings size={18} className="text-[#191c1e]" />
+                    </button>
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Manage area relationships */}
+      <Dialog open={manageArea !== null} onOpenChange={v => !v && setManageArea(null)}>
+        <DialogContent className="max-w-xl rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
+              <Building2 size={24} className="text-[#506600]" /> {manageArea?.name}
+            </DialogTitle>
+            <p className="text-sm text-[#747a60] italic">Relacione os critérios e usuários que pertencem a esta área.</p>
+          </DialogHeader>
+
+          {manageArea && (
+            <Tabs defaultValue="criteria" className="pt-2">
+              <TabsList className="grid grid-cols-2 w-full rounded-none border-2 border-[#191c1e] bg-[#eceef0] p-0 h-auto">
+                <TabsTrigger
+                  value="criteria"
+                  data-testid="tab-area-criteria"
+                  className="rounded-none data-[state=active]:bg-[#191c1e] data-[state=active]:text-[#ccff00] font-bold italic uppercase text-xs py-2.5 flex items-center gap-1.5"
+                >
+                  <ListChecks size={14} /> Critérios
+                </TabsTrigger>
+                <TabsTrigger
+                  value="users"
+                  data-testid="tab-area-users"
+                  className="rounded-none data-[state=active]:bg-[#191c1e] data-[state=active]:text-[#ccff00] font-bold italic uppercase text-xs py-2.5 flex items-center gap-1.5"
+                >
+                  <Users size={14} /> Usuários
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Criteria tab */}
+              <TabsContent value="criteria" className="mt-4">
+                <ScrollArea className="h-[360px] border-2 border-[#191c1e]">
+                  <div className="divide-y-2 divide-[#eceef0]">
+                    {(criteria ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => {
+                      const belongs = c.responsibleAreaId === manageArea.id;
+                      const elsewhere = c.responsibleAreaId != null && !belongs;
+                      return (
+                        <label
+                          key={c.id}
+                          data-testid={`manage-criterion-${c.id}`}
+                          className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#f2f4f6] transition-colors ${belongs ? "bg-[#f6ffd9]" : ""}`}
+                        >
+                          <Checkbox
+                            checked={belongs}
+                            disabled={updateCriterionMutation.isPending}
+                            onCheckedChange={() => toggleCriterion(c.id, belongs, manageArea.id)}
+                            className="rounded-none border-2 border-[#191c1e] data-[state=checked]:bg-[#ccff00] data-[state=checked]:text-[#191c1e]"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold italic uppercase text-sm text-[#191c1e] truncate">{c.name}</p>
+                            {elsewhere && (
+                              <p className="text-[11px] text-[#b02f00] italic flex items-center gap-1 mt-0.5">
+                                <ArrowRightLeft size={11} /> Atualmente em: {c.responsibleAreaName}
+                              </p>
+                            )}
+                          </div>
+                          {!c.active && <span className="text-[10px] font-bold uppercase italic text-[#747a60]">Inativo</span>}
+                        </label>
+                      );
+                    })}
+                    {(criteria ?? []).length === 0 && (
+                      <p className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério cadastrado.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              {/* Users tab */}
+              <TabsContent value="users" className="mt-4">
+                <ScrollArea className="h-[360px] border-2 border-[#191c1e]">
+                  <div className="divide-y-2 divide-[#eceef0]">
+                    {(users ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(u => {
+                      const belongs = u.areaId === manageArea.id;
+                      const elsewhere = u.areaId != null && !belongs;
+                      return (
+                        <label
+                          key={u.id}
+                          data-testid={`manage-user-${u.id}`}
+                          className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#f2f4f6] transition-colors ${belongs ? "bg-[#f6ffd9]" : ""}`}
+                        >
+                          <Checkbox
+                            checked={belongs}
+                            disabled={updateUserMutation.isPending}
+                            onCheckedChange={() => toggleUser(u.id, belongs, manageArea.id)}
+                            className="rounded-none border-2 border-[#191c1e] data-[state=checked]:bg-[#ccff00] data-[state=checked]:text-[#191c1e]"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold italic text-sm text-[#191c1e] truncate">{u.name}</p>
+                            <p className="text-[11px] text-[#747a60] truncate">{u.email}</p>
+                            {elsewhere && (
+                              <p className="text-[11px] text-[#b02f00] italic flex items-center gap-1 mt-0.5">
+                                <ArrowRightLeft size={11} /> Atualmente em: {u.areaName}
+                              </p>
+                            )}
+                          </div>
+                          {!u.active && <span className="text-[10px] font-bold uppercase italic text-[#747a60]">Inativo</span>}
+                        </label>
+                      );
+                    })}
+                    {(users ?? []).length === 0 && (
+                      <p className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum usuário cadastrado.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          )}
+
+          <div className="flex justify-end pt-4 border-t-2 border-[#e0e3e5]">
+            <button
+              data-testid="button-close-manage"
+              onClick={() => setManageArea(null)}
+              className="bg-[#191c1e] text-white border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase"
+            >
+              Concluir
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
