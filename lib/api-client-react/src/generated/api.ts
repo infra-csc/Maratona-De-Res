@@ -44,6 +44,7 @@ import type {
   EvaluationInput,
   EvaluationUpdate,
   Event,
+  EventCriteriaConfirm,
   EventCriteriaUpdate,
   EventCriterion,
   EventDetail,
@@ -2550,6 +2551,78 @@ export const useUpdateEventCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateEventCriteriaMutationOptions(options));
+    }
+
+export const getConfirmEventCriteriaUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/confirm`
+}
+
+/**
+ * @summary Confirm event criteria and unlock evaluation
+ */
+export const confirmEventCriteria = async (id: number,
+    eventCriteriaConfirm: EventCriteriaConfirm, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getConfirmEventCriteriaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eventCriteriaConfirm,)
+  }
+);}
+
+
+
+
+export const getConfirmEventCriteriaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmEventCriteria>>, TError,{id: number;data: BodyType<EventCriteriaConfirm>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmEventCriteria>>, TError,{id: number;data: BodyType<EventCriteriaConfirm>}, TContext> => {
+
+const mutationKey = ['confirmEventCriteria'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmEventCriteria>>, {id: number;data: BodyType<EventCriteriaConfirm>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  confirmEventCriteria(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmEventCriteriaMutationResult = NonNullable<Awaited<ReturnType<typeof confirmEventCriteria>>>
+    export type ConfirmEventCriteriaMutationBody = BodyType<EventCriteriaConfirm>
+    export type ConfirmEventCriteriaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm event criteria and unlock evaluation
+ */
+export const useConfirmEventCriteria = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmEventCriteria>>, TError,{id: number;data: BodyType<EventCriteriaConfirm>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmEventCriteria>>,
+        TError,
+        {id: number;data: BodyType<EventCriteriaConfirm>},
+        TContext
+      > => {
+      return useMutation(getConfirmEventCriteriaMutationOptions(options));
     }
 
 export const getGetCriteriaUrl = () => {

@@ -5,7 +5,8 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { EventCriteriaUpdateCriteriaItem } from './eventCriteriaUpdateCriteriaItem';
 
 export interface EventCriteriaUpdate {
-  activeCriterionIds: number[];
+  criteria: EventCriteriaUpdateCriteriaItem[];
 }

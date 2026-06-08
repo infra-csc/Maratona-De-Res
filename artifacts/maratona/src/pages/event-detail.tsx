@@ -1,9 +1,14 @@
-import { useRoute } from "wouter";
-import { useGetEvent, useGetEventResult, getGetEventQueryKey } from "@workspace/api-client-react";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert } from "lucide-react";
-import { Link } from "wouter";
+import { useRoute, Link } from "wouter";
+import { useState, useEffect } from "react";
+import { useGetEvent, useGetEventResult, useUpdateEventCriteria, useConfirmEventCriteria, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 
@@ -19,6 +24,35 @@ export default function EventDetailPage() {
     query: { enabled: !!id, queryKey: ["event-result", id] as unknown[] },
   });
   const participantResults = result?.participants ?? [];
+
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const canManage = !!user && ["admin", "rh"].includes(user.role);
+
+  const [config, setConfig] = useState<{ criterionId: number; active: boolean; weight: number }[]>([]);
+  useEffect(() => {
+    if (event?.criteria) {
+      setConfig(event.criteria.map(c => ({
+        criterionId: c.criterionId,
+        active: c.active,
+        weight: c.weightOverride ?? c.originalWeight ?? 0,
+      })));
+    }
+  }, [event?.criteria]);
+
+  const updateCriteria = useUpdateEventCriteria({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Pesos salvos" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+    },
+  });
+  const confirmCriteria = useConfirmEventCriteria({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    },
+  });
 
   if (isLoading) {
     return (
@@ -46,6 +80,18 @@ export default function EventDetailPage() {
 
   const fmt = (v: number) => `${v.toFixed(1)}`;
   const activeCriteriaCount = (event.criteria ?? []).filter(c => c.active).length;
+  const critMeta = new Map((event.criteria ?? []).map(c => [c.criterionId, c]));
+  const activeSum = config.filter(c => c.active).reduce((s, c) => s + (Number(c.weight) || 0), 0);
+  const sumValid = Math.abs(activeSum - 20) <= 0.01;
+  const criteriaConfirmed = event.criteriaConfirmed ?? false;
+
+  const setCriterionActive = (criterionId: number, active: boolean) =>
+    setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, active } : c)));
+  const setCriterionWeight = (criterionId: number, weight: number) =>
+    setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, weight } : c)));
+  const handleSaveCriteria = () =>
+    updateCriteria.mutate({ id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
+  const handleConfirmCriteria = (value: boolean) => confirmCriteria.mutate({ id, data: { confirmed: value } });
   const matrixCells = (event.evaluationMatrix ?? []).flatMap(row => row.criteria ?? []);
   const filledCells = matrixCells.filter(c => c.averageScore != null || (c.status && c.status !== "pendente")).length;
   const evaluationProgress = matrixCells.length > 0 ? Math.round((filledCells / matrixCells.length) * 100) : 0;
@@ -147,6 +193,116 @@ export default function EventDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* HR criteria configuration + confirmation gate */}
+        {canManage && (
+          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal size={18} />
+                <span className="font-black uppercase tracking-tight">Configuração de Critérios (RH)</span>
+              </div>
+              {criteriaConfirmed ? (
+                <span data-testid="badge-criteria-confirmed" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
+                  <Lock size={12} /> Critérios Confirmados
+                </span>
+              ) : (
+                <span data-testid="badge-criteria-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
+                  <AlertCircle size={12} /> Aguardando Confirmação
+                </span>
+              )}
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm italic text-[#444933]">
+                Revise os critérios deste evento. Desative os que não se aplicam e redistribua os pesos — a soma dos ativos deve ser <strong>20</strong>. As áreas só podem avaliar após a confirmação do RH.
+              </p>
+
+              <div className="flex items-center justify-between bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+                <span className="text-xs font-bold italic uppercase text-[#444933]">Soma dos Pesos Ativos</span>
+                <span data-testid="text-criteria-sum" className={`text-2xl font-black italic ${sumValid ? "text-[#506600]" : "text-[#ba1a1a]"}`}>
+                  {Math.round(activeSum * 100) / 100} <span className="text-base text-[#747a60]">/ 20</span>
+                </span>
+              </div>
+
+              <div className="divide-y-2 divide-[#eceef0] border-2 border-[#191c1e]">
+                {config.map(item => {
+                  const meta = critMeta.get(item.criterionId);
+                  return (
+                    <div key={item.criterionId} data-testid={`row-event-criterion-${item.criterionId}`} className={`flex flex-wrap items-center gap-4 p-4 ${!item.active ? "opacity-60 bg-[#f7f9fb]" : "bg-white"}`}>
+                      <div className="flex-1 min-w-[180px]">
+                        <p className="font-black italic uppercase text-sm text-[#191c1e]">{meta?.criterionName ?? `Critério ${item.criterionId}`}</p>
+                        {meta?.responsibleAreaName && <p className="text-[10px] font-bold italic uppercase text-[#747a60]">{meta.responsibleAreaName}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Peso</span>
+                        <Input
+                          data-testid={`input-event-criterion-weight-${item.criterionId}`}
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={item.active ? item.weight : 0}
+                          disabled={!item.active || criteriaConfirmed}
+                          onChange={e => setCriterionWeight(item.criterionId, Number(e.target.value))}
+                          className="w-20 h-10 rounded-none border-2 border-[#191c1e] text-center font-black italic disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 min-w-[110px] justify-end">
+                        <span className={`text-[10px] font-bold uppercase italic ${item.active ? "text-[#506600]" : "text-[#747a60]"}`}>{item.active ? "Ativo" : "Inativo"}</span>
+                        <Switch
+                          data-testid={`switch-event-criterion-${item.criterionId}`}
+                          checked={item.active}
+                          disabled={criteriaConfirmed}
+                          onCheckedChange={v => setCriterionActive(item.criterionId, v)}
+                          className="data-[state=checked]:bg-[#506600]"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {config.length === 0 && (
+                  <div className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhum critério vinculado a este evento.</div>
+                )}
+              </div>
+
+              {!sumValid && !criteriaConfirmed && (
+                <p className="text-xs font-bold italic uppercase text-[#ba1a1a] text-right">Ajuste os pesos para somar exatamente 20 antes de salvar ou confirmar.</p>
+              )}
+
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+                {!criteriaConfirmed ? (
+                  <>
+                    <button
+                      data-testid="button-save-criteria"
+                      onClick={handleSaveCriteria}
+                      disabled={!sumValid || updateCriteria.isPending}
+                      className="bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
+                    >
+                      <Save size={16} /> {updateCriteria.isPending ? "Salvando..." : "Salvar Pesos"}
+                    </button>
+                    <button
+                      data-testid="button-confirm-criteria"
+                      onClick={() => handleConfirmCriteria(true)}
+                      disabled={!sumValid || confirmCriteria.isPending}
+                      className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${HARD_SHADOW}`}
+                    >
+                      <CheckCircle2 size={16} /> Confirmar e Liberar Avaliação
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    data-testid="button-reopen-criteria"
+                    onClick={() => handleConfirmCriteria(false)}
+                    disabled={confirmCriteria.isPending}
+                    className="bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Unlock size={16} /> Reabrir Edição dos Critérios
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">

@@ -3,7 +3,7 @@ import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable,
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
-import { convertScoreToPercentage, normalizeWeights } from "../lib/calculations.js";
+import { convertScoreToPercentage } from "../lib/calculations.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,10 +34,9 @@ router.get("/events", async (req, res) => {
   res.json(enriched);
 });
 
-router.get("/events/:id", async (req, res) => {
-  const id = parseInt(req.params.id as string);
+async function loadEventDetail(id: number) {
   const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
-  if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (!ev) return null;
 
   const participants = await db
     .select({
@@ -71,10 +70,17 @@ router.get("/events/:id", async (req, res) => {
   const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
   const enrichedCriteria = criteria.map(c => {
     const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0 };
+    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0 };
   });
 
-  res.json({ ...ev, participants, criteria: enrichedCriteria, evaluationMatrix: [], results: [] });
+  return { ...ev, participants, criteria: enrichedCriteria, evaluationMatrix: [], results: [] };
+}
+
+router.get("/events/:id", async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const detail = await loadEventDetail(id);
+  if (!detail) { res.status(404).json({ error: "Não encontrado" }); return; }
+  res.json(detail);
 });
 
 router.post("/events", requireRole("admin", "rh", "avaliador"), async (req, res) => {
@@ -198,42 +204,56 @@ router.get("/events/:id/criteria", async (req, res) => {
   const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
   res.json(criteria.map(c => {
     const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, responsibleAreaName: null };
+    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0, responsibleAreaName: null };
   }));
 });
 
+const TARGET_WEIGHT = 20;
+
+type CriterionConfigItem = { criterionId: number; active: boolean; weight: number };
+
 router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const { activeCriterionIds } = req.body;
+  const items = (req.body?.criteria ?? []) as CriterionConfigItem[];
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ error: "Envie a lista de critérios (criteria) do evento" });
+    return;
+  }
+
   const existing = await db
     .select({
       id: eventCriteriaTable.id,
       criterionId: eventCriteriaTable.criterionId,
+      active: eventCriteriaTable.active,
+      weightOverride: eventCriteriaTable.weightOverride,
       originalWeight: criteriaTable.defaultWeight,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(eq(eventCriteriaTable.eventId, eventId));
 
-  const activeIds = activeCriterionIds as number[];
-  const activeRows = existing.filter(ec => activeIds.includes(ec.criterionId));
-
-  const TARGET_WEIGHT = 20;
-  const redistributed = new Map<number, number>();
-  if (activeRows.length > 0) {
-    const rawWeights = activeRows.map(ec => parseFloat(ec.originalWeight ?? "1"));
-    const normalized = normalizeWeights(rawWeights, TARGET_WEIGHT);
-    activeRows.forEach((ec, idx) => {
-      redistributed.set(ec.id, normalized[idx]);
-    });
+  // Validate the resulting persisted active-weight sum (merging unchanged rows
+  // with the incoming payload), not just the payload itself.
+  const resultingActiveSum = existing.reduce((s, ec) => {
+    const item = items.find(i => i.criterionId === ec.criterionId);
+    const active = item ? item.active : ec.active;
+    if (!active) return s;
+    const weight = item
+      ? (Number(item.weight) || 0)
+      : parseFloat(ec.weightOverride ?? ec.originalWeight ?? "0");
+    return s + weight;
+  }, 0);
+  if (Math.abs(resultingActiveSum - TARGET_WEIGHT) > 0.01) {
+    res.status(400).json({ error: `A soma dos pesos dos critérios ativos deve ser ${TARGET_WEIGHT} (atual: ${Math.round(resultingActiveSum * 100) / 100})` });
+    return;
   }
 
   for (const ec of existing) {
-    const isActive = activeIds.includes(ec.criterionId);
-    const newWeight = isActive ? String(redistributed.get(ec.id) ?? parseFloat(ec.originalWeight ?? "1")) : null;
+    const item = items.find(i => i.criterionId === ec.criterionId);
+    if (!item) continue;
     await db.update(eventCriteriaTable).set({
-      active: isActive,
-      weightOverride: newWeight,
+      active: item.active,
+      weightOverride: item.active ? String(Number(item.weight) || 0) : null,
     }).where(eq(eventCriteriaTable.id, ec.id));
   }
 
@@ -263,6 +283,33 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
       weight: c.active ? parseFloat(c.weightOverride ?? c.originalWeight ?? "1") : 0,
     };
   }));
+});
+
+router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const confirmed = req.body?.confirmed !== false;
+  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+
+  if (confirmed) {
+    const rows = await db
+      .select({ active: eventCriteriaTable.active, originalWeight: criteriaTable.defaultWeight, weightOverride: eventCriteriaTable.weightOverride })
+      .from(eventCriteriaTable)
+      .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+      .where(eq(eventCriteriaTable.eventId, id));
+    const sum = rows.filter(r => r.active).reduce((s, r) => s + parseFloat(r.weightOverride ?? r.originalWeight ?? "1"), 0);
+    if (Math.abs(sum - TARGET_WEIGHT) > 0.01) {
+      res.status(400).json({ error: `Ajuste os pesos para somar ${TARGET_WEIGHT} antes de confirmar (atual: ${Math.round(sum * 100) / 100})` });
+      return;
+    }
+  }
+
+  const [ev] = await db.update(eventsTable).set({
+    criteriaConfirmed: confirmed,
+    criteriaConfirmedAt: confirmed ? new Date() : null,
+  }).where(eq(eventsTable.id, id)).returning();
+  await audit(req.user!.userId, confirmed ? "confirm_criteria" : "reopen_criteria", "events", id, before, ev);
+  res.json(await loadEventDetail(id));
 });
 
 export default router;

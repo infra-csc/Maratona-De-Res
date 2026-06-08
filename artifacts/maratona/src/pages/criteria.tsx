@@ -25,7 +25,7 @@ export default function CriteriaPage() {
   const { data: areas } = useGetAreas();
 
   const { register, handleSubmit, reset, setValue } = useForm<CriterionInput>({
-    defaultValues: { defaultWeight: 1, displayOrder: 0 },
+    defaultValues: { defaultWeight: 1 },
   });
 
   const createMutation = useCreateCriterion({
@@ -127,15 +127,9 @@ export default function CriteriaPage() {
                   <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Descrição do que é avaliado</Label>
                   <Input data-testid="input-criterion-desc" {...register("description")} placeholder="Instruções para o avaliador..." className="h-11 rounded-none border-2 border-[#191c1e]" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Peso Padrão</Label>
-                    <Input data-testid="input-criterion-weight" type="number" min="0" step="1" {...register("defaultWeight", { valueAsNumber: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Ordem de Exibição</Label>
-                    <Input type="number" {...register("displayOrder", { valueAsNumber: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Peso Padrão</Label>
+                  <Input data-testid="input-criterion-weight" type="number" min="0" step="1" {...register("defaultWeight", { valueAsNumber: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Área Responsável (Opcional)</Label>
@@ -178,12 +172,11 @@ export default function CriteriaPage() {
                     <th className="px-6 py-4 text-xs font-bold uppercase italic">Critério & Descrição</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic">Área Responsável</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-center">Peso</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-center">Ordem</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
-                  {(criteria ?? []).sort((a,b) => a.displayOrder - b.displayOrder).map(c => (
+                  {(criteria ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => (
                     <tr key={c.id} data-testid={`row-criterion-${c.id}`} className={`hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group ${!c.active ? 'opacity-60' : ''}`}>
                       <td className="px-6 py-4">
                         <p className="font-bold italic uppercase text-[#191c1e] group-hover:text-[#506600] transition-colors">{c.name}</p>
@@ -203,9 +196,6 @@ export default function CriteriaPage() {
                           <span className="text-lg font-black italic">{Number(c.defaultWeight).toFixed(0)}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center text-[#444933] font-bold italic">
-                        {c.displayOrder}
-                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-3">
                           <span className={`text-xs font-bold uppercase italic ${c.active ? 'text-[#506600]' : 'text-[#747a60]'}`}>
@@ -222,7 +212,7 @@ export default function CriteriaPage() {
                     </tr>
                   ))}
                   {(!criteria || criteria.length === 0) && (
-                    <tr><td colSpan={5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério configurado.</td></tr>
+                    <tr><td colSpan={4} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério configurado.</td></tr>
                   )}
                 </tbody>
               </table>

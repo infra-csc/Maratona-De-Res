@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target } from "lucide-react";
+import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { cn } from "@/lib/utils";
@@ -95,6 +95,7 @@ export default function EvaluationsPage() {
   const feedbackReleased = eventResult?.feedbackReleased ?? false;
 
   const currentEvent = events?.find(e => e.id === selectedEventId);
+  const criteriaLocked = currentEvent ? !currentEvent.criteriaConfirmed : false;
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
@@ -271,7 +272,15 @@ export default function EvaluationsPage() {
               <div className="space-y-4">
                 <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1">Critérios de Avaliação</h3>
 
-                {activeCriteria.length === 0 ? (
+                {criteriaLocked ? (
+                  <div data-testid="notice-criteria-locked" className="text-center py-14 bg-[#fff4e5] border-2 border-[#191c1e] px-6">
+                    <div className="w-14 h-14 border-2 border-[#191c1e] bg-[#ff5722] text-white flex items-center justify-center mx-auto mb-4">
+                      <Lock size={26} />
+                    </div>
+                    <h2 className="text-2xl italic uppercase font-black tracking-tight text-[#b02f00] mb-1">Avaliação bloqueada</h2>
+                    <p className="text-sm md:text-base italic text-[#444933] max-w-md mx-auto">Os critérios deste evento ainda não foram confirmados pelo RH. Aguarde a liberação para iniciar a avaliação da equipe.</p>
+                  </div>
+                ) : activeCriteria.length === 0 ? (
                   <div className="text-center py-12 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">Nenhum critério ativo neste evento.</div>
                 ) : (
                   <div className={`bg-white border-2 border-[#191c1e] p-6 md:p-8 ${HARD_SHADOW}`}>

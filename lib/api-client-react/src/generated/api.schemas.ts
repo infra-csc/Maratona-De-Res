@@ -144,6 +144,7 @@ export interface Event {
   evaluationProgress?: number;
   /** @nullable */
   averageScore?: number | null;
+  criteriaConfirmed?: boolean;
   createdAt?: string;
 }
 
@@ -170,6 +171,7 @@ export interface EventCriterion {
   /** @nullable */
   weightOverride?: number | null;
   normalizedWeight: number;
+  weight?: number;
 }
 
 export interface EvaluationMatrixCell {
@@ -233,6 +235,7 @@ export interface EventDetail {
   forcedClosed?: boolean;
   /** @nullable */
   forcedCloseReason?: string | null;
+  criteriaConfirmed?: boolean;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   evaluationMatrix?: EvaluationMatrixRow[];
@@ -304,8 +307,18 @@ export interface CriterionUpdate {
   displayOrder?: number;
 }
 
+export type EventCriteriaUpdateCriteriaItem = {
+  criterionId: number;
+  active: boolean;
+  weight: number;
+};
+
 export interface EventCriteriaUpdate {
-  activeCriterionIds: number[];
+  criteria: EventCriteriaUpdateCriteriaItem[];
+}
+
+export interface EventCriteriaConfirm {
+  confirmed: boolean;
 }
 
 export interface Evaluation {

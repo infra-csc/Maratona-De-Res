@@ -112,6 +112,10 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
     res.status(400).json({ error: "Evento fechado ou não encontrado" });
     return;
   }
+  if (req.user!.role === "avaliador" && !event.criteriaConfirmed) {
+    res.status(400).json({ error: "Os critérios deste evento ainda não foram confirmados pelo RH. Aguarde a liberação para avaliar." });
+    return;
+  }
 
   const [existing] = await db.select().from(evaluationsTable)
     .where(and(

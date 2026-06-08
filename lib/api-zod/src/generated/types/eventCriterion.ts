@@ -18,4 +18,5 @@ export interface EventCriterion {
   /** @nullable */
   weightOverride?: number | null;
   normalizedWeight: number;
+  weight?: number;
 }

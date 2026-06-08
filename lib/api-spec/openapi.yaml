@@ -654,6 +654,31 @@ paths:
                 items:
                   $ref: "#/components/schemas/EventCriterion"
 
+  /events/{id}/criteria/confirm:
+    post:
+      operationId: confirmEventCriteria
+      tags: [events]
+      summary: Confirm event criteria and unlock evaluation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCriteriaConfirm"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+
   /criteria:
     get:
       operationId: getCriteria
@@ -1749,6 +1774,8 @@ components:
           type: number
         averageScore:
           type: ["number", "null"]
+        criteriaConfirmed:
+          type: boolean
         createdAt:
           type: string
 
@@ -1782,6 +1809,8 @@ components:
           type: boolean
         forcedCloseReason:
           type: ["string", "null"]
+        criteriaConfirmed:
+          type: boolean
         participants:
           type: array
           items:
@@ -1954,15 +1983,32 @@ components:
           type: ["number", "null"]
         normalizedWeight:
           type: number
+        weight:
+          type: number
 
     EventCriteriaUpdate:
       type: object
-      required: [activeCriterionIds]
+      required: [criteria]
       properties:
-        activeCriterionIds:
+        criteria:
           type: array
           items:
-            type: integer
+            type: object
+            required: [criterionId, active, weight]
+            properties:
+              criterionId:
+                type: integer
+              active:
+                type: boolean
+              weight:
+                type: number
+
+    EventCriteriaConfirm:
+      type: object
+      required: [confirmed]
+      properties:
+        confirmed:
+          type: boolean
 
     Evaluation:
       type: object

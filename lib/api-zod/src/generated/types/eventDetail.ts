@@ -29,6 +29,7 @@ export interface EventDetail {
   forcedClosed?: boolean;
   /** @nullable */
   forcedCloseReason?: string | null;
+  criteriaConfirmed?: boolean;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   evaluationMatrix?: EvaluationMatrixRow[];

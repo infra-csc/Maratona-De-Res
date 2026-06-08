@@ -30,5 +30,6 @@ export interface Event {
   evaluationProgress?: number;
   /** @nullable */
   averageScore?: number | null;
+  criteriaConfirmed?: boolean;
   createdAt?: string;
 }

@@ -20,6 +20,8 @@ export const eventsTable = pgTable("events", {
   forcedCloseReason: text("forced_close_reason"),
   feedbackReleased: boolean("feedback_released").notNull().default(false),
   feedbackReleasedAt: timestamp("feedback_released_at"),
+  criteriaConfirmed: boolean("criteria_confirmed").notNull().default(false),
+  criteriaConfirmedAt: timestamp("criteria_confirmed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   externalIdUq: uniqueIndex("events_external_id_uq").on(t.externalId),

@@ -361,6 +361,7 @@ export const GetEventsResponseItem = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -403,6 +404,7 @@ export const GetEventResponse = zod.object({
   "status": zod.string(),
   "forcedClosed": zod.boolean().optional(),
   "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -421,7 +423,8 @@ export const GetEventResponse = zod.object({
   "active": zod.boolean(),
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
-  "normalizedWeight": zod.number()
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional()
 })).optional(),
   "evaluationMatrix": zod.array(zod.object({
   "employeeId": zod.number(),
@@ -490,6 +493,7 @@ export const UpdateEventResponse = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -532,6 +536,7 @@ export const CloseEventResponse = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -561,6 +566,7 @@ export const ReopenEventResponse = zod.object({
   "participantCount": zod.number().optional(),
   "evaluationProgress": zod.number().optional(),
   "averageScore": zod.number().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -710,7 +716,8 @@ export const GetEventCriteriaResponseItem = zod.object({
   "active": zod.boolean(),
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
-  "normalizedWeight": zod.number()
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional()
 })
 export const GetEventCriteriaResponse = zod.array(GetEventCriteriaResponseItem)
 
@@ -723,7 +730,11 @@ export const UpdateEventCriteriaParams = zod.object({
 })
 
 export const UpdateEventCriteriaBody = zod.object({
-  "activeCriterionIds": zod.array(zod.number())
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "active": zod.boolean(),
+  "weight": zod.number()
+}))
 })
 
 export const UpdateEventCriteriaResponseItem = zod.object({
@@ -735,9 +746,88 @@ export const UpdateEventCriteriaResponseItem = zod.object({
   "active": zod.boolean(),
   "originalWeight": zod.number().optional(),
   "weightOverride": zod.number().nullish(),
-  "normalizedWeight": zod.number()
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional()
 })
 export const UpdateEventCriteriaResponse = zod.array(UpdateEventCriteriaResponseItem)
+
+
+/**
+ * @summary Confirm event criteria and unlock evaluation
+ */
+export const ConfirmEventCriteriaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ConfirmEventCriteriaBody = zod.object({
+  "confirmed": zod.boolean()
+})
+
+export const ConfirmEventCriteriaResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "year": zod.number(),
+  "quarter": zod.number(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "participants": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional()
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "eventId": zod.number(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional()
+})
 
 
 /**
