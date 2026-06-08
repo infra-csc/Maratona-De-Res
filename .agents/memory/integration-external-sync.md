@@ -16,3 +16,5 @@ Maratona's `POST /api/integration/sync` pulls data from an external Replit app a
 **Why:** `externalId` is the upsert key (employees/events); participations upsert by resolved `(eventId, employeeId)`. A participation whose event/employee externalId isn't found is skipped and logged.
 
 **How to apply:** year/quarter derived from startDate when absent; synced employees get `sourceType: "erp"`. Sync runs in a DB transaction with a single-flight `syncing` guard. Status endpoint surfaces the last run's log lines.
+
+**Function filter:** only collaborators/participations whose function is "Cenotécnica" or "Cenotécnica Local" are imported (see `ALLOWED_FUNCTIONS`). Comparison is accent/case-insensitive. A participation is kept if its function matches; an employee is kept if their function matches OR they're referenced by a kept participation. All events are imported (events have no function). To change the relevant roles, edit `ALLOWED_FUNCTIONS` in integration.ts.

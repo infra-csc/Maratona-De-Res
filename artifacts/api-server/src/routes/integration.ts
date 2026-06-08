@@ -40,6 +40,18 @@ function deriveYearQuarter(dateStr?: string) {
   return { year: d.getUTCFullYear(), quarter: Math.ceil((d.getUTCMonth() + 1) / 3) };
 }
 
+// Apenas estas funções são relevantes para a Maratona.
+const ALLOWED_FUNCTIONS = new Set(["cenotecnica", "cenotecnica local"]);
+function normalizeFunction(s?: string): string {
+  return (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+function isAllowedFunction(s?: string): boolean {
+  return ALLOWED_FUNCTIONS.has(normalizeFunction(s));
+}
+function extIdOf(o: { externalId?: string | number; id?: string | number }): string | null {
+  return o.externalId != null ? String(o.externalId) : (o.id != null ? String(o.id) : null);
+}
+
 type ExtEmployee = {
   externalId?: string | number; id?: string | number; name: string;
   document?: string; email?: string; phone?: string;
@@ -114,9 +126,22 @@ router.post("/integration/sync", async (req, res) => {
     const extParticipations = rawParticipations as ExtParticipation[];
     log(`Recebidos: ${extEmployees.length} colaboradores, ${extEvents.length} eventos, ${extParticipations.length} participações.`);
 
+    // Filtro de função: somente Cenotécnica / Cenotécnica Local.
+    const keptParticipations = extParticipations.filter(p => isAllowedFunction(p.functionName ?? p.function));
+    const neededEmpIds = new Set(
+      keptParticipations
+        .map(p => (p.employeeExternalId != null ? String(p.employeeExternalId) : (p.employeeId != null ? String(p.employeeId) : null)))
+        .filter((v): v is string => !!v)
+    );
+    const keptEmployees = extEmployees.filter(e => {
+      const id = extIdOf(e);
+      return isAllowedFunction(e.functionName ?? e.function) || (id != null && neededEmpIds.has(id));
+    });
+    log(`Filtro de função (Cenotécnica / Cenotécnica Local): mantidos ${keptEmployees.length}/${extEmployees.length} colaboradores e ${keptParticipations.length}/${extParticipations.length} participações.`);
+
     await db.transaction(async (tx) => {
       // Colaboradores — upsert por externalId
-      for (const e of extEmployees) {
+      for (const e of keptEmployees) {
         const externalId = e.externalId != null ? String(e.externalId) : (e.id != null ? String(e.id) : null);
         if (!externalId || !e.name) continue;
         const fields = {
@@ -171,7 +196,7 @@ router.post("/integration/sync", async (req, res) => {
       const evMap = new Map(allEvents.map(e => [e.externalId!, e.id]));
 
       // Participações — upsert por (eventId, employeeId)
-      for (const p of extParticipations) {
+      for (const p of keptParticipations) {
         const evExt = p.eventExternalId != null ? String(p.eventExternalId) : (p.eventId != null ? String(p.eventId) : null);
         const empExt = p.employeeExternalId != null ? String(p.employeeExternalId) : (p.employeeId != null ? String(p.employeeId) : null);
         if (!evExt || !empExt) continue;
