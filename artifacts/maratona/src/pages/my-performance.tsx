@@ -16,7 +16,7 @@ import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 const QUARTER_LABELS = ["1º Trimestre", "2º Trimestre", "3º Trimestre", "4º Trimestre"];
-const YEAR_OPTIONS = [2024, 2025, 2026, 2027];
+const YEAR_OPTIONS = [2026];
 
 function usePeriod() {
   const now = new Date();
@@ -164,8 +164,8 @@ function EventCard({ event }: { event: EventSummary }) {
 
 export default function MyPerformancePage() {
   const { user } = useAuth();
-  const { year: defaultYear, quarter: defaultQuarter } = usePeriod();
-  const [year, setYear] = useState(defaultYear);
+  const { quarter: defaultQuarter } = usePeriod();
+  const [year, setYear] = useState(2026);
   const [quarter, setQuarter] = useState(defaultQuarter);
 
   const { data, isLoading, error } = useQuery<PerformanceData>({

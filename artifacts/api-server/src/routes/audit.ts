@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 
 const router = Router();
 router.use(requireAuth);
-router.use(requireRole("admin", "rh", "diretoria"));
+router.use(requireRole("admin", "rh"));
 
 router.get("/audit-logs", async (req, res) => {
   const { userId, entity, action, from, to, page = "1", limit = "50" } = req.query;

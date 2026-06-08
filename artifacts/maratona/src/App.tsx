@@ -104,15 +104,15 @@ function AppRoutes() {
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />
       <Route path="/evaluations" component={() => <ProtectedRoute component={EvaluationsPage} />} />
       <Route path="/calibrations" component={() => <ProtectedRoute component={CalibrationsPage} roles={["admin", "rh", "avaliador", "diretoria"]} />} />
-      <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} roles={["admin", "rh", "avaliador"]} />} />
+      <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} roles={["admin", "rh", "avaliador", "diretoria"]} />} />
       <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/ranking" component={() => <ProtectedRoute component={RankingPage} />} />
-      <Route path="/criteria" component={() => <ProtectedRoute component={CriteriaPage} roles={["admin", "rh"]} />} />
+      <Route path="/criteria" component={() => <ProtectedRoute component={CriteriaPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/areas" component={() => <ProtectedRoute component={AreasPage} roles={["admin", "rh"]} />} />
       <Route path="/users" component={() => <ProtectedRoute component={UsersPage} roles={["admin", "rh"]} />} />
-      <Route path="/rules" component={() => <ProtectedRoute component={RulesPage} roles={["admin", "rh"]} />} />
+      <Route path="/rules" component={() => <ProtectedRoute component={RulesPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/integration" component={() => <ProtectedRoute component={IntegrationPage} roles={["admin", "rh"]} />} />
-      <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} roles={["admin", "rh", "diretoria"]} />} />
+      <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} roles={["admin", "rh"]} />} />
       <Route path="/meu-desempenho" component={() => <ProtectedRoute component={MyPerformancePage} />} />
       <Route component={NotFound} />
     </Switch>

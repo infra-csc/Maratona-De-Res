@@ -49,7 +49,7 @@ const navGroups: NavGroup[] = [
       { label: "Faltas", path: "/absences", icon: UserCheck, roles: ["admin", "rh", "avaliador"] },
       { label: "Regras do Sistema", path: "/rules", icon: Settings, roles: ["admin", "rh"] },
       { label: "Integração", path: "/integration", icon: Database, roles: ["admin", "rh"] },
-      { label: "Auditoria", path: "/audit", icon: FolderLock, roles: ["admin", "rh", "diretoria"] },
+      { label: "Auditoria", path: "/audit", icon: FolderLock, roles: ["admin", "rh"] },
     ]
   },
   {
@@ -102,6 +102,10 @@ export function Sidebar() {
             const visibleItems = group.items.filter(item => {
               // Avaliadores have a focused experience: only the Avaliações tab.
               if (user?.role === "avaliador") return item.path === "/evaluations";
+              // Diretoria sees a focused set of sections (calibração e acompanhamento).
+              if (user?.role === "diretoria") {
+                return ["/", "/calibrations", "/results", "/ranking", "/rules", "/absences", "/criteria"].includes(item.path);
+              }
               return !item.roles || (user && item.roles.includes(user.role));
             });
 
