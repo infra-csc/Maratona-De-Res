@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey, exportPendingEvaluations } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock } from "lucide-react";
+import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ export default function EvaluationsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
 
@@ -90,6 +92,17 @@ export default function EvaluationsPage() {
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
   const openEvents = (events ?? []).filter(e => e.status === "open");
+  // Only events whose criteria the RH has already confirmed can be evaluated.
+  const configuredEvents = openEvents.filter(e => e.criteriaConfirmed);
+  const pickedEvent = configuredEvents.find(e => e.id === selectedEventId);
+
+  // If the selected event stops being selectable (closed or criteria unconfirmed
+  // server-side), clear the selection so trigger text and loaded data stay in sync.
+  useEffect(() => {
+    if (selectedEventId == null || !events) return;
+    const stillValid = events.some(e => e.id === selectedEventId && e.status === "open" && e.criteriaConfirmed);
+    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); }
+  }, [selectedEventId, events]);
   const canRelease = user && ["admin", "rh", "diretoria"].includes(user.role);
   const eventComplete = eventResult?.isComplete ?? false;
   const feedbackReleased = eventResult?.feedbackReleased ?? false;
@@ -186,23 +199,68 @@ export default function EvaluationsPage() {
         </section>
 
         {/* STEP 01 — Selecionar Evento */}
-        <section className="bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden">
+        <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 px-3 py-1.5 bg-[#ccff00] border-l-2 border-b-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider">ETAPA 01</div>
-          <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight mb-4">Selecionar Evento</h3>
-          <div className="w-full max-w-md">
-            <Select
-              value={selectedEventId ? String(selectedEventId) : ""}
-              onValueChange={v => { setSelectedEventId(Number(v)); setScores({}); setComments({}); }}
-            >
-              <SelectTrigger data-testid="select-event" className="h-12 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-                <SelectValue placeholder="Selecione um evento para avaliar..." />
-              </SelectTrigger>
-              <SelectContent>
-                {openEvents.map(ev => (
-                  <SelectItem key={ev.id} value={String(ev.id)}>{ev.name} — {ev.clientName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight mb-1">Selecionar Evento</h3>
+          <p className="text-sm text-[#444933] italic mb-5">Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação.</p>
+
+          <div className="w-full max-w-2xl">
+            <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  role="combobox"
+                  aria-expanded={eventPickerOpen}
+                  data-testid="select-event"
+                  disabled={configuredEvents.length === 0}
+                  className={`w-full min-h-[3.25rem] px-4 py-3 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#f7f9fb] ${HARD_SHADOW}`}
+                >
+                  {pickedEvent ? (
+                    <span className="flex flex-col min-w-0">
+                      <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
+                      <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName} · {pickedEvent.city}/{pickedEvent.state}</span>
+                    </span>
+                  ) : (
+                    <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60]">
+                      {configuredEvents.length === 0 ? "Nenhum evento configurado disponível" : "Selecione um evento para avaliar..."}
+                    </span>
+                  )}
+                  <ChevronsUpDown size={18} className="shrink-0 text-[#191c1e]" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                <Command className="rounded-none">
+                  <CommandInput data-testid="input-event-search" placeholder="Buscar por evento ou cliente..." className="italic" />
+                  <CommandList className="max-h-[320px]">
+                    <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {configuredEvents.map(ev => (
+                        <CommandItem
+                          key={ev.id}
+                          value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
+                          data-testid={`option-event-${ev.id}`}
+                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setEventPickerOpen(false); }}
+                          className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
+                        >
+                          <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
+                          <span className="flex flex-col min-w-0">
+                            <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
+                            <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{ev.clientName} · {ev.city}/{ev.state}</span>
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+              <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
+              <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#444933]">
+                Apenas eventos já configurados e liberados pelo RH aparecem nesta lista.
+              </p>
+            </div>
           </div>
         </section>
 
