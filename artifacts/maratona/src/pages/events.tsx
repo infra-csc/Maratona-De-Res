@@ -12,13 +12,12 @@ const currentYear = new Date().getFullYear();
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
-function StatusChip({ status }: { status: string }) {
-  const open = status === "open";
+function StatusChip({ confirmed }: { confirmed: boolean }) {
   return (
     <span
-      className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block ${open ? "bg-[#ccff00] text-[#161e00]" : "bg-[#d8dadc] text-[#444933]"}`}
+      className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block ${confirmed ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"}`}
     >
-      <span className="inline-block skew-x-[8deg]">{open ? "Aberto" : "Fechado"}</span>
+      <span className="inline-block skew-x-[8deg]">{confirmed ? "Configurado" : "Aguardando RH"}</span>
     </span>
   );
 }
@@ -31,9 +30,9 @@ export default function EventsPage() {
   const [filterQuarter, setFilterQuarter] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const queryKey = getGetEventsQueryKey({ year: Number(filterYear), status: filterStatus === "all" ? undefined : filterStatus });
+  const queryKey = getGetEventsQueryKey({ year: Number(filterYear) });
   const { data: events, isLoading } = useGetEvents(
-    { year: Number(filterYear), status: filterStatus === "all" ? undefined : filterStatus }, 
+    { year: Number(filterYear) },
     { query: { queryKey } }
   );
 
@@ -44,10 +43,13 @@ export default function EventsPage() {
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
   });
 
+  const todayStr = new Date().toISOString().slice(0, 10);
   const filtered = (events ?? []).filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchQuarter = filterQuarter === "all" || ev.quarter === Number(filterQuarter);
-    return matchSearch && matchQuarter;
+    const matchConfig = filterStatus === "all" || (filterStatus === "configured" ? !!ev.criteriaConfirmed : !ev.criteriaConfirmed);
+    const isFinished = ev.endDate < todayStr;
+    return matchSearch && matchQuarter && matchConfig && isFinished;
   });
 
   const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
@@ -87,8 +89,8 @@ export default function EventsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="open">Abertos</SelectItem>
-                <SelectItem value="closed">Fechados</SelectItem>
+                <SelectItem value="configured">Configurados</SelectItem>
+                <SelectItem value="pending">Aguardando RH</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterYear} onValueChange={setFilterYear}>
@@ -138,7 +140,7 @@ export default function EventsPage() {
                     <div className="flex justify-between items-start gap-4 mb-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <StatusChip status={ev.status} />
+                          <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
                           {ev.forcedClosed && (
                             <span className="bg-[#ff5722] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
                               <span className="inline-block skew-x-[8deg]">Fechamento Forçado</span>
