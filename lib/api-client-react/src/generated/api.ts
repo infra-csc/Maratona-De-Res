@@ -74,6 +74,7 @@ import type {
   GetQuarterlyResultsParams,
   GetRankingParams,
   HealthStatus,
+  ImpersonateInput,
   ImportResult,
   IntegrationStatus,
   LoginInput,
@@ -401,6 +402,77 @@ export const useLogout = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getLogoutMutationOptions(options));
+    }
+
+export const getImpersonateUrl = () => {
+
+
+
+
+  return `/auth/impersonate`
+}
+
+/**
+ * @summary Admin dev mode — get a session token to view as another user
+ */
+export const impersonate = async (impersonateInput: ImpersonateInput, options?: RequestInit): Promise<AuthResponse> => {
+
+  return customFetch<AuthResponse>(getImpersonateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      impersonateInput,)
+  }
+);}
+
+
+
+
+export const getImpersonateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof impersonate>>, TError,{data: BodyType<ImpersonateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof impersonate>>, TError,{data: BodyType<ImpersonateInput>}, TContext> => {
+
+const mutationKey = ['impersonate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof impersonate>>, {data: BodyType<ImpersonateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  impersonate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImpersonateMutationResult = NonNullable<Awaited<ReturnType<typeof impersonate>>>
+    export type ImpersonateMutationBody = BodyType<ImpersonateInput>
+    export type ImpersonateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin dev mode — get a session token to view as another user
+ */
+export const useImpersonate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof impersonate>>, TError,{data: BodyType<ImpersonateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof impersonate>>,
+        TError,
+        {data: BodyType<ImpersonateInput>},
+        TContext
+      > => {
+      return useMutation(getImpersonateMutationOptions(options));
     }
 
 export const getGetUsersUrl = () => {

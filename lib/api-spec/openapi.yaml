@@ -78,6 +78,25 @@ paths:
         "200":
           description: OK
 
+  /auth/impersonate:
+    post:
+      operationId: impersonate
+      tags: [auth]
+      summary: Admin dev mode — get a session token to view as another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImpersonateInput"
+      responses:
+        "200":
+          description: Impersonation session issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
   /users:
     get:
       operationId: getUsers
@@ -1561,6 +1580,13 @@ components:
           type: string
         password:
           type: string
+
+    ImpersonateInput:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: integer
 
     AuthResponse:
       type: object

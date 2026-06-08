@@ -71,6 +71,7 @@ export * from './getQuarterEligibilityParams';
 export * from './getQuarterlyResultsParams';
 export * from './getRankingParams';
 export * from './healthStatus';
+export * from './impersonateInput';
 export * from './importResult';
 export * from './integrationStatus';
 export * from './loginInput';

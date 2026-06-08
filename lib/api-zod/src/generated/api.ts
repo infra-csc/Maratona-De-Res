@@ -57,6 +57,29 @@ export const GetMeResponse = zod.object({
 
 
 /**
+ * @summary Admin dev mode — get a session token to view as another user
+ */
+export const ImpersonateBody = zod.object({
+  "userId": zod.number()
+})
+
+export const ImpersonateResponse = zod.object({
+  "token": zod.string(),
+  "user": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "role": zod.string(),
+  "areaId": zod.number().nullish(),
+  "areaName": zod.string().nullish(),
+  "employeeId": zod.number().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.string().optional()
+})
+})
+
+
+/**
  * @summary List users
  */
 export const GetUsersResponseItem = zod.object({

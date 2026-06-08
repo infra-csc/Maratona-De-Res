@@ -48,6 +48,11 @@ async function seed() {
     { name: "Diretoria Geral", email: "diretoria@cenografica.com.br", passwordHash: hash, role: "diretoria" },
     { name: "Visualizador", email: "visualizador@cenografica.com.br", passwordHash: hash, role: "visualizador" },
     { name: "Marcos Avaliador Logística", email: "avaliador2@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[1].id },
+    { name: "Avaliador Atendimento e Ativação", email: "avaliador.atendimento@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[2].id },
+    { name: "Avaliador Produção", email: "avaliador.producao@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[3].id },
+    { name: "Avaliador Departamento Pessoal", email: "avaliador.dp@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[4].id },
+    { name: "Avaliador Comercial", email: "avaliador.comercial@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[5].id },
+    { name: "Avaliador Almoxarifado", email: "avaliador.almoxarifado@cenografica.com.br", passwordHash: hash, role: "avaliador", areaId: areas[6].id },
   ]).returning();
 
   console.log(`✓ ${users.length} usuários criados`);

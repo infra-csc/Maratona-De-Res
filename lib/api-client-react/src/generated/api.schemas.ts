@@ -14,6 +14,10 @@ export interface LoginInput {
   password: string;
 }
 
+export interface ImpersonateInput {
+  userId: number;
+}
+
 export interface User {
   id: number;
   name: string;

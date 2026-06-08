@@ -28,6 +28,8 @@ function handleAuthError(error: unknown) {
   if (status === 401 && localStorage.getItem("maratona_token")) {
     localStorage.removeItem("maratona_token");
     localStorage.removeItem("maratona_user");
+    localStorage.removeItem("maratona_real_token");
+    localStorage.removeItem("maratona_real_user");
     const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
     if (!window.location.pathname.endsWith("/login")) {
       window.location.assign(`${base}/login`);

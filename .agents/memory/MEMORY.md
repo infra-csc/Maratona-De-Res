@@ -4,6 +4,7 @@
 - [JWT_SECRET env](jwt-secret-env.md) — keep in encrypted Secrets store; auth.ts throws at startup if missing (no fallback)
 - [API client /api prefix](api-client-prefix.md) — generated paths must be BARE; single /api prefix owned by runtime setBaseUrl, else double-prefix → 401
 - [Confidential endpoint gating](confidential-endpoint-gating.md) — manager-only data must be gated with requireRole server-side; UI hiding is not a security boundary (shared pages have no route guard)
+- [Auth/impersonation storage cleanup](auth-storage-cleanup.md) — every auth-teardown path (401 handler, logout, stopImpersonating) must clear ALL session keys incl. preserved real-admin keys
 - [evaluationProgress scale](event-progress-scale.md) — Event.evaluationProgress is a 0–1 fraction (submitted/total), not a percent; filter "done" with >= 1
 - [Criteria weight validation](criteria-weight-validation.md) — per-event active weights must sum to 20 (tol 0.01, mirror front/back); validate merged persisted sum; HR confirm gates avaliador evaluations
 - [External API sync](integration-external-sync.md) — sync pulls employees/events/participations from external app via EXTERNAL_API_URL+TOKEN; contract the other app must expose

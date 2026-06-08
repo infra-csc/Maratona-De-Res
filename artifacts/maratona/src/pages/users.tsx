@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser, useDeleteUser, useResetUserPassword, useGetAreas, getGetUsersQueryKey } from "@workspace/api-client-react";
+import { useGetUsers, useCreateUser, useDeleteUser, useResetUserPassword, useGetAreas, useImpersonate, getGetUsersQueryKey } from "@workspace/api-client-react";
 import type { UserInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter } from "lucide-react";
+import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -29,7 +29,8 @@ function initials(name: string) {
 }
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, impersonate } = useAuth();
+  const isAdmin = currentUser?.role === "admin";
   const { toast } = useToast();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -63,6 +64,17 @@ export default function UsersPage() {
         toast({ title: "Usuário removido" });
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const impersonateMutation = useImpersonate({
+    mutation: {
+      onSuccess: (res) => {
+        impersonate(res.token, res.user);
+        const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+        window.location.assign(`${base}/`);
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao entrar no modo dev", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -272,6 +284,17 @@ export default function UsersPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {isAdmin && u.id !== currentUser?.id && u.active && (
+                              <button
+                                data-testid={`button-impersonate-${u.id}`}
+                                onClick={() => impersonateMutation.mutate({ data: { userId: u.id } })}
+                                disabled={impersonateMutation.isPending}
+                                title="Visualizar como este usuário (modo dev)"
+                                className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ccff00] transition-all disabled:opacity-50"
+                              >
+                                <Eye size={14} />
+                              </button>
+                            )}
                             <button
                               data-testid={`button-reset-pw-${u.id}`}
                               onClick={() => setResetOpen(u.id)}
