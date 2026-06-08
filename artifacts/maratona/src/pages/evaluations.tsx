@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
-import { cn } from "@/lib/utils";
+import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const currentYear = new Date().getFullYear();
 const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
@@ -99,7 +99,7 @@ function EvaluatorEventCard({
         <span className="text-[11px] font-bold italic uppercase text-[#747a60] shrink-0">T{event.quarter}/{event.year}</span>
       </div>
       <h4 className="text-lg italic uppercase font-black tracking-tight leading-tight">{event.name}</h4>
-      <p className="text-[12px] font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{event.clientName} · {event.city}/{event.state}</p>
+      {formatEventSubtitle(event) && <p className="text-[12px] font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{formatEventSubtitle(event)}</p>}
       <div className="mt-4">
         <div className="flex justify-between items-center mb-1">
           <span className="text-[11px] font-bold italic uppercase text-[#444933]">{submitted} de {total} critérios submetidos</span>
@@ -371,7 +371,7 @@ export default function EvaluationsPage() {
                   {pickedEvent ? (
                     <span className="flex flex-col min-w-0">
                       <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
-                      <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName} · {pickedEvent.city}/{pickedEvent.state}</span>
+                      {formatEventSubtitle(pickedEvent) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>}
                     </span>
                   ) : (
                     <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60]">
@@ -400,7 +400,7 @@ export default function EvaluationsPage() {
                           <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
                           <span className="flex flex-col min-w-0">
                             <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
-                            <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{ev.clientName} · {ev.city}/{ev.state}</span>
+                            {formatEventSubtitle(ev) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
                           </span>
                         </CommandItem>
                       ))}

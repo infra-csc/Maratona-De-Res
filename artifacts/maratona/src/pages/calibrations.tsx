@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, Check, Info, Save, CheckCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const currentYear = new Date().getFullYear();
 
@@ -172,7 +172,7 @@ export default function CalibrationsPage() {
                   {pickedEvent ? (
                     <span className="flex flex-col min-w-0">
                       <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
-                      <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName} · {pickedEvent.city}/{pickedEvent.state}</span>
+                      {formatEventSubtitle(pickedEvent) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>}
                     </span>
                   ) : (
                     <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60]">
@@ -199,7 +199,7 @@ export default function CalibrationsPage() {
                           <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
                           <span className="flex flex-col min-w-0">
                             <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
-                            <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{ev.clientName} · {ev.city}/{ev.state}</span>
+                            {formatEventSubtitle(ev) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
                           </span>
                         </CommandItem>
                       ))}
