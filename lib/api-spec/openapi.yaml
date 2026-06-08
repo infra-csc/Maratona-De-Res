@@ -368,14 +368,6 @@ paths:
       tags: [events]
       summary: List events
       parameters:
-        - name: year
-          in: query
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          schema:
-            type: integer
         - name: status
           in: query
           schema:
@@ -980,14 +972,6 @@ paths:
           in: query
           schema:
             type: integer
-        - name: year
-          in: query
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1145,15 +1129,6 @@ paths:
       operationId: getDashboardSummary
       tags: [dashboard]
       summary: Get dashboard summary
-      parameters:
-        - name: year
-          in: query
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1167,15 +1142,6 @@ paths:
       operationId: getDashboardPlatoonDistribution
       tags: [dashboard]
       summary: Get platoon distribution
-      parameters:
-        - name: year
-          in: query
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1191,15 +1157,6 @@ paths:
       operationId: getDashboardTopEmployees
       tags: [dashboard]
       summary: Get top 10 employees
-      parameters:
-        - name: year
-          in: query
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1215,11 +1172,6 @@ paths:
       operationId: getDashboardQuarterlyEvolution
       tags: [dashboard]
       summary: Get quarterly evolution chart data
-      parameters:
-        - name: year
-          in: query
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1236,16 +1188,6 @@ paths:
       tags: [results]
       summary: Get quarterly results
       parameters:
-        - name: year
-          in: query
-          required: true
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          required: true
-          schema:
-            type: integer
         - name: employeeId
           in: query
           schema:
@@ -1268,7 +1210,7 @@ paths:
     post:
       operationId: closeQuarter
       tags: [results]
-      summary: Close a quarter
+      summary: Close the current cycle
       requestBody:
         required: true
         content:
@@ -1308,20 +1250,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuarterlyResult"
 
-  /quarter-eligibility:
+  /cycle-eligibility:
     get:
-      operationId: getQuarterEligibility
+      operationId: getCycleEligibility
       tags: [results]
-      summary: List quarterly ineligibility records
+      summary: List cycle ineligibility records
       parameters:
-        - name: year
-          in: query
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          schema:
-            type: integer
         - name: employeeId
           in: query
           schema:
@@ -1336,9 +1270,9 @@ paths:
                 items:
                   $ref: "#/components/schemas/QuarterEligibility"
     post:
-      operationId: setQuarterEligibility
+      operationId: setCycleEligibility
       tags: [results]
-      summary: Set quarterly eligibility for an employee
+      summary: Set cycle eligibility for an employee
       requestBody:
         required: true
         content:
@@ -1359,16 +1293,6 @@ paths:
       tags: [ranking]
       summary: Get ranking (Maratona de Resultados)
       parameters:
-        - name: year
-          in: query
-          required: true
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          required: true
-          schema:
-            type: integer
         - name: search
           in: query
           schema:
@@ -1392,14 +1316,6 @@ paths:
         - name: employeeId
           in: query
           required: true
-          schema:
-            type: integer
-        - name: year
-          in: query
-          schema:
-            type: integer
-        - name: quarter
-          in: query
           schema:
             type: integer
       responses:
@@ -1559,17 +1475,6 @@ paths:
       operationId: exportQuarterlyResults
       tags: [exports]
       summary: Export quarterly results CSV
-      parameters:
-        - name: year
-          in: query
-          required: true
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          required: true
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1583,17 +1488,6 @@ paths:
       operationId: exportRanking
       tags: [exports]
       summary: Export ranking CSV
-      parameters:
-        - name: year
-          in: query
-          required: true
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          required: true
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1607,17 +1501,6 @@ paths:
       operationId: exportCajuBonuses
       tags: [exports]
       summary: Export Caju bonus report CSV
-      parameters:
-        - name: year
-          in: query
-          required: true
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          required: true
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1631,17 +1514,6 @@ paths:
       operationId: exportAbsences
       tags: [exports]
       summary: Export absences CSV
-      parameters:
-        - name: year
-          in: query
-          required: false
-          schema:
-            type: integer
-        - name: quarter
-          in: query
-          required: false
-          schema:
-            type: integer
       responses:
         "200":
           description: OK
@@ -1865,7 +1737,7 @@ components:
 
     Event:
       type: object
-      required: [id, name, startDate, endDate, year, quarter, status]
+      required: [id, name, startDate, endDate, cycleId, status]
       properties:
         id:
           type: integer
@@ -1885,10 +1757,10 @@ components:
           type: string
         endDate:
           type: string
-        year:
+        cycleId:
           type: integer
-        quarter:
-          type: integer
+        cycleName:
+          type: string
         status:
           type: string
         eventWeight:
@@ -1912,7 +1784,7 @@ components:
 
     EventDetail:
       type: object
-      required: [id, name, startDate, endDate, year, quarter, status]
+      required: [id, name, startDate, endDate, cycleId, status]
       properties:
         id:
           type: integer
@@ -1930,10 +1802,10 @@ components:
           type: string
         endDate:
           type: string
-        year:
+        cycleId:
           type: integer
-        quarter:
-          type: integer
+        cycleName:
+          type: string
         status:
           type: string
         forcedClosed:
@@ -1969,7 +1841,7 @@ components:
 
     EventInput:
       type: object
-      required: [name, startDate, endDate, year, quarter]
+      required: [name, startDate, endDate]
       properties:
         name:
           type: string
@@ -1985,10 +1857,6 @@ components:
           type: string
         endDate:
           type: string
-        year:
-          type: integer
-        quarter:
-          type: integer
 
     EventUpdate:
       type: object
@@ -2320,7 +2188,7 @@ components:
 
     Absence:
       type: object
-      required: [id, employeeId, date, year, quarter, quantity, penaltyType, points]
+      required: [id, employeeId, date, cycleId, quantity, penaltyType, points]
       properties:
         id:
           type: integer
@@ -2341,9 +2209,7 @@ components:
           type: integer
         date:
           type: string
-        year:
-          type: integer
-        quarter:
+        cycleId:
           type: integer
         quantity:
           type: integer
@@ -2356,7 +2222,7 @@ components:
 
     AbsenceInput:
       type: object
-      required: [employeeId, penaltyType, date, year, quarter]
+      required: [employeeId, penaltyType, date]
       properties:
         employeeId:
           type: integer
@@ -2367,10 +2233,6 @@ components:
           enum: [falta, atraso_30, atraso_60, merito_galpao, merito_evento]
         date:
           type: string
-        year:
-          type: integer
-        quarter:
-          type: integer
         quantity:
           type: integer
           minimum: 1
@@ -2475,12 +2337,12 @@ components:
 
     DashboardSummary:
       type: object
-      required: [year, quarter, totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations, eventsInCalibration, quarterAverage, totalBonusPreview, totalAbsences, eventsWithPendencies, atRiskEmployees]
+      required: [totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations, eventsInCalibration, quarterAverage, totalBonusPreview, totalAbsences, eventsWithPendencies, atRiskEmployees]
       properties:
-        year:
+        cycleId:
           type: integer
-        quarter:
-          type: integer
+        cycleName:
+          type: string
         totalEvents:
           type: integer
         totalEmployeesEvaluated:
@@ -2543,11 +2405,9 @@ components:
 
     QuarterlyEvolution:
       type: object
-      required: [year, quarter, label, average]
+      required: [label, average]
       properties:
-        year:
-          type: integer
-        quarter:
+        cycleId:
           type: integer
         label:
           type: string
@@ -2596,7 +2456,7 @@ components:
 
     QuarterlyResult:
       type: object
-      required: [employeeId, employeeName, year, quarter, finalResult, platoon, bonusValue]
+      required: [employeeId, employeeName, finalResult, platoon, bonusValue]
       properties:
         id:
           type: integer
@@ -2604,17 +2464,21 @@ components:
           type: integer
         employeeName:
           type: string
-        year:
-          type: integer
-        quarter:
+        cycleId:
           type: integer
         eventsCount:
           type: integer
+        participatedEventsCount:
+          type: integer
+        scoreSum:
+          type: number
         grossAverage:
           type: number
         totalAbsences:
           type: integer
         absencePenalty:
+          type: number
+        meritPoints:
           type: number
         finalResult:
           type: number
@@ -2769,7 +2633,7 @@ components:
 
     QuarterEligibility:
       type: object
-      required: [id, employeeId, year, quarter, eligible]
+      required: [id, employeeId, eligible]
       properties:
         id:
           type: integer
@@ -2777,9 +2641,7 @@ components:
           type: integer
         employeeName:
           type: ["string", "null"]
-        year:
-          type: integer
-        quarter:
+        cycleId:
           type: integer
         eligible:
           type: boolean
@@ -2794,13 +2656,9 @@ components:
 
     QuarterEligibilityInput:
       type: object
-      required: [employeeId, year, quarter, eligible]
+      required: [employeeId, eligible]
       properties:
         employeeId:
-          type: integer
-        year:
-          type: integer
-        quarter:
           type: integer
         eligible:
           type: boolean
@@ -2820,12 +2678,7 @@ components:
 
     CloseQuarterInput:
       type: object
-      required: [year, quarter]
       properties:
-        year:
-          type: integer
-        quarter:
-          type: integer
         forced:
           type: boolean
         reason:
@@ -2833,14 +2686,14 @@ components:
 
     QuarterCloseResult:
       type: object
-      required: [success, year, quarter, totalProcessed]
+      required: [success, totalProcessed]
       properties:
         success:
           type: boolean
-        year:
+        cycleId:
           type: integer
-        quarter:
-          type: integer
+        forced:
+          type: boolean
         totalProcessed:
           type: integer
         warnings:
@@ -2867,6 +2720,8 @@ components:
         bonusValue:
           type: number
         eventsCount:
+          type: integer
+        participatedEventsCount:
           type: integer
         absences:
           type: integer
@@ -2923,7 +2778,7 @@ components:
 
     RankingDetail:
       type: object
-      required: [employee, period, summary, events, penalties, merits]
+      required: [employee, cycle, summary, events, penalties, merits]
       properties:
         employee:
           type: object
@@ -2937,14 +2792,14 @@ components:
               type: ["string", "null"]
             functionName:
               type: ["string", "null"]
-        period:
+        cycle:
           type: object
-          required: [year, quarter]
+          required: [id, name]
           properties:
-            year:
+            id:
               type: integer
-            quarter:
-              type: integer
+            name:
+              type: string
         summary:
           type: object
           required: [penaltyPoints, meritPoints, eventsCount, isQuarterClosed]

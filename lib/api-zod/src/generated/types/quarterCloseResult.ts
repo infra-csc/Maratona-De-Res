@@ -8,8 +8,8 @@
 
 export interface QuarterCloseResult {
   success: boolean;
-  year: number;
-  quarter: number;
+  cycleId?: number;
+  forced?: boolean;
   totalProcessed: number;
   warnings?: string[];
 }

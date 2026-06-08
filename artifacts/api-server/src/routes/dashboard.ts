@@ -2,15 +2,23 @@ import { Router } from "express";
 import { db, eventsTable, evaluationsTable, absencesTable, quarterlyResultsTable, employeesTable, platoonRulesTable, eventParticipantsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
 
-router.get("/dashboard/summary", async (req, res) => {
-  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
-  const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : Math.ceil((new Date().getMonth() + 1) / 3);
+router.get("/dashboard/summary", async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) {
+    res.json({
+      totalEvents: 0, totalEmployeesEvaluated: 0, pendingEvaluations: 0, submittedEvaluations: 0,
+      eventsInCalibration: 0, quarterAverage: null, totalBonusPreview: 0, totalAbsences: 0,
+      eventsWithPendencies: [], atRiskEmployees: [],
+    });
+    return;
+  }
 
-  const events = await db.select().from(eventsTable).where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter)));
+  const events = await db.select().from(eventsTable).where(eq(eventsTable.cycleId, cycle.id));
   const totalEvents = events.length;
 
   const allEvals = await db.select({
@@ -18,15 +26,15 @@ router.get("/dashboard/summary", async (req, res) => {
     eventId: evaluationsTable.eventId,
     status: evaluationsTable.status,
   }).from(evaluationsTable).where(
-    sql`${evaluationsTable.eventId} IN (SELECT id FROM events WHERE year = ${year} AND quarter = ${quarter})`
+    sql`${evaluationsTable.eventId} IN (SELECT id FROM events WHERE cycle_id = ${cycle.id})`
   );
   const pendingEvaluations = allEvals.filter(e => e.status === "draft").length;
   const submittedEvaluations = allEvals.filter(e => e.status === "submitted").length;
 
-  const absences = await db.select().from(absencesTable).where(and(eq(absencesTable.year, year), eq(absencesTable.quarter, quarter)));
+  const absences = await db.select().from(absencesTable).where(eq(absencesTable.cycleId, cycle.id));
   const totalAbsences = absences.reduce((s, a) => s + a.quantity, 0);
 
-  const quarterResults = await db.select().from(quarterlyResultsTable).where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)));
+  const quarterResults = await db.select().from(quarterlyResultsTable).where(eq(quarterlyResultsTable.cycleId, cycle.id));
   const totalEmployeesEvaluated = quarterResults.length;
 
   const quarterAverage = quarterResults.length > 0
@@ -59,8 +67,7 @@ router.get("/dashboard/summary", async (req, res) => {
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
     .where(and(
-      eq(quarterlyResultsTable.year, year),
-      eq(quarterlyResultsTable.quarter, quarter),
+      eq(quarterlyResultsTable.cycleId, cycle.id),
       sql`${quarterlyResultsTable.finalResult}::numeric < 50`
     ))
     .orderBy(sql`${quarterlyResultsTable.finalResult}::numeric ASC`)
@@ -73,17 +80,17 @@ router.get("/dashboard/summary", async (req, res) => {
   }));
 
   res.json({
-    year, quarter, totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations,
+    totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations,
     eventsInCalibration, quarterAverage, totalBonusPreview, totalAbsences,
     eventsWithPendencies, atRiskEmployees,
   });
 });
 
-router.get("/dashboard/platoon-distribution", async (req, res) => {
-  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
-  const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : Math.ceil((new Date().getMonth() + 1) / 3);
+router.get("/dashboard/platoon-distribution", async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
 
-  const results = await db.select().from(quarterlyResultsTable).where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)));
+  const results = await db.select().from(quarterlyResultsTable).where(eq(quarterlyResultsTable.cycleId, cycle.id));
   const total = results.length;
 
   const platoonMap = new Map<string, { name: string; color: string; count: number }>();
@@ -103,16 +110,15 @@ router.get("/dashboard/platoon-distribution", async (req, res) => {
   })));
 });
 
-router.get("/dashboard/top-employees", async (req, res) => {
-  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
-  const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : Math.ceil((new Date().getMonth() + 1) / 3);
+router.get("/dashboard/top-employees", async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
 
   const results = await db
     .select({
       employeeId: quarterlyResultsTable.employeeId,
       employeeName: employeesTable.name,
-      year: quarterlyResultsTable.year,
-      quarter: quarterlyResultsTable.quarter,
+      cycleId: quarterlyResultsTable.cycleId,
       eventsCount: quarterlyResultsTable.eventsCount,
       grossAverage: quarterlyResultsTable.grossAverage,
       totalAbsences: quarterlyResultsTable.totalAbsences,
@@ -124,7 +130,7 @@ router.get("/dashboard/top-employees", async (req, res) => {
     })
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)))
+    .where(eq(quarterlyResultsTable.cycleId, cycle.id))
     .orderBy(sql`${quarterlyResultsTable.finalResult}::numeric DESC`)
     .limit(10);
 
@@ -138,19 +144,17 @@ router.get("/dashboard/top-employees", async (req, res) => {
   })));
 });
 
-router.get("/dashboard/quarterly-evolution", async (req, res) => {
-  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+router.get("/dashboard/quarterly-evolution", async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
 
-  const quarterLabels = ["Q1", "Q2", "Q3", "Q4"];
-  const evolution = [];
-  for (let q = 1; q <= 4; q++) {
-    const results = await db.select({ finalResult: quarterlyResultsTable.finalResult })
-      .from(quarterlyResultsTable)
-      .where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, q)));
-    const avg = results.length > 0 ? results.reduce((s, r) => s + parseFloat(r.finalResult), 0) / results.length : 0;
-    evolution.push({ year, quarter: q, label: `${quarterLabels[q - 1]}/${year}`, average: avg });
-  }
-  res.json(evolution);
+  const results = await db.select({ finalResult: quarterlyResultsTable.finalResult })
+    .from(quarterlyResultsTable)
+    .where(eq(quarterlyResultsTable.cycleId, cycle.id));
+  const average = results.length > 0
+    ? results.reduce((s, r) => s + parseFloat(r.finalResult), 0) / results.length
+    : null;
+  res.json([{ cycleId: cycle.id, label: cycle.name, average }]);
 });
 
 export default router;

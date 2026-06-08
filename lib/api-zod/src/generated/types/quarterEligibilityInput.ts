@@ -8,8 +8,6 @@
 
 export interface QuarterEligibilityInput {
   employeeId: number;
-  year: number;
-  quarter: number;
   eligible: boolean;
   reason?: string;
 }

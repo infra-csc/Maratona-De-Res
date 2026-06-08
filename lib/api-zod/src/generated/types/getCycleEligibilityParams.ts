@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetDashboardSummaryParams = {
-year?: number;
-quarter?: number;
+export type GetCycleEligibilityParams = {
+employeeId?: number;
 };

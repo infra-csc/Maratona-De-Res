@@ -11,9 +11,6 @@ import { useForm } from "react-hook-form";
 import { Plus, Trash2, UserMinus, Download, Search, AlertTriangle, Award } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
-const currentYear = new Date().getFullYear();
-const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
-
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
@@ -32,18 +29,16 @@ export default function AbsencesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [year, setYear] = useState(currentYear);
-  const [quarter, setQuarter] = useState(currentQuarter);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const qKey = getGetAbsencesQueryKey({ year, quarter });
-  const { data: absences, isLoading } = useGetAbsences({ year, quarter }, { query: { queryKey: qKey } });
+  const qKey = getGetAbsencesQueryKey();
+  const { data: absences, isLoading } = useGetAbsences(undefined, { query: { queryKey: qKey } });
   const { data: employees } = useGetEmployees({ active: true });
-  const { data: events } = useGetEvents({ year });
+  const { data: events } = useGetEvents();
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<AbsenceInput>({
-    defaultValues: { year: currentYear, quarter: currentQuarter, quantity: 1, penaltyType: "atraso_30" },
+    defaultValues: { quantity: 1, penaltyType: "atraso_30" },
   });
   const selectedType = watch("penaltyType");
 
@@ -53,7 +48,7 @@ export default function AbsencesPage() {
         qc.invalidateQueries({ queryKey: qKey });
         toast({ title: "Lançamento registrado com sucesso" });
         setOpen(false);
-        reset({ year: currentYear, quarter: currentQuarter, quantity: 1, penaltyType: "atraso_30" });
+        reset({ quantity: 1, penaltyType: "atraso_30" });
       },
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
     },
@@ -70,7 +65,7 @@ export default function AbsencesPage() {
 
   async function handleExport() {
     try {
-      const data = await exportAbsences({ year, quarter });
+      const data = await exportAbsences();
       const blob = new Blob([data.data], { type: "text/csv" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -92,11 +87,6 @@ export default function AbsencesPage() {
 
   function handleEventChange(v: string) {
     setValue("eventId", Number(v));
-    const ev = (events ?? []).find(e => String(e.id) === v);
-    if (ev) {
-      setValue("year", ev.year);
-      setValue("quarter", ev.quarter);
-    }
   }
 
   return (
@@ -117,31 +107,6 @@ export default function AbsencesPage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex border-2 border-[#191c1e] bg-white p-1">
-              <Select value={String(year)} onValueChange={v => setYear(Number(v))}>
-                <SelectTrigger data-testid="select-year" className="w-24 border-none shadow-none rounded-none font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[currentYear - 1, currentYear, currentYear + 1].map(y => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="w-0.5 bg-[#191c1e] my-1 mx-1" />
-              <Select value={String(quarter)} onValueChange={v => setQuarter(Number(v))}>
-                <SelectTrigger data-testid="select-quarter" className="w-20 border-none shadow-none rounded-none font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">T1</SelectItem>
-                  <SelectItem value="2">T2</SelectItem>
-                  <SelectItem value="3">T3</SelectItem>
-                  <SelectItem value="4">T4</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <button
               data-testid="button-export-absences"
               onClick={handleExport}
@@ -168,7 +133,7 @@ export default function AbsencesPage() {
                   </DialogHeader>
                   <form
                     onSubmit={handleSubmit(d => createMutation.mutate({
-                      data: { ...d, employeeId: Number(d.employeeId), eventId: d.eventId ? Number(d.eventId) : null, year: Number(d.year), quarter: Number(d.quarter), quantity: Number(d.quantity) },
+                      data: { ...d, employeeId: Number(d.employeeId), eventId: d.eventId ? Number(d.eventId) : null, quantity: Number(d.quantity) },
                     }))}
                     className="space-y-4 pt-4"
                   >
@@ -198,7 +163,7 @@ export default function AbsencesPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {(events ?? []).map(e => (
-                            <SelectItem key={e.id} value={String(e.id)}>{e.name} (T{e.quarter})</SelectItem>
+                            <SelectItem key={e.id} value={String(e.id)}>{e.name}{e.cycleName ? ` (${e.cycleName})` : ""}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

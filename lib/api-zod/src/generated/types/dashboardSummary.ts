@@ -9,8 +9,8 @@ import type { AtRiskEmployee } from './atRiskEmployee';
 import type { EventPendency } from './eventPendency';
 
 export interface DashboardSummary {
-  year: number;
-  quarter: number;
+  cycleId?: number;
+  cycleName?: string;
   totalEvents: number;
   totalEmployeesEvaluated: number;
   pendingEvaluations: number;

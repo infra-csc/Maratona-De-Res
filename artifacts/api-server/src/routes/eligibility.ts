@@ -1,68 +1,70 @@
 import { Router } from "express";
-import { db, employeeQuarterEligibilityTable, employeesTable, usersTable } from "@workspace/db";
+import { db, employeeCycleEligibilityTable, employeesTable, usersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
 
 /**
- * Inelegibilidade trimestral (ex.: questões disciplinares).
- * GET /quarter-eligibility?year=&quarter=&employeeId=
+ * Inelegibilidade por ciclo (ex.: questões disciplinares).
+ * GET /cycle-eligibility?employeeId=
  */
-router.get("/quarter-eligibility", async (req, res) => {
-  const { year, quarter, employeeId } = req.query;
-  const conditions = [];
-  if (year) conditions.push(eq(employeeQuarterEligibilityTable.year, parseInt(year as string)));
-  if (quarter) conditions.push(eq(employeeQuarterEligibilityTable.quarter, parseInt(quarter as string)));
-  if (employeeId) conditions.push(eq(employeeQuarterEligibilityTable.employeeId, parseInt(employeeId as string)));
+router.get("/cycle-eligibility", async (req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
 
-  let query = db.select({
-    id: employeeQuarterEligibilityTable.id,
-    employeeId: employeeQuarterEligibilityTable.employeeId,
+  const { employeeId } = req.query;
+  const conditions = [eq(employeeCycleEligibilityTable.cycleId, cycle.id)];
+  if (employeeId) conditions.push(eq(employeeCycleEligibilityTable.employeeId, parseInt(employeeId as string)));
+
+  const query = db.select({
+    id: employeeCycleEligibilityTable.id,
+    employeeId: employeeCycleEligibilityTable.employeeId,
     employeeName: employeesTable.name,
-    year: employeeQuarterEligibilityTable.year,
-    quarter: employeeQuarterEligibilityTable.quarter,
-    eligible: employeeQuarterEligibilityTable.eligible,
-    reason: employeeQuarterEligibilityTable.reason,
-    createdByUserId: employeeQuarterEligibilityTable.createdByUserId,
+    cycleId: employeeCycleEligibilityTable.cycleId,
+    eligible: employeeCycleEligibilityTable.eligible,
+    reason: employeeCycleEligibilityTable.reason,
+    createdByUserId: employeeCycleEligibilityTable.createdByUserId,
     createdByName: usersTable.name,
-    updatedAt: employeeQuarterEligibilityTable.updatedAt,
+    updatedAt: employeeCycleEligibilityTable.updatedAt,
   })
-  .from(employeeQuarterEligibilityTable)
-  .leftJoin(employeesTable, eq(employeeQuarterEligibilityTable.employeeId, employeesTable.id))
-  .leftJoin(usersTable, eq(employeeQuarterEligibilityTable.createdByUserId, usersTable.id))
-  .$dynamic();
-  if (conditions.length) query = query.where(and(...conditions));
+  .from(employeeCycleEligibilityTable)
+  .leftJoin(employeesTable, eq(employeeCycleEligibilityTable.employeeId, employeesTable.id))
+  .leftJoin(usersTable, eq(employeeCycleEligibilityTable.createdByUserId, usersTable.id))
+  .where(and(...conditions));
 
   res.json(await query);
 });
 
-router.post("/quarter-eligibility", requireRole("admin", "rh", "diretoria"), async (req, res) => {
-  const { employeeId, year, quarter, eligible, reason } = req.body;
-  if (!employeeId || !year || !quarter || eligible === undefined) {
-    res.status(400).json({ error: "Campos obrigatórios: employeeId, year, quarter, eligible" });
+router.post("/cycle-eligibility", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
+
+  const { employeeId, eligible, reason } = req.body;
+  if (!employeeId || eligible === undefined) {
+    res.status(400).json({ error: "Campos obrigatórios: employeeId, eligible" });
     return;
   }
-  const [existing] = await db.select().from(employeeQuarterEligibilityTable)
+  const [existing] = await db.select().from(employeeCycleEligibilityTable)
     .where(and(
-      eq(employeeQuarterEligibilityTable.employeeId, employeeId),
-      eq(employeeQuarterEligibilityTable.year, year),
-      eq(employeeQuarterEligibilityTable.quarter, quarter),
+      eq(employeeCycleEligibilityTable.employeeId, employeeId),
+      eq(employeeCycleEligibilityTable.cycleId, cycle.id),
     )).limit(1);
 
   let record;
   if (existing) {
-    [record] = await db.update(employeeQuarterEligibilityTable).set({
+    [record] = await db.update(employeeCycleEligibilityTable).set({
       eligible, reason: reason ?? null, createdByUserId: req.user!.userId, updatedAt: new Date(),
-    }).where(eq(employeeQuarterEligibilityTable.id, existing.id)).returning();
+    }).where(eq(employeeCycleEligibilityTable.id, existing.id)).returning();
   } else {
-    [record] = await db.insert(employeeQuarterEligibilityTable).values({
-      employeeId, year, quarter, eligible, reason: reason ?? null, createdByUserId: req.user!.userId,
+    [record] = await db.insert(employeeCycleEligibilityTable).values({
+      employeeId, cycleId: cycle.id, eligible, reason: reason ?? null, createdByUserId: req.user!.userId,
     }).returning();
   }
-  await audit(req.user!.userId, "set_quarter_eligibility", "employee_quarter_eligibility", record.id);
+  await audit(req.user!.userId, "set_cycle_eligibility", "employee_cycle_eligibility", record.id);
   res.status(201).json(record);
 });
 

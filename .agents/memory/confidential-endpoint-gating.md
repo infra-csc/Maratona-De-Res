@@ -15,6 +15,13 @@ UI role-gating (hiding panels/buttons for non-managers) is NOT a security bounda
 
 **Role-focused menus = three layers that must stay in sync.** A "this role sees ONLY these sections" request touches: (1) sidebar nav visibility, (2) the App.tsx route guard (`ProtectedRoute roles={...}`), and (3) the backend `requireRole`. Pattern for a focused role: add an allowlist branch in the sidebar filter (e.g. `if (user.role === "avaliador") return item.path === "/evaluations";`, same for diretoria with a path array) — this short-circuits BEFORE the generic `item.roles` check, so listed items show even if their own `roles` array excludes the role. But the sidebar only hides; to actually grant/deny access you must also edit the route guard, and to make a page load its data the relevant GET endpoints must permit the role (most list GETs here are `requireAuth`-only = open). When REMOVING a section from a role (e.g. dropped diretoria from Auditoria), update all three (sidebar item roles, route guard, backend requireRole) or the role can still deep-link to it.
 
+## Financial results reads are manager-gated; ranking is the only public results surface
+`GET /results/quarterly`, `GET /exports/quarterly-results`, `GET /exports/caju-bonuses` carry payment-sensitive
+fields (bonusStatus, paymentMethod, paidAt, eligibilityReason, etc.) and MUST stay `requireRole("admin","rh","diretoria")`.
+The unified Resultados page shows Consolidação/Bônus tabs only to managers, but that is UI-only — the server gate is the real boundary.
+`GET /ranking` + `/exports/ranking` are the ONLY public results endpoints (public fields only); the RankingTab is what non-managers see.
+**Why:** these read/export endpoints were originally `requireAuth`-only, so any avaliador could fetch everyone's bonus data — caught in review during the cycle/unified-results migration.
+
 ## Route/nav role lists must match write-endpoint RBAC
 Calibration writes (POST /calibrations) require admin|rh|diretoria. The
 /calibrations route guard AND the sidebar nav must use the SAME role set. When

@@ -11,9 +11,6 @@ import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
-const currentYear = new Date().getFullYear();
-const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
-
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
@@ -41,7 +38,7 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
 function EvaluatorEventCard({
   event, userId, selected, onSelect,
 }: {
-  event: { id: number; name: string; clientName?: string | null; city?: string | null; state?: string | null; quarter: number; year: number };
+  event: { id: number; name: string; clientName?: string | null; city?: string | null; state?: string | null; cycleName?: string };
   userId: number | undefined;
   selected: boolean;
   onSelect: () => void;
@@ -97,7 +94,7 @@ function EvaluatorEventCard({
         <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block", badge.cls)}>
           <span className="inline-flex items-center gap-1.5 skew-x-[8deg]"><Badge size={12} /> {badge.label}</span>
         </span>
-        <span className="text-[11px] font-bold italic uppercase text-[#747a60] shrink-0">T{event.quarter}/{event.year}</span>
+        {event.cycleName && <span className="text-[11px] font-bold italic uppercase text-[#747a60] shrink-0">{event.cycleName}</span>}
       </div>
       <h4 className="text-lg italic uppercase font-black tracking-tight leading-tight">{event.name}</h4>
       {formatEventSubtitle(event) && <p className="text-[12px] font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{formatEventSubtitle(event)}</p>}
@@ -131,7 +128,7 @@ export default function EvaluationsPage() {
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
 
-  const { data: events } = useGetEvents({ year: currentYear, quarter: currentQuarter, status: "open" });
+  const { data: events } = useGetEvents({ status: "open" });
 
   const { data: participants } = useGetEventParticipants(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-participants", selectedEventId] as unknown[] },
@@ -481,9 +478,11 @@ export default function EvaluationsPage() {
                       <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#ccff00] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
                         <span className="inline-block skew-x-[8deg]">Aberto</span>
                       </span>
-                      <span className="bg-transparent text-white px-3 py-1 border-2 border-white/30 font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
-                        <span className="inline-block skew-x-[8deg]">T{currentEvent.quarter}/{currentEvent.year}</span>
-                      </span>
+                      {currentEvent.cycleName && (
+                        <span className="bg-transparent text-white px-3 py-1 border-2 border-white/30 font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
+                          <span className="inline-block skew-x-[8deg]">{currentEvent.cycleName}</span>
+                        </span>
+                      )}
                     </div>
                     <h2 className="text-3xl md:text-4xl italic uppercase font-black tracking-tighter leading-none mb-1">{currentEvent.name}</h2>
                     <p className="text-[#ccff00] font-bold italic uppercase text-lg">{currentEvent.clientName}</p>

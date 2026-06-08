@@ -331,12 +331,14 @@ export const GetEmployeeHistoryResponseItem = zod.object({
   "id": zod.number().optional(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
   "eventsCount": zod.number().optional(),
+  "participatedEventsCount": zod.number().optional(),
+  "scoreSum": zod.number().optional(),
   "grossAverage": zod.number().optional(),
   "totalAbsences": zod.number().optional(),
   "absencePenalty": zod.number().optional(),
+  "meritPoints": zod.number().optional(),
   "finalResult": zod.number(),
   "platoon": zod.string().nullable(),
   "platoonColor": zod.string().nullish(),
@@ -361,8 +363,6 @@ export const GetEmployeeHistoryResponse = zod.array(GetEmployeeHistoryResponseIt
  * @summary List events
  */
 export const GetEventsQueryParams = zod.object({
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional(),
   "status": zod.coerce.string().optional()
 })
 
@@ -376,8 +376,8 @@ export const GetEventsResponseItem = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "eventWeight": zod.number().optional(),
   "forcedClosed": zod.boolean().optional(),
@@ -402,9 +402,7 @@ export const CreateEventBody = zod.object({
   "city": zod.string().optional(),
   "state": zod.string().optional(),
   "startDate": zod.string(),
-  "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number()
+  "endDate": zod.string()
 })
 
 
@@ -424,8 +422,8 @@ export const GetEventResponse = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "forcedClosed": zod.boolean().optional(),
   "forcedCloseReason": zod.string().nullish(),
@@ -522,8 +520,8 @@ export const UpdateEventResponse = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "eventWeight": zod.number().optional(),
   "forcedClosed": zod.boolean().optional(),
@@ -567,8 +565,8 @@ export const CloseEventResponse = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "eventWeight": zod.number().optional(),
   "forcedClosed": zod.boolean().optional(),
@@ -599,8 +597,8 @@ export const ReopenEventResponse = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "eventWeight": zod.number().optional(),
   "forcedClosed": zod.boolean().optional(),
@@ -822,8 +820,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "forcedClosed": zod.boolean().optional(),
   "forcedCloseReason": zod.string().nullish(),
@@ -912,8 +910,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "forcedClosed": zod.boolean().optional(),
   "forcedCloseReason": zod.string().nullish(),
@@ -1012,8 +1010,8 @@ export const DeleteEventCriterionResponse = zod.object({
   "state": zod.string().nullish(),
   "startDate": zod.string(),
   "endDate": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
   "status": zod.string(),
   "forcedClosed": zod.boolean().optional(),
   "forcedCloseReason": zod.string().nullish(),
@@ -1289,9 +1287,7 @@ export const CreateCalibrationBody = zod.object({
  * @summary List absences
  */
 export const GetAbsencesQueryParams = zod.object({
-  "employeeId": zod.coerce.number().optional(),
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional()
+  "employeeId": zod.coerce.number().optional()
 })
 
 export const GetAbsencesResponseItem = zod.object({
@@ -1304,8 +1300,7 @@ export const GetAbsencesResponseItem = zod.object({
   "kind": zod.enum(['penalty', 'merit']).optional(),
   "points": zod.number(),
   "date": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number(),
   "quantity": zod.number(),
   "reason": zod.string().nullish(),
   "registeredByUserId": zod.number().optional(),
@@ -1325,8 +1320,6 @@ export const CreateAbsenceBody = zod.object({
   "eventId": zod.number().nullish(),
   "penaltyType": zod.enum(['falta', 'atraso_30', 'atraso_60', 'merito_galpao', 'merito_evento']),
   "date": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
   "quantity": zod.number().min(1).optional(),
   "reason": zod.string().optional()
 })
@@ -1454,14 +1447,9 @@ export const DeletePlatoonRuleParams = zod.object({
 /**
  * @summary Get dashboard summary
  */
-export const GetDashboardSummaryQueryParams = zod.object({
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional()
-})
-
 export const GetDashboardSummaryResponse = zod.object({
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
+  "cycleName": zod.string().optional(),
   "totalEvents": zod.number(),
   "totalEmployeesEvaluated": zod.number(),
   "pendingEvaluations": zod.number(),
@@ -1486,11 +1474,6 @@ export const GetDashboardSummaryResponse = zod.object({
 /**
  * @summary Get platoon distribution
  */
-export const GetDashboardPlatoonDistributionQueryParams = zod.object({
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional()
-})
-
 export const GetDashboardPlatoonDistributionResponseItem = zod.object({
   "platoonName": zod.string(),
   "color": zod.string(),
@@ -1503,21 +1486,18 @@ export const GetDashboardPlatoonDistributionResponse = zod.array(GetDashboardPla
 /**
  * @summary Get top 10 employees
  */
-export const GetDashboardTopEmployeesQueryParams = zod.object({
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional()
-})
-
 export const GetDashboardTopEmployeesResponseItem = zod.object({
   "id": zod.number().optional(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
   "eventsCount": zod.number().optional(),
+  "participatedEventsCount": zod.number().optional(),
+  "scoreSum": zod.number().optional(),
   "grossAverage": zod.number().optional(),
   "totalAbsences": zod.number().optional(),
   "absencePenalty": zod.number().optional(),
+  "meritPoints": zod.number().optional(),
   "finalResult": zod.number(),
   "platoon": zod.string().nullable(),
   "platoonColor": zod.string().nullish(),
@@ -1541,13 +1521,8 @@ export const GetDashboardTopEmployeesResponse = zod.array(GetDashboardTopEmploye
 /**
  * @summary Get quarterly evolution chart data
  */
-export const GetDashboardQuarterlyEvolutionQueryParams = zod.object({
-  "year": zod.coerce.number().optional()
-})
-
 export const GetDashboardQuarterlyEvolutionResponseItem = zod.object({
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
   "label": zod.string(),
   "average": zod.number()
 })
@@ -1558,8 +1533,6 @@ export const GetDashboardQuarterlyEvolutionResponse = zod.array(GetDashboardQuar
  * @summary Get quarterly results
  */
 export const GetQuarterlyResultsQueryParams = zod.object({
-  "year": zod.coerce.number(),
-  "quarter": zod.coerce.number(),
   "employeeId": zod.coerce.number().optional(),
   "platoon": zod.coerce.string().optional()
 })
@@ -1568,12 +1541,14 @@ export const GetQuarterlyResultsResponseItem = zod.object({
   "id": zod.number().optional(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
   "eventsCount": zod.number().optional(),
+  "participatedEventsCount": zod.number().optional(),
+  "scoreSum": zod.number().optional(),
   "grossAverage": zod.number().optional(),
   "totalAbsences": zod.number().optional(),
   "absencePenalty": zod.number().optional(),
+  "meritPoints": zod.number().optional(),
   "finalResult": zod.number(),
   "platoon": zod.string().nullable(),
   "platoonColor": zod.string().nullish(),
@@ -1595,19 +1570,17 @@ export const GetQuarterlyResultsResponse = zod.array(GetQuarterlyResultsResponse
 
 
 /**
- * @summary Close a quarter
+ * @summary Close the current cycle
  */
 export const CloseQuarterBody = zod.object({
-  "year": zod.number(),
-  "quarter": zod.number(),
   "forced": zod.boolean().optional(),
   "reason": zod.string().optional()
 })
 
 export const CloseQuarterResponse = zod.object({
   "success": zod.boolean(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
+  "forced": zod.boolean().optional(),
   "totalProcessed": zod.number(),
   "warnings": zod.array(zod.string()).optional()
 })
@@ -1632,12 +1605,14 @@ export const UpdateBonusPaymentResponse = zod.object({
   "id": zod.number().optional(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
   "eventsCount": zod.number().optional(),
+  "participatedEventsCount": zod.number().optional(),
+  "scoreSum": zod.number().optional(),
   "grossAverage": zod.number().optional(),
   "totalAbsences": zod.number().optional(),
   "absencePenalty": zod.number().optional(),
+  "meritPoints": zod.number().optional(),
   "finalResult": zod.number(),
   "platoon": zod.string().nullable(),
   "platoonColor": zod.string().nullish(),
@@ -1658,36 +1633,31 @@ export const UpdateBonusPaymentResponse = zod.object({
 
 
 /**
- * @summary List quarterly ineligibility records
+ * @summary List cycle ineligibility records
  */
-export const GetQuarterEligibilityQueryParams = zod.object({
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional(),
+export const GetCycleEligibilityQueryParams = zod.object({
   "employeeId": zod.coerce.number().optional()
 })
 
-export const GetQuarterEligibilityResponseItem = zod.object({
+export const GetCycleEligibilityResponseItem = zod.object({
   "id": zod.number(),
   "employeeId": zod.number(),
   "employeeName": zod.string().nullish(),
-  "year": zod.number(),
-  "quarter": zod.number(),
+  "cycleId": zod.number().optional(),
   "eligible": zod.boolean(),
   "reason": zod.string().nullish(),
   "createdByUserId": zod.number().nullish(),
   "createdByName": zod.string().nullish(),
   "updatedAt": zod.string().optional()
 })
-export const GetQuarterEligibilityResponse = zod.array(GetQuarterEligibilityResponseItem)
+export const GetCycleEligibilityResponse = zod.array(GetCycleEligibilityResponseItem)
 
 
 /**
- * @summary Set quarterly eligibility for an employee
+ * @summary Set cycle eligibility for an employee
  */
-export const SetQuarterEligibilityBody = zod.object({
+export const SetCycleEligibilityBody = zod.object({
   "employeeId": zod.number(),
-  "year": zod.number(),
-  "quarter": zod.number(),
   "eligible": zod.boolean(),
   "reason": zod.string().optional()
 })
@@ -1697,8 +1667,6 @@ export const SetQuarterEligibilityBody = zod.object({
  * @summary Get ranking (Maratona de Resultados)
  */
 export const GetRankingQueryParams = zod.object({
-  "year": zod.coerce.number(),
-  "quarter": zod.coerce.number(),
   "search": zod.coerce.string().optional()
 })
 
@@ -1711,6 +1679,7 @@ export const GetRankingResponseItem = zod.object({
   "platoonColor": zod.string().nullish(),
   "bonusValue": zod.number(),
   "eventsCount": zod.number(),
+  "participatedEventsCount": zod.number().optional(),
   "absences": zod.number()
 })
 export const GetRankingResponse = zod.array(GetRankingResponseItem)
@@ -1720,9 +1689,7 @@ export const GetRankingResponse = zod.array(GetRankingResponseItem)
  * @summary Ranking detail for an employee (drill-down)
  */
 export const GetRankingDetailQueryParams = zod.object({
-  "employeeId": zod.coerce.number(),
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional()
+  "employeeId": zod.coerce.number()
 })
 
 export const GetRankingDetailResponse = zod.object({
@@ -1732,9 +1699,9 @@ export const GetRankingDetailResponse = zod.object({
   "department": zod.string().nullish(),
   "functionName": zod.string().nullish()
 }),
-  "period": zod.object({
-  "year": zod.number(),
-  "quarter": zod.number()
+  "cycle": zod.object({
+  "id": zod.number(),
+  "name": zod.string()
 }),
   "summary": zod.object({
   "finalResult": zod.number().nullish(),
@@ -1899,11 +1866,6 @@ export const ExportEventResultsResponse = zod.object({
 /**
  * @summary Export quarterly results CSV
  */
-export const ExportQuarterlyResultsQueryParams = zod.object({
-  "year": zod.coerce.number(),
-  "quarter": zod.coerce.number()
-})
-
 export const ExportQuarterlyResultsResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
@@ -1913,11 +1875,6 @@ export const ExportQuarterlyResultsResponse = zod.object({
 /**
  * @summary Export ranking CSV
  */
-export const ExportRankingQueryParams = zod.object({
-  "year": zod.coerce.number(),
-  "quarter": zod.coerce.number()
-})
-
 export const ExportRankingResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
@@ -1927,11 +1884,6 @@ export const ExportRankingResponse = zod.object({
 /**
  * @summary Export Caju bonus report CSV
  */
-export const ExportCajuBonusesQueryParams = zod.object({
-  "year": zod.coerce.number(),
-  "quarter": zod.coerce.number()
-})
-
 export const ExportCajuBonusesResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
@@ -1941,11 +1893,6 @@ export const ExportCajuBonusesResponse = zod.object({
 /**
  * @summary Export absences CSV
  */
-export const ExportAbsencesQueryParams = zod.object({
-  "year": zod.coerce.number().optional(),
-  "quarter": zod.coerce.number().optional()
-})
-
 export const ExportAbsencesResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()

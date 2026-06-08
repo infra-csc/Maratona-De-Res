@@ -3,7 +3,6 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Trophy, Target, Calendar, TrendingUp, AlertTriangle,
@@ -15,20 +14,9 @@ import { useQuery } from "@tanstack/react-query";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-const QUARTER_LABELS = ["1º Trimestre", "2º Trimestre", "3º Trimestre", "4º Trimestre"];
-const YEAR_OPTIONS = [2026];
-
-function usePeriod() {
-  const now = new Date();
-  return {
-    year: now.getFullYear(),
-    quarter: Math.ceil((now.getMonth() + 1) / 3),
-  };
-}
-
 interface PerformanceData {
   employee: { id: number; name: string; department: string; functionName: string };
-  period: { year: number; quarter: number };
+  cycle: { id: number; name: string };
   summary: {
     grossAverage: number | null;
     currentPlatoon: string | null;
@@ -164,16 +152,13 @@ function EventCard({ event }: { event: EventSummary }) {
 
 export default function MyPerformancePage() {
   const { user } = useAuth();
-  const { quarter: defaultQuarter } = usePeriod();
-  const [year, setYear] = useState(2026);
-  const [quarter, setQuarter] = useState(defaultQuarter);
 
   const { data, isLoading, error } = useQuery<PerformanceData>({
-    queryKey: ["my-performance", year, quarter],
+    queryKey: ["my-performance"],
     queryFn: async () => {
       const token = localStorage.getItem("maratona_token");
       const apiBase = import.meta.env.VITE_API_BASE_URL ?? "/api";
-      const resp = await fetch(`${apiBase}/my-performance?year=${year}&quarter=${quarter}`, {
+      const resp = await fetch(`${apiBase}/my-performance`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!resp.ok) {
@@ -218,25 +203,12 @@ export default function MyPerformancePage() {
             <span className="text-xs font-semibold text-muted-foreground uppercase">{data?.employee.functionName}</span>
           </div>
         </div>
-        <div className="flex bg-white p-1.5 rounded-xl border shadow-sm gap-2 w-max">
-          <Select value={String(year)} onValueChange={v => setYear(Number(v))}>
-            <SelectTrigger className="w-28 h-10 border-none shadow-none font-bold bg-slate-50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {YEAR_OPTIONS.map(y => <SelectItem key={y} value={String(y)} className="font-medium">{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <div className="w-px bg-border my-2" />
-          <Select value={String(quarter)} onValueChange={v => setQuarter(Number(v))}>
-            <SelectTrigger className="w-40 h-10 border-none shadow-none font-bold bg-slate-50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {QUARTER_LABELS.map((q, i) => <SelectItem key={i + 1} value={String(i + 1)} className="font-medium">{q}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        {data?.cycle && (
+          <div className="flex bg-white p-1.5 rounded-xl border shadow-sm gap-2 w-max items-center px-4 py-2">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Ciclo</span>
+            <span className="font-black text-slate-800">{data.cycle.name}</span>
+          </div>
+        )}
       </div>
 
       {isLoading && (
@@ -263,7 +235,7 @@ export default function MyPerformancePage() {
                 <Trophy size={100} />
               </div>
               <CardContent className="p-6 relative z-10">
-                <p className="text-xs font-bold text-white/70 uppercase tracking-widest mb-1">Média do Trimestre</p>
+                <p className="text-xs font-bold text-white/70 uppercase tracking-widest mb-1">Média do Ciclo</p>
                 {result !== null ? (
                   <div className="flex items-baseline gap-1 mt-2">
                     <span className="text-5xl font-black">{result.toFixed(1)}</span>
@@ -359,7 +331,7 @@ export default function MyPerformancePage() {
             </h2>
             {data.events.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-dashed text-slate-400 font-medium shadow-sm">
-                Nenhum evento registrado no {QUARTER_LABELS[quarter - 1]} de {year}.
+                Nenhum evento registrado no ciclo {data.cycle.name}.
               </div>
             ) : (
               <div className="space-y-4">

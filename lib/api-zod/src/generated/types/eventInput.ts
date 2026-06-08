@@ -14,6 +14,4 @@ export interface EventInput {
   state?: string;
   startDate: string;
   endDate: string;
-  year: number;
-  quarter: number;
 }

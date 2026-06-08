@@ -5,15 +5,15 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { RankingDetailCycle } from './rankingDetailCycle';
 import type { RankingDetailEmployee } from './rankingDetailEmployee';
 import type { RankingDetailEvent } from './rankingDetailEvent';
-import type { RankingDetailPeriod } from './rankingDetailPeriod';
 import type { RankingDetailRow } from './rankingDetailRow';
 import type { RankingDetailSummary } from './rankingDetailSummary';
 
 export interface RankingDetail {
   employee: RankingDetailEmployee;
-  period: RankingDetailPeriod;
+  cycle: RankingDetailCycle;
   summary: RankingDetailSummary;
   events: RankingDetailEvent[];
   penalties: RankingDetailRow[];

@@ -7,8 +7,6 @@ import { Search, Lock, Unlock, Calendar, MapPin, ChevronRight, Users } from "luc
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 
-const currentYear = new Date().getFullYear();
-
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
@@ -26,13 +24,11 @@ export default function EventsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filterYear, setFilterYear] = useState(String(currentYear));
-  const [filterQuarter, setFilterQuarter] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const queryKey = getGetEventsQueryKey({ year: Number(filterYear) });
+  const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
-    { year: Number(filterYear) },
+    undefined,
     { query: { queryKey } }
   );
 
@@ -46,10 +42,9 @@ export default function EventsPage() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const filtered = (events ?? []).filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchQuarter = filterQuarter === "all" || ev.quarter === Number(filterQuarter);
     const matchConfig = filterStatus === "all" || (filterStatus === "configured" ? !!ev.criteriaConfirmed : !ev.criteriaConfirmed);
     const isFinished = ev.endDate < todayStr;
-    return matchSearch && matchQuarter && matchConfig && isFinished;
+    return matchSearch && matchConfig && isFinished;
   });
 
   const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
@@ -93,28 +88,6 @@ export default function EventsPage() {
                 <SelectItem value="pending">Aguardando RH</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger data-testid="select-filter-year" className="w-full md:w-28 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[currentYear - 1, currentYear, currentYear + 1].map(y => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterQuarter} onValueChange={setFilterQuarter}>
-              <SelectTrigger data-testid="select-filter-quarter" className="w-full md:w-32 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todo o Ano</SelectItem>
-                <SelectItem value="1">T1</SelectItem>
-                <SelectItem value="2">T2</SelectItem>
-                <SelectItem value="3">T3</SelectItem>
-                <SelectItem value="4">T4</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </section>
 
@@ -149,9 +122,11 @@ export default function EventsPage() {
                               <span className="inline-block skew-x-[8deg]">Fechamento Forçado</span>
                             </span>
                           )}
-                          <span className="bg-[#191c1e] text-[#ccff00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                            <span className="inline-block skew-x-[8deg]">T{ev.quarter}/{ev.year}</span>
-                          </span>
+                          {ev.cycleName && (
+                            <span className="bg-[#191c1e] text-[#ccff00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
+                              <span className="inline-block skew-x-[8deg]">{ev.cycleName}</span>
+                            </span>
+                          )}
                           {concluded ? (
                             <span className="bg-[#506600] text-white px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
                               <span className="inline-block skew-x-[8deg]">Evento Concluído</span>

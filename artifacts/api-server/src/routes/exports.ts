@@ -3,6 +3,7 @@ import { db, quarterlyResultsTable, employeesTable, eventsTable, absencesTable }
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { computeEventTeamResult } from "./results.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -14,15 +15,17 @@ function toCsv(rows: Record<string, unknown>[]): string {
   return lines.join("\n");
 }
 
-router.get("/exports/quarterly-results", async (req, res) => {
-  const { year, quarter } = req.query;
-  if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
+function cycleSlug(name: string): string {
+  return name.trim().replace(/\s+/g, "-");
+}
+
+router.get("/exports/quarterly-results", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json({ filename: `resultados.csv`, data: "" }); return; }
 
   const results = await db
     .select({
       "Nome": employeesTable.name,
-      "Ano": quarterlyResultsTable.year,
-      "Trimestre": quarterlyResultsTable.quarter,
       "Nº Eventos": quarterlyResultsTable.eventsCount,
       "Média Bruta": quarterlyResultsTable.grossAverage,
       "Total Faltas": quarterlyResultsTable.totalAbsences,
@@ -33,15 +36,16 @@ router.get("/exports/quarterly-results", async (req, res) => {
     })
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(and(eq(quarterlyResultsTable.year, parseInt(year as string)), eq(quarterlyResultsTable.quarter, parseInt(quarter as string))))
+    .where(eq(quarterlyResultsTable.cycleId, cycle.id))
     .orderBy(quarterlyResultsTable.finalResult);
 
-  res.json({ filename: `resultados-Q${quarter}-${year}.csv`, data: toCsv(results as never) });
+  const rows = results.map(r => ({ "Ciclo": cycle.name, ...r }));
+  res.json({ filename: `resultados-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows as never) });
 });
 
-router.get("/exports/ranking", async (req, res) => {
-  const { year, quarter } = req.query;
-  if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
+router.get("/exports/ranking", async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json({ filename: `ranking.csv`, data: "" }); return; }
 
   const results = await db
     .select({
@@ -52,18 +56,19 @@ router.get("/exports/ranking", async (req, res) => {
     })
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(and(eq(quarterlyResultsTable.year, parseInt(year as string)), eq(quarterlyResultsTable.quarter, parseInt(quarter as string))));
+    .where(eq(quarterlyResultsTable.cycleId, cycle.id));
 
   const sorted = results.sort((a, b) => parseFloat(b.finalResult) - parseFloat(a.finalResult));
   const rows = sorted.map((r, i) => ({
     "Posição": i + 1,
+    "Ciclo": cycle.name,
     "Nome": r.employeeName,
     "Resultado Final": r.finalResult,
     "Pelotão": r.platoon ?? "",
     "Bônus Caju (R$)": r.bonusValue,
   }));
 
-  res.json({ filename: `ranking-Q${quarter}-${year}.csv`, data: toCsv(rows) });
+  res.json({ filename: `ranking-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows) });
 });
 
 router.get("/exports/event-results", async (req, res) => {
@@ -94,9 +99,9 @@ router.get("/exports/event-results", async (req, res) => {
   res.json({ filename: `evento-${ev.name}.csv`, data: toCsv(rows) });
 });
 
-router.get("/exports/caju-bonuses", async (req, res) => {
-  const { year, quarter } = req.query;
-  if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
+router.get("/exports/caju-bonuses", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json({ filename: `bonus-caju.csv`, data: "" }); return; }
 
   const results = await db
     .select({
@@ -107,18 +112,16 @@ router.get("/exports/caju-bonuses", async (req, res) => {
     })
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(and(eq(quarterlyResultsTable.year, parseInt(year as string)), eq(quarterlyResultsTable.quarter, parseInt(quarter as string))))
+    .where(eq(quarterlyResultsTable.cycleId, cycle.id))
     .orderBy(quarterlyResultsTable.bonusValue);
 
-  res.json({ filename: `bonus-caju-Q${quarter}-${year}.csv`, data: toCsv(results as never) });
+  const rows = results.map(r => ({ "Ciclo": cycle.name, ...r }));
+  res.json({ filename: `bonus-caju-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows as never) });
 });
 
-router.get("/exports/absences", async (req, res) => {
-  const { year, quarter } = req.query;
-  const conditions = [];
-  if (year) conditions.push(eq(absencesTable.year, parseInt(year as string)));
-  if (quarter) conditions.push(eq(absencesTable.quarter, parseInt(quarter as string)));
-  const whereClause = conditions.length ? and(...conditions) : undefined;
+router.get("/exports/absences", async (_req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json({ filename: `penalidades.csv`, data: "" }); return; }
 
   const results = await db
     .select({
@@ -127,19 +130,17 @@ router.get("/exports/absences", async (req, res) => {
       "Evento": eventsTable.name,
       "Pontos": absencesTable.points,
       "Data": absencesTable.date,
-      "Ano": absencesTable.year,
-      "Trimestre": absencesTable.quarter,
       "Quantidade": absencesTable.quantity,
       "Motivo": absencesTable.reason,
     })
     .from(absencesTable)
     .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
     .leftJoin(eventsTable, eq(absencesTable.eventId, eventsTable.id))
-    .where(whereClause)
+    .where(eq(absencesTable.cycleId, cycle.id))
     .orderBy(absencesTable.date);
 
-  const suffix = year && quarter ? `-Q${quarter}-${year}` : "";
-  res.json({ filename: `penalidades${suffix}.csv`, data: toCsv(results as never) });
+  const rows = results.map(r => ({ ...r, "Ciclo": cycle.name }));
+  res.json({ filename: `penalidades-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows as never) });
 });
 
 router.get("/exports/pending-evaluations", requireRole("admin", "rh", "diretoria"), async (_req, res) => {

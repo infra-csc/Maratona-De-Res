@@ -4,19 +4,20 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult } from "../lib/calculations.js";
-import { recomputeQuarterResults } from "./results.js";
+import { recomputeCycleResults } from "./results.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
 
 router.get("/events", async (req, res) => {
-  const { year, quarter, status } = req.query;
+  const { status } = req.query;
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
   let query = db.select().from(eventsTable).$dynamic();
-  const conditions = [];
-  if (year) conditions.push(eq(eventsTable.year, parseInt(year as string)));
-  if (quarter) conditions.push(eq(eventsTable.quarter, parseInt(quarter as string)));
+  const conditions = [eq(eventsTable.cycleId, cycle.id)];
   if (status) conditions.push(eq(eventsTable.status, status as string));
-  if (conditions.length) query = query.where(and(...conditions));
+  query = query.where(and(...conditions));
   const events = await query.orderBy(eventsTable.startDate);
 
   if (events.length === 0) { res.json([]); return; }
@@ -172,14 +173,16 @@ router.get("/events/:id", async (req, res) => {
 });
 
 router.post("/events", requireRole("admin", "rh"), async (req, res) => {
-  const { name, clientName, location, city, state, startDate, endDate, year, quarter } = req.body;
-  if (!name || !startDate || !endDate || !year || !quarter) {
-    res.status(400).json({ error: "Campos obrigatórios: name, startDate, endDate, year, quarter" });
+  const { name, clientName, location, city, state, startDate, endDate } = req.body;
+  if (!name || !startDate || !endDate) {
+    res.status(400).json({ error: "Campos obrigatórios: name, startDate, endDate" });
     return;
   }
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
   const [ev] = await db.insert(eventsTable).values({
     name, clientName: clientName ?? null, location: location ?? null, city: city ?? null,
-    state: state ?? null, startDate, endDate, year, quarter,
+    state: state ?? null, startDate, endDate, cycleId: cycle.id,
   }).returning();
 
   const allCriteria = await db.select().from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
@@ -227,7 +230,7 @@ router.post("/events/:id/close", requireRole("admin", "rh", "diretoria"), async 
   }).where(eq(eventsTable.id, id)).returning();
   if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
   await audit(req.user!.userId, "close", "events", id);
-  await recomputeQuarterResults(ev.year, ev.quarter, req.user!.userId);
+  await recomputeCycleResults(ev.cycleId, req.user!.userId);
   res.json(ev);
 });
 
@@ -236,7 +239,7 @@ router.post("/events/:id/reopen", requireRole("admin", "rh"), async (req, res) =
   const [ev] = await db.update(eventsTable).set({ status: "open", forcedClosed: false, forcedCloseReason: null }).where(eq(eventsTable.id, id)).returning();
   if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
   await audit(req.user!.userId, "reopen", "events", id);
-  await recomputeQuarterResults(ev.year, ev.quarter, req.user!.userId);
+  await recomputeCycleResults(ev.cycleId, req.user!.userId);
   res.json(ev);
 });
 

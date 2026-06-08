@@ -224,9 +224,11 @@ export default function EventDetailPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-3 mb-3">
                   <StatusBadge status={event.status} />
-                  <span className="bg-[#191c1e] text-[#ccff00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                    <span className="inline-block skew-x-[8deg]">T{event.quarter}/{event.year}</span>
-                  </span>
+                  {event.cycleName && (
+                    <span className="bg-[#191c1e] text-[#ccff00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
+                      <span className="inline-block skew-x-[8deg]">{event.cycleName}</span>
+                    </span>
+                  )}
                   {event.forcedClosed && (
                     <span className="bg-[#ff5722] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
                       <span className="inline-flex items-center gap-1 skew-x-[8deg]"><ShieldAlert size={10} /> Fechamento Forçado</span>

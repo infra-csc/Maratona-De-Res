@@ -1,28 +1,20 @@
-import { useState } from "react";
 import { useGetDashboardSummary, useGetDashboardPlatoonDistribution, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, getGetDashboardSummaryQueryKey, getGetDashboardPlatoonDistributionQueryKey } from "@workspace/api-client-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { CheckCircle2, Users, Trophy, DollarSign, History, AlertTriangle, Clock, ChevronRight } from "lucide-react";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
-
-const currentYear = new Date().getFullYear();
-const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
 export default function DashboardPage() {
-  const [year, setYear] = useState(currentYear);
-  const [quarter, setQuarter] = useState(currentQuarter);
-
-  const { data: summary } = useGetDashboardSummary({ year, quarter }, {
-    query: { queryKey: getGetDashboardSummaryQueryKey({ year, quarter }) },
+  const { data: summary } = useGetDashboardSummary({
+    query: { queryKey: getGetDashboardSummaryQueryKey() },
   });
-  const { data: distribution } = useGetDashboardPlatoonDistribution({ year, quarter }, {
-    query: { queryKey: getGetDashboardPlatoonDistributionQueryKey({ year, quarter }) },
+  const { data: distribution } = useGetDashboardPlatoonDistribution({
+    query: { queryKey: getGetDashboardPlatoonDistributionQueryKey() },
   });
-  const { data: topEmployees } = useGetDashboardTopEmployees({ year, quarter });
-  const { data: evolution } = useGetDashboardQuarterlyEvolution({ year });
+  const { data: topEmployees } = useGetDashboardTopEmployees();
+  const { data: evolution } = useGetDashboardQuarterlyEvolution();
 
   const fmt = (v: number) => `${v.toFixed(1)}/100`;
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -41,29 +33,13 @@ export default function DashboardPage() {
         <h1 data-testid="text-page-title" className="text-2xl md:text-3xl italic font-black text-[#506600] uppercase tracking-tighter">
           Painel de Controle
         </h1>
-        <div className="flex gap-2">
-          <Select value={String(year)} onValueChange={v => setYear(Number(v))}>
-            <SelectTrigger data-testid="select-year" className="w-28 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[currentYear - 1, currentYear, currentYear + 1].map(y => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(quarter)} onValueChange={v => setQuarter(Number(v))}>
-            <SelectTrigger data-testid="select-quarter" className="w-32 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">1º Trimestre</SelectItem>
-              <SelectItem value="2">2º Trimestre</SelectItem>
-              <SelectItem value="3">3º Trimestre</SelectItem>
-              <SelectItem value="4">4º Trimestre</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {summary?.cycleName && (
+          <div className="flex gap-2">
+            <span data-testid="text-cycle-name" className="bg-[#191c1e] text-[#ccff00] px-4 py-2 border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider skew-x-[-6deg] inline-block">
+              <span className="inline-block skew-x-[6deg]">{summary.cycleName}</span>
+            </span>
+          </div>
+        )}
       </header>
 
       <div className="p-6 md:p-10 space-y-10">
@@ -72,11 +48,11 @@ export default function DashboardPage() {
           {/* Média Geral */}
           <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
             <div className="z-10">
-              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Média Geral</p>
+              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Média do Ciclo</p>
               <h2 data-testid="text-quarter-avg" className="text-[40px] leading-none italic font-black mt-2">
                 {summary?.quarterAverage != null ? summary.quarterAverage.toFixed(1) : "—"}
               </h2>
-              <p className="text-[11px] font-bold uppercase italic opacity-50 mt-1">Pontos no trimestre</p>
+              <p className="text-[11px] font-bold uppercase italic opacity-50 mt-1">Pontos no ciclo</p>
             </div>
             <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
               <Trophy size={110} strokeWidth={1.5} />
@@ -119,7 +95,7 @@ export default function DashboardPage() {
               <h2 data-testid="text-projected-bonus" className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">
                 {summary?.totalBonusPreview != null ? fmtBRL(summary.totalBonusPreview) : "—"}
               </h2>
-              <p className="text-[11px] font-bold uppercase italic opacity-50 mt-1">Estimativa do trimestre</p>
+              <p className="text-[11px] font-bold uppercase italic opacity-50 mt-1">Estimativa do ciclo</p>
             </div>
             <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
               <DollarSign size={110} strokeWidth={1.5} />
@@ -134,7 +110,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap justify-between items-end gap-3 mb-8">
               <div>
                 <h3 className="text-xl md:text-2xl italic uppercase font-black">Evolução de Performance</h3>
-                <p className="text-sm text-[#444933]">Média de pontos por trimestre — {year}</p>
+                <p className="text-sm text-[#444933]">Média de pontos por ciclo</p>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={280}>

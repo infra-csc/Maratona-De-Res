@@ -12,8 +12,6 @@ import { useAuth } from "@/lib/auth-context";
 import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock } from "lucide-react";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
-const currentYear = new Date().getFullYear();
-
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 
 function statusChip(status: string): { label: string; cls: string } {
@@ -39,7 +37,7 @@ export default function CalibrationsPage() {
   const [calReasons, setCalReasons] = useState<Record<number, string>>({});
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
 
-  const { data: events } = useGetEvents({ year: currentYear });
+  const { data: events } = useGetEvents();
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["ec", selectedEventId] as unknown[] },
   });
@@ -105,7 +103,7 @@ export default function CalibrationsPage() {
       await closeMutation.mutateAsync({ id: selectedEventId, data: {} });
       closed = true;
       await releaseMutation.mutateAsync({ id: selectedEventId });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey({ year: currentYear }) });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
       qc.invalidateQueries({ queryKey: fbQKey });
       setFinalizeOpen(false);
       toast({ title: "Evento finalizado", description: "As notas foram liberadas para os funcionários." });
@@ -113,7 +111,7 @@ export default function CalibrationsPage() {
       const msg = (e as { message?: string })?.message;
       // Sempre atualiza o estado: o fechamento pode ter sido aplicado mesmo que
       // a liberação tenha falhado.
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey({ year: currentYear }) });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
       qc.invalidateQueries({ queryKey: fbQKey });
       if (closed) {
         toast({

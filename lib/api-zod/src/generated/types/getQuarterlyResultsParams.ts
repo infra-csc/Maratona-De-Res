@@ -7,8 +7,6 @@
  */
 
 export type GetQuarterlyResultsParams = {
-year: number;
-quarter: number;
 employeeId?: number;
 platoon?: string;
 };

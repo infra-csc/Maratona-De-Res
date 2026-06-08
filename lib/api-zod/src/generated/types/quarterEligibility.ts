@@ -11,8 +11,7 @@ export interface QuarterEligibility {
   employeeId: number;
   /** @nullable */
   employeeName?: string | null;
-  year: number;
-  quarter: number;
+  cycleId?: number;
   eligible: boolean;
   /** @nullable */
   reason?: string | null;

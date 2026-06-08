@@ -17,5 +17,6 @@ export interface RankingEntry {
   platoonColor?: string | null;
   bonusValue: number;
   eventsCount: number;
+  participatedEventsCount?: number;
   absences: number;
 }

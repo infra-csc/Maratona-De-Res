@@ -7,8 +7,6 @@
  */
 
 export interface CloseQuarterInput {
-  year: number;
-  quarter: number;
   forced?: boolean;
   reason?: string;
 }

@@ -7,8 +7,7 @@
  */
 
 export interface QuarterlyEvolution {
-  year: number;
-  quarter: number;
+  cycleId?: number;
   label: string;
   average: number;
 }

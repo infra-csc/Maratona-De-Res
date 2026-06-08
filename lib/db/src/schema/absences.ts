@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
 import { eventsTable } from "./events";
+import { cyclesTable } from "./cycles";
 import { usersTable } from "./users";
 
 export const absencesTable = pgTable("absences", {
@@ -13,8 +14,7 @@ export const absencesTable = pgTable("absences", {
   kind: text("kind").notNull().default("penalty"),
   points: integer("points").notNull().default(0),
   date: date("date").notNull(),
-  year: integer("year").notNull(),
-  quarter: integer("quarter").notNull(),
+  cycleId: integer("cycle_id").notNull().references(() => cyclesTable.id),
   quantity: integer("quantity").notNull().default(1),
   reason: text("reason"),
   registeredByUserId: integer("registered_by_user_id").notNull().references(() => usersTable.id),

@@ -13,8 +13,6 @@ export interface AbsenceInput {
   eventId?: number | null;
   penaltyType: AbsenceInputPenaltyType;
   date: string;
-  year: number;
-  quarter: number;
   /** @minimum 1 */
   quantity?: number;
   reason?: string;

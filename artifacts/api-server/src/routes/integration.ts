@@ -3,6 +3,7 @@ import { db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable,
 import { isNotNull, inArray, eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -106,6 +107,16 @@ router.post("/integration/sync", async (req, res) => {
     return;
   }
 
+  const cycle = await getCurrentCycle();
+  if (!cycle) {
+    res.status(400).json({
+      success: false,
+      message: "Nenhum ciclo ativo",
+      eventsSync: 0, employeesSync: 0, participantsSync: 0,
+    });
+    return;
+  }
+
   const logs: string[] = [];
   const log = (m: string) => logs.push(m);
   let employeesSync = 0, eventsSync = 0, participantsSync = 0;
@@ -187,7 +198,6 @@ router.post("/integration/sync", async (req, res) => {
         if (!externalId || !ev.name) continue;
         const startDate = normalizeDate(ev.startDate);
         const endDate = ev.endDate ? normalizeDate(ev.endDate) : startDate;
-        const yq = deriveYearQuarter(ev.startDate);
         const fields = {
           name: ev.name,
           clientName: ev.clientName ?? ev.client ?? null,
@@ -196,8 +206,7 @@ router.post("/integration/sync", async (req, res) => {
           state: ev.state ?? null,
           startDate,
           endDate,
-          year: ev.year ?? yq.year,
-          quarter: ev.quarter ?? yq.quarter,
+          cycleId: cycle.id,
         };
         await tx.insert(eventsTable)
           .values({ externalId, ...fields })

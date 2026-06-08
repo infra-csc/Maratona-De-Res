@@ -11,12 +11,14 @@ export interface QuarterlyResult {
   id?: number;
   employeeId: number;
   employeeName: string;
-  year: number;
-  quarter: number;
+  cycleId?: number;
   eventsCount?: number;
+  participatedEventsCount?: number;
+  scoreSum?: number;
   grossAverage?: number;
   totalAbsences?: number;
   absencePenalty?: number;
+  meritPoints?: number;
   finalResult: number;
   /** @nullable */
   platoon: string | null;

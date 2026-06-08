@@ -68,14 +68,13 @@ router.get("/employees/:id/history", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const results = await db.select().from(quarterlyResultsTable)
     .where(eq(quarterlyResultsTable.employeeId, id))
-    .orderBy(quarterlyResultsTable.year, quarterlyResultsTable.quarter);
+    .orderBy(quarterlyResultsTable.cycleId);
   const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   const employeeName = employee?.name ?? "";
   res.json(results.map(r => ({
     employeeId: r.employeeId,
     employeeName,
-    year: r.year,
-    quarter: r.quarter,
+    cycleId: r.cycleId,
     eventsCount: r.eventsCount,
     grossAverage: parseFloat(r.grossAverage),
     totalAbsences: r.totalAbsences,

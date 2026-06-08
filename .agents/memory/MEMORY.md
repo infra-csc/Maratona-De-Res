@@ -17,4 +17,7 @@
 - [Event detail progress source](event-detail-progress.md) — loadEventDetail returns evaluationMatrix:[] always; use the evaluationProgress field (submitted/total evals) for any "% avaliado", never the matrix
 - [Per-event area assignment](event-area-assignment.md) — eval scoping is event→area→avaliador (event_area_assignments), NOT profile areaId; confirm gate blocks until every active-criteria area assigned
 - [Event-scoped duplicate criteria](event-scoped-criteria.md) — duplicating a quesito makes its OWN criteria row (eventScoped=true) since scores key by global criterionId; exclude eventScoped from /criteria, sync, AND POST /events seeding
+- [Cycle migration](cycle-migration.md) — year+quarter removed → single current ciclo (getCurrentCycle); eventsCount(scored) vs participatedEventsCount(eligibility, >=min_events_eligibility default 8)
+- [Consolidação net display](consolidation-net-display.md) — Penalidades/Méritos = stored meritPoints - absencePenalty, NOT grossAverage-finalResult (clamp-distorted at 0/100)
+- [Unified Resultados page](unified-results-page.md) — one /results page, 3 tabs (Ranking all roles · Consolidação · Bônus managers); /ranking redirects to /results; ranking.tsx deleted
 - [Quarterly recompute triggers](quarterly-recompute-triggers.md) — dashboard/results/ranking read snapshot quarterlyResultsTable; event close/reopen/release must call recomputeQuarterResults (idempotent, preserves payments, txn)

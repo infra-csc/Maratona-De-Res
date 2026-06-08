@@ -8,6 +8,4 @@
 
 export type GetAbsencesParams = {
 employeeId?: number;
-year?: number;
-quarter?: number;
 };

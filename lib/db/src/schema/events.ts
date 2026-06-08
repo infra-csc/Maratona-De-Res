@@ -2,6 +2,7 @@ import { pgTable, serial, text, boolean, integer, numeric, timestamp, date, uniq
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
+import { cyclesTable } from "./cycles";
 
 export const eventsTable = pgTable("events", {
   id: serial("id").primaryKey(),
@@ -13,8 +14,7 @@ export const eventsTable = pgTable("events", {
   state: text("state"),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
-  year: integer("year").notNull(),
-  quarter: integer("quarter").notNull(),
+  cycleId: integer("cycle_id").notNull().references(() => cyclesTable.id),
   status: text("status").notNull().default("open"),
   forcedClosed: boolean("forced_closed").notNull().default(false),
   forcedCloseReason: text("forced_close_reason"),

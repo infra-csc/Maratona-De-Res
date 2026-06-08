@@ -19,8 +19,7 @@ export interface Absence {
   kind?: AbsenceKind;
   points: number;
   date: string;
-  year: number;
-  quarter: number;
+  cycleId: number;
   quantity: number;
   /** @nullable */
   reason?: string | null;

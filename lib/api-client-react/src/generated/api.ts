@@ -56,23 +56,15 @@ import type {
   EventParticipantInput,
   EventTeamResult,
   EventUpdate,
-  ExportAbsencesParams,
-  ExportCajuBonusesParams,
   ExportEventResultsParams,
-  ExportQuarterlyResultsParams,
-  ExportRankingParams,
   ForceCloseInput,
   GetAbsencesParams,
   GetAuditLogsParams,
   GetCalibrationsParams,
-  GetDashboardPlatoonDistributionParams,
-  GetDashboardQuarterlyEvolutionParams,
-  GetDashboardSummaryParams,
-  GetDashboardTopEmployeesParams,
+  GetCycleEligibilityParams,
   GetEmployeesParams,
   GetEvaluationsParams,
   GetEventsParams,
-  GetQuarterEligibilityParams,
   GetQuarterlyResultsParams,
   GetRankingDetailParams,
   GetRankingParams,
@@ -4323,27 +4315,20 @@ export const useDeletePlatoonRule = <TError = ErrorType<unknown>,
       return useMutation(getDeletePlatoonRuleMutationOptions(options));
     }
 
-export const getGetDashboardSummaryUrl = (params?: GetDashboardSummaryParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getGetDashboardSummaryUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/dashboard/summary?${stringifiedParams}` : `/dashboard/summary`
+  return `/dashboard/summary`
 }
 
 /**
  * @summary Get dashboard summary
  */
-export const getDashboardSummary = async (params?: GetDashboardSummaryParams, options?: RequestInit): Promise<DashboardSummary> => {
+export const getDashboardSummary = async ( options?: RequestInit): Promise<DashboardSummary> => {
 
-  return customFetch<DashboardSummary>(getGetDashboardSummaryUrl(params),
+  return customFetch<DashboardSummary>(getGetDashboardSummaryUrl(),
   {
     ...options,
     method: 'GET'
@@ -4356,23 +4341,23 @@ export const getDashboardSummary = async (params?: GetDashboardSummaryParams, op
 
 
 
-export const getGetDashboardSummaryQueryKey = (params?: GetDashboardSummaryParams,) => {
+export const getGetDashboardSummaryQueryKey = () => {
     return [
-    `/dashboard/summary`, ...(params ? [params] : [])
+    `/dashboard/summary`
     ] as const;
     }
 
 
-export const getGetDashboardSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>(params?: GetDashboardSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSummaryQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSummaryQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSummary>>> = ({ signal }) => getDashboardSummary(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSummary>>> = ({ signal }) => getDashboardSummary({ signal, ...requestOptions });
 
 
 
@@ -4390,11 +4375,11 @@ export type GetDashboardSummaryQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>(
- params?: GetDashboardSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardSummaryQueryOptions(params,options)
+  const queryOptions = getGetDashboardSummaryQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -4407,27 +4392,20 @@ export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDash
 
 
 
-export const getGetDashboardPlatoonDistributionUrl = (params?: GetDashboardPlatoonDistributionParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getGetDashboardPlatoonDistributionUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/dashboard/platoon-distribution?${stringifiedParams}` : `/dashboard/platoon-distribution`
+  return `/dashboard/platoon-distribution`
 }
 
 /**
  * @summary Get platoon distribution
  */
-export const getDashboardPlatoonDistribution = async (params?: GetDashboardPlatoonDistributionParams, options?: RequestInit): Promise<PlatoonDistribution[]> => {
+export const getDashboardPlatoonDistribution = async ( options?: RequestInit): Promise<PlatoonDistribution[]> => {
 
-  return customFetch<PlatoonDistribution[]>(getGetDashboardPlatoonDistributionUrl(params),
+  return customFetch<PlatoonDistribution[]>(getGetDashboardPlatoonDistributionUrl(),
   {
     ...options,
     method: 'GET'
@@ -4440,23 +4418,23 @@ export const getDashboardPlatoonDistribution = async (params?: GetDashboardPlato
 
 
 
-export const getGetDashboardPlatoonDistributionQueryKey = (params?: GetDashboardPlatoonDistributionParams,) => {
+export const getGetDashboardPlatoonDistributionQueryKey = () => {
     return [
-    `/dashboard/platoon-distribution`, ...(params ? [params] : [])
+    `/dashboard/platoon-distribution`
     ] as const;
     }
 
 
-export const getGetDashboardPlatoonDistributionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError = ErrorType<unknown>>(params?: GetDashboardPlatoonDistributionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardPlatoonDistributionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardPlatoonDistributionQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardPlatoonDistributionQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>> = ({ signal }) => getDashboardPlatoonDistribution(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>> = ({ signal }) => getDashboardPlatoonDistribution({ signal, ...requestOptions });
 
 
 
@@ -4474,11 +4452,11 @@ export type GetDashboardPlatoonDistributionQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardPlatoonDistribution<TData = Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError = ErrorType<unknown>>(
- params?: GetDashboardPlatoonDistributionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPlatoonDistribution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardPlatoonDistributionQueryOptions(params,options)
+  const queryOptions = getGetDashboardPlatoonDistributionQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -4491,27 +4469,20 @@ export function useGetDashboardPlatoonDistribution<TData = Awaited<ReturnType<ty
 
 
 
-export const getGetDashboardTopEmployeesUrl = (params?: GetDashboardTopEmployeesParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getGetDashboardTopEmployeesUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/dashboard/top-employees?${stringifiedParams}` : `/dashboard/top-employees`
+  return `/dashboard/top-employees`
 }
 
 /**
  * @summary Get top 10 employees
  */
-export const getDashboardTopEmployees = async (params?: GetDashboardTopEmployeesParams, options?: RequestInit): Promise<QuarterlyResult[]> => {
+export const getDashboardTopEmployees = async ( options?: RequestInit): Promise<QuarterlyResult[]> => {
 
-  return customFetch<QuarterlyResult[]>(getGetDashboardTopEmployeesUrl(params),
+  return customFetch<QuarterlyResult[]>(getGetDashboardTopEmployeesUrl(),
   {
     ...options,
     method: 'GET'
@@ -4524,23 +4495,23 @@ export const getDashboardTopEmployees = async (params?: GetDashboardTopEmployees
 
 
 
-export const getGetDashboardTopEmployeesQueryKey = (params?: GetDashboardTopEmployeesParams,) => {
+export const getGetDashboardTopEmployeesQueryKey = () => {
     return [
-    `/dashboard/top-employees`, ...(params ? [params] : [])
+    `/dashboard/top-employees`
     ] as const;
     }
 
 
-export const getGetDashboardTopEmployeesQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError = ErrorType<unknown>>(params?: GetDashboardTopEmployeesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardTopEmployeesQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardTopEmployeesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardTopEmployeesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardTopEmployees>>> = ({ signal }) => getDashboardTopEmployees(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardTopEmployees>>> = ({ signal }) => getDashboardTopEmployees({ signal, ...requestOptions });
 
 
 
@@ -4558,11 +4529,11 @@ export type GetDashboardTopEmployeesQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardTopEmployees<TData = Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError = ErrorType<unknown>>(
- params?: GetDashboardTopEmployeesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardTopEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardTopEmployeesQueryOptions(params,options)
+  const queryOptions = getGetDashboardTopEmployeesQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -4575,27 +4546,20 @@ export function useGetDashboardTopEmployees<TData = Awaited<ReturnType<typeof ge
 
 
 
-export const getGetDashboardQuarterlyEvolutionUrl = (params?: GetDashboardQuarterlyEvolutionParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getGetDashboardQuarterlyEvolutionUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/dashboard/quarterly-evolution?${stringifiedParams}` : `/dashboard/quarterly-evolution`
+  return `/dashboard/quarterly-evolution`
 }
 
 /**
  * @summary Get quarterly evolution chart data
  */
-export const getDashboardQuarterlyEvolution = async (params?: GetDashboardQuarterlyEvolutionParams, options?: RequestInit): Promise<QuarterlyEvolution[]> => {
+export const getDashboardQuarterlyEvolution = async ( options?: RequestInit): Promise<QuarterlyEvolution[]> => {
 
-  return customFetch<QuarterlyEvolution[]>(getGetDashboardQuarterlyEvolutionUrl(params),
+  return customFetch<QuarterlyEvolution[]>(getGetDashboardQuarterlyEvolutionUrl(),
   {
     ...options,
     method: 'GET'
@@ -4608,23 +4572,23 @@ export const getDashboardQuarterlyEvolution = async (params?: GetDashboardQuarte
 
 
 
-export const getGetDashboardQuarterlyEvolutionQueryKey = (params?: GetDashboardQuarterlyEvolutionParams,) => {
+export const getGetDashboardQuarterlyEvolutionQueryKey = () => {
     return [
-    `/dashboard/quarterly-evolution`, ...(params ? [params] : [])
+    `/dashboard/quarterly-evolution`
     ] as const;
     }
 
 
-export const getGetDashboardQuarterlyEvolutionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>, TError = ErrorType<unknown>>(params?: GetDashboardQuarterlyEvolutionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardQuarterlyEvolutionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardQuarterlyEvolutionQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardQuarterlyEvolutionQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>> = ({ signal }) => getDashboardQuarterlyEvolution(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>> = ({ signal }) => getDashboardQuarterlyEvolution({ signal, ...requestOptions });
 
 
 
@@ -4642,11 +4606,11 @@ export type GetDashboardQuarterlyEvolutionQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardQuarterlyEvolution<TData = Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>, TError = ErrorType<unknown>>(
- params?: GetDashboardQuarterlyEvolutionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardQuarterlyEvolution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardQuarterlyEvolutionQueryOptions(params,options)
+  const queryOptions = getGetDashboardQuarterlyEvolutionQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -4659,7 +4623,7 @@ export function useGetDashboardQuarterlyEvolution<TData = Awaited<ReturnType<typ
 
 
 
-export const getGetQuarterlyResultsUrl = (params: GetQuarterlyResultsParams,) => {
+export const getGetQuarterlyResultsUrl = (params?: GetQuarterlyResultsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -4677,7 +4641,7 @@ export const getGetQuarterlyResultsUrl = (params: GetQuarterlyResultsParams,) =>
 /**
  * @summary Get quarterly results
  */
-export const getQuarterlyResults = async (params: GetQuarterlyResultsParams, options?: RequestInit): Promise<QuarterlyResult[]> => {
+export const getQuarterlyResults = async (params?: GetQuarterlyResultsParams, options?: RequestInit): Promise<QuarterlyResult[]> => {
 
   return customFetch<QuarterlyResult[]>(getGetQuarterlyResultsUrl(params),
   {
@@ -4699,7 +4663,7 @@ export const getGetQuarterlyResultsQueryKey = (params?: GetQuarterlyResultsParam
     }
 
 
-export const getGetQuarterlyResultsQueryOptions = <TData = Awaited<ReturnType<typeof getQuarterlyResults>>, TError = ErrorType<unknown>>(params: GetQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetQuarterlyResultsQueryOptions = <TData = Awaited<ReturnType<typeof getQuarterlyResults>>, TError = ErrorType<unknown>>(params?: GetQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -4726,7 +4690,7 @@ export type GetQuarterlyResultsQueryError = ErrorType<unknown>
  */
 
 export function useGetQuarterlyResults<TData = Awaited<ReturnType<typeof getQuarterlyResults>>, TError = ErrorType<unknown>>(
- params: GetQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -4752,7 +4716,7 @@ export const getCloseQuarterUrl = () => {
 }
 
 /**
- * @summary Close a quarter
+ * @summary Close the current cycle
  */
 export const closeQuarter = async (closeQuarterInput: CloseQuarterInput, options?: RequestInit): Promise<QuarterCloseResult> => {
 
@@ -4801,7 +4765,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CloseQuarterMutationError = ErrorType<unknown>
 
     /**
- * @summary Close a quarter
+ * @summary Close the current cycle
  */
 export const useCloseQuarter = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeQuarter>>, TError,{data: BodyType<CloseQuarterInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -4886,7 +4850,7 @@ export const useUpdateBonusPayment = <TError = ErrorType<unknown>,
       return useMutation(getUpdateBonusPaymentMutationOptions(options));
     }
 
-export const getGetQuarterEligibilityUrl = (params?: GetQuarterEligibilityParams,) => {
+export const getGetCycleEligibilityUrl = (params?: GetCycleEligibilityParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -4898,15 +4862,15 @@ export const getGetQuarterEligibilityUrl = (params?: GetQuarterEligibilityParams
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/quarter-eligibility?${stringifiedParams}` : `/quarter-eligibility`
+  return stringifiedParams.length > 0 ? `/cycle-eligibility?${stringifiedParams}` : `/cycle-eligibility`
 }
 
 /**
- * @summary List quarterly ineligibility records
+ * @summary List cycle ineligibility records
  */
-export const getQuarterEligibility = async (params?: GetQuarterEligibilityParams, options?: RequestInit): Promise<QuarterEligibility[]> => {
+export const getCycleEligibility = async (params?: GetCycleEligibilityParams, options?: RequestInit): Promise<QuarterEligibility[]> => {
 
-  return customFetch<QuarterEligibility[]>(getGetQuarterEligibilityUrl(params),
+  return customFetch<QuarterEligibility[]>(getGetCycleEligibilityUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4919,45 +4883,45 @@ export const getQuarterEligibility = async (params?: GetQuarterEligibilityParams
 
 
 
-export const getGetQuarterEligibilityQueryKey = (params?: GetQuarterEligibilityParams,) => {
+export const getGetCycleEligibilityQueryKey = (params?: GetCycleEligibilityParams,) => {
     return [
-    `/quarter-eligibility`, ...(params ? [params] : [])
+    `/cycle-eligibility`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetQuarterEligibilityQueryOptions = <TData = Awaited<ReturnType<typeof getQuarterEligibility>>, TError = ErrorType<unknown>>(params?: GetQuarterEligibilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCycleEligibilityQueryOptions = <TData = Awaited<ReturnType<typeof getCycleEligibility>>, TError = ErrorType<unknown>>(params?: GetCycleEligibilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCycleEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetQuarterEligibilityQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetCycleEligibilityQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuarterEligibility>>> = ({ signal }) => getQuarterEligibility(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCycleEligibility>>> = ({ signal }) => getCycleEligibility(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQuarterEligibility>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCycleEligibility>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetQuarterEligibilityQueryResult = NonNullable<Awaited<ReturnType<typeof getQuarterEligibility>>>
-export type GetQuarterEligibilityQueryError = ErrorType<unknown>
+export type GetCycleEligibilityQueryResult = NonNullable<Awaited<ReturnType<typeof getCycleEligibility>>>
+export type GetCycleEligibilityQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List quarterly ineligibility records
+ * @summary List cycle ineligibility records
  */
 
-export function useGetQuarterEligibility<TData = Awaited<ReturnType<typeof getQuarterEligibility>>, TError = ErrorType<unknown>>(
- params?: GetQuarterEligibilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarterEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetCycleEligibility<TData = Awaited<ReturnType<typeof getCycleEligibility>>, TError = ErrorType<unknown>>(
+ params?: GetCycleEligibilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCycleEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetQuarterEligibilityQueryOptions(params,options)
+  const queryOptions = getGetCycleEligibilityQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -4970,20 +4934,20 @@ export function useGetQuarterEligibility<TData = Awaited<ReturnType<typeof getQu
 
 
 
-export const getSetQuarterEligibilityUrl = () => {
+export const getSetCycleEligibilityUrl = () => {
 
 
 
 
-  return `/quarter-eligibility`
+  return `/cycle-eligibility`
 }
 
 /**
- * @summary Set quarterly eligibility for an employee
+ * @summary Set cycle eligibility for an employee
  */
-export const setQuarterEligibility = async (quarterEligibilityInput: QuarterEligibilityInput, options?: RequestInit): Promise<QuarterEligibility> => {
+export const setCycleEligibility = async (quarterEligibilityInput: QuarterEligibilityInput, options?: RequestInit): Promise<QuarterEligibility> => {
 
-  return customFetch<QuarterEligibility>(getSetQuarterEligibilityUrl(),
+  return customFetch<QuarterEligibility>(getSetCycleEligibilityUrl(),
   {
     ...options,
     method: 'POST',
@@ -4996,11 +4960,11 @@ export const setQuarterEligibility = async (quarterEligibilityInput: QuarterElig
 
 
 
-export const getSetQuarterEligibilityMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setQuarterEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof setQuarterEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext> => {
+export const getSetCycleEligibilityMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCycleEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setCycleEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext> => {
 
-const mutationKey = ['setQuarterEligibility'];
+const mutationKey = ['setCycleEligibility'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5010,10 +4974,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setQuarterEligibility>>, {data: BodyType<QuarterEligibilityInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setCycleEligibility>>, {data: BodyType<QuarterEligibilityInput>}> = (props) => {
           const {data} = props ?? {};
 
-          return  setQuarterEligibility(data,requestOptions)
+          return  setCycleEligibility(data,requestOptions)
         }
 
 
@@ -5023,25 +4987,25 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type SetQuarterEligibilityMutationResult = NonNullable<Awaited<ReturnType<typeof setQuarterEligibility>>>
-    export type SetQuarterEligibilityMutationBody = BodyType<QuarterEligibilityInput>
-    export type SetQuarterEligibilityMutationError = ErrorType<unknown>
+    export type SetCycleEligibilityMutationResult = NonNullable<Awaited<ReturnType<typeof setCycleEligibility>>>
+    export type SetCycleEligibilityMutationBody = BodyType<QuarterEligibilityInput>
+    export type SetCycleEligibilityMutationError = ErrorType<unknown>
 
     /**
- * @summary Set quarterly eligibility for an employee
+ * @summary Set cycle eligibility for an employee
  */
-export const useSetQuarterEligibility = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setQuarterEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useSetCycleEligibility = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCycleEligibility>>, TError,{data: BodyType<QuarterEligibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof setQuarterEligibility>>,
+        Awaited<ReturnType<typeof setCycleEligibility>>,
         TError,
         {data: BodyType<QuarterEligibilityInput>},
         TContext
       > => {
-      return useMutation(getSetQuarterEligibilityMutationOptions(options));
+      return useMutation(getSetCycleEligibilityMutationOptions(options));
     }
 
-export const getGetRankingUrl = (params: GetRankingParams,) => {
+export const getGetRankingUrl = (params?: GetRankingParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -5059,7 +5023,7 @@ export const getGetRankingUrl = (params: GetRankingParams,) => {
 /**
  * @summary Get ranking (Maratona de Resultados)
  */
-export const getRanking = async (params: GetRankingParams, options?: RequestInit): Promise<RankingEntry[]> => {
+export const getRanking = async (params?: GetRankingParams, options?: RequestInit): Promise<RankingEntry[]> => {
 
   return customFetch<RankingEntry[]>(getGetRankingUrl(params),
   {
@@ -5081,7 +5045,7 @@ export const getGetRankingQueryKey = (params?: GetRankingParams,) => {
     }
 
 
-export const getGetRankingQueryOptions = <TData = Awaited<ReturnType<typeof getRanking>>, TError = ErrorType<unknown>>(params: GetRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetRankingQueryOptions = <TData = Awaited<ReturnType<typeof getRanking>>, TError = ErrorType<unknown>>(params?: GetRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -5108,7 +5072,7 @@ export type GetRankingQueryError = ErrorType<unknown>
  */
 
 export function useGetRanking<TData = Awaited<ReturnType<typeof getRanking>>, TError = ErrorType<unknown>>(
- params: GetRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -5737,27 +5701,20 @@ export function useExportEventResults<TData = Awaited<ReturnType<typeof exportEv
 
 
 
-export const getExportQuarterlyResultsUrl = (params: ExportQuarterlyResultsParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getExportQuarterlyResultsUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/exports/quarterly-results?${stringifiedParams}` : `/exports/quarterly-results`
+  return `/exports/quarterly-results`
 }
 
 /**
  * @summary Export quarterly results CSV
  */
-export const exportQuarterlyResults = async (params: ExportQuarterlyResultsParams, options?: RequestInit): Promise<CsvExport> => {
+export const exportQuarterlyResults = async ( options?: RequestInit): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportQuarterlyResultsUrl(params),
+  return customFetch<CsvExport>(getExportQuarterlyResultsUrl(),
   {
     ...options,
     method: 'GET'
@@ -5770,23 +5727,23 @@ export const exportQuarterlyResults = async (params: ExportQuarterlyResultsParam
 
 
 
-export const getExportQuarterlyResultsQueryKey = (params?: ExportQuarterlyResultsParams,) => {
+export const getExportQuarterlyResultsQueryKey = () => {
     return [
-    `/exports/quarterly-results`, ...(params ? [params] : [])
+    `/exports/quarterly-results`
     ] as const;
     }
 
 
-export const getExportQuarterlyResultsQueryOptions = <TData = Awaited<ReturnType<typeof exportQuarterlyResults>>, TError = ErrorType<unknown>>(params: ExportQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportQuarterlyResultsQueryOptions = <TData = Awaited<ReturnType<typeof exportQuarterlyResults>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportQuarterlyResultsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getExportQuarterlyResultsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportQuarterlyResults>>> = ({ signal }) => exportQuarterlyResults(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportQuarterlyResults>>> = ({ signal }) => exportQuarterlyResults({ signal, ...requestOptions });
 
 
 
@@ -5804,11 +5761,11 @@ export type ExportQuarterlyResultsQueryError = ErrorType<unknown>
  */
 
 export function useExportQuarterlyResults<TData = Awaited<ReturnType<typeof exportQuarterlyResults>>, TError = ErrorType<unknown>>(
- params: ExportQuarterlyResultsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportQuarterlyResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportQuarterlyResultsQueryOptions(params,options)
+  const queryOptions = getExportQuarterlyResultsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -5821,27 +5778,20 @@ export function useExportQuarterlyResults<TData = Awaited<ReturnType<typeof expo
 
 
 
-export const getExportRankingUrl = (params: ExportRankingParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getExportRankingUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/exports/ranking?${stringifiedParams}` : `/exports/ranking`
+  return `/exports/ranking`
 }
 
 /**
  * @summary Export ranking CSV
  */
-export const exportRanking = async (params: ExportRankingParams, options?: RequestInit): Promise<CsvExport> => {
+export const exportRanking = async ( options?: RequestInit): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportRankingUrl(params),
+  return customFetch<CsvExport>(getExportRankingUrl(),
   {
     ...options,
     method: 'GET'
@@ -5854,23 +5804,23 @@ export const exportRanking = async (params: ExportRankingParams, options?: Reque
 
 
 
-export const getExportRankingQueryKey = (params?: ExportRankingParams,) => {
+export const getExportRankingQueryKey = () => {
     return [
-    `/exports/ranking`, ...(params ? [params] : [])
+    `/exports/ranking`
     ] as const;
     }
 
 
-export const getExportRankingQueryOptions = <TData = Awaited<ReturnType<typeof exportRanking>>, TError = ErrorType<unknown>>(params: ExportRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportRankingQueryOptions = <TData = Awaited<ReturnType<typeof exportRanking>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportRankingQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getExportRankingQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportRanking>>> = ({ signal }) => exportRanking(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportRanking>>> = ({ signal }) => exportRanking({ signal, ...requestOptions });
 
 
 
@@ -5888,11 +5838,11 @@ export type ExportRankingQueryError = ErrorType<unknown>
  */
 
 export function useExportRanking<TData = Awaited<ReturnType<typeof exportRanking>>, TError = ErrorType<unknown>>(
- params: ExportRankingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRanking>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportRankingQueryOptions(params,options)
+  const queryOptions = getExportRankingQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -5905,27 +5855,20 @@ export function useExportRanking<TData = Awaited<ReturnType<typeof exportRanking
 
 
 
-export const getExportCajuBonusesUrl = (params: ExportCajuBonusesParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getExportCajuBonusesUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/exports/caju-bonuses?${stringifiedParams}` : `/exports/caju-bonuses`
+  return `/exports/caju-bonuses`
 }
 
 /**
  * @summary Export Caju bonus report CSV
  */
-export const exportCajuBonuses = async (params: ExportCajuBonusesParams, options?: RequestInit): Promise<CsvExport> => {
+export const exportCajuBonuses = async ( options?: RequestInit): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportCajuBonusesUrl(params),
+  return customFetch<CsvExport>(getExportCajuBonusesUrl(),
   {
     ...options,
     method: 'GET'
@@ -5938,23 +5881,23 @@ export const exportCajuBonuses = async (params: ExportCajuBonusesParams, options
 
 
 
-export const getExportCajuBonusesQueryKey = (params?: ExportCajuBonusesParams,) => {
+export const getExportCajuBonusesQueryKey = () => {
     return [
-    `/exports/caju-bonuses`, ...(params ? [params] : [])
+    `/exports/caju-bonuses`
     ] as const;
     }
 
 
-export const getExportCajuBonusesQueryOptions = <TData = Awaited<ReturnType<typeof exportCajuBonuses>>, TError = ErrorType<unknown>>(params: ExportCajuBonusesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportCajuBonusesQueryOptions = <TData = Awaited<ReturnType<typeof exportCajuBonuses>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportCajuBonusesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getExportCajuBonusesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportCajuBonuses>>> = ({ signal }) => exportCajuBonuses(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportCajuBonuses>>> = ({ signal }) => exportCajuBonuses({ signal, ...requestOptions });
 
 
 
@@ -5972,11 +5915,11 @@ export type ExportCajuBonusesQueryError = ErrorType<unknown>
  */
 
 export function useExportCajuBonuses<TData = Awaited<ReturnType<typeof exportCajuBonuses>>, TError = ErrorType<unknown>>(
- params: ExportCajuBonusesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportCajuBonuses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportCajuBonusesQueryOptions(params,options)
+  const queryOptions = getExportCajuBonusesQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -5989,27 +5932,20 @@ export function useExportCajuBonuses<TData = Awaited<ReturnType<typeof exportCaj
 
 
 
-export const getExportAbsencesUrl = (params?: ExportAbsencesParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getExportAbsencesUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/exports/absences?${stringifiedParams}` : `/exports/absences`
+  return `/exports/absences`
 }
 
 /**
  * @summary Export absences CSV
  */
-export const exportAbsences = async (params?: ExportAbsencesParams, options?: RequestInit): Promise<CsvExport> => {
+export const exportAbsences = async ( options?: RequestInit): Promise<CsvExport> => {
 
-  return customFetch<CsvExport>(getExportAbsencesUrl(params),
+  return customFetch<CsvExport>(getExportAbsencesUrl(),
   {
     ...options,
     method: 'GET'
@@ -6022,23 +5958,23 @@ export const exportAbsences = async (params?: ExportAbsencesParams, options?: Re
 
 
 
-export const getExportAbsencesQueryKey = (params?: ExportAbsencesParams,) => {
+export const getExportAbsencesQueryKey = () => {
     return [
-    `/exports/absences`, ...(params ? [params] : [])
+    `/exports/absences`
     ] as const;
     }
 
 
-export const getExportAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>(params?: ExportAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExportAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExportAbsencesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getExportAbsencesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAbsences>>> = ({ signal }) => exportAbsences(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAbsences>>> = ({ signal }) => exportAbsences({ signal, ...requestOptions });
 
 
 
@@ -6056,11 +5992,11 @@ export type ExportAbsencesQueryError = ErrorType<unknown>
  */
 
 export function useExportAbsences<TData = Awaited<ReturnType<typeof exportAbsences>>, TError = ErrorType<unknown>>(
- params?: ExportAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExportAbsencesQueryOptions(params,options)
+  const queryOptions = getExportAbsencesQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

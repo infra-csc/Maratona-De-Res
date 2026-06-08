@@ -21,8 +21,8 @@ export interface Event {
   state?: string | null;
   startDate: string;
   endDate: string;
-  year: number;
-  quarter: number;
+  cycleId: number;
+  cycleName?: string;
   status: string;
   eventWeight?: number;
   forcedClosed?: boolean;

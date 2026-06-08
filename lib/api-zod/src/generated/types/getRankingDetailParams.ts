@@ -8,6 +8,4 @@
 
 export type GetRankingDetailParams = {
 employeeId: number;
-year?: number;
-quarter?: number;
 };

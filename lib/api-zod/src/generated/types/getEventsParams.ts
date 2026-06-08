@@ -7,7 +7,5 @@
  */
 
 export type GetEventsParams = {
-year?: number;
-quarter?: number;
 status?: string;
 };

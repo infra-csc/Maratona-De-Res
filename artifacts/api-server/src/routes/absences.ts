@@ -3,6 +3,7 @@ import { db, absencesTable, employeesTable, eventsTable, rulesTable } from "@wor
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,7 +35,9 @@ function catalogKind(type: string): "penalty" | "merit" | null {
 }
 
 router.get("/absences", async (req, res) => {
-  const { employeeId, year, quarter } = req.query;
+  const { employeeId } = req.query;
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
   let query = db.select({
     id: absencesTable.id,
     employeeId: absencesTable.employeeId,
@@ -45,8 +48,7 @@ router.get("/absences", async (req, res) => {
     kind: absencesTable.kind,
     points: absencesTable.points,
     date: absencesTable.date,
-    year: absencesTable.year,
-    quarter: absencesTable.quarter,
+    cycleId: absencesTable.cycleId,
     quantity: absencesTable.quantity,
     reason: absencesTable.reason,
     registeredByUserId: absencesTable.registeredByUserId,
@@ -57,20 +59,23 @@ router.get("/absences", async (req, res) => {
   .leftJoin(eventsTable, eq(absencesTable.eventId, eventsTable.id))
   .$dynamic();
 
-  const conditions = [];
+  const conditions = [eq(absencesTable.cycleId, cycle.id)];
   if (employeeId) conditions.push(eq(absencesTable.employeeId, parseInt(employeeId as string)));
-  if (year) conditions.push(eq(absencesTable.year, parseInt(year as string)));
-  if (quarter) conditions.push(eq(absencesTable.quarter, parseInt(quarter as string)));
-  if (conditions.length) query = query.where(and(...conditions));
+  query = query.where(and(...conditions));
 
   res.json(await query);
 });
 
 router.post("/absences", requireRole("admin", "rh", "diretoria"), async (req, res) => {
-  const { employeeId, eventId, date, year, quarter, quantity, reason, penaltyType } = req.body;
+  const { employeeId, eventId, date, quantity, reason, penaltyType } = req.body;
   const type = (penaltyType as string) ?? "falta";
-  if (!employeeId || !date || !year || !quarter) {
-    res.status(400).json({ error: "Campos obrigatórios: employeeId, date, year, quarter" });
+  if (!employeeId || !date) {
+    res.status(400).json({ error: "Campos obrigatórios: employeeId, date" });
+    return;
+  }
+  const cycle = await getCurrentCycle();
+  if (!cycle) {
+    res.status(400).json({ error: "Nenhum ciclo ativo" });
     return;
   }
   const kind = catalogKind(type);
@@ -89,7 +94,7 @@ router.post("/absences", requireRole("admin", "rh", "diretoria"), async (req, re
     points = ruleRow[0] ? parseFloat(ruleRow[0].value) : 50;
   }
   const [absence] = await db.insert(absencesTable).values({
-    employeeId, eventId: eventId ?? null, penaltyType: type, kind, points, date, year, quarter,
+    employeeId, eventId: eventId ?? null, penaltyType: type, kind, points, date, cycleId: cycle.id,
     quantity: qty, reason: reason ?? null,
     registeredByUserId: req.user!.userId,
   }).returning();

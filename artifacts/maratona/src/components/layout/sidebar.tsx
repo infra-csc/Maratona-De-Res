@@ -30,8 +30,7 @@ const navGroups: NavGroup[] = [
       { label: "Eventos", path: "/events", icon: Calendar },
       { label: "Avaliações", path: "/evaluations", icon: ClipboardList },
       { label: "Calibrações", path: "/calibrations", icon: Target, roles: ["admin", "rh", "diretoria"] },
-      { label: "Resultados Trimestrais", path: "/results", icon: BarChart3, roles: ["admin", "rh", "diretoria"] },
-      { label: "Maratona / Ranking", path: "/ranking", icon: Trophy },
+      { label: "Resultados & Ranking", path: "/results", icon: Trophy },
     ]
   },
   {
@@ -104,7 +103,7 @@ export function Sidebar() {
               if (user?.role === "avaliador") return item.path === "/evaluations";
               // Diretoria sees a focused set of sections (calibração e acompanhamento).
               if (user?.role === "diretoria") {
-                return ["/", "/calibrations", "/results", "/ranking", "/rules", "/absences", "/criteria"].includes(item.path);
+                return ["/", "/calibrations", "/results", "/rules", "/absences", "/criteria"].includes(item.path);
               }
               return !item.roles || (user && item.roles.includes(user.role));
             });

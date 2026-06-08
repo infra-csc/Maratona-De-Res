@@ -7,14 +7,16 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore } from "../lib/calculations.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
 
 const router = Router();
 router.use(requireAuth);
 
 router.get("/ranking", async (req, res) => {
-  const { year, quarter, search } = req.query;
-  if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
+  const { search } = req.query;
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
 
   const results = await db
     .select({
@@ -25,14 +27,12 @@ router.get("/ranking", async (req, res) => {
       platoonColor: quarterlyResultsTable.platoonColor,
       bonusValue: quarterlyResultsTable.bonusValue,
       eventsCount: quarterlyResultsTable.eventsCount,
+      participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
       totalAbsences: quarterlyResultsTable.totalAbsences,
     })
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(and(
-      eq(quarterlyResultsTable.year, parseInt(year as string)),
-      eq(quarterlyResultsTable.quarter, parseInt(quarter as string)),
-    ))
+    .where(eq(quarterlyResultsTable.cycleId, cycle.id))
     .orderBy(sql`${quarterlyResultsTable.finalResult} DESC`);
 
   let filtered = results;
@@ -50,6 +50,7 @@ router.get("/ranking", async (req, res) => {
     platoonColor: r.platoonColor,
     bonusValue: parseFloat(r.bonusValue),
     eventsCount: r.eventsCount,
+    participatedEventsCount: r.participatedEventsCount,
     absences: r.totalAbsences,
   })));
 });
@@ -62,8 +63,8 @@ router.get("/ranking", async (req, res) => {
 router.get("/ranking-detail", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const employeeId = parseInt(req.query.employeeId as string);
   if (!employeeId) { res.status(400).json({ error: "employeeId obrigatório" }); return; }
-  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
-  const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : Math.ceil((new Date().getMonth() + 1) / 3);
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.status(404).json({ error: "Nenhum ciclo ativo" }); return; }
 
   const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
   if (!employee) { res.status(404).json({ error: "Colaborador não encontrado" }); return; }
@@ -71,8 +72,7 @@ router.get("/ranking-detail", requireRole("admin", "rh", "diretoria"), async (re
   const [quarterResult] = await db.select().from(quarterlyResultsTable)
     .where(and(
       eq(quarterlyResultsTable.employeeId, employeeId),
-      eq(quarterlyResultsTable.year, year),
-      eq(quarterlyResultsTable.quarter, quarter),
+      eq(quarterlyResultsTable.cycleId, cycle.id),
     )).limit(1);
 
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
@@ -97,8 +97,7 @@ router.get("/ranking-detail", requireRole("admin", "rh", "diretoria"), async (re
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
     .where(and(
       eq(eventParticipantsTable.employeeId, employeeId),
-      eq(eventsTable.year, year),
-      eq(eventsTable.quarter, quarter),
+      eq(eventsTable.cycleId, cycle.id),
     ));
 
   const events = [];
@@ -174,8 +173,7 @@ router.get("/ranking-detail", requireRole("admin", "rh", "diretoria"), async (re
     .leftJoin(eventsTable, eq(absencesTable.eventId, eventsTable.id))
     .where(and(
       eq(absencesTable.employeeId, employeeId),
-      eq(absencesTable.year, year),
-      eq(absencesTable.quarter, quarter),
+      eq(absencesTable.cycleId, cycle.id),
     ));
 
   const label = (t: string) => MERIT_CATALOG[t]?.label ?? PENALTY_CATALOG[t]?.label ?? t;
@@ -205,7 +203,7 @@ router.get("/ranking-detail", requireRole("admin", "rh", "diretoria"), async (re
       department: employee.department ?? null,
       functionName: employee.functionName ?? null,
     },
-    period: { year, quarter },
+    cycle: { id: cycle.id, name: cycle.name },
     summary: {
       finalResult: quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : null,
       grossAverage,

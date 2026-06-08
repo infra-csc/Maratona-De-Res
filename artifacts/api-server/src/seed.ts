@@ -4,7 +4,8 @@ import {
   db, usersTable, areasTable, employeesTable, criteriaTable, eventsTable,
   eventParticipantsTable, eventCriteriaTable, platoonRulesTable, rulesTable,
   evaluationsTable, calibrationsTable, absencesTable, auditLogsTable,
-  quarterlyResultsTable, employeeEventResultsTable, employeeQuarterEligibilityTable,
+  quarterlyResultsTable, employeeEventResultsTable, employeeCycleEligibilityTable,
+  cyclesTable,
 } from "@workspace/db";
 
 async function seed() {
@@ -34,7 +35,7 @@ async function seed() {
 
   // Wipe in reverse-dependency order
   await db.delete(auditLogsTable);
-  await db.delete(employeeQuarterEligibilityTable);
+  await db.delete(employeeCycleEligibilityTable);
   await db.delete(employeeEventResultsTable);
   await db.delete(quarterlyResultsTable);
   await db.delete(calibrationsTable);
@@ -43,6 +44,7 @@ async function seed() {
   await db.delete(eventCriteriaTable);
   await db.delete(eventParticipantsTable);
   await db.delete(eventsTable);
+  await db.delete(cyclesTable);
   await db.delete(platoonRulesTable);
   await db.delete(rulesTable);
   await db.delete(criteriaTable);
@@ -172,7 +174,8 @@ async function seed() {
     { key: "absence_penalty_per_absence", value: "50", description: "Penalidade por falta (desconto em pontos no resultado final, escala 0-100)" },
     { key: "max_score", value: "5", description: "Pontuação máxima por critério (escala 0-5)" },
     { key: "min_evaluations_to_close", value: "1", description: "Mínimo de avaliações submetidas para fechar evento" },
-    { key: "quarter_bonus_paid_by", value: "caju", description: "Forma de pagamento do bônus trimestral" },
+    { key: "min_events_eligibility", value: "8", description: "Mínimo de eventos participados no ciclo para o colaborador ser elegível ao bônus" },
+    { key: "cycle_bonus_paid_by", value: "caju", description: "Forma de pagamento do bônus do ciclo" },
   ]);
 
   console.log("✓ Regras do sistema criadas");
@@ -181,6 +184,14 @@ async function seed() {
   const year = now.getFullYear();
   const quarter = Math.ceil((now.getMonth() + 1) / 3);
   const monthBase = (quarter - 1) * 3 + 1;
+
+  const [cycle] = await db.insert(cyclesTable).values({
+    name: `Ciclo ${year}`,
+    status: "open",
+    isCurrent: true,
+  }).returning();
+
+  console.log(`✓ Ciclo atual criado: ${cycle.name}`);
 
   const events = await db.insert(eventsTable).values([
     {
@@ -191,7 +202,7 @@ async function seed() {
       state: "RN",
       startDate: `${year}-${String(monthBase).padStart(2, "0")}-10`,
       endDate: `${year}-${String(monthBase).padStart(2, "0")}-12`,
-      year, quarter,
+      cycleId: cycle.id,
       status: "closed",
     },
     {
@@ -202,7 +213,7 @@ async function seed() {
       state: "CE",
       startDate: `${year}-${String(monthBase).padStart(2, "0")}-20`,
       endDate: `${year}-${String(monthBase).padStart(2, "0")}-22`,
-      year, quarter,
+      cycleId: cycle.id,
       status: "closed",
     },
     {
@@ -213,7 +224,7 @@ async function seed() {
       state: "RJ",
       startDate: `${year}-${String(Math.min(12, monthBase + 1)).padStart(2, "0")}-05`,
       endDate: `${year}-${String(Math.min(12, monthBase + 1)).padStart(2, "0")}-07`,
-      year, quarter,
+      cycleId: cycle.id,
       status: "open",
     },
     {
@@ -224,7 +235,7 @@ async function seed() {
       state: "SP",
       startDate: `${year}-${String(Math.min(12, monthBase + 2)).padStart(2, "0")}-15`,
       endDate: `${year}-${String(Math.min(12, monthBase + 2)).padStart(2, "0")}-17`,
-      year, quarter,
+      cycleId: cycle.id,
       status: "open",
     },
   ]).returning();
@@ -297,8 +308,7 @@ async function seed() {
     penaltyType: "falta",
     points: 50,
     date: `${year}-${String(monthBase).padStart(2, "0")}-11`,
-    year,
-    quarter,
+    cycleId: cycle.id,
     quantity: 1,
     reason: "Falta justificada",
     registeredByUserId: users[1].id,

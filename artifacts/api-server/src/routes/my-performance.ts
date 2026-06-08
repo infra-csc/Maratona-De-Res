@@ -2,11 +2,12 @@ import { Router } from "express";
 import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
-  platoonRulesTable, employeesTable, areasTable, employeeQuarterEligibilityTable,
+  platoonRulesTable, employeesTable, areasTable, employeeCycleEligibilityTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore } from "../lib/calculations.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -24,9 +25,11 @@ router.get("/my-performance", async (req, res) => {
     return;
   }
 
-  const { year, quarter } = req.query;
-  const currentYear = year ? parseInt(year as string) : new Date().getFullYear();
-  const currentQuarter = quarter ? parseInt(quarter as string) : Math.ceil((new Date().getMonth() + 1) / 3);
+  const cycle = await getCurrentCycle();
+  if (!cycle) {
+    res.status(404).json({ error: "Nenhum ciclo ativo" });
+    return;
+  }
 
   const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
   if (!employee) {
@@ -37,15 +40,13 @@ router.get("/my-performance", async (req, res) => {
   const [quarterResult] = await db.select().from(quarterlyResultsTable)
     .where(and(
       eq(quarterlyResultsTable.employeeId, employeeId),
-      eq(quarterlyResultsTable.year, currentYear),
-      eq(quarterlyResultsTable.quarter, currentQuarter),
+      eq(quarterlyResultsTable.cycleId, cycle.id),
     )).limit(1);
 
-  const [quarterElig] = await db.select().from(employeeQuarterEligibilityTable)
+  const [quarterElig] = await db.select().from(employeeCycleEligibilityTable)
     .where(and(
-      eq(employeeQuarterEligibilityTable.employeeId, employeeId),
-      eq(employeeQuarterEligibilityTable.year, currentYear),
-      eq(employeeQuarterEligibilityTable.quarter, currentQuarter),
+      eq(employeeCycleEligibilityTable.employeeId, employeeId),
+      eq(employeeCycleEligibilityTable.cycleId, cycle.id),
     )).limit(1);
 
   const participations = await db
@@ -63,8 +64,7 @@ router.get("/my-performance", async (req, res) => {
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
     .where(and(
       eq(eventParticipantsTable.employeeId, employeeId),
-      eq(eventsTable.year, currentYear),
-      eq(eventsTable.quarter, currentQuarter),
+      eq(eventsTable.cycleId, cycle.id),
     ));
 
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
@@ -178,8 +178,7 @@ router.get("/my-performance", async (req, res) => {
   const absences = await db.select().from(absencesTable)
     .where(and(
       eq(absencesTable.employeeId, employeeId),
-      eq(absencesTable.year, currentYear),
-      eq(absencesTable.quarter, currentQuarter),
+      eq(absencesTable.cycleId, cycle.id),
     ));
   const totalAbsences = absences.reduce((s, a) => s + a.quantity, 0);
 
@@ -220,7 +219,7 @@ router.get("/my-performance", async (req, res) => {
       eligible,
       eligibilityStatus: employee.eligibilityStatus,
     },
-    period: { year: currentYear, quarter: currentQuarter },
+    cycle: { id: cycle.id, name: cycle.name },
     summary: {
       grossAverage,
       currentPlatoon,

@@ -7,7 +7,5 @@
  */
 
 export type GetRankingParams = {
-year: number;
-quarter: number;
 search?: string;
 };

@@ -139,8 +139,8 @@ export interface Event {
   state?: string | null;
   startDate: string;
   endDate: string;
-  year: number;
-  quarter: number;
+  cycleId: number;
+  cycleName?: string;
   status: string;
   eventWeight?: number;
   forcedClosed?: boolean;
@@ -250,8 +250,8 @@ export interface EventDetail {
   state?: string | null;
   startDate: string;
   endDate: string;
-  year: number;
-  quarter: number;
+  cycleId: number;
+  cycleName?: string;
   status: string;
   forcedClosed?: boolean;
   /** @nullable */
@@ -274,8 +274,6 @@ export interface EventInput {
   state?: string;
   startDate: string;
   endDate: string;
-  year: number;
-  quarter: number;
 }
 
 export interface EventUpdate {
@@ -443,8 +441,7 @@ export interface Absence {
   kind?: AbsenceKind;
   points: number;
   date: string;
-  year: number;
-  quarter: number;
+  cycleId: number;
   quantity: number;
   /** @nullable */
   reason?: string | null;
@@ -469,8 +466,6 @@ export interface AbsenceInput {
   eventId?: number | null;
   penaltyType: AbsenceInputPenaltyType;
   date: string;
-  year: number;
-  quarter: number;
   /** @minimum 1 */
   quantity?: number;
   reason?: string;
@@ -543,8 +538,8 @@ export interface AtRiskEmployee {
 }
 
 export interface DashboardSummary {
-  year: number;
-  quarter: number;
+  cycleId?: number;
+  cycleName?: string;
   totalEvents: number;
   totalEmployeesEvaluated: number;
   pendingEvaluations: number;
@@ -566,8 +561,7 @@ export interface PlatoonDistribution {
 }
 
 export interface QuarterlyEvolution {
-  year: number;
-  quarter: number;
+  cycleId?: number;
   label: string;
   average: number;
 }
@@ -582,12 +576,14 @@ export interface QuarterlyResult {
   id?: number;
   employeeId: number;
   employeeName: string;
-  year: number;
-  quarter: number;
+  cycleId?: number;
   eventsCount?: number;
+  participatedEventsCount?: number;
+  scoreSum?: number;
   grossAverage?: number;
   totalAbsences?: number;
   absencePenalty?: number;
+  meritPoints?: number;
   finalResult: number;
   /** @nullable */
   platoon: string | null;
@@ -686,8 +682,7 @@ export interface QuarterEligibility {
   employeeId: number;
   /** @nullable */
   employeeName?: string | null;
-  year: number;
-  quarter: number;
+  cycleId?: number;
   eligible: boolean;
   /** @nullable */
   reason?: string | null;
@@ -700,23 +695,19 @@ export interface QuarterEligibility {
 
 export interface QuarterEligibilityInput {
   employeeId: number;
-  year: number;
-  quarter: number;
   eligible: boolean;
   reason?: string;
 }
 
 export interface CloseQuarterInput {
-  year: number;
-  quarter: number;
   forced?: boolean;
   reason?: string;
 }
 
 export interface QuarterCloseResult {
   success: boolean;
-  year: number;
-  quarter: number;
+  cycleId?: number;
+  forced?: boolean;
   totalProcessed: number;
   warnings?: string[];
 }
@@ -732,6 +723,7 @@ export interface RankingEntry {
   platoonColor?: string | null;
   bonusValue: number;
   eventsCount: number;
+  participatedEventsCount?: number;
   absences: number;
 }
 
@@ -778,9 +770,9 @@ export type RankingDetailEmployee = {
   functionName?: string | null;
 };
 
-export type RankingDetailPeriod = {
-  year: number;
-  quarter: number;
+export type RankingDetailCycle = {
+  id: number;
+  name: string;
 };
 
 export type RankingDetailSummary = {
@@ -802,7 +794,7 @@ export type RankingDetailSummary = {
 
 export interface RankingDetail {
   employee: RankingDetailEmployee;
-  period: RankingDetailPeriod;
+  cycle: RankingDetailCycle;
   summary: RankingDetailSummary;
   events: RankingDetailEvent[];
   penalties: RankingDetailRow[];
@@ -871,8 +863,6 @@ active?: boolean;
 };
 
 export type GetEventsParams = {
-year?: number;
-quarter?: number;
 status?: string;
 };
 
@@ -887,52 +877,23 @@ eventId?: number;
 
 export type GetAbsencesParams = {
 employeeId?: number;
-year?: number;
-quarter?: number;
-};
-
-export type GetDashboardSummaryParams = {
-year?: number;
-quarter?: number;
-};
-
-export type GetDashboardPlatoonDistributionParams = {
-year?: number;
-quarter?: number;
-};
-
-export type GetDashboardTopEmployeesParams = {
-year?: number;
-quarter?: number;
-};
-
-export type GetDashboardQuarterlyEvolutionParams = {
-year?: number;
 };
 
 export type GetQuarterlyResultsParams = {
-year: number;
-quarter: number;
 employeeId?: number;
 platoon?: string;
 };
 
-export type GetQuarterEligibilityParams = {
-year?: number;
-quarter?: number;
+export type GetCycleEligibilityParams = {
 employeeId?: number;
 };
 
 export type GetRankingParams = {
-year: number;
-quarter: number;
 search?: string;
 };
 
 export type GetRankingDetailParams = {
 employeeId: number;
-year?: number;
-quarter?: number;
 };
 
 export type GetAuditLogsParams = {
@@ -947,25 +908,5 @@ limit?: number;
 
 export type ExportEventResultsParams = {
 eventId: number;
-};
-
-export type ExportQuarterlyResultsParams = {
-year: number;
-quarter: number;
-};
-
-export type ExportRankingParams = {
-year: number;
-quarter: number;
-};
-
-export type ExportCajuBonusesParams = {
-year: number;
-quarter: number;
-};
-
-export type ExportAbsencesParams = {
-year?: number;
-quarter?: number;
 };
 

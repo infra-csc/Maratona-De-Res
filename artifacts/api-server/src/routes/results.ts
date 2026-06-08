@@ -2,12 +2,13 @@ import { Router } from "express";
 import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
-  platoonRulesTable, employeesTable, rulesTable, employeeEventResultsTable,
-  employeeQuarterEligibilityTable, areasTable,
+  platoonRulesTable, employeesTable, employeeEventResultsTable,
+  employeeCycleEligibilityTable, areasTable, cyclesTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore, validateCalculationExample } from "../lib/calculations.js";
+import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
 
 const router = Router();
@@ -103,40 +104,41 @@ export async function computeEventTeamResult(eventId: number) {
 }
 
 /**
- * Recalcula e regrava os resultados trimestrais (quarterly_results) e os
- * resultados por evento (employee_event_results) de um trimestre, a partir de
- * TODOS os eventos atualmente fechados (status="closed") naquele ano/trimestre.
+ * Recalcula e regrava os resultados do ciclo (quarterly_results) e os resultados
+ * por evento (employee_event_results) de um CICLO, a partir de TODOS os eventos
+ * atualmente fechados (status="closed") naquele ciclo.
  *
- * É idempotente: limpa o trimestre e reconstrói. Preserva o estado de pagamento
+ * É idempotente: limpa o ciclo e reconstrói. Preserva o estado de pagamento
  * já acionado manualmente (aprovado/agendado/pago/bloqueado ou já pago) para não
  * descartar decisões de bônus ao reprocessar quando um novo evento é fechado.
  *
- * Usado tanto pelo fechamento manual do trimestre quanto automaticamente quando
+ * Consolida TODOS os colaboradores que participaram de qualquer evento do ciclo
+ * (mesmo sem nota), registrando separadamente:
+ *  - eventsCount = eventos COM NOTA (score > 0) — base de Soma/Média;
+ *  - participatedEventsCount = eventos PARTICIPADOS no ciclo — base de elegibilidade.
+ *
+ * Usado tanto pelo fechamento manual do ciclo quanto automaticamente quando
  * um evento é fechado/reaberto/liberado, mantendo dashboard, resultados e
  * ranking sempre atualizados.
  */
-export async function recomputeQuarterResults(year: number, quarter: number, userId: number) {
-  const closedEvents = await db.select().from(eventsTable)
-    .where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter), eq(eventsTable.status, "closed")));
-  const closedEventIds = closedEvents.map(e => e.id);
+export async function recomputeCycleResults(cycleId: number, userId: number) {
+  const cycleEvents = await db.select().from(eventsTable).where(eq(eventsTable.cycleId, cycleId));
+  const allCycleEventIds = cycleEvents.map(e => e.id);
+  const closedEvents = cycleEvents.filter(e => e.status === "closed");
+  const closedEventIds = new Set(closedEvents.map(e => e.id));
   const platoonRules = await loadPlatoonRules();
+  const minEvents = await getMinEventsForEligibility();
   const warnings: string[] = [];
-
-  // IDs de TODOS os eventos do trimestre (independente de status) para limpar o
-  // cache por evento (employee_event_results) de eventos reabertos.
-  const allQuarterEvents = await db.select({ id: eventsTable.id }).from(eventsTable)
-    .where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter)));
-  const allQuarterEventIds = allQuarterEvents.map(e => e.id);
 
   // Snapshot do estado de pagamento atual para preservar decisões manuais.
   const existingRows = await db.select().from(quarterlyResultsTable)
-    .where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)));
+    .where(eq(quarterlyResultsTable.cycleId, cycleId));
   const PRESERVE_STATUSES = ["approved", "scheduled", "paid", "blocked"];
   const paymentByEmployee = new Map<number, typeof existingRows[number]>();
   for (const r of existingRows) paymentByEmployee.set(r.employeeId, r);
 
   // FASE DE LEITURA — calcula tudo antes de escrever, para gravar dentro de uma
-  // única transação (rebuild atômico: nunca deixa o trimestre vazio em caso de erro).
+  // única transação (rebuild atômico: nunca deixa o ciclo vazio em caso de erro).
 
   // 1. Nota do TIME de cada evento fechado + linhas por evento.
   const eventScoreById = new Map<number, number>();
@@ -162,109 +164,116 @@ export async function recomputeQuarterResults(year: number, quarter: number, use
     }
   }
 
-  // 2. Consolida o resultado trimestral por colaborador a partir dos eventos fechados.
-  const quarterlyInserts: (typeof quarterlyResultsTable.$inferInsert)[] = [];
-  if (closedEventIds.length > 0) {
-    const participants = await db
-      .selectDistinct({ employeeId: eventParticipantsTable.employeeId })
-      .from(eventParticipantsTable)
-      .where(inArray(eventParticipantsTable.eventId, closedEventIds));
-
-    for (const { employeeId } of participants) {
-      if (!employeeId) continue;
-
-      const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
-      if (!employee) continue;
-
-      const participantEvents = await db.select({ eventId: eventParticipantsTable.eventId })
+  // 2. Participação por colaborador em TODOS os eventos do ciclo (qualquer status).
+  const participationRows = allCycleEventIds.length > 0
+    ? await db.select({ employeeId: eventParticipantsTable.employeeId, eventId: eventParticipantsTable.eventId })
         .from(eventParticipantsTable)
-        .where(and(eq(eventParticipantsTable.employeeId, employeeId), inArray(eventParticipantsTable.eventId, closedEventIds)));
-
-      const eventScores: number[] = [];
-      for (const { eventId } of participantEvents) {
-        const s = eventScoreById.get(eventId);
-        if (s !== undefined && s > 0) eventScores.push(s);
-      }
-
-      if (eventScores.length === 0) {
-        warnings.push(`Colaborador ID ${employeeId}: sem eventos com avaliações`);
-        continue;
-      }
-
-      const absenceRows = await db.select().from(absencesTable)
-        .where(and(eq(absencesTable.employeeId, employeeId), eq(absencesTable.year, year), eq(absencesTable.quarter, quarter)));
-      const penaltyRows = absenceRows.filter(a => a.kind !== "merit");
-      const meritRows = absenceRows.filter(a => a.kind === "merit");
-      const totalAbsences = penaltyRows.reduce((s, a) => s + a.quantity, 0);
-
-      const grossAverage = calculateQuarterGrossAverage(eventScores);
-      const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
-      const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
-      const absencePenalty = penaltyPoints;
-      // Méritos somam, penalidades subtraem; resultado final fica travado entre 0 e 100.
-      const finalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints);
-      const platoon = getPlatoonByScore(finalResult, platoonRules);
-
-      const [quarterElig] = await db.select().from(employeeQuarterEligibilityTable)
-        .where(and(
-          eq(employeeQuarterEligibilityTable.employeeId, employeeId),
-          eq(employeeQuarterEligibilityTable.year, year),
-          eq(employeeQuarterEligibilityTable.quarter, quarter),
-        )).limit(1);
-
-      let eligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
-      let eligibilityReason: string | null = null;
-      if (!eligible) {
-        eligibilityReason = employee.eligibilityReason ?? `Colaborador inelegível (${employee.eligibilityStatus})`;
-      }
-      if (quarterElig && !quarterElig.eligible) {
-        eligible = false;
-        eligibilityReason = quarterElig.reason ?? "Inelegível neste trimestre";
-      }
-
-      const bonusValue = eligible ? (platoon?.bonusValue ?? 0) : 0;
-      const autoStatus = eligible ? "projected" : "not_eligible";
-
-      // Preserva decisões de pagamento já acionadas manualmente.
-      const prev = paymentByEmployee.get(employeeId);
-      const keepPayment = !!prev && (!!prev.paidAt || PRESERVE_STATUSES.includes(prev.bonusStatus));
-
-      quarterlyInserts.push({
-        employeeId,
-        year,
-        quarter,
-        eventsCount: eventScores.length,
-        grossAverage: String(grossAverage),
-        totalAbsences,
-        absencePenalty: String(absencePenalty),
-        finalResult: String(finalResult),
-        platoon: platoon?.name ?? null,
-        platoonColor: platoon?.color ?? null,
-        bonusValue: String(bonusValue),
-        eligible,
-        eligibilityReason,
-        bonusStatus: keepPayment ? prev!.bonusStatus : autoStatus,
-        paymentMethod: prev?.paymentMethod ?? "Caju Saldo Livre",
-        paymentDueDate: keepPayment ? prev!.paymentDueDate : null,
-        paidAt: keepPayment ? prev!.paidAt : null,
-        paymentNotes: keepPayment ? prev!.paymentNotes : null,
-        closedAt: new Date(),
-        closedByUserId: userId,
-      });
-    }
+        .where(inArray(eventParticipantsTable.eventId, allCycleEventIds))
+    : [];
+  const participatedByEmployee = new Map<number, Set<number>>();
+  for (const r of participationRows) {
+    if (!r.employeeId) continue;
+    if (!participatedByEmployee.has(r.employeeId)) participatedByEmployee.set(r.employeeId, new Set());
+    participatedByEmployee.get(r.employeeId)!.add(r.eventId);
   }
 
-  // FASE DE ESCRITA — rebuild atômico de todo o trimestre.
+  // 3. Consolida o resultado do ciclo por colaborador.
+  const quarterlyInserts: (typeof quarterlyResultsTable.$inferInsert)[] = [];
+  for (const [employeeId, eventSet] of participatedByEmployee) {
+    const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+    if (!employee) continue;
+
+    const participatedCount = eventSet.size;
+
+    // Eventos COM NOTA (score > 0) dentre os fechados que o colaborador participou.
+    const eventScores: number[] = [];
+    for (const eventId of eventSet) {
+      if (!closedEventIds.has(eventId)) continue;
+      const s = eventScoreById.get(eventId);
+      if (s !== undefined && s > 0) eventScores.push(s);
+    }
+    const scoredCount = eventScores.length;
+    const scoreSum = Math.round(eventScores.reduce((a, b) => a + b, 0) * 100) / 100;
+
+    const absenceRows = await db.select().from(absencesTable)
+      .where(and(eq(absencesTable.employeeId, employeeId), eq(absencesTable.cycleId, cycleId)));
+    const penaltyRows = absenceRows.filter(a => a.kind !== "merit");
+    const meritRows = absenceRows.filter(a => a.kind === "merit");
+    const totalAbsences = penaltyRows.reduce((s, a) => s + a.quantity, 0);
+
+    const grossAverage = calculateQuarterGrossAverage(eventScores);
+    const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
+    const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
+    const absencePenalty = penaltyPoints;
+    // Méritos somam, penalidades subtraem; resultado final fica travado entre 0 e 100.
+    const finalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints);
+    const platoon = getPlatoonByScore(finalResult, platoonRules);
+
+    const [cycleElig] = await db.select().from(employeeCycleEligibilityTable)
+      .where(and(
+        eq(employeeCycleEligibilityTable.employeeId, employeeId),
+        eq(employeeCycleEligibilityTable.cycleId, cycleId),
+      )).limit(1);
+
+    let eligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
+    let eligibilityReason: string | null = null;
+    if (!eligible) {
+      eligibilityReason = employee.eligibilityReason ?? `Colaborador inelegível (${employee.eligibilityStatus})`;
+    }
+    if (cycleElig && !cycleElig.eligible) {
+      eligible = false;
+      eligibilityReason = cycleElig.reason ?? "Inelegível neste ciclo";
+    }
+    // Regra de participação: precisa ter participado de no mínimo N eventos no ciclo.
+    if (eligible && participatedCount < minEvents) {
+      eligible = false;
+      eligibilityReason = `Participou de ${participatedCount} de ${minEvents} eventos exigidos no ciclo`;
+    }
+
+    const bonusValue = eligible ? (platoon?.bonusValue ?? 0) : 0;
+    const autoStatus = eligible ? "projected" : "not_eligible";
+
+    // Preserva decisões de pagamento já acionadas manualmente.
+    const prev = paymentByEmployee.get(employeeId);
+    const keepPayment = !!prev && (!!prev.paidAt || PRESERVE_STATUSES.includes(prev.bonusStatus));
+
+    quarterlyInserts.push({
+      employeeId,
+      cycleId,
+      eventsCount: scoredCount,
+      participatedEventsCount: participatedCount,
+      scoreSum: String(scoreSum),
+      grossAverage: String(grossAverage),
+      totalAbsences,
+      absencePenalty: String(absencePenalty),
+      meritPoints: String(meritPoints),
+      finalResult: String(finalResult),
+      platoon: platoon?.name ?? null,
+      platoonColor: platoon?.color ?? null,
+      bonusValue: String(bonusValue),
+      eligible,
+      eligibilityReason,
+      bonusStatus: keepPayment ? prev!.bonusStatus : autoStatus,
+      paymentMethod: prev?.paymentMethod ?? "Caju Saldo Livre",
+      paymentDueDate: keepPayment ? prev!.paymentDueDate : null,
+      paidAt: keepPayment ? prev!.paidAt : null,
+      paymentNotes: keepPayment ? prev!.paymentNotes : null,
+      closedAt: new Date(),
+      closedByUserId: userId,
+    });
+  }
+
+  // FASE DE ESCRITA — rebuild atômico de todo o ciclo.
   await db.transaction(async (tx) => {
-    if (allQuarterEventIds.length > 0) {
+    if (allCycleEventIds.length > 0) {
       await tx.delete(employeeEventResultsTable)
-        .where(inArray(employeeEventResultsTable.eventId, allQuarterEventIds));
+        .where(inArray(employeeEventResultsTable.eventId, allCycleEventIds));
     }
     if (eventResultInserts.length > 0) {
       await tx.insert(employeeEventResultsTable).values(eventResultInserts);
     }
     await tx.delete(quarterlyResultsTable)
-      .where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)));
+      .where(eq(quarterlyResultsTable.cycleId, cycleId));
     if (quarterlyInserts.length > 0) {
       await tx.insert(quarterlyResultsTable).values(quarterlyInserts);
     }
@@ -325,20 +334,24 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
   });
 });
 
-router.get("/results/quarterly", async (req, res) => {
-  const { year, quarter, employeeId, platoon } = req.query;
-  if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
+router.get("/results/quarterly", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const { employeeId, platoon } = req.query;
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json([]); return; }
 
   const query = db
     .select({
+      id: quarterlyResultsTable.id,
       employeeId: quarterlyResultsTable.employeeId,
       employeeName: employeesTable.name,
-      year: quarterlyResultsTable.year,
-      quarter: quarterlyResultsTable.quarter,
+      cycleId: quarterlyResultsTable.cycleId,
       eventsCount: quarterlyResultsTable.eventsCount,
+      participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
+      scoreSum: quarterlyResultsTable.scoreSum,
       grossAverage: quarterlyResultsTable.grossAverage,
       totalAbsences: quarterlyResultsTable.totalAbsences,
       absencePenalty: quarterlyResultsTable.absencePenalty,
+      meritPoints: quarterlyResultsTable.meritPoints,
       finalResult: quarterlyResultsTable.finalResult,
       platoon: quarterlyResultsTable.platoon,
       platoonColor: quarterlyResultsTable.platoonColor,
@@ -353,10 +366,7 @@ router.get("/results/quarterly", async (req, res) => {
     })
     .from(quarterlyResultsTable)
     .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(and(
-      eq(quarterlyResultsTable.year, parseInt(year as string)),
-      eq(quarterlyResultsTable.quarter, parseInt(quarter as string)),
-    ));
+    .where(eq(quarterlyResultsTable.cycleId, cycle.id));
 
   const results = await query;
   const filtered = results
@@ -365,8 +375,10 @@ router.get("/results/quarterly", async (req, res) => {
 
   res.json(filtered.map(r => ({
     ...r,
+    scoreSum: parseFloat(r.scoreSum),
     grossAverage: parseFloat(r.grossAverage),
     absencePenalty: parseFloat(r.absencePenalty),
+    meritPoints: parseFloat(r.meritPoints),
     finalResult: parseFloat(r.finalResult),
     bonusValue: parseFloat(r.bonusValue),
     eventBreakdown: [],
@@ -374,26 +386,27 @@ router.get("/results/quarterly", async (req, res) => {
 });
 
 router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, res) => {
-  const { year, quarter, forced, reason } = req.body;
-  if (!year || !quarter) { res.status(400).json({ error: "year e quarter obrigatórios" }); return; }
+  const { forced, reason } = req.body;
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
 
   const closedEvents = await db.select().from(eventsTable)
-    .where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter), eq(eventsTable.status, "closed")));
+    .where(and(eq(eventsTable.cycleId, cycle.id), eq(eventsTable.status, "closed")));
 
   if (closedEvents.length === 0) {
-    res.status(400).json({ error: "Nenhum evento fechado neste trimestre" });
+    res.status(400).json({ error: "Nenhum evento fechado neste ciclo" });
     return;
   }
 
-  // Fechamento forçado: se ainda há eventos abertos no trimestre, exige confirmação
+  // Fechamento forçado: se ainda há eventos abertos no ciclo, exige confirmação
   // explícita (forced=true) com justificativa obrigatória.
   const openEvents = await db.select({ id: eventsTable.id }).from(eventsTable)
-    .where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter), eq(eventsTable.status, "open")));
+    .where(and(eq(eventsTable.cycleId, cycle.id), eq(eventsTable.status, "open")));
 
   if (openEvents.length > 0) {
     if (!forced) {
       res.status(409).json({
-        error: `Há ${openEvents.length} evento(s) ainda aberto(s) neste trimestre. Para fechar mesmo assim, confirme o fechamento forçado com justificativa.`,
+        error: `Há ${openEvents.length} evento(s) ainda aberto(s) neste ciclo. Para fechar mesmo assim, confirme o fechamento forçado com justificativa.`,
         requiresForce: true,
         openEventsCount: openEvents.length,
       });
@@ -406,19 +419,23 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
   }
   const isForced = openEvents.length > 0 && !!forced;
 
-  const { processed, warnings } = await recomputeQuarterResults(year, quarter, req.user!.userId);
+  const { processed, warnings } = await recomputeCycleResults(cycle.id, req.user!.userId);
+
+  await db.update(cyclesTable)
+    .set({ status: "closed", closedAt: new Date() })
+    .where(eq(cyclesTable.id, cycle.id));
 
   await audit(
     req.user!.userId,
-    isForced ? "force_close_quarter" : "close_quarter",
-    "quarterly_results",
-    `${year}-Q${quarter}`,
+    isForced ? "force_close_cycle" : "close_cycle",
+    "cycles",
+    cycle.id,
     null,
     isForced
       ? { forced: true, reason: String(reason).trim(), openEventsCount: openEvents.length }
       : { forced: false },
   );
-  res.json({ success: true, year, quarter, totalProcessed: processed, warnings, forced: isForced });
+  res.json({ success: true, cycleId: cycle.id, totalProcessed: processed, warnings, forced: isForced });
 });
 
 /**
