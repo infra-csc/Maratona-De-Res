@@ -1,20 +1,13 @@
 import { useState } from "react";
-import { useGetEvents, useCreateEvent, useCloseEvent, useReopenEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
-import type { EventInput } from "@workspace/api-client-react";
+import { useGetEvents, useCloseEvent, useReopenEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { Plus, Search, Lock, Unlock, Calendar, MapPin, ChevronRight, Users } from "lucide-react";
+import { Search, Lock, Unlock, Calendar, MapPin, ChevronRight, Users } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 
 const currentYear = new Date().getFullYear();
-const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -32,35 +25,17 @@ function StatusChip({ status }: { status: string }) {
 
 export default function EventsPage() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterYear, setFilterYear] = useState(String(currentYear));
   const [filterQuarter, setFilterQuarter] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [open, setOpen] = useState(false);
 
   const queryKey = getGetEventsQueryKey({ year: Number(filterYear), status: filterStatus === "all" ? undefined : filterStatus });
   const { data: events, isLoading } = useGetEvents(
     { year: Number(filterYear), status: filterStatus === "all" ? undefined : filterStatus }, 
     { query: { queryKey } }
   );
-
-  const { register, handleSubmit, reset, setValue } = useForm<EventInput>({
-    defaultValues: { year: currentYear, quarter: currentQuarter },
-  });
-
-  const createMutation = useCreateEvent({
-    mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey });
-        toast({ title: "Evento criado com sucesso" });
-        setOpen(false);
-        reset();
-      },
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-    },
-  });
 
   const closeMutation = useCloseEvent({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
@@ -86,82 +61,11 @@ export default function EventsPage() {
             <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
               Gestão de <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Eventos</span>
             </h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-xl">Crie eventos e acompanhe o andamento das avaliações das equipes.</p>
+            <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-xl">Acompanhe o andamento das avaliações das equipes nos eventos sincronizados.</p>
           </div>
-          {canEdit && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <button
-                  data-testid="button-create-event"
-                  className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 whitespace-nowrap ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-                >
-                  <Plus size={18} /> Novo Evento Cenográfico
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Evento Cenográfico</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
-                  <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome do Evento <span className="text-[#ba1a1a]">*</span></Label>
-                    <Input data-testid="input-event-name" {...register("name", { required: true })} placeholder="Ex: Convenção Anual de Vendas 2025" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cliente</Label>
-                      <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome da empresa" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cidade</Label>
-                      <Input data-testid="input-event-city" {...register("city")} placeholder="São Paulo - SP" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Início <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Fim <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input data-testid="input-event-end" type="date" {...register("endDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Ano <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input data-testid="input-event-year" type="number" {...register("year", { required: true, valueAsNumber: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Trimestre <span className="text-[#ba1a1a]">*</span></Label>
-                      <Select defaultValue={String(currentQuarter)} onValueChange={v => setValue("quarter", Number(v))}>
-                        <SelectTrigger data-testid="select-event-quarter" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1º Trimestre</SelectItem>
-                          <SelectItem value="2">2º Trimestre</SelectItem>
-                          <SelectItem value="3">3º Trimestre</SelectItem>
-                          <SelectItem value="4">4º Trimestre</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                    <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
-                    <button
-                      data-testid="button-submit-event"
-                      type="submit"
-                      disabled={createMutation.isPending}
-                      className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
-                    >
-                      {createMutation.isPending ? "Criando..." : "Criar Evento"}
-                    </button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+          <div className="flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] bg-[#e6e8ea] border-2 border-[#191c1e] px-4 py-3 skew-x-[-4deg]">
+            <span className="inline-block skew-x-[4deg]">Eventos sincronizados via integração</span>
+          </div>
         </section>
 
         {/* Filter bar */}
@@ -222,7 +126,7 @@ export default function EventsPage() {
           <div className="text-center py-24 bg-white border-2 border-dashed border-[#191c1e]">
             <Calendar size={48} className="mx-auto mb-4 opacity-20" />
             <h3 className="text-xl font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
-            <p className="text-[#747a60] italic mt-1">Tente ajustar os filtros ou criar um novo evento.</p>
+            <p className="text-[#747a60] italic mt-1">Tente ajustar os filtros ou sincronizar os eventos via integração.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
