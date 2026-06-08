@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw, UserCheck, ClipboardList, Copy, Check } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -30,6 +30,15 @@ export default function EventDetailPage() {
     query: { enabled: !!id && canViewResult, queryKey: ["event-result", id] as unknown[] },
   });
   const participantResults = result?.participants ?? [];
+
+  const { data: evaluations } = useGetEvaluations(
+    { eventId: id },
+    { query: { enabled: !!id && canViewResult, queryKey: ["evals", id] as unknown[] } }
+  );
+  const justificationsFor = (critId: number) =>
+    (evaluations ?? [])
+      .filter(e => e.criterionId === critId && e.status === "submitted")
+      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim() }));
 
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -349,12 +358,28 @@ export default function EventDetailPage() {
                 <tbody className="divide-y-2 divide-[#eceef0]">
                   {result.criteriaDetails.map(c => {
                     const calibrated = c.calibratedScore != null;
+                    const justifications = justificationsFor(c.criterionId);
                     return (
-                      <tr key={c.criterionId} data-testid={`row-criterion-detail-${c.criterionId}`} className="hover:bg-[#f2f4f6] transition-all">
+                      <tr key={c.criterionId} data-testid={`row-criterion-detail-${c.criterionId}`} className="hover:bg-[#f2f4f6] transition-all align-top">
                         <td className="px-6 py-4">
                           <p className="font-black italic uppercase text-sm text-[#191c1e]">{c.criterionName}</p>
                           {c.responsibleAreaLabel && (
                             <p className="text-[10px] font-bold italic uppercase text-[#747a60]">{c.responsibleAreaLabel}</p>
+                          )}
+                          {justifications.length > 0 && (
+                            <div className="mt-3 space-y-1.5" data-testid={`justifications-${c.criterionId}`}>
+                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Justificativas dos Avaliadores</p>
+                              {justifications.map((j, i) => (
+                                <div key={i} className="border-l-2 border-[#191c1e] bg-[#f7f9fb] px-2.5 py-1.5">
+                                  <p className="text-[10px] font-bold italic uppercase text-[#444933]">{j.name} <span className="text-[#747a60]">— {j.score.toFixed(1)}</span></p>
+                                  {j.comment ? (
+                                    <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words mt-0.5">{j.comment}</p>
+                                  ) : (
+                                    <p className="text-[10px] italic text-[#9aa088] mt-0.5">Sem justificativa</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">{fmt(c.weight)}</td>

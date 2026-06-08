@@ -130,7 +130,7 @@ export default function CalibrationsPage() {
   function getAreaScores(critId: number) {
     return (evaluations ?? [])
       .filter(e => e.criterionId === critId && e.status === "submitted")
-      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string) }));
+      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim() }));
   }
 
   function getAvgScore(critId: number) {
@@ -415,11 +415,20 @@ export default function CalibrationsPage() {
                       </p>
                       {areaScores.length > 0 ? (
                         <>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-col gap-2">
                             {areaScores.map((s, i) => (
-                              <div key={i} className="flex items-center gap-2 border-2 border-[#191c1e] bg-white pl-2.5 pr-1.5 py-1 max-w-full">
-                                <span className="text-[11px] font-bold italic uppercase text-[#444933] break-words min-w-0">{s.name}</span>
-                                <span className="text-sm font-black italic text-[#191c1e] bg-[#eceef0] border-l-2 border-[#191c1e] px-2 leading-6 shrink-0">{s.score.toFixed(1)}</span>
+                              <div key={i} className="border-2 border-[#191c1e] bg-white max-w-full">
+                                <div className="flex items-center justify-between gap-2 px-2.5 py-1">
+                                  <span className="text-[11px] font-bold italic uppercase text-[#444933] break-words min-w-0">{s.name}</span>
+                                  <span className="text-sm font-black italic text-[#191c1e] bg-[#eceef0] border-l-2 border-[#191c1e] px-2 leading-6 shrink-0">{s.score.toFixed(1)}</span>
+                                </div>
+                                {s.comment ? (
+                                  <p className="text-[11px] italic text-[#444933] border-t-2 border-[#eceef0] px-2.5 py-1.5 leading-snug whitespace-pre-wrap break-words">
+                                    <span className="font-bold uppercase text-[#747a60] not-italic">Justificativa: </span>{s.comment}
+                                  </p>
+                                ) : (
+                                  <p className="text-[10px] italic text-[#9aa088] border-t-2 border-[#eceef0] px-2.5 py-1.5">Sem justificativa</p>
+                                )}
                               </div>
                             ))}
                           </div>
