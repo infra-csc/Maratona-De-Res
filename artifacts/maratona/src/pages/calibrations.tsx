@@ -591,6 +591,41 @@ export default function CalibrationsPage() {
               )}
             </div>
 
+            {scoredCriteria.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><SlidersHorizontal size={13} className="text-[#506600]" /> Notas Finais por Critério</p>
+                <div className="border-2 border-[#191c1e]">
+                  <div className="grid grid-cols-[1fr_auto] gap-x-3 px-3 py-1.5 bg-[#191c1e] text-white text-[9px] font-bold uppercase italic tracking-wider">
+                    <span>Critério</span>
+                    <span className="text-right">Original → Calibrada = Final</span>
+                  </div>
+                  {scoredCriteria.map((c, i) => {
+                    const avg = getAvgScore(c.criterionId);
+                    const cal = getCalibration(c.criterionId);
+                    const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+                    const finalVal = calVal ?? avg;
+                    return (
+                      <div key={c.criterionId} className={`grid grid-cols-[1fr_auto] gap-x-3 px-3 py-2 items-center ${i % 2 ? "bg-[#f7f9fb]" : "bg-white"}`} data-testid={`finalize-criterion-${c.criterionId}`}>
+                        <span className="text-xs font-bold italic uppercase text-[#191c1e] truncate pr-2">{c.criterionName}</span>
+                        <span className="flex items-center gap-1.5 justify-end text-xs font-black italic shrink-0">
+                          <span className={calVal != null ? "text-[#c4c9ac] line-through" : "text-[#444933]"}>{avg != null ? avg.toFixed(2) : "—"}</span>
+                          {calVal != null && (
+                            <>
+                              <span className="text-[#747a60]">→</span>
+                              <span className="text-[#a06a00]">{calVal.toFixed(2)}</span>
+                            </>
+                          )}
+                          <span className="text-[#747a60]">=</span>
+                          <span className="text-[#506600] bg-[#eef3da] border border-[#191c1e] px-1.5">{finalVal != null ? finalVal.toFixed(2) : "—"}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] italic text-[#747a60] mt-1.5">Cada critério usa a nota calibrada quando há calibragem; caso contrário, a média original da área.</p>
+              </div>
+            )}
+
             {feedback && feedback.highlights && feedback.highlights.length > 0 && (
               <div>
                 <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><CheckCircle size={13} className="text-[#506600]" /> Destaques</p>
