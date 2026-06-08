@@ -10,3 +10,5 @@ UI role-gating (hiding panels/buttons for non-managers) is NOT a security bounda
 **Why:** the "administrative info is confidential to adm/RH" requirement was first implemented as UI-only hiding, which left `/events/:id/result` and `/exports/pending-evaluations` openly fetchable by avaliadores — a real data leak caught in review.
 
 **How to apply:** when adding a manager-only stat to a shared page, gate BOTH the API route (requireRole) and the client query (enabled flag). Manager role set is `["admin","rh","diretoria"]`; criteria-config writes use the narrower `["admin","rh"]`.
+
+**Related trap (conditional filter fall-through):** `GET /evaluations` scopes an avaliador to their area only inside `if (role === "avaliador" && user.areaId)`. When `areaId` was null the guard was skipped and the query fell through UNFILTERED, exposing every team's evaluations. Rule: a role-scoped list endpoint that builds its filter from a per-user value must hard-fail (return `[]`/403) when that value is missing — never let a missing scope value bypass the filter.

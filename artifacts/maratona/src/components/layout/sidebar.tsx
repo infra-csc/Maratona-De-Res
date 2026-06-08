@@ -99,9 +99,11 @@ export function Sidebar() {
       <ScrollArea className="flex-1 py-4">
         <nav className="px-3 space-y-6">
           {navGroups.map(group => {
-            const visibleItems = group.items.filter(item => 
-              !item.roles || (user && item.roles.includes(user.role))
-            );
+            const visibleItems = group.items.filter(item => {
+              // Avaliadores have a focused experience: only the Avaliações tab.
+              if (user?.role === "avaliador") return item.path === "/evaluations";
+              return !item.roles || (user && item.roles.includes(user.role));
+            });
 
             if (visibleItems.length === 0) return null;
 

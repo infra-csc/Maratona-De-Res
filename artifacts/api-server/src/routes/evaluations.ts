@@ -42,7 +42,13 @@ router.get("/evaluations", async (req, res) => {
   const user = req.user!;
 
   let criterionIds: number[] | null = null;
-  if (user.role === "avaliador" && user.areaId) {
+  if (user.role === "avaliador") {
+    // An avaliador without an area has no criteria to see — never fall through
+    // to the unfiltered query (that would expose every team's evaluations).
+    if (!user.areaId) {
+      res.json([]);
+      return;
+    }
     const areaCriteria = await db.select({ id: criteriaTable.id })
       .from(criteriaTable)
       .where(eq(criteriaTable.responsibleAreaId, user.areaId));

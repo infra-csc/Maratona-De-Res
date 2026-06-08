@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey, exportPendingEvaluations } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, useReleaseEventFeedback, getGetEvaluationsQueryKey, exportPendingEvaluations, getEventCriteria } from "@workspace/api-client-react";
+import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +33,79 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
     >
       <span className="text-2xl italic font-black">{score}</span>
       <span className="text-[10px] leading-tight text-center font-bold uppercase italic">{label}</span>
+    </button>
+  );
+}
+
+function EvaluatorEventCard({
+  event, userAreaId, userId, selected, onSelect,
+}: {
+  event: { id: number; name: string; clientName?: string | null; city?: string | null; state?: string | null; quarter: number; year: number };
+  userAreaId: number | null;
+  userId: number | undefined;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { data: criteria } = useGetEventCriteria(event.id, {
+    query: { queryKey: ["event-criteria", event.id] as unknown[] },
+  });
+  const { data: evals } = useGetEvaluations(
+    { eventId: event.id },
+    { query: { queryKey: getGetEvaluationsQueryKey({ eventId: event.id }) } },
+  );
+
+  const myCriteria = (criteria ?? []).filter(
+    c => c.active && userAreaId != null && c.responsibleAreaId === userAreaId,
+  );
+  // Only events that actually have criteria for this avaliador's area are theirs to do.
+  if (myCriteria.length === 0) return null;
+
+  const myEval = (cid: number) => (evals ?? []).find(e => e.criterionId === cid && e.evaluatorUserId === userId);
+  const total = myCriteria.length;
+  const submitted = myCriteria.filter(c => myEval(c.criterionId)?.status === "submitted").length;
+  const drafts = myCriteria.filter(c => myEval(c.criterionId)?.status === "draft").length;
+  const done = submitted === total;
+  const inProgress = !done && (submitted > 0 || drafts > 0);
+
+  const badge = done
+    ? { label: "Concluída", cls: "bg-[#506600] text-[#ccff00]", Icon: CheckCircle }
+    : inProgress
+      ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
+      : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
+  const Badge = badge.Icon;
+  const pct = Math.round((submitted / total) * 100);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      data-testid={`evaluator-event-${event.id}`}
+      className={cn(
+        "text-left border-2 border-[#191c1e] p-5 transition-all",
+        HARD_SHADOW, HARD_SHADOW_HOVER,
+        selected ? "bg-[#f7ffd1]" : "bg-white",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block", badge.cls)}>
+          <span className="inline-flex items-center gap-1.5 skew-x-[8deg]"><Badge size={12} /> {badge.label}</span>
+        </span>
+        <span className="text-[11px] font-bold italic uppercase text-[#747a60] shrink-0">T{event.quarter}/{event.year}</span>
+      </div>
+      <h4 className="text-lg italic uppercase font-black tracking-tight leading-tight">{event.name}</h4>
+      <p className="text-[12px] font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{event.clientName} · {event.city}/{event.state}</p>
+      <div className="mt-4">
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-[11px] font-bold italic uppercase text-[#444933]">{submitted} de {total} critérios submetidos</span>
+          <span className="text-xs font-black italic text-[#506600]">{pct}%</span>
+        </div>
+        <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2">
+          <div className="bg-[#ccff00] h-full transition-[width]" style={{ width: `${pct}%` }} />
+        </div>
+        {drafts > 0 && (
+          <p className="text-[11px] text-[#862200] italic mt-1.5 font-bold uppercase">{drafts} em rascunho — submeta para concluir</p>
+        )}
+      </div>
     </button>
   );
 }
@@ -97,6 +170,25 @@ export default function EvaluationsPage() {
   // Only events whose criteria the RH has already confirmed can be evaluated.
   const configuredEvents = openEvents.filter(e => e.criteriaConfirmed);
   const pickedEvent = configuredEvents.find(e => e.id === selectedEventId);
+
+  // For evaluators: fetch criteria for every selectable event so the overview
+  // only lists events that actually have work for their area (and so the empty
+  // state is accurate). Same query key as the per-event fetch → deduped/cached.
+  const evaluatorCriteriaQueries = useQueries({
+    queries: isEvaluator
+      ? configuredEvents.map(ev => ({
+          queryKey: ["event-criteria", ev.id] as unknown[],
+          queryFn: () => getEventCriteria(ev.id),
+        }))
+      : [],
+  });
+  const relevantEvaluatorEvents = isEvaluator
+    ? configuredEvents.filter((_, i) =>
+        (evaluatorCriteriaQueries[i]?.data ?? []).some(
+          c => c.active && user?.areaId != null && c.responsibleAreaId === user.areaId,
+        ),
+      )
+    : [];
 
   // If the selected event stops being selectable (closed or criteria unconfirmed
   // server-side), clear the selection so trigger text and loaded data stay in sync.
@@ -290,6 +382,41 @@ export default function EvaluationsPage() {
             </div>
           </div>
         </section>
+
+        {/* Evaluator overview — pending vs completed evaluations at a glance */}
+        {isEvaluator && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <ListChecks size={22} />
+              <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">Minhas Avaliações</h3>
+            </div>
+            <p className="text-sm text-[#444933] italic px-1 -mt-1">
+              Acompanhe o que ainda falta avaliar e o que você já concluiu. Clique em um evento para avaliar ou rever.
+            </p>
+            {configuredEvents.length === 0 ? (
+              <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
+                Nenhum evento liberado para avaliação no momento.
+              </div>
+            ) : relevantEvaluatorEvents.length === 0 ? (
+              <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
+                Nenhuma avaliação atribuída à sua área nos eventos abertos no momento.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {relevantEvaluatorEvents.map(ev => (
+                  <EvaluatorEventCard
+                    key={ev.id}
+                    event={ev}
+                    userAreaId={user?.areaId ?? null}
+                    userId={user?.id}
+                    selected={selectedEventId === ev.id}
+                    onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); }}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {!selectedEventId ? (
           <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-[#191c1e] bg-white">

@@ -77,6 +77,13 @@ function ProtectedRoute({ component: Component, roles }: { component: React.Comp
   );
 }
 
+function HomeRoute() {
+  const { user, isLoading } = useAuth();
+  // Avaliadores live entirely in the Avaliações page; send them there from "/".
+  if (!isLoading && user?.role === "avaliador") return <Redirect to="/evaluations" />;
+  return <ProtectedRoute component={DashboardPage} />;
+}
+
 function AppRoutes() {
   const { user, isLoading } = useAuth();
   if (isLoading) {
@@ -91,7 +98,7 @@ function AppRoutes() {
       <Route path="/login">
         {user ? <Redirect to="/" /> : <LoginPage />}
       </Route>
-      <Route path="/" component={() => <ProtectedRoute component={DashboardPage} />} />
+      <Route path="/" component={HomeRoute} />
       <Route path="/events/:id" component={() => <ProtectedRoute component={EventDetailPage} />} />
       <Route path="/events" component={() => <ProtectedRoute component={EventsPage} />} />
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />
