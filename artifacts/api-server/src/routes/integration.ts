@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, eventsTable, employeesTable, eventParticipantsTable } from "@workspace/db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { isNotNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -128,10 +128,17 @@ router.post("/integration/sync", async (req, res) => {
     const extParticipations = rawParticipations as ExtParticipation[];
     log(`Recebidos: ${extEmployees.length} colaboradores, ${extEvents.length} eventos, ${extParticipations.length} participações.`);
 
-    // 1) Eventos de TARGET_YEAR.
-    const keptEvents = extEvents.filter(ev => {
+    // 1) Eventos de TARGET_YEAR que JÁ FINALIZARAM (data de término no passado).
+    //    Só importamos eventos encerrados: com o evento concluído, a escalação de
+    //    funções não muda mais, então os dados importados são definitivos.
+    const today = new Date().toISOString().slice(0, 10);
+    const allYearEvents = extEvents.filter(ev => {
       const yq = deriveYearQuarter(ev.startDate);
       return (ev.year ?? yq.year) === TARGET_YEAR;
+    });
+    const keptEvents = allYearEvents.filter(ev => {
+      const end = ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate);
+      return end < today;
     });
     const keptEventIds = new Set(keptEvents.map(ev => extIdOf(ev)).filter((v): v is string => !!v));
 
@@ -152,7 +159,7 @@ router.post("/integration/sync", async (req, res) => {
       const id = extIdOf(e);
       return id != null && neededEmpIds.has(id);
     });
-    log(`Filtro: eventos ${TARGET_YEAR} (${keptEvents.length}/${extEvents.length}), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
+    log(`Filtro: eventos ${TARGET_YEAR} finalizados (${keptEvents.length}/${allYearEvents.length} de ${TARGET_YEAR}; demais ainda não terminaram), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
 
     await db.transaction(async (tx) => {
       // Colaboradores — upsert por externalId
@@ -168,12 +175,9 @@ router.post("/integration/sync", async (req, res) => {
           functionName: e.functionName || e.function || "Colaborador",
           active: e.active ?? true,
         };
-        const existing = await tx.select().from(employeesTable).where(eq(employeesTable.externalId, externalId)).limit(1);
-        if (existing.length) {
-          await tx.update(employeesTable).set(fields).where(eq(employeesTable.id, existing[0]!.id));
-        } else {
-          await tx.insert(employeesTable).values({ externalId, sourceType: "erp", ...fields });
-        }
+        await tx.insert(employeesTable)
+          .values({ externalId, sourceType: "erp", ...fields })
+          .onConflictDoUpdate({ target: employeesTable.externalId, set: fields });
         employeesSync++;
       }
 
@@ -195,12 +199,9 @@ router.post("/integration/sync", async (req, res) => {
           year: ev.year ?? yq.year,
           quarter: ev.quarter ?? yq.quarter,
         };
-        const existing = await tx.select().from(eventsTable).where(eq(eventsTable.externalId, externalId)).limit(1);
-        if (existing.length) {
-          await tx.update(eventsTable).set(fields).where(eq(eventsTable.id, existing[0]!.id));
-        } else {
-          await tx.insert(eventsTable).values({ externalId, ...fields });
-        }
+        await tx.insert(eventsTable)
+          .values({ externalId, ...fields })
+          .onConflictDoUpdate({ target: eventsTable.externalId, set: fields });
         eventsSync++;
       }
 
@@ -226,14 +227,12 @@ router.post("/integration/sync", async (req, res) => {
           teamName: p.teamName ?? p.team ?? null,
           confirmed: p.confirmed ?? true,
         };
-        const existing = await tx.select().from(eventParticipantsTable)
-          .where(and(eq(eventParticipantsTable.eventId, eventId), eq(eventParticipantsTable.employeeId, employeeId)))
-          .limit(1);
-        if (existing.length) {
-          await tx.update(eventParticipantsTable).set(fields).where(eq(eventParticipantsTable.id, existing[0]!.id));
-        } else {
-          await tx.insert(eventParticipantsTable).values({ eventId, employeeId, ...fields });
-        }
+        await tx.insert(eventParticipantsTable)
+          .values({ eventId, employeeId, ...fields })
+          .onConflictDoUpdate({
+            target: [eventParticipantsTable.eventId, eventParticipantsTable.employeeId],
+            set: fields,
+          });
         participantsSync++;
       }
     });

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, integer, numeric, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, numeric, timestamp, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
@@ -21,7 +21,9 @@ export const eventsTable = pgTable("events", {
   feedbackReleased: boolean("feedback_released").notNull().default(false),
   feedbackReleasedAt: timestamp("feedback_released_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  externalIdUq: uniqueIndex("events_external_id_uq").on(t.externalId),
+}));
 
 export const eventParticipantsTable = pgTable("event_participants", {
   id: serial("id").primaryKey(),
@@ -30,7 +32,9 @@ export const eventParticipantsTable = pgTable("event_participants", {
   functionName: text("function_name"),
   teamName: text("team_name"),
   confirmed: boolean("confirmed").notNull().default(true),
-});
+}, (t) => ({
+  eventEmployeeUq: uniqueIndex("event_participants_event_employee_uq").on(t.eventId, t.employeeId),
+}));
 
 export const insertEventSchema = createInsertSchema(eventsTable).omit({ id: true, createdAt: true });
 export const insertEventParticipantSchema = createInsertSchema(eventParticipantsTable).omit({ id: true });

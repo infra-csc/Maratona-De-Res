@@ -2,16 +2,26 @@ import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, getGetI
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase } from "lucide-react";
-import { useRef } from "react";
+import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle } from "lucide-react";
+import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+type SyncResult = {
+  success: boolean;
+  message: string;
+  eventsSync?: number;
+  employeesSync?: number;
+  participantsSync?: number;
+};
 
 export default function IntegrationPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [result, setResult] = useState<SyncResult | null>(null);
 
   const qKey = getGetIntegrationStatusQueryKey();
   const { data: status, isLoading } = useGetIntegrationStatus({ query: { queryKey: qKey } });
@@ -20,9 +30,17 @@ export default function IntegrationPage() {
     mutation: {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: data.message });
+        setResult({ ...data, success: true });
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro na sincronização", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => {
+        setResult({
+          success: false,
+          message: e.message ?? "Não foi possível concluir a sincronização.",
+          eventsSync: 0,
+          employeesSync: 0,
+          participantsSync: 0,
+        });
+      },
     },
   });
 
@@ -181,6 +199,61 @@ export default function IntegrationPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!result} onOpenChange={(open) => { if (!open) setResult(null); }}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-sync-result">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {result?.success ? (
+                <>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100">
+                    <CheckCircle2 className="text-green-600" size={20} />
+                  </span>
+                  Sincronização concluída
+                </>
+              ) : (
+                <>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100">
+                    <AlertTriangle className="text-red-600" size={20} />
+                  </span>
+                  Falha na sincronização
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {result?.success
+                ? "Apenas eventos de 2026 já finalizados e participações de Cenotécnica / Cenotécnica Local foram importados. Registros existentes são atualizados, nunca duplicados."
+                : result?.message}
+            </DialogDescription>
+          </DialogHeader>
+
+          {result?.success && (
+            <div className="grid grid-cols-3 gap-3 py-2">
+              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <Calendar size={18} className="mx-auto text-slate-400 mb-2" />
+                <p className="text-2xl font-black text-slate-800" data-testid="text-result-events">{result.eventsSync ?? 0}</p>
+                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos</p>
+              </div>
+              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <Users size={18} className="mx-auto text-slate-400 mb-2" />
+                <p className="text-2xl font-black text-slate-800" data-testid="text-result-employees">{result.employeesSync ?? 0}</p>
+                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores</p>
+              </div>
+              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <Briefcase size={18} className="mx-auto text-slate-400 mb-2" />
+                <p className="text-2xl font-black text-slate-800" data-testid="text-result-participants">{result.participantsSync ?? 0}</p>
+                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Participações</p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={() => setResult(null)} className="w-full" data-testid="button-close-result">
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
