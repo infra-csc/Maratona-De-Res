@@ -1,20 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, getGetCalibrationsQueryKey } from "@workspace/api-client-react";
-import type { CalibrationInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { Target, Plus, AlertCircle, Building2, ArrowRight, SlidersHorizontal, CalendarDays } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, Check, Info, Save, CheckCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const currentYear = new Date().getFullYear();
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
 function statusChip(status: string): { label: string; cls: string } {
   const map: Record<string, { label: string; cls: string }> = {
@@ -32,7 +30,10 @@ export default function CalibrationsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [open, setOpen] = useState(false);
+  const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [calScores, setCalScores] = useState<Record<number, string>>({});
+  const [calReasons, setCalReasons] = useState<Record<number, string>>({});
+  const [savingCritId, setSavingCritId] = useState<number | null>(null);
 
   const { data: events } = useGetEvents({ year: currentYear });
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
@@ -48,24 +49,44 @@ export default function CalibrationsPage() {
     { query: { enabled: !!selectedEventId, queryKey: calQKey } }
   );
 
-  const { register, handleSubmit, reset, setValue } = useForm<CalibrationInput & { criterionId: number }>();
+  // Only events that finished all evaluations OR were closed by RH in event management.
+  // evaluationProgress is a 0–1 fraction (submitted / total evaluations).
+  const calibratableEvents = (events ?? []).filter(
+    e => (e.evaluationProgress ?? 0) >= 1 || e.status === "closed" || e.forcedClosed
+  );
+  const pickedEvent = calibratableEvents.find(e => e.id === selectedEventId);
+
+  // Clear selection if the picked event is no longer calibratable (e.g. reopened by RH)
+  useEffect(() => {
+    if (selectedEventId && !calibratableEvents.some(e => e.id === selectedEventId)) {
+      setSelectedEventId(null);
+      setCalScores({});
+      setCalReasons({});
+    }
+  }, [selectedEventId, calibratableEvents]);
 
   const createMutation = useCreateCalibration({
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: calQKey });
         toast({ title: "Calibração registrada" });
-        setOpen(false);
-        reset();
+        setSavingCritId(null);
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => {
+        toast({ title: "Erro", description: e.message, variant: "destructive" });
+        setSavingCritId(null);
+      },
     },
   });
 
-  function getAvgScore(critId: number) {
-    const scores = (evaluations ?? [])
+  function getAreaScores(critId: number) {
+    return (evaluations ?? [])
       .filter(e => e.criterionId === critId && e.status === "submitted")
-      .map(e => parseFloat(e.score as unknown as string));
+      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string) }));
+  }
+
+  function getAvgScore(critId: number) {
+    const scores = getAreaScores(critId).map(s => s.score);
     return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   }
 
@@ -73,9 +94,33 @@ export default function CalibrationsPage() {
     return (calibrations ?? []).find(c => c.criterionId === critId);
   }
 
-  const activeCriteria = (criteria ?? []).filter(c => c.active);
-  const selectedEvent = events?.find(e => e.id === selectedEventId);
+  function saveCalibration(critId: number) {
+    const existing = getCalibration(critId);
+    const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
+    const reason = (calReasons[critId] ?? existing?.calibrationReason ?? "").trim();
+    const score = Number(raw);
+    if (!raw || isNaN(score) || score < 1 || score > 5) {
+      toast({ title: "Nota inválida", description: "Informe uma nota calibrada de 1 a 5.", variant: "destructive" });
+      return;
+    }
+    if (!reason) {
+      toast({ title: "Justificativa obrigatória", description: "Explique por que a nota foi alterada.", variant: "destructive" });
+      return;
+    }
+    setSavingCritId(critId);
+    const avg = getAvgScore(critId);
+    createMutation.mutate({
+      data: {
+        eventId: selectedEventId!,
+        criterionId: critId,
+        calibratedScore: score,
+        calibrationReason: reason,
+        originalAverageScore: avg ?? undefined,
+      },
+    });
+  }
 
+  const activeCriteria = (criteria ?? []).filter(c => c.active);
   const pendingCount = selectedEventId
     ? activeCriteria.filter(c => getAvgScore(c.criterionId) != null && !getCalibration(c.criterionId)).length
     : 0;
@@ -85,7 +130,7 @@ export default function CalibrationsPage() {
       <div className="p-6 md:p-10 space-y-10">
         {/* Hero panel */}
         <section className="relative">
-          <div className={`bg-[#191c1e] text-white p-8 skew-x-[-2deg] shadow-[8px_8px_0px_0px_#ccff00]`}>
+          <div className="bg-[#191c1e] text-white p-8 skew-x-[-2deg] shadow-[8px_8px_0px_0px_#ccff00]">
             <div className="skew-x-[2deg] flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
               <div>
                 <h1 data-testid="text-page-title" className="text-3xl md:text-5xl italic uppercase font-black tracking-tighter leading-none mb-3 flex items-center gap-3">
@@ -110,207 +155,209 @@ export default function CalibrationsPage() {
           </div>
         </section>
 
-        {/* Event selector + new calibration */}
-        <section className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          <div className="md:col-span-8 bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-full bg-[#eceef0] opacity-30 skew-x-[-12deg] translate-x-16" />
-            <Label className="text-xs font-bold uppercase italic tracking-wider text-[#444933] mb-3 flex items-center gap-2 relative">
-              <CalendarDays size={16} /> Selecionar Evento
-            </Label>
-            <Select
-              value={selectedEventId ? String(selectedEventId) : ""}
-              onValueChange={v => setSelectedEventId(Number(v))}
-            >
-              <SelectTrigger data-testid="select-event" className="h-12 rounded-none border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic uppercase text-sm tracking-wider focus:ring-0 relative">
-                <SelectValue placeholder="Busque um evento para calibrar..." />
-              </SelectTrigger>
-              <SelectContent>
-                {(events ?? []).map(ev => (
-                  <SelectItem key={ev.id} value={String(ev.id)}>{ev.name} — {ev.clientName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Event selector */}
+        <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 px-3 py-1.5 bg-[#ccff00] border-l-2 border-b-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider">ETAPA 01</div>
+          <Label className="text-xs font-bold uppercase italic tracking-wider text-[#444933] mb-3 flex items-center gap-2 relative">
+            <CalendarDays size={16} /> Selecionar Evento
+          </Label>
 
-          <div className="md:col-span-4 bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between">
-            <h3 className="text-xs font-bold uppercase italic tracking-wider text-[#444933] mb-4">Nova Calibração</h3>
-            {selectedEventId ? (
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <button
-                    data-testid="button-add-calibration"
-                    className={`w-full bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-                  >
-                    <Plus size={18} /> Nova Calibração
-                  </button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Registrar Calibração</DialogTitle>
-                  </DialogHeader>
-                  <form
-                    onSubmit={handleSubmit(d => {
-                      const critId = Number(d.criterionId);
-                      const avg = getAvgScore(critId);
-                      createMutation.mutate({
-                        data: {
-                          eventId: selectedEventId,
-                          criterionId: critId,
-                          calibratedScore: Number(d.calibratedScore),
-                          calibrationReason: d.calibrationReason,
-                          originalAverageScore: avg ?? undefined,
-                        },
-                      });
-                    })}
-                    className="space-y-5 pt-4"
-                  >
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Critério <span className="text-[#ba1a1a]">*</span></Label>
-                      <Select onValueChange={v => setValue("criterionId", Number(v))}>
-                        <SelectTrigger data-testid="select-cal-criterion" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
-                          <SelectValue placeholder="Selecione um critério..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {activeCriteria.map(c => (
-                            <SelectItem key={c.criterionId} value={String(c.criterionId)}>{c.criterionName}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nota Calibrada Final <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input
-                        data-testid="input-calibrated-score"
-                        type="number"
-                        min="1" max="5" step="1"
-                        placeholder="Nota de 1 a 5"
-                        className="h-11 rounded-none border-2 border-[#191c1e]"
-                        {...register("calibratedScore", { required: true, valueAsNumber: true })}
-                      />
-                      <p className="text-xs text-[#747a60] italic">Esta nota substituirá a média das avaliações neste critério.</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Justificativa da Calibração <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input
-                        data-testid="input-calibration-reason"
-                        {...register("calibrationReason", { required: true })}
-                        placeholder="Por que a nota original foi alterada?"
-                        className="h-11 rounded-none border-2 border-[#191c1e]"
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                      <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
-                      <button
-                        data-testid="button-submit-calibration"
-                        type="submit"
-                        disabled={createMutation.isPending}
-                        className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
-                      >
-                        {createMutation.isPending ? "Salvando..." : "Confirmar Calibração"}
-                      </button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            ) : (
-              <p className="text-sm italic text-[#747a60] font-bold uppercase">Selecione um evento para iniciar.</p>
-            )}
+          <div className="w-full max-w-2xl">
+            <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  role="combobox"
+                  aria-expanded={eventPickerOpen}
+                  data-testid="select-event"
+                  disabled={calibratableEvents.length === 0}
+                  className={`w-full min-h-[3.25rem] px-4 py-3 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#f7f9fb] ${HARD_SHADOW}`}
+                >
+                  {pickedEvent ? (
+                    <span className="flex flex-col min-w-0">
+                      <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
+                      <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName} · {pickedEvent.city}/{pickedEvent.state}</span>
+                    </span>
+                  ) : (
+                    <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60]">
+                      {calibratableEvents.length === 0 ? "Nenhum evento pronto para calibração" : "Busque um evento para calibrar..."}
+                    </span>
+                  )}
+                  <ChevronsUpDown size={18} className="shrink-0 text-[#191c1e]" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                <Command className="rounded-none">
+                  <CommandInput data-testid="input-event-search" placeholder="Buscar por evento ou cliente..." className="italic" />
+                  <CommandList className="max-h-[320px]">
+                    <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {calibratableEvents.map(ev => (
+                        <CommandItem
+                          key={ev.id}
+                          value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
+                          data-testid={`option-event-${ev.id}`}
+                          onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setEventPickerOpen(false); }}
+                          className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
+                        >
+                          <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
+                          <span className="flex flex-col min-w-0">
+                            <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
+                            <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{ev.clientName} · {ev.city}/{ev.state}</span>
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+              <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
+              <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#444933]">
+                Apenas eventos com todas as avaliações concluídas ou já fechados pelo RH na gestão de eventos aparecem nesta lista.
+              </p>
+            </div>
           </div>
         </section>
 
-        {/* Comparison table */}
+        {/* Inline calibration */}
         {selectedEventId ? (
-          <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
-            {selectedEvent && (
-              <div className="bg-[#f2f4f6] p-5 border-b-2 border-[#191c1e] flex items-center justify-between gap-4">
+          <section className="space-y-5">
+            {pickedEvent && (
+              <div className="bg-white border-2 border-[#191c1e] p-5 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="w-12 h-12 border-2 border-[#191c1e] skew-x-[-4deg] bg-[#e0e3e5] flex items-center justify-center shrink-0">
                     <span className="skew-x-[4deg]"><Target size={20} /></span>
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-black italic uppercase tracking-tight text-[#191c1e] truncate">{selectedEvent.name}</h3>
-                    <p className="text-xs font-bold italic uppercase text-[#747a60] truncate">{selectedEvent.clientName}</p>
+                    <h3 className="font-black italic uppercase tracking-tight text-[#191c1e] truncate">{pickedEvent.name}</h3>
+                    <p className="text-xs font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName}</p>
                   </div>
                 </div>
-                <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block ${statusChip(selectedEvent.status).cls}`}>
-                  <span className="inline-block skew-x-[8deg]">{statusChip(selectedEvent.status).label}</span>
+                <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${statusChip(pickedEvent.status).cls}`}>
+                  <span className="inline-block skew-x-[8deg]">{statusChip(pickedEvent.status).label}</span>
                 </span>
               </div>
             )}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[#191c1e] text-[#ccff00]">
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic tracking-wider w-[28%]">Critério</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic tracking-wider">Área Responsável</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic tracking-wider text-center">Nota Média Original</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic tracking-wider text-center">Nota Calibrada</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic tracking-wider w-[28%]">Justificativa</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-[#eceef0]">
-                  {activeCriteria.map(c => {
-                    const avg = getAvgScore(c.criterionId);
-                    const cal = getCalibration(c.criterionId);
-                    const hasCalibration = !!cal;
 
-                    return (
-                      <tr key={c.criterionId} data-testid={`row-cal-${c.criterionId}`} className="hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group">
-                        <td className="px-6 py-4">
-                          <div className="font-bold italic text-[#191c1e]">{c.criterionName}</div>
-                          <div className="text-xs font-bold italic uppercase text-[#747a60] mt-1">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {c.responsibleAreaName ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold italic uppercase text-[#444933] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1 skew-x-[-6deg]">
-                              <span className="inline-flex items-center gap-1.5 skew-x-[6deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
-                            </span>
-                          ) : (
-                            <span className="text-[#c4c9ac]">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {avg != null ? (
-                            <span className={`text-lg font-black italic ${hasCalibration ? "text-[#c4c9ac] line-through" : "text-[#191c1e]"}`}>
-                              {avg.toFixed(2)}
-                            </span>
-                          ) : (
-                            <span className="text-[#c4c9ac]">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {cal ? (
-                            <div className="flex items-center justify-center gap-2">
-                              <ArrowRight size={18} className="text-[#506600]" />
-                              <div className="flex flex-col items-center justify-center bg-[#ccff00] border-2 border-[#191c1e] px-3 py-1 skew-x-[-8deg]">
-                                <span className="skew-x-[8deg] text-xl font-black italic text-[#191c1e] leading-none">
-                                  {parseFloat(cal.calibratedScore as unknown as string).toFixed(2)}
-                                </span>
+            {activeCriteria.length === 0 && (
+              <div className="bg-white border-2 border-[#191c1e] text-center py-16 italic uppercase font-bold text-[#747a60]">
+                Nenhum critério ativo para este evento.
+              </div>
+            )}
+
+            {activeCriteria.map(c => {
+              const areaScores = getAreaScores(c.criterionId);
+              const avg = getAvgScore(c.criterionId);
+              const cal = getCalibration(c.criterionId);
+              const scoreVal = calScores[c.criterionId] ?? (cal ? String(parseFloat(cal.calibratedScore as unknown as string)) : "");
+              const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
+              const isSaving = savingCritId === c.criterionId && createMutation.isPending;
+
+              return (
+                <article key={c.criterionId} data-testid={`row-cal-${c.criterionId}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
+                  {/* Criterion header */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
+                    <div className="min-w-0">
+                      <div className="font-black italic uppercase tracking-tight text-[#191c1e]">{c.criterionName}</div>
+                      <div className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {c.responsibleAreaName && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1 skew-x-[-6deg]">
+                          <span className="inline-flex items-center gap-1.5 skew-x-[6deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
+                        </span>
+                      )}
+                      {cal ? (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#506600] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1">
+                          <CheckCircle size={12} /> Calibrado
+                        </span>
+                      ) : avg != null ? (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border-2 border-[#191c1e] px-2 py-1">Pendente</span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 divide-y-2 lg:divide-y-0 lg:divide-x-2 divide-[#191c1e]">
+                    {/* Left: scores from the area */}
+                    <div className="p-5">
+                      <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-3 flex items-center gap-1.5">
+                        <Building2 size={13} /> Notas da Área
+                      </p>
+                      {areaScores.length > 0 ? (
+                        <>
+                          <div className="flex flex-wrap gap-2">
+                            {areaScores.map((s, i) => (
+                              <div key={i} className="flex items-center gap-2 border-2 border-[#191c1e] bg-white pl-2.5 pr-1.5 py-1">
+                                <span className="text-[11px] font-bold italic uppercase text-[#444933] truncate max-w-[140px]">{s.name}</span>
+                                <span className="text-sm font-black italic text-[#191c1e] bg-[#eceef0] border-l-2 border-[#191c1e] px-2 leading-6">{s.score.toFixed(1)}</span>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="text-center"><span className="text-[#c4c9ac]">—</span></div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {cal ? (
-                            <div className="text-xs italic text-[#444933] bg-[#f2f4f6] border-l-4 border-[#ff5722] p-3 relative">
-                              <AlertCircle size={12} className="text-[#ff5722] absolute top-2 right-2" />
-                              <span className="block pr-4">"{cal.calibrationReason}"</span>
-                            </div>
-                          ) : (
-                            <span className="text-[#c4c9ac]">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {activeCriteria.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério ativo para este evento.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            ))}
+                          </div>
+                          <div className="mt-4 flex items-baseline gap-2">
+                            <span className="text-[11px] font-bold uppercase italic tracking-wider text-[#747a60]">Média Original</span>
+                            <span className={`text-2xl font-black italic ${cal ? "text-[#c4c9ac] line-through" : "text-[#191c1e]"}`}>{avg?.toFixed(2)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm italic text-[#747a60] font-bold uppercase">Nenhuma nota enviada pela área para este critério.</p>
+                      )}
+                    </div>
+
+                    {/* Right: inline calibration */}
+                    <div className="p-5 bg-[#fbfcfd]">
+                      <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-3 flex items-center gap-1.5">
+                        <SlidersHorizontal size={13} /> Calibração
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
+                        <div className="sm:w-28 shrink-0">
+                          <Label className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota (1–5)</Label>
+                          <Input
+                            data-testid={`input-cal-score-${c.criterionId}`}
+                            type="number"
+                            min="1" max="5" step="1"
+                            value={scoreVal}
+                            onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
+                            placeholder="—"
+                            className="h-11 mt-1 rounded-none border-2 border-[#191c1e] text-lg font-black italic"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Justificativa</Label>
+                          <Textarea
+                            data-testid={`input-cal-reason-${c.criterionId}`}
+                            value={reasonVal}
+                            onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
+                            placeholder="Por que a nota original foi alterada?"
+                            rows={2}
+                            className="mt-1 rounded-none border-2 border-[#191c1e] resize-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-end">
+                        <button
+                          data-testid={`button-save-cal-${c.criterionId}`}
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => saveCalibration(c.criterionId)}
+                          className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
+                        >
+                          <Save size={16} /> {isSaving ? "Salvando..." : cal ? "Atualizar Calibração" : "Salvar Calibração"}
+                        </button>
+                      </div>
+                      {cal && (
+                        <div className="mt-3 text-xs italic text-[#444933] bg-[#f2f4f6] border-l-4 border-[#ff5722] p-3 relative">
+                          <AlertCircle size={12} className="text-[#ff5722] absolute top-2 right-2" />
+                          <span className="block pr-4">Calibração atual: <strong className="not-italic">{parseFloat(cal.calibratedScore as unknown as string).toFixed(2)}</strong>{cal.calibratedByName ? ` · por ${cal.calibratedByName}` : ""}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </section>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center bg-white border-2 border-dashed border-[#191c1e]">
@@ -318,7 +365,7 @@ export default function CalibrationsPage() {
               <span className="skew-x-[4deg]"><Target className="text-[#747a60]" size={32} /></span>
             </div>
             <h2 className="text-2xl font-black italic uppercase tracking-tight mb-2 text-[#191c1e]">Área de Calibração</h2>
-            <p className="text-[#747a60] italic max-w-md">Selecione um evento no campo acima para visualizar as médias originais e aplicar notas calibradas por critério.</p>
+            <p className="text-[#747a60] italic max-w-md">Selecione um evento no campo acima para visualizar as notas da área e calibrar cada critério diretamente.</p>
           </div>
         )}
       </div>
