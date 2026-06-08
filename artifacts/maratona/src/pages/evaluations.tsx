@@ -551,7 +551,7 @@ export default function EvaluationsPage() {
                         return (
                           <div key={g.area} data-testid={`status-area-${g.area}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                             <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
-                              <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight min-w-0 truncate">
+                              <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight min-w-0 truncate pr-1.5">
                                 <Building2 size={16} className="shrink-0" /> {g.area}
                               </span>
                               <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0", areaDone ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffb5a0] text-[#3b0900]")}>
@@ -564,9 +564,9 @@ export default function EvaluationsPage() {
                                 const responsible = (c.responsibleAreaId != null ? evaluatorByAreaId.get(c.responsibleAreaId) : null) ?? st.who;
                                 return (
                                   <li key={c.criterionId} data-testid={`status-crit-${c.criterionId}`} className="flex items-center justify-between gap-3 px-5 py-3 border-t-2 border-[#eceef0] first:border-t-0">
-                                    <span className="font-bold italic text-[#191c1e] min-w-0 truncate">{c.criterionName}</span>
+                                    <span className="font-bold italic text-[#191c1e] min-w-0 truncate pr-1.5">{c.criterionName}</span>
                                     <span className="shrink-0 flex items-center gap-2">
-                                      <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] truncate max-w-[160px] hidden sm:inline-flex items-center gap-1">
+                                      <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-nowrap hidden sm:inline-flex items-center gap-1 pr-0.5">
                                         <User size={11} className="shrink-0" /> {responsible ?? "Sem responsável"}
                                       </span>
                                       {st.state === "submitted" ? (
