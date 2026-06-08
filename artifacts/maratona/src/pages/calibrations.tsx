@@ -595,8 +595,9 @@ export default function CalibrationsPage() {
               <div>
                 <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><SlidersHorizontal size={13} className="text-[#506600]" /> Notas Finais por Critério</p>
                 <div className="border-2 border-[#191c1e]">
-                  <div className="grid grid-cols-[1fr_auto] gap-x-3 px-3 py-1.5 bg-[#191c1e] text-white text-[9px] font-bold uppercase italic tracking-wider">
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-1.5 bg-[#191c1e] text-white text-[9px] font-bold uppercase italic tracking-wider">
                     <span>Critério</span>
+                    <span className="text-center">Peso</span>
                     <span className="text-right">Original → Calibrada = Final</span>
                   </div>
                   {scoredCriteria.map((c, i) => {
@@ -604,9 +605,11 @@ export default function CalibrationsPage() {
                     const cal = getCalibration(c.criterionId);
                     const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
                     const finalVal = calVal ?? avg;
+                    const peso = c.weightOverride ?? c.originalWeight ?? 0;
                     return (
-                      <div key={c.criterionId} className={`grid grid-cols-[1fr_auto] gap-x-3 px-3 py-2 items-center ${i % 2 ? "bg-[#f7f9fb]" : "bg-white"}`} data-testid={`finalize-criterion-${c.criterionId}`}>
+                      <div key={c.criterionId} className={`grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-2 items-center ${i % 2 ? "bg-[#f7f9fb]" : "bg-white"}`} data-testid={`finalize-criterion-${c.criterionId}`}>
                         <span className="text-xs font-bold italic uppercase text-[#191c1e] truncate pr-2">{c.criterionName}</span>
+                        <span className="text-xs font-black italic text-[#444933] text-center tabular-nums shrink-0">{peso}</span>
                         <span className="flex items-center gap-1.5 justify-end text-xs font-black italic shrink-0">
                           <span className={calVal != null ? "text-[#c4c9ac] line-through" : "text-[#444933]"}>{avg != null ? avg.toFixed(2) : "—"}</span>
                           {calVal != null && (
