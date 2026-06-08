@@ -114,6 +114,9 @@ export default function EvaluationsPage() {
   const { user } = useAuth();
   const isManager = !!user && ["admin", "rh", "diretoria"].includes(user.role);
   const isEvaluator = user?.role === "avaliador";
+  // Everyone who is not an evaluator (managers, diretoria, visualizador) is in
+  // read-only consultation mode: they inspect evaluation progress, never score.
+  const isConsultation = !!user && !isEvaluator;
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
@@ -169,7 +172,9 @@ export default function EvaluationsPage() {
   const openEvents = (events ?? []).filter(e => e.status === "open");
   // Only events whose criteria the RH has already confirmed can be evaluated.
   const configuredEvents = openEvents.filter(e => e.criteriaConfirmed);
-  const pickedEvent = configuredEvents.find(e => e.id === selectedEventId);
+  // Evaluators may only act on RH-released events; consultation roles may inspect any open event.
+  const selectableEvents = isEvaluator ? configuredEvents : openEvents;
+  const pickedEvent = selectableEvents.find(e => e.id === selectedEventId);
 
   // For evaluators: fetch criteria for every selectable event so the overview
   // only lists events that actually have work for their area (and so the empty
@@ -194,9 +199,9 @@ export default function EvaluationsPage() {
   // server-side), clear the selection so trigger text and loaded data stay in sync.
   useEffect(() => {
     if (selectedEventId == null || !events) return;
-    const stillValid = events.some(e => e.id === selectedEventId && e.status === "open" && e.criteriaConfirmed);
+    const stillValid = events.some(e => e.id === selectedEventId && e.status === "open" && (isEvaluator ? e.criteriaConfirmed : true));
     if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); }
-  }, [selectedEventId, events]);
+  }, [selectedEventId, events, isEvaluator]);
   const canRelease = isManager;
   const eventComplete = eventResult?.isComplete ?? false;
   const feedbackReleased = eventResult?.feedbackReleased ?? false;
@@ -304,7 +309,7 @@ export default function EvaluationsPage() {
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
           <div>
             <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">Central de Avaliações</h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2">Mantenha o ritmo. Avalie a sprint e impulsione a equipe.</p>
+            <p className="text-base md:text-lg text-[#444933] italic mt-2">{isConsultation ? "Consulte o andamento das avaliações de cada evento em tempo real." : "Mantenha o ritmo. Avalie a sprint e impulsione a equipe."}</p>
           </div>
           {isManager && (
             <button
@@ -321,7 +326,7 @@ export default function EvaluationsPage() {
         <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 px-3 py-1.5 bg-[#ccff00] border-l-2 border-b-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider">ETAPA 01</div>
           <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight mb-1">Selecionar Evento</h3>
-          <p className="text-sm text-[#444933] italic mb-5">Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação.</p>
+          <p className="text-sm text-[#444933] italic mb-5">{isConsultation ? "Busque pelo nome do evento ou do cliente e selecione para consultar o andamento." : "Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação."}</p>
 
           <div className="w-full max-w-2xl">
             <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
@@ -331,7 +336,7 @@ export default function EvaluationsPage() {
                   role="combobox"
                   aria-expanded={eventPickerOpen}
                   data-testid="select-event"
-                  disabled={configuredEvents.length === 0}
+                  disabled={selectableEvents.length === 0}
                   className={`w-full min-h-[3.25rem] px-4 py-3 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#f7f9fb] ${HARD_SHADOW}`}
                 >
                   {pickedEvent ? (
@@ -341,7 +346,9 @@ export default function EvaluationsPage() {
                     </span>
                   ) : (
                     <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60]">
-                      {configuredEvents.length === 0 ? "Nenhum evento configurado disponível" : "Selecione um evento para avaliar..."}
+                      {selectableEvents.length === 0
+                        ? (isConsultation ? "Nenhum evento aberto disponível" : "Nenhum evento configurado disponível")
+                        : (isConsultation ? "Selecione um evento para consultar..." : "Selecione um evento para avaliar...")}
                     </span>
                   )}
                   <ChevronsUpDown size={18} className="shrink-0 text-[#191c1e]" />
@@ -353,7 +360,7 @@ export default function EvaluationsPage() {
                   <CommandList className="max-h-[320px]">
                     <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
                     <CommandGroup>
-                      {configuredEvents.map(ev => (
+                      {selectableEvents.map(ev => (
                         <CommandItem
                           key={ev.id}
                           value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
@@ -377,7 +384,9 @@ export default function EvaluationsPage() {
             <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
               <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
               <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#444933]">
-                Apenas eventos já configurados e liberados pelo RH aparecem nesta lista.
+                {isConsultation
+                  ? "Modo consulta: acompanhe o status de cada avaliação por evento, sem editar notas."
+                  : "Apenas eventos já configurados e liberados pelo RH aparecem nesta lista."}
               </p>
             </div>
           </div>
@@ -423,8 +432,8 @@ export default function EvaluationsPage() {
             <div className="w-16 h-16 border-2 border-[#191c1e] bg-[#ccff00] flex items-center justify-center mb-4 skew-x-[-6deg]">
               <CheckCircle className="text-[#161e00] skew-x-[6deg]" size={32} />
             </div>
-            <h2 className="text-2xl italic uppercase font-black tracking-tight mb-2">Pronto para avaliar</h2>
-            <p className="text-[#444933] italic max-w-md">Selecione um evento no menu acima para iniciar ou continuar a avaliação da equipe responsável.</p>
+            <h2 className="text-2xl italic uppercase font-black tracking-tight mb-2">{isConsultation ? "Pronto para consultar" : "Pronto para avaliar"}</h2>
+            <p className="text-[#444933] italic max-w-md">{isConsultation ? "Selecione um evento no menu acima para consultar o andamento das avaliações da equipe." : "Selecione um evento no menu acima para iniciar ou continuar a avaliação da equipe responsável."}</p>
           </div>
         ) : (
           <div className="space-y-10">
@@ -485,10 +494,10 @@ export default function EvaluationsPage() {
               {/* Criteria Column / Evaluation Form */}
               <div className="space-y-4">
                 <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
-                  {isManager ? (<><ListChecks size={22} /> Status das Avaliações</>) : "Critérios de Avaliação"}
+                  {isConsultation ? (<><ListChecks size={22} /> Status das Avaliações</>) : "Critérios de Avaliação"}
                 </h3>
 
-                {isManager ? (
+                {isConsultation ? (
                   areaGroups.length === 0 ? (
                     <div className="text-center py-12 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">Nenhum critério ativo neste evento.</div>
                   ) : (
@@ -673,20 +682,20 @@ export default function EvaluationsPage() {
               <div className="sticky top-6 space-y-6">
                 <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                   <div className="bg-[#191c1e] text-[#ccff00] px-5 py-4 italic">
-                    <h3 className="text-lg font-black uppercase tracking-tight">{isManager ? "Status do Time" : "Resumo da Avaliação"}</h3>
-                    <p className="text-[11px] font-bold uppercase text-white/70">{isManager ? "Acompanhamento da equipe" : "Sua avaliação para este evento"}</p>
+                    <h3 className="text-lg font-black uppercase tracking-tight">{isConsultation ? "Status do Time" : "Resumo da Avaliação"}</h3>
+                    <p className="text-[11px] font-bold uppercase text-white/70">{isConsultation ? "Acompanhamento da equipe" : "Sua avaliação para este evento"}</p>
                   </div>
 
                   <div className="p-5 border-b-2 border-[#eceef0]">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs font-bold italic uppercase text-[#444933]">Progresso</span>
-                      <span className="text-sm font-black italic text-[#506600]">{Math.round(isManager ? teamProgressPct : progressPct)}%</span>
+                      <span className="text-sm font-black italic text-[#506600]">{Math.round(isConsultation ? teamProgressPct : progressPct)}%</span>
                     </div>
                     <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2.5 mb-2">
-                      <div className="bg-[#ccff00] h-full transition-[width] duration-500" style={{ width: `${isManager ? teamProgressPct : progressPct}%` }} />
+                      <div className="bg-[#ccff00] h-full transition-[width] duration-500" style={{ width: `${isConsultation ? teamProgressPct : progressPct}%` }} />
                     </div>
                     <p className="text-[11px] text-[#747a60] italic">
-                      {isManager
+                      {isConsultation
                         ? `${teamSubmittedCount} de ${activeCriteria.length} critérios submetidos pelo time.`
                         : `${completedCount} de ${myCriteria.length} critérios preenchidos (rascunho ou submetido).`}
                     </p>
