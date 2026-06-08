@@ -133,7 +133,7 @@ export default function EventsPage() {
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {filtered.map(ev => {
-              const progress = ev.evaluationProgress ?? 0;
+              const progress = Math.round((ev.evaluationProgress ?? 0) * 100);
               const score = ev.teamScore ?? ev.averageScore ?? null;
               const calibrated = ev.hasCalibration ?? false;
               const concluded = ev.status === "closed";
@@ -192,13 +192,22 @@ export default function EventsPage() {
                   </div>
 
                   <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">
-                    <div className="flex-1 max-w-[200px]">
-                      <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
-                        <span className="text-[#444933]">Avaliações</span>
-                        <span className={progress === 100 ? "text-[#506600]" : "text-[#191c1e]"}>{progress}%</span>
+                    <div className="flex-1 max-w-[220px] space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
+                          <span className="text-[#444933]">Avaliações dos Avaliadores</span>
+                          <span className={progress === 100 ? "text-[#506600]" : "text-[#191c1e]"}>{progress}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
+                          <div className={progress === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${progress}%` }} />
+                        </div>
                       </div>
-                      <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
-                        <div className={progress === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${progress}%` }} />
+                      <div className="flex items-center justify-between text-xs font-bold italic uppercase">
+                        <span className="text-[#444933]">Calibragem</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className={`inline-block w-2 h-2 border border-[#191c1e] ${concluded ? "bg-[#506600]" : calibrated ? "bg-[#ffb300]" : "bg-[#cfd4d8]"}`} />
+                          <span className={concluded ? "text-[#506600]" : calibrated ? "text-[#a06a00]" : "text-[#747a60]"}>{concluded ? "Concluída" : calibrated ? "Em andamento" : "Pendente"}</span>
+                        </span>
                       </div>
                     </div>
 
