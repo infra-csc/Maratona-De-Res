@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore } from "../lib/calculations.js";
 import { audit } from "../lib/audit.js";
+import { recomputeQuarterResults } from "./results.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -143,6 +144,7 @@ router.post("/events/:id/feedback/release", requireRole("admin", "rh", "diretori
     feedbackReleasedAt: new Date(),
   }).where(eq(eventsTable.id, eventId)).returning();
   await audit(req.user!.userId, "release_feedback", "events", eventId);
+  await recomputeQuarterResults(updated.year, updated.quarter, req.user!.userId);
   res.json({ ...feedback, feedbackReleased: updated.feedbackReleased });
 });
 

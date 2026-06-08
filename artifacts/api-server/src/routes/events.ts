@@ -4,6 +4,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult } from "../lib/calculations.js";
+import { recomputeQuarterResults } from "./results.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -226,6 +227,7 @@ router.post("/events/:id/close", requireRole("admin", "rh", "diretoria"), async 
   }).where(eq(eventsTable.id, id)).returning();
   if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
   await audit(req.user!.userId, "close", "events", id);
+  await recomputeQuarterResults(ev.year, ev.quarter, req.user!.userId);
   res.json(ev);
 });
 
@@ -234,6 +236,7 @@ router.post("/events/:id/reopen", requireRole("admin", "rh"), async (req, res) =
   const [ev] = await db.update(eventsTable).set({ status: "open", forcedClosed: false, forcedCloseReason: null }).where(eq(eventsTable.id, id)).returning();
   if (!ev) { res.status(404).json({ error: "Não encontrado" }); return; }
   await audit(req.user!.userId, "reopen", "events", id);
+  await recomputeQuarterResults(ev.year, ev.quarter, req.user!.userId);
   res.json(ev);
 });
 

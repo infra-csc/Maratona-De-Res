@@ -103,6 +103,172 @@ export async function computeEventTeamResult(eventId: number) {
 }
 
 /**
+ * Recalcula e regrava os resultados trimestrais (quarterly_results) e os
+ * resultados por evento (employee_event_results) de um trimestre, a partir de
+ * TODOS os eventos atualmente fechados (status="closed") naquele ano/trimestre.
+ *
+ * É idempotente: limpa o trimestre e reconstrói. Preserva o estado de pagamento
+ * já acionado manualmente (aprovado/agendado/pago/bloqueado ou já pago) para não
+ * descartar decisões de bônus ao reprocessar quando um novo evento é fechado.
+ *
+ * Usado tanto pelo fechamento manual do trimestre quanto automaticamente quando
+ * um evento é fechado/reaberto/liberado, mantendo dashboard, resultados e
+ * ranking sempre atualizados.
+ */
+export async function recomputeQuarterResults(year: number, quarter: number, userId: number) {
+  const closedEvents = await db.select().from(eventsTable)
+    .where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter), eq(eventsTable.status, "closed")));
+  const closedEventIds = closedEvents.map(e => e.id);
+  const platoonRules = await loadPlatoonRules();
+  const warnings: string[] = [];
+
+  // IDs de TODOS os eventos do trimestre (independente de status) para limpar o
+  // cache por evento (employee_event_results) de eventos reabertos.
+  const allQuarterEvents = await db.select({ id: eventsTable.id }).from(eventsTable)
+    .where(and(eq(eventsTable.year, year), eq(eventsTable.quarter, quarter)));
+  const allQuarterEventIds = allQuarterEvents.map(e => e.id);
+
+  // Snapshot do estado de pagamento atual para preservar decisões manuais.
+  const existingRows = await db.select().from(quarterlyResultsTable)
+    .where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)));
+  const PRESERVE_STATUSES = ["approved", "scheduled", "paid", "blocked"];
+  const paymentByEmployee = new Map<number, typeof existingRows[number]>();
+  for (const r of existingRows) paymentByEmployee.set(r.employeeId, r);
+
+  // FASE DE LEITURA — calcula tudo antes de escrever, para gravar dentro de uma
+  // única transação (rebuild atômico: nunca deixa o trimestre vazio em caso de erro).
+
+  // 1. Nota do TIME de cada evento fechado + linhas por evento.
+  const eventScoreById = new Map<number, number>();
+  const eventResultInserts: (typeof employeeEventResultsTable.$inferInsert)[] = [];
+  for (const ev of closedEvents) {
+    const team = await computeEventTeamResult(ev.id);
+    eventScoreById.set(ev.id, team.eventScore);
+    const platoonProj = getPlatoonByScore(team.eventScore, platoonRules);
+
+    const eventParticipants = await db.select({ employeeId: eventParticipantsTable.employeeId })
+      .from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, ev.id));
+
+    for (const p of eventParticipants) {
+      eventResultInserts.push({
+        eventId: ev.id,
+        employeeId: p.employeeId,
+        eventScore: String(team.eventScore),
+        calibratedEventScore: team.hasCalibration ? String(team.eventScore) : null,
+        finalEventScore: String(team.eventScore),
+        platoonProjected: platoonProj?.name ?? null,
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  // 2. Consolida o resultado trimestral por colaborador a partir dos eventos fechados.
+  const quarterlyInserts: (typeof quarterlyResultsTable.$inferInsert)[] = [];
+  if (closedEventIds.length > 0) {
+    const participants = await db
+      .selectDistinct({ employeeId: eventParticipantsTable.employeeId })
+      .from(eventParticipantsTable)
+      .where(inArray(eventParticipantsTable.eventId, closedEventIds));
+
+    for (const { employeeId } of participants) {
+      if (!employeeId) continue;
+
+      const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+      if (!employee) continue;
+
+      const participantEvents = await db.select({ eventId: eventParticipantsTable.eventId })
+        .from(eventParticipantsTable)
+        .where(and(eq(eventParticipantsTable.employeeId, employeeId), inArray(eventParticipantsTable.eventId, closedEventIds)));
+
+      const eventScores: number[] = [];
+      for (const { eventId } of participantEvents) {
+        const s = eventScoreById.get(eventId);
+        if (s !== undefined && s > 0) eventScores.push(s);
+      }
+
+      if (eventScores.length === 0) {
+        warnings.push(`Colaborador ID ${employeeId}: sem eventos com avaliações`);
+        continue;
+      }
+
+      const absenceRows = await db.select().from(absencesTable)
+        .where(and(eq(absencesTable.employeeId, employeeId), eq(absencesTable.year, year), eq(absencesTable.quarter, quarter)));
+      const totalAbsences = absenceRows.reduce((s, a) => s + a.quantity, 0);
+
+      const grossAverage = calculateQuarterGrossAverage(eventScores);
+      const absencePenalty = absenceRows.reduce((s, a) => s + a.points * a.quantity, 0);
+      const finalResult = calculateQuarterFinalResult(grossAverage, absencePenalty);
+      const platoon = getPlatoonByScore(finalResult, platoonRules);
+
+      const [quarterElig] = await db.select().from(employeeQuarterEligibilityTable)
+        .where(and(
+          eq(employeeQuarterEligibilityTable.employeeId, employeeId),
+          eq(employeeQuarterEligibilityTable.year, year),
+          eq(employeeQuarterEligibilityTable.quarter, quarter),
+        )).limit(1);
+
+      let eligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
+      let eligibilityReason: string | null = null;
+      if (!eligible) {
+        eligibilityReason = employee.eligibilityReason ?? `Colaborador inelegível (${employee.eligibilityStatus})`;
+      }
+      if (quarterElig && !quarterElig.eligible) {
+        eligible = false;
+        eligibilityReason = quarterElig.reason ?? "Inelegível neste trimestre";
+      }
+
+      const bonusValue = eligible ? (platoon?.bonusValue ?? 0) : 0;
+      const autoStatus = eligible ? "projected" : "not_eligible";
+
+      // Preserva decisões de pagamento já acionadas manualmente.
+      const prev = paymentByEmployee.get(employeeId);
+      const keepPayment = !!prev && (!!prev.paidAt || PRESERVE_STATUSES.includes(prev.bonusStatus));
+
+      quarterlyInserts.push({
+        employeeId,
+        year,
+        quarter,
+        eventsCount: eventScores.length,
+        grossAverage: String(grossAverage),
+        totalAbsences,
+        absencePenalty: String(absencePenalty),
+        finalResult: String(finalResult),
+        platoon: platoon?.name ?? null,
+        platoonColor: platoon?.color ?? null,
+        bonusValue: String(bonusValue),
+        eligible,
+        eligibilityReason,
+        bonusStatus: keepPayment ? prev!.bonusStatus : autoStatus,
+        paymentMethod: prev?.paymentMethod ?? "Caju Saldo Livre",
+        paymentDueDate: keepPayment ? prev!.paymentDueDate : null,
+        paidAt: keepPayment ? prev!.paidAt : null,
+        paymentNotes: keepPayment ? prev!.paymentNotes : null,
+        closedAt: new Date(),
+        closedByUserId: userId,
+      });
+    }
+  }
+
+  // FASE DE ESCRITA — rebuild atômico de todo o trimestre.
+  await db.transaction(async (tx) => {
+    if (allQuarterEventIds.length > 0) {
+      await tx.delete(employeeEventResultsTable)
+        .where(inArray(employeeEventResultsTable.eventId, allQuarterEventIds));
+    }
+    if (eventResultInserts.length > 0) {
+      await tx.insert(employeeEventResultsTable).values(eventResultInserts);
+    }
+    await tx.delete(quarterlyResultsTable)
+      .where(and(eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)));
+    if (quarterlyInserts.length > 0) {
+      await tx.insert(quarterlyResultsTable).values(quarterlyInserts);
+    }
+  });
+
+  return { processed: quarterlyInserts.length, warnings };
+}
+
+/**
  * GET /events/:id/result
  * Resultado do TIME do evento + lista de participantes (todos recebem a mesma nota).
  */
@@ -235,120 +401,7 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
   }
   const isForced = openEvents.length > 0 && !!forced;
 
-  const closedEventIds = closedEvents.map(e => e.id);
-  const platoonRules = await loadPlatoonRules();
-
-  // 1. Calcula a nota do TIME de cada evento (uma vez por evento) e grava o
-  //    resultado por colaborador participante (mesma nota para todos do time).
-  const eventScoreById = new Map<number, number>();
-  for (const ev of closedEvents) {
-    const team = await computeEventTeamResult(ev.id);
-    eventScoreById.set(ev.id, team.eventScore);
-    const platoonProj = getPlatoonByScore(team.eventScore, platoonRules);
-
-    const eventParticipants = await db.select({ employeeId: eventParticipantsTable.employeeId })
-      .from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, ev.id));
-
-    await db.delete(employeeEventResultsTable).where(eq(employeeEventResultsTable.eventId, ev.id));
-    if (eventParticipants.length > 0) {
-      await db.insert(employeeEventResultsTable).values(eventParticipants.map(p => ({
-        eventId: ev.id,
-        employeeId: p.employeeId,
-        eventScore: String(team.eventScore),
-        calibratedEventScore: team.hasCalibration ? String(team.eventScore) : null,
-        finalEventScore: String(team.eventScore),
-        platoonProjected: platoonProj?.name ?? null,
-        updatedAt: new Date(),
-      })));
-    }
-  }
-
-  // 2. Consolida resultado trimestral por colaborador
-  const participants = await db
-    .selectDistinct({ employeeId: eventParticipantsTable.employeeId })
-    .from(eventParticipantsTable)
-    .where(inArray(eventParticipantsTable.eventId, closedEventIds));
-
-  let processed = 0;
-  const warnings: string[] = [];
-
-  for (const { employeeId } of participants) {
-    if (!employeeId) continue;
-
-    const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
-    if (!employee) continue;
-
-    const participantEvents = await db.select({ eventId: eventParticipantsTable.eventId })
-      .from(eventParticipantsTable)
-      .where(and(eq(eventParticipantsTable.employeeId, employeeId), inArray(eventParticipantsTable.eventId, closedEventIds)));
-
-    const eventScores: number[] = [];
-    for (const { eventId } of participantEvents) {
-      const s = eventScoreById.get(eventId);
-      if (s !== undefined && s > 0) eventScores.push(s);
-    }
-
-    if (eventScores.length === 0) {
-      warnings.push(`Colaborador ID ${employeeId}: sem eventos com avaliações`);
-      continue;
-    }
-
-    const absenceRows = await db.select().from(absencesTable)
-      .where(and(eq(absencesTable.employeeId, employeeId), eq(absencesTable.year, year), eq(absencesTable.quarter, quarter)));
-    const totalAbsences = absenceRows.reduce((s, a) => s + a.quantity, 0);
-
-    const grossAverage = calculateQuarterGrossAverage(eventScores);
-    const absencePenalty = absenceRows.reduce((s, a) => s + a.points * a.quantity, 0);
-    const finalResult = calculateQuarterFinalResult(grossAverage, absencePenalty);
-    const platoon = getPlatoonByScore(finalResult, platoonRules);
-
-    // Elegibilidade: cadastro + inelegibilidade trimestral
-    const [quarterElig] = await db.select().from(employeeQuarterEligibilityTable)
-      .where(and(
-        eq(employeeQuarterEligibilityTable.employeeId, employeeId),
-        eq(employeeQuarterEligibilityTable.year, year),
-        eq(employeeQuarterEligibilityTable.quarter, quarter),
-      )).limit(1);
-
-    let eligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
-    let eligibilityReason: string | null = null;
-    if (!eligible) {
-      eligibilityReason = employee.eligibilityReason ?? `Colaborador inelegível (${employee.eligibilityStatus})`;
-    }
-    if (quarterElig && !quarterElig.eligible) {
-      eligible = false;
-      eligibilityReason = quarterElig.reason ?? "Inelegível neste trimestre";
-    }
-
-    // Bônus só é gerado se elegível; resultado é mantido para histórico.
-    const bonusValue = eligible ? (platoon?.bonusValue ?? 0) : 0;
-    const bonusStatus = eligible ? "projected" : "not_eligible";
-
-    await db.delete(quarterlyResultsTable)
-      .where(and(eq(quarterlyResultsTable.employeeId, employeeId), eq(quarterlyResultsTable.year, year), eq(quarterlyResultsTable.quarter, quarter)));
-
-    await db.insert(quarterlyResultsTable).values({
-      employeeId,
-      year,
-      quarter,
-      eventsCount: eventScores.length,
-      grossAverage: String(grossAverage),
-      totalAbsences,
-      absencePenalty: String(absencePenalty),
-      finalResult: String(finalResult),
-      platoon: platoon?.name ?? null,
-      platoonColor: platoon?.color ?? null,
-      bonusValue: String(bonusValue),
-      eligible,
-      eligibilityReason,
-      bonusStatus,
-      paymentMethod: "Caju Saldo Livre",
-      closedAt: new Date(),
-      closedByUserId: req.user!.userId,
-    });
-
-    processed++;
-  }
+  const { processed, warnings } = await recomputeQuarterResults(year, quarter, req.user!.userId);
 
   await audit(
     req.user!.userId,
