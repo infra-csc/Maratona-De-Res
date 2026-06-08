@@ -204,6 +204,7 @@ export default function CalibrationsPage() {
     setSavingAll(true);
     let ok = 0;
     const failed: number[] = [];
+    let firstError: string | null = null;
     for (const x of toSave) {
       try {
         await bulkMutation.mutateAsync({
@@ -216,8 +217,9 @@ export default function CalibrationsPage() {
           },
         });
         ok++;
-      } catch {
+      } catch (e) {
         failed.push(x.critId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
       }
     }
     setSavingAll(false);
@@ -225,7 +227,7 @@ export default function CalibrationsPage() {
     if (failed.length === 0) {
       toast({ title: `${ok} calibraç${ok === 1 ? "ão salva" : "ões salvas"}` });
     } else {
-      toast({ title: `${ok} salva(s), ${failed.length} com erro`, description: "Revise os critérios destacados e tente novamente.", variant: "destructive" });
+      toast({ title: `${ok} salva(s), ${failed.length} com erro`, description: firstError ?? "Revise os critérios destacados e tente novamente.", variant: "destructive" });
     }
   }
 

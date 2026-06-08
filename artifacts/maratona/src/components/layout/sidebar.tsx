@@ -29,7 +29,7 @@ const navGroups: NavGroup[] = [
       { label: "Dashboard", path: "/", icon: LayoutDashboard },
       { label: "Eventos", path: "/events", icon: Calendar },
       { label: "Avaliações", path: "/evaluations", icon: ClipboardList },
-      { label: "Calibrações", path: "/calibrations", icon: Target, roles: ["admin", "rh", "avaliador", "diretoria"] },
+      { label: "Calibrações", path: "/calibrations", icon: Target, roles: ["admin", "rh", "diretoria"] },
       { label: "Resultados Trimestrais", path: "/results", icon: BarChart3, roles: ["admin", "rh", "diretoria"] },
       { label: "Maratona / Ranking", path: "/ranking", icon: Trophy },
     ]
