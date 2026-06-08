@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Maratona de Resultados — Resultados Trimestrais</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .kinetic-shadow {
+            box-shadow: 4px 4px 0px 0px #000000;
+        }
+        .kinetic-shadow-accent {
+            box-shadow: 4px 4px 0px 0px #ccff00;
+        }
+        .kinetic-shadow-sm {
+            box-shadow: 2px 2px 0px 0px #000000;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #000000;
+            border-radius: 0px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #ccff00;
+        }
+        .italic-header {
+            font-weight: 900;
+            font-style: italic;
+            text-transform: uppercase;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary": "#ccff00",
+                      "on-primary": "#000000",
+                      "surface": "#ffffff",
+                      "on-surface": "#000000",
+                      "surface-variant": "#f8fafc",
+                      "outline": "#000000",
+                      "platoon-gold": "#FFD700",
+                      "platoon-blue": "#0066FF",
+                      "platoon-green": "#00C853",
+                      "platoon-silver": "#94A3B8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0px",
+                      "lg": "0px",
+                      "xl": "0px",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "1.5rem",
+                      "component-gap": "1rem",
+                      "margin-mobile": "1rem",
+                      "section-gap": "3rem",
+                      "container-max": "1440px",
+                      "margin-desktop": "2.5rem"
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- Side Navigation Shell -->
+<aside class="fixed left-0 top-0 h-full w-[280px] bg-surface border-r-2 border-on-surface flex flex-col py-gutter px-4 z-50">
+<div class="mb-10 px-2">
+<h1 class="text-2xl font-black italic uppercase leading-none">Cenográfica</h1>
+<p class="text-xs font-bold uppercase tracking-tighter opacity-70">Maratona de Resultados</p>
+</div>
+<nav class="flex-grow space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 border-2 border-transparent hover:border-on-surface hover:bg-primary transition-all font-bold uppercase text-sm" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 border-2 border-transparent hover:border-on-surface hover:bg-primary transition-all font-bold uppercase text-sm" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Platoons</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 border-2 border-on-surface bg-primary kinetic-shadow-sm font-black italic uppercase text-sm" href="#">
+<span class="material-symbols-outlined">speed</span>
+<span>Performance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 border-2 border-transparent hover:border-on-surface hover:bg-primary transition-all font-bold uppercase text-sm" href="#">
+<span class="material-symbols-outlined">military_tech</span>
+<span>Rewards</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 border-2 border-transparent hover:border-on-surface hover:bg-primary transition-all font-bold uppercase text-sm" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span>Team</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 border-2 border-transparent hover:border-on-surface hover:bg-primary transition-all font-bold uppercase text-sm" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="mt-auto space-y-4 px-2">
+<button class="w-full bg-primary text-on-primary border-2 border-on-surface kinetic-shadow-sm font-black italic uppercase py-3 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center gap-2">
+<span>Submit Results</span>
+</button>
+<div class="pt-4 border-t-2 border-on-surface space-y-1">
+<a class="flex items-center gap-3 px-2 py-2 font-bold uppercase text-xs hover:bg-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-2 py-2 font-bold uppercase text-xs hover:bg-red-500 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-[280px] min-h-screen flex flex-col">
+<!-- Top App Bar -->
+<header class="flex justify-between items-center h-20 w-full px-margin-desktop bg-surface border-b-2 border-on-surface sticky top-0 z-40">
+<div class="flex items-center gap-4">
+<h2 class="text-2xl italic-header">Maratona de Resultados</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-8">
+<a class="font-bold uppercase text-sm hover:underline underline-offset-4" href="#">Overview</a>
+<a class="font-black italic uppercase text-sm bg-primary px-2 py-1 border-2 border-on-surface kinetic-shadow-sm" href="#">Analytics</a>
+<a class="font-bold uppercase text-sm hover:underline underline-offset-4" href="#">Reports</a>
+</div>
+<div class="h-10 w-0.5 bg-on-surface mx-2"></div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer hover:bg-primary p-1">notifications</span>
+<div class="flex items-center gap-2 bg-on-surface text-surface px-4 py-2 border-2 border-on-surface cursor-pointer">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="font-black italic uppercase text-xs">Admin</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Screen Content -->
+<div class="p-margin-desktop max-w-container-max mx-auto w-full flex-grow">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+<div>
+<h1 class="text-6xl italic-header mb-4 leading-none" data-testid="page-title">Resultados Trimestrais</h1>
+<p class="font-bold text-lg max-w-3xl border-l-4 border-primary pl-6 py-2">
+                    Análise consolidada de performance individual e coletiva. Revise as métricas de participação, bonificações e status de pagamento para o fechamento do período.
+                </p>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-8 py-4 border-2 border-on-surface font-black italic uppercase text-sm hover:bg-primary kinetic-shadow transition-all flex items-center gap-2">
+<span class="material-symbols-outlined">download</span>
+                    Exportar
+                </button>
+<button class="px-8 py-4 bg-primary border-2 border-on-surface font-black italic uppercase text-sm hover:bg-white kinetic-shadow transition-all flex items-center gap-2">
+<span class="material-symbols-outlined">lock</span>
+                    Fechar Trimestre
+                </button>
+</div>
+</div>
+<!-- Filters & Stats Bento -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+<!-- Filters Card -->
+<div class="md:col-span-1 border-2 border-on-surface p-8 kinetic-shadow bg-surface">
+<p class="font-black italic uppercase text-sm mb-6 flex items-center gap-2 border-b-2 border-on-surface pb-2">
+<span class="material-symbols-outlined text-lg">filter_list</span> Período
+                </p>
+<div class="space-y-6">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-black uppercase tracking-widest">Ano</label>
+<select class="bg-white border-2 border-on-surface font-black italic uppercase text-sm focus:ring-0 focus:ring-offset-0 py-3 px-4 w-full">
+<option>2024</option>
+<option>2023</option>
+</select>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-black uppercase tracking-widest">Trimestre</label>
+<select class="bg-white border-2 border-on-surface font-black italic uppercase text-sm focus:ring-0 focus:ring-offset-0 py-3 px-4 w-full">
+<option>Q3 (Jul - Set)</option>
+<option>Q4 (Out - Dez)</option>
+<option>Q1 (Jan - Mar)</option>
+<option>Q2 (Abr - Jun)</option>
+</select>
+</div>
+</div>
+</div>
+<!-- KPI Cards -->
+<div class="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-8">
+<div class="border-2 border-on-surface p-8 kinetic-shadow bg-surface group">
+<p class="font-bold uppercase text-xs mb-2 opacity-60">Total em Bônus</p>
+<h3 class="text-4xl italic-header">R$ 428.500</h3>
+<div class="flex items-center gap-2 mt-4">
+<span class="bg-green-500 text-white font-black italic uppercase text-[10px] px-2 py-1 border border-on-surface shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                            +12% vs. Q2
+                        </span>
+</div>
+</div>
+<div class="border-2 border-on-surface p-8 kinetic-shadow bg-surface group">
+<p class="font-bold uppercase text-xs mb-2 opacity-60">Elegibilidade</p>
+<h3 class="text-4xl italic-header">84.2%</h3>
+<div class="flex items-center gap-2 mt-4">
+<span class="bg-red-500 text-white font-black italic uppercase text-[10px] px-2 py-1 border border-on-surface shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                            -2.4% Alvo
+                        </span>
+</div>
+</div>
+<div class="border-2 border-on-surface p-8 kinetic-shadow bg-surface group">
+<p class="font-bold uppercase text-xs mb-2 opacity-60">Engajamento</p>
+<h3 class="text-4xl italic-header">91%</h3>
+<div class="flex items-center gap-2 mt-4">
+<span class="bg-primary text-on-primary font-black italic uppercase text-[10px] px-2 py-1 border border-on-surface shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                            Recorde
+                        </span>
+</div>
+</div>
+</div>
+</div>
+<!-- Dense Results Table -->
+<div class="border-2 border-on-surface kinetic-shadow bg-surface overflow-hidden">
+<div class="px-8 py-6 border-b-2 border-on-surface bg-primary flex flex-col md:flex-row justify-between items-center gap-4">
+<h3 class="text-2xl italic-header">Detalhamento Individual</h3>
+<div class="flex items-center gap-4 w-full md:w-auto">
+<div class="relative flex-grow md:flex-grow-0">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface font-bold">search</span>
+<input class="bg-white border-2 border-on-surface pl-10 pr-4 py-2 text-sm font-bold uppercase w-full md:w-80 focus:ring-0 outline-none" placeholder="Buscar colaborador..." type="text"/>
+</div>
+<button class="bg-on-surface text-surface p-2 border-2 border-on-surface">
+<span class="material-symbols-outlined">density_medium</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-on-surface text-surface">
+<th class="px-6 py-4 font-black italic uppercase text-xs border-r border-surface/20">Colaborador</th>
+<th class="px-6 py-4 font-black italic uppercase text-xs border-r border-surface/20">Atividade</th>
+<th class="px-6 py-4 font-black italic uppercase text-xs border-r border-surface/20 text-center">Nota</th>
+<th class="px-6 py-4 font-black italic uppercase text-xs border-r border-surface/20">Pelotão</th>
+<th class="px-6 py-4 font-black italic uppercase text-xs border-r border-surface/20 text-center">Eleg.</th>
+<th class="px-6 py-4 font-black italic uppercase text-xs border-r border-surface/20">Bônus</th>
+<th class="px-6 py-4 font-black italic uppercase text-xs border-r border-surface/20">Status</th>
+<th class="px-6 py-4 font-black italic uppercase text-xs text-center">Ação</th>
+</tr>
+</thead>
+<tbody class="divide-y-2 divide-on-surface">
+<!-- Row 1 -->
+<tr class="hover:bg-primary/10 transition-colors group">
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex items-center gap-4">
+<img class="w-12 h-12 border-2 border-on-surface object-cover kinetic-shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXtieBu1k2LUHOTpoJ3wl2Y6NgZEXXUuIz0UFwwdUCHQSDw38R--FzdG145U4S4FpKray1pXGFFU0o7bf3FiryrGTt4JqGmOV5sFTJ6Lxfv6x1A0cVo_75gHXu8Ln7FwsT4wnjdz6LMDbTUqEk4pam6jSNdbCVJj3xYq9zu0vfymVidlxa-6kLSSHWK_CJns7g1zVmYbtxALJYA6FyS-j00ji2Z20WybUthSSyGwLawkYMjaFlf-eJHck4I6Fg3ZDFenaRfwbXDH0"/>
+<div>
+<p class="font-black italic uppercase text-sm">Ricardo Alvez</p>
+<p class="text-[10px] font-bold uppercase opacity-60">Liderança</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex flex-col gap-1">
+<span class="font-black text-sm italic">12 EVENTOS</span>
+<span class="bg-on-surface text-surface text-[9px] font-black uppercase px-2 py-0.5 w-max">Zero Faltas</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="text-3xl font-black italic text-on-surface">98</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="bg-platoon-gold border-2 border-on-surface px-3 py-1 kinetic-shadow-sm w-max">
+<span class="text-on-surface font-black italic uppercase text-[10px]">Kenya / Gold</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="material-symbols-outlined text-green-600 font-black" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface bg-primary">
+<span class="font-black italic text-lg">R$ 12.400</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<span class="font-black uppercase text-[10px] flex items-center gap-1">
+<span class="w-2 h-2 bg-green-500 border border-on-surface"></span> Pago
+                                </span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-2 border-2 border-on-surface hover:bg-primary kinetic-shadow-sm transition-all">
+<span class="material-symbols-outlined font-black">receipt_long</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-primary/10 transition-colors group">
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex items-center gap-4">
+<img class="w-12 h-12 border-2 border-on-surface object-cover kinetic-shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5bIMLf2EmWmOwVNoXYtxzsRTWB2_W1b7-6Yy1sONIDO7JbTkLdmDRBfGPI3MoKW12tmdrY1ik8e51UH1wwdgePy_4sWMR5AdP_rI2H9jOgZyQ1YOt47ok3bc1t7hNKCkds8gYtQAgLsdVhHJ9Vuhok9nAuU1A0OG6MHxMn_ZISYMJnwxFGSquulNa7tGzh-n9DJkeCCcAPKMIUEunf0dzf9WSR-sbtLRq0OC87oLGFG6iL18Ix0iuMJ8vnnQt_990yG48OcdRGnI"/>
+<div>
+<p class="font-black italic uppercase text-sm">Mariana Costa</p>
+<p class="text-[10px] font-bold uppercase opacity-60">Coordenação</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex flex-col gap-1">
+<span class="font-black text-sm italic">10 EVENTOS</span>
+<span class="bg-red-500 text-white text-[9px] font-black uppercase px-2 py-0.5 w-max">2 Ausências</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="text-3xl font-black italic text-on-surface">74</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="bg-platoon-blue text-white border-2 border-on-surface px-3 py-1 kinetic-shadow-sm w-max">
+<span class="font-black italic uppercase text-[10px]">Blue / Senior</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="material-symbols-outlined text-green-600 font-black" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface bg-primary">
+<span class="font-black italic text-lg">R$ 4.250</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<span class="font-black uppercase text-[10px] flex items-center gap-1">
+<span class="w-2 h-2 bg-yellow-500 border border-on-surface"></span> Pendente
+                                </span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-2 border-2 border-on-surface hover:bg-primary kinetic-shadow-sm transition-all">
+<span class="material-symbols-outlined font-black">receipt_long</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-primary/10 transition-colors group">
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex items-center gap-4">
+<img class="w-12 h-12 border-2 border-on-surface object-cover kinetic-shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDnD_sXkENGbunJtYMsTtz9bWJf95cqk_r304J-8qtRf_Y-2siqfWATV4Mnf-4bYRv4oq6RBB9HI0uUgwy9whcCHyh7m-xkQhOk8RnVN1kPwVZbD4QC4E22wjbTtSHkIodnXcAT5DGWU4BsPLZuyHeNIO6z4PTyDzL_V_GIh91m4teOsXCbffALXnSFWE7incHmV5nKKYxGEAoEaFak9oAuQonkXv9i2qKCrik3_biFzd62Domg2bkCXr40cFTYDHiT_G41wz44yAw"/>
+<div>
+<p class="font-black italic uppercase text-sm">Felipe Mendes</p>
+<p class="text-[10px] font-bold uppercase opacity-60">Logística</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex flex-col gap-1">
+<span class="font-black text-sm italic">8 EVENTOS</span>
+<span class="bg-red-500 text-white text-[9px] font-black uppercase px-2 py-0.5 w-max">5 Ausências</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="text-3xl font-black italic opacity-40">42</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="bg-platoon-silver text-on-surface border-2 border-on-surface px-3 py-1 kinetic-shadow-sm w-max">
+<span class="font-black italic uppercase text-[10px]">Silver / Junior</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="material-symbols-outlined text-red-600 font-black" style="font-variation-settings: 'FILL' 1;">cancel</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface bg-gray-100">
+<span class="font-black italic text-lg opacity-30">R$ 0,00</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<span class="font-black uppercase text-[10px] flex items-center gap-1">
+<span class="w-2 h-2 bg-on-surface border border-on-surface"></span> Bloqueado
+                                </span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-2 border-2 border-on-surface opacity-20 cursor-not-allowed">
+<span class="material-symbols-outlined font-black">receipt_long</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-primary/10 transition-colors group">
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex items-center gap-4">
+<img class="w-12 h-12 border-2 border-on-surface object-cover kinetic-shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBityV0KPnMKeEG5d9OhuFTMRsTi_TPMXh8-bdkVKwEDHpn3wrd-VbuyEMKwXqFpdVT4rrdw8ahRfCP6nVdgycF0K26IK6vAt6-PkUh69QIowl2ueif3lII3OJPxINd0IES__JPS1VpMslk45803R1ybuKTRujuA8Zpd5V4OEy8MqsdJ3YnJR0svP5MW15c_wbQZSmhwGVueP22d6Zw0tOdkvlUHosFEWO0l3WDeXTTvaSzV99QAW2U8wB_7QEZGPPgpIdcCFiAuAg"/>
+<div>
+<p class="font-black italic uppercase text-sm">Sandra Helena</p>
+<p class="text-[10px] font-bold uppercase opacity-60">Diretoria</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="flex flex-col gap-1">
+<span class="font-black text-sm italic">15 EVENTOS</span>
+<span class="bg-on-surface text-surface text-[9px] font-black uppercase px-2 py-0.5 w-max">Top Perform</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="text-3xl font-black italic text-on-surface">100</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<div class="bg-platoon-gold border-2 border-on-surface px-3 py-1 kinetic-shadow-sm w-max">
+<span class="text-on-surface font-black italic uppercase text-[10px]">Kenya / Gold</span>
+</div>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface text-center">
+<span class="material-symbols-outlined text-green-600 font-black" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface bg-primary">
+<span class="font-black italic text-lg">R$ 18.200</span>
+</td>
+<td class="px-6 py-4 border-r-2 border-on-surface">
+<span class="font-black uppercase text-[10px] flex items-center gap-1">
+<span class="w-2 h-2 bg-green-500 border border-on-surface"></span> Pago
+                                </span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-2 border-2 border-on-surface hover:bg-primary kinetic-shadow-sm transition-all">
+<span class="material-symbols-outlined font-black">receipt_long</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-8 py-4 border-t-2 border-on-surface flex justify-between items-center bg-surface-variant">
+<p class="font-black uppercase text-[10px]">Exibindo 4 de 124 colaboradores</p>
+<div class="flex gap-2">
+<button class="w-10 h-10 border-2 border-on-surface hover:bg-primary transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-10 h-10 border-2 border-on-surface bg-on-surface text-surface font-black italic">1</button>
+<button class="w-10 h-10 border-2 border-on-surface hover:bg-primary font-black italic transition-colors">2</button>
+<button class="w-10 h-10 border-2 border-on-surface hover:bg-primary transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Warning Area -->
+<div class="mt-12 border-2 border-on-surface p-8 kinetic-shadow-accent bg-on-surface text-surface flex flex-col md:flex-row items-center gap-8">
+<div class="w-16 h-16 bg-primary text-on-surface flex items-center justify-center flex-shrink-0 border-2 border-primary kinetic-shadow-sm">
+<span class="material-symbols-outlined text-4xl font-black">warning</span>
+</div>
+<div>
+<h4 class="text-2xl italic-header text-primary">Pendências de Fechamento</h4>
+<p class="font-bold text-sm mt-2 opacity-80 uppercase tracking-tight">
+                    Existem 12 colaboradores com status "Em Aprovação" que impedem o fechamento definitivo do Q3. Por favor, revise as notas antes de travar o período.
+                </p>
+</div>
+<button class="md:ml-auto px-10 py-4 bg-primary text-on-surface border-2 border-surface font-black italic uppercase text-sm hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all whitespace-nowrap">
+                Revisar Pendências
+            </button>
+</div>
+</div>
+<!-- Footer -->
+<footer class="mt-auto px-margin-desktop py-10 border-t-2 border-on-surface bg-surface flex flex-col md:flex-row justify-between items-center gap-6">
+<p class="font-black uppercase text-[10px]">© 2024 Cenográfica — Kinetic Performance Engine</p>
+<div class="flex gap-10">
+<a class="font-black uppercase text-[10px] hover:underline underline-offset-2" href="#">Privacidade</a>
+<a class="font-black uppercase text-[10px] hover:underline underline-offset-2" href="#">Termos</a>
+<a class="font-black uppercase text-[10px] hover:underline underline-offset-2" href="#">Suporte</a>
+</div>
+</footer>
+</main>
+<script>
+    document.querySelectorAll('tr').forEach(row => {
+        row.addEventListener('mousedown', () => {
+            row.style.transform = 'translate(2px, 2px)';
+        });
+        row.addEventListener('mouseup', () => {
+            row.style.transform = 'translate(0px, 0px)';
+        });
+        row.addEventListener('mouseleave', () => {
+            row.style.transform = 'translate(0px, 0px)';
+        });
+    });
+</script>
+</body></html>

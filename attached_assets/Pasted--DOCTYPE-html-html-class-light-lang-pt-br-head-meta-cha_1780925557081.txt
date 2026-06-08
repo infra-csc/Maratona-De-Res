@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Detalhe do Evento | Cenográfica</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400;1,700;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#506600",
+                        "on-tertiary-container": "#6b6b6b",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface": "#f7f9fb",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#e2e2e2",
+                        "on-tertiary-fixed": "#1b1b1b",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-tint": "#506600",
+                        "on-surface": "#191c1e",
+                        "on-secondary-container": "#541100",
+                        "on-secondary-fixed-variant": "#862200",
+                        "on-primary-fixed-variant": "#3c4d00",
+                        "surface-container-low": "#f2f4f6",
+                        "on-surface-variant": "#444933",
+                        "outline-variant": "#c4c9ac",
+                        "on-primary-fixed": "#161e00",
+                        "inverse-surface": "#2d3133",
+                        "secondary-container": "#ff5722",
+                        "surface-bright": "#f7f9fb",
+                        "surface-container": "#eceef0",
+                        "on-secondary-fixed": "#3b0900",
+                        "tertiary-container": "#ededed",
+                        "background": "#f7f9fb",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "inverse-on-surface": "#eff1f3",
+                        "error": "#ba1a1a",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#ffb5a0",
+                        "on-background": "#191c1e",
+                        "primary-fixed": "#c3f400",
+                        "surface-dim": "#d8dadc",
+                        "surface-container-highest": "#e0e3e5",
+                        "secondary": "#b02f00",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed": "#ffdbd1",
+                        "outline": "#747a60",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#5e5e5e",
+                        "on-tertiary-fixed-variant": "#474747",
+                        "primary-fixed-dim": "#abd600",
+                        "surface-variant": "#e0e3e5",
+                        "primary-container": "#ccff00",
+                        "on-primary-container": "#5b7300",
+                        "inverse-primary": "#abd600"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "margin-desktop": "48px",
+                        "slant-offset": "12px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "stats-num": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "label-bold": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "display-hero": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "stats-num": ["40px", {"lineHeight": "1", "fontWeight": "800"}],
+                        "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "headline-lg-mobile": ["32px", {"lineHeight": "1.1", "fontWeight": "800"}],
+                        "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}],
+                        "label-bold": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "display-hero": ["72px", {"lineHeight": "1", "letterSpacing": "-0.04em", "fontWeight": "800"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .parallelogram-btn {
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .parallelogram-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0px 0px #000000;
+        }
+        .card-slant {
+            transform: skewX(-1deg);
+        }
+        .platoon-badge {
+            clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%);
+        }
+    </style>
+</head>
+<body class="bg-surface-bright text-on-surface overflow-x-hidden">
+<!-- TopNavBar -->
+<nav class="bg-surface dark:bg-inverse-surface border-b-2 border-on-background dark:border-on-surface shadow-[4px_4px_0px_0px_rgba(204,255,0,1)] flex justify-between items-center px-margin-desktop py-4 w-full sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md italic font-black text-primary dark:text-primary-fixed uppercase tracking-tighter font-bold">
+                Cenográfica
+            </span>
+<div class="hidden md:flex gap-6">
+<a class="text-on-surface-variant dark:text-surface-variant font-label-bold text-label-bold italic uppercase hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 px-2 py-1" href="#">Dashboard</a>
+<a class="text-primary dark:text-primary-fixed font-bold italic font-label-bold text-label-bold uppercase border-b-2 border-primary" href="#">Eventos</a>
+<a class="text-on-surface-variant dark:text-surface-variant font-label-bold text-label-bold italic uppercase hover:bg-primary-container hover:text-on-primary-fixed transition-colors duration-150 px-2 py-1" href="#">Equipe</a>
+</div>
+</div>
+<div class="flex items-center gap-4 ml-auto">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="bg-surface-container border-2 border-on-background px-10 py-2 font-label-bold text-label-bold uppercase focus:outline-none focus:ring-0 focus:border-primary-container" placeholder="BUSCAR EVENTO..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant active:translate-y-0.5 active:translate-x-0.5 transition-all relative">notifications<span class="absolute top-0 right-0 w-2 h-2 bg-primary-container rounded-full border border-on-background"></span></button>
+<div class="w-10 h-10 border-2 border-on-background">
+<img alt="User profile photo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnZ_5AC8waKD4HlldPE9BjYPFcYoxYnVySGxO-Nm8t1n4dgFQfHD00YcaP1gcIVq-bd2RyMZabMg1fRX0nm5_uqdWDUsHiw9tyzLNIzZ1PJhuJaIE1HAAUxYEwqCE1d57sp1o0tx3oVQxbQRMnzvszJhteezP8dMxSW8nyLdYNVxbYuUyVI8D4j0KGj3JU3q6hgREXlT-aZTdE9X0I2C-D8ZaeInJqg0tBJMXWMjyqO1nrTOVatvPdo9yXeRrhCW5r62ALGY4p-6U"/>
+</div>
+</div>
+</nav>
+<div class="flex">
+<!-- SideNavBar -->
+<aside class="hidden lg:flex flex-col h-[calc(100vh-80px)] w-64 sticky top-20 border-r-3 border-on-background p-gutter gap-4 shrink-0 bg-surface-container">
+<div class="mb-6">
+<h2 class="font-headline-lg text-headline-lg italic font-black text-on-background uppercase -skew-x-6">Maratona</h2>
+<p class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-widest">Resultados</p>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-bold text-label-bold italic uppercase font-black">Dashboard</span>
+</a>
+<a class="bg-primary-container text-on-primary-fixed border-2 border-on-background -skew-x-6 px-4 py-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">event</span>
+<span class="font-label-bold text-label-bold italic uppercase font-black">Eventos</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-bold text-label-bold italic uppercase font-black">Platoon</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary px-4 py-2 flex items-center gap-3 transition-all hover:-skew-x-3" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-label-bold text-label-bold italic uppercase font-black">Performance</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-2">
+<button class="parallelogram-btn bg-primary-container text-on-primary-fixed border-2 border-on-background font-label-bold text-label-bold italic uppercase py-3 w-full">
+                    START RACE
+                </button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-grow p-6 md:p-margin-desktop bg-surface-bright">
+<!-- Back Link -->
+<a class="inline-flex items-center gap-2 font-label-bold text-label-bold italic uppercase text-on-surface-variant hover:text-primary mb-8 transition-colors group" href="#">
+<span class="material-symbols-outlined transition-transform group-hover:-translate-x-1">arrow_back</span>
+                Voltar para Eventos
+            </a>
+<!-- Hero Section -->
+<section class="bg-surface-container-lowest border-2 border-on-background shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden mb-10">
+<div class="flex flex-col lg:flex-row">
+<!-- Event Info -->
+<div class="flex-grow p-8">
+<div class="flex flex-wrap items-center gap-4 mb-4">
+<span class="bg-primary-fixed text-on-primary-fixed font-label-bold text-label-bold italic uppercase px-3 py-1 border-2 border-on-background">EM MONTAGEM</span>
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase tracking-widest">ID: #EV-2024-085</span>
+</div>
+<h1 class="font-headline-lg text-4xl md:text-5xl italic font-black uppercase text-on-background leading-none mb-2">Innovation Summit 2024</h1>
+<p class="font-body-lg text-body-lg text-primary italic font-bold mb-8 uppercase">CLIENTE: TECH GLOBAL SOLUTIONS</p>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">calendar_today</span>
+<div>
+<p class="text-[10px] font-label-bold uppercase text-on-surface-variant">Data do Evento</p>
+<p class="font-label-bold uppercase">12 - 15 Nov, 2024</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">location_on</span>
+<div>
+<p class="text-[10px] font-label-bold uppercase text-on-surface-variant">Localização</p>
+<p class="font-label-bold uppercase">Expocenter, São Paulo</p>
+</div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-end">
+<span class="font-label-bold text-label-bold uppercase italic">Progresso da Montagem</span>
+<span class="font-stats-num text-2xl text-primary">85%</span>
+</div>
+<div class="h-4 w-full bg-surface-container border-2 border-on-background">
+<div class="h-full bg-primary-container" style="width: 85%;"></div>
+</div>
+</div>
+</div>
+<!-- Score Block -->
+<div class="lg:w-80 bg-on-background text-on-primary p-8 flex flex-col items-center justify-center text-center border-t-2 lg:border-t-0 lg:border-l-2 border-on-background">
+<p class="font-label-bold text-label-bold italic uppercase text-primary-container mb-4">SCORE EQUIPE</p>
+<div class="relative mb-6">
+<span class="font-stats-num text-[80px] leading-none text-white italic">9.4</span>
+<div class="absolute -top-2 -right-4 bg-primary-container text-on-primary-fixed px-2 py-0.5 border-2 border-on-background font-black italic text-xs">TOP</div>
+</div>
+<div class="platoon-badge bg-primary-container text-on-primary-fixed px-6 py-2 font-black italic uppercase text-sm border-2 border-on-background">
+                            PLATOON ALPHA
+                        </div>
+</div>
+</div>
+</section>
+<!-- Stats Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+<div class="bg-surface-container-high border-2 border-on-background p-6 -skew-x-2 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary text-4xl mb-2">groups</span>
+<p class="font-stats-num text-4xl text-on-background">42</p>
+<p class="font-label-bold text-label-bold italic uppercase text-on-surface-variant">Participantes</p>
+</div>
+<div class="bg-surface-container-high border-2 border-on-background p-6 -skew-x-2 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary text-4xl mb-2">rule</span>
+<p class="font-stats-num text-4xl text-on-background">12</p>
+<p class="font-label-bold text-label-bold italic uppercase text-on-surface-variant">Critérios Ativos</p>
+</div>
+<div class="bg-surface-container-high border-2 border-on-background p-6 -skew-x-2 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-primary text-4xl mb-2">check_circle</span>
+<p class="font-stats-num text-4xl text-on-background">156</p>
+<p class="font-label-bold text-label-bold italic uppercase text-on-surface-variant">Itens Avaliados</p>
+</div>
+</section>
+<!-- Bottom Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Performance Table -->
+<div class="lg:col-span-8 bg-surface-container-lowest border-2 border-on-background">
+<div class="p-6 border-b-2 border-on-background bg-surface-container flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md italic font-black uppercase">Performance Individual</h2>
+<button class="text-primary font-label-bold text-xs uppercase italic flex items-center gap-1">Ver todos <span class="material-symbols-outlined text-sm">open_in_new</span></button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="border-b-2 border-on-background font-label-bold text-xs uppercase text-on-surface-variant italic">
+<th class="px-6 py-4">Membro</th>
+<th class="px-6 py-4">Função</th>
+<th class="px-6 py-4">Status</th>
+<th class="px-6 py-4 text-right">Eficiência</th>
+</tr>
+</thead>
+<tbody class="font-label-bold text-sm uppercase">
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 flex items-center gap-3">
+<div class="w-8 h-8 bg-on-background rounded-none border border-on-background overflow-hidden">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTaHMtZU76S08nCQSHzrJztwEecFX46Yg9SpANCtEQAoJoZhbZKTDUrDT8agti4_8wu31VCMjtvWplzLiTKRWX7CCW6_Ga1-iz90VDU0VlDBtnCB67EkM-qe7upczP0xASFYj19nWuVnZmW2bHoxtPu9qDyle6k-Oc7GGRkMWsJA0Y7of45mDgghcvt_qL1FkZ7n-Ntqlyp2UKzyJTjmaU0AB9oMAxdU_UBjEQBbjfJXvyYGYFfFL5dpxS1Z4zSAyJe51jJl1sP90"/>
+</div>
+                                        Ricardo M.
+                                    </td>
+<td class="px-6 py-4 text-on-surface-variant">Lead Designer</td>
+<td class="px-6 py-4"><span class="text-primary">● ONLINE</span></td>
+<td class="px-6 py-4 text-right font-stats-num text-primary">98%</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 flex items-center gap-3">
+<div class="w-8 h-8 bg-on-background rounded-none border border-on-background overflow-hidden">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPUp6o0hKrvLyCe2Bez7nPW4vBmODPLpi6WE7jcZG1JsHaPHymP1IzDRnpSzBBByf2hUcd5DR3SSNGy336iLA635hyX5WvR0XLACR09uK8psfJOHHHOEzyzpQIrJ5l7CEvxikM4aDutPd1gAQesD9et6TTc7gV8BwHcto7Rzf7_wbyLV7qo7CRgfea17VcqZkn6hE48qRW0tsBnPojwFUY2o1WT0Gk9xuMCajziKgojKBcmUR_g3GCkTVsr4Dj5yUTmKNJjX4jxN0"/>
+</div>
+                                        Juliana S.
+                                    </td>
+<td class="px-6 py-4 text-on-surface-variant">Cenógrafa</td>
+<td class="px-6 py-4"><span class="text-primary">● ONLINE</span></td>
+<td class="px-6 py-4 text-right font-stats-num text-primary">92%</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 flex items-center gap-3">
+<div class="w-8 h-8 bg-on-background rounded-none border border-on-background overflow-hidden">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDs-OhkyJniGa7bdlPgVREXBYaGcTZbecdMfgeF3z16AONnLTPU3Q2cPcfsAkhZORCNqirv5zwYJW8C60pLfr2jfN_BZzVqLZYLDD69ju-X9P8biZMlint0KS7GT73MAnv-fAeZdoiaD8GqL7Z8JA-CuWJEJBIQ77LpAZYIle2fn5KeCBw6720x1UjQGGHbsypsDb2sRD2c7hKTDVtPdAcN3buX1XzU8kRbONO-zQkxOGTyolquR9DPWLjeEHFFndRtS6RvXu0ulYc"/>
+</div>
+                                        Felipe T.
+                                    </td>
+<td class="px-6 py-4 text-on-surface-variant">Eng. Estrutural</td>
+<td class="px-6 py-4"><span class="text-on-tertiary-container">○ OFFLINE</span></td>
+<td class="px-6 py-4 text-right font-stats-num text-primary">85%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Team Allocation -->
+<div class="lg:col-span-4 flex flex-col gap-6">
+<div class="bg-primary-container border-2 border-on-background p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] -rotate-1">
+<h2 class="font-headline-md text-headline-md italic font-black uppercase text-on-background mb-4">Equipe Alocada</h2>
+<div class="space-y-4">
+<div class="flex items-center justify-between border-b border-on-background/20 pb-2">
+<span class="font-label-bold text-xs uppercase italic">Logística</span>
+<span class="bg-on-background text-primary-container px-2 py-0.5 text-[10px] font-black">12 PAX</span>
+</div>
+<div class="flex items-center justify-between border-b border-on-background/20 pb-2">
+<span class="font-label-bold text-xs uppercase italic">Montagem</span>
+<span class="bg-on-background text-primary-container px-2 py-0.5 text-[10px] font-black">24 PAX</span>
+</div>
+<div class="flex items-center justify-between border-b border-on-background/20 pb-2">
+<span class="font-label-bold text-xs uppercase italic">Elétrica/AV</span>
+<span class="bg-on-background text-primary-container px-2 py-0.5 text-[10px] font-black">06 PAX</span>
+</div>
+</div>
+<button class="w-full mt-6 bg-on-background text-primary-container py-3 font-label-bold text-xs uppercase italic border-2 border-on-background">MODIFICAR PLATOON</button>
+</div>
+<!-- Action Card -->
+<div class="bg-on-background text-white p-6 border-2 border-on-background">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-primary-container text-3xl">bolt</span>
+<h3 class="font-headline-md text-xl italic font-black uppercase">Fase Crítica</h3>
+</div>
+<p class="text-surface-variant font-body-md text-sm mb-6">A montagem do palco principal inicia em 4 horas. Todos os sistemas devem estar em check.</p>
+<button class="parallelogram-btn bg-primary-container text-on-primary-fixed w-full py-3 font-label-bold text-xs uppercase italic">VERIFICAR CHECKLIST</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Floating Action Button -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-primary-container border-4 border-on-background shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:scale-110 active:translate-y-1 transition-all z-40">
+<span class="material-symbols-outlined text-3xl font-bold">add</span>
+</button>
+<script>
+        // Simple search focus effect
+        const searchInput = document.querySelector('input[type="text"]');
+        if(searchInput) {
+            searchInput.addEventListener('focus', () => {
+                searchInput.parentElement.style.boxShadow = '4px 4px 0px 0px #ccff00';
+            });
+            searchInput.addEventListener('blur', () => {
+                searchInput.parentElement.style.boxShadow = 'none';
+            });
+        }
+    </script>
+</body></html>
