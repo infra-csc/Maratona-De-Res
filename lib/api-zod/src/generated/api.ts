@@ -1042,7 +1042,7 @@ export const GetCalibrationsResponseItem = zod.object({
   "responsibleAreaName": zod.string().nullish(),
   "originalAverageScore": zod.number().nullish(),
   "calibratedScore": zod.number(),
-  "calibrationReason": zod.string(),
+  "calibrationReason": zod.string().nullish(),
   "calibratedByUserId": zod.number().optional(),
   "calibratedByName": zod.string().nullish(),
   "calibratedAt": zod.string().optional()
@@ -1057,7 +1057,7 @@ export const CreateCalibrationBody = zod.object({
   "eventId": zod.number(),
   "criterionId": zod.number(),
   "calibratedScore": zod.number(),
-  "calibrationReason": zod.string(),
+  "calibrationReason": zod.string().nullish(),
   "originalAverageScore": zod.number().optional()
 })
 

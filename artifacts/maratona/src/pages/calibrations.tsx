@@ -103,10 +103,6 @@ export default function CalibrationsPage() {
       toast({ title: "Nota inválida", description: "Informe uma nota calibrada de 1 a 5.", variant: "destructive" });
       return;
     }
-    if (!reason) {
-      toast({ title: "Justificativa obrigatória", description: "Explique por que a nota foi alterada.", variant: "destructive" });
-      return;
-    }
     setSavingCritId(critId);
     const avg = getAvgScore(critId);
     createMutation.mutate({

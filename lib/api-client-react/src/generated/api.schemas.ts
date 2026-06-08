@@ -374,7 +374,8 @@ export interface Calibration {
   /** @nullable */
   originalAverageScore?: number | null;
   calibratedScore: number;
-  calibrationReason: string;
+  /** @nullable */
+  calibrationReason?: string | null;
   calibratedByUserId?: number;
   /** @nullable */
   calibratedByName?: string | null;
@@ -385,7 +386,8 @@ export interface CalibrationInput {
   eventId: number;
   criterionId: number;
   calibratedScore: number;
-  calibrationReason: string;
+  /** @nullable */
+  calibrationReason?: string | null;
   originalAverageScore?: number;
 }
 

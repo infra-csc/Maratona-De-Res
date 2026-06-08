@@ -47,10 +47,11 @@ router.get("/calibrations", async (req, res) => {
 
 router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { eventId, criterionId, calibratedScore, calibrationReason, originalAverageScore } = req.body;
-  if (!eventId || !criterionId || calibratedScore === undefined || !calibrationReason) {
-    res.status(400).json({ error: "Campos obrigatórios: eventId, criterionId, calibratedScore, calibrationReason" });
+  if (!eventId || !criterionId || calibratedScore === undefined) {
+    res.status(400).json({ error: "Campos obrigatórios: eventId, criterionId, calibratedScore" });
     return;
   }
+  const reason = typeof calibrationReason === "string" && calibrationReason.trim() ? calibrationReason.trim() : null;
   const numScore = parseFloat(calibratedScore);
   if (isNaN(numScore) || numScore < 1 || numScore > 5) {
     res.status(400).json({ error: "A nota calibrada deve estar entre 1 e 5" });
@@ -70,7 +71,7 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
   if (existing) {
     [calibration] = await db.update(calibrationsTable).set({
       calibratedScore: String(numScore),
-      calibrationReason,
+      calibrationReason: reason,
       originalAverageScore: originalAverageScore !== undefined ? String(originalAverageScore) : existing.originalAverageScore,
       calibratedByUserId: req.user!.userId,
       calibratedAt: new Date(),
@@ -79,7 +80,7 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
     [calibration] = await db.insert(calibrationsTable).values({
       eventId, criterionId,
       calibratedScore: String(numScore),
-      calibrationReason,
+      calibrationReason: reason,
       originalAverageScore: originalAverageScore !== undefined ? String(originalAverageScore) : null,
       calibratedByUserId: req.user!.userId,
     }).returning();

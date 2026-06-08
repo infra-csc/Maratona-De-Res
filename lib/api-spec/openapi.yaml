@@ -2124,7 +2124,7 @@ components:
 
     Calibration:
       type: object
-      required: [id, eventId, criterionId, calibratedScore, calibrationReason]
+      required: [id, eventId, criterionId, calibratedScore]
       properties:
         id:
           type: integer
@@ -2141,7 +2141,7 @@ components:
         calibratedScore:
           type: number
         calibrationReason:
-          type: string
+          type: ["string", "null"]
         calibratedByUserId:
           type: integer
         calibratedByName:
@@ -2151,7 +2151,7 @@ components:
 
     CalibrationInput:
       type: object
-      required: [eventId, criterionId, calibratedScore, calibrationReason]
+      required: [eventId, criterionId, calibratedScore]
       properties:
         eventId:
           type: integer
@@ -2160,7 +2160,7 @@ components:
         calibratedScore:
           type: number
         calibrationReason:
-          type: string
+          type: ["string", "null"]
         originalAverageScore:
           type: number
 

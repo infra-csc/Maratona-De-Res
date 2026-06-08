@@ -17,7 +17,8 @@ export interface Calibration {
   /** @nullable */
   originalAverageScore?: number | null;
   calibratedScore: number;
-  calibrationReason: string;
+  /** @nullable */
+  calibrationReason?: string | null;
   calibratedByUserId?: number;
   /** @nullable */
   calibratedByName?: string | null;

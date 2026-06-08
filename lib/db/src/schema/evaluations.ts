@@ -28,7 +28,7 @@ export const calibrationsTable = pgTable("calibrations", {
   criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
   originalAverageScore: numeric("original_average_score", { precision: 5, scale: 2 }),
   calibratedScore: numeric("calibrated_score", { precision: 5, scale: 2 }).notNull(),
-  calibrationReason: text("calibration_reason").notNull(),
+  calibrationReason: text("calibration_reason"),
   calibratedByUserId: integer("calibrated_by_user_id").notNull().references(() => usersTable.id),
   calibratedAt: timestamp("calibrated_at").notNull().defaultNow(),
 });

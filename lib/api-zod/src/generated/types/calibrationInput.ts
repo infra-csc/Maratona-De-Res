@@ -10,6 +10,7 @@ export interface CalibrationInput {
   eventId: number;
   criterionId: number;
   calibratedScore: number;
-  calibrationReason: string;
+  /** @nullable */
+  calibrationReason?: string | null;
   originalAverageScore?: number;
 }
