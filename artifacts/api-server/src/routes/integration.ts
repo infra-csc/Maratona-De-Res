@@ -40,6 +40,8 @@ function deriveYearQuarter(dateStr?: string) {
   return { year: d.getUTCFullYear(), quarter: Math.ceil((d.getUTCMonth() + 1) / 3) };
 }
 
+// Ano do programa da Maratona: só importamos eventos deste ano.
+const TARGET_YEAR = 2026;
 // Apenas estas funções são relevantes para a Maratona.
 const ALLOWED_FUNCTIONS = new Set(["cenotecnica", "cenotecnica local"]);
 function normalizeFunction(s?: string): string {
@@ -126,8 +128,21 @@ router.post("/integration/sync", async (req, res) => {
     const extParticipations = rawParticipations as ExtParticipation[];
     log(`Recebidos: ${extEmployees.length} colaboradores, ${extEvents.length} eventos, ${extParticipations.length} participações.`);
 
-    // Filtro de função: somente Cenotécnica / Cenotécnica Local.
-    const keptParticipations = extParticipations.filter(p => isAllowedFunction(p.functionName ?? p.function));
+    // 1) Eventos de TARGET_YEAR.
+    const keptEvents = extEvents.filter(ev => {
+      const yq = deriveYearQuarter(ev.startDate);
+      return (ev.year ?? yq.year) === TARGET_YEAR;
+    });
+    const keptEventIds = new Set(keptEvents.map(ev => extIdOf(ev)).filter((v): v is string => !!v));
+
+    // 2) Participações nesses eventos com função Cenotécnica / Cenotécnica Local.
+    const keptParticipations = extParticipations.filter(p => {
+      if (!isAllowedFunction(p.functionName ?? p.function)) return false;
+      const evExt = p.eventExternalId != null ? String(p.eventExternalId) : (p.eventId != null ? String(p.eventId) : null);
+      return evExt != null && keptEventIds.has(evExt);
+    });
+
+    // 3) Colaboradores que participaram dessas participações.
     const neededEmpIds = new Set(
       keptParticipations
         .map(p => (p.employeeExternalId != null ? String(p.employeeExternalId) : (p.employeeId != null ? String(p.employeeId) : null)))
@@ -135,9 +150,9 @@ router.post("/integration/sync", async (req, res) => {
     );
     const keptEmployees = extEmployees.filter(e => {
       const id = extIdOf(e);
-      return isAllowedFunction(e.functionName ?? e.function) || (id != null && neededEmpIds.has(id));
+      return id != null && neededEmpIds.has(id);
     });
-    log(`Filtro de função (Cenotécnica / Cenotécnica Local): mantidos ${keptEmployees.length}/${extEmployees.length} colaboradores e ${keptParticipations.length}/${extParticipations.length} participações.`);
+    log(`Filtro: eventos ${TARGET_YEAR} (${keptEvents.length}/${extEvents.length}), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
 
     await db.transaction(async (tx) => {
       // Colaboradores — upsert por externalId
@@ -163,7 +178,7 @@ router.post("/integration/sync", async (req, res) => {
       }
 
       // Eventos — upsert por externalId
-      for (const ev of extEvents) {
+      for (const ev of keptEvents) {
         const externalId = ev.externalId != null ? String(ev.externalId) : (ev.id != null ? String(ev.id) : null);
         if (!externalId || !ev.name) continue;
         const startDate = normalizeDate(ev.startDate);
