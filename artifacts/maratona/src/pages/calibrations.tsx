@@ -629,17 +629,6 @@ export default function CalibrationsPage() {
               </div>
             )}
 
-            {feedback && feedback.highlights && feedback.highlights.length > 0 && (
-              <div>
-                <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><CheckCircle size={13} className="text-[#506600]" /> Destaques</p>
-                <ul className="space-y-1">
-                  {feedback.highlights.map((h, i) => (
-                    <li key={i} className="text-sm italic text-[#191c1e] border-l-4 border-[#506600] pl-2.5 py-0.5">{h}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {feedback && feedback.attentionPoints && feedback.attentionPoints.length > 0 && (
               <div>
                 <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><AlertTriangle size={13} className="text-[#ff5722]" /> Pontos de Atenção</p>
