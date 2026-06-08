@@ -322,6 +322,73 @@ export default function EventDetailPage() {
           </div>
         </section>
 
+        {/* Detalhamento por Critério — notas e calibrações */}
+        {canViewResult && result && result.criteriaDetails && result.criteriaDetails.length > 0 && (
+          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+              <TrendingUp size={18} />
+              <span className="font-black uppercase tracking-tight">Notas e Calibrações por Critério</span>
+            </div>
+            <div className="px-6 py-3 border-b-2 border-[#eceef0]">
+              <p className="text-xs italic text-[#444933]">
+                <strong>Média Original</strong> é a nota dada pela área avaliadora. <strong>Nota Calibrada</strong> é o valor ajustado na calibração. <strong>Nota Final</strong> é a que entra no cálculo do score da equipe.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Critério</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Peso</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Média Original</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Calibrada</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Final</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Contribuição</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y-2 divide-[#eceef0]">
+                  {result.criteriaDetails.map(c => {
+                    const calibrated = c.calibratedScore != null;
+                    return (
+                      <tr key={c.criterionId} data-testid={`row-criterion-detail-${c.criterionId}`} className="hover:bg-[#f2f4f6] transition-all">
+                        <td className="px-6 py-4">
+                          <p className="font-black italic uppercase text-sm text-[#191c1e]">{c.criterionName}</p>
+                          {c.responsibleAreaLabel && (
+                            <p className="text-[10px] font-bold italic uppercase text-[#747a60]">{c.responsibleAreaLabel}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">{fmt(c.weight)}</td>
+                        <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">
+                          {c.averageScore != null ? fmt(c.averageScore) : "—"}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {calibrated ? (
+                            <span className="inline-flex items-center gap-1 text-xs uppercase font-black italic bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1">
+                              <Check size={10} /> {fmt(c.calibratedScore as number)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] uppercase font-bold italic text-[#747a60]">Sem calibração</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {c.scoreUsed != null ? (
+                            <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-3 py-1 border-2 border-[#191c1e]">
+                              {fmt(c.scoreUsed)}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">
+                          {c.criterionTotal != null ? fmt(c.criterionTotal) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
         {/* HR criteria configuration + evaluator assignment (merged) */}
         {canManage && (
           <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
