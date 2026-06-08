@@ -183,7 +183,10 @@ export default function EvaluationsPage() {
   // Only events whose criteria the RH has already confirmed can be evaluated.
   const configuredEvents = openEvents.filter(e => e.criteriaConfirmed);
   // Evaluators may only act on RH-released events; consultation roles may inspect any open event.
-  const selectableEvents = isEvaluator ? configuredEvents : openEvents;
+  // Ordenado alfabeticamente por nome do evento (pt-BR, ignorando maiúsc./acentos).
+  const selectableEvents = [...(isEvaluator ? configuredEvents : openEvents)].sort((a, b) =>
+    (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" })
+  );
   const pickedEvent = selectableEvents.find(e => e.id === selectedEventId);
 
   // For evaluators: fetch criteria for every selectable event so the overview
