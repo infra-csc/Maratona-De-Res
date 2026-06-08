@@ -564,7 +564,7 @@ export default function CalibrationsPage() {
 
       {/* Modal explicativo de finalização do evento */}
       <Dialog open={finalizeOpen} onOpenChange={(o) => { if (!finalizing) setFinalizeOpen(o); }}>
-        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] p-0 gap-0 shadow-[8px_8px_0px_0px_#ccff00]">
+        <DialogContent className="max-w-2xl rounded-none border-2 border-[#191c1e] p-0 gap-0 shadow-[8px_8px_0px_0px_#ccff00]">
           <DialogHeader className="bg-[#191c1e] text-white p-5 space-y-1 text-left">
             <DialogTitle className="text-xl font-black italic uppercase tracking-tight flex items-center gap-2">
               <Flag size={20} className="text-[#ccff00]" /> Finalizar Evento
@@ -572,7 +572,7 @@ export default function CalibrationsPage() {
             <p className="text-xs font-bold italic uppercase text-white/60">{pickedEvent?.name}</p>
           </DialogHeader>
 
-          <div className="p-5 space-y-4 max-h-[55vh] overflow-y-auto">
+          <div className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">
             {/* Resumo: como foi o evento */}
             <div className="flex items-stretch gap-3">
               <div className="flex-1 border-2 border-[#191c1e] p-4 flex flex-col justify-center">
