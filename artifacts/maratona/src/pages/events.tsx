@@ -212,7 +212,7 @@ export default function EventsPage() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {canEdit && ev.status === "open" && (
+                      {canEdit && ev.status === "open" && ev.criteriaConfirmed && (
                         <button
                           data-testid={`button-close-event-${ev.id}`}
                           className="h-8 px-3 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-xs font-bold italic uppercase transition-all"
