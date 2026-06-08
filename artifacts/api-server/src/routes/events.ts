@@ -96,7 +96,7 @@ router.get("/events/:id", async (req, res) => {
   res.json(detail);
 });
 
-router.post("/events", requireRole("admin", "rh", "avaliador"), async (req, res) => {
+router.post("/events", requireRole("admin", "rh"), async (req, res) => {
   const { name, clientName, location, city, state, startDate, endDate, year, quarter } = req.body;
   if (!name || !startDate || !endDate || !year || !quarter) {
     res.status(400).json({ error: "Campos obrigatórios: name, startDate, endDate, year, quarter" });
@@ -116,7 +116,7 @@ router.post("/events", requireRole("admin", "rh", "avaliador"), async (req, res)
   res.status(201).json({ ...ev, participantCount: 0, evaluationProgress: 0, averageScore: null });
 });
 
-router.patch("/events/:id", requireRole("admin", "rh", "avaliador"), async (req, res) => {
+router.patch("/events/:id", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { name, clientName, location, city, state, startDate, endDate, status } = req.body;
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
@@ -181,7 +181,7 @@ router.get("/events/:id/participants", async (req, res) => {
   res.json(participants);
 });
 
-router.post("/events/:id/participants", requireRole("admin", "rh", "avaliador"), async (req, res) => {
+router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const { employeeId, functionName, teamName } = req.body;
   if (!employeeId) { res.status(400).json({ error: "employeeId obrigatório" }); return; }
@@ -192,7 +192,7 @@ router.post("/events/:id/participants", requireRole("admin", "rh", "avaliador"),
   res.status(201).json({ ...participant, employeeName: emp?.name ?? "" });
 });
 
-router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh", "avaliador"), async (req, res) => {
+router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
   const participantId = parseInt(req.params.participantId as string);
   await db.delete(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId));
   res.status(204).end();
