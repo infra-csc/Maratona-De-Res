@@ -170,6 +170,10 @@ export default function EventDetailPage() {
     setAssignments(prev => ({ ...prev, [areaId]: userId }));
   const handleSaveAssignments = () =>
     updateAssignments.mutate({ id, data: { assignments: assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserId: assignments[a.areaId] ?? null })) } });
+  const handleSaveAll = () => {
+    if (sumValid) handleSaveCriteria();
+    if (assignmentsDirty) handleSaveAssignments();
+  };
 
   const overview: { label: string; value: string }[] = [
     { label: "Status", value: event.status },
@@ -302,116 +306,44 @@ export default function EventDetailPage() {
           </div>
         </section>
 
-        {/* HR per-area evaluator assignment */}
-        {canManage && (
-          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
-              <div className="flex items-center gap-2">
-                <UserCheck size={18} />
-                <span className="font-black uppercase tracking-tight">Avaliadores por Área (RH)</span>
-              </div>
-              {allAssigned ? (
-                <span data-testid="badge-assignments-complete" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
-                  <CheckCircle2 size={12} /> Todas as Áreas Atribuídas
-                </span>
-              ) : (
-                <span data-testid="badge-assignments-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
-                  <AlertCircle size={12} /> Atribuição Pendente
-                </span>
-              )}
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-sm italic text-[#444933]">
-                Defina, para cada área responsável por um critério ativo, qual avaliador dará a nota daquela área <strong>neste evento</strong>. A atribuição é obrigatória antes de liberar a avaliação.
-              </p>
-
-              {hasEvaluations && (
-                <div data-testid="notice-assignments-locked" className="flex items-center gap-2 bg-[#fff4e5] border-2 border-[#ff5722] text-[#7a2e00] px-4 py-3 text-xs font-bold italic uppercase">
-                  <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. As atribuições estão bloqueadas.
-                </div>
-              )}
-
-              <div className="divide-y-2 divide-[#eceef0] border-2 border-[#191c1e]">
-                {assignAreas.map(area => {
-                  const areaEvaluators = evaluatorsForArea(area.areaId);
-                  return (
-                    <div key={area.areaId} data-testid={`row-assignment-${area.areaId}`} className="flex flex-wrap items-center gap-4 p-4 bg-white">
-                      <div className="flex-1 min-w-[180px]">
-                        <p className="font-black italic uppercase text-sm text-[#191c1e]">{area.areaName}</p>
-                        {areaEvaluators.length === 0 ? (
-                          <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
-                        ) : !assignments[area.areaId] ? (
-                          <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador</p>
-                        ) : null}
-                      </div>
-                      <select
-                        data-testid={`select-assignment-${area.areaId}`}
-                        value={assignments[area.areaId] ?? ""}
-                        disabled={hasEvaluations || areaEvaluators.length === 0}
-                        onChange={e => setAreaEvaluator(area.areaId, e.target.value ? Number(e.target.value) : null)}
-                        className="h-10 min-w-[220px] rounded-none border-2 border-[#191c1e] bg-white px-3 font-bold italic uppercase text-xs disabled:opacity-50"
-                      >
-                        <option value="">{areaEvaluators.length === 0 ? "— Nenhum avaliador desta área —" : "— Selecione um avaliador —"}</option>
-                        {areaEvaluators.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                })}
-                {assignAreas.length === 0 && (
-                  <div className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhuma área com critério ativo para atribuir.</div>
-                )}
-              </div>
-
-              {assignAreas.some(a => evaluatorsForArea(a.areaId).length === 0) && (
-                <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Há áreas sem nenhum avaliador vinculado. Cadastre avaliadores nessas áreas (em Usuários) para poder atribuí-los.</p>
-              )}
-
-              {assignAreas.length > 0 && !hasEvaluations && (
-                <div className="flex items-center justify-end pt-1">
-                  <button
-                    data-testid="button-save-assignments"
-                    onClick={handleSaveAssignments}
-                    disabled={!assignmentsDirty || updateAssignments.isPending}
-                    className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:translate-y-[1px] transition-all"
-                  >
-                    <Save size={16} /> {updateAssignments.isPending ? "Salvando..." : "Salvar Atribuições"}
-                  </button>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* HR criteria configuration + confirmation gate */}
+        {/* HR criteria configuration + evaluator assignment (merged) */}
         {canManage && (
           <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
             <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal size={18} />
-                <span className="font-black uppercase tracking-tight">Configuração de Critérios (RH)</span>
+                <span className="font-black uppercase tracking-tight">Critérios e Avaliadores (RH)</span>
               </div>
-              {criteriaConfirmed ? (
-                <span data-testid="badge-criteria-confirmed" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
-                  <Lock size={12} /> Critérios Confirmados
-                </span>
-              ) : (
-                <span data-testid="badge-criteria-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
-                  <AlertCircle size={12} /> Aguardando Confirmação
-                </span>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {allAssigned ? (
+                  <span data-testid="badge-assignments-complete" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
+                    <UserCheck size={12} /> Avaliadores Atribuídos
+                  </span>
+                ) : (
+                  <span data-testid="badge-assignments-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
+                    <AlertCircle size={12} /> Atribuição Pendente
+                  </span>
+                )}
+                {criteriaConfirmed ? (
+                  <span data-testid="badge-criteria-confirmed" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
+                    <Lock size={12} /> Critérios Confirmados
+                  </span>
+                ) : (
+                  <span data-testid="badge-criteria-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
+                    <AlertCircle size={12} /> Aguardando Confirmação
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="p-6 space-y-4">
               <p className="text-sm italic text-[#444933]">
-                Revise os critérios deste evento. Desative os que não se aplicam e redistribua os pesos — a soma dos ativos deve ser <strong>20</strong>. As áreas só podem avaliar após a confirmação do RH.
+                Para cada critério deste evento defina o <strong>peso</strong> e o <strong>avaliador</strong> que dará a nota daquela área. Desative os que não se aplicam — a soma dos pesos ativos deve ser <strong>20</strong>. As áreas só podem avaliar após a confirmação do RH.
               </p>
 
               {hasEvaluations && (
                 <div data-testid="notice-criteria-locked" className="flex items-center gap-2 bg-[#fff4e5] border-2 border-[#ff5722] text-[#7a2e00] px-4 py-3 text-xs font-bold italic uppercase">
-                  <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. Os critérios e pesos estão bloqueados e não podem mais ser alterados.
+                  <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. Critérios, pesos e avaliadores estão bloqueados.
                 </div>
               )}
 
@@ -422,119 +354,168 @@ export default function EventDetailPage() {
                 </span>
               </div>
 
-              <div className="divide-y-2 divide-[#eceef0] border-2 border-[#191c1e]">
-                {config.map(item => {
-                  const meta = critMeta.get(item.criterionId);
-                  const isEditingName = editingName[item.criterionId] !== undefined;
-                  return (
-                    <div key={item.criterionId} data-testid={`row-event-criterion-${item.criterionId}`} className={`flex flex-wrap items-center gap-4 p-4 ${!item.active ? "opacity-60 bg-[#f7f9fb]" : "bg-white"}`}>
-                      <div className="flex-1 min-w-[180px]">
-                        {isEditingName ? (
-                          <div className="flex items-center gap-1.5">
-                            <Input
-                              data-testid={`input-event-criterion-name-${item.criterionId}`}
-                              value={editingName[item.criterionId]}
-                              autoFocus
-                              onChange={e => setEditingName(prev => ({ ...prev, [item.criterionId]: e.target.value }))}
-                              onKeyDown={e => { if (e.key === "Enter") handleRename(item.criterionId); if (e.key === "Escape") setEditingName(prev => { const n = { ...prev }; delete n[item.criterionId]; return n; }); }}
-                              className="h-9 rounded-none border-2 border-[#191c1e] font-black italic text-sm"
-                            />
-                            <button
-                              type="button"
-                              data-testid={`button-save-name-${item.criterionId}`}
-                              onClick={() => handleRename(item.criterionId)}
-                              title="Salvar nome"
-                              className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] hover:translate-y-[1px] transition-all"
-                            >
-                              <Check size={16} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <p className="font-black italic uppercase text-sm text-[#191c1e]">{meta?.criterionName ?? item.name}</p>
-                            {item.eventScoped && (
-                              <span className="bg-[#191c1e] text-[#ccff00] px-1.5 py-0.5 text-[9px] font-black italic uppercase">Cópia</span>
+              <div className="overflow-x-auto border-2 border-[#191c1e]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                      <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Critério</th>
+                      <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Área</th>
+                      <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-center">Peso</th>
+                      <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Avaliador</th>
+                      <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-[#eceef0]">
+                    {config.map(item => {
+                      const meta = critMeta.get(item.criterionId);
+                      const isEditingName = editingName[item.criterionId] !== undefined;
+                      const areaId = meta?.responsibleAreaId ?? null;
+                      const areaEvaluators = areaId != null ? evaluatorsForArea(areaId) : [];
+                      return (
+                        <tr key={item.criterionId} data-testid={`row-event-criterion-${item.criterionId}`} className={`align-top ${!item.active ? "opacity-60 bg-[#f7f9fb]" : "bg-white"}`}>
+                          <td className="px-4 py-3 min-w-[180px]">
+                            {isEditingName ? (
+                              <div className="flex items-center gap-1.5">
+                                <Input
+                                  data-testid={`input-event-criterion-name-${item.criterionId}`}
+                                  value={editingName[item.criterionId]}
+                                  autoFocus
+                                  onChange={e => setEditingName(prev => ({ ...prev, [item.criterionId]: e.target.value }))}
+                                  onKeyDown={e => { if (e.key === "Enter") handleRename(item.criterionId); if (e.key === "Escape") setEditingName(prev => { const n = { ...prev }; delete n[item.criterionId]; return n; }); }}
+                                  className="h-9 rounded-none border-2 border-[#191c1e] font-black italic text-sm"
+                                />
+                                <button
+                                  type="button"
+                                  data-testid={`button-save-name-${item.criterionId}`}
+                                  onClick={() => handleRename(item.criterionId)}
+                                  title="Salvar nome"
+                                  className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] hover:translate-y-[1px] transition-all"
+                                >
+                                  <Check size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="font-black italic uppercase text-sm text-[#191c1e]">{meta?.criterionName ?? item.name}</span>
+                                {item.eventScoped && (
+                                  <span className="bg-[#191c1e] text-[#ccff00] px-1.5 py-0.5 text-[9px] font-black italic uppercase">Cópia</span>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        )}
-                        {meta?.responsibleAreaName && <p className="text-[10px] font-bold italic uppercase text-[#747a60]">{meta.responsibleAreaName}</p>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Peso</span>
-                        <Input
-                          data-testid={`input-event-criterion-weight-${item.criterionId}`}
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={item.active ? item.weight : 0}
-                          disabled={!item.active || editLocked}
-                          onChange={e => setCriterionWeight(item.criterionId, Number(e.target.value))}
-                          className="w-20 h-10 rounded-none border-2 border-[#191c1e] text-center font-black italic disabled:opacity-50"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 min-w-[150px] justify-end">
-                        {!editLocked && item.eventScoped && !isEditingName && (
-                          <button
-                            type="button"
-                            data-testid={`button-rename-event-criterion-${item.criterionId}`}
-                            onClick={() => setEditingName(prev => ({ ...prev, [item.criterionId]: item.name }))}
-                            title="Renomear cópia"
-                            className="h-9 px-3 flex items-center gap-1.5 border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-[11px] font-bold italic uppercase transition-all"
-                          >
-                            Renomear
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          data-testid={`button-duplicate-event-criterion-${item.criterionId}`}
-                          disabled={editLocked || duplicateCriterion.isPending}
-                          onClick={() => handleDuplicate(item.criterionId, item.name)}
-                          title="Duplicar quesito"
-                          className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                        >
-                          <Copy size={16} />
-                        </button>
-                        {item.eventScoped ? (
-                          <button
-                            type="button"
-                            data-testid={`button-delete-event-criterion-${item.criterionId}`}
-                            disabled={editLocked || deleteCriterion.isPending}
-                            onClick={() => setPendingDelete(item.id)}
-                            title="Excluir cópia"
-                            className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        ) : item.active ? (
-                          <button
-                            type="button"
-                            data-testid={`button-remove-event-criterion-${item.criterionId}`}
-                            disabled={editLocked}
-                            onClick={() => setPendingRemoval(item.criterionId)}
-                            title="Remover critério"
-                            className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            data-testid={`button-restore-event-criterion-${item.criterionId}`}
-                            disabled={editLocked}
-                            onClick={() => setCriterionActive(item.criterionId, true)}
-                            className="h-9 px-3 flex items-center gap-1.5 border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-[11px] font-bold italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                          >
-                            <RotateCcw size={14} /> Reativar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {config.length === 0 && (
-                  <div className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhum critério vinculado a este evento.</div>
-                )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-[11px] font-bold italic uppercase text-[#747a60]">{meta?.responsibleAreaName ?? "—"}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Input
+                              data-testid={`input-event-criterion-weight-${item.criterionId}`}
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={item.active ? item.weight : 0}
+                              disabled={!item.active || editLocked}
+                              onChange={e => setCriterionWeight(item.criterionId, Number(e.target.value))}
+                              className="w-20 h-10 rounded-none border-2 border-[#191c1e] text-center font-black italic disabled:opacity-50 inline-block"
+                            />
+                          </td>
+                          <td className="px-4 py-3 min-w-[200px]">
+                            {!item.active || areaId == null ? (
+                              <span className="text-[11px] font-bold italic uppercase text-[#747a60]">—</span>
+                            ) : (
+                              <>
+                                <select
+                                  data-testid={`select-assignment-${item.criterionId}`}
+                                  value={assignments[areaId] ?? ""}
+                                  disabled={hasEvaluations || areaEvaluators.length === 0}
+                                  onChange={e => setAreaEvaluator(areaId, e.target.value ? Number(e.target.value) : null)}
+                                  className="h-10 w-full min-w-[200px] rounded-none border-2 border-[#191c1e] bg-white px-3 font-bold italic uppercase text-xs disabled:opacity-50"
+                                >
+                                  <option value="">{areaEvaluators.length === 0 ? "— Nenhum avaliador desta área —" : "— Selecione um avaliador —"}</option>
+                                  {areaEvaluators.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                  ))}
+                                </select>
+                                {areaEvaluators.length === 0 ? (
+                                  <p className="mt-1 text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
+                                ) : !assignments[areaId] ? (
+                                  <p className="mt-1 text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador</p>
+                                ) : null}
+                              </>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2 justify-end">
+                              {!editLocked && item.eventScoped && !isEditingName && (
+                                <button
+                                  type="button"
+                                  data-testid={`button-rename-event-criterion-${item.criterionId}`}
+                                  onClick={() => setEditingName(prev => ({ ...prev, [item.criterionId]: item.name }))}
+                                  title="Renomear cópia"
+                                  className="h-9 px-3 flex items-center gap-1.5 border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-[11px] font-bold italic uppercase transition-all"
+                                >
+                                  Renomear
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                data-testid={`button-duplicate-event-criterion-${item.criterionId}`}
+                                disabled={editLocked || duplicateCriterion.isPending}
+                                onClick={() => handleDuplicate(item.criterionId, item.name)}
+                                title="Duplicar quesito"
+                                className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                              >
+                                <Copy size={16} />
+                              </button>
+                              {item.eventScoped ? (
+                                <button
+                                  type="button"
+                                  data-testid={`button-delete-event-criterion-${item.criterionId}`}
+                                  disabled={editLocked || deleteCriterion.isPending}
+                                  onClick={() => setPendingDelete(item.id)}
+                                  title="Excluir cópia"
+                                  className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : item.active ? (
+                                <button
+                                  type="button"
+                                  data-testid={`button-remove-event-criterion-${item.criterionId}`}
+                                  disabled={editLocked}
+                                  onClick={() => setPendingRemoval(item.criterionId)}
+                                  title="Remover critério"
+                                  className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  data-testid={`button-restore-event-criterion-${item.criterionId}`}
+                                  disabled={editLocked}
+                                  onClick={() => setCriterionActive(item.criterionId, true)}
+                                  className="h-9 px-3 flex items-center gap-1.5 border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-[11px] font-bold italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                >
+                                  <RotateCcw size={14} /> Reativar
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {config.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhum critério vinculado a este evento.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
+
+              {config.some(item => item.active && (critMeta.get(item.criterionId)?.responsibleAreaId != null) && evaluatorsForArea(critMeta.get(item.criterionId)!.responsibleAreaId!).length === 0) && (
+                <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Há áreas sem nenhum avaliador vinculado. Cadastre avaliadores nessas áreas (em Usuários) para poder atribuí-los.</p>
+              )}
 
               {!sumValid && !criteriaConfirmed && (
                 <p className="text-xs font-bold italic uppercase text-[#ba1a1a] text-right">Ajuste os pesos para somar exatamente 20 antes de salvar ou confirmar.</p>
@@ -591,11 +572,11 @@ export default function EventDetailPage() {
                   <>
                     <button
                       data-testid="button-save-criteria"
-                      onClick={handleSaveCriteria}
-                      disabled={!sumValid || updateCriteria.isPending}
+                      onClick={handleSaveAll}
+                      disabled={!sumValid || updateCriteria.isPending || updateAssignments.isPending}
                       className="bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                     >
-                      <Save size={16} /> {updateCriteria.isPending ? "Salvando..." : "Salvar Pesos"}
+                      <Save size={16} /> {(updateCriteria.isPending || updateAssignments.isPending) ? "Salvando..." : "Salvar"}
                     </button>
                     <button
                       data-testid="button-confirm-criteria"
@@ -608,14 +589,26 @@ export default function EventDetailPage() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    data-testid="button-reopen-criteria"
-                    onClick={() => handleConfirmCriteria(false)}
-                    disabled={confirmCriteria.isPending}
-                    className="bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Unlock size={16} /> Reabrir Edição dos Critérios
-                  </button>
+                  <>
+                    {assignmentsDirty && (
+                      <button
+                        data-testid="button-save-assignments"
+                        onClick={handleSaveAssignments}
+                        disabled={updateAssignments.isPending}
+                        className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:translate-y-[1px] transition-all"
+                      >
+                        <Save size={16} /> {updateAssignments.isPending ? "Salvando..." : "Salvar Avaliadores"}
+                      </button>
+                    )}
+                    <button
+                      data-testid="button-reopen-criteria"
+                      onClick={() => handleConfirmCriteria(false)}
+                      disabled={confirmCriteria.isPending}
+                      className="bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Unlock size={16} /> Reabrir Edição dos Critérios
+                    </button>
+                  </>
                 )}
               </div>
             </div>

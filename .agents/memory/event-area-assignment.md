@@ -13,3 +13,5 @@ Evaluation authority is per (event, area, avaliador), stored in `event_area_assi
 **Why:** Same person's profile area should not auto-grant scoring; RH picks who scores which area per event.
 
 **How to apply:** Frontend confirm button must also block on unsaved (dirty) assignments so local state can't bypass the backend gate.
+
+**Unified Critérios+Avaliadores table (event-detail.tsx):** criteria config and evaluator assignment are ONE table (cols Critério|Área|Peso|Avaliador|Ações), one row per criterion. The Avaliador select binds to `assignments[criterion.responsibleAreaId]`, so multiple criteria sharing an area stay in sync (assignment is per-area, not per-criterion). Evaluator selects are locked ONLY by `hasEvaluations` (not by `criteriaConfirmed`), so RH can still reassign after confirming criteria but before any evaluation — the confirmed branch shows a "Salvar Avaliadores" button when `assignmentsDirty`.
