@@ -106,7 +106,7 @@ export async function computeEventTeamResult(eventId: number) {
  * GET /events/:id/result
  * Resultado do TIME do evento + lista de participantes (todos recebem a mesma nota).
  */
-router.get("/events/:id/result", async (req, res) => {
+router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
 
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);

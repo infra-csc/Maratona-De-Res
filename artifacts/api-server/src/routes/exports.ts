@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, quarterlyResultsTable, employeesTable, eventsTable, absencesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { requireAuth } from "../lib/auth.js";
+import { requireAuth, requireRole } from "../lib/auth.js";
 import { computeEventTeamResult } from "./results.js";
 
 const router = Router();
@@ -138,7 +138,7 @@ router.get("/exports/absences", async (req, res) => {
   res.json({ filename: `faltas${suffix}.csv`, data: toCsv(results as never) });
 });
 
-router.get("/exports/pending-evaluations", async (_req, res) => {
+router.get("/exports/pending-evaluations", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
   const openEvents = await db.select().from(eventsTable).where(eq(eventsTable.status, "open"));
   const rows: Record<string, unknown>[] = [];
   for (const ev of openEvents) {

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -58,12 +58,15 @@ async function loadEventDetail(id: number) {
       eventId: eventCriteriaTable.eventId,
       criterionId: eventCriteriaTable.criterionId,
       criterionName: criteriaTable.name,
+      responsibleAreaId: criteriaTable.responsibleAreaId,
+      responsibleAreaName: areasTable.name,
       active: eventCriteriaTable.active,
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
     .where(eq(eventCriteriaTable.eventId, id));
 
   const activeCriteria = criteria.filter(c => c.active);
@@ -203,18 +206,21 @@ router.get("/events/:id/criteria", async (req, res) => {
       eventId: eventCriteriaTable.eventId,
       criterionId: eventCriteriaTable.criterionId,
       criterionName: criteriaTable.name,
+      responsibleAreaId: criteriaTable.responsibleAreaId,
+      responsibleAreaName: areasTable.name,
       active: eventCriteriaTable.active,
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
     .where(eq(eventCriteriaTable.eventId, id));
   const activeCriteria = criteria.filter(c => c.active);
   const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
   res.json(criteria.map(c => {
     const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0, responsibleAreaName: null };
+    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0 };
   }));
 });
 

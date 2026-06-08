@@ -1975,6 +1975,8 @@ components:
           type: integer
         criterionName:
           type: string
+        responsibleAreaId:
+          type: ["integer", "null"]
         responsibleAreaName:
           type: ["string", "null"]
         active:

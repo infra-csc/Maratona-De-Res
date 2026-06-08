@@ -12,6 +12,8 @@ export interface EventCriterion {
   criterionId: number;
   criterionName: string;
   /** @nullable */
+  responsibleAreaId?: number | null;
+  /** @nullable */
   responsibleAreaName?: string | null;
   active: boolean;
   originalWeight?: number;

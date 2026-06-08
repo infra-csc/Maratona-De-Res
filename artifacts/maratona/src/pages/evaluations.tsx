@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info } from "lucide-react";
+import { CheckCircle, Clock, Send, Users, MessageSquareShare, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,8 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
 
 export default function EvaluationsPage() {
   const { user } = useAuth();
+  const isManager = !!user && ["admin", "rh", "diretoria"].includes(user.role);
+  const isEvaluator = user?.role === "avaliador";
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
@@ -63,7 +65,7 @@ export default function EvaluationsPage() {
   );
 
   const { data: eventResult } = useGetEventResult(selectedEventId!, {
-    query: { enabled: !!selectedEventId, queryKey: ["event-result-eval", selectedEventId] as unknown[] },
+    query: { enabled: !!selectedEventId && isManager, queryKey: ["event-result-eval", selectedEventId] as unknown[] },
   });
 
   const createMutation = useCreateEvaluation({
@@ -103,12 +105,35 @@ export default function EvaluationsPage() {
     const stillValid = events.some(e => e.id === selectedEventId && e.status === "open" && e.criteriaConfirmed);
     if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); }
   }, [selectedEventId, events]);
-  const canRelease = user && ["admin", "rh", "diretoria"].includes(user.role);
+  const canRelease = isManager;
   const eventComplete = eventResult?.isComplete ?? false;
   const feedbackReleased = eventResult?.feedbackReleased ?? false;
 
   const currentEvent = events?.find(e => e.id === selectedEventId);
   const criteriaLocked = currentEvent ? !currentEvent.criteriaConfirmed : false;
+
+  // Avaliadores only see/evaluate the criteria assigned to their own area.
+  const myCriteria = activeCriteria.filter(c => user?.areaId != null && c.responsibleAreaId === user.areaId);
+
+  // Manager-only oversight: per-criterion submission status ("quem preencheu / quem falta").
+  function criterionStatus(criterionId: number): { state: "submitted" | "draft" | "pending"; who: string | null } {
+    const evs = (evaluations ?? []).filter(e => e.criterionId === criterionId);
+    const submitted = evs.find(e => e.status === "submitted");
+    if (submitted) return { state: "submitted", who: submitted.evaluatorName ?? null };
+    const draft = evs.find(e => e.status === "draft");
+    if (draft) return { state: "draft", who: draft.evaluatorName ?? null };
+    return { state: "pending", who: null };
+  }
+
+  const areaGroups = Object.values(
+    activeCriteria.reduce((acc, c) => {
+      const key = c.responsibleAreaName ?? "Sem área definida";
+      (acc[key] ??= { area: key, criteria: [] as typeof activeCriteria }).criteria.push(c);
+      return acc;
+    }, {} as Record<string, { area: string; criteria: typeof activeCriteria }>)
+  );
+  const teamSubmittedCount = activeCriteria.filter(c => criterionStatus(c.criterionId).state === "submitted").length;
+  const teamProgressPct = activeCriteria.length ? (teamSubmittedCount / activeCriteria.length) * 100 : 0;
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
@@ -146,18 +171,18 @@ export default function EvaluationsPage() {
     myDrafts.forEach(e => submitMutation.mutate({ id: e.id }));
   }
 
-  const allEvaled = activeCriteria.length > 0 && activeCriteria.every(c => {
+  const allEvaled = myCriteria.length > 0 && myCriteria.every(c => {
     const ev = getEval(c.criterionId);
     return ev && ev.status === "submitted";
   });
-  const hasDrafts = activeCriteria.some(c => getEval(c.criterionId)?.status === "draft");
+  const hasDrafts = myCriteria.some(c => getEval(c.criterionId)?.status === "draft");
 
-  const completedCount = activeCriteria.filter(c => {
+  const completedCount = myCriteria.filter(c => {
     const ev = getEval(c.criterionId);
     return ev && (ev.status === "submitted" || ev.status === "draft");
   }).length;
 
-  const progressPct = activeCriteria.length ? (completedCount / activeCriteria.length) * 100 : 0;
+  const progressPct = myCriteria.length ? (completedCount / myCriteria.length) * 100 : 0;
 
   async function handleExportPending() {
     try {
@@ -189,13 +214,15 @@ export default function EvaluationsPage() {
             <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">Central de Avaliações</h1>
             <p className="text-base md:text-lg text-[#444933] italic mt-2">Mantenha o ritmo. Avalie a sprint e impulsione a equipe.</p>
           </div>
-          <button
-            data-testid="button-export-pending"
-            onClick={handleExportPending}
-            className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-          >
-            <Download size={18} /> Exportar Pendentes
-          </button>
+          {isManager && (
+            <button
+              data-testid="button-export-pending"
+              onClick={handleExportPending}
+              className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+            >
+              <Download size={18} /> Exportar Pendentes
+            </button>
+          )}
         </section>
 
         {/* STEP 01 — Selecionar Evento */}
@@ -309,17 +336,19 @@ export default function EvaluationsPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col justify-end">
-                    <div className="bg-black/30 border-2 border-white/20 p-4 w-full md:w-64">
-                      <p className="text-xs text-white/80 font-bold italic uppercase mb-2">Progresso Geral (Todo o time)</p>
-                      <div className="flex items-center justify-between mb-1 text-xs italic font-bold">
-                        <span>{currentEvent.evaluationProgress}% Concluído</span>
-                      </div>
-                      <div className="w-full bg-black/40 border border-white/20 h-2.5">
-                        <div className="bg-[#ccff00] h-full transition-[width]" style={{ width: `${currentEvent.evaluationProgress}%` }} />
+                  {isManager && (
+                    <div className="flex flex-col justify-end">
+                      <div className="bg-black/30 border-2 border-white/20 p-4 w-full md:w-64">
+                        <p className="text-xs text-white/80 font-bold italic uppercase mb-2">Progresso Geral (Todo o time)</p>
+                        <div className="flex items-center justify-between mb-1 text-xs italic font-bold">
+                          <span>{Math.round(teamProgressPct)}% Concluído</span>
+                        </div>
+                        <div className="w-full bg-black/40 border border-white/20 h-2.5">
+                          <div className="bg-[#ccff00] h-full transition-[width]" style={{ width: `${teamProgressPct}%` }} />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </section>
             )}
@@ -328,9 +357,60 @@ export default function EvaluationsPage() {
 
               {/* Criteria Column / Evaluation Form */}
               <div className="space-y-4">
-                <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1">Critérios de Avaliação</h3>
+                <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
+                  {isManager ? (<><ListChecks size={22} /> Status das Avaliações</>) : "Critérios de Avaliação"}
+                </h3>
 
-                {criteriaLocked ? (
+                {isManager ? (
+                  areaGroups.length === 0 ? (
+                    <div className="text-center py-12 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">Nenhum critério ativo neste evento.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {criteriaLocked && (
+                        <div className="flex items-start gap-2.5 bg-[#fff4e5] border-2 border-[#191c1e] px-4 py-3">
+                          <Lock size={16} className="shrink-0 mt-0.5 text-[#b02f00]" />
+                          <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#b02f00]">Critérios ainda não confirmados — as áreas não podem avaliar até a liberação.</p>
+                        </div>
+                      )}
+                      {areaGroups.map(g => {
+                        const submittedInArea = g.criteria.filter(c => criterionStatus(c.criterionId).state === "submitted").length;
+                        const areaDone = submittedInArea === g.criteria.length;
+                        return (
+                          <div key={g.area} data-testid={`status-area-${g.area}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
+                            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
+                              <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight min-w-0 truncate">
+                                <Building2 size={16} className="shrink-0" /> {g.area}
+                              </span>
+                              <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0", areaDone ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffb5a0] text-[#3b0900]")}>
+                                <span className="inline-block skew-x-[8deg]">{submittedInArea}/{g.criteria.length} {areaDone ? "Concluído" : "Pendente"}</span>
+                              </span>
+                            </div>
+                            <ul>
+                              {g.criteria.map(c => {
+                                const st = criterionStatus(c.criterionId);
+                                return (
+                                  <li key={c.criterionId} data-testid={`status-crit-${c.criterionId}`} className="flex items-center justify-between gap-3 px-5 py-3 border-t-2 border-[#eceef0] first:border-t-0">
+                                    <span className="font-bold italic text-[#191c1e] min-w-0 truncate">{c.criterionName}</span>
+                                    <span className="shrink-0 flex items-center gap-2">
+                                      {st.who && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate max-w-[140px] hidden sm:inline">{st.who}</span>}
+                                      {st.state === "submitted" ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1"><CheckCircle size={12} /> Preenchido</span>
+                                      ) : st.state === "draft" ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffdbd1] text-[#862200] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Rascunho</span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Falta</span>
+                                      )}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : criteriaLocked ? (
                   <div data-testid="notice-criteria-locked" className="text-center py-14 bg-[#fff4e5] border-2 border-[#191c1e] px-6">
                     <div className="w-14 h-14 border-2 border-[#191c1e] bg-[#ff5722] text-white flex items-center justify-center mx-auto mb-4">
                       <Lock size={26} />
@@ -338,12 +418,17 @@ export default function EvaluationsPage() {
                     <h2 className="text-2xl italic uppercase font-black tracking-tight text-[#b02f00] mb-1">Avaliação bloqueada</h2>
                     <p className="text-sm md:text-base italic text-[#444933] max-w-md mx-auto">Os critérios deste evento ainda não foram confirmados pelo RH. Aguarde a liberação para iniciar a avaliação da equipe.</p>
                   </div>
-                ) : activeCriteria.length === 0 ? (
-                  <div className="text-center py-12 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">Nenhum critério ativo neste evento.</div>
+                ) : myCriteria.length === 0 ? (
+                  <div data-testid="notice-no-area-criteria" className="text-center py-12 bg-white border-2 border-[#191c1e] px-6">
+                    <div className="w-14 h-14 border-2 border-[#191c1e] bg-[#f2f4f6] text-[#747a60] flex items-center justify-center mx-auto mb-4">
+                      <Building2 size={24} />
+                    </div>
+                    <p className="italic uppercase font-bold text-[#747a60] max-w-md mx-auto">Nenhum critério atribuído à sua área neste evento.</p>
+                  </div>
                 ) : (
                   <div className={`bg-white border-2 border-[#191c1e] p-6 md:p-8 ${HARD_SHADOW}`}>
                     <div className="space-y-10">
-                      {activeCriteria.map((c, index) => {
+                      {myCriteria.map((c, index) => {
                         const ev = getEval(c.criterionId);
                         const submitted = ev?.status === "submitted";
                         const isDraft = ev?.status === "draft";
@@ -461,75 +546,83 @@ export default function EvaluationsPage() {
               <div className="sticky top-6 space-y-6">
                 <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                   <div className="bg-[#191c1e] text-[#ccff00] px-5 py-4 italic">
-                    <h3 className="text-lg font-black uppercase tracking-tight">Resumo da Avaliação</h3>
-                    <p className="text-[11px] font-bold uppercase text-white/70">Sua avaliação para este evento</p>
+                    <h3 className="text-lg font-black uppercase tracking-tight">{isManager ? "Status do Time" : "Resumo da Avaliação"}</h3>
+                    <p className="text-[11px] font-bold uppercase text-white/70">{isManager ? "Acompanhamento da equipe" : "Sua avaliação para este evento"}</p>
                   </div>
 
                   <div className="p-5 border-b-2 border-[#eceef0]">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs font-bold italic uppercase text-[#444933]">Progresso</span>
-                      <span className="text-sm font-black italic text-[#506600]">{Math.round(progressPct)}%</span>
+                      <span className="text-sm font-black italic text-[#506600]">{Math.round(isManager ? teamProgressPct : progressPct)}%</span>
                     </div>
                     <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2.5 mb-2">
-                      <div className="bg-[#ccff00] h-full transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
+                      <div className="bg-[#ccff00] h-full transition-[width] duration-500" style={{ width: `${isManager ? teamProgressPct : progressPct}%` }} />
                     </div>
                     <p className="text-[11px] text-[#747a60] italic">
-                      {completedCount} de {activeCriteria.length} critérios preenchidos (rascunho ou submetido).
+                      {isManager
+                        ? `${teamSubmittedCount} de ${activeCriteria.length} critérios submetidos pelo time.`
+                        : `${completedCount} de ${myCriteria.length} critérios preenchidos (rascunho ou submetido).`}
                     </p>
                   </div>
 
-                  <div className="p-5 bg-[#f2f4f6] space-y-4 border-b-2 border-[#eceef0]">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold italic uppercase text-[#444933]">Equipe</span>
-                      <span className="text-sm font-black italic">{participants?.length || 0} pessoas</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold italic uppercase text-[#444933]">Critérios Pendentes</span>
-                      <span className="text-sm font-black italic text-[#b02f00]">{activeCriteria.length - completedCount}</span>
-                    </div>
-                    {eventResult && (
-                      <div className="flex justify-between items-center pt-2 border-t-2 border-[#e0e3e5]">
-                        <span className="text-xs font-black italic uppercase">Nota Parcial da Equipe</span>
-                        <div className="text-right">
-                          <span className="text-xl font-black italic text-[#506600]">{eventResult.eventScore.toFixed(1)}</span>
-                          <span className="text-xs text-[#747a60] italic">/100</span>
-                        </div>
-                      </div>
-                    )}
-                    {eventResult?.projectedPlatoon && (
+                  {/* Confidential administrative info — managers only */}
+                  {isManager && (
+                    <div className="p-5 bg-[#f2f4f6] space-y-4 border-b-2 border-[#eceef0]">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold italic uppercase text-[#444933]">Pelotão Projetado</span>
-                        <PlatoonBadge platoon={eventResult.projectedPlatoon} colorHex={eventResult.projectedPlatoonColor} />
+                        <span className="text-xs font-bold italic uppercase text-[#444933]">Equipe</span>
+                        <span className="text-sm font-black italic">{participants?.length || 0} pessoas</span>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="p-5">
-                    {hasDrafts ? (
-                      <button
-                        data-testid="button-submit-eval"
-                        onClick={handleSubmitAll}
-                        disabled={submitMutation.isPending}
-                        className={`w-full bg-[#ccff00] border-2 border-[#191c1e] py-4 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-                      >
-                        <Send size={16} /> Submeter Avaliações
-                      </button>
-                    ) : allEvaled ? (
-                      <div className="flex items-center justify-center gap-2 text-[#506600] bg-[#ccff00]/30 border-2 border-[#506600] p-3 font-bold italic uppercase text-sm">
-                        <CheckCircle size={16} /> Você já concluiu sua avaliação
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold italic uppercase text-[#444933]">Critérios Pendentes</span>
+                        <span className="text-sm font-black italic text-[#b02f00]">{activeCriteria.length - teamSubmittedCount}</span>
                       </div>
-                    ) : (
-                      <button disabled className="w-full bg-[#eceef0] border-2 border-[#191c1e] py-4 font-bold text-sm italic uppercase tracking-wider opacity-60 cursor-not-allowed">
-                        Preencha os critérios
-                      </button>
-                    )}
+                      {eventResult && (
+                        <div className="flex justify-between items-center pt-2 border-t-2 border-[#e0e3e5]">
+                          <span className="text-xs font-black italic uppercase">Nota Parcial da Equipe</span>
+                          <div className="text-right">
+                            <span className="text-xl font-black italic text-[#506600]">{eventResult.eventScore.toFixed(1)}</span>
+                            <span className="text-xs text-[#747a60] italic">/100</span>
+                          </div>
+                        </div>
+                      )}
+                      {eventResult?.projectedPlatoon && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold italic uppercase text-[#444933]">Pelotão Projetado</span>
+                          <PlatoonBadge platoon={eventResult.projectedPlatoon} colorHex={eventResult.projectedPlatoonColor} />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                    {hasDrafts && (
-                      <p className="text-[11px] text-center text-[#747a60] italic mt-3 leading-relaxed">
-                        Critérios em <strong>rascunho</strong> precisam ser submetidos para compor a nota final da equipe.
-                      </p>
-                    )}
-                  </div>
+                  {/* Submission — evaluators only */}
+                  {isEvaluator && myCriteria.length > 0 && (
+                    <div className="p-5">
+                      {hasDrafts ? (
+                        <button
+                          data-testid="button-submit-eval"
+                          onClick={handleSubmitAll}
+                          disabled={submitMutation.isPending}
+                          className={`w-full bg-[#ccff00] border-2 border-[#191c1e] py-4 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                        >
+                          <Send size={16} /> Submeter Avaliações
+                        </button>
+                      ) : allEvaled ? (
+                        <div className="flex items-center justify-center gap-2 text-[#506600] bg-[#ccff00]/30 border-2 border-[#506600] p-3 font-bold italic uppercase text-sm">
+                          <CheckCircle size={16} /> Você já concluiu sua avaliação
+                        </div>
+                      ) : (
+                        <button disabled className="w-full bg-[#eceef0] border-2 border-[#191c1e] py-4 font-bold text-sm italic uppercase tracking-wider opacity-60 cursor-not-allowed">
+                          Preencha os critérios
+                        </button>
+                      )}
+
+                      {hasDrafts && (
+                        <p className="text-[11px] text-center text-[#747a60] italic mt-3 leading-relaxed">
+                          Critérios em <strong>rascunho</strong> precisam ser submetidos para compor a nota final da equipe.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Release Feedback Card (Admin only) */}

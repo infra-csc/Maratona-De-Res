@@ -19,16 +19,18 @@ export default function EventDetailPage() {
   const [, params] = useRoute("/events/:id");
   const id = params ? parseInt(params.id) : 0;
 
+  const { user } = useAuth();
+  const canViewResult = !!user && ["admin", "rh", "diretoria"].includes(user.role);
+
   const { data: event, isLoading } = useGetEvent(id, {
     query: { enabled: !!id, queryKey: getGetEventQueryKey(id) },
   });
 
   const { data: result } = useGetEventResult(id, {
-    query: { enabled: !!id, queryKey: ["event-result", id] as unknown[] },
+    query: { enabled: !!id && canViewResult, queryKey: ["event-result", id] as unknown[] },
   });
   const participantResults = result?.participants ?? [];
 
-  const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const canManage = !!user && ["admin", "rh"].includes(user.role);
