@@ -753,12 +753,19 @@ export default function EvaluationsPage() {
                         <span className="text-sm font-black italic text-[#b02f00]">{activeCriteria.length - teamSubmittedCount}</span>
                       </div>
                       {eventResult && (
-                        <div className="flex justify-between items-center pt-2 border-t-2 border-[#e0e3e5]">
-                          <span className="text-xs font-black italic uppercase">Nota Parcial da Equipe</span>
-                          <div className="text-right">
-                            <span className="text-xl font-black italic text-[#506600]">{eventResult.eventScore.toFixed(1)}</span>
-                            <span className="text-xs text-[#747a60] italic">/100</span>
+                        <div className="pt-2 border-t-2 border-[#e0e3e5] space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-black italic uppercase">Nota Parcial da Equipe</span>
+                            <div className="text-right">
+                              <span className="text-xl font-black italic text-[#506600]">{eventResult.eventScore.toFixed(1)}</span>
+                              <span className="text-xs text-[#747a60] italic">/100</span>
+                            </div>
                           </div>
+                          {!eventResult.hasCalibration && (
+                            <p className="text-[10px] font-bold italic uppercase tracking-wide text-[#b02f00] leading-tight">
+                              Provisória — antes da calibração. O valor final do colaborador sai após a calibração.
+                            </p>
+                          )}
                         </div>
                       )}
                       {eventResult?.projectedPlatoon && (

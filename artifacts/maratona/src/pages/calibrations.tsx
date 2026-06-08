@@ -79,6 +79,11 @@ export default function CalibrationsPage() {
     },
   });
 
+  // Mutation usada na gravação em lote ("salvar todas") — sem toast por item,
+  // para não disparar uma notificação por critério. O resumo é exibido no fim.
+  const bulkMutation = useCreateCalibration();
+  const [savingAll, setSavingAll] = useState(false);
+
   function getAreaScores(critId: number) {
     return (evaluations ?? [])
       .filter(e => e.criterionId === critId && e.status === "submitted")
@@ -120,6 +125,54 @@ export default function CalibrationsPage() {
   const pendingCount = selectedEventId
     ? activeCriteria.filter(c => getAvgScore(c.criterionId) != null && !getCalibration(c.criterionId)).length
     : 0;
+
+  // Quantos critérios têm uma nota calibrada preenchida (e válida) pronta para salvar.
+  function pendingScore(critId: number) {
+    const existing = getCalibration(critId);
+    const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
+    const score = Number(raw);
+    if (!raw || isNaN(score) || score < 1 || score > 5) return null;
+    return score;
+  }
+  const fillableCount = activeCriteria.filter(c => pendingScore(c.criterionId) != null).length;
+
+  // Grava TODAS as calibrações preenchidas de uma vez (a diretoria preenche tudo
+  // e salva em um clique, em vez de critério por critério).
+  async function saveAllCalibrations() {
+    const toSave = activeCriteria
+      .map(c => ({ critId: c.criterionId, score: pendingScore(c.criterionId), reason: (calReasons[c.criterionId] ?? getCalibration(c.criterionId)?.calibrationReason ?? "").trim() }))
+      .filter((x): x is { critId: number; score: number; reason: string } => x.score != null);
+    if (toSave.length === 0) {
+      toast({ title: "Nada para salvar", description: "Preencha ao menos uma nota calibrada (1 a 5).", variant: "destructive" });
+      return;
+    }
+    setSavingAll(true);
+    let ok = 0;
+    const failed: number[] = [];
+    for (const x of toSave) {
+      try {
+        await bulkMutation.mutateAsync({
+          data: {
+            eventId: selectedEventId!,
+            criterionId: x.critId,
+            calibratedScore: x.score,
+            calibrationReason: x.reason,
+            originalAverageScore: getAvgScore(x.critId) ?? undefined,
+          },
+        });
+        ok++;
+      } catch {
+        failed.push(x.critId);
+      }
+    }
+    setSavingAll(false);
+    qc.invalidateQueries({ queryKey: calQKey });
+    if (failed.length === 0) {
+      toast({ title: `${ok} calibraç${ok === 1 ? "ão salva" : "ões salvas"}` });
+    } else {
+      toast({ title: `${ok} salva(s), ${failed.length} com erro`, description: "Revise os critérios destacados e tente novamente.", variant: "destructive" });
+    }
+  }
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -244,6 +297,29 @@ export default function CalibrationsPage() {
               </div>
             )}
 
+            {activeCriteria.length > 0 && (
+              <div className="sticky top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Salvar todas de uma vez</p>
+                    <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
+                      {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 5) abaixo"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  data-testid="button-save-all-cal"
+                  type="button"
+                  disabled={savingAll || fillableCount === 0}
+                  onClick={saveAllCalibrations}
+                  className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
+                >
+                  <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                </button>
+              </div>
+            )}
+
             {activeCriteria.map(c => {
               const areaScores = getAreaScores(c.criterionId);
               const avg = getAvgScore(c.criterionId);
@@ -336,7 +412,7 @@ export default function CalibrationsPage() {
                         <button
                           data-testid={`button-save-cal-${c.criterionId}`}
                           type="button"
-                          disabled={isSaving}
+                          disabled={isSaving || savingAll}
                           onClick={() => saveCalibration(c.criterionId)}
                           className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
                         >
