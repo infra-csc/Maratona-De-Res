@@ -290,7 +290,7 @@ export default function MyPerformancePage() {
                 {summary.projectedBonus !== null ? (
                   <>
                     <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">{fmtBRL(summary.projectedBonus)}</h2>
-                    <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Valor estimado — sujeito a alteração</p>
+                    <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Valor parcial — validado apenas ao fim do ciclo</p>
                   </>
                 ) : (
                   <div className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</div>
