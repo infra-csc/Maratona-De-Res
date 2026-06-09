@@ -946,11 +946,11 @@ export default function EvaluationsPage() {
                   )}
 
                   {/* Grade summary — evaluators only */}
-                  {isEvaluator && myCriteria.length > 0 && (
+                  {isEvaluator && activeCriteria.length > 0 && (
                     <div className="p-5 border-b-2 border-[#eceef0]">
                       <p className="text-xs font-bold italic uppercase text-[#444933] mb-3">Resumo das Notas</p>
                       <div className="space-y-2">
-                        {myCriteria.map(c => {
+                        {activeCriteria.map(c => {
                           const ev = getEval(c.criterionId);
                           const score = currentScore(c.criterionId);
                           const hasScore = score > 0;
@@ -1017,11 +1017,11 @@ export default function EvaluationsPage() {
                               {" "}<strong>bloqueadas para edição</strong> e compõem a nota final da equipe. Deseja continuar?
                             </AlertDialogDescription>
                           </AlertDialogHeader>
-                          {isEvaluator && myCriteria.length > 0 && (
+                          {isEvaluator && activeCriteria.length > 0 && (
                             <div className="border-2 border-[#191c1e] bg-[#f2f4f6] p-4 max-h-60 overflow-y-auto">
                               <p className="text-xs font-bold italic uppercase text-[#444933] mb-3">Resumo das Notas</p>
                               <div className="space-y-2">
-                                {myCriteria.map(c => {
+                                {activeCriteria.map(c => {
                                   const ev = getEval(c.criterionId);
                                   const score = currentScore(c.criterionId);
                                   const hasScore = score > 0;
