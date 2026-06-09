@@ -22,8 +22,9 @@ interface PerformanceData {
     grossAverage: number | null;
     currentPlatoon: string | null;
     projectedBonus: number | null;
-    evaluatedEvents: number;
-    pendingEvents: number;
+    totalEvents: number;
+    closedEvents: number;
+    openEvents: number;
     totalAbsences: number;
     isQuarterClosed: boolean;
     finalResult: number | null;
@@ -308,10 +309,10 @@ export default function MyPerformancePage() {
             <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
               <div className="z-10">
                 <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Participação</p>
-                <h2 className="text-[40px] leading-none italic font-black mt-2">{summary.evaluatedEvents}</h2>
+                <h2 className="text-[40px] leading-none italic font-black mt-2">{summary.totalEvents}</h2>
                 <p className="text-[11px] font-bold uppercase italic text-[#506600] mt-1">eventos no ciclo</p>
-                {summary.pendingEvents > 0 && (
-                  <p className="text-[10px] font-bold uppercase italic text-amber-600 mt-1">{summary.pendingEvents} pendente{summary.pendingEvents > 1 ? 's' : ''}</p>
+                {summary.openEvents > 0 && (
+                  <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-1">{summary.openEvents} em avaliação</p>
                 )}
                 {summary.totalAbsences > 0 && (
                   <p className="text-[10px] font-bold uppercase italic text-[#862200] mt-1">{summary.totalAbsences} faltas</p>

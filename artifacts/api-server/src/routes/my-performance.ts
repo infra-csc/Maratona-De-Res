@@ -184,8 +184,9 @@ router.get("/my-performance", async (req, res) => {
     ));
   const totalAbsences = absences.reduce((s, a) => s + a.quantity, 0);
 
-  const pendingEvents = eventSummaries.filter(e => e.isPending || e.status === "open").length;
-  const evaluatedEvents = eventSummaries.filter(e => !e.isPending && e.status !== "open").length;
+  const totalEvents = eventSummaries.length;
+  const openEvents = eventSummaries.filter(e => e.status === "open").length;
+  const closedEvents = eventSummaries.filter(e => e.status === "closed").length;
 
   const scoredEvents = eventSummaries.filter(e => e.eventScore > 0);
   const grossAverage = scoredEvents.length > 0
@@ -228,8 +229,9 @@ router.get("/my-performance", async (req, res) => {
       projectedBonus: currentBonus,
       bonusStatus,
       eligible,
-      evaluatedEvents,
-      pendingEvents,
+      totalEvents,
+      closedEvents,
+      openEvents,
       totalAbsences,
       isQuarterClosed: cycle.status === "closed" || !!cycle.closedAt,
       finalResult,
