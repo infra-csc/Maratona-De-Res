@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useGetCurrentCycle } from "@workspace/api-client-react";
-import { formatCyclePeriod } from "@/components/cycle-badge";
+import { formatCyclePeriod, CycleBadge } from "@/components/cycle-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -203,19 +203,7 @@ export default function MyPerformancePage() {
           <TrendingUp size={28} />
           Meu Desempenho
         </h1>
-        {data?.cycle && (
-          <div className="bg-white border-2 border-[#191c1e] px-4 py-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase italic tracking-wider text-[#747a60]">Ciclo</span>
-              <span className="font-black text-[#191c1e] text-sm">{data.cycle.name}</span>
-            </div>
-            {formatCyclePeriod(currentCycle?.startDate, currentCycle?.endDate) && (
-              <span className="text-[11px] font-bold italic text-[#747a60] mt-0.5">
-                {formatCyclePeriod(currentCycle?.startDate, currentCycle?.endDate)}
-              </span>
-            )}
-          </div>
-        )}
+        <CycleBadge className="bg-[#f7f9fb]" />
       </header>
 
       <div className="p-6 md:p-10 space-y-10">
@@ -250,7 +238,7 @@ export default function MyPerformancePage() {
                 {result !== null ? (
                   <h2 className="text-[40px] leading-none italic font-black mt-2">{result.toFixed(1)}<span className="text-[18px] text-[#747a60]">/100</span></h2>
                 ) : (
-                  <div className="text-lg font-medium text-[#747a60] mt-4 italic">Em andamento</div>
+                  <div className="text-lg font-medium text-[#747a60] mt-4 italic">-</div>
                 )}
                 {summary.isQuarterClosed && (
                   <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Fechado Oficialmente</p>
@@ -309,7 +297,7 @@ export default function MyPerformancePage() {
                 <h2 className="text-[40px] leading-none italic font-black mt-2">{summary.evaluatedEvents}</h2>
                 <p className="text-[11px] font-bold uppercase italic text-[#506600] mt-1">eventos no ciclo</p>
                 {summary.pendingEvents > 0 && (
-                  <p className="text-[10px] font-bold uppercase italic text-amber-600 mt-1">{summary.pendingEvents} em andamento</p>
+                  <p className="text-[10px] font-bold uppercase italic text-amber-600 mt-1">{summary.pendingEvents} pendente{summary.pendingEvents > 1 ? 's' : ''}</p>
                 )}
                 {summary.totalAbsences > 0 && (
                   <p className="text-[10px] font-bold uppercase italic text-red-600 mt-1">{summary.totalAbsences} faltas</p>
