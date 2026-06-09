@@ -514,9 +514,17 @@ export default function CalibrationsPage() {
                               </div>
                             ))}
                           </div>
-                          <div className="mt-4 flex items-baseline gap-2">
+                          <div className="mt-4 flex items-baseline gap-3">
                             <span className="text-[11px] font-bold uppercase italic tracking-wider text-[#747a60]">Média Original</span>
                             <span className={`text-2xl font-black italic ${cal ? "text-[#c4c9ac] line-through" : "text-[#191c1e]"}`}>{avg?.toFixed(2)}</span>
+                            {cal && (
+                              <>
+                                <span className="text-sm font-bold italic text-[#747a60]">→</span>
+                                <span className="text-2xl font-black italic text-[#ff5722]">{parseFloat(cal.calibratedScore as unknown as string).toFixed(2)}</span>
+                                <span className="text-sm font-bold italic text-[#747a60]">=</span>
+                                <span className="text-2xl font-black italic text-[#506600]">{(parseFloat(cal.calibratedScore as unknown as string)).toFixed(2)}</span>
+                              </>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -583,6 +591,46 @@ export default function CalibrationsPage() {
                 </article>
               );
             })}
+
+            {/* Painel de média / soma ponderada */}
+            {(() => {
+              let weightedSum = 0;
+              let weightSum = 0;
+              let scoredCount = 0;
+              for (const c of activeCriteria) {
+                const cal = getCalibration(c.criterionId);
+                const avg = getAvgScore(c.criterionId);
+                const score = cal ? parseFloat(cal.calibratedScore as unknown as string) : (avg ?? null);
+                const weight = c.weightOverride ?? c.originalWeight ?? 0;
+                if (score !== null && weight > 0) {
+                  weightedSum += score * weight;
+                  weightSum += weight;
+                  scoredCount++;
+                }
+              }
+              const eventScore = weightSum > 0 ? Math.round((weightedSum / weightSum) * 10 * 100) / 100 : 0;
+              const hasCalibration = activeCriteria.some(c => getCalibration(c.criterionId));
+              return (
+                <div className={`bg-[#191c1e] text-white border-2 border-[#191c1e] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[6px_6px_0px_0px_#ccff00]`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Trophy size={22} className="text-[#ccff00] shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Soma Ponderada (Nota × Peso)</p>
+                      <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
+                        {scoredCount} de {activeCriteria.length} critérios com nota · {hasCalibration ? "Calibração aplicada" : "Média original da área"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="text-right">
+                      <span className="text-[9px] font-bold uppercase italic text-white/60 block leading-none">Score do Time</span>
+                      <span className="text-3xl font-black italic text-[#ccff00] leading-none">{eventScore.toFixed(1)}</span>
+                      <span className="text-xs font-bold italic text-white/60">/100</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Finalização — aparece apenas quando todas as calibrações estão salvas */}
             {scoredCriteria.length > 0 && (
