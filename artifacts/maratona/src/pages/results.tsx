@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Download, LockKeyhole, Wallet, CheckCircle2, Wallet2, Users,
   Search, Trophy, Crown, Award, AlertTriangle, MapPin, ChevronRight, Table2, ListOrdered,
+  ArrowUpDown, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
@@ -38,6 +39,25 @@ const BONUS_STATUS_LABELS: Record<string, { label: string; class: string }> = {
   not_eligible: { label: "Não elegível", class: "bg-[#eceef0] text-[#747a60]" },
 };
 const BONUS_STATUS_OPTIONS = ["projected", "approved", "scheduled", "paid", "blocked", "not_eligible"];
+
+type SortDir = "asc" | "desc";
+
+function useSort<T extends Record<string, any>>(items: T[], key: keyof T | null, dir: SortDir) {
+  if (!key) return items;
+  const sorted = [...items].sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (typeof av === "string" && typeof bv === "string") return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    if (typeof av === "number" && typeof bv === "number") return dir === "asc" ? av - bv : bv - av;
+    return 0;
+  });
+  return sorted;
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ArrowUpDown size={12} className="text-[#747a60] opacity-50" />;
+  return dir === "asc" ? <ArrowUp size={12} className="text-[#191c1e]" /> : <ArrowDown size={12} className="text-[#191c1e]" />;
+}
 
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
@@ -421,12 +441,195 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 /* CONSOLIDAÇÃO TAB                                                    */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* SHARED DETAIL SHEET COMPONENT                                       */
+/* ------------------------------------------------------------------ */
+
+function EmployeeDetailSheet({
+  employeeId,
+  onClose,
+}: {
+  employeeId: number | null;
+  onClose: () => void;
+}) {
+  const detailParams = { employeeId: employeeId ?? 0 };
+  const { data: detail, isLoading: detailLoading } = useGetRankingDetail(detailParams, {
+    query: { queryKey: getGetRankingDetailQueryKey(detailParams), enabled: !!employeeId },
+  });
+
+  return (
+    <Sheet open={!!employeeId} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto rounded-none border-l-4 border-[#191c1e] bg-[#f7f9fb] p-0">
+        {detailLoading || !detail ? (
+          <div className="p-10 text-center italic uppercase font-bold text-[#747a60]">Carregando detalhamento...</div>
+        ) : (
+          <div>
+            <SheetHeader className="bg-[#191c1e] text-white p-6 space-y-3 text-left">
+              <SheetTitle className="text-white text-2xl italic uppercase font-black tracking-tight leading-none">
+                {detail.employee.name}
+              </SheetTitle>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase italic">
+                {detail.summary.platoon && <PlatoonBadge platoon={detail.summary.platoon} colorHex={detail.summary.platoonColor ?? undefined} />}
+                {detail.employee.functionName && (
+                  <span className="border-2 border-[#ccff00] text-[#ccff00] px-2 py-0.5">{detail.employee.functionName}</span>
+                )}
+                <span className="text-[#9da3a8]">{detail.cycle.name}</span>
+              </div>
+            </SheetHeader>
+
+            <div className="p-6 space-y-8">
+              <section className="grid grid-cols-2 gap-3">
+                <div className={`bg-[#ccff00] border-2 border-[#191c1e] p-4 ${HARD_SHADOW}`}>
+                  <span className="text-[10px] font-bold uppercase italic text-[#161e00] block">Nota Final</span>
+                  <p className="text-3xl font-black italic leading-none mt-1" data-testid="detail-final-result">
+                    {detail.summary.finalResult != null ? detail.summary.finalResult.toFixed(1) : "—"}
+                  </p>
+                </div>
+                <div className="bg-white border-2 border-[#191c1e] p-4">
+                  <span className="text-[10px] font-bold uppercase italic text-[#747a60] block">Média Bruta</span>
+                  <p className="text-3xl font-black italic leading-none mt-1 text-[#506600]">
+                    {detail.summary.grossAverage != null ? detail.summary.grossAverage.toFixed(1) : "—"}
+                  </p>
+                </div>
+                <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
+                  <AlertTriangle size={18} className="text-[#ff5722] shrink-0" />
+                  <div>
+                    <span className="text-[10px] font-bold uppercase italic text-[#747a60] block leading-none">Penalidades</span>
+                    <p className="text-lg font-black italic leading-none text-[#ff5722]">-{detail.summary.penaltyPoints}</p>
+                  </div>
+                </div>
+                <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
+                  <Award size={18} className="text-[#506600] shrink-0" />
+                  <div>
+                    <span className="text-[10px] font-bold uppercase italic text-[#747a60] block leading-none">Méritos</span>
+                    <p className="text-lg font-black italic leading-none text-[#506600]">+{detail.summary.meritPoints}</p>
+                  </div>
+                </div>
+              </section>
+
+              {!detail.summary.isQuarterClosed && (
+                <div className="bg-[#fff3cd] border-2 border-[#191c1e] px-4 py-3 text-xs font-bold italic uppercase text-[#664d03]">
+                  Ciclo ainda não fechado — valores parciais.
+                </div>
+              )}
+
+              <section className="space-y-3">
+                <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2">
+                  <Trophy size={16} /> Desempenho nas Provas
+                </h4>
+                {detail.events.length === 0 ? (
+                  <p className="text-sm italic text-[#747a60] font-medium">Nenhum evento avaliado no ciclo.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {detail.events.map(ev => (
+                      <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black italic uppercase text-sm truncate">{ev.eventName}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold italic text-[#747a60]">
+                            {(ev.city || ev.state) && (
+                              <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
+                            )}
+                            <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="block text-[9px] uppercase font-bold italic text-[#747a60] leading-none mb-1">Nota Time</span>
+                          <p className="text-xl font-black italic leading-none text-[#506600]">{ev.eventScore.toFixed(1)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="space-y-3">
+                <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2 text-[#ff5722]">
+                  <AlertTriangle size={16} /> Penalidades
+                </h4>
+                {detail.penalties.length === 0 ? (
+                  <p className="text-sm italic text-[#747a60] font-medium">Sem penalidades no ciclo.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {detail.penalties.map(p => (
+                      <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black italic uppercase text-sm">{p.label}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
+                            <span>{new Date(p.date).toLocaleDateString("pt-BR")}</span>
+                            {p.eventName && <span className="truncate">· {p.eventName}</span>}
+                            {p.quantity > 1 && <span>· {p.quantity}x</span>}
+                          </div>
+                        </div>
+                        <span className="bg-[#ff5722] text-white font-black px-3 py-1 border-2 border-[#191c1e] text-xs shrink-0">-{p.total}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="space-y-3">
+                <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2 text-[#506600]">
+                  <Award size={16} /> Méritos
+                </h4>
+                {detail.merits.length === 0 ? (
+                  <p className="text-sm italic text-[#747a60] font-medium">Sem méritos no ciclo.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {detail.merits.map(m => (
+                      <div key={m.id} data-testid={`detail-merit-${m.id}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black italic uppercase text-sm">{m.label}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
+                            <span>{new Date(m.date).toLocaleDateString("pt-BR")}</span>
+                            {m.eventName && <span className="truncate">· {m.eventName}</span>}
+                            {m.quantity > 1 && <span>· {m.quantity}x</span>}
+                          </div>
+                        </div>
+                        <span className="bg-[#ccff00] text-[#191c1e] font-black px-3 py-1 border-2 border-[#191c1e] text-xs shrink-0">+{m.total}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {detail.summary.bonusValue != null && detail.summary.bonusValue > 0 && (
+                <section className={`bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between ${HARD_SHADOW}`}>
+                  <span className="text-xs font-black uppercase italic tracking-wider">Bônus do Ciclo</span>
+                  <span className="text-2xl font-black italic">{fmtBRL(detail.summary.bonusValue)}</span>
+                </section>
+              )}
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* CONSOLIDAÇÃO TAB                                                    */
+/* ------------------------------------------------------------------ */
+
 function ConsolidationTab() {
   const { toast } = useToast();
   const { data: results, isLoading } = useGetQuarterlyResults(undefined, {
     query: { queryKey: getGetQuarterlyResultsQueryKey() },
   });
   const rows = results ?? [];
+  const [sortKey, setSortKey] = useState<keyof QuarterlyResult | null>("finalResult");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  function handleSort(key: keyof QuarterlyResult) {
+    if (sortKey === key) {
+      setSortDir(prev => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  const sortedRows = useSort(rows, sortKey, sortDir);
 
   async function handleExport() {
     try {
@@ -440,6 +643,21 @@ function ConsolidationTab() {
       toast({ title: "Erro ao exportar", variant: "destructive" });
     }
   }
+
+  const headerCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center") => (
+    <th
+      className={cn(
+        "px-5 py-4 text-xs font-bold uppercase italic text-[#444933] cursor-pointer select-none hover:bg-[#e0e3e5] transition-colors",
+        align === "center" && "text-center"
+      )}
+      onClick={() => handleSort(key)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <SortIcon active={sortKey === key} dir={sortDir} />
+      </span>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -471,22 +689,27 @@ function ConsolidationTab() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                  <th className="px-5 py-4 text-xs font-bold uppercase italic text-[#444933]">Colaborador</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Soma das Notas</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Eventos c/ Nota</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Eventos Participados</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Penalidades / Méritos</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Média (Nota Final)</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Pelotão</th>
+                  {headerCell("Colaborador", "employeeName", "left")}
+                  {headerCell("Soma das Notas", "scoreSum")}
+                  {headerCell("Eventos c/ Nota", "eventsCount")}
+                  {headerCell("Eventos Participados", "participatedEventsCount")}
+                  {headerCell("Penalidades / Méritos", "absencePenalty")}
+                  {headerCell("Média (Nota Final)", "finalResult")}
+                  {headerCell("Pelotão", "platoon")}
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-[#eceef0]">
-                {[...rows].sort((a, b) => b.finalResult - a.finalResult).map((r) => {
+                {sortedRows.map((r) => {
                   const penalty = r.absencePenalty ?? 0;
                   const merit = r.meritPoints ?? 0;
                   const net = Math.round((merit - penalty) * 10) / 10;
                   return (
-                    <tr key={r.employeeId} data-testid={`row-consolidation-${r.employeeId}`} className="hover:bg-[#f2f4f6] transition-all">
+                    <tr
+                      key={r.employeeId}
+                      data-testid={`row-consolidation-${r.employeeId}`}
+                      className="hover:bg-[#f2f4f6] transition-all cursor-pointer"
+                      onClick={() => setSelectedId(r.employeeId)}
+                    >
                       <td className="px-5 py-4">
                         <div className="font-black italic uppercase text-sm text-[#191c1e]">{r.employeeName}</div>
                       </td>
@@ -523,6 +746,8 @@ function ConsolidationTab() {
           </div>
         </div>
       )}
+
+      <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} />
     </div>
   );
 }
@@ -538,6 +763,9 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
   const [payForm, setPayForm] = useState({ bonusStatus: "projected", paymentMethod: "Caju Saldo Livre", paymentNotes: "" });
   const [forceClose, setForceClose] = useState(false);
   const [forceReason, setForceReason] = useState("");
+  const [sortKey, setSortKey] = useState<keyof QuarterlyResult | null>("finalResult");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const qKey = getGetQuarterlyResultsQueryKey();
   const { data: results, isLoading } = useGetQuarterlyResults(undefined, { query: { queryKey: qKey } });
@@ -610,10 +838,35 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
     });
   }
 
+  function handleSort(key: keyof QuarterlyResult) {
+    if (sortKey === key) {
+      setSortDir(prev => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
   const rows = results ?? [];
   const totalBonus = rows.reduce((acc, r) => acc + (r.bonusValue ?? 0), 0);
   const eligibleCount = rows.filter(r => r.eligible !== false).length;
   const eligibilityPct = rows.length > 0 ? Math.round((eligibleCount / rows.length) * 100) : 0;
+  const sortedRows = useSort(rows, sortKey, sortDir);
+
+  const payHeaderCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center") => (
+    <th
+      className={cn(
+        "px-6 py-4 text-xs font-bold uppercase italic text-[#444933] cursor-pointer select-none hover:bg-[#e0e3e5] transition-colors",
+        align === "center" && "text-center"
+      )}
+      onClick={() => handleSort(key)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <SortIcon active={sortKey === key} dir={sortDir} />
+      </span>
+    </th>
+  );
 
   return (
     <div className="space-y-8">
@@ -735,21 +988,26 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Colaborador</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Atividade</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Final</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Pelotão Oficial</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Elegibilidade</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Bônus</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Status do Pagamento</th>
+                  {payHeaderCell("Colaborador", "employeeName", "left")}
+                  {payHeaderCell("Atividade", "eventsCount")}
+                  {payHeaderCell("Nota Final", "finalResult")}
+                  {payHeaderCell("Pelotão Oficial", "platoon")}
+                  {payHeaderCell("Elegibilidade", "eligible")}
+                  {payHeaderCell("Bônus", "bonusValue")}
+                  {payHeaderCell("Status do Pagamento", "bonusStatus")}
                   {canManage && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Ação</th>}
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-[#eceef0]">
-                {[...rows].sort((a, b) => b.finalResult - a.finalResult).map((r) => {
+                {sortedRows.map((r) => {
                   const statusInfo = r.bonusStatus ? (BONUS_STATUS_LABELS[r.bonusStatus] ?? { label: r.bonusStatus, class: "bg-[#eceef0] text-[#444933]" }) : null;
                   return (
-                    <tr key={r.employeeId} data-testid={`row-result-${r.employeeId}`} className="hover:bg-[#f2f4f6] transition-all group">
+                    <tr
+                      key={r.employeeId}
+                      data-testid={`row-result-${r.employeeId}`}
+                      className="hover:bg-[#f2f4f6] transition-all cursor-pointer group"
+                      onClick={() => setSelectedId(r.employeeId)}
+                    >
                       <td className="px-6 py-4">
                         <div className="font-black italic uppercase text-sm text-[#191c1e]">{r.employeeName}</div>
                       </td>
@@ -800,7 +1058,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                             <button
                               data-testid={`button-payment-${r.employeeId}`}
                               className="p-2 border-2 border-transparent text-[#747a60] hover:border-[#191c1e] hover:text-[#161e00] hover:bg-[#ccff00] transition-all"
-                              onClick={() => openPayment(r)}
+                              onClick={(e) => { e.stopPropagation(); openPayment(r); }}
                             >
                               <Wallet size={16} />
                             </button>
@@ -874,6 +1132,8 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} />
     </div>
   );
 }
