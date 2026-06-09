@@ -18,6 +18,7 @@
 - [Per-event area assignment](event-area-assignment.md) — eval scoping is event→area→avaliador (event_area_assignments), NOT profile areaId; confirm gate blocks until every active-criteria area assigned
 - [Event-scoped duplicate criteria](event-scoped-criteria.md) — duplicating a quesito makes its OWN criteria row (eventScoped=true) since scores key by global criterionId; exclude eventScoped from /criteria, sync, AND POST /events seeding
 - [Results filters + search](results-filters-search.md) — all 3 tabs have search bar + platoon filter dropdown + elegibility filter (ranking & payments only); filtering client-side after API fetch; use "__all" sentinel for Select default
+- [Label rename: Nota Avaliador](nota-avaliador-label.md) — "Média Original" → "Nota Avaliador" on event-detail and calibrations tables/tooltips for clarity
 - [Cycle migration](cycle-migration.md) — year+quarter removed → single current ciclo (getCurrentCycle); eventsCount(scored) vs participatedEventsCount(eligibility, >=min_events_eligibility default 8)
 - [Consolidação net display](consolidation-net-display.md) — Penalidades/Méritos = stored meritPoints - absencePenalty, NOT grossAverage-finalResult (clamp-distorted at 0/100)
 - [Unified Resultados page](unified-results-page.md) — one /results page, 3 tabs (Ranking all roles · Consolidação · Bônus managers); /ranking redirects to /results; ranking.tsx deleted

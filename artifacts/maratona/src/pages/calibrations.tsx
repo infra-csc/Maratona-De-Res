@@ -523,7 +523,7 @@ export default function CalibrationsPage() {
                             ))}
                           </div>
                           <div className="mt-4 flex items-baseline gap-3">
-                            <span className="text-[11px] font-bold uppercase italic tracking-wider text-[#747a60]">Média Original</span>
+                            <span className="text-[11px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota Avaliador</span>
                             <span className={`text-2xl font-black italic ${cal ? "text-[#c4c9ac] line-through" : "text-[#191c1e]"}`}>{avg?.toFixed(2)}</span>
                             {cal && (
                               <>

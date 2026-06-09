@@ -353,7 +353,7 @@ export default function EventDetailPage() {
             </div>
             <div className="px-6 py-3 border-b-2 border-[#eceef0]">
               <p className="text-xs italic text-[#444933]">
-                <strong>Média Original</strong> é a nota dada pela área avaliadora. <strong>Nota Calibrada</strong> é o valor ajustado na calibração. <strong>Nota Final</strong> é a que entra no cálculo do score da equipe.
+                <strong>Nota Avaliador</strong> é a nota dada pela área avaliadora. <strong>Nota Calibrada</strong> é o valor ajustado na calibração. <strong>Nota Final</strong> é a que entra no cálculo do score da equipe.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -362,7 +362,7 @@ export default function EventDetailPage() {
                   <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Critério</th>
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Peso</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Média Original</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Avaliador</th>
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Calibrada</th>
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Final</th>
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Contribuição</th>
