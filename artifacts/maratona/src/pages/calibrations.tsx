@@ -401,7 +401,17 @@ export default function CalibrationsPage() {
               </div>
             )}
 
-            {activeCriteria.length > 0 && !alreadyReleased && (
+            {alreadyClosed && (
+              <div className="bg-[#d8dadc] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
+                <Lock size={20} className="text-[#444933] shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">Evento Fechado</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#444933] leading-tight">Este evento foi encerrado. As calibrações estão bloqueadas para edição.</p>
+                </div>
+              </div>
+            )}
+
+            {activeCriteria.length > 0 && !alreadyReleased && !alreadyClosed && (
               <div className="sticky top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
                 <div className="flex items-center gap-3 min-w-0">
                   <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
@@ -556,7 +566,7 @@ export default function CalibrationsPage() {
                               setCalScores(prev => ({ ...prev, [c.criterionId]: val }));
                             }}
                             placeholder="—"
-                            disabled={alreadyReleased}
+                            disabled={alreadyReleased || alreadyClosed}
                             className="h-11 mt-1 w-full px-3 border-2 border-[#191c1e] text-lg font-black italic disabled:opacity-60 disabled:bg-[#eceef0] focus:outline-none focus:ring-2 focus:ring-[#ccff00] focus:ring-offset-2 focus:ring-offset-[#fbfcfd]"
                           />
                         </div>
@@ -568,12 +578,12 @@ export default function CalibrationsPage() {
                             onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
                             placeholder="Por que a nota original foi alterada?"
                             rows={2}
-                            disabled={alreadyReleased}
+                            disabled={alreadyReleased || alreadyClosed}
                             className="mt-1 rounded-none border-2 border-[#191c1e] resize-none disabled:opacity-60 disabled:bg-[#eceef0]"
                           />
                         </div>
                       </div>
-                      {!alreadyReleased && (
+                      {!alreadyReleased && !alreadyClosed && (
                         <div className="mt-3 flex items-center justify-end">
                           <button
                             data-testid={`button-save-cal-${c.criterionId}`}
