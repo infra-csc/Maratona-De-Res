@@ -168,7 +168,7 @@ export default function EventsPage() {
                   </div>
 
                   <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">
-                    <div className="flex-1 max-w-[220px] space-y-2">
+                    <div className="flex-1 max-w-[280px] space-y-2">
                       <div>
                         <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
                           <span className="text-[#444933]">Avaliações dos Avaliadores</span>
