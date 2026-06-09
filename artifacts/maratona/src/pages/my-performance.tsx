@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Trophy, Target, Calendar, TrendingUp, AlertTriangle,
   CheckCircle2, Clock, ChevronDown, ChevronRight,
-  MapPin, DollarSign,
+  MapPin, DollarSign, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -164,6 +164,7 @@ function EventCard({ event }: { event: EventSummary }) {
 export default function MyPerformancePage() {
   const { user } = useAuth();
   const { data: currentCycle } = useGetCurrentCycle();
+  const [eventFilter, setEventFilter] = useState("");
 
   const { data, isLoading, error } = useQuery<PerformanceData>({
     queryKey: ["my-performance"],
@@ -200,6 +201,14 @@ export default function MyPerformancePage() {
   const summary = data?.summary;
   const result = summary?.finalResult ?? summary?.grossAverage ?? null;
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
+  const filteredEvents = eventFilter
+    ? (data?.events ?? []).filter(ev =>
+        ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
+        (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
+        (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase())
+      )
+    : (data?.events ?? []);
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -332,17 +341,32 @@ export default function MyPerformancePage() {
 
           {/* Event breakdown */}
           <div className="pt-4">
-            <h2 className="text-xl font-black uppercase tracking-tight text-slate-800 mb-6 flex items-center gap-2">
-              <Calendar className="text-primary" size={24} />
-              Histórico de Eventos
-            </h2>
-            {data.events.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-dashed text-slate-400 font-medium shadow-sm">
-                Nenhum evento registrado no ciclo {data.cycle.name}.
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-xl font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
+                <Calendar className="text-primary" size={24} />
+                Histórico de Eventos
+              </h2>
+              <div className="relative max-w-sm w-full">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+                <input
+                  type="text"
+                  value={eventFilter}
+                  onChange={(e) => setEventFilter(e.target.value)}
+                  placeholder="Buscar evento..."
+                  className="w-full pl-9 pr-4 py-2 bg-white border-2 border-[#191c1e] text-sm font-bold italic text-[#191c1e] placeholder:text-[#747a60] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                />
+              </div>
+            </div>
+            {filteredEvents.length === 0 ? (
+              <div className="text-center py-20 bg-white border-2 border-dashed border-[#747a60] text-[#747a60] font-medium">
+                {eventFilter
+                  ? `Nenhum evento encontrado para "${eventFilter}".`
+                  : `Nenhum evento registrado no ciclo ${data.cycle.name}.`
+                }
               </div>
             ) : (
               <div className="space-y-4">
-                {data.events.map(ev => <EventCard key={ev.eventId} event={ev} />)}
+                {filteredEvents.map(ev => <EventCard key={ev.eventId} event={ev} />)}
               </div>
             )}
           </div>
