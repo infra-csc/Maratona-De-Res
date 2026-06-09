@@ -172,7 +172,7 @@ router.get("/my-performance", async (req, res) => {
       projectedPlatoonColor: platoon?.color ?? null,
       evaluatedCriteria,
       totalCriteria: totalExpected,
-      isPending: !isComplete,
+      // isPending removed — not shown to collaborators
       criteriaDetails,
     });
   }

@@ -14,7 +14,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
-import { StatusBadge } from "@/components/ui/status-badge";
 
 interface PerformanceData {
   employee: { id: number; name: string; department: string; functionName: string };
@@ -46,7 +45,6 @@ interface EventSummary {
   projectedPlatoonColor: string | null;
   evaluatedCriteria: number;
   totalCriteria: number;
-  isPending: boolean;
   criteriaDetails: CriterionDetail[];
 }
 
@@ -77,10 +75,9 @@ function EventCard({ event }: { event: EventSummary }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <StatusBadge status={event.status} />
-              {event.isPending && (
-                <span className="text-[10px] font-bold uppercase italic px-2 py-0.5 bg-[#ffdbd1] text-[#862200] border border-[#191c1e]">Ação Pendente</span>
-              )}
+              <span className="text-[10px] font-bold uppercase italic px-2 py-0.5 bg-[#ccff00] text-[#191c1e] border-2 border-[#191c1e]">
+                {event.status === "closed" ? "Fechado" : "Em avaliação"}
+              </span>
             </div>
             <p className="font-bold text-base truncate text-[#191c1e]">{event.eventName}</p>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold italic text-[#747a60]">
