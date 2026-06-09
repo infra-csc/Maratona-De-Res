@@ -77,7 +77,7 @@ function EventCard({ event }: { event: EventSummary }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-[10px] font-bold uppercase italic px-2 py-0.5 bg-[#ccff00] text-[#191c1e] border-2 border-[#191c1e]">
-                {event.status === "closed" ? "Fechado" : "Em avaliação"}
+                {event.status === "closed" ? "Avaliado" : "Em avaliação"}
               </span>
             </div>
             <p className="font-bold text-base truncate text-[#191c1e]">{event.eventName}</p>
@@ -256,7 +256,7 @@ export default function MyPerformancePage() {
                   <div className="text-lg font-medium text-[#747a60] mt-4 italic">-</div>
                 )}
                 {summary.isQuarterClosed && (
-                  <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Fechado Oficialmente</p>
+                  <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Avaliado Oficialmente</p>
                 )}
               </div>
               <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
@@ -350,7 +350,7 @@ export default function MyPerformancePage() {
                 <div className="flex bg-white border-2 border-[#191c1e]">
                   {[
                     { key: "all", label: "Todos" },
-                    { key: "closed", label: "Fechados" },
+                    { key: "closed", label: "Avaliados" },
                     { key: "open", label: "Em avaliação" },
                   ].map(btn => (
                     <button
