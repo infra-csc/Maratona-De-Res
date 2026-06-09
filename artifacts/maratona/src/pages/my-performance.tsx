@@ -36,8 +36,9 @@ interface PerformanceData {
 interface EventSummary {
   eventId: number;
   eventName: string;
-  city: string;
-  state: string;
+  city: string | null;
+  state: string | null;
+  location: string | null;
   startDate: string;
   status: string;
   eventScore: number;
@@ -82,7 +83,9 @@ function EventCard({ event }: { event: EventSummary }) {
               </div>
               <p className="font-bold text-base truncate text-slate-900">{event.eventName}</p>
               <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-medium text-slate-500">
-                <span className="flex items-center gap-1"><MapPin size={12} /> {event.city}/{event.state}</span>
+                {(event.city || event.location) && (
+                  <span className="flex items-center gap-1"><MapPin size={12} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
+                )}
                 {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
                 <span className="bg-slate-100 px-2 py-0.5 rounded-md">Quesitos: {event.evaluatedCriteria}/{event.totalCriteria}</span>
               </div>

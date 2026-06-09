@@ -644,10 +644,12 @@ export default function EvaluationsPage() {
                         <Calendar size={16} />
                         <span>{new Date(currentEvent.startDate).toLocaleDateString('pt-BR')} — {new Date(currentEvent.endDate).toLocaleDateString('pt-BR')}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin size={16} />
-                        <span>{currentEvent.city}, {currentEvent.state}</span>
-                      </div>
+                      {(currentEvent.city || currentEvent.location) && (
+                        <div className="flex items-center gap-2">
+                          <MapPin size={16} />
+                          <span>{currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `, ${currentEvent.state}` : ""}` : currentEvent.location}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2">
                         <Users size={16} />
                         <span>{currentEvent.participantCount} participantes</span>
