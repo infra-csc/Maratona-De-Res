@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useSubmitEvaluation, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Send, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket } from "lucide-react";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
@@ -131,6 +132,9 @@ export default function EvaluationsPage() {
   // Per-criterion audio override (objectPath). "" means the user cleared a
   // previously saved audio (re-recording). undefined => fall back to saved eval.
   const [audioOverrides, setAudioOverrides] = useState<Record<number, string>>({});
+  // Confirmation modal + in-flight state for the one-click "Lançar Avaliação" flow.
+  const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
   const { data: events } = useGetEvents({ status: "open" });
 
@@ -162,17 +166,6 @@ export default function EvaluationsPage() {
       onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
     },
   });
-
-  const submitMutation = useSubmitEvaluation({
-    mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: evalsQKey });
-        toast({ title: "Avaliação submetida com sucesso" });
-      },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao submeter", description: e.message, variant: "destructive" }),
-    },
-  });
-
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
   const openEvents = (events ?? []).filter(e => e.status === "open");
@@ -304,20 +297,67 @@ export default function EvaluationsPage() {
     setScores(s => ({ ...s, [criterionId]: score }));
   }
 
-  function handleSubmitAll() {
-    const myDrafts = (evaluations ?? []).filter(e => e.evaluatorUserId === user?.id && e.status === "draft");
-    if (myDrafts.length === 0) {
-      toast({ title: "Nenhuma avaliação pendente para submeter" });
-      return;
+  // A criterion is "ready to launch" if it's already submitted, OR fully filled
+  // in-screen (score chosen, justificativa when nota < 6, and áudio gravado) —
+  // even if it was never explicitly saved as rascunho.
+  function criterionReady(criterionId: number): boolean {
+    const ev = getEval(criterionId);
+    if (ev?.status === "submitted") return true;
+    const score = currentScore(criterionId);
+    if (score === 0) return false;
+    const comment = comments[criterionId] ?? ev?.comments ?? "";
+    if (score < 6 && (!comment || comment.trim().length === 0)) return false;
+    if (!currentAudio(criterionId)) return false;
+    return true;
+  }
+
+  // One-click submit: create/update each pending criterion as draft then submit
+  // it, with no requirement to have saved a rascunho first. On success we leave
+  // the evaluation screen so the avaliador sees the event as concluded.
+  async function handleLaunchAll() {
+    if (!selectedEventId) return;
+    setLaunching(true);
+    try {
+      for (const c of myCriteria) {
+        const ev = getEval(c.criterionId);
+        if (ev?.status === "submitted") continue;
+        const score = currentScore(c.criterionId);
+        const comment = comments[c.criterionId] ?? ev?.comments ?? "";
+        const audioUrl = currentAudio(c.criterionId);
+        const created = await createEvaluation({
+          eventId: selectedEventId,
+          criterionId: c.criterionId,
+          score,
+          comments: comment || undefined,
+          audioUrl: audioUrl ?? undefined,
+        });
+        await submitEvaluation(created.id);
+      }
+      await qc.invalidateQueries({ queryKey: evalsQKey });
+      toast({ title: "Avaliação lançada com sucesso", description: "Você não tem pendências para este evento." });
+      setConfirmLaunchOpen(false);
+      setSelectedEventId(null);
+      setScores({}); setComments({}); setAudioOverrides({});
+    } catch (e) {
+      // A criterion may already be submitted (e.g. a retry after a partial
+      // failure). Refetch so getEval() reflects the real server state and the
+      // next attempt skips what's already done instead of erroring again.
+      await qc.invalidateQueries({ queryKey: evalsQKey });
+      toast({ title: "Erro ao lançar avaliação", description: ((e as { message?: string })?.message ?? "") + " Confira o que ficou pendente e tente novamente.", variant: "destructive" });
+    } finally {
+      setLaunching(false);
     }
-    myDrafts.forEach(e => submitMutation.mutate({ id: e.id }));
   }
 
   const allEvaled = myCriteria.length > 0 && myCriteria.every(c => {
     const ev = getEval(c.criterionId);
     return ev && ev.status === "submitted";
   });
-  const hasDrafts = myCriteria.some(c => getEval(c.criterionId)?.status === "draft");
+  // Ready to launch when every criterion is filled in-screen (or already done),
+  // and there is at least one not-yet-submitted criterion to send.
+  const allReady = myCriteria.length > 0 && myCriteria.every(c => criterionReady(c.criterionId));
+  const pendingToFill = myCriteria.filter(c => !criterionReady(c.criterionId)).length;
+  const toSubmitCount = myCriteria.filter(c => getEval(c.criterionId)?.status !== "submitted").length;
 
   const completedCount = myCriteria.filter(c => {
     const ev = getEval(c.criterionId);
@@ -819,30 +859,64 @@ export default function EvaluationsPage() {
                   {/* Submission — evaluators only */}
                   {isEvaluator && myCriteria.length > 0 && (
                     <div className="p-5">
-                      {hasDrafts ? (
-                        <button
-                          data-testid="button-submit-eval"
-                          onClick={handleSubmitAll}
-                          disabled={submitMutation.isPending}
-                          className={`w-full bg-[#ccff00] border-2 border-[#191c1e] py-4 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-                        >
-                          <Send size={16} /> Submeter Avaliações
-                        </button>
-                      ) : allEvaled ? (
+                      {allEvaled ? (
                         <div className="flex items-center justify-center gap-2 text-[#506600] bg-[#ccff00]/30 border-2 border-[#506600] p-3 font-bold italic uppercase text-sm">
                           <CheckCircle size={16} /> Você já concluiu sua avaliação
                         </div>
+                      ) : allReady ? (
+                        <button
+                          data-testid="button-submit-eval"
+                          onClick={() => setConfirmLaunchOpen(true)}
+                          disabled={launching}
+                          className={`w-full bg-[#ccff00] border-2 border-[#191c1e] py-4 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                        >
+                          <Rocket size={16} /> Lançar Avaliação
+                        </button>
                       ) : (
                         <button disabled className="w-full bg-[#eceef0] border-2 border-[#191c1e] py-4 font-bold text-sm italic uppercase tracking-wider opacity-60 cursor-not-allowed">
-                          Preencha os critérios
+                          {pendingToFill} {pendingToFill === 1 ? "critério pendente" : "critérios pendentes"}
                         </button>
                       )}
 
-                      {hasDrafts && (
+                      {!allEvaled && (
                         <p className="text-[11px] text-center text-[#747a60] italic mt-3 leading-relaxed">
-                          Critérios em <strong>rascunho</strong> precisam ser submetidos para compor a nota final da equipe.
+                          {allReady
+                            ? <>Ao lançar, suas notas são <strong>submetidas e bloqueadas</strong>. Salvar rascunho é opcional.</>
+                            : <>Dê nota, justifique (notas abaixo de 6) e grave o áudio de cada critério. <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
                         </p>
                       )}
+
+                      <AlertDialog open={confirmLaunchOpen} onOpenChange={(o) => { if (!launching) setConfirmLaunchOpen(o); }}>
+                        <AlertDialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]" data-testid="dialog-confirm-launch">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
+                              <Rocket size={22} className="text-[#506600]" /> Confirmar lançamento
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-sm text-[#444933] italic leading-relaxed">
+                              Você está prestes a submeter {toSubmitCount} {toSubmitCount === 1 ? "avaliação" : "avaliações"} para
+                              {" "}<strong>{pickedEvent?.name}</strong>. Após o lançamento, as notas ficam
+                              {" "}<strong>bloqueadas para edição</strong> e compõem a nota final da equipe. Deseja continuar?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel
+                              disabled={launching}
+                              data-testid="button-cancel-launch"
+                              className="rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider"
+                            >
+                              Voltar
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) => { e.preventDefault(); handleLaunchAll(); }}
+                              disabled={launching}
+                              data-testid="button-confirm-launch"
+                              className="rounded-none border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-bold italic uppercase text-xs tracking-wider hover:bg-[#bdf000] disabled:opacity-60"
+                            >
+                              {launching ? "Lançando..." : "Lançar agora"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   )}
                 </div>

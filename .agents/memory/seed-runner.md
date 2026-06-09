@@ -18,6 +18,6 @@ If ANY integration data exists (events with `external_id`, or employees with `so
 
 **Why:** reflexively running the seed (incl. `FORCE_SEED=1`) to refresh demo fixtures wiped the user's synced production data more than once ("perdemos o que sincronizamos"); the user demanded it be impossible. The only way to clear a DB with integration data is a deliberate manual SQL action.
 
-**Recovery if data is ever lost:** re-run the external sync — `POST /api/integration/sync` as admin/rh (admin@cenografica.com.br / 123456) — which re-imports employees/events/participations from the external app. Idempotent.
+**Recovery if data is ever lost:** re-run the external sync — `POST /api/integration/sync` authenticated as an admin/rh user — which re-imports employees/events/participations from the external app. Idempotent.
 
 **Other delete paths are single-row admin actions only** (DELETE event-by-id, DELETE participant-by-id in routes/events.ts) — no other mass-delete of employees/events exists. Post-merge reconcile (`scripts/post-merge.sh`) runs only `pnpm install` + `db push` (no seed).
