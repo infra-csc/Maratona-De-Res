@@ -27,6 +27,7 @@ export * from './criterionScoreDetail';
 export * from './criterionUpdate';
 export * from './csvExport';
 export * from './csvImportInput';
+export * from './cycle';
 export * from './dashboardSummary';
 export * from './employee';
 export * from './employeeEventResult';

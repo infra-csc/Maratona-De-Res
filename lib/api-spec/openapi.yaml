@@ -1288,6 +1288,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuarterEligibility"
 
+  /cycles/current:
+    get:
+      operationId: getCurrentCycle
+      tags: [cycles]
+      summary: Current cycle (período de referência)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cycle"
+
   /ranking:
     get:
       operationId: getRanking
@@ -2838,6 +2851,23 @@ components:
           type: array
           items:
             type: string
+
+    Cycle:
+      type: object
+      required: [id, name, status, isCurrent]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        status:
+          type: string
+        isCurrent:
+          type: boolean
 
     RankingEntry:
       type: object

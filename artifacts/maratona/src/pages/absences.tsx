@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Trash2, UserMinus, Download, Search, AlertTriangle, Award } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { CycleBadge } from "@/components/cycle-badge";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -106,6 +107,7 @@ export default function AbsencesPage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <CycleBadge />
             <button
               data-testid="button-export-absences"
               onClick={handleExport}

@@ -20,6 +20,7 @@ import myPerformanceRouter from "./my-performance.js";
 import feedbackRouter from "./feedback.js";
 import eligibilityRouter from "./eligibility.js";
 import storageRouter from "./storage.js";
+import cyclesRouter from "./cycles.js";
 
 const router: IRouter = Router();
 
@@ -31,6 +32,11 @@ router.use(authRouter);
 // uploads/playback used by avaliadores. Storage has its own guards: requireAuth
 // on the upload-URL endpoint, public GET for <audio> playback.
 router.use(storageRouter);
+// cyclesRouter mounted early for the same reason as storageRouter: it must come
+// BEFORE auditRouter/integrationRouter (blanket requireRole("admin","rh")),
+// otherwise those guards 403 the current-cycle read for non-admin roles
+// (avaliador/colaborador) that need it on my-performance, etc.
+router.use(cyclesRouter);
 router.use(usersRouter);
 router.use(areasRouter);
 router.use(employeesRouter);

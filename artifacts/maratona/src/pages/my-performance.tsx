@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useGetCurrentCycle } from "@workspace/api-client-react";
+import { formatCyclePeriod } from "@/components/cycle-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -152,6 +154,7 @@ function EventCard({ event }: { event: EventSummary }) {
 
 export default function MyPerformancePage() {
   const { user } = useAuth();
+  const { data: currentCycle } = useGetCurrentCycle();
 
   const { data, isLoading, error } = useQuery<PerformanceData>({
     queryKey: ["my-performance"],
@@ -204,9 +207,16 @@ export default function MyPerformancePage() {
           </div>
         </div>
         {data?.cycle && (
-          <div className="flex bg-white p-1.5 rounded-xl border shadow-sm gap-2 w-max items-center px-4 py-2">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Ciclo</span>
-            <span className="font-black text-slate-800">{data.cycle.name}</span>
+          <div className="flex flex-col bg-white p-3 rounded-xl border shadow-sm w-max px-4 py-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Ciclo</span>
+              <span className="font-black text-slate-800">{data.cycle.name}</span>
+            </div>
+            {formatCyclePeriod(currentCycle?.startDate, currentCycle?.endDate) && (
+              <span className="text-[11px] font-semibold text-muted-foreground mt-0.5">
+                {formatCyclePeriod(currentCycle?.startDate, currentCycle?.endDate)}
+              </span>
+            )}
           </div>
         )}
       </div>

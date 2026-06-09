@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Lock, Unlock, Calendar, MapPin, ChevronRight, Users } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
+import { CycleBadge } from "@/components/cycle-badge";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -60,8 +61,11 @@ export default function EventsPage() {
             </h1>
             <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-xl">Acompanhe o andamento das avaliações das equipes nos eventos sincronizados.</p>
           </div>
-          <div className="flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] bg-[#e6e8ea] border-2 border-[#191c1e] px-4 py-3 skew-x-[-4deg]">
-            <span className="inline-block skew-x-[4deg]">Eventos sincronizados via integração</span>
+          <div className="flex flex-col items-start md:items-end gap-2">
+            <CycleBadge />
+            <div className="flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] bg-[#e6e8ea] border-2 border-[#191c1e] px-4 py-3 skew-x-[-4deg]">
+              <span className="inline-block skew-x-[4deg]">Eventos sincronizados via integração</span>
+            </div>
           </div>
         </section>
 

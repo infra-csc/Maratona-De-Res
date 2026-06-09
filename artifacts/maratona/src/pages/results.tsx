@@ -6,6 +6,7 @@ import {
   useCloseQuarter, useUpdateBonusPayment,
 } from "@workspace/api-client-react";
 import type { QuarterlyResult } from "@workspace/api-client-react";
+import { CycleBadge } from "@/components/cycle-badge";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -890,11 +891,14 @@ export default function ResultsPage() {
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="p-6 md:p-10 space-y-8">
-        <section className="border-l-8 border-[#ccff00] pl-6 py-1">
-          <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-            Resultados <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">do Ciclo</span>
-          </h1>
-          <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-2xl">Ranking, consolidação de notas e pagamentos de bônus do ciclo atual.</p>
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
+          <div>
+            <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
+              Resultados <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">do Ciclo</span>
+            </h1>
+            <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-2xl">Ranking, consolidação de notas e pagamentos de bônus do ciclo atual.</p>
+          </div>
+          <CycleBadge />
         </section>
 
         {isManager ? (

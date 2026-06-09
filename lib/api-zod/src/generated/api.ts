@@ -1670,6 +1670,19 @@ export const SetCycleEligibilityBody = zod.object({
 
 
 /**
+ * @summary Current cycle (período de referência)
+ */
+export const GetCurrentCycleResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "isCurrent": zod.boolean()
+})
+
+
+/**
  * @summary Get ranking (Maratona de Resultados)
  */
 export const GetRankingQueryParams = zod.object({

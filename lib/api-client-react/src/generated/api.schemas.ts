@@ -745,6 +745,17 @@ export interface QuarterCloseResult {
   warnings?: string[];
 }
 
+export interface Cycle {
+  id: number;
+  name: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  status: string;
+  isCurrent: boolean;
+}
+
 export interface RankingEntry {
   position: number;
   employeeId: number;

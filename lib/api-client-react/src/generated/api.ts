@@ -36,6 +36,7 @@ import type {
   CriterionUpdate,
   CsvExport,
   CsvImportInput,
+  Cycle,
   DashboardSummary,
   Employee,
   EmployeeInput,
@@ -5007,6 +5008,83 @@ export const useSetCycleEligibility = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getSetCycleEligibilityMutationOptions(options));
     }
+
+export const getGetCurrentCycleUrl = () => {
+
+
+
+
+  return `/cycles/current`
+}
+
+/**
+ * @summary Current cycle (período de referência)
+ */
+export const getCurrentCycle = async ( options?: RequestInit): Promise<Cycle> => {
+
+  return customFetch<Cycle>(getGetCurrentCycleUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentCycleQueryKey = () => {
+    return [
+    `/cycles/current`
+    ] as const;
+    }
+
+
+export const getGetCurrentCycleQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentCycle>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentCycle>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentCycleQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentCycle>>> = ({ signal }) => getCurrentCycle({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentCycle>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentCycleQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentCycle>>>
+export type GetCurrentCycleQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current cycle (período de referência)
+ */
+
+export function useGetCurrentCycle<TData = Awaited<ReturnType<typeof getCurrentCycle>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentCycle>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentCycleQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetRankingUrl = (params?: GetRankingParams,) => {
   const normalizedParams = new URLSearchParams();

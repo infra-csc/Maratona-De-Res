@@ -2,6 +2,7 @@ import { useGetDashboardSummary, useGetDashboardPlatoonDistribution, useGetDashb
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { CheckCircle2, Users, Trophy, DollarSign, History, AlertTriangle, Clock, ChevronRight } from "lucide-react";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
+import { CycleBadge } from "@/components/cycle-badge";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -33,13 +34,7 @@ export default function DashboardPage() {
         <h1 data-testid="text-page-title" className="text-2xl md:text-3xl italic font-black text-[#506600] uppercase tracking-tighter">
           Painel de Controle
         </h1>
-        {summary?.cycleName && (
-          <div className="flex gap-2">
-            <span data-testid="text-cycle-name" className="bg-[#191c1e] text-[#ccff00] px-4 py-2 border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider skew-x-[-6deg] inline-block">
-              <span className="inline-block skew-x-[6deg]">{summary.cycleName}</span>
-            </span>
-          </div>
-        )}
+        <CycleBadge />
       </header>
 
       <div className="p-6 md:p-10 space-y-10">
