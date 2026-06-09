@@ -153,8 +153,8 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 
   const filteredRanking = allResults.filter(r => {
     if (filterPlatoon !== "__all" && r.platoon !== filterPlatoon) return false;
-    if (filterEligible === "eligible" && r.bonusValue === 0) return false;
-    if (filterEligible === "ineligible" && r.bonusValue > 0) return false;
+    if (filterEligible === "eligible" && r.eligible === false) return false;
+    if (filterEligible === "ineligible" && r.eligible !== false) return false;
     return true;
   });
 
