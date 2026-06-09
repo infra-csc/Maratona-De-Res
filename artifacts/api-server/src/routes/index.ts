@@ -49,11 +49,11 @@ router.use(rulesRouter);
 router.use(dashboardRouter);
 router.use(resultsRouter);
 router.use(rankingRouter);
-router.use(auditRouter);
-router.use(integrationRouter);
-router.use(exportsRouter);
 router.use(myPerformanceRouter);
 router.use(feedbackRouter);
 router.use(eligibilityRouter);
+router.use(auditRouter);
+router.use(integrationRouter);
+router.use(exportsRouter);
 
 export default router;
