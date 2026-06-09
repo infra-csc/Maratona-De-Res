@@ -66,6 +66,35 @@ export default function EventsPage() {
           </div>
         </section>
 
+        {/* Summary cards */}
+        {events && events.length > 0 && (
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(() => {
+              const all = events ?? [];
+              const configured = all.filter(e => e.criteriaConfirmed).length;
+              const pendingRH = all.filter(e => !e.criteriaConfirmed).length;
+              const pendingCal = all.filter(e => e.status === "closed" && !e.hasCalibration).length;
+              const fullyEval = all.filter(e => e.evaluationProgress === 1).length;
+              const cards = [
+                { label: "Configurados", value: configured, color: "#506600" },
+                { label: "Aguardando RH", value: pendingRH, color: "#ff5722" },
+                { label: "Falta Calibrar", value: pendingCal, color: "#ffb300" },
+                { label: "Avaliação 100%", value: fullyEval, color: "#ccff00" },
+              ];
+              return cards.map(c => (
+                <div key={c.label} className="bg-white border-2 border-[#191c1e] p-4 flex flex-col justify-between h-28 relative overflow-hidden">
+                  <div className="z-10">
+                    <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933]">{c.label}</p>
+                    <h2 className="text-[32px] leading-none italic font-black mt-1" style={{ color: c.color }}>{c.value}</h2>
+                    <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-1">de {all.length} eventos</p>
+                  </div>
+                  <div className="w-full h-1.5 mt-auto" style={{ backgroundColor: c.color }} />
+                </div>
+              ));
+            })()}
+          </section>
+        )}
+
         {/* Filter bar */}
         <section className="bg-[#e6e8ea] border-2 border-[#191c1e] flex flex-col md:flex-row gap-4 items-stretch md:items-center p-4 skew-x-[-1deg]">
           <div className="relative flex-1 skew-x-[1deg]">
