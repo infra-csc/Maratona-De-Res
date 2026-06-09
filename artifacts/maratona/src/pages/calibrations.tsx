@@ -197,7 +197,7 @@ export default function CalibrationsPage() {
       .map(c => ({ critId: c.criterionId, score: pendingScore(c.criterionId), reason: (calReasons[c.criterionId] ?? getCalibration(c.criterionId)?.calibrationReason ?? "").trim() }))
       .filter((x): x is { critId: number; score: number; reason: string } => x.score != null);
     if (toSave.length === 0) {
-      toast({ title: "Nada para salvar", description: "Preencha ao menos uma nota calibrada (1 a 5).", variant: "destructive" });
+      toast({ title: "Nada para salvar", description: "Preencha ao menos uma nota calibrada (1 a 10).", variant: "destructive" });
       return;
     }
     setSavingAll(true);
@@ -360,7 +360,7 @@ export default function CalibrationsPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Salvar todas de uma vez</p>
                     <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
-                      {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 5) abaixo"}
+                      {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 10) abaixo"}
                     </p>
                   </div>
                 </div>
