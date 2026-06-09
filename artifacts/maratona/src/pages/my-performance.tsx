@@ -162,6 +162,7 @@ export default function MyPerformancePage() {
   const { user } = useAuth();
   const { data: currentCycle } = useGetCurrentCycle();
   const [eventFilter, setEventFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "closed" | "open">("all");
 
   const { data, isLoading, error } = useQuery<PerformanceData>({
     queryKey: ["my-performance"],
@@ -199,13 +200,14 @@ export default function MyPerformancePage() {
   const result = summary?.finalResult ?? summary?.grossAverage ?? null;
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-  const filteredEvents = eventFilter
-    ? (data?.events ?? []).filter(ev =>
-        ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
-        (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
-        (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase())
-      )
-    : (data?.events ?? []);
+  const filteredEvents = (data?.events ?? []).filter(ev => {
+    const matchesText = !eventFilter ||
+      ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
+      (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
+      (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase());
+    const matchesStatus = statusFilter === "all" || ev.status === statusFilter;
+    return matchesText && matchesStatus;
+  });
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -343,15 +345,36 @@ export default function MyPerformancePage() {
                 <Calendar className="text-primary" size={24} />
                 Histórico de Eventos
               </h2>
-              <div className="relative max-w-sm w-full">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-                <input
-                  type="text"
-                  value={eventFilter}
-                  onChange={(e) => setEventFilter(e.target.value)}
-                  placeholder="Buscar evento..."
-                  className="w-full pl-9 pr-4 py-2 bg-white border-2 border-[#191c1e] text-sm font-bold italic text-[#191c1e] placeholder:text-[#747a60] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
-                />
+              <div className="flex items-center gap-2">
+                <div className="flex bg-white border-2 border-[#191c1e]">
+                  {[
+                    { key: "all", label: "Todos" },
+                    { key: "closed", label: "Fechados" },
+                    { key: "open", label: "Em avaliação" },
+                  ].map(btn => (
+                    <button
+                      key={btn.key}
+                      onClick={() => setStatusFilter(btn.key as typeof statusFilter)}
+                      className={`px-3 py-2 text-[10px] font-bold uppercase italic transition-colors ${
+                        statusFilter === btn.key
+                          ? "bg-[#ccff00] text-[#191c1e]"
+                          : "bg-white text-[#747a60] hover:bg-[#f2f4f6]"
+                      }`}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative max-w-sm w-full">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+                  <input
+                    type="text"
+                    value={eventFilter}
+                    onChange={(e) => setEventFilter(e.target.value)}
+                    placeholder="Buscar evento..."
+                    className="w-full pl-9 pr-4 py-2 bg-white border-2 border-[#191c1e] text-sm font-bold italic text-[#191c1e] placeholder:text-[#747a60] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                  />
+                </div>
               </div>
             </div>
             {filteredEvents.length === 0 ? (
