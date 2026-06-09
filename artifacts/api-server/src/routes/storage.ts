@@ -81,11 +81,14 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 /**
  * GET /storage/objects/*
  *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * These are served from a separate path from /public-objects and can optionally
- * be protected with authentication or ACL checks based on the use case.
+ * Serve object entities from PRIVATE_OBJECT_DIR. These hold sensitive content
+ * (evaluation audio justifications), so the route requires authentication.
+ * The browser can't send an Authorization header on an <audio src>, so the
+ * frontend fetches the bytes with its Bearer token and plays them via a blob URL
+ * (see fetchAudioObjectUrl in the web app). Any authenticated user may read;
+ * finer-grained per-object ACL is a known follow-up.
  */
-router.get("/storage/objects/*path", async (req: Request, res: Response) => {
+router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;

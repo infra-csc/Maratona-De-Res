@@ -25,8 +25,21 @@ export async function uploadAudioBlob(blob: Blob): Promise<string> {
   return objectPath;
 }
 
-/** Builds the serving URL for a stored audio objectPath. */
-export function audioSrc(objectPath: string): string {
+/**
+ * Fetches a stored audio object with the user's Bearer token and returns a blob
+ * object URL playable by <audio>. The serving endpoint requires authentication
+ * (sensitive HR content), and <audio src> cannot carry an Authorization header,
+ * so we fetch the bytes ourselves. Callers must URL.revokeObjectURL when done.
+ */
+export async function fetchAudioObjectUrl(objectPath: string): Promise<string> {
   const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
-  return `${base}/storage${objectPath}`;
+  const token = localStorage.getItem("maratona_token");
+  const res = await fetch(`${base}/storage${objectPath}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new Error("Falha ao carregar o áudio.");
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }

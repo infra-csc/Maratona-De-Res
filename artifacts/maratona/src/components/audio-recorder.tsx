@@ -1,14 +1,48 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square, RotateCcw, Loader2, AlertCircle } from "lucide-react";
-import { uploadAudioBlob, audioSrc } from "@/lib/audio-upload";
+import { uploadAudioBlob, fetchAudioObjectUrl } from "@/lib/audio-upload";
 import { cn } from "@/lib/utils";
 
 export function AudioPlayer({ objectPath, className }: { objectPath: string; className?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let url: string | null = null;
+    setSrc(null);
+    setFailed(false);
+    fetchAudioObjectUrl(objectPath)
+      .then(u => {
+        if (cancelled) { URL.revokeObjectURL(u); return; }
+        url = u;
+        setSrc(u);
+      })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [objectPath]);
+
+  if (failed) {
+    return (
+      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#ba1a1a]", className)}>
+        <AlertCircle size={12} /> Falha ao carregar o áudio
+      </p>
+    );
+  }
+  if (!src) {
+    return (
+      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#5c5f61]", className)} data-testid="audio-loading">
+        <Loader2 size={12} className="animate-spin" /> Carregando áudio...
+      </p>
+    );
+  }
   return (
     <audio
       controls
-      preload="none"
-      src={audioSrc(objectPath)}
+      src={src}
       data-testid="audio-player"
       className={cn("w-full h-10", className)}
     />
