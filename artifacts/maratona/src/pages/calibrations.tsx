@@ -230,6 +230,46 @@ export default function CalibrationsPage() {
     }
   }
 
+  // Salva TUDO e já abre o modal de fechamento/liberação (fluxo "Enviar").
+  async function sendAllCalibrations() {
+    const toSave = activeCriteria
+      .map(c => ({ critId: c.criterionId, score: pendingScore(c.criterionId), reason: (calReasons[c.criterionId] ?? getCalibration(c.criterionId)?.calibrationReason ?? "").trim() }))
+      .filter((x): x is { critId: number; score: number; reason: string } => x.score != null);
+    if (toSave.length === 0) {
+      toast({ title: "Nada para enviar", description: "Preencha ao menos uma nota calibrada (1 a 10).", variant: "destructive" });
+      return;
+    }
+    setSavingAll(true);
+    let ok = 0;
+    const failed: number[] = [];
+    let firstError: string | null = null;
+    for (const x of toSave) {
+      try {
+        await bulkMutation.mutateAsync({
+          data: {
+            eventId: selectedEventId!,
+            criterionId: x.critId,
+            calibratedScore: x.score,
+            calibrationReason: x.reason,
+            originalAverageScore: getAvgScore(x.critId) ?? undefined,
+          },
+        });
+        ok++;
+      } catch (e) {
+        failed.push(x.critId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+      }
+    }
+    setSavingAll(false);
+    qc.invalidateQueries({ queryKey: calQKey });
+    if (failed.length === 0) {
+      toast({ title: `${ok} calibraç${ok === 1 ? "ão enviada" : "ões enviadas"}`, description: "Pronto para fechar o evento e liberar as notas." });
+      setFinalizeOpen(true);
+    } else {
+      toast({ title: `${ok} enviada(s), ${failed.length} com erro`, description: firstError ?? "Revise os critérios destacados e tente novamente.", variant: "destructive" });
+    }
+  }
+
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="p-6 md:p-10 space-y-10">
@@ -358,31 +398,55 @@ export default function CalibrationsPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Salvar todas de uma vez</p>
-                    <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
-                      {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 10) abaixo"}
-                    </p>
+                    {readyToFinalize ? (
+                      <>
+                        <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Todas as calibrações salvas</p>
+                        <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
+                          {alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Salvar todas de uma vez</p>
+                        <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
+                          {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 10) abaixo"}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    data-testid="button-save-all-cal"
-                    type="button"
-                    disabled={savingAll || fillableCount === 0}
-                    onClick={saveAllCalibrations}
-                    className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
-                  >
-                    <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
-                  </button>
-                  <button
-                    data-testid="button-send-all-cal"
-                    type="button"
-                    disabled={savingAll || fillableCount === 0}
-                    onClick={saveAllCalibrations}
-                    className="bg-white text-[#191c1e] border-2 border-white px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
-                  >
-                    <Send size={16} /> Enviar
-                  </button>
+                  {readyToFinalize ? (
+                    <button
+                      data-testid="button-open-finalize"
+                      type="button"
+                      onClick={() => setFinalizeOpen(true)}
+                      className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 transition-all hover:bg-white hover:border-white"
+                    >
+                      <Flag size={16} /> {alreadyClosed ? "Liberar Notas" : "Fechar Evento e Liberar Notas"}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        data-testid="button-save-all-cal"
+                        type="button"
+                        disabled={savingAll || fillableCount === 0}
+                        onClick={saveAllCalibrations}
+                        className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
+                      >
+                        <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                      </button>
+                      <button
+                        data-testid="button-send-all-cal"
+                        type="button"
+                        disabled={savingAll || fillableCount === 0}
+                        onClick={sendAllCalibrations}
+                        className="bg-white text-[#191c1e] border-2 border-white px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
+                      >
+                        <Send size={16} /> Enviar
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
