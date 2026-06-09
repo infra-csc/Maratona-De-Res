@@ -51,6 +51,12 @@ export default function EventsPage() {
     return matchSearch && matchConfig && isFinished && matchCard;
   });
 
+  // Eventos do ciclo atual (dentro do período do ciclo)
+  const cycleEvents = (events ?? []).filter(ev => {
+    const isFinished = ev.endDate < todayStr;
+    return isFinished;
+  });
+
   const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
 
   return (

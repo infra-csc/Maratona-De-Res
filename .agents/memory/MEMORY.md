@@ -21,6 +21,7 @@
 - [Label rename: Nota Avaliador](nota-avaliador-label.md) — "Média Original" → "Nota Avaliador" on event-detail and calibrations tables/tooltips for clarity
 - [Evaluations include closed events](evaluations-closed-events.md) — Central de Avaliações dropdown shows open + closed events (not just open); status filter removed from useGetEvents call; all downstream filters use activeEvents (open|closed)
 - [Cycle migration](cycle-migration.md) — year+quarter removed → single current ciclo (getCurrentCycle); eventsCount(scored) vs participatedEventsCount(eligibility, >=min_events_eligibility default 8)
+- [Cycle-scoped event filtering](cycle-event-filtering.md) — /events GET must filter to cycle.startDate ≤ endDate ≤ cycle.endDate; integration sync may import events outside cycle period; backend filter prevents stale data
 - [Consolidação net display](consolidation-net-display.md) — Penalidades/Méritos = stored meritPoints - absencePenalty, NOT grossAverage-finalResult (clamp-distorted at 0/100)
 - [Unified Resultados page](unified-results-page.md) — one /results page, 3 tabs (Ranking all roles · Consolidação · Bônus managers); /ranking redirects to /results; ranking.tsx deleted
 - [Quarterly recompute triggers](quarterly-recompute-triggers.md) — dashboard/results/ranking read snapshot quarterlyResultsTable; event close/reopen/release must call recomputeQuarterResults (idempotent, preserves payments, txn)

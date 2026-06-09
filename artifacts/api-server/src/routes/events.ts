@@ -35,7 +35,10 @@ router.get("/events", async (req, res) => {
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
   ]);
 
-  const enriched = events.map((ev) => {
+  // Filtra eventos dentro do período do ciclo atual
+  const cycleEvents = events.filter(ev => ev.endDate >= cycle.startDate && ev.endDate <= cycle.endDate);
+
+  const enriched = cycleEvents.map((ev) => {
     const participantCount = participants.filter(p => p.eventId === ev.id).length;
     const evEvals = evals.filter(e => e.eventId === ev.id);
     const submitted = evEvals.filter(e => e.status === "submitted");
