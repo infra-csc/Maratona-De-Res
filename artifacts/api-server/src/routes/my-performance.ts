@@ -137,7 +137,7 @@ router.get("/my-performance", async (req, res) => {
         weight,
         scoreUsed,
         criterionTotal,
-        hasCalibration: calibratedScore !== null,
+        // hasCalibration removed — not shown to collaborators
         publicComments,
         evaluated: scoreUsed !== null,
         status: scoreUsed !== null ? "avaliado" : "pendente",

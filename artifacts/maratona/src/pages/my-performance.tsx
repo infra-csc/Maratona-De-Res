@@ -57,7 +57,6 @@ interface CriterionDetail {
   weight: number;
   scoreUsed: number | null;
   criterionTotal: number | null;
-  hasCalibration: boolean;
   publicComments: string[];
   evaluated: boolean;
 }
@@ -66,92 +65,99 @@ function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all bg-white mb-4">
-      <CardContent className="p-0">
-        <button
-          onClick={() => setOpen(v => !v)}
-          className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-slate-50 transition-colors text-left gap-4"
-        >
-          <div className="flex items-start gap-4 min-w-0 w-full">
-            <div className="mt-1 shrink-0 bg-slate-100 p-2 rounded-full text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-              {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+    <div className="bg-white border-2 border-[#191c1e] mb-4">
+      {/* Header do evento */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-[#f2f4f6] transition-colors text-left gap-4"
+      >
+        <div className="flex items-start gap-4 min-w-0 w-full">
+          <div className="mt-1 shrink-0 bg-[#ccff00] border-2 border-[#191c1e] p-2 text-[#191c1e]">
+            {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <StatusBadge status={event.status} />
+              {event.isPending && (
+                <span className="text-[10px] font-bold uppercase italic px-2 py-0.5 bg-[#ffdbd1] text-[#862200] border border-[#191c1e]">Ação Pendente</span>
+              )}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <StatusBadge status={event.status} />
-                {event.isPending && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Ação Pendente</Badge>}
-              </div>
-              <p className="font-bold text-base truncate text-slate-900">{event.eventName}</p>
-              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-medium text-slate-500">
-                {(event.city || event.location) && (
-                  <span className="flex items-center gap-1"><MapPin size={12} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
-                )}
-                {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
-                <span className="bg-slate-100 px-2 py-0.5 rounded-md">Quesitos: {event.evaluatedCriteria}/{event.totalCriteria}</span>
-              </div>
+            <p className="font-bold text-base truncate text-[#191c1e]">{event.eventName}</p>
+            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold italic text-[#747a60]">
+              {(event.city || event.location) && (
+                <span className="flex items-center gap-1"><MapPin size={12} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
+              )}
+              {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
+              <span className="bg-[#f2f4f6] border border-[#191c1e] px-2 py-0.5">Quesitos: {event.evaluatedCriteria}/{event.totalCriteria}</span>
             </div>
           </div>
-          
-          <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
-            {event.projectedPlatoon && <PlatoonBadge platoon={event.projectedPlatoon} colorHex={event.projectedPlatoonColor} />}
-            
-            {event.eventScore > 0 && (
-              <div className="text-right bg-primary/5 px-3 py-1.5 rounded-lg border border-primary/10">
-                <span className="block text-[10px] uppercase font-bold text-primary mb-0.5">Nota</span>
-                <span className="font-black text-xl text-primary">{event.eventScore.toFixed(1)}</span>
-              </div>
-            )}
-          </div>
-        </button>
+        </div>
 
-        {open && (
-          <div className="border-t bg-slate-50/80 p-5 md:p-6 space-y-4">
-            <h4 className="font-semibold text-sm uppercase tracking-wide text-slate-500 mb-2">Detalhamento dos Critérios</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {event.criteriaDetails.map(c => (
-                <div key={c.criterionId} className="bg-white rounded-xl border p-4 shadow-sm relative overflow-hidden">
-                  {c.hasCalibration && <div className="absolute top-0 right-0 w-8 h-8 bg-amber-100 transform rotate-45 translate-x-4 -translate-y-4"></div>}
-                  
-                  <div className="flex justify-between items-start gap-4 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">Peso {c.weight}</span>
-                        {c.evaluated && !c.hasCalibration && <span className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 size={12}/> Avaliado</span>}
-                        {c.hasCalibration && <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1"><AlertTriangle size={12}/> Calibrado</span>}
-                      </div>
-                      <p className="font-bold text-sm text-slate-800 leading-tight">{c.criterionName}</p>
-                    </div>
-                    
-                    <div className="text-right shrink-0">
-                      {c.scoreUsed !== null ? (
-                        <div className="flex items-end gap-1">
-                          <span className="font-black text-2xl text-slate-900 leading-none">{c.scoreUsed.toFixed(1)}</span>
-                          <span className="text-xs font-bold text-slate-400 pb-1">/5</span>
-                        </div>
-                      ) : (
-                        <Badge variant="outline" className="bg-slate-50 text-slate-400 border-slate-200">Pendente</Badge>
+        <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#191c1e]/20">
+          {event.projectedPlatoon && (
+            <span className="text-[10px] font-bold uppercase italic px-2 py-1 border-2 border-[#191c1e]"
+              style={{ backgroundColor: event.projectedPlatoonColor || '#ccff00', color: '#191c1e' }}>
+              {event.projectedPlatoon}
+            </span>
+          )}
+
+          {event.eventScore > 0 && (
+            <div className="text-right bg-[#ccff00] border-2 border-[#191c1e] px-3 py-1.5">
+              <span className="block text-[10px] uppercase font-bold text-[#191c1e] mb-0.5 italic">Nota</span>
+              <span className="font-black text-xl text-[#506600]">{event.eventScore.toFixed(1)}</span>
+            </div>
+          )}
+        </div>
+      </button>
+
+      {/* Detalhamento dos critérios */}
+      {open && (
+        <div className="border-t-2 border-[#191c1e] bg-[#f2f4f6] p-5 md:p-6 space-y-4">
+          <h4 className="text-sm font-black uppercase tracking-tighter text-[#747a60] mb-2 italic">Detalhamento dos Critérios</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {event.criteriaDetails.map(c => (
+              <div key={c.criterionId} className="bg-white border-2 border-[#191c1e] p-4 relative overflow-hidden">
+                <div className="flex justify-between items-start gap-4 mb-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase italic text-[#747a60] bg-[#f2f4f6] border border-[#191c1e] px-2 py-0.5">Peso {c.weight}</span>
+                      {c.evaluated && (
+                        <span className="text-[10px] font-bold uppercase italic text-[#506600] flex items-center gap-1">
+                          <CheckCircle2 size={12}/> Avaliado
+                        </span>
                       )}
                     </div>
+                    <p className="font-bold text-sm text-[#191c1e] leading-tight italic">{c.criterionName}</p>
                   </div>
-                  
-                  {c.publicComments.length > 0 && (
-                    <div className="mt-4 space-y-2 pt-3 border-t border-slate-100">
-                      <p className="text-[10px] font-bold uppercase text-slate-400">Feedbacks da equipe avaliadora</p>
-                      {c.publicComments.map((comment, i) => (
-                        <div key={i} className="text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100 relative">
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400 rounded-l-lg"></div>
-                          <span className="italic leading-relaxed">"{comment}"</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
+                  <div className="text-right shrink-0">
+                    {c.scoreUsed !== null ? (
+                      <div className="flex items-end gap-1">
+                        <span className="font-black text-2xl text-[#191c1e] leading-none">{c.scoreUsed.toFixed(1)}</span>
+                        <span className="text-xs font-bold text-[#747a60] pb-1 italic">/10</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-bold uppercase italic px-2 py-1 bg-[#f2f4f6] text-[#747a60] border border-[#191c1e]">Pendente</span>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                {c.publicComments.length > 0 && (
+                  <div className="mt-4 space-y-2 pt-3 border-t-2 border-[#191c1e]/20">
+                    <p className="text-[10px] font-black uppercase italic text-[#747a60]">Feedbacks da equipe avaliadora</p>
+                    {c.publicComments.map((comment, i) => (
+                      <div key={i} className="text-xs text-[#444933] bg-[#f2f4f6] p-3 border-l-2 border-[#191c1e] relative">
+                        <span className="italic leading-relaxed">"{comment}"</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 }
 
