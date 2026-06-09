@@ -148,7 +148,7 @@ export default function DashboardPage() {
                   </span>
                   <div className="flex-1 skew-x-[3deg]">
                     <p className="text-sm font-black uppercase italic">{p.platoonName}</p>
-                    <p className="text-[11px] font-bold opacity-60 italic uppercase">{p.count} colaboradores · {p.percentage}%</p>
+                    <p className="text-[11px] font-bold opacity-60 italic uppercase">{p.count} colaboradores · {p.percentage.toFixed(1)}%</p>
                   </div>
                   {i === 0
                     ? <Trophy size={22} className="text-[#191c1e] skew-x-[3deg]" />
