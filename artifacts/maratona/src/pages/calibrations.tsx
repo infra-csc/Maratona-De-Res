@@ -457,15 +457,18 @@ export default function CalibrationsPage() {
                       <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
                         <div className="sm:w-28 shrink-0">
                           <Label className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota (1–10)</Label>
-                          <Input
+                          <input
                             data-testid={`input-cal-score-${c.criterionId}`}
-                            type="number"
-                            min="1" max="10" step="1"
+                            type="text"
+                            inputMode="numeric"
                             value={scoreVal}
-                            onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
+                            onChange={e => {
+                              const val = e.target.value.replace(/[^0-9]/g, "");
+                              setCalScores(prev => ({ ...prev, [c.criterionId]: val }));
+                            }}
                             placeholder="—"
                             disabled={alreadyReleased}
-                            className="h-11 mt-1 rounded-none border-2 border-[#191c1e] text-lg font-black italic disabled:opacity-60 disabled:bg-[#eceef0]"
+                            className="h-11 mt-1 w-full px-3 border-2 border-[#191c1e] text-lg font-black italic disabled:opacity-60 disabled:bg-[#eceef0] focus:outline-none focus:ring-2 focus:ring-[#ccff00] focus:ring-offset-2 focus:ring-offset-[#fbfcfd]"
                           />
                         </div>
                         <div className="flex-1">
