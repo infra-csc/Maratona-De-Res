@@ -123,6 +123,8 @@ function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: numb
 function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [filterPlatoon, setFilterPlatoon] = useState<string>("__all");
+  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const qKey = getGetRankingQueryKey({ search: search || undefined });
@@ -146,10 +148,20 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
     }
   }
 
-  const top3 = ranking?.slice(0, 3) || [];
-  const maxResult = ranking && ranking.length > 0 ? Math.max(...ranking.map(r => r.finalResult)) : 0;
-  const activeRunners = ranking?.length ?? 0;
-  const avgResult = ranking && ranking.length > 0 ? ranking.reduce((acc, r) => acc + r.finalResult, 0) / ranking.length : 0;
+  const allResults = ranking ?? [];
+  const platoons = Array.from(new Set(allResults.map(r => r.platoon).filter(Boolean))).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
+
+  const filteredRanking = allResults.filter(r => {
+    if (filterPlatoon !== "__all" && r.platoon !== filterPlatoon) return false;
+    if (filterEligible === "eligible" && r.bonusValue === 0) return false;
+    if (filterEligible === "ineligible" && r.bonusValue > 0) return false;
+    return true;
+  });
+
+  const top3 = filteredRanking.slice(0, 3);
+  const maxResult = filteredRanking.length > 0 ? Math.max(...filteredRanking.map(r => r.finalResult)) : 0;
+  const activeRunners = filteredRanking.length;
+  const avgResult = filteredRanking.length > 0 ? filteredRanking.reduce((acc, r) => acc + r.finalResult, 0) / filteredRanking.length : 0;
 
   function openDetail(id: number) {
     if (!canViewDetail) return;
@@ -196,15 +208,42 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-5">
-            <div className="relative max-w-md">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-              <Input
-                data-testid="input-search-ranking"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
-                placeholder="Buscar colaborador no ranking..."
-              />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative max-w-md flex-1">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+                <Input
+                  data-testid="input-search-ranking"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
+                  placeholder="Buscar colaborador no ranking..."
+                />
+              </div>
+              <div className="flex gap-3">
+                <div className="w-40">
+                  <Select value={filterPlatoon} onValueChange={setFilterPlatoon}>
+                    <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
+                      <SelectValue placeholder="Pelotão" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                      <SelectItem value="__all">Todos os pelotões</SelectItem>
+                      {platoons.map(p => <SelectItem key={p} value={p!}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-48">
+                  <Select value={filterEligible} onValueChange={(v) => setFilterEligible(v as any)}>
+                    <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
+                      <SelectValue placeholder="Elegibilidade" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="eligible">Elegíveis</SelectItem>
+                      <SelectItem value="ineligible">Não elegíveis</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
             <section className="bg-white border-2 border-[#191c1e]">
@@ -213,7 +252,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                 <h3 className="text-xs font-bold uppercase tracking-widest">Classificação Geral</h3>
               </div>
               <div className="divide-y-2 divide-[#eceef0]">
-                {ranking.map((entry) => {
+                {filteredRanking.map((entry) => {
                   const actualRank = entry.position;
                   const pct = maxResult > 0 ? Math.min(100, Math.round((entry.finalResult / maxResult) * 100)) : 0;
                   return (
@@ -616,9 +655,19 @@ function ConsolidationTab() {
     query: { queryKey: getGetQuarterlyResultsQueryKey() },
   });
   const rows = results ?? [];
+  const [search, setSearch] = useState("");
+  const [filterPlatoon, setFilterPlatoon] = useState<string>("__all");
   const [sortKey, setSortKey] = useState<keyof QuarterlyResult | null>("finalResult");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  const platoons = Array.from(new Set(rows.map(r => r.platoon).filter(Boolean))).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
+
+  const filteredRows = rows.filter(r => {
+    const matchSearch = !search || (r.employeeName ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchPlatoon = filterPlatoon === "__all" || r.platoon === filterPlatoon;
+    return matchSearch && matchPlatoon;
+  });
 
   function handleSort(key: keyof QuarterlyResult) {
     if (sortKey === key) {
@@ -629,7 +678,7 @@ function ConsolidationTab() {
     }
   }
 
-  const sortedRows = useSort(rows, sortKey, sortDir);
+  const sortedRows = useSort(filteredRows, sortKey, sortDir);
 
   async function handleExport() {
     try {
@@ -680,11 +729,35 @@ function ConsolidationTab() {
           <p className="text-[#747a60] italic max-w-md mx-auto">Não há resultados gerados para o ciclo atual.</p>
         </div>
       ) : (
-        <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-          <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-            <Table2 size={18} />
-            <span className="font-black uppercase tracking-tight">Planilha de Consolidação</span>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative max-w-md flex-1">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
+                placeholder="Buscar colaborador..."
+              />
+            </div>
+            <div className="w-40">
+              <Select value={filterPlatoon} onValueChange={setFilterPlatoon}>
+                <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
+                  <SelectValue placeholder="Pelotão" />
+                </SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                  <SelectItem value="__all">Todos os pelotões</SelectItem>
+                  {platoons.map(p => <SelectItem key={p} value={p!}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+              <Table2 size={18} />
+              <span className="font-black uppercase tracking-tight">Planilha de Consolidação</span>
+            </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -745,6 +818,7 @@ function ConsolidationTab() {
             </table>
           </div>
         </div>
+      </div>
       )}
 
       <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} />
@@ -763,6 +837,9 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
   const [payForm, setPayForm] = useState({ bonusStatus: "projected", paymentMethod: "Caju Saldo Livre", paymentNotes: "" });
   const [forceClose, setForceClose] = useState(false);
   const [forceReason, setForceReason] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterPlatoon, setFilterPlatoon] = useState<string>("__all");
+  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
   const [sortKey, setSortKey] = useState<keyof QuarterlyResult | null>("finalResult");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -848,10 +925,20 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
   }
 
   const rows = results ?? [];
-  const totalBonus = rows.reduce((acc, r) => acc + (r.bonusValue ?? 0), 0);
-  const eligibleCount = rows.filter(r => r.eligible !== false).length;
-  const eligibilityPct = rows.length > 0 ? Math.round((eligibleCount / rows.length) * 100) : 0;
-  const sortedRows = useSort(rows, sortKey, sortDir);
+  const platoons = Array.from(new Set(rows.map(r => r.platoon).filter(Boolean))).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
+
+  const filteredRows = rows.filter(r => {
+    const matchSearch = !search || (r.employeeName ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchPlatoon = filterPlatoon === "__all" || r.platoon === filterPlatoon;
+    if (filterEligible === "eligible" && r.eligible === false) return false;
+    if (filterEligible === "ineligible" && r.eligible !== false) return false;
+    return matchSearch && matchPlatoon;
+  });
+
+  const totalBonus = filteredRows.reduce((acc, r) => acc + (r.bonusValue ?? 0), 0);
+  const eligibleCount = filteredRows.filter(r => r.eligible !== false).length;
+  const eligibilityPct = filteredRows.length > 0 ? Math.round((eligibleCount / filteredRows.length) * 100) : 0;
+  const sortedRows = useSort(filteredRows, sortKey, sortDir);
 
   const payHeaderCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center") => (
     <th
@@ -979,12 +1066,48 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
           {canManage && <p className="text-sm mt-2 text-[#444933] italic">Clique em "Fechar Ciclo" para gerar os resultados oficiais.</p>}
         </div>
       ) : (
-        <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-          <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-            <Wallet size={18} />
-            <span className="font-black uppercase tracking-tight">Bônus & Pagamentos</span>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative max-w-md flex-1">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
+                placeholder="Buscar colaborador..."
+              />
+            </div>
+            <div className="w-40">
+              <Select value={filterPlatoon} onValueChange={setFilterPlatoon}>
+                <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
+                  <SelectValue placeholder="Pelotão" />
+                </SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                  <SelectItem value="__all">Todos os pelotões</SelectItem>
+                  {platoons.map(p => <SelectItem key={p} value={p!}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-48">
+              <Select value={filterEligible} onValueChange={(v) => setFilterEligible(v as any)}>
+                <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
+                  <SelectValue placeholder="Elegibilidade" />
+                </SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="eligible">Elegíveis</SelectItem>
+                  <SelectItem value="ineligible">Não elegíveis</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="overflow-x-auto">
+
+          <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+              <Wallet size={18} />
+              <span className="font-black uppercase tracking-tight">Bônus & Pagamentos</span>
+            </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
@@ -1072,6 +1195,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
             </table>
           </div>
         </div>
+      </div>
       )}
 
       <Dialog open={!!payTarget} onOpenChange={o => !o && setPayTarget(null)}>
