@@ -950,6 +950,36 @@ export default function EvaluationsPage() {
                     </div>
                   )}
 
+                  {/* Grade summary — evaluators only */}
+                  {isEvaluator && myCriteria.length > 0 && (
+                    <div className="p-5 border-b-2 border-[#eceef0]">
+                      <p className="text-xs font-bold italic uppercase text-[#444933] mb-3">Resumo das Notas</p>
+                      <div className="space-y-2">
+                        {myCriteria.map(c => {
+                          const ev = getEval(c.criterionId);
+                          const score = currentScore(c.criterionId);
+                          const hasScore = score > 0;
+                          const isSubmitted = ev?.status === "submitted";
+                          const isDraft = ev?.status === "draft";
+                          return (
+                            <div key={c.criterionId} className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[11px] font-bold italic uppercase text-[#191c1e] truncate">{c.criterionName}</span>
+                                {isSubmitted && <Lock size={11} className="shrink-0 text-[#506600]" />}
+                                {isDraft && !isSubmitted && <span className="shrink-0 text-[9px] font-black italic uppercase text-[#862200] tracking-wide">rascunho</span>}
+                              </div>
+                              {hasScore ? (
+                                <span className="shrink-0 text-sm font-black italic text-[#506600]">{score}<span className="text-[10px] text-[#747a60]">/10</span></span>
+                              ) : (
+                                <span className="shrink-0 text-sm font-black italic text-[#c2c6c9]">—</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Submission — evaluators only */}
                   {isEvaluator && myCriteria.length > 0 && (
                     <div className="p-5">
