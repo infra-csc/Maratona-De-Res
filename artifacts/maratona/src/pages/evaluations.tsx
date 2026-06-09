@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
@@ -210,6 +211,40 @@ export default function EvaluationsPage() {
       })
     : [];
 
+  // Fetch this avaliador's evaluations for every configured event so the
+  // overview can split events into "A Fazer" vs "Concluídas". Same query key as
+  // the per-event/card fetch → deduped/cached, no extra network.
+  const evaluatorEvalQueries = useQueries({
+    queries: isEvaluator
+      ? configuredEvents.map(ev => ({
+          queryKey: getGetEvaluationsQueryKey({ eventId: ev.id }),
+          queryFn: () => getEvaluations({ eventId: ev.id }),
+        }))
+      : [],
+  });
+  // Per-event completion stats for the avaliador (only events that actually
+  // have criteria assigned to their area count as theirs).
+  const evaluatorEventStats = isEvaluator
+    ? configuredEvents.map((ev, i) => {
+        const myAreaIds = new Set(
+          (evaluatorEventDetailQueries[i]?.data?.areaAssignments ?? [])
+            .filter(a => a.evaluatorUserId === user?.id)
+            .map(a => a.areaId),
+        );
+        const myCrit = (evaluatorCriteriaQueries[i]?.data ?? []).filter(
+          c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
+        );
+        const evs = evaluatorEvalQueries[i]?.data ?? [];
+        const submitted = myCrit.filter(
+          c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === user?.id)?.status === "submitted",
+        ).length;
+        const total = myCrit.length;
+        return { event: ev, total, submitted, done: total > 0 && submitted === total, relevant: total > 0 };
+      }).filter(s => s.relevant)
+    : [];
+  const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
+  const doneEvents = evaluatorEventStats.filter(s => s.done).map(s => s.event);
+
   // If the selected event stops being selectable (closed or criteria unconfirmed
   // server-side), clear the selection so trigger text and loaded data stay in sync.
   useEffect(() => {
@@ -379,6 +414,60 @@ export default function EvaluationsPage() {
     }
   }
 
+  const renderEventPicker = (compact: boolean) => (
+    <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={eventPickerOpen}
+          data-testid="select-event"
+          disabled={selectableEvents.length === 0}
+          className={`${compact ? "w-full md:w-[20rem] min-h-[3rem] px-3 py-2" : "w-full min-h-[3.25rem] px-4 py-3"} flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#f7f9fb] ${HARD_SHADOW}`}
+        >
+          {pickedEvent ? (
+            <span className="flex flex-col min-w-0">
+              <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
+              {formatEventSubtitle(pickedEvent) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>}
+            </span>
+          ) : (
+            <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60] truncate">
+              {selectableEvents.length === 0
+                ? (isConsultation ? "Nenhum evento aberto disponível" : "Nenhum evento disponível")
+                : (isConsultation ? "Selecione um evento para consultar..." : (compact ? "Selecionar evento..." : "Selecione um evento para avaliar..."))}
+            </span>
+          )}
+          <ChevronsUpDown size={compact ? 16 : 18} className="shrink-0 text-[#191c1e]" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align={compact ? "end" : "start"} className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+        <Command className="rounded-none">
+          <CommandInput data-testid="input-event-search" placeholder="Buscar por evento ou cliente..." className="italic" />
+          <CommandList className="max-h-[320px]">
+            <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+            <CommandGroup>
+              {selectableEvents.map(ev => (
+                <CommandItem
+                  key={ev.id}
+                  value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
+                  data-testid={`option-event-${ev.id}`}
+                  onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setEventPickerOpen(false); }}
+                  className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
+                >
+                  <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
+                  <span className="flex flex-col min-w-0">
+                    <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
+                    {formatEventSubtitle(ev) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+
   const labels = {
     1: "Crítico",
     2: "Muito abaixo",
@@ -410,66 +499,23 @@ export default function EvaluationsPage() {
               <Download size={18} /> Exportar Pendentes
             </button>
           )}
+          {isEvaluator && (
+            <div className="flex flex-col gap-1 md:items-end">
+              <span className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] px-1">Selecionar evento</span>
+              {renderEventPicker(true)}
+            </div>
+          )}
         </section>
 
-        {/* STEP 01 — Selecionar Evento */}
+        {/* STEP 01 — Selecionar Evento (managers/consultation pick from the full panel) */}
+        {!isEvaluator && (
         <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 px-3 py-1.5 bg-[#ccff00] border-l-2 border-b-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider">ETAPA 01</div>
           <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight mb-1">Selecionar Evento</h3>
           <p className="text-sm text-[#444933] italic mb-5">{isConsultation ? "Busque pelo nome do evento ou do cliente e selecione para consultar o andamento." : "Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação."}</p>
 
           <div className="w-full max-w-2xl">
-            <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  role="combobox"
-                  aria-expanded={eventPickerOpen}
-                  data-testid="select-event"
-                  disabled={selectableEvents.length === 0}
-                  className={`w-full min-h-[3.25rem] px-4 py-3 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#f7f9fb] ${HARD_SHADOW}`}
-                >
-                  {pickedEvent ? (
-                    <span className="flex flex-col min-w-0">
-                      <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
-                      {formatEventSubtitle(pickedEvent) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>}
-                    </span>
-                  ) : (
-                    <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60]">
-                      {selectableEvents.length === 0
-                        ? (isConsultation ? "Nenhum evento aberto disponível" : "Nenhum evento configurado disponível")
-                        : (isConsultation ? "Selecione um evento para consultar..." : "Selecione um evento para avaliar...")}
-                    </span>
-                  )}
-                  <ChevronsUpDown size={18} className="shrink-0 text-[#191c1e]" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
-                <Command className="rounded-none">
-                  <CommandInput data-testid="input-event-search" placeholder="Buscar por evento ou cliente..." className="italic" />
-                  <CommandList className="max-h-[320px]">
-                    <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {selectableEvents.map(ev => (
-                        <CommandItem
-                          key={ev.id}
-                          value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
-                          data-testid={`option-event-${ev.id}`}
-                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setEventPickerOpen(false); }}
-                          className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
-                        >
-                          <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
-                          <span className="flex flex-col min-w-0">
-                            <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
-                            {formatEventSubtitle(ev) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
-                          </span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            {renderEventPicker(false)}
 
             <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
               <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
@@ -481,6 +527,7 @@ export default function EvaluationsPage() {
             </div>
           </div>
         </section>
+        )}
 
         {/* Evaluator overview — pending vs completed evaluations at a glance */}
         {isEvaluator && (
@@ -490,7 +537,7 @@ export default function EvaluationsPage() {
               <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">Minhas Avaliações</h3>
             </div>
             <p className="text-sm text-[#444933] italic px-1 -mt-1">
-              Acompanhe o que ainda falta avaliar e o que você já concluiu. Clique em um evento para avaliar ou rever.
+              Foque no que ainda falta avaliar. As avaliações concluídas ficam na aba ao lado. Clique em um evento para avaliar ou rever.
             </p>
             {configuredEvents.length === 0 ? (
               <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
@@ -501,17 +548,62 @@ export default function EvaluationsPage() {
                 Nenhuma avaliação atribuída à sua área nos eventos abertos no momento.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {relevantEvaluatorEvents.map(ev => (
-                  <EvaluatorEventCard
-                    key={ev.id}
-                    event={ev}
-                    userId={user?.id}
-                    selected={selectedEventId === ev.id}
-                    onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                  />
-                ))}
-              </div>
+              <Tabs defaultValue="todo" className="space-y-4">
+                <TabsList className="bg-transparent p-0 h-auto gap-2 justify-start rounded-none">
+                  <TabsTrigger
+                    value="todo"
+                    data-testid="tab-todo"
+                    className="rounded-none border-2 border-[#191c1e] bg-white px-4 py-2 font-black italic uppercase text-xs tracking-wider data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none"
+                  >
+                    A Fazer ({todoEvents.length})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="done"
+                    data-testid="tab-done"
+                    className="rounded-none border-2 border-[#191c1e] bg-white px-4 py-2 font-black italic uppercase text-xs tracking-wider data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none"
+                  >
+                    Concluídas ({doneEvents.length})
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="todo" className="mt-0">
+                  {todoEvents.length === 0 ? (
+                    <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
+                      Tudo em dia! Nenhuma avaliação pendente no momento.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {todoEvents.map(ev => (
+                        <EvaluatorEventCard
+                          key={ev.id}
+                          event={ev}
+                          userId={user?.id}
+                          selected={selectedEventId === ev.id}
+                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+                <TabsContent value="done" className="mt-0">
+                  {doneEvents.length === 0 ? (
+                    <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
+                      Nenhuma avaliação concluída ainda.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {doneEvents.map(ev => (
+                        <EvaluatorEventCard
+                          key={ev.id}
+                          event={ev}
+                          userId={user?.id}
+                          selected={selectedEventId === ev.id}
+                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </section>
         )}
