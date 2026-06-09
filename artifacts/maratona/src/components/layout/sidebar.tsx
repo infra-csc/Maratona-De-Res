@@ -101,6 +101,8 @@ export function Sidebar() {
             const visibleItems = group.items.filter(item => {
               // Avaliadores have a focused experience: only the Avaliações tab.
               if (user?.role === "avaliador") return item.path === "/evaluations";
+              // Colaboradores (visualizador) só veem Meu Desempenho.
+              if (user?.role === "visualizador") return item.path === "/meu-desempenho";
               // Diretoria sees a focused set of sections (calibração e acompanhamento).
               if (user?.role === "diretoria") {
                 return ["/", "/calibrations", "/results", "/rules", "/absences", "/criteria"].includes(item.path);

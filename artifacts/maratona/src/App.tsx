@@ -80,6 +80,8 @@ function HomeRoute() {
   const { user, isLoading } = useAuth();
   // Avaliadores live entirely in the Avaliações page; send them there from "/".
   if (!isLoading && user?.role === "avaliador") return <Redirect to="/evaluations" />;
+  // Colaboradores (visualizador) só veem Meu Desempenho.
+  if (!isLoading && user?.role === "visualizador") return <Redirect to="/meu-desempenho" />;
   return <ProtectedRoute component={DashboardPage} />;
 }
 
