@@ -26,6 +26,7 @@ export default function EventsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [cardFilter, setCardFilter] = useState<string | null>(null);
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -42,7 +43,12 @@ export default function EventsPage() {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchConfig = filterStatus === "all" || (filterStatus === "configured" ? !!ev.criteriaConfirmed : !ev.criteriaConfirmed);
     const isFinished = ev.endDate < todayStr;
-    return matchSearch && matchConfig && isFinished;
+    const matchCard = cardFilter === null
+      || (cardFilter === "configured" && ev.criteriaConfirmed)
+      || (cardFilter === "pendingRH" && !ev.criteriaConfirmed)
+      || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.hasCalibration)
+      || (cardFilter === "fullyEval" && ev.evaluationProgress === 1);
+    return matchSearch && matchConfig && isFinished && matchCard;
   });
 
   const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
@@ -76,21 +82,29 @@ export default function EventsPage() {
               const pendingCal = all.filter(e => e.status === "closed" && !e.hasCalibration).length;
               const fullyEval = all.filter(e => e.evaluationProgress === 1).length;
               const cards = [
-                { label: "Configurados", value: configured, color: "#506600" },
-                { label: "Aguardando RH", value: pendingRH, color: "#ff5722" },
-                { label: "Falta Calibrar", value: pendingCal, color: "#ffb300" },
-                { label: "Avaliação 100%", value: fullyEval, color: "#ccff00" },
+                { key: "configured", label: "Configurados", value: configured, color: "#506600" },
+                { key: "pendingRH", label: "Aguardando RH", value: pendingRH, color: "#ff5722" },
+                { key: "pendingCal", label: "Falta Calibrar", value: pendingCal, color: "#ffb300" },
+                { key: "fullyEval", label: "Avaliação 100%", value: fullyEval, color: "#ccff00" },
               ];
-              return cards.map(c => (
-                <div key={c.label} className="bg-white border-2 border-[#191c1e] p-4 flex flex-col justify-between h-28 relative overflow-hidden">
-                  <div className="z-10">
-                    <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933]">{c.label}</p>
-                    <h2 className="text-[32px] leading-none italic font-black mt-1" style={{ color: c.color }}>{c.value}</h2>
-                    <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-1">de {all.length} eventos</p>
-                  </div>
-                  <div className="w-full h-1.5 mt-auto" style={{ backgroundColor: c.color }} />
-                </div>
-              ));
+              return cards.map(c => {
+                const isActive = cardFilter === c.key;
+                return (
+                  <button
+                    key={c.label}
+                    onClick={() => setCardFilter(isActive ? null : c.key)}
+                    className={`bg-white border-2 p-4 flex flex-col justify-between h-28 relative overflow-hidden text-left cursor-pointer transition-all hover:translate-y-[-2px] ${isActive ? "border-[#ccff00] shadow-[4px_4px_0px_0px_#ccff00]" : "border-[#191c1e] hover:shadow-[2px_2px_0px_0px_#191c1e]"}`}
+                  >
+                    <div className="z-10">
+                      <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933]">{c.label}</p>
+                      <h2 className="text-[32px] leading-none italic font-black mt-1" style={{ color: c.color }}>{c.value}</h2>
+                      <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-1">de {all.length} eventos</p>
+                    </div>
+                    <div className="w-full h-1.5 mt-auto" style={{ backgroundColor: c.color }} />
+                    {isActive && <div className="absolute top-2 right-2 w-3 h-3 bg-[#ccff00] border-2 border-[#191c1e]" />}
+                  </button>
+                );
+              });
             })()}
           </section>
         )}
