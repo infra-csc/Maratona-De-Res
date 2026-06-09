@@ -175,7 +175,9 @@ export default function EventsPage() {
                       <div>
                         <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
                           <span className="text-[#444933]">Avaliações dos Avaliadores</span>
-                          <span className={progress === 100 ? "text-[#506600]" : "text-[#191c1e]"}>{progress}%</span>
+                          <span className={progress === 100 ? "text-[#506600]" : "text-[#191c1e]"}>
+                            {progress}% ({ev.submittedCount ?? 0} / {ev.totalCriteria ?? 0})
+                          </span>
                         </div>
                         <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
                           <div className={progress === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${progress}%` }} />

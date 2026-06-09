@@ -66,7 +66,7 @@ router.get("/events", async (req, res) => {
     });
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
 
-    return { ...ev, participantCount, evaluationProgress: progress, averageScore, teamScore, hasCalibration };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration };
   });
   res.json(enriched);
 });

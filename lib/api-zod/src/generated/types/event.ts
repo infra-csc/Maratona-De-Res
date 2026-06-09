@@ -28,6 +28,8 @@ export interface Event {
   forcedClosed?: boolean;
   participantCount?: number;
   evaluationProgress?: number;
+  totalCriteria?: number;
+  submittedCount?: number;
   /** @nullable */
   averageScore?: number | null;
   /** @nullable */
