@@ -183,15 +183,15 @@ export default function MyPerformancePage() {
 
   if (!user?.employeeId) {
     return (
-      <div className="p-8 max-w-2xl mx-auto mt-12 bg-white rounded-2xl border shadow-sm text-center space-y-4">
-        <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500 mb-2">
+      <div className="p-8 max-w-2xl mx-auto mt-12 bg-white border-2 border-[#191c1e] text-center space-y-4">
+        <div className="w-20 h-20 bg-[#ffdbd1] border-2 border-[#191c1e] flex items-center justify-center mx-auto text-[#862200] mb-2">
           <AlertTriangle size={32} />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800">Acesso Restrito</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-2xl font-bold text-[#191c1e]">Acesso Restrito</h2>
+        <p className="text-[#444933] italic">
           Seu perfil de usuário não está vinculado a um colaborador no sistema. O painel Meu Desempenho é exclusivo para participantes da Maratona de Resultados.
         </p>
-        <p className="text-sm font-medium pt-4 text-slate-500 border-t">Contate o RH ou o administrador do sistema para realizar a vinculação.</p>
+        <p className="text-sm font-bold pt-4 text-[#747a60] border-t-2 border-[#191c1e]">Contate o RH ou o administrador do sistema para realizar a vinculação.</p>
       </div>
     );
   }
@@ -229,15 +229,15 @@ export default function MyPerformancePage() {
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-2xl" />
+            <Skeleton key={i} className="h-32 border-2 border-[#191c1e]" />
           ))}
         </div>
       )}
 
       {error && (
-        <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
+        <Alert variant="destructive" className="bg-[#ffdbd1] border-2 border-[#862200] text-[#862200]">
           <AlertTriangle className="h-5 w-5" />
-          <AlertDescription className="font-medium ml-2">{(error as Error).message}</AlertDescription>
+          <AlertDescription className="font-bold ml-2 italic">{(error as Error).message}</AlertDescription>
         </Alert>
       )}
 
@@ -314,7 +314,7 @@ export default function MyPerformancePage() {
                   <p className="text-[10px] font-bold uppercase italic text-amber-600 mt-1">{summary.pendingEvents} pendente{summary.pendingEvents > 1 ? 's' : ''}</p>
                 )}
                 {summary.totalAbsences > 0 && (
-                  <p className="text-[10px] font-bold uppercase italic text-red-600 mt-1">{summary.totalAbsences} faltas</p>
+                  <p className="text-[10px] font-bold uppercase italic text-[#862200] mt-1">{summary.totalAbsences} faltas</p>
                 )}
               </div>
               <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
@@ -326,11 +326,11 @@ export default function MyPerformancePage() {
 
           {/* Absence penalty info */}
           {summary.absencePenalty !== null && summary.absencePenalty > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-4">
-              <div className="bg-red-100 text-red-600 p-2 rounded-full shrink-0"><AlertTriangle size={20} /></div>
+            <div className="bg-[#ffdbd1] border-2 border-[#191c1e] p-4 flex items-start gap-4">
+              <div className="bg-white text-[#862200] p-2 border-2 border-[#191c1e] shrink-0"><AlertTriangle size={20} /></div>
               <div>
-                <h4 className="font-bold text-red-800 mb-1">Penalidade por Faltas</h4>
-                <p className="text-sm text-red-700 font-medium">
+                <h4 className="font-bold text-[#862200] mb-1 italic">Penalidade por Faltas</h4>
+                <p className="text-sm text-[#444933] font-medium italic">
                   Foi aplicado um desconto de <strong>{summary.absencePenalty} pontos</strong> na sua nota final devido às faltas registradas no período.
                   {summary.grossAverage !== null && ` (A média original era ${summary.grossAverage.toFixed(1)}).`}
                 </p>
@@ -341,8 +341,8 @@ export default function MyPerformancePage() {
           {/* Event breakdown */}
           <div className="pt-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <h2 className="text-xl font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
-                <Calendar className="text-primary" size={24} />
+              <h2 className="text-xl font-black uppercase tracking-tight text-[#506600] flex items-center gap-2">
+                <Calendar size={24} />
                 Histórico de Eventos
               </h2>
               <div className="flex items-center gap-2">
@@ -392,11 +392,11 @@ export default function MyPerformancePage() {
           </div>
 
           {/* Privacy note */}
-          <div className="bg-slate-100 rounded-lg p-4 text-center mt-8 border border-slate-200">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+          <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 text-center mt-8">
+            <p className="text-[10px] font-black uppercase italic text-[#506600] tracking-widest">
               Sigilo de Avaliação
             </p>
-            <p className="text-xs text-slate-600 font-medium mt-1">
+            <p className="text-xs text-[#444933] font-medium mt-1 italic">
               Para garantir imparcialidade, as notas e comentários exibidos são consolidados. A identidade dos avaliadores é estritamente confidencial.
             </p>
           </div>
