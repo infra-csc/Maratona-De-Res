@@ -381,22 +381,13 @@ export default function CalibrationsPage() {
                     <p className="text-xs font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {(() => {
-                    let sum = 0, count = 0;
-                    for (const c of activeCriteria) {
-                      const cal = getCalibration(c.criterionId);
-                      const avg = getAvgScore(c.criterionId);
-                      const score = cal ? parseFloat(cal.calibratedScore as unknown as string) : (avg ?? null);
-                      if (score !== null) { sum += score; count++; }
-                    }
-                    const overallAvg = count > 0 ? sum / count : null;
-                    return overallAvg != null ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold italic uppercase text-[#191c1e] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1">
-                        Média {overallAvg.toFixed(2)}
-                      </span>
-                    ) : null;
-                  })()}
+                <div className="flex items-center gap-3 shrink-0">
+                  {feedback && (
+                    <div className="border-2 border-[#191c1e] px-3 py-1.5 flex flex-col items-center justify-center">
+                      <span className="text-[9px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota Final da Equipe</span>
+                      <span className="text-2xl font-black italic text-[#506600] leading-none">{feedback.eventScore.toFixed(1)}<span className="text-sm text-[#747a60]">/100</span></span>
+                    </div>
+                  )}
                   <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${statusChip(pickedEvent.status).cls}`}>
                     <span className="inline-block skew-x-[8deg]">{statusChip(pickedEvent.status).label}</span>
                   </span>
