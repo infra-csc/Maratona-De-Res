@@ -137,7 +137,7 @@ export default function EvaluationsPage() {
   const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
 
-  const { data: events } = useGetEvents({ status: "open" });
+  const { data: events } = useGetEvents({});
 
   const { data: participants } = useGetEventParticipants(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-participants", selectedEventId] as unknown[] },
@@ -169,12 +169,12 @@ export default function EvaluationsPage() {
   });
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
-  const openEvents = (events ?? []).filter(e => e.status === "open");
+  const activeEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
   // Only events whose criteria the RH has already confirmed can be evaluated.
-  const configuredEvents = openEvents.filter(e => e.criteriaConfirmed);
+  const configuredEvents = activeEvents.filter(e => e.criteriaConfirmed);
   // Evaluators may only act on RH-released events; consultation roles may inspect any open event.
   // Ordenado alfabeticamente por nome do evento (pt-BR, ignorando maiúsc./acentos).
-  const selectableEvents = [...(isEvaluator ? configuredEvents : openEvents)].sort((a, b) =>
+  const selectableEvents = [...(isEvaluator ? configuredEvents : activeEvents)].sort((a, b) =>
     (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" })
   );
   const pickedEvent = selectableEvents.find(e => e.id === selectedEventId);
@@ -249,7 +249,7 @@ export default function EvaluationsPage() {
   // server-side), clear the selection so trigger text and loaded data stay in sync.
   useEffect(() => {
     if (selectedEventId == null || !events) return;
-    const stillValid = events.some(e => e.id === selectedEventId && e.status === "open" && (isEvaluator ? e.criteriaConfirmed : true));
+    const stillValid = events.some(e => e.id === selectedEventId && (e.status === "open" || e.status === "closed") && (isEvaluator ? e.criteriaConfirmed : true));
     if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }
   }, [selectedEventId, events, isEvaluator]);
   const canRelease = isManager;
@@ -427,7 +427,7 @@ export default function EvaluationsPage() {
           ) : (
             <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60] truncate">
               {selectableEvents.length === 0
-                ? (isConsultation ? "Nenhum evento aberto disponível" : "Nenhum evento disponível")
+                ? (isConsultation ? "Nenhum evento disponível" : "Nenhum evento disponível")
                 : (isConsultation ? "Selecione um evento para consultar..." : (compact ? "Selecionar evento..." : "Selecione um evento para avaliar..."))}
             </span>
           )}
