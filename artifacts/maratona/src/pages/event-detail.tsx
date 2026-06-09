@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw, UserCheck, ClipboardList, Copy, Check } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
+import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -38,7 +39,7 @@ export default function EventDetailPage() {
   const justificationsFor = (critId: number) =>
     (evaluations ?? [])
       .filter(e => e.criterionId === critId && e.status === "submitted")
-      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim() }));
+      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null }));
 
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -389,6 +390,7 @@ export default function EventDetailPage() {
                                   ) : (
                                     <p className="text-[10px] italic text-[#9aa088] mt-0.5">Sem justificativa</p>
                                   )}
+                                  {j.audioUrl && <div className="mt-1.5"><AudioPlayer objectPath={j.audioUrl} /></div>}
                                 </div>
                               ))}
                             </div>

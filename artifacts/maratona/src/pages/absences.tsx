@@ -16,9 +16,8 @@ const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e]
 
 type EntryKind = "penalty" | "merit";
 const ENTRY_OPTIONS: { value: string; label: string; hint: string; kind: EntryKind }[] = [
-  { value: "falta", label: "Falta", hint: "regra do sistema", kind: "penalty" },
-  { value: "atraso_30", label: "Atraso (30 min)", hint: "−50 pts", kind: "penalty" },
-  { value: "atraso_60", label: "Atraso (1 hora)", hint: "−100 pts", kind: "penalty" },
+  { value: "falta", label: "Falta não justificada", hint: "−50 pts", kind: "penalty" },
+  { value: "atraso", label: "Atraso", hint: "−20 pts", kind: "penalty" },
   { value: "merito_galpao", label: "Mérito Galpão", hint: "+50 pts", kind: "merit" },
   { value: "merito_evento", label: "Mérito Evento", hint: "+25 pts", kind: "merit" },
 ];
@@ -38,7 +37,7 @@ export default function AbsencesPage() {
   const { data: events } = useGetEvents();
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<AbsenceInput>({
-    defaultValues: { quantity: 1, penaltyType: "atraso_30" },
+    defaultValues: { quantity: 1, penaltyType: "atraso" },
   });
   const selectedType = watch("penaltyType");
 
@@ -48,7 +47,7 @@ export default function AbsencesPage() {
         qc.invalidateQueries({ queryKey: qKey });
         toast({ title: "Lançamento registrado com sucesso" });
         setOpen(false);
-        reset({ quantity: 1, penaltyType: "atraso_30" });
+        reset({ quantity: 1, penaltyType: "atraso" });
       },
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
     },
@@ -139,7 +138,7 @@ export default function AbsencesPage() {
                   >
                     <div className="space-y-1.5">
                       <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo de Lançamento <span className="text-[#ba1a1a]">*</span></Label>
-                      <Select defaultValue="atraso_30" onValueChange={v => setValue("penaltyType", v as AbsenceInput["penaltyType"])}>
+                      <Select defaultValue="atraso" onValueChange={v => setValue("penaltyType", v as AbsenceInput["penaltyType"])}>
                         <SelectTrigger data-testid="select-penalty-type" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
                           <SelectValue placeholder="Selecione o tipo..." />
                         </SelectTrigger>

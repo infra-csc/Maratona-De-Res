@@ -9,6 +9,7 @@ import { CheckCircle, Clock, Send, Users, Download, Calendar, MapPin, Building2,
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
+import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -127,6 +128,9 @@ export default function EvaluationsPage() {
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
+  // Per-criterion audio override (objectPath). "" means the user cleared a
+  // previously saved audio (re-recording). undefined => fall back to saved eval.
+  const [audioOverrides, setAudioOverrides] = useState<Record<number, string>>({});
 
   const { data: events } = useGetEvents({ status: "open" });
 
@@ -218,7 +222,7 @@ export default function EvaluationsPage() {
   useEffect(() => {
     if (selectedEventId == null || !events) return;
     const stillValid = events.some(e => e.id === selectedEventId && e.status === "open" && (isEvaluator ? e.criteriaConfirmed : true));
-    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); }
+    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }
   }, [selectedEventId, events, isEvaluator]);
   const canRelease = isManager;
   const eventComplete = eventResult?.isComplete ?? false;
@@ -272,17 +276,28 @@ export default function EvaluationsPage() {
     return ev ? parseFloat(ev.score as unknown as string) : 0;
   }
 
+  function currentAudio(criterionId: number): string | null {
+    const override = audioOverrides[criterionId];
+    if (override !== undefined) return override === "" ? null : override;
+    return getEval(criterionId)?.audioUrl ?? null;
+  }
+
   function handleSaveDraft(criterionId: number) {
     if (!selectedEventId) return;
     const score = currentScore(criterionId);
     if (score === 0) return;
 
     const comment = comments[criterionId] ?? getEval(criterionId)?.comments ?? "";
-    if (score < 3 && (!comment || comment.trim().length === 0)) {
-      toast({ title: "Comentário obrigatório", description: "Notas abaixo de 3 exigem uma justificativa.", variant: "destructive" });
+    if (score < 6 && (!comment || comment.trim().length === 0)) {
+      toast({ title: "Comentário obrigatório", description: "Notas abaixo de 6 exigem uma justificativa.", variant: "destructive" });
       return;
     }
-    createMutation.mutate({ data: { eventId: selectedEventId, criterionId, score, comments: comment || undefined } });
+    const audioUrl = currentAudio(criterionId);
+    if (!audioUrl) {
+      toast({ title: "Áudio obrigatório", description: "Grave um áudio explicando a avaliação antes de salvar.", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate({ data: { eventId: selectedEventId, criterionId, score, comments: comment || undefined, audioUrl } });
   }
 
   function handleScoreClick(criterionId: number, score: number) {
@@ -326,10 +341,15 @@ export default function EvaluationsPage() {
 
   const labels = {
     1: "Crítico",
-    2: "Abaixo do esperado",
-    3: "Atendeu minimamente",
-    4: "Atendeu bem",
-    5: "Excelência"
+    2: "Muito abaixo",
+    3: "Abaixo do esperado",
+    4: "Insuficiente",
+    5: "Atendeu minimamente",
+    6: "Atendeu",
+    7: "Atendeu bem",
+    8: "Muito bom",
+    9: "Ótimo",
+    10: "Excelência"
   };
 
   return (
@@ -395,7 +415,7 @@ export default function EvaluationsPage() {
                           key={ev.id}
                           value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
                           data-testid={`option-event-${ev.id}`}
-                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setEventPickerOpen(false); }}
+                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setEventPickerOpen(false); }}
                           className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
                         >
                           <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
@@ -448,7 +468,7 @@ export default function EvaluationsPage() {
                     event={ev}
                     userId={user?.id}
                     selected={selectedEventId === ev.id}
-                    onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); }}
+                    onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
                   />
                 ))}
               </div>
@@ -604,9 +624,12 @@ export default function EvaluationsPage() {
                         const isDraft = ev?.status === "draft";
                         const score = currentScore(c.criterionId);
                         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
+                        const audio = currentAudio(c.criterionId);
 
-                        // Show requirement alert if score < 3 and comment is empty
-                        const needsComment = score > 0 && score < 3 && (!comment || comment.trim().length === 0);
+                        // Show requirement alert if score < 6 and comment is empty
+                        const needsComment = score > 0 && score < 6 && (!comment || comment.trim().length === 0);
+                        // Áudio é obrigatório para salvar/submeter qualquer avaliação.
+                        const needsAudio = !audio;
 
                         return (
                           <div key={c.criterionId} className={cn("criterion-row border-l-4 pl-6 py-2", submitted ? "border-[#506600]" : isDraft ? "border-[#ff5722]" : score > 0 ? "border-[#ccff00]" : "border-[#191c1e]/20")}>
@@ -644,7 +667,7 @@ export default function EvaluationsPage() {
 
                             <div className="mb-4">
                               <div className="grid grid-cols-5 gap-2 md:gap-3">
-                                {[1, 2, 3, 4, 5].map((val) => (
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
                                   <ScoreButton
                                     key={val}
                                     score={val}
@@ -661,19 +684,34 @@ export default function EvaluationsPage() {
                               <div className={cn("mt-4 border-2 p-4", needsComment ? "border-[#ba1a1a] bg-[#ffdad6]/20" : "border-[#191c1e] bg-[#f2f4f6]")}>
                                 <label className="text-xs font-black italic uppercase flex items-center gap-2 mb-2">
                                   Justificativa / Feedback
-                                  {score > 0 && score < 3 && <span className="text-[10px] text-white bg-[#ba1a1a] px-2 py-0.5 font-bold italic uppercase">Obrigatório para nota {score}</span>}
+                                  {score > 0 && score < 6 && <span className="text-[10px] text-white bg-[#ba1a1a] px-2 py-0.5 font-bold italic uppercase">Obrigatório para nota {score}</span>}
                                 </label>
                                 <Textarea
-                                  placeholder={score > 0 && score < 3 ? "Explique os motivos que levaram a esta nota baixa..." : "Comentários opcionais para a equipe (serão vistos anonimamente)..."}
+                                  placeholder={score > 0 && score < 6 ? "Explique os motivos que levaram a esta nota baixa..." : "Comentários opcionais para a equipe (serão vistos anonimamente)..."}
                                   value={comment}
                                   onChange={e => setComments(s => ({ ...s, [c.criterionId]: e.target.value }))}
                                   className={cn("bg-white rounded-none border-2 resize-y min-h-24 italic focus-visible:ring-0", needsComment ? "border-[#ba1a1a]" : "border-[#191c1e]")}
                                 />
 
+                                <div className={cn("mt-4 border-2 p-4", needsAudio ? "border-[#ba1a1a] bg-[#ffdad6]/20" : "border-[#191c1e] bg-white")}>
+                                  <label className="text-xs font-black italic uppercase flex items-center gap-2 mb-2">
+                                    Áudio da avaliação
+                                    <span className="text-[10px] text-white bg-[#ba1a1a] px-2 py-0.5 font-bold italic uppercase">Obrigatório</span>
+                                  </label>
+                                  <p className="text-[11px] text-[#444933] italic mb-3 leading-relaxed">
+                                    Grave um áudio explicando a nota. Sem áudio não é possível salvar nem submeter a avaliação.
+                                  </p>
+                                  <AudioRecorder
+                                    value={audio}
+                                    onChange={path => setAudioOverrides(s => ({ ...s, [c.criterionId]: path ?? "" }))}
+                                  />
+                                </div>
+
                                 <div className="flex justify-end pt-3">
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
-                                    disabled={score === 0 || needsComment}
+                                    disabled={score === 0 || needsComment || needsAudio}
+                                    data-testid={`button-save-draft-${c.criterionId}`}
                                     className="bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                                   >
                                     <Save size={14} />
@@ -687,6 +725,13 @@ export default function EvaluationsPage() {
                               <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 mt-4">
                                 <p className="text-xs font-black italic uppercase mb-1">Seu Feedback:</p>
                                 <p className="text-sm text-[#444933] italic">"{comment}"</p>
+                              </div>
+                            )}
+
+                            {submitted && audio && (
+                              <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 mt-4">
+                                <p className="text-xs font-black italic uppercase mb-2">Áudio da avaliação</p>
+                                <AudioPlayer objectPath={audio} />
                               </div>
                             )}
                           </div>

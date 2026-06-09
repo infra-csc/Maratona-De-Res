@@ -13,6 +13,14 @@ router.use(requireAuth);
  * "criterion area == user's fixed profile area" rule. Multiple users can belong
  * to an area, but only the one RH assigned for the event may score it.
  */
+// Audio justification paths must point at an uploaded object entity
+// (/objects/uploads/<id>). This prevents bypassing the "áudio obrigatório"
+// rule by saving an arbitrary non-empty string as the audioUrl.
+const AUDIO_PATH_RE = /^\/objects\/uploads\/[^/\s]+$/;
+function isValidAudioPath(value: unknown): value is string {
+  return typeof value === "string" && AUDIO_PATH_RE.test(value.trim());
+}
+
 async function isAssignedForCriterion(eventId: number, criterionId: number, userId: number): Promise<boolean> {
   const [crit] = await db
     .select({ areaId: criteriaTable.responsibleAreaId })
@@ -75,6 +83,7 @@ router.get("/evaluations", async (req, res) => {
     evaluatorName: usersTable.name,
     score: evaluationsTable.score,
     comments: evaluationsTable.comments,
+    audioUrl: evaluationsTable.audioUrl,
     commentVisibility: evaluationsTable.commentVisibility,
     status: evaluationsTable.status,
     submittedAt: evaluationsTable.submittedAt,
@@ -115,21 +124,25 @@ router.get("/evaluations", async (req, res) => {
  * POST /evaluations
  * Cria/atualiza a nota do TIME para um critério do evento.
  * avaliador só pode avaliar critérios da sua área.
- * Escala oficial: 1 a 5 (nota 0 não é permitida).
+ * Escala oficial: 1 a 10 (nota 0 não é permitida). Áudio obrigatório no submit.
  */
 router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req, res) => {
-  const { eventId, criterionId, score, comments, commentVisibility } = req.body;
+  const { eventId, criterionId, score, comments, commentVisibility, audioUrl } = req.body;
   if (!eventId || !criterionId || score === undefined) {
     res.status(400).json({ error: "Campos obrigatórios: eventId, criterionId, score" });
     return;
   }
   const numScore = parseFloat(score);
-  if (isNaN(numScore) || numScore < 1 || numScore > 5) {
-    res.status(400).json({ error: "A nota deve estar entre 1 e 5 (nota 0 não é permitida na avaliação oficial)" });
+  if (isNaN(numScore) || numScore < 1 || numScore > 10) {
+    res.status(400).json({ error: "A nota deve estar entre 1 e 10 (nota 0 não é permitida na avaliação oficial)" });
     return;
   }
-  if (numScore < 3 && (!comments || comments.trim().length === 0)) {
-    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 3" });
+  if (numScore < 6 && (!comments || comments.trim().length === 0)) {
+    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 6" });
+    return;
+  }
+  if (audioUrl !== undefined && audioUrl !== null && !isValidAudioPath(audioUrl)) {
+    res.status(400).json({ error: "Áudio inválido: o arquivo de áudio deve ser enviado pelo gravador." });
     return;
   }
 
@@ -169,6 +182,7 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
       score: String(numScore),
       comments: comments ?? existing.comments,
       commentVisibility: commentVisibility ?? existing.commentVisibility,
+      audioUrl: audioUrl ?? existing.audioUrl,
     }).where(eq(evaluationsTable.id, existing.id)).returning();
   } else {
     // First evaluation for this (event, criterion, evaluator): freeze the
@@ -180,6 +194,7 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
       score: String(numScore),
       comments: comments ?? null,
       commentVisibility: commentVisibility ?? "internal",
+      audioUrl: audioUrl ?? null,
     }).returning();
   }
   res.status(201).json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
@@ -187,7 +202,7 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
 
 router.patch("/evaluations/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const { score, comments, commentVisibility } = req.body;
+  const { score, comments, commentVisibility, audioUrl } = req.body;
 
   const [existing] = await db.select().from(evaluationsTable).where(eq(evaluationsTable.id, id)).limit(1);
   if (!existing) { res.status(404).json({ error: "Não encontrado" }); return; }
@@ -210,13 +225,17 @@ router.patch("/evaluations/:id", async (req, res) => {
   }
 
   const numScore = score !== undefined ? parseFloat(score) : parseFloat(existing.score as unknown as string);
-  if (score !== undefined && (isNaN(numScore) || numScore < 1 || numScore > 5)) {
-    res.status(400).json({ error: "A nota deve estar entre 1 e 5 (nota 0 não é permitida)" });
+  if (score !== undefined && (isNaN(numScore) || numScore < 1 || numScore > 10)) {
+    res.status(400).json({ error: "A nota deve estar entre 1 e 10 (nota 0 não é permitida)" });
     return;
   }
   const finalComments = comments !== undefined ? comments : existing.comments;
-  if (numScore < 3 && (!finalComments || finalComments.trim().length === 0)) {
-    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 3" });
+  if (numScore < 6 && (!finalComments || finalComments.trim().length === 0)) {
+    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 6" });
+    return;
+  }
+  if (audioUrl !== undefined && audioUrl !== null && !isValidAudioPath(audioUrl)) {
+    res.status(400).json({ error: "Áudio inválido: o arquivo de áudio deve ser enviado pelo gravador." });
     return;
   }
 
@@ -224,6 +243,7 @@ router.patch("/evaluations/:id", async (req, res) => {
     ...(score !== undefined && { score: String(numScore) }),
     ...(comments !== undefined && { comments }),
     ...(commentVisibility !== undefined && { commentVisibility }),
+    ...(audioUrl !== undefined && { audioUrl }),
   }).where(eq(evaluationsTable.id, id)).returning();
   res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
 });
@@ -245,8 +265,12 @@ router.post("/evaluations/:id/submit", async (req, res) => {
     }
   }
   const numScore = parseFloat(existing.score as unknown as string);
-  if (numScore < 3 && (!existing.comments || existing.comments.trim().length === 0)) {
-    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 3 antes de submeter" });
+  if (numScore < 6 && (!existing.comments || existing.comments.trim().length === 0)) {
+    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 6 antes de submeter" });
+    return;
+  }
+  if (!isValidAudioPath(existing.audioUrl)) {
+    res.status(400).json({ error: "Áudio obrigatório: grave um áudio explicando a avaliação antes de submeter." });
     return;
   }
   const [evaluation] = await db.update(evaluationsTable).set({

@@ -7,6 +7,7 @@ import {
   quarterlyResultsTable, employeeEventResultsTable, employeeCycleEligibilityTable,
   cyclesTable,
 } from "@workspace/db";
+import { calculateEventResult } from "./lib/calculations";
 
 async function seed() {
   console.log("🌱 Iniciando seed...");
@@ -172,7 +173,7 @@ async function seed() {
 
   await db.insert(rulesTable).values([
     { key: "absence_penalty_per_absence", value: "50", description: "Penalidade por falta (desconto em pontos no resultado final, escala 0-100)" },
-    { key: "max_score", value: "5", description: "Pontuação máxima por critério (escala 0-5)" },
+    { key: "max_score", value: "10", description: "Pontuação máxima por critério (escala 0-10)" },
     { key: "min_evaluations_to_close", value: "1", description: "Mínimo de avaliações submetidas para fechar evento" },
     { key: "min_events_eligibility", value: "8", description: "Mínimo de eventos participados no ciclo para o colaborador ser elegível ao bônus" },
     { key: "cycle_bonus_paid_by", value: "caju", description: "Forma de pagamento do bônus do ciclo" },
@@ -182,11 +183,11 @@ async function seed() {
 
   const now = new Date();
   const year = now.getFullYear();
-  const quarter = Math.ceil((now.getMonth() + 1) / 3);
-  const monthBase = (quarter - 1) * 3 + 1;
 
   const [cycle] = await db.insert(cyclesTable).values({
     name: `Ciclo ${year}`,
+    startDate: `${year}-06-01`,
+    endDate: `${year}-09-30`,
     status: "open",
     isCurrent: true,
   }).returning();
@@ -200,8 +201,8 @@ async function seed() {
       location: "Centro de Eventos",
       city: "Mossoró",
       state: "RN",
-      startDate: `${year}-${String(monthBase).padStart(2, "0")}-10`,
-      endDate: `${year}-${String(monthBase).padStart(2, "0")}-12`,
+      startDate: `${year}-06-13`,
+      endDate: `${year}-06-15`,
       cycleId: cycle.id,
       status: "closed",
     },
@@ -211,8 +212,8 @@ async function seed() {
       location: "Centro de Convenções",
       city: "Fortaleza",
       state: "CE",
-      startDate: `${year}-${String(monthBase).padStart(2, "0")}-20`,
-      endDate: `${year}-${String(monthBase).padStart(2, "0")}-22`,
+      startDate: `${year}-06-27`,
+      endDate: `${year}-06-29`,
       cycleId: cycle.id,
       status: "closed",
     },
@@ -222,8 +223,8 @@ async function seed() {
       location: "Parque Estadual",
       city: "Rio de Janeiro",
       state: "RJ",
-      startDate: `${year}-${String(Math.min(12, monthBase + 1)).padStart(2, "0")}-05`,
-      endDate: `${year}-${String(Math.min(12, monthBase + 1)).padStart(2, "0")}-07`,
+      startDate: `${year}-07-11`,
+      endDate: `${year}-07-13`,
       cycleId: cycle.id,
       status: "open",
     },
@@ -233,8 +234,8 @@ async function seed() {
       location: "Shopping Iguatemi",
       city: "São Paulo",
       state: "SP",
-      startDate: `${year}-${String(Math.min(12, monthBase + 2)).padStart(2, "0")}-15`,
-      endDate: `${year}-${String(Math.min(12, monthBase + 2)).padStart(2, "0")}-17`,
+      startDate: `${year}-08-15`,
+      endDate: `${year}-08-17`,
       cycleId: cycle.id,
       status: "open",
     },
@@ -261,9 +262,9 @@ async function seed() {
 
   // Avaliação por TIME do evento: uma nota por (evento, critério, avaliador).
   // Todos os participantes do time recebem a MESMA nota do evento.
-  // pesos oficiais=[3,2,3,3,3,3,3], notas=[4,4,4,3,2,3,5]
-  //   = 3×4+2×4+3×4+3×3+3×2+3×3+3×5 = 12+8+12+9+6+9+15 = 71
-  const exampleScores = [4, 4, 4, 3, 2, 3, 5];
+  // pesos oficiais=[3,2,3,3,3,3,3] (soma 20), notas (0-10)=[8,8,8,6,4,6,10]
+  //   média ponderada = (3×8+2×8+3×8+3×6+3×4+3×6+3×10)/20 ×10 = 142/20 ×10 = 71
+  const exampleScores = [8, 8, 8, 6, 4, 6, 10];
   const closedEvents = events.filter(e => e.status === "closed");
 
   for (const ev of closedEvents) {
@@ -275,7 +276,7 @@ async function seed() {
         criterionId: c.id,
         evaluatorUserId: users[2].id,
         score: String(score),
-        comments: score < 3 ? "Ponto de atenção do time neste critério — reforçar na próxima missão." : null,
+        comments: score < 6 ? "Ponto de atenção do time neste critério — reforçar na próxima missão." : null,
         commentVisibility: "internal",
         status: "submitted",
         submittedAt: new Date(),
@@ -283,7 +284,7 @@ async function seed() {
     }
   }
 
-  console.log("✓ Avaliações do time criadas (resultado do evento esperado: 71/100)");
+  console.log("✓ Avaliações do time criadas (escala 0–10, resultado em média ponderada ×10 → 0–100)");
 
   // Calibração no nível do critério do evento (não por colaborador).
   for (const ev of closedEvents) {
@@ -307,18 +308,25 @@ async function seed() {
     eventId: closedEvents[0]?.id ?? null,
     penaltyType: "falta",
     points: 50,
-    date: `${year}-${String(monthBase).padStart(2, "0")}-11`,
+    date: `${year}-06-14`,
     cycleId: cycle.id,
     quantity: 1,
-    reason: "Falta justificada",
+    reason: "Sem justificativa apresentada",
     registeredByUserId: users[1].id,
   });
 
   console.log("✓ Ausências seed criadas");
   console.log("\n✅ Seed concluído com sucesso!");
-  console.log("\n📊 Validação de cálculo:");
-  console.log("   Pesos oficiais: [3,2,3,3,3,3,3], Notas: [4,4,4,3,2,3,5]");
-  console.log("   Esperado: 71 | Resultado:", [3,2,3,3,3,3,3].reduce((s, w, i) => s + w * [4,4,4,3,2,3,5][i], 0));
+  console.log("\n📊 Validação de cálculo (escala 0–10, média ponderada ×10 → 0–100):");
+  {
+    const exWeights = [3, 3, 2, 3, 3, 3, 3];
+    const exScores = [8, 8, 8, 6, 4, 6, 10];
+    const exResult = calculateEventResult(
+      exWeights.map((weight, i) => ({ criterionId: i + 1, weight, averageScore: exScores[i], calibratedScore: null })),
+    );
+    console.log(`   Pesos: [${exWeights.join(",")}], Notas: [${exScores.join(",")}]`);
+    console.log(`   Esperado: 71 | Resultado: ${exResult}`);
+  }
   console.log("\n👤 Usuários criados (senha: 123456):");
   users.forEach((u: typeof users[number]) => console.log(`   ${u.email} — ${u.role}`));
 }

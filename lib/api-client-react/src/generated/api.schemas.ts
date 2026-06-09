@@ -5,6 +5,36 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+export interface UploadUrlRequest {
+  /**
+     * Original file name.
+     * @minLength 1
+     */
+  name: string;
+  /**
+     * File size in bytes.
+     * @minimum 1
+     */
+  size: number;
+  /**
+     * MIME type of the file (e.g. `audio/webm`).
+     * @minLength 1
+     */
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  /** Presigned GCS URL for PUT upload. */
+  uploadURL: string;
+  /** Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database. */
+  objectPath: string;
+  metadata?: UploadUrlRequest;
+}
+
+export interface ErrorEnvelope {
+  error: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -372,6 +402,8 @@ export interface Evaluation {
   score: number;
   /** @nullable */
   comments?: string | null;
+  /** @nullable */
+  audioUrl?: string | null;
   commentVisibility?: string;
   status: string;
   /** @nullable */
@@ -384,12 +416,14 @@ export interface EvaluationInput {
   criterionId: number;
   score: number;
   comments?: string;
+  audioUrl?: string;
   commentVisibility?: string;
 }
 
 export interface EvaluationUpdate {
   score?: number;
   comments?: string;
+  audioUrl?: string;
   commentVisibility?: string;
 }
 
@@ -454,8 +488,7 @@ export type AbsenceInputPenaltyType = typeof AbsenceInputPenaltyType[keyof typeo
 
 export const AbsenceInputPenaltyType = {
   falta: 'falta',
-  atraso_30: 'atraso_30',
-  atraso_60: 'atraso_60',
+  atraso: 'atraso',
   merito_galpao: 'merito_galpao',
   merito_evento: 'merito_evento',
 } as const;

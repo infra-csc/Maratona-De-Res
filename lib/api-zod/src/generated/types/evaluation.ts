@@ -19,6 +19,8 @@ export interface Evaluation {
   score: number;
   /** @nullable */
   comments?: string | null;
+  /** @nullable */
+  audioUrl?: string | null;
   commentVisibility?: string;
   status: string;
   /** @nullable */

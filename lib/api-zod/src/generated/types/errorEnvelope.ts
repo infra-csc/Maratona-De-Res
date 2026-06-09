@@ -6,9 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface EvaluationUpdate {
-  score?: number;
-  comments?: string;
-  audioUrl?: string;
-  commentVisibility?: string;
+export interface ErrorEnvelope {
+  error: string;
 }

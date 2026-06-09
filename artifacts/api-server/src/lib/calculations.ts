@@ -19,24 +19,28 @@ export interface CriterionData {
 }
 
 /**
- * Calcula o resultado do evento: Σ(nota_usada × peso)
- * Com pesos somando 20 e notas de 0-5, o resultado fica na escala 0-100.
- * Exemplo: pesos=[3,3,2,3,3,3,3], notas=[4,4,4,3,2,3,5] → 71
+ * Calcula o resultado do evento como MÉDIA PONDERADA das notas (escala 0-10),
+ * normalizada para 0-100: (Σ(nota_usada × peso) / Σ(peso)) × 10.
+ * Pesos são livres (temporário); apenas critérios com nota entram na média.
+ * Exemplo: pesos=[3,3,2,3,3,3,3], notas=[8,8,8,6,4,6,10] → 71
  */
 export function calculateEventResult(criteria: CriterionData[]): number {
-  let total = 0;
+  let weighted = 0;
+  let weightSum = 0;
   for (const c of criteria) {
     const score = getScoreUsedForCalculation(c.averageScore, c.calibratedScore);
     if (score !== null) {
-      total += score * c.weight;
+      weighted += score * c.weight;
+      weightSum += c.weight;
     }
   }
-  return Math.round(total * 100) / 100;
+  if (weightSum === 0) return 0;
+  return Math.round((weighted / weightSum) * 10 * 100) / 100;
 }
 
 export function validateCalculationExample(): boolean {
   const weights = [3, 3, 2, 3, 3, 3, 3];
-  const scores = [4, 4, 4, 3, 2, 3, 5];
+  const scores = [8, 8, 8, 6, 4, 6, 10];
   const criteria: CriterionData[] = weights.map((weight, i) => ({
     criterionId: i + 1,
     weight,
@@ -89,10 +93,10 @@ export function calculateBonusByScore(score: number, rules: PlatoonRuleData[]): 
 }
 
 /**
- * Converte uma nota bruta (0–5) para percentual (0–100).
+ * Converte uma nota bruta (0–10) para percentual (0–100).
  * Útil para exibição e relatórios sem alterar o cálculo base.
  */
-export function convertScoreToPercentage(score: number, maxScore = 5): number {
+export function convertScoreToPercentage(score: number, maxScore = 10): number {
   if (maxScore === 0) return 0;
   return Math.round((score / maxScore) * 100 * 100) / 100;
 }

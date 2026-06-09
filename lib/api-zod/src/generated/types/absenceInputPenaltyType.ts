@@ -11,8 +11,7 @@ export type AbsenceInputPenaltyType = typeof AbsenceInputPenaltyType[keyof typeo
 
 export const AbsenceInputPenaltyType = {
   falta: 'falta',
-  atraso_30: 'atraso_30',
-  atraso_60: 'atraso_60',
+  atraso: 'atraso',
   merito_galpao: 'merito_galpao',
   merito_evento: 'merito_evento',
 } as const;

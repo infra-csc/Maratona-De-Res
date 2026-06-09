@@ -1153,6 +1153,7 @@ export const GetEvaluationsResponseItem = zod.object({
   "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "audioUrl": zod.string().nullish(),
   "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
@@ -1169,6 +1170,7 @@ export const CreateEvaluationBody = zod.object({
   "criterionId": zod.number(),
   "score": zod.number(),
   "comments": zod.string().optional(),
+  "audioUrl": zod.string().optional(),
   "commentVisibility": zod.string().optional()
 })
 
@@ -1183,6 +1185,7 @@ export const UpdateEvaluationParams = zod.object({
 export const UpdateEvaluationBody = zod.object({
   "score": zod.number().optional(),
   "comments": zod.string().optional(),
+  "audioUrl": zod.string().optional(),
   "commentVisibility": zod.string().optional()
 })
 
@@ -1195,6 +1198,7 @@ export const UpdateEvaluationResponse = zod.object({
   "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "audioUrl": zod.string().nullish(),
   "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
@@ -1218,6 +1222,7 @@ export const SubmitEvaluationResponse = zod.object({
   "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "audioUrl": zod.string().nullish(),
   "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
@@ -1241,6 +1246,7 @@ export const ReopenEvaluationResponse = zod.object({
   "evaluatorName": zod.string().nullish(),
   "score": zod.number(),
   "comments": zod.string().nullish(),
+  "audioUrl": zod.string().nullish(),
   "commentVisibility": zod.string().optional(),
   "status": zod.string(),
   "submittedAt": zod.string().nullish(),
@@ -1318,7 +1324,7 @@ export const GetAbsencesResponse = zod.array(GetAbsencesResponseItem)
 export const CreateAbsenceBody = zod.object({
   "employeeId": zod.number(),
   "eventId": zod.number().nullish(),
-  "penaltyType": zod.enum(['falta', 'atraso_30', 'atraso_60', 'merito_galpao', 'merito_evento']),
+  "penaltyType": zod.enum(['falta', 'atraso', 'merito_galpao', 'merito_evento']),
   "date": zod.string(),
   "quantity": zod.number().min(1).optional(),
   "reason": zod.string().optional()
@@ -1905,6 +1911,55 @@ export const ExportAbsencesResponse = zod.object({
 export const ExportPendingEvaluationsResponse = zod.object({
   "filename": zod.string(),
   "data": zod.string()
+})
+
+
+/**
+ * Returns a presigned GCS URL for direct upload. The client sends JSON
+metadata here, then uploads the file directly to the returned URL.
+
+ * @summary Request a presigned URL for file upload
+ */
+
+
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `audio\/webm`).')
+})
+
+
+
+
+
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().url().describe('Presigned GCS URL for PUT upload.'),
+  "objectPath": zod.string().describe('Normalized object path (e.g. `\/objects\/uploads\/uuid`). Store this in your database.'),
+  "metadata": zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `audio\/webm`).')
+}).optional()
+})
+
+
+/**
+ * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+ */
+export const GetPublicObjectParams = zod.object({
+  "filePath": zod.coerce.string()
+})
+
+
+/**
+ * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ */
+export const GetStorageObjectParams = zod.object({
+  "objectPath": zod.coerce.string()
 })
 
 

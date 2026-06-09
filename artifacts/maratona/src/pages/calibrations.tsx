@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock } from "lucide-react";
@@ -128,7 +129,7 @@ export default function CalibrationsPage() {
   function getAreaScores(critId: number) {
     return (evaluations ?? [])
       .filter(e => e.criterionId === critId && e.status === "submitted")
-      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim() }));
+      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null }));
   }
 
   function getAvgScore(critId: number) {
@@ -145,8 +146,8 @@ export default function CalibrationsPage() {
     const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
     const reason = (calReasons[critId] ?? existing?.calibrationReason ?? "").trim();
     const score = Number(raw);
-    if (!raw || isNaN(score) || score < 1 || score > 5) {
-      toast({ title: "Nota inválida", description: "Informe uma nota calibrada de 1 a 5.", variant: "destructive" });
+    if (!raw || isNaN(score) || score < 1 || score > 10) {
+      toast({ title: "Nota inválida", description: "Informe uma nota calibrada de 1 a 10.", variant: "destructive" });
       return;
     }
     setSavingCritId(critId);
@@ -172,7 +173,7 @@ export default function CalibrationsPage() {
     const existing = getCalibration(critId);
     const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
     const score = Number(raw);
-    if (!raw || isNaN(score) || score < 1 || score > 5) return null;
+    if (!raw || isNaN(score) || score < 1 || score > 10) return null;
     return score;
   }
   const fillableCount = activeCriteria.filter(c => pendingScore(c.criterionId) != null).length;
@@ -429,6 +430,12 @@ export default function CalibrationsPage() {
                                 ) : (
                                   <p className="text-[10px] italic text-[#9aa088] border-t-2 border-[#eceef0] px-2.5 py-1.5">Sem justificativa</p>
                                 )}
+                                {s.audioUrl && (
+                                  <div className="border-t-2 border-[#eceef0] px-2.5 py-1.5">
+                                    <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60] mb-1">Áudio</p>
+                                    <AudioPlayer objectPath={s.audioUrl} />
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -449,11 +456,11 @@ export default function CalibrationsPage() {
                       </p>
                       <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
                         <div className="sm:w-28 shrink-0">
-                          <Label className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota (1–5)</Label>
+                          <Label className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota (1–10)</Label>
                           <Input
                             data-testid={`input-cal-score-${c.criterionId}`}
                             type="number"
-                            min="1" max="5" step="1"
+                            min="1" max="10" step="1"
                             value={scoreVal}
                             onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
                             placeholder="—"

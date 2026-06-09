@@ -9,13 +9,13 @@ const router = Router();
 router.use(requireAuth);
 
 /**
- * Catálogo de penalidades. `points` fixo por tipo; quando null, usa a regra
- * configurável `absence_penalty_per_absence` (a "Falta" segue a regra do sistema).
+ * Catálogo de penalidades (matriz de pontuação). Pontos fixos por tipo,
+ * subtraídos da nota final (com clamp 0-100): Falta não justificada = 50,
+ * Atraso = 20. (`points` segue como `number | null` por compatibilidade.)
  */
 export const PENALTY_CATALOG: Record<string, { label: string; points: number | null }> = {
-  falta: { label: "Falta", points: null },
-  atraso_30: { label: "Atraso (30 min)", points: 50 },
-  atraso_60: { label: "Atraso (1 hora)", points: 100 },
+  falta: { label: "Falta não justificada", points: 50 },
+  atraso: { label: "Atraso", points: 20 },
 };
 
 /**

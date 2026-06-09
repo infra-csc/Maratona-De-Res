@@ -11,5 +11,6 @@ export interface EvaluationInput {
   criterionId: number;
   score: number;
   comments?: string;
+  audioUrl?: string;
   commentVisibility?: string;
 }

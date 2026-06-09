@@ -305,7 +305,6 @@ router.get("/events/:id/criteria", async (req, res) => {
   }));
 });
 
-const TARGET_WEIGHT = 20;
 
 type CriterionConfigItem = { criterionId: number; active: boolean; weight: number };
 
@@ -345,8 +344,10 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
       : parseFloat(ec.weightOverride ?? ec.originalWeight ?? "0");
     return s + weight;
   }, 0);
-  if (Math.abs(resultingActiveSum - TARGET_WEIGHT) > 0.01) {
-    res.status(400).json({ error: `A soma dos pesos dos critérios ativos deve ser ${TARGET_WEIGHT} (atual: ${Math.round(resultingActiveSum * 100) / 100})` });
+  // Pesos livres (temporário): basta haver peso positivo. A nota do evento usa
+  // média ponderada, então a soma dos pesos não precisa ser fixa.
+  if (resultingActiveSum <= 0) {
+    res.status(400).json({ error: "Defina pesos positivos para os critérios ativos." });
     return;
   }
 
@@ -532,8 +533,8 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
       .where(eq(eventCriteriaTable.eventId, id));
     const sum = rows.filter(r => r.active).reduce((s, r) => s + parseFloat(r.weightOverride ?? r.originalWeight ?? "1"), 0);
-    if (Math.abs(sum - TARGET_WEIGHT) > 0.01) {
-      res.status(400).json({ error: `Ajuste os pesos para somar ${TARGET_WEIGHT} antes de confirmar (atual: ${Math.round(sum * 100) / 100})` });
+    if (sum <= 0) {
+      res.status(400).json({ error: "Defina pesos positivos para os critérios ativos antes de confirmar." });
       return;
     }
 

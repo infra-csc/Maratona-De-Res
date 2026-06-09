@@ -19,11 +19,18 @@ import exportsRouter from "./exports.js";
 import myPerformanceRouter from "./my-performance.js";
 import feedbackRouter from "./feedback.js";
 import eligibilityRouter from "./eligibility.js";
+import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+// storageRouter is mounted early, BEFORE any router with a blanket
+// requireRole (audit, integration use requireRole("admin","rh")). Those guards
+// run for every fall-through request and would otherwise 403 audio
+// uploads/playback used by avaliadores. Storage has its own guards: requireAuth
+// on the upload-URL endpoint, public GET for <audio> playback.
+router.use(storageRouter);
 router.use(usersRouter);
 router.use(areasRouter);
 router.use(employeesRouter);
