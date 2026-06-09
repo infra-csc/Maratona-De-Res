@@ -39,7 +39,8 @@ router.get("/events", async (req, res) => {
     const participantCount = participants.filter(p => p.eventId === ev.id).length;
     const evEvals = evals.filter(e => e.eventId === ev.id);
     const submitted = evEvals.filter(e => e.status === "submitted");
-    const progress = evEvals.length > 0 ? submitted.length / evEvals.length : 0;
+    const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active);
+    const progress = activeCriteria.length > 0 ? submitted.length / activeCriteria.length : 0;
     const scored = submitted.filter(e => e.score != null);
     const avgRaw = scored.length > 0
       ? scored.reduce((s, e) => s + parseFloat(e.score as unknown as string), 0) / scored.length
@@ -48,7 +49,6 @@ router.get("/events", async (req, res) => {
 
     // Nota do time (mesma lógica de computeEventTeamResult): por critério ativo,
     // média das avaliações submetidas, substituída pela calibração quando existe.
-    const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active);
     const evCals = calibrations.filter(c => c.eventId === ev.id);
     let evaluatedCriteria = 0;
     let hasCalibration = false;
@@ -119,9 +119,11 @@ async function loadEventDetail(id: number) {
 
   // Non-confidential progress: share of evaluations already submitted for this
   // event. Mirrors the /events list metric so both views agree.
+  // Denominator = total active criteria (not evaluations created in DB), because
+  // criteria may exist without any evaluation record yet (submitted=0).
   const allEvals = await db.select({ status: evaluationsTable.status }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
   const submittedCount = allEvals.filter(e => e.status === "submitted").length;
-  const evaluationProgress = allEvals.length > 0 ? submittedCount / allEvals.length : 0;
+  const evaluationProgress = activeCriteria.length > 0 ? submittedCount / activeCriteria.length : 0;
 
   const areaAssignments = await db
     .select({
