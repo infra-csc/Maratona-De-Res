@@ -468,11 +468,6 @@ export default function CalibrationsPage() {
                       <div className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {avg != null && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold italic uppercase text-[#191c1e] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1">
-                          Média {avg.toFixed(2)}
-                        </span>
-                      )}
                       {c.responsibleAreaName && (
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1 skew-x-[-6deg]">
                           <span className="inline-flex items-center gap-1.5 skew-x-[6deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
@@ -521,15 +516,15 @@ export default function CalibrationsPage() {
                           </div>
                           <div className="mt-4 flex items-baseline gap-3">
                             <span className="text-[11px] font-bold uppercase italic tracking-wider text-[#747a60]">Média Original</span>
-                            <span className="text-2xl font-black italic text-[#191c1e]">{avg?.toFixed(2)}</span>
+                            <span className={`text-2xl font-black italic ${cal ? "text-[#c4c9ac] line-through" : "text-[#191c1e]"}`}>{avg?.toFixed(2)}</span>
                             {cal && (
                               <>
                                 <span className="text-sm font-bold italic text-[#747a60]">→</span>
                                 <span className="text-2xl font-black italic text-[#ff5722]">{parseFloat(cal.calibratedScore as unknown as string).toFixed(2)}</span>
+                                <span className="text-sm font-bold italic text-[#747a60]">=</span>
+                                <span className="text-2xl font-black italic text-[#506600]">{(parseFloat(cal.calibratedScore as unknown as string) * (c.weightOverride ?? c.originalWeight ?? 0)).toFixed(2)}</span>
                               </>
                             )}
-                            <span className="text-sm font-bold italic text-[#747a60]">=</span>
-                            <span className="text-2xl font-black italic text-[#506600]">{(cal ? parseFloat(cal.calibratedScore as unknown as string) : (avg ?? 0)) * (c.weightOverride ?? c.originalWeight ?? 0)}</span>
                           </div>
                         </>
                       ) : (
@@ -638,9 +633,37 @@ export default function CalibrationsPage() {
               );
             })()}
 
-            {/* Status de finalização — apenas mensagens informativas, botão está no header sticky */}
-            {scoredCriteria.length > 0 && !alreadyReleased && !readyToFinalize && (
-              allCalibrated && !evaluationsComplete ? (
+            {/* Finalização — aparece apenas quando todas as calibrações estão salvas */}
+            {scoredCriteria.length > 0 && (
+              alreadyReleased ? (
+                <div className="bg-[#506600] text-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[6px_6px_0px_0px_#191c1e]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CheckCircle size={26} className="shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-base font-black italic uppercase tracking-tight leading-tight">Evento finalizado</p>
+                      <p className="text-xs font-bold italic uppercase text-[#ccff00]/70 leading-tight">As notas já foram liberadas para os funcionários.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : readyToFinalize ? (
+                <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[6px_6px_0px_0px_#ccff00]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CheckCircle size={26} className="text-[#ccff00] shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-base font-black italic uppercase tracking-tight leading-tight">{alreadyClosed ? "Evento fechado — notas não liberadas" : "Todas as calibrações salvas"}</p>
+                      <p className="text-xs font-bold italic uppercase text-white/60 leading-tight">{alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}</p>
+                    </div>
+                  </div>
+                  <button
+                    data-testid="button-open-finalize"
+                    type="button"
+                    onClick={() => setFinalizeOpen(true)}
+                    className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 transition-all hover:bg-white hover:border-white"
+                  >
+                    <Flag size={16} /> {alreadyClosed ? "Liberar Notas" : "Fechar Evento e Liberar Notas"}
+                  </button>
+                </div>
+              ) : allCalibrated && !evaluationsComplete ? (
                 <div className="bg-white border-2 border-[#191c1e] p-5 flex items-center gap-3 text-[#444933]">
                   <AlertTriangle size={20} className="shrink-0 text-[#ff5722]" />
                   <p className="text-xs font-bold italic uppercase tracking-wide leading-tight">
