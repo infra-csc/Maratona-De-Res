@@ -100,6 +100,7 @@ function AppRoutes() {
         {user ? <Redirect to="/" /> : <LoginPage />}
       </Route>
       <Route path="/" component={HomeRoute} />
+      <Route path="/dashboard"><Redirect to="/meu-desempenho" /></Route>
       <Route path="/events/:id" component={() => <ProtectedRoute component={EventDetailPage} />} />
       <Route path="/events" component={() => <ProtectedRoute component={EventsPage} />} />
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />

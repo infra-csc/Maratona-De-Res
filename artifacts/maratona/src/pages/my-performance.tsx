@@ -196,33 +196,33 @@ export default function MyPerformancePage() {
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-6xl mx-auto bg-slate-50/30 min-h-full">
+    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3 uppercase">
-            <TrendingUp className="text-primary" size={28} />
-            Meu Desempenho
-          </h1>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="font-bold text-slate-700 bg-white px-3 py-1 rounded-md border shadow-sm text-sm">{data?.employee.name ?? user?.name}</span>
-            <span className="text-xs font-semibold text-muted-foreground uppercase">{data?.employee.functionName}</span>
-          </div>
-        </div>
+      <header className="sticky top-0 z-30 bg-[#f7f9fb] border-b-4 border-[#191c1e] flex flex-wrap gap-4 justify-between items-center px-6 md:px-10 py-4">
+        <h1 className="text-2xl md:text-3xl italic font-black text-[#506600] uppercase tracking-tighter flex items-center gap-3">
+          <TrendingUp size={28} />
+          Meu Desempenho
+        </h1>
         {data?.cycle && (
-          <div className="flex flex-col bg-white p-3 rounded-xl border shadow-sm w-max px-4 py-2">
+          <div className="bg-white border-2 border-[#191c1e] px-4 py-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Ciclo</span>
-              <span className="font-black text-slate-800">{data.cycle.name}</span>
+              <span className="text-xs font-bold uppercase italic tracking-wider text-[#747a60]">Ciclo</span>
+              <span className="font-black text-[#191c1e] text-sm">{data.cycle.name}</span>
             </div>
             {formatCyclePeriod(currentCycle?.startDate, currentCycle?.endDate) && (
-              <span className="text-[11px] font-semibold text-muted-foreground mt-0.5">
+              <span className="text-[11px] font-bold italic text-[#747a60] mt-0.5">
                 {formatCyclePeriod(currentCycle?.startDate, currentCycle?.endDate)}
               </span>
             )}
           </div>
         )}
-      </div>
+      </header>
+
+      <div className="p-6 md:p-10 space-y-10">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-[#191c1e] bg-[#ccff00] px-3 py-1 border-2 border-[#191c1e] text-sm italic">{data?.employee.name ?? user?.name}</span>
+          <span className="text-xs font-bold uppercase italic text-[#747a60]">{data?.employee.functionName}</span>
+        </div>
 
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -241,85 +241,85 @@ export default function MyPerformancePage() {
 
       {data && summary && (
         <>
-          {/* Executive Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="border-none shadow-md bg-gradient-to-br from-sidebar to-sidebar-accent text-white relative overflow-hidden">
-              <div className="absolute -right-4 -bottom-4 opacity-10">
-                <Trophy size={100} />
-              </div>
-              <CardContent className="p-6 relative z-10">
-                <p className="text-xs font-bold text-white/70 uppercase tracking-widest mb-1">Média do Ciclo</p>
+          {/* Executive Summary Cards — estilo app */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Média do Ciclo */}
+            <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
+              <div className="z-10">
+                <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Média do Ciclo</p>
                 {result !== null ? (
-                  <div className="flex items-baseline gap-1 mt-2">
-                    <span className="text-5xl font-black">{result.toFixed(1)}</span>
-                    <span className="text-white/60 font-bold">/100</span>
-                  </div>
+                  <h2 className="text-[40px] leading-none italic font-black mt-2">{result.toFixed(1)}<span className="text-[18px] text-[#747a60]">/100</span></h2>
                 ) : (
-                  <div className="text-lg font-medium text-white/70 mt-4">Em andamento</div>
+                  <div className="text-lg font-medium text-[#747a60] mt-4 italic">Em andamento</div>
                 )}
                 {summary.isQuarterClosed && (
-                  <Badge variant="outline" className="mt-4 bg-white/10 border-white/20 text-white text-[10px] font-bold">FECHADO OFICIALMENTE</Badge>
+                  <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Fechado Oficialmente</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <Trophy size={110} strokeWidth={1.5} />
+              </div>
+              <div className="w-full h-2 bg-[#191c1e] mt-auto" />
+            </div>
 
-            <Card className="border-none shadow-sm bg-white">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Seu Pelotão</p>
-                  <div className="bg-slate-100 p-2 rounded-lg text-slate-500"><Target size={20} /></div>
-                </div>
+            {/* Seu Pelotão */}
+            <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
+              <div className="z-10">
+                <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Seu Pelotão</p>
                 {summary.currentPlatoon ? (
                   <>
-                    <h3 className="text-2xl font-black text-slate-800 leading-tight">{summary.currentPlatoon}</h3>
-                    <Badge variant="secondary" className="mt-3 bg-slate-100 text-slate-600 font-bold text-[10px]">
-                      {summary.isQuarterClosed ? "CLASSIFICAÇÃO FINAL" : "PROJEÇÃO ATUAL"}
-                    </Badge>
+                    <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">{summary.currentPlatoon}</h2>
+                    <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-2">
+                      {summary.isQuarterClosed ? "Classificação Final" : "Projeção Atual"}
+                    </p>
                   </>
                 ) : (
-                  <div className="text-2xl font-black text-slate-300">—</div>
+                  <div className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <Target size={110} strokeWidth={1.5} />
+              </div>
+              <div className="w-full h-2 bg-[#506600] mt-auto" />
+            </div>
 
-            <Card className="border-none shadow-sm bg-white">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Bônus Caju</p>
-                  <div className="bg-green-100 p-2 rounded-lg text-green-600"><DollarSign size={20} /></div>
-                </div>
+            {/* Bônus Caju */}
+            <div className="bg-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden shadow-[4px_4px_0px_0px_#191c1e]">
+              <div className="z-10">
+                <p className="text-xs font-bold uppercase italic tracking-wider text-[#161e00]">Bônus Caju</p>
                 {summary.projectedBonus !== null ? (
                   <>
-                    <h3 className="text-3xl font-black text-green-600">{fmtBRL(summary.projectedBonus)}</h3>
-                    <Badge variant="outline" className="mt-2 bg-green-50 border-green-200 text-green-700 font-bold text-[10px]">
-                      {summary.isQuarterClosed ? "VALOR CONFIRMADO" : "VALOR PROJETADO"}
-                    </Badge>
+                    <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">{fmtBRL(summary.projectedBonus)}</h2>
+                    <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Valor estimado — sujeito a alteração</p>
                   </>
                 ) : (
-                  <div className="text-3xl font-black text-slate-300">—</div>
+                  <div className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              <div className="absolute -right-3 -bottom-3 opacity-10">
+                <DollarSign size={110} strokeWidth={1.5} />
+              </div>
+              <div className="w-full h-2 bg-[#191c1e] mt-auto" />
+            </div>
 
-            <Card className="border-none shadow-sm bg-white">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Participação</p>
-                  <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Calendar size={20} /></div>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <h3 className="text-3xl font-black text-slate-800">{summary.evaluatedEvents}</h3>
-                  <span className="text-sm font-semibold text-slate-500">eventos</span>
-                </div>
-                
-                {(summary.pendingEvents > 0 || summary.totalAbsences > 0) && (
-                  <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
-                    {summary.pendingEvents > 0 && <span className="text-xs font-bold flex items-center gap-1.5 text-amber-600"><Clock size={12}/> {summary.pendingEvents} avaliações em andamento</span>}
-                    {summary.totalAbsences > 0 && <span className="text-xs font-bold flex items-center gap-1.5 text-red-600"><AlertTriangle size={12}/> {summary.totalAbsences} faltas registradas</span>}
-                  </div>
+            {/* Participação */}
+            <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
+              <div className="z-10">
+                <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Participação</p>
+                <h2 className="text-[40px] leading-none italic font-black mt-2">{summary.evaluatedEvents}</h2>
+                <p className="text-[11px] font-bold uppercase italic text-[#506600] mt-1">eventos no ciclo</p>
+                {summary.pendingEvents > 0 && (
+                  <p className="text-[10px] font-bold uppercase italic text-amber-600 mt-1">{summary.pendingEvents} em andamento</p>
                 )}
-              </CardContent>
-            </Card>
+                {summary.totalAbsences > 0 && (
+                  <p className="text-[10px] font-bold uppercase italic text-red-600 mt-1">{summary.totalAbsences} faltas</p>
+                )}
+              </div>
+              <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <Calendar size={110} strokeWidth={1.5} />
+              </div>
+              <div className="w-full h-2 bg-[#191c1e] mt-auto" />
+            </div>
           </div>
 
           {/* Absence penalty info */}
