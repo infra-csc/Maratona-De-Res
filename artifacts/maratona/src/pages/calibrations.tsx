@@ -381,9 +381,26 @@ export default function CalibrationsPage() {
                     <p className="text-xs font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName}</p>
                   </div>
                 </div>
-                <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${statusChip(pickedEvent.status).cls}`}>
-                  <span className="inline-block skew-x-[8deg]">{statusChip(pickedEvent.status).label}</span>
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {(() => {
+                    let sum = 0, count = 0;
+                    for (const c of activeCriteria) {
+                      const cal = getCalibration(c.criterionId);
+                      const avg = getAvgScore(c.criterionId);
+                      const score = cal ? parseFloat(cal.calibratedScore as unknown as string) : (avg ?? null);
+                      if (score !== null) { sum += score; count++; }
+                    }
+                    const overallAvg = count > 0 ? sum / count : null;
+                    return overallAvg != null ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold italic uppercase text-[#191c1e] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1">
+                        Média {overallAvg.toFixed(2)}
+                      </span>
+                    ) : null;
+                  })()}
+                  <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${statusChip(pickedEvent.status).cls}`}>
+                    <span className="inline-block skew-x-[8deg]">{statusChip(pickedEvent.status).label}</span>
+                  </span>
+                </div>
               </div>
             )}
 
@@ -603,22 +620,12 @@ export default function CalibrationsPage() {
                   </div>
                 </div>
               ) : readyToFinalize ? (
-                <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[6px_6px_0px_0px_#ccff00]">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <CheckCircle size={26} className="text-[#ccff00] shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-base font-black italic uppercase tracking-tight leading-tight">{alreadyClosed ? "Evento fechado — notas não liberadas" : "Todas as calibrações salvas"}</p>
-                      <p className="text-xs font-bold italic uppercase text-white/60 leading-tight">{alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}</p>
-                    </div>
+                <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-5 flex items-center gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
+                  <CheckCircle size={26} className="text-[#ccff00] shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-base font-black italic uppercase tracking-tight leading-tight">{alreadyClosed ? "Evento fechado — notas não liberadas" : "Todas as calibrações salvas"}</p>
+                    <p className="text-xs font-bold italic uppercase text-white/60 leading-tight">{alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}</p>
                   </div>
-                  <button
-                    data-testid="button-open-finalize"
-                    type="button"
-                    onClick={() => setFinalizeOpen(true)}
-                    className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 transition-all hover:bg-white hover:border-white"
-                  >
-                    <Flag size={16} /> {alreadyClosed ? "Liberar Notas" : "Fechar Evento e Liberar Notas"}
-                  </button>
                 </div>
               ) : allCalibrated && !evaluationsComplete ? (
                 <div className="bg-white border-2 border-[#191c1e] p-5 flex items-center gap-3 text-[#444933]">
