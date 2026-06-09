@@ -137,10 +137,6 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
     res.status(400).json({ error: "A nota deve estar entre 1 e 10 (nota 0 não é permitida na avaliação oficial)" });
     return;
   }
-  if (numScore < 6 && (!comments || comments.trim().length === 0)) {
-    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 6" });
-    return;
-  }
   if (audioUrl !== undefined && audioUrl !== null && !isValidAudioPath(audioUrl)) {
     res.status(400).json({ error: "Áudio inválido: o arquivo de áudio deve ser enviado pelo gravador." });
     return;
@@ -229,11 +225,6 @@ router.patch("/evaluations/:id", async (req, res) => {
     res.status(400).json({ error: "A nota deve estar entre 1 e 10 (nota 0 não é permitida)" });
     return;
   }
-  const finalComments = comments !== undefined ? comments : existing.comments;
-  if (numScore < 6 && (!finalComments || finalComments.trim().length === 0)) {
-    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 6" });
-    return;
-  }
   if (audioUrl !== undefined && audioUrl !== null && !isValidAudioPath(audioUrl)) {
     res.status(400).json({ error: "Áudio inválido: o arquivo de áudio deve ser enviado pelo gravador." });
     return;
@@ -263,11 +254,6 @@ router.post("/evaluations/:id/submit", async (req, res) => {
       res.status(403).json({ error: "Você não é o avaliador designado para esta área neste evento" });
       return;
     }
-  }
-  const numScore = parseFloat(existing.score as unknown as string);
-  if (numScore < 6 && (!existing.comments || existing.comments.trim().length === 0)) {
-    res.status(400).json({ error: "Comentário obrigatório para pontuação inferior a 6 antes de submeter" });
-    return;
   }
   if (!isValidAudioPath(existing.audioUrl)) {
     res.status(400).json({ error: "Áudio obrigatório: grave um áudio explicando a avaliação antes de submeter." });

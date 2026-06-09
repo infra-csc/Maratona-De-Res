@@ -316,10 +316,6 @@ export default function EvaluationsPage() {
     if (score === 0) return;
 
     const comment = comments[criterionId] ?? getEval(criterionId)?.comments ?? "";
-    if (score < 6 && (!comment || comment.trim().length === 0)) {
-      toast({ title: "Comentário obrigatório", description: "Notas abaixo de 6 exigem uma justificativa.", variant: "destructive" });
-      return;
-    }
     const audioUrl = currentAudio(criterionId);
     if (!audioUrl) {
       toast({ title: "Áudio obrigatório", description: "Grave um áudio explicando a avaliação antes de salvar.", variant: "destructive" });
@@ -333,15 +329,13 @@ export default function EvaluationsPage() {
   }
 
   // A criterion is "ready to launch" if it's already submitted, OR fully filled
-  // in-screen (score chosen, justificativa when nota < 6, and áudio gravado) —
+  // in-screen (score chosen and áudio gravado) — justificativa is opcional —
   // even if it was never explicitly saved as rascunho.
   function criterionReady(criterionId: number): boolean {
     const ev = getEval(criterionId);
     if (ev?.status === "submitted") return true;
     const score = currentScore(criterionId);
     if (score === 0) return false;
-    const comment = comments[criterionId] ?? ev?.comments ?? "";
-    if (score < 6 && (!comment || comment.trim().length === 0)) return false;
     if (!currentAudio(criterionId)) return false;
     return true;
   }
@@ -760,9 +754,8 @@ export default function EvaluationsPage() {
                         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
                         const audio = currentAudio(c.criterionId);
 
-                        // Show requirement alert if score < 6 and comment is empty
-                        const needsComment = score > 0 && score < 6 && (!comment || comment.trim().length === 0);
                         // Áudio é obrigatório para salvar/submeter qualquer avaliação.
+                        // Justificativa é sempre opcional.
                         const needsAudio = !audio;
 
                         return (
@@ -815,16 +808,16 @@ export default function EvaluationsPage() {
                             </div>
 
                             {!submitted && (
-                              <div className={cn("mt-4 border-2 p-4", needsComment ? "border-[#ba1a1a] bg-[#ffdad6]/20" : "border-[#191c1e] bg-[#f2f4f6]")}>
+                              <div className="mt-4 border-2 p-4 border-[#191c1e] bg-[#f2f4f6]">
                                 <label className="text-xs font-black italic uppercase flex items-center gap-2 mb-2">
                                   Justificativa / Feedback
-                                  {score > 0 && score < 6 && <span className="text-[10px] text-white bg-[#ba1a1a] px-2 py-0.5 font-bold italic uppercase">Obrigatório para nota {score}</span>}
+                                  <span className="text-[10px] text-[#444933] bg-[#e6e8ea] border border-[#191c1e] px-2 py-0.5 font-bold italic uppercase">Opcional</span>
                                 </label>
                                 <Textarea
-                                  placeholder={score > 0 && score < 6 ? "Explique os motivos que levaram a esta nota baixa..." : "Comentários opcionais para a equipe (serão vistos anonimamente)..."}
+                                  placeholder="Comentários opcionais para a equipe (serão vistos anonimamente)..."
                                   value={comment}
                                   onChange={e => setComments(s => ({ ...s, [c.criterionId]: e.target.value }))}
-                                  className={cn("bg-white rounded-none border-2 resize-y min-h-24 italic focus-visible:ring-0", needsComment ? "border-[#ba1a1a]" : "border-[#191c1e]")}
+                                  className="bg-white rounded-none border-2 resize-y min-h-24 italic focus-visible:ring-0 border-[#191c1e]"
                                 />
 
                                 <div className={cn("mt-4 border-2 p-4", needsAudio ? "border-[#ba1a1a] bg-[#ffdad6]/20" : "border-[#191c1e] bg-white")}>
@@ -844,7 +837,7 @@ export default function EvaluationsPage() {
                                 <div className="flex justify-end pt-3">
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
-                                    disabled={score === 0 || needsComment || needsAudio}
+                                    disabled={score === 0 || needsAudio}
                                     data-testid={`button-save-draft-${c.criterionId}`}
                                     className="bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                                   >
@@ -1006,7 +999,7 @@ export default function EvaluationsPage() {
                         <p className="text-[11px] text-center text-[#747a60] italic mt-3 leading-relaxed">
                           {allReady
                             ? <>Ao lançar, suas notas são <strong>submetidas e bloqueadas</strong>. Salvar rascunho é opcional.</>
-                            : <>Dê nota, justifique (notas abaixo de 6) e grave o áudio de cada critério. <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
+                            : <>Dê nota e grave o áudio de cada critério (a justificativa é opcional). <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
                         </p>
                       )}
 
