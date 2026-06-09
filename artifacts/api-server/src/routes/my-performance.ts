@@ -231,7 +231,7 @@ router.get("/my-performance", async (req, res) => {
       evaluatedEvents,
       pendingEvents,
       totalAbsences,
-      isQuarterClosed: !!quarterResult,
+      isQuarterClosed: cycle.status === "closed" || !!cycle.closedAt,
       finalResult,
       absencePenalty: quarterResult ? parseFloat(quarterResult.absencePenalty as unknown as string) : null,
       paymentMethod: quarterResult ? quarterResult.paymentMethod : "Caju Saldo Livre",
