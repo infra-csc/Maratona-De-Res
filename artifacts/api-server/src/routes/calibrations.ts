@@ -58,6 +58,12 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
     return;
   }
 
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.userId)).limit(1);
+  if (!user) {
+    res.status(401).json({ error: "Usuário não encontrado. Faça login novamente." });
+    return;
+  }
+
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
   if (event.feedbackReleased) {
