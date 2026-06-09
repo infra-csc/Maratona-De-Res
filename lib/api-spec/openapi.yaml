@@ -2125,6 +2125,8 @@ components:
           type: integer
         criterionName:
           type: string
+        criterionDescription:
+          type: ["string", "null"]
         responsibleAreaId:
           type: ["integer", "null"]
         responsibleAreaName:

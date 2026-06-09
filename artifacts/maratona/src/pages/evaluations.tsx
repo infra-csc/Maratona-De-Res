@@ -782,7 +782,9 @@ export default function EvaluationsPage() {
                                 </div>
                                 <h4 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">{index + 1}. {c.criterionName}</h4>
                                 <p className="text-sm text-[#444933] italic mt-1 leading-relaxed">
-                                  Avalie o desempenho da equipe considerando este critério específico para o evento atual.
+                                  {c.criterionDescription && c.criterionDescription.trim().length > 0
+                                    ? c.criterionDescription
+                                    : "Avalie o desempenho da equipe considerando este critério específico para o evento atual."}
                                 </p>
                               </div>
 
