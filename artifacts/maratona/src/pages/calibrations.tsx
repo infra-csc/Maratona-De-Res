@@ -364,15 +364,26 @@ export default function CalibrationsPage() {
                     </p>
                   </div>
                 </div>
-                <button
-                  data-testid="button-save-all-cal"
-                  type="button"
-                  disabled={savingAll || fillableCount === 0}
-                  onClick={saveAllCalibrations}
-                  className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
-                >
-                  <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    data-testid="button-save-all-cal"
+                    type="button"
+                    disabled={savingAll || fillableCount === 0}
+                    onClick={saveAllCalibrations}
+                    className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
+                  >
+                    <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                  </button>
+                  <button
+                    data-testid="button-send-all-cal"
+                    type="button"
+                    disabled={savingAll || fillableCount === 0}
+                    onClick={saveAllCalibrations}
+                    className="bg-white text-[#191c1e] border-2 border-white px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
+                  >
+                    <Send size={16} /> Enviar
+                  </button>
+                </div>
               </div>
             )}
 
