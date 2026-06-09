@@ -522,7 +522,7 @@ export default function CalibrationsPage() {
                                 <span className="text-sm font-bold italic text-[#747a60]">→</span>
                                 <span className="text-2xl font-black italic text-[#ff5722]">{parseFloat(cal.calibratedScore as unknown as string).toFixed(2)}</span>
                                 <span className="text-sm font-bold italic text-[#747a60]">=</span>
-                                <span className="text-2xl font-black italic text-[#506600]">{(parseFloat(cal.calibratedScore as unknown as string)).toFixed(2)}</span>
+                                <span className="text-2xl font-black italic text-[#506600]">{(parseFloat(cal.calibratedScore as unknown as string) * (c.weightOverride ?? c.originalWeight ?? 0)).toFixed(2)}</span>
                               </>
                             )}
                           </div>
@@ -592,23 +592,24 @@ export default function CalibrationsPage() {
               );
             })}
 
-            {/* Painel de média / soma ponderada */}
+            {/* Painel de soma ponderada */}
             {(() => {
               let weightedSum = 0;
-              let weightSum = 0;
+              let maxSum = 0;
               let scoredCount = 0;
               for (const c of activeCriteria) {
                 const cal = getCalibration(c.criterionId);
                 const avg = getAvgScore(c.criterionId);
                 const score = cal ? parseFloat(cal.calibratedScore as unknown as string) : (avg ?? null);
                 const weight = c.weightOverride ?? c.originalWeight ?? 0;
-                if (score !== null && weight > 0) {
-                  weightedSum += score * weight;
-                  weightSum += weight;
-                  scoredCount++;
+                if (weight > 0) {
+                  maxSum += 10 * weight;
+                  if (score !== null) {
+                    weightedSum += score * weight;
+                    scoredCount++;
+                  }
                 }
               }
-              const eventScore = weightSum > 0 ? Math.round((weightedSum / weightSum) * 10 * 100) / 100 : 0;
               const hasCalibration = activeCriteria.some(c => getCalibration(c.criterionId));
               return (
                 <div className={`bg-[#191c1e] text-white border-2 border-[#191c1e] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[6px_6px_0px_0px_#ccff00]`}>
@@ -623,9 +624,9 @@ export default function CalibrationsPage() {
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
-                      <span className="text-[9px] font-bold uppercase italic text-white/60 block leading-none">Score do Time</span>
-                      <span className="text-3xl font-black italic text-[#ccff00] leading-none">{eventScore.toFixed(1)}</span>
-                      <span className="text-xs font-bold italic text-white/60">/100</span>
+                      <span className="text-[9px] font-bold uppercase italic text-white/60 block leading-none">Total</span>
+                      <span className="text-3xl font-black italic text-[#ccff00] leading-none">{weightedSum.toFixed(1)}</span>
+                      <span className="text-xs font-bold italic text-white/60">/{maxSum.toFixed(0)}</span>
                     </div>
                   </div>
                 </div>
@@ -756,7 +757,7 @@ export default function CalibrationsPage() {
                               </>
                             )}
                             <span className="text-[#747a60]">=</span>
-                            <span className="text-[#506600] bg-[#eef3da] border border-[#191c1e] px-1.5">{finalVal != null ? finalVal.toFixed(2) : "—"}</span>
+                            <span className="text-[#506600] bg-[#eef3da] border border-[#191c1e] px-1.5">{finalVal != null ? (finalVal * peso).toFixed(2) : "—"}</span>
                           </span>
                         </div>
                         {scores.length > 0 && (
@@ -779,10 +780,14 @@ export default function CalibrationsPage() {
                       const p = c.weightOverride ?? c.originalWeight ?? 0;
                       return acc + final * p;
                     }, 0);
+                    const maxWeighted = scoredCriteria.reduce((acc, c) => {
+                      const p = c.weightOverride ?? c.originalWeight ?? 0;
+                      return acc + 10 * p;
+                    }, 0);
                     return (
                       <div className="flex items-center justify-between gap-3 px-3 py-2 bg-[#191c1e] text-white" data-testid="finalize-weighted-total">
                         <span className="text-[10px] font-bold uppercase italic tracking-wider">Soma ponderada (nota × peso)</span>
-                        <span className="text-base font-black italic text-[#ccff00]">{totalWeighted.toFixed(1)}<span className="text-white/50 text-xs">/100</span></span>
+                        <span className="text-base font-black italic text-[#ccff00]">{totalWeighted.toFixed(1)}<span className="text-white/50 text-xs">/{maxWeighted.toFixed(0)}</span></span>
                       </div>
                     );
                   })()}
