@@ -13,9 +13,11 @@ The seed must wipe existing data in reverse foreign-key order BEFORE inserting, 
 
 **How to apply:** Re-seeding resets serial IDs — downstream tests that hardcode IDs must be updated (e.g. the two closed demo events come back as the first two event IDs after a fresh seed).
 
-# ⚠️ NEVER destroy synced (ERP) data with the seed
-The seed guards integration data (events with `external_id`, employees with `source_type='erp'`). The plain seed REFUSES to run when such data exists.
+# ⚠️ The seed can NEVER destroy synced (ERP) data — absolute guard
+If ANY integration data exists (events with `external_id`, or employees with `source_type='erp'`), the seed aborts immediately. **There is NO env flag that overrides this** — `FORCE_SEED` / `WIPE_INTEGRATION` were removed as bypasses. The seed only ever populates a demo DB that has zero integration data.
 
-**`FORCE_SEED=1` alone does NOT bypass this anymore** — it still preserves integration data. Destroying synced data now requires BOTH `FORCE_SEED=1` AND `WIPE_INTEGRATION=1`. **Why:** reflexively running `FORCE_SEED=1` to refresh demo fixtures wiped the user's synced production data more than once ("perdemos o que sincronizamos"). Never reach for the wipe flags on a DB holding real synced data — to recover, re-run the external sync (`POST /api/integration/sync` as admin/rh), which re-imports employees/events/participations from the external app.
+**Why:** reflexively running the seed (incl. `FORCE_SEED=1`) to refresh demo fixtures wiped the user's synced production data more than once ("perdemos o que sincronizamos"); the user demanded it be impossible. The only way to clear a DB with integration data is a deliberate manual SQL action.
 
-**How to apply:** to test fixtures, use a DB without integration data, or test against existing data. Treat `WIPE_INTEGRATION=1` as effectively never-for-this-project.
+**Recovery if data is ever lost:** re-run the external sync — `POST /api/integration/sync` as admin/rh (admin@cenografica.com.br / 123456) — which re-imports employees/events/participations from the external app. Idempotent.
+
+**Other delete paths are single-row admin actions only** (DELETE event-by-id, DELETE participant-by-id in routes/events.ts) — no other mass-delete of employees/events exists. Post-merge reconcile (`scripts/post-merge.sh`) runs only `pnpm install` + `db push` (no seed).

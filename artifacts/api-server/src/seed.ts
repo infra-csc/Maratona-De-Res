@@ -12,15 +12,13 @@ import { calculateEventResult } from "./lib/calculations";
 async function seed() {
   console.log("🌱 Iniciando seed...");
 
-  // GUARD: nunca apagar dados vindos da integração (ERP).
+  // GUARD ABSOLUTO: o seed NUNCA apaga dados vindos da integração (ERP).
   // Eventos sincronizados têm external_id e colaboradores têm source_type = 'erp'.
-  // Esses dados precisam ser preservados — a sincronização apenas incrementa.
-  //
-  // IMPORTANTE: FORCE_SEED=1 sozinho NÃO apaga dados da integração. Isso é
-  // proposital: durante o desenvolvimento é comum recriar as fixtures de demo,
-  // e o reflexo de rodar "FORCE_SEED=1" já destruiu os dados sincronizados mais
-  // de uma vez. Para realmente apagar a integração é preciso o segundo flag
-  // explícito WIPE_INTEGRATION=1 (em conjunto com FORCE_SEED=1).
+  // Se existir QUALQUER dado de integração, o seed aborta — e NÃO há flag de
+  // ambiente que contorne isso. Reseeds acidentais (inclusive FORCE_SEED) já
+  // destruíram os dados sincronizados mais de uma vez; por isso a única forma de
+  // limpar um banco com integração é uma ação manual deliberada via SQL.
+  // O seed serve apenas para popular um banco de demonstração SEM integração.
   const [{ extEvents }] = await db
     .select({ extEvents: sql<number>`count(*)` })
     .from(eventsTable)
@@ -31,18 +29,13 @@ async function seed() {
     .where(eq(employeesTable.sourceType, "erp"));
   const hasIntegrationData = Number(extEvents) > 0 || Number(erpEmployees) > 0;
 
-  const forceSeed = process.env.FORCE_SEED === "1";
-  const wipeIntegration = process.env.WIPE_INTEGRATION === "1";
-
-  if (hasIntegrationData && !(forceSeed && wipeIntegration)) {
+  if (hasIntegrationData) {
     console.log(
       `\n⛔ Seed cancelado: há dados da integração no banco ` +
-      `(${extEvents} eventos, ${erpEmployees} colaboradores ERP) que NÃO serão apagados.\n` +
-      (forceSeed
-        ? "   FORCE_SEED=1 sozinho NÃO apaga dados da integração. " +
-          "Para apagar mesmo assim, rode também com WIPE_INTEGRATION=1.\n"
-        : "   Para reinicializar um banco SEM integração, rode com FORCE_SEED=1. " +
-          "Se realmente quiser perder os dados sincronizados, use FORCE_SEED=1 WIPE_INTEGRATION=1.\n"),
+      `(${extEvents} eventos, ${erpEmployees} colaboradores ERP). ` +
+      "Esses dados NUNCA são apagados pelo seed e nenhum flag contorna isso.\n" +
+      "   Para recuperar dados perdidos, rode a sincronização novamente " +
+      "(POST /api/integration/sync como admin/rh).\n",
     );
     return;
   }
