@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useGetEvents, useCloseEvent, useReopenEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useReopenEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Lock, Unlock, Calendar, MapPin, ChevronRight, Users } from "lucide-react";
+import { Search, Unlock, Calendar, MapPin, ChevronRight, Users } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -33,9 +33,6 @@ export default function EventsPage() {
     { query: { queryKey } }
   );
 
-  const closeMutation = useCloseEvent({
-    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
-  });
   const reopenMutation = useReopenEvent({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
   });
@@ -193,15 +190,6 @@ export default function EventsPage() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {canEdit && ev.status === "open" && ev.criteriaConfirmed && (
-                        <button
-                          data-testid={`button-close-event-${ev.id}`}
-                          className="h-8 px-3 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-xs font-bold italic uppercase transition-all"
-                          onClick={() => closeMutation.mutate({ id: ev.id })}
-                        >
-                          <Lock size={14} className="mr-1.5" /> Fechar
-                        </button>
-                      )}
                       {canEdit && ev.status === "closed" && (
                         <button
                           data-testid={`button-reopen-event-${ev.id}`}
