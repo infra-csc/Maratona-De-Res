@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw, UserCheck, ClipboardList, Copy, Check } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -48,6 +48,7 @@ export default function EventDetailPage() {
   const [config, setConfig] = useState<{ id: number; criterionId: number; active: boolean; weight: number; name: string; eventScoped: boolean }[]>([]);
   const [pendingRemoval, setPendingRemoval] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [pendingRemoveParticipant, setPendingRemoveParticipant] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<Record<number, string>>({});
   useEffect(() => {
     if (event?.criteria) {
@@ -91,6 +92,13 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Nome atualizado" }); },
       onError: (e: { message?: string }) => toast({ title: "Erro ao renomear", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const removeParticipant = useRemoveEventParticipant({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Participante removido" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -685,6 +693,32 @@ export default function EventDetailPage() {
                 </AlertDialogContent>
               </AlertDialog>
 
+              <AlertDialog open={pendingRemoveParticipant !== null} onOpenChange={o => { if (!o) setPendingRemoveParticipant(null); }}>
+                <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover participante?</AlertDialogTitle>
+                    <AlertDialogDescription className="italic text-[#444933]">
+                      O colaborador <strong>{event?.participants?.find(p => p.id === pendingRemoveParticipant)?.employeeName ?? ""}</strong> será removido da equipe deste evento. Se ele já possuir avaliações enviadas, as notas serão perdidas.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-remove-participant" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      data-testid="button-confirm-remove-participant"
+                      onClick={() => {
+                        if (pendingRemoveParticipant !== null) {
+                          removeParticipant.mutate({ id, participantId: pendingRemoveParticipant });
+                        }
+                        setPendingRemoveParticipant(null);
+                      }}
+                      className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
+                    >
+                      <Trash2 size={16} className="mr-1.5" /> Remover
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
                 {hasEvaluations ? (
                   <span data-testid="text-criteria-locked" className="flex items-center gap-2 text-xs font-bold italic uppercase text-[#747a60] bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
@@ -798,6 +832,16 @@ export default function EventDetailPage() {
                         <p className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</p>
                         <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">{p.functionName}</p>
                       </div>
+                      {canManage && (
+                        <button
+                          data-testid={`button-remove-participant-${p.employeeId}`}
+                          onClick={() => setPendingRemoveParticipant(p.id)}
+                          className="p-1.5 border-2 border-[#191c1e] bg-white text-[#862200] hover:bg-[#862200] hover:text-white transition-colors shrink-0"
+                          title="Remover do evento"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
