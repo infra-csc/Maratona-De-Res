@@ -47,6 +47,8 @@ import type {
   EvaluationUpdate,
   Event,
   EventAssignmentsUpdate,
+  EventConformity,
+  EventConformityInput,
   EventCriteriaConfirm,
   EventCriteriaUpdate,
   EventCriterion,
@@ -2474,6 +2476,155 @@ export const useRemoveEventParticipant = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRemoveEventParticipantMutationOptions(options));
+    }
+
+export const getGetEventConformityUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/conformity`
+}
+
+/**
+ * @summary Get event conformity matrix
+ */
+export const getEventConformity = async (id: number, options?: RequestInit): Promise<EventConformity | null> => {
+
+  return customFetch<EventConformity | null>(getGetEventConformityUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEventConformityQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/conformity`
+    ] as const;
+    }
+
+
+export const getGetEventConformityQueryOptions = <TData = Awaited<ReturnType<typeof getEventConformity>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventConformity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEventConformityQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEventConformity>>> = ({ signal }) => getEventConformity(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEventConformity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEventConformityQueryResult = NonNullable<Awaited<ReturnType<typeof getEventConformity>>>
+export type GetEventConformityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get event conformity matrix
+ */
+
+export function useGetEventConformity<TData = Awaited<ReturnType<typeof getEventConformity>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventConformity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEventConformityQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSetEventConformityUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/conformity`
+}
+
+/**
+ * @summary Create or update event conformity matrix
+ */
+export const setEventConformity = async (id: number,
+    eventConformityInput: EventConformityInput, options?: RequestInit): Promise<EventConformity> => {
+
+  return customFetch<EventConformity>(getSetEventConformityUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eventConformityInput,)
+  }
+);}
+
+
+
+
+export const getSetEventConformityMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventConformity>>, TError,{id: number;data: BodyType<EventConformityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setEventConformity>>, TError,{id: number;data: BodyType<EventConformityInput>}, TContext> => {
+
+const mutationKey = ['setEventConformity'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setEventConformity>>, {id: number;data: BodyType<EventConformityInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setEventConformity(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetEventConformityMutationResult = NonNullable<Awaited<ReturnType<typeof setEventConformity>>>
+    export type SetEventConformityMutationBody = BodyType<EventConformityInput>
+    export type SetEventConformityMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create or update event conformity matrix
+ */
+export const useSetEventConformity = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventConformity>>, TError,{id: number;data: BodyType<EventConformityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setEventConformity>>,
+        TError,
+        {id: number;data: BodyType<EventConformityInput>},
+        TContext
+      > => {
+      return useMutation(getSetEventConformityMutationOptions(options));
     }
 
 export const getGetEventCriteriaUrl = (id: number,) => {

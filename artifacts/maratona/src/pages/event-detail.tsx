@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useGetEventConformity, useSetEventConformity, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, Save, Trash2, RotateCcw, UserCheck, ClipboardList, Copy, Check } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -44,6 +44,38 @@ export default function EventDetailPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const canManage = !!user && ["admin", "rh"].includes(user.role);
+
+  const { data: conformityData } = useGetEventConformity(id, {
+    query: { enabled: !!id, queryKey: ["event-conformity", id] as unknown[] },
+  });
+  const setConformity = useSetEventConformity({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["event-conformity", id] });
+        qc.invalidateQueries({ queryKey: ["event-result", id] });
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        toast({ title: "Matriz de conformidade atualizada", variant: "default" });
+      },
+      onError: () => toast({ title: "Erro ao salvar conformidade", variant: "destructive" }),
+    },
+  });
+  const [conformityForm, setConformityForm] = useState<{ epi: boolean; estaiamentos: boolean; guardaEquipamentos: boolean; conduta: boolean }>({ epi: true, estaiamentos: true, guardaEquipamentos: true, conduta: true });
+  const conformityItems = [
+    { key: "epi" as const, label: "Uso de EPI" },
+    { key: "estaiamentos" as const, label: "Estaiamentos / Aterramentos" },
+    { key: "guardaEquipamentos" as const, label: "Guarda de Equipamentos" },
+    { key: "conduta" as const, label: "Conduta" },
+  ];
+  useEffect(() => {
+    if (conformityData) {
+      setConformityForm({
+        epi: conformityData.epi,
+        estaiamentos: conformityData.estaiamentos,
+        guardaEquipamentos: conformityData.guardaEquipamentos,
+        conduta: conformityData.conduta,
+      });
+    }
+  }, [conformityData?.id]);
 
   const [config, setConfig] = useState<{ id: number; criterionId: number; active: boolean; weight: number; name: string; eventScoped: boolean }[]>([]);
   const [pendingRemoval, setPendingRemoval] = useState<number | null>(null);
@@ -268,14 +300,21 @@ export default function EventDetailPage() {
               {result && result.eventScore > 0 && (() => {
                 const concluded = event.status === "closed";
                 const calibrated = (result.criteriaDetails ?? []).some(c => c.calibratedScore != null);
+                const displayScore = (result.conformityScore != null ? result.conformityScore : result.eventScore) as number;
+                const hasPenalty = (result.conformityPenalty ?? 0) > 0;
                 return (
-                <div className="shrink-0 bg-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col items-center justify-center min-w-[160px] -skew-x-6">
+                <div className={`shrink-0 border-2 border-[#191c1e] p-6 flex flex-col items-center justify-center min-w-[160px] -skew-x-6 ${hasPenalty ? "bg-[#ffb300]" : "bg-[#ccff00]"}`}>
                   <div className="skew-x-6 flex flex-col items-center">
                     <span className="text-[10px] font-black italic uppercase tracking-widest text-[#161e00] mb-1">{concluded ? "Score Final" : "Score Provisório"}</span>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-5xl font-black italic text-[#161e00] leading-none">{fmt(result.eventScore)}</span>
+                      <span className="text-5xl font-black italic text-[#161e00] leading-none">{fmt(displayScore)}</span>
                       <span className="text-sm font-black italic text-[#506600]">/100</span>
                     </div>
+                    {hasPenalty && (
+                      <span className="mt-1 text-[9px] font-black italic uppercase text-[#862200] bg-white border border-[#862200] px-1.5 py-0.5">
+                        -{result.conformityPenalty} pts conformidade
+                      </span>
+                    )}
                     {!concluded && (
                       <span className="mt-2 inline-flex items-center gap-1 bg-[#191c1e] text-[#ffb300] text-[9px] font-black italic uppercase tracking-wider px-2 py-1" data-testid="badge-calibration-pending">
                         <AlertCircle size={11} />
@@ -816,6 +855,48 @@ export default function EventDetailPage() {
           </div>
 
           <div className="space-y-6">
+            {/* Matriz de Conformidade */}
+            <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+              <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+                <ShieldAlert size={18} />
+                <span className="font-black uppercase tracking-tight">Matriz de Conformidade</span>
+              </div>
+              <div className="p-4 space-y-3">
+                {conformityItems.map(item => {
+                  const value = conformityForm[item.key];
+                  return (
+                    <div key={item.key} className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-bold italic text-[#191c1e]">{item.label}</span>
+                      {canManage ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = { ...conformityForm, [item.key]: !value };
+                            setConformityForm(next);
+                            setConformity.mutate({ id, data: { [item.key]: !value } });
+                          }}
+                          className={`text-[11px] font-black italic uppercase px-3 py-1 border-2 border-[#191c1e] transition-all ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}
+                        >
+                          {value ? "Sim" : "Não"}
+                        </button>
+                      ) : (
+                        <span className={`text-[11px] font-black italic uppercase px-2 py-1 border border-[#191c1e] ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}>
+                          {value ? "Sim" : "Não"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {(result?.conformityPenalty ?? 0) > 0 && (
+                  <div className="pt-2 border-t-2 border-[#eceef0]">
+                    <p className="text-xs font-bold italic uppercase text-[#862200]">
+                      Penalidade: -{result?.conformityPenalty} pts
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {event.participants && event.participants.length > 0 && (
               <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
                 <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">

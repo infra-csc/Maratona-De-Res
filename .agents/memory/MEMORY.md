@@ -27,3 +27,4 @@
 - [Quarterly recompute triggers](quarterly-recompute-triggers.md) — dashboard/results/ranking read snapshot quarterlyResultsTable; event close/reopen/release must call recomputeQuarterResults (idempotent, preserves payments, txn)
 - [Router mount-order shadowing](router-mount-shadowing.md) — blanket router.use(requireRole) in audit/integration 403s every fall-through route mounted AFTER it; mount must-reach routers (storage, cycles) before them
 - [Mandatory audio on evaluations](mandatory-audio-eval.md) — every eval submit requires audioUrl matching /objects/uploads/<id> (validate POST+PATCH+submit); upload via presigned PUT, playback via authed GET /storage/objects/*
+- [Conformity matrix calculation](conformity-matrix-calc.md) — `computeEventTeamResult` returns both raw `eventScore` and penalized `conformityScore`; quarterly recomputation must use `conformityScore` for cycle aggregation; `employee_event_results.finalEventScore` stores the penalized score

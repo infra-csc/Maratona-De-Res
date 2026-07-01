@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { EventConformity } from './eventConformity';
 import type { EventTeamCriterion } from './eventTeamCriterion';
 import type { EventTeamParticipant } from './eventTeamParticipant';
 
@@ -14,6 +15,10 @@ export interface EventTeamResult {
   eventStatus?: string;
   feedbackReleased?: boolean;
   eventScore: number;
+  /** @nullable */
+  conformity?: EventConformity | null;
+  conformityPenalty?: number;
+  conformityScore?: number;
   /** @nullable */
   projectedPlatoon?: string | null;
   /** @nullable */

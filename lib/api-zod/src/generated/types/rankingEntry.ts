@@ -19,4 +19,5 @@ export interface RankingEntry {
   eventsCount: number;
   participatedEventsCount?: number;
   absences: number;
+  eligible: boolean;
 }

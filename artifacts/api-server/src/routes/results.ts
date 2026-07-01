@@ -3,7 +3,7 @@ import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, employeeEventResultsTable,
-  employeeCycleEligibilityTable, areasTable, cyclesTable,
+  employeeCycleEligibilityTable, areasTable, cyclesTable, eventConformitiesTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -94,13 +94,26 @@ export async function computeEventTeamResult(eventId: number) {
     calibratedScore: cd.calibratedScore,
   }));
 
-  const eventScore = calculateEventResult(criteriaForCalc);
+  let eventScore = calculateEventResult(criteriaForCalc);
+
+  // Matriz de Conformidade: cada "não" remove 10 pts (mínimo 0).
+  const [conformity] = await db
+    .select()
+    .from(eventConformitiesTable)
+    .where(eq(eventConformitiesTable.eventId, eventId));
+  const noCount = conformity
+    ? [conformity.epi, conformity.estaiamentos, conformity.guardaEquipamentos, conformity.conduta]
+        .filter(v => v === false).length
+    : 0;
+  const conformityPenalty = noCount * 10;
+  const conformityScore = Math.max(0, eventScore - conformityPenalty);
+
   const hasCalibration = criteriaDetails.some(cd => cd.calibratedScore !== null);
   const pendingCriteria = criteriaDetails.filter(cd => cd.status === "pendente").length;
   const evaluatedCriteria = criteriaDetails.length - pendingCriteria;
   const isComplete = criteriaDetails.length > 0 && pendingCriteria === 0;
 
-  return { criteriaDetails, eventScore, hasCalibration, pendingCriteria, evaluatedCriteria, totalCriteria: criteriaDetails.length, isComplete };
+  return { criteriaDetails, eventScore, conformity, conformityPenalty, conformityScore, hasCalibration, pendingCriteria, evaluatedCriteria, totalCriteria: criteriaDetails.length, isComplete };
 }
 
 /**
@@ -145,8 +158,8 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   const eventResultInserts: (typeof employeeEventResultsTable.$inferInsert)[] = [];
   for (const ev of closedEvents) {
     const team = await computeEventTeamResult(ev.id);
-    eventScoreById.set(ev.id, team.eventScore);
-    const platoonProj = getPlatoonByScore(team.eventScore, platoonRules);
+    eventScoreById.set(ev.id, team.conformityScore);
+    const platoonProj = getPlatoonByScore(team.conformityScore, platoonRules);
 
     const eventParticipants = await db.select({ employeeId: eventParticipantsTable.employeeId })
       .from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, ev.id));
@@ -157,7 +170,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
         employeeId: p.employeeId,
         eventScore: String(team.eventScore),
         calibratedEventScore: team.hasCalibration ? String(team.eventScore) : null,
-        finalEventScore: String(team.eventScore),
+        finalEventScore: String(team.conformityScore),
         platoonProjected: platoonProj?.name ?? null,
         updatedAt: new Date(),
       });
@@ -294,7 +307,7 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
 
   const platoonRules = await loadPlatoonRules();
   const team = await computeEventTeamResult(eventId);
-  const platoon = getPlatoonByScore(team.eventScore, platoonRules);
+  const platoon = getPlatoonByScore(team.conformityScore, platoonRules);
 
   const participants = await db
     .select({
@@ -315,6 +328,9 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
     eventStatus: event.status,
     feedbackReleased: event.feedbackReleased,
     eventScore: team.eventScore,
+    conformity: team.conformity ?? null,
+    conformityPenalty: team.conformityPenalty,
+    conformityScore: team.conformityScore,
     projectedPlatoon: platoon?.name ?? null,
     projectedPlatoonColor: platoon?.color ?? null,
     projectedBonus: platoon?.bonusValue ?? 0,
@@ -329,7 +345,7 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
       employeeName: p.employeeName ?? "",
       functionName: p.functionName ?? p.employeeFunction ?? "",
       eligible: (p.eligibleForBonus ?? true) && (p.eligibilityStatus ?? "eligible") === "eligible",
-      eventScore: team.eventScore,
+      eventScore: team.conformityScore,
     })),
   });
 });

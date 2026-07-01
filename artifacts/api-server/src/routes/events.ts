@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -142,7 +142,9 @@ async function loadEventDetail(id: number) {
     .leftJoin(usersTable, eq(eventAreaAssignmentsTable.evaluatorUserId, usersTable.id))
     .where(eq(eventAreaAssignmentsTable.eventId, id));
 
-  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [] };
+  const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
+
+  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null };
 }
 
 /**
@@ -282,6 +284,41 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
   const participantId = parseInt(req.params.participantId as string);
   await db.delete(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId));
   res.status(204).end();
+});
+
+// Matriz de Conformidade
+router.get("/events/:id/conformity", async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
+  res.json(conformity ?? null);
+});
+
+router.post("/events/:id/conformity", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const { epi, estaiamentos, guardaEquipamentos, conduta } = req.body;
+  const userId = req.user!.userId;
+
+  const existing = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
+  if (existing.length > 0) {
+    const [updated] = await db.update(eventConformitiesTable)
+      .set({
+        epi: epi ?? existing[0].epi,
+        estaiamentos: estaiamentos ?? existing[0].estaiamentos,
+        guardaEquipamentos: guardaEquipamentos ?? existing[0].guardaEquipamentos,
+        conduta: conduta ?? existing[0].conduta,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventConformitiesTable.eventId, eventId))
+      .returning();
+    await audit(userId, "update_conformity", "events", eventId, existing[0], updated);
+    res.json(updated);
+  } else {
+    const [created] = await db.insert(eventConformitiesTable)
+      .values({ eventId, epi: epi ?? true, estaiamentos: estaiamentos ?? true, guardaEquipamentos: guardaEquipamentos ?? true, conduta: conduta ?? true, createdByUserId: userId })
+      .returning();
+    await audit(userId, "create_conformity", "events", eventId, null, created);
+    res.status(201).json(created);
+  }
 });
 
 router.get("/events/:id/criteria", async (req, res) => {

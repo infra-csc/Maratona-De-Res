@@ -44,6 +44,8 @@ export * from './eventAreaAssignment';
 export * from './eventAssignmentsUpdate';
 export * from './eventAssignmentsUpdateAssignmentsItem';
 export * from './eventBreakdown';
+export * from './eventConformity';
+export * from './eventConformityInput';
 export * from './eventCriteriaConfirm';
 export * from './eventCriteriaUpdate';
 export * from './eventCriteriaUpdateCriteriaItem';

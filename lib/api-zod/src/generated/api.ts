@@ -634,6 +634,19 @@ export const GetEventResultResponse = zod.object({
   "eventStatus": zod.string().optional(),
   "feedbackReleased": zod.boolean().optional(),
   "eventScore": zod.number(),
+  "conformity": zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean(),
+  "estaiamentos": zod.boolean(),
+  "guardaEquipamentos": zod.boolean(),
+  "conduta": zod.boolean(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}).nullish(),
+  "conformityPenalty": zod.number().optional(),
+  "conformityScore": zod.number().optional(),
   "projectedPlatoon": zod.string().nullish(),
   "projectedPlatoonColor": zod.string().nullish(),
   "projectedBonus": zod.number().optional(),
@@ -747,6 +760,53 @@ export const AddEventParticipantBody = zod.object({
 export const RemoveEventParticipantParams = zod.object({
   "id": zod.coerce.number(),
   "participantId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Get event conformity matrix
+ */
+export const GetEventConformityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEventConformityResponse = zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean(),
+  "estaiamentos": zod.boolean(),
+  "guardaEquipamentos": zod.boolean(),
+  "conduta": zod.boolean(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()])
+
+
+/**
+ * @summary Create or update event conformity matrix
+ */
+export const SetEventConformityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetEventConformityBody = zod.object({
+  "epi": zod.boolean().optional(),
+  "estaiamentos": zod.boolean().optional(),
+  "guardaEquipamentos": zod.boolean().optional(),
+  "conduta": zod.boolean().optional()
+})
+
+export const SetEventConformityResponse = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean(),
+  "estaiamentos": zod.boolean(),
+  "guardaEquipamentos": zod.boolean(),
+  "conduta": zod.boolean(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
 })
 
 
@@ -1713,7 +1773,8 @@ export const GetRankingResponseItem = zod.object({
   "bonusValue": zod.number(),
   "eventsCount": zod.number(),
   "participatedEventsCount": zod.number().optional(),
-  "absences": zod.number()
+  "absences": zod.number(),
+  "eligible": zod.boolean()
 })
 export const GetRankingResponse = zod.array(GetRankingResponseItem)
 

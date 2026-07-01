@@ -332,6 +332,25 @@ export interface EventParticipantInput {
   teamName?: string;
 }
 
+export interface EventConformity {
+  id: number;
+  eventId: number;
+  epi: boolean;
+  estaiamentos: boolean;
+  guardaEquipamentos: boolean;
+  conduta: boolean;
+  createdByUserId: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EventConformityInput {
+  epi?: boolean;
+  estaiamentos?: boolean;
+  guardaEquipamentos?: boolean;
+  conduta?: boolean;
+}
+
 export interface Criterion {
   id: number;
   name: string;
@@ -686,6 +705,10 @@ export interface EventTeamResult {
   feedbackReleased?: boolean;
   eventScore: number;
   /** @nullable */
+  conformity?: EventConformity | null;
+  conformityPenalty?: number;
+  conformityScore?: number;
+  /** @nullable */
   projectedPlatoon?: string | null;
   /** @nullable */
   projectedPlatoonColor?: string | null;
@@ -773,6 +796,7 @@ export interface RankingEntry {
   eventsCount: number;
   participatedEventsCount?: number;
   absences: number;
+  eligible: boolean;
 }
 
 export interface RankingDetailEvent {

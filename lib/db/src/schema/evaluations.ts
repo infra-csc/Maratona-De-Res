@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, numeric, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { eventsTable } from "./events";
@@ -36,6 +36,22 @@ export const calibrationsTable = pgTable("calibrations", {
 
 // Resultado do evento gravado por colaborador (mesma nota para todos do time),
 // para cálculo trimestral individual.
+// Matriz de conformidade: 4 itens fixos preenchidos por RH/admin.
+// Cada "não" remove 10 pts da nota de performance do evento.
+export const eventConformitiesTable = pgTable("event_conformities", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
+  epi: boolean("epi").notNull().default(true),
+  estaiamentos: boolean("estaiamentos").notNull().default(true),
+  guardaEquipamentos: boolean("guarda_equipamentos").notNull().default(true),
+  conduta: boolean("conduta").notNull().default(true),
+  createdByUserId: integer("created_by_user_id").notNull().references(() => usersTable.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  eventUq: uniqueIndex("event_conformities_event_uq").on(t.eventId),
+}));
+
 export const employeeEventResultsTable = pgTable("employee_event_results", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
@@ -51,7 +67,12 @@ export const employeeEventResultsTable = pgTable("employee_event_results", {
 export const insertEvaluationSchema = createInsertSchema(evaluationsTable).omit({ id: true, createdAt: true });
 export const insertCalibrationSchema = createInsertSchema(calibrationsTable).omit({ id: true, calibratedAt: true });
 export const insertEmployeeEventResultSchema = createInsertSchema(employeeEventResultsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEventConformitySchema = createInsertSchema(eventConformitiesTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const updateEventConformitySchema = createInsertSchema(eventConformitiesTable).omit({ id: true, eventId: true, createdByUserId: true, createdAt: true, updatedAt: true });
 export type InsertEvaluation = z.infer<typeof insertEvaluationSchema>;
 export type Evaluation = typeof evaluationsTable.$inferSelect;
 export type Calibration = typeof calibrationsTable.$inferSelect;
 export type EmployeeEventResult = typeof employeeEventResultsTable.$inferSelect;
+export type EventConformity = typeof eventConformitiesTable.$inferSelect;
+export type InsertEventConformity = z.infer<typeof insertEventConformitySchema>;
+export type UpdateEventConformity = z.infer<typeof updateEventConformitySchema>;

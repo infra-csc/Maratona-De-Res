@@ -620,6 +620,56 @@ paths:
         "204":
           description: Deleted
 
+  /events/{id}/conformity:
+    get:
+      operationId: getEventConformity
+      tags: [events]
+      summary: Get event conformity matrix
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/EventConformity"
+                  - type: "null"
+    post:
+      operationId: setEventConformity
+      tags: [events]
+      summary: Create or update event conformity matrix
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventConformityInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventConformity"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventConformity"
+
   /events/{id}/criteria:
     get:
       operationId: getEventCriteria
@@ -2065,6 +2115,43 @@ components:
         teamName:
           type: string
 
+    EventConformity:
+      type: object
+      required: [id, eventId, epi, estaiamentos, guardaEquipamentos, conduta, createdByUserId]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        epi:
+          type: boolean
+        estaiamentos:
+          type: boolean
+        guardaEquipamentos:
+          type: boolean
+        conduta:
+          type: boolean
+        createdByUserId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EventConformityInput:
+      type: object
+      properties:
+        epi:
+          type: boolean
+        estaiamentos:
+          type: boolean
+        guardaEquipamentos:
+          type: boolean
+        conduta:
+          type: boolean
+
     Criterion:
       type: object
       required: [id, name, defaultWeight, active, displayOrder]
@@ -2692,6 +2779,13 @@ components:
           type: boolean
         eventScore:
           type: number
+        conformity:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/EventConformity"
+        conformityPenalty:
+          type: number
+        conformityScore:
+          type: number
         projectedPlatoon:
           type: ["string", "null"]
         projectedPlatoonColor:
@@ -2877,7 +2971,7 @@ components:
 
     RankingEntry:
       type: object
-      required: [position, employeeId, employeeName, finalResult, platoon, bonusValue, eventsCount, absences]
+      required: [position, employeeId, employeeName, finalResult, platoon, bonusValue, eventsCount, absences, eligible]
       properties:
         position:
           type: integer
@@ -2899,6 +2993,8 @@ components:
           type: integer
         absences:
           type: integer
+        eligible:
+          type: boolean
 
     RankingDetailEvent:
       type: object
