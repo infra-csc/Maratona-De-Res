@@ -14,6 +14,7 @@ export interface PlatoonRuleInput {
   minInclusive?: boolean;
   maxInclusive?: boolean;
   bonusValue: number;
+  bonusPerExtraEvent?: number;
   description?: string;
   displayOrder?: number;
 }

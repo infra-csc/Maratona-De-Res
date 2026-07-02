@@ -2507,7 +2507,7 @@ components:
 
     PlatoonRule:
       type: object
-      required: [id, name, color, minScore, maxScore, bonusValue, active, displayOrder]
+      required: [id, name, color, minScore, maxScore, bonusValue, bonusPerExtraEvent, active, displayOrder]
       properties:
         id:
           type: integer
@@ -2524,6 +2524,8 @@ components:
         maxInclusive:
           type: boolean
         bonusValue:
+          type: number
+        bonusPerExtraEvent:
           type: number
         description:
           type: ["string", "null"]
@@ -2550,6 +2552,8 @@ components:
           type: boolean
         bonusValue:
           type: number
+        bonusPerExtraEvent:
+          type: number
         description:
           type: string
         displayOrder:
@@ -2571,6 +2575,8 @@ components:
         maxInclusive:
           type: boolean
         bonusValue:
+          type: number
+        bonusPerExtraEvent:
           type: number
         description:
           type: string

@@ -15,6 +15,7 @@ export interface PlatoonRule {
   minInclusive?: boolean;
   maxInclusive?: boolean;
   bonusValue: number;
+  bonusPerExtraEvent: number;
   /** @nullable */
   description?: string | null;
   active: boolean;

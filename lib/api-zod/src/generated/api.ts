@@ -1458,6 +1458,7 @@ export const GetPlatoonRulesResponseItem = zod.object({
   "minInclusive": zod.boolean().optional(),
   "maxInclusive": zod.boolean().optional(),
   "bonusValue": zod.number(),
+  "bonusPerExtraEvent": zod.number(),
   "description": zod.string().nullish(),
   "active": zod.boolean(),
   "displayOrder": zod.number()
@@ -1476,6 +1477,7 @@ export const CreatePlatoonRuleBody = zod.object({
   "minInclusive": zod.boolean().optional(),
   "maxInclusive": zod.boolean().optional(),
   "bonusValue": zod.number(),
+  "bonusPerExtraEvent": zod.number().optional(),
   "description": zod.string().optional(),
   "displayOrder": zod.number().optional()
 })
@@ -1496,6 +1498,7 @@ export const UpdatePlatoonRuleBody = zod.object({
   "minInclusive": zod.boolean().optional(),
   "maxInclusive": zod.boolean().optional(),
   "bonusValue": zod.number().optional(),
+  "bonusPerExtraEvent": zod.number().optional(),
   "description": zod.string().optional(),
   "active": zod.boolean().optional(),
   "displayOrder": zod.number().optional()
@@ -1510,6 +1513,7 @@ export const UpdatePlatoonRuleResponse = zod.object({
   "minInclusive": zod.boolean().optional(),
   "maxInclusive": zod.boolean().optional(),
   "bonusValue": zod.number(),
+  "bonusPerExtraEvent": zod.number(),
   "description": zod.string().nullish(),
   "active": zod.boolean(),
   "displayOrder": zod.number()

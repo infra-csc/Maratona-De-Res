@@ -183,7 +183,8 @@ export default function EventDetailPage() {
   const activeCriteriaCount = (event.criteria ?? []).filter(c => c.active).length;
   const critMeta = new Map((event.criteria ?? []).map(c => [c.criterionId, c]));
   const activeSum = config.filter(c => c.active).reduce((s, c) => s + (Number(c.weight) || 0), 0);
-  const sumValid = Math.abs(activeSum - 20) <= 0.01;
+  const targetWeightSum = (event.criteria ?? []).reduce((s, c) => s + (Number(c.originalWeight) || 0), 0);
+  const sumValid = Math.abs(activeSum - targetWeightSum) <= 0.01;
   const criteriaConfirmed = event.criteriaConfirmed ?? false;
   const hasEvaluations = event.hasEvaluations ?? false;
   const editLocked = criteriaConfirmed || hasEvaluations;
@@ -507,7 +508,7 @@ export default function EventDetailPage() {
 
             <div className="p-6 space-y-4">
               <p className="text-sm italic text-[#444933]">
-                Para cada critério deste evento defina o <strong>peso</strong> e o <strong>avaliador</strong> que dará a nota daquela área. Desative os que não se aplicam — a soma dos pesos ativos deve ser <strong>20</strong>. As áreas só podem avaliar após a confirmação do RH.
+                Para cada critério deste evento defina o <strong>peso</strong> e o <strong>avaliador</strong> que dará a nota daquela área. Desative os que não se aplicam — a soma dos pesos ativos deve ser <strong>{fmt(targetWeightSum)}</strong>. As áreas só podem avaliar após a confirmação do RH.
               </p>
 
               {hasEvaluations && (
@@ -519,7 +520,7 @@ export default function EventDetailPage() {
               <div className="flex items-center justify-between bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
                 <span className="text-xs font-bold italic uppercase text-[#444933]">Soma dos Pesos Ativos</span>
                 <span data-testid="text-criteria-sum" className={`text-2xl font-black italic ${sumValid ? "text-[#506600]" : "text-[#ba1a1a]"}`}>
-                  {Math.round(activeSum * 100) / 100} <span className="text-base text-[#747a60]">/ 20</span>
+                  {Math.round(activeSum * 100) / 100} <span className="text-base text-[#747a60]">/ {fmt(targetWeightSum)}</span>
                 </span>
               </div>
 
@@ -687,7 +688,7 @@ export default function EventDetailPage() {
               )}
 
               {!sumValid && !criteriaConfirmed && (
-                <p className="text-xs font-bold italic uppercase text-[#ba1a1a] text-right">Ajuste os pesos para somar exatamente 20 antes de salvar ou confirmar.</p>
+                <p className="text-xs font-bold italic uppercase text-[#ba1a1a] text-right">Ajuste os pesos para somar exatamente {fmt(targetWeightSum)} antes de salvar ou confirmar.</p>
               )}
 
               <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
@@ -695,7 +696,7 @@ export default function EventDetailPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover critério?</AlertDialogTitle>
                     <AlertDialogDescription className="italic text-[#444933]">
-                      O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? ""}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>20</strong> antes de salvar ou confirmar.
+                      O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? ""}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>{fmt(targetWeightSum)}</strong> antes de salvar ou confirmar.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -716,7 +717,7 @@ export default function EventDetailPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="italic uppercase font-black tracking-tight">Excluir cópia?</AlertDialogTitle>
                     <AlertDialogDescription className="italic text-[#444933]">
-                      Esta cópia será <strong>removida permanentemente</strong> deste evento. Caso ela esteja ativa, lembre-se de redistribuir o peso entre os critérios restantes para que a soma volte a <strong>20</strong>.
+                      Esta cópia será <strong>removida permanentemente</strong> deste evento. Caso ela esteja ativa, lembre-se de redistribuir o peso entre os critérios restantes para que a soma volte a <strong>{fmt(targetWeightSum)}</strong>.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -777,7 +778,7 @@ export default function EventDetailPage() {
                       data-testid="button-confirm-criteria"
                       onClick={handleConfirmAndRelease}
                       disabled={!sumValid || !allAssigned || confirmBusy}
-                      title={!sumValid ? "A soma dos pesos ativos precisa ser 20" : !allAssigned ? "Atribua um avaliador para todas as áreas antes de liberar" : undefined}
+                      title={!sumValid ? `A soma dos pesos ativos precisa ser ${fmt(targetWeightSum)}` : !allAssigned ? "Atribua um avaliador para todas as áreas antes de liberar" : undefined}
                       className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${HARD_SHADOW}`}
                     >
                       <CheckCircle2 size={16} /> {confirmBusy ? "Confirmando..." : "Confirmar e Liberar Avaliação"}

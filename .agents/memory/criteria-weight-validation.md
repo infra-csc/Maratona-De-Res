@@ -5,12 +5,21 @@ description: Rules for validating/confirming per-event criteria weights and the 
 
 # Per-event criteria weight validation
 
-- Active-weight sum must equal TARGET_WEIGHT (20) with tolerance 0.01. The PUT
-  criteria endpoint validates the **resulting persisted** active sum (merge
-  unchanged DB rows with the request payload), NOT just the payload — partial
-  payloads must not be able to leave the event in an off-20 state.
-- Confirm endpoint re-validates the **stored** sum == 20 before flipping
-  `criteriaConfirmed`; reopen (`confirmed:false`) skips the check.
+- The active-weight target is DYNAMIC per event, not a fixed constant: it's the
+  sum of `originalWeight` (defaultWeight) across all of that event's criteria
+  rows, active or not. Frontend computes `targetWeightSum` this way in
+  event-detail.tsx (never hardcode 20 — the criteria catalog changed from a
+  7-item set summing to 20 to a 5-item "Matriz de Performance" set summing to
+  11, and future catalogs may differ again).
+- The PUT criteria endpoint validates the **resulting persisted** active sum
+  (merge unchanged DB rows with the request payload), NOT just the payload —
+  partial payloads must not be able to leave the event in an inconsistent
+  state.
+- Confirm endpoint (backend) only checks `sum > 0` for active criteria, not an
+  exact target — it doesn't need the dynamic target since any positive weight
+  distribution is mathematically valid (the formula normalizes by dividing by
+  the active sum). The exact-sum-must-match-target UX guardrail lives only on
+  the frontend to guide admins back to the intended weight distribution.
 - Frontend and backend tolerance MUST be identical (`<= 0.01`). A mismatch
   (`<` vs `<=`) blocks the UI at boundary values the backend would accept.
 

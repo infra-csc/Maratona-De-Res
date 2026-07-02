@@ -549,6 +549,7 @@ export interface PlatoonRule {
   minInclusive?: boolean;
   maxInclusive?: boolean;
   bonusValue: number;
+  bonusPerExtraEvent: number;
   /** @nullable */
   description?: string | null;
   active: boolean;
@@ -563,6 +564,7 @@ export interface PlatoonRuleInput {
   minInclusive?: boolean;
   maxInclusive?: boolean;
   bonusValue: number;
+  bonusPerExtraEvent?: number;
   description?: string;
   displayOrder?: number;
 }
@@ -575,6 +577,7 @@ export interface PlatoonRuleUpdate {
   minInclusive?: boolean;
   maxInclusive?: boolean;
   bonusValue?: number;
+  bonusPerExtraEvent?: number;
   description?: string;
   active?: boolean;
   displayOrder?: number;
