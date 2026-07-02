@@ -290,19 +290,21 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                         </div>
                         <span className="text-[11px] font-bold italic w-9 text-right">{pct}%</span>
                       </div>
-                      <div className="flex items-center gap-4 shrink-0 sm:pl-4">
+                      <div className="flex items-center gap-4 shrink-0 sm:pl-4 sm:w-[17rem] sm:justify-end">
                         <div className="text-right">
                           <span className="block text-[9px] uppercase font-bold italic text-[#747a60] leading-none mb-1">Nota Final</span>
                           <p className="font-black italic text-2xl text-[#506600] leading-none" data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</p>
                         </div>
-                        {entry.bonusValue > 0 && (
-                          <div className="text-right hidden sm:block bg-[#ccff00] border-2 border-[#191c1e] px-3 py-1.5 skew-x-[-6deg]">
-                            <div className="skew-x-[6deg]">
-                              <span className="block text-[9px] uppercase font-bold italic text-[#161e00] leading-none mb-1">Bônus</span>
-                              <p className="font-black italic text-base text-[#191c1e] leading-none">{fmtBRLShort(entry.bonusValue)}</p>
+                        <div className="text-right hidden sm:block w-28 shrink-0">
+                          {entry.bonusValue > 0 && (
+                            <div className="bg-[#ccff00] border-2 border-[#191c1e] px-3 py-1.5 skew-x-[-6deg]">
+                              <div className="skew-x-[6deg]">
+                                <span className="block text-[9px] uppercase font-bold italic text-[#161e00] leading-none mb-1">Bônus</span>
+                                <p className="font-black italic text-base text-[#191c1e] leading-none">{fmtBRLShort(entry.bonusValue)}</p>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                         {canViewDetail && <ChevronRight size={18} className="text-[#747a60] group-hover:text-[#191c1e] transition-colors shrink-0" />}
                       </div>
                     </button>
