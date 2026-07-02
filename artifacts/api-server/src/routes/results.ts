@@ -446,7 +446,7 @@ router.get("/results/quarterly", async (req, res) => {
   })));
 });
 
-router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, res) => {
+router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { forced, reason } = req.body;
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
@@ -503,7 +503,7 @@ router.post("/results/quarterly/close", requireRole("admin", "rh"), async (req, 
  * PATCH /results/quarterly/:id/payment
  * Atualiza status/pagamento do bônus (Caju Saldo Livre).
  */
-router.patch("/results/quarterly/:id/payment", requireRole("admin", "rh"), async (req, res) => {
+router.patch("/results/quarterly/:id/payment", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { bonusStatus, paymentMethod, paymentDueDate, paidAt, paymentNotes } = req.body;
 
