@@ -393,7 +393,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                       {detail.events.map(ev => (
                         <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="font-black italic uppercase text-sm truncate">{ev.eventName}</p>
+                            <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
                             <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold italic text-[#747a60]">
                               {(ev.city || ev.state) && (
                                 <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
@@ -425,7 +425,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                             <p className="font-black italic uppercase text-sm">{p.label}</p>
                             <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
                               <span>{new Date(p.date).toLocaleDateString("pt-BR")}</span>
-                              {p.eventName && <span className="truncate">· {p.eventName}</span>}
+                              {p.eventName && <span>· {p.eventName}</span>}
                               {p.quantity > 1 && <span>· {p.quantity}x</span>}
                             </div>
                           </div>
@@ -450,7 +450,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                             <p className="font-black italic uppercase text-sm">{m.label}</p>
                             <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
                               <span>{new Date(m.date).toLocaleDateString("pt-BR")}</span>
-                              {m.eventName && <span className="truncate">· {m.eventName}</span>}
+                              {m.eventName && <span>· {m.eventName}</span>}
                               {m.quantity > 1 && <span>· {m.quantity}x</span>}
                             </div>
                           </div>
@@ -563,7 +563,7 @@ function EmployeeDetailSheet({
                     {detail.events.map(ev => (
                       <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="font-black italic uppercase text-sm truncate">{ev.eventName}</p>
+                          <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold italic text-[#747a60]">
                             {(ev.city || ev.state) && (
                               <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
@@ -595,7 +595,7 @@ function EmployeeDetailSheet({
                           <p className="font-black italic uppercase text-sm">{p.label}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
                             <span>{new Date(p.date).toLocaleDateString("pt-BR")}</span>
-                            {p.eventName && <span className="truncate">· {p.eventName}</span>}
+                            {p.eventName && <span>· {p.eventName}</span>}
                             {p.quantity > 1 && <span>· {p.quantity}x</span>}
                           </div>
                         </div>
@@ -620,7 +620,7 @@ function EmployeeDetailSheet({
                           <p className="font-black italic uppercase text-sm">{m.label}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
                             <span>{new Date(m.date).toLocaleDateString("pt-BR")}</span>
-                            {m.eventName && <span className="truncate">· {m.eventName}</span>}
+                            {m.eventName && <span>· {m.eventName}</span>}
                             {m.quantity > 1 && <span>· {m.quantity}x</span>}
                           </div>
                         </div>

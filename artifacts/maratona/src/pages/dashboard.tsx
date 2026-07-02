@@ -219,7 +219,7 @@ export default function DashboardPage() {
                 <div className="space-y-2">
                   {summary.eventsWithPendencies.slice(0, 5).map(ev => (
                     <div key={ev.eventId} className="flex items-center justify-between p-3 border-2 border-[#ffdbd1] bg-[#ffdbd1]/30">
-                      <span className="text-sm font-bold italic uppercase truncate flex-1 pr-2">{ev.eventName}</span>
+                      <span className="text-sm font-bold italic uppercase flex-1 pr-2">{ev.eventName}</span>
                       <span className="text-xs font-black italic text-white bg-[#b02f00] px-2 py-0.5 flex items-center gap-1">{ev.pendingCount} pend. <ChevronRight size={12} /></span>
                     </div>
                   ))}

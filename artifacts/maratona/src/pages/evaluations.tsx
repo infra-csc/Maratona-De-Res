@@ -482,7 +482,7 @@ export default function EvaluationsPage() {
         >
           {pickedEvent ? (
             <span className="flex flex-col min-w-0">
-              <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
+              <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e]">{pickedEvent.name}</span>
               {formatEventSubtitle(pickedEvent) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>}
             </span>
           ) : (

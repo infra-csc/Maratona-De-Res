@@ -337,7 +337,7 @@ export default function CalibrationsPage() {
                 >
                   {pickedEvent ? (
                     <span className="flex flex-col min-w-0">
-                      <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
+                      <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e]">{pickedEvent.name}</span>
                       {formatEventSubtitle(pickedEvent) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>}
                     </span>
                   ) : (
@@ -394,7 +394,7 @@ export default function CalibrationsPage() {
                     <span className="skew-x-[4deg]"><Target size={20} /></span>
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-black italic uppercase tracking-tight text-[#191c1e] truncate">{pickedEvent.name}</h3>
+                    <h3 className="font-black italic uppercase tracking-tight text-[#191c1e]">{pickedEvent.name}</h3>
                     <p className="text-xs font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName}</p>
                   </div>
                 </div>

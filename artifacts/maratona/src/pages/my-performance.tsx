@@ -81,7 +81,7 @@ function EventCard({ event }: { event: EventSummary }) {
                 {event.feedbackReleased ? "Avaliação Final" : "Avaliação Parcial"}
               </span>
             </div>
-            <p className="font-bold text-base truncate text-[#191c1e]">{event.eventName}</p>
+            <p className="font-bold text-base text-[#191c1e]">{event.eventName}</p>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold italic text-[#747a60]">
               {(event.city || event.location) && (
                 <span className="flex items-center gap-1"><MapPin size={12} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>

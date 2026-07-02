@@ -270,7 +270,7 @@ export default function AbsencesPage() {
                           {penaltyLabel(a.penaltyType)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-bold italic text-sm text-[#444933] max-w-xs truncate">{a.eventName || "—"}</td>
+                      <td className="px-6 py-4 font-bold italic text-sm text-[#444933]">{a.eventName || "—"}</td>
                       <td className="px-6 py-4 font-bold italic text-sm text-[#444933]">{new Date(a.date).toLocaleDateString('pt-BR')}</td>
                       <td className="px-6 py-4 text-center">
                         <span className="inline-block bg-[#eceef0] text-[#191c1e] font-black px-3 py-1 border-2 border-[#191c1e] text-xs">
