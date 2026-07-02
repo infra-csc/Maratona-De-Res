@@ -31,30 +31,25 @@ export default function EventsPage() {
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
     undefined,
-    { query: { queryKey } }
+    { query: { queryKey, refetchInterval: 15000, refetchOnWindowFocus: true } }
   );
 
   const reopenMutation = useReopenEvent({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
   });
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // O backend já retorna apenas os eventos do ciclo atual (getEvents filtra por
+  // cycle.startDate/endDate) — aqui mostramos TODOS eles, abertos ou fechados,
+  // para que o card atualize ao vivo conforme os avaliadores forem enviando notas.
   const filtered = (events ?? []).filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchConfig = filterStatus === "all" || (filterStatus === "configured" ? !!ev.criteriaConfirmed : !ev.criteriaConfirmed);
-    const isFinished = ev.endDate < todayStr;
     const matchCard = cardFilter === null
       || (cardFilter === "configured" && ev.criteriaConfirmed)
       || (cardFilter === "pendingRH" && !ev.criteriaConfirmed)
       || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.hasCalibration)
       || (cardFilter === "fullyEval" && ev.evaluationProgress === 1);
-    return matchSearch && matchConfig && isFinished && matchCard;
-  });
-
-  // Eventos do ciclo atual (dentro do período do ciclo)
-  const cycleEvents = (events ?? []).filter(ev => {
-    const isFinished = ev.endDate < todayStr;
-    return isFinished;
+    return matchSearch && matchConfig && matchCard;
   });
 
   const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
