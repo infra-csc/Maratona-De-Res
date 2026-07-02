@@ -3,10 +3,11 @@ import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, areasTable, employeeCycleEligibilityTable,
+  eventAreaAssignmentsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, selectExtraEventScores } from "../lib/calculations.js";
+import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 
 const router = Router();
@@ -87,6 +88,7 @@ router.get("/my-performance", async (req, res) => {
         criterionId: eventCriteriaTable.criterionId,
         criterionName: criteriaTable.name,
         criterionDescription: criteriaTable.description,
+        responsibleAreaId: criteriaTable.responsibleAreaId,
         responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
         responsibleAreaName: areasTable.name,
         active: eventCriteriaTable.active,
@@ -105,6 +107,7 @@ router.get("/my-performance", async (req, res) => {
       comments: evaluationsTable.comments,
       commentVisibility: evaluationsTable.commentVisibility,
       status: evaluationsTable.status,
+      evaluatorUserId: evaluationsTable.evaluatorUserId,
     }).from(evaluationsTable)
       .where(eq(evaluationsTable.eventId, p.eventId));
 
@@ -114,15 +117,22 @@ router.get("/my-performance", async (req, res) => {
     }).from(calibrationsTable)
       .where(eq(calibrationsTable.eventId, p.eventId));
 
+    const areaAssignments = await db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
+      .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, p.eventId));
+    const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments);
+
     const criteriaDetails = eventCriteriaRows.map(c => {
       const weight = parseFloat(c.weight ?? c.defaultWeight ?? "1");
-      const evalScores = allEvals
-        .filter(e => e.criterionId === c.criterionId && e.status === "submitted")
-        .map(e => parseFloat(e.score as unknown as string));
+      const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
+      const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
       const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
       const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
       const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
+      // scoreUsed alimenta a nota PROVISÓRIA do evento (inclui médias parciais);
+      // "evaluated"/status usa a definição completa (todos os avaliadores da área).
       const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
+      const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+      const isEvaluated = calibratedScore !== null || completion.isEvaluated;
       const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
 
       // Apenas comentários públicos — nunca expõe nome do avaliador
@@ -140,8 +150,8 @@ router.get("/my-performance", async (req, res) => {
         criterionTotal,
         // hasCalibration removed — not shown to collaborators
         publicComments,
-        evaluated: scoreUsed !== null,
-        status: scoreUsed !== null ? "avaliado" : "pendente",
+        evaluated: isEvaluated,
+        status: isEvaluated ? "avaliado" : "pendente",
       };
     });
 

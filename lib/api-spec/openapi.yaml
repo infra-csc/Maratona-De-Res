@@ -2297,12 +2297,14 @@ components:
           type: array
           items:
             type: object
-            required: [areaId]
+            required: [areaId, evaluatorUserIds]
             properties:
               areaId:
                 type: integer
-              evaluatorUserId:
-                type: ["integer", "null"]
+              evaluatorUserIds:
+                type: array
+                items:
+                  type: integer
 
     Evaluation:
       type: object

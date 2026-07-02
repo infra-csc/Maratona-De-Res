@@ -139,11 +139,14 @@ export default function EventDetailPage() {
   // Apenas avaliadores RELACIONADOS à área aparecem no seletor daquela área.
   const evaluatorsForArea = (areaId: number) => evaluators.filter(u => u.areaId === areaId);
 
-  const [assignments, setAssignments] = useState<Record<number, number | null>>({});
+  const [assignments, setAssignments] = useState<Record<number, number[]>>({});
   useEffect(() => {
     if (event?.areaAssignments) {
-      const map: Record<number, number | null> = {};
-      for (const a of event.areaAssignments) map[a.areaId] = a.evaluatorUserId;
+      const map: Record<number, number[]> = {};
+      for (const a of event.areaAssignments) {
+        if (!map[a.areaId]) map[a.areaId] = [];
+        map[a.areaId].push(a.evaluatorUserId);
+      }
       setAssignments(map);
     }
   }, [event?.areaAssignments]);
@@ -215,12 +218,25 @@ export default function EventDetailPage() {
         .map(c => [c.responsibleAreaId as number, c.responsibleAreaName ?? `Área ${c.responsibleAreaId}`] as [number, string])
     ).entries()
   ).map(([areaId, areaName]) => ({ areaId, areaName }));
-  const allAssigned = assignAreas.every(a => !!assignments[a.areaId]);
-  const assignmentsDirty = assignAreas.some(a => (assignments[a.areaId] ?? null) !== (event.areaAssignments?.find(x => x.areaId === a.areaId)?.evaluatorUserId ?? null));
-  const setAreaEvaluator = (areaId: number, userId: number | null) =>
-    setAssignments(prev => ({ ...prev, [areaId]: userId }));
+  const allAssigned = assignAreas.every(a => (assignments[a.areaId] ?? []).length > 0);
+  const sameEvaluatorSet = (a: number[], b: number[]) => {
+    const sa = [...a].sort((x, y) => x - y);
+    const sb = [...b].sort((x, y) => x - y);
+    return sa.length === sb.length && sa.every((v, i) => v === sb[i]);
+  };
+  const assignmentsDirty = assignAreas.some(a => {
+    const current = (event.areaAssignments ?? []).filter(x => x.areaId === a.areaId).map(x => x.evaluatorUserId);
+    return !sameEvaluatorSet(assignments[a.areaId] ?? [], current);
+  });
+  const toggleAreaEvaluator = (areaId: number, userId: number, checked: boolean) =>
+    setAssignments(prev => {
+      const current = prev[areaId] ?? [];
+      const next = checked ? [...current, userId] : current.filter(v => v !== userId);
+      return { ...prev, [areaId]: next };
+    });
+  const buildAssignmentsPayload = () => assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserIds: assignments[a.areaId] ?? [] }));
   const handleSaveAssignments = () =>
-    updateAssignments.mutate({ id, data: { assignments: assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserId: assignments[a.areaId] ?? null })) } });
+    updateAssignments.mutate({ id, data: { assignments: buildAssignmentsPayload() } });
   const handleSaveAll = () => {
     if (sumValid) handleSaveCriteria();
     if (assignmentsDirty) handleSaveAssignments();
@@ -233,7 +249,7 @@ export default function EventDetailPage() {
         await updateCriteria.mutateAsync({ id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
       }
       if (assignmentsDirty) {
-        await updateAssignments.mutateAsync({ id, data: { assignments: assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserId: assignments[a.areaId] ?? null })) } });
+        await updateAssignments.mutateAsync({ id, data: { assignments: buildAssignmentsPayload() } });
       }
       await confirmCriteria.mutateAsync({ id, data: { confirmed: true } });
     } catch {
@@ -593,22 +609,32 @@ export default function EventDetailPage() {
                               <span className="text-[11px] font-bold italic uppercase text-[#747a60]">—</span>
                             ) : (
                               <>
-                                <select
-                                  data-testid={`select-assignment-${item.criterionId}`}
-                                  value={assignments[areaId] ?? ""}
-                                  disabled={hasEvaluations || areaEvaluators.length === 0}
-                                  onChange={e => setAreaEvaluator(areaId, e.target.value ? Number(e.target.value) : null)}
-                                  className="h-10 w-full min-w-[200px] rounded-none border-2 border-[#191c1e] bg-white px-3 font-bold italic uppercase text-xs disabled:opacity-50"
-                                >
-                                  <option value="">{areaEvaluators.length === 0 ? "— Nenhum avaliador desta área —" : "— Selecione um avaliador —"}</option>
-                                  {areaEvaluators.map(u => (
-                                    <option key={u.id} value={u.id}>{u.name}</option>
-                                  ))}
-                                </select>
                                 {areaEvaluators.length === 0 ? (
-                                  <p className="mt-1 text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
-                                ) : !assignments[areaId] ? (
+                                  <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
+                                ) : (
+                                  <div data-testid={`select-assignment-${item.criterionId}`} className="flex flex-col gap-1 max-w-[220px]">
+                                    {areaEvaluators.map(u => {
+                                      const checked = (assignments[areaId] ?? []).includes(u.id);
+                                      return (
+                                        <label key={u.id} className="flex items-center gap-2 text-xs font-bold italic uppercase text-[#191c1e] cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            data-testid={`checkbox-evaluator-${item.criterionId}-${u.id}`}
+                                            checked={checked}
+                                            disabled={hasEvaluations}
+                                            onChange={e => toggleAreaEvaluator(areaId, u.id, e.target.checked)}
+                                            className="h-4 w-4 accent-[#191c1e] disabled:opacity-50"
+                                          />
+                                          {u.name}
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                {areaEvaluators.length > 0 && (assignments[areaId] ?? []).length === 0 ? (
                                   <p className="mt-1 text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador</p>
+                                ) : (assignments[areaId] ?? []).length > 1 ? (
+                                  <p className="mt-1 text-[10px] font-bold italic uppercase text-[#506600]">{(assignments[areaId] ?? []).length} avaliadores — nota final é a média</p>
                                 ) : null}
                               </>
                             )}

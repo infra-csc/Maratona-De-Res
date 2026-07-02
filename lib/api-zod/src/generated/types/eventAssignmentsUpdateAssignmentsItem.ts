@@ -8,6 +8,5 @@
 
 export type EventAssignmentsUpdateAssignmentsItem = {
   areaId: number;
-  /** @nullable */
-  evaluatorUserId?: number | null;
+  evaluatorUserIds: number[];
 };

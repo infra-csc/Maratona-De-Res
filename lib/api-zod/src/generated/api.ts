@@ -883,7 +883,7 @@ export const UpdateEventAssignmentsParams = zod.object({
 export const UpdateEventAssignmentsBody = zod.object({
   "assignments": zod.array(zod.object({
   "areaId": zod.number(),
-  "evaluatorUserId": zod.number().nullish()
+  "evaluatorUserIds": zod.array(zod.number())
 }))
 })
 

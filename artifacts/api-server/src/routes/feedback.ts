@@ -2,10 +2,11 @@ import { Router } from "express";
 import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, employeesTable, platoonRulesTable,
+  eventAreaAssignmentsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { calculateEventResult, getPlatoonByScore } from "../lib/calculations.js";
+import { calculateEventResult, getPlatoonByScore, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { audit } from "../lib/audit.js";
 import { recomputeCycleResults } from "./results.js";
 
@@ -20,6 +21,7 @@ async function buildEventFeedback(eventId: number) {
     .select({
       criterionId: eventCriteriaTable.criterionId,
       criterionName: criteriaTable.name,
+      responsibleAreaId: criteriaTable.responsibleAreaId,
       active: eventCriteriaTable.active,
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
@@ -32,16 +34,22 @@ async function buildEventFeedback(eventId: number) {
   const activeCriteria = eventCriteriaRows.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
   const allEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
   const allCalibrations = await db.select().from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
+  const areaAssignments = await db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
+    .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, eventId));
+  const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments);
 
   const criteria = activeCriteria.map(c => {
     const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    const evalScores = allEvals
-      .filter(e => e.criterionId === c.criterionId && e.status === "submitted")
-      .map(e => parseFloat(e.score as unknown as string));
+    const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
+    const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
     const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
     const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
     const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
-    const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
+    // "Avaliado" (scoreUsed não nulo) exige que TODOS os avaliadores designados
+    // para a área do critério tenham enviado, ou que exista calibração.
+    const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+    const isEvaluated = calibratedScore !== null || completion.isEvaluated;
+    const scoreUsed = isEvaluated ? (calibratedScore !== null ? calibratedScore : averageScore) : null;
     return { name: c.criterionName ?? "", weight, averageScore, calibratedScore, scoreUsed };
   });
 

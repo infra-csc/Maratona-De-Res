@@ -4,6 +4,7 @@ import {
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, employeeEventResultsTable,
   employeeCycleEligibilityTable, areasTable, cyclesTable, eventConformitiesTable,
+  eventAreaAssignmentsTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -11,6 +12,7 @@ import {
   calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
   calculateTieredBonus, selectExtraEventScores, validateCalculationExample, calculateConformitySubtotal,
   calculateConformityPenalty, calculateFinalEventScore, validateConformityCalculationExample,
+  buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus,
 } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
@@ -54,6 +56,7 @@ export async function computeEventTeamResult(eventId: number) {
       criterionId: eventCriteriaTable.criterionId,
       criterionName: criteriaTable.name,
       criterionDescription: criteriaTable.description,
+      responsibleAreaId: criteriaTable.responsibleAreaId,
       responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
       responsibleAreaName: areasTable.name,
       active: eventCriteriaTable.active,
@@ -70,17 +73,23 @@ export async function computeEventTeamResult(eventId: number) {
 
   const allEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
   const allCalibrations = await db.select().from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
+  const areaAssignments = await db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
+    .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, eventId));
+  const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments);
 
   const criteriaDetails = activeCriteria.map(c => {
     const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    const evalScores = allEvals
-      .filter(e => e.criterionId === c.criterionId && e.status === "submitted")
-      .map(e => parseFloat(e.score as unknown as string));
+    const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
+    const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
     const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
     const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
     const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
     const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
     const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
+    // "Avaliado" exige que TODOS os avaliadores designados para a área do
+    // critério tenham enviado (ou que exista calibração, que sempre finaliza).
+    const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+    const isEvaluated = calibratedScore !== null || completion.isEvaluated;
     return {
       criterionId: c.criterionId!,
       criterionName: c.criterionName ?? "",
@@ -91,7 +100,9 @@ export async function computeEventTeamResult(eventId: number) {
       calibratedScore,
       scoreUsed,
       criterionTotal,
-      status: scoreUsed !== null ? "avaliado" : "pendente",
+      requiredEvaluators: completion.requiredEvaluators,
+      submittedEvaluators: completion.submittedEvaluators,
+      status: isEvaluated ? "avaliado" : "pendente",
     };
   });
 

@@ -11,6 +11,65 @@ export function getScoreUsedForCalculation(
   return averageScore;
 }
 
+/**
+ * Agrupa as atribuições de avaliador por área: quais evaluatorUserId's foram
+ * designados para cada área NESTE evento. Um evento pode ter mais de um
+ * avaliador por área — quando isso ocorre, a nota final do critério é a média
+ * das avaliações de todos eles.
+ */
+export function buildAssignedEvaluatorsByArea(
+  assignments: { areaId: number; evaluatorUserId: number }[],
+): Map<number, Set<number>> {
+  const map = new Map<number, Set<number>>();
+  for (const a of assignments) {
+    if (!map.has(a.areaId)) map.set(a.areaId, new Set());
+    map.get(a.areaId)!.add(a.evaluatorUserId);
+  }
+  return map;
+}
+
+export interface CriterionEvaluationStatus {
+  /** true se todos os avaliadores designados para a área do critério já enviaram sua avaliação. */
+  isEvaluated: boolean;
+  /** quantos avaliadores estão designados para a área do critério (0 = nenhuma atribuição configurada). */
+  requiredEvaluators: number;
+  /** quantos dos avaliadores designados já enviaram avaliação para este critério. */
+  submittedEvaluators: number;
+}
+
+/**
+ * Determina se um critério está "avaliado": todos os avaliadores designados
+ * para a área responsável pelo critério enviaram sua avaliação. Se a área não
+ * tiver nenhuma atribuição configurada (dado legado/sem RH definir), cai no
+ * comportamento antigo: qualquer avaliação enviada conta como avaliado.
+ */
+export function getCriterionEvaluationStatus(
+  responsibleAreaId: number | null | undefined,
+  submittedEvaluatorIds: number[],
+  assignedEvaluatorsByArea: Map<number, Set<number>>,
+): CriterionEvaluationStatus {
+  const distinctSubmitted = new Set(submittedEvaluatorIds);
+  const required = responsibleAreaId != null ? assignedEvaluatorsByArea.get(responsibleAreaId) : undefined;
+
+  if (!required || required.size === 0) {
+    return {
+      isEvaluated: distinctSubmitted.size > 0,
+      requiredEvaluators: 0,
+      submittedEvaluators: distinctSubmitted.size,
+    };
+  }
+
+  let submittedFromRequired = 0;
+  for (const id of required) {
+    if (distinctSubmitted.has(id)) submittedFromRequired++;
+  }
+  return {
+    isEvaluated: submittedFromRequired === required.size,
+    requiredEvaluators: required.size,
+    submittedEvaluators: submittedFromRequired,
+  };
+}
+
 export interface CriterionData {
   criterionId: number;
   weight: number;

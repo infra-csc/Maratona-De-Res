@@ -15,7 +15,7 @@
 - [Penalties & Merits model](penalties-model.md) — penalties+merits share /absences via `kind` col; points positive, sign from kind; final=clamp(gross-pen+merit,0,100); qty must be int≥1
 - [Orval path+query collision](orval-path-query-collision.md) — never mix a path param + query params on one op (dup `GetXParams` export breaks codegen); make the id a query param
 - [Event detail progress source](event-detail-progress.md) — loadEventDetail returns evaluationMatrix:[] always; use the evaluationProgress field (submitted/total evals) for any "% avaliado", never the matrix
-- [Per-event area assignment](event-area-assignment.md) — eval scoping is event→area→avaliador (event_area_assignments), NOT profile areaId; confirm gate blocks until every active-criteria area assigned
+- [Per-event area assignment](event-area-assignment.md) — eval scoping is event→area→N avaliadores (multi-evaluator per area); PUT replaces only areas listed; completeness needs ALL assigned to submit, then averaged
 - [Event-scoped duplicate criteria](event-scoped-criteria.md) — duplicating a quesito makes its OWN criteria row (eventScoped=true) since scores key by global criterionId; exclude eventScoped from /criteria, sync, AND POST /events seeding
 - [Results filters + search](results-filters-search.md) — all 3 tabs have search bar + platoon filter dropdown + elegibility filter (ranking & payments only); filtering client-side after API fetch; use "__all" sentinel for Select default
 - [Label rename: Nota Avaliador](nota-avaliador-label.md) — "Média Original" → "Nota Avaliador" on event-detail and calibrations tables/tooltips for clarity

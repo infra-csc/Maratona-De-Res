@@ -269,21 +269,50 @@ export default function EvaluationsPage() {
   );
   const myCriteria = activeCriteria.filter(c => c.responsibleAreaId != null && myAssignedAreaIds.has(c.responsibleAreaId));
 
-  // Manager-only oversight: per-criterion submission status ("quem preencheu / quem falta").
-  function criterionStatus(criterionId: number): { state: "submitted" | "draft" | "pending"; who: string | null } {
-    const evs = (evaluations ?? []).filter(e => e.criterionId === criterionId);
-    const submitted = evs.find(e => e.status === "submitted");
-    if (submitted) return { state: "submitted", who: submitted.evaluatorName ?? null };
-    const draft = evs.find(e => e.status === "draft");
-    if (draft) return { state: "draft", who: draft.evaluatorName ?? null };
-    return { state: "pending", who: null };
+  // Avaliadores atribuídos a cada área (evento → área → avaliador[]); pode haver
+  // mais de um por área — a nota final é a média entre eles.
+  const assignedEvaluatorsByArea = new Map<number, { id: number; name: string }[]>();
+  for (const a of (selectedEventDetail?.areaAssignments ?? [])) {
+    if (a.evaluatorUserId == null) continue;
+    const list = assignedEvaluatorsByArea.get(a.areaId) ?? [];
+    list.push({ id: a.evaluatorUserId, name: a.evaluatorName ?? "Sem nome" });
+    assignedEvaluatorsByArea.set(a.areaId, list);
   }
 
-  // Avaliador responsável atribuído a cada área (evento → área → avaliador),
-  // para exibir "quem é o responsável" em cada quesito, mesmo sem nota ainda.
-  const evaluatorByAreaId = new Map(
-    (selectedEventDetail?.areaAssignments ?? []).map(a => [a.areaId, a.evaluatorName ?? null] as const)
-  );
+  // Manager-only oversight: per-criterion submission status ("quem preencheu / quem falta").
+  // "submitted" só quando TODOS os avaliadores designados para a área enviaram;
+  // "partial" cobre o caso de 1 de N já ter enviado.
+  type CriterionUiStatus = {
+    state: "submitted" | "partial" | "draft" | "pending";
+    submittedNames: string[];
+    pendingNames: string[];
+    requiredCount: number;
+    submittedCount: number;
+  };
+  function criterionStatus(criterionId: number, responsibleAreaId: number | null): CriterionUiStatus {
+    const evs = (evaluations ?? []).filter(e => e.criterionId === criterionId);
+    const assigned = responsibleAreaId != null ? (assignedEvaluatorsByArea.get(responsibleAreaId) ?? []) : [];
+    const evalByEvaluator = new Map(evs.filter(e => e.evaluatorUserId != null).map(e => [e.evaluatorUserId as number, e]));
+    if (assigned.length > 0) {
+      const submitted = assigned.filter(a => evalByEvaluator.get(a.id)?.status === "submitted");
+      const drafted = assigned.filter(a => evalByEvaluator.get(a.id)?.status === "draft");
+      const pending = assigned.filter(a => !submitted.includes(a));
+      const state: CriterionUiStatus["state"] = submitted.length === assigned.length
+        ? "submitted"
+        : submitted.length > 0
+          ? "partial"
+          : drafted.length > 0
+            ? "draft"
+            : "pending";
+      return { state, submittedNames: submitted.map(a => a.name), pendingNames: pending.map(a => a.name), requiredCount: assigned.length, submittedCount: submitted.length };
+    }
+    // Sem atribuição configurada para a área: cai no fallback "qualquer envio conta" (espelha o backend).
+    const submitted = evs.find(e => e.status === "submitted");
+    if (submitted) return { state: "submitted", submittedNames: [submitted.evaluatorName ?? "—"], pendingNames: [], requiredCount: 1, submittedCount: 1 };
+    const draft = evs.find(e => e.status === "draft");
+    if (draft) return { state: "draft", submittedNames: [], pendingNames: [], requiredCount: 1, submittedCount: 0 };
+    return { state: "pending", submittedNames: [], pendingNames: [], requiredCount: 1, submittedCount: 0 };
+  }
 
   function groupByArea(list: typeof activeCriteria) {
     return Object.values(
@@ -295,7 +324,7 @@ export default function EvaluationsPage() {
     );
   }
   const areaGroups = groupByArea(activeCriteria);
-  const teamSubmittedCount = activeCriteria.filter(c => criterionStatus(c.criterionId).state === "submitted").length;
+  const teamSubmittedCount = activeCriteria.filter(c => criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted").length;
   const teamProgressPct = activeCriteria.length ? (teamSubmittedCount / activeCriteria.length) * 100 : 0;
 
   // Avaliadores atribuídos ao evento (evento → área → avaliador), com status
@@ -307,10 +336,14 @@ export default function EvaluationsPage() {
     if (existing) existing.areaIds.add(a.areaId);
     else avaliadorMap.set(a.evaluatorUserId, { id: a.evaluatorUserId, name: a.evaluatorName ?? "Sem nome", areaIds: new Set([a.areaId]) });
   }
+  // Progresso POR avaliador: conta apenas as submissões DELE, não a completude
+  // agregada do critério (que pode exigir outro avaliador da mesma área).
   const avaliadorStats = Array.from(avaliadorMap.values())
     .map(av => {
       const crit = activeCriteria.filter(c => c.responsibleAreaId != null && av.areaIds.has(c.responsibleAreaId));
-      const submitted = crit.filter(c => criterionStatus(c.criterionId).state === "submitted").length;
+      const submitted = crit.filter(c =>
+        (evaluations ?? []).some(e => e.criterionId === c.criterionId && e.evaluatorUserId === av.id && e.status === "submitted")
+      ).length;
       const total = crit.length;
       return { ...av, total, submitted, done: total > 0 && submitted === total };
     })
@@ -759,7 +792,7 @@ export default function EvaluationsPage() {
                         </div>
                       )}
                       {filteredAreaGroups.map(g => {
-                        const submittedInArea = g.criteria.filter(c => criterionStatus(c.criterionId).state === "submitted").length;
+                        const submittedInArea = g.criteria.filter(c => criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted").length;
                         const areaDone = submittedInArea === g.criteria.length;
                         return (
                           <div key={g.area} data-testid={`status-area-${g.area}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
@@ -773,8 +806,9 @@ export default function EvaluationsPage() {
                             </div>
                             <ul>
                               {g.criteria.map(c => {
-                                const st = criterionStatus(c.criterionId);
-                                const responsible = (c.responsibleAreaId != null ? evaluatorByAreaId.get(c.responsibleAreaId) : null) ?? st.who;
+                                const st = criterionStatus(c.criterionId, c.responsibleAreaId ?? null);
+                                const assignedNames = c.responsibleAreaId != null ? (assignedEvaluatorsByArea.get(c.responsibleAreaId) ?? []).map(a => a.name) : [];
+                                const responsible = assignedNames.length > 0 ? assignedNames.join(", ") : (st.submittedNames[0] ?? null);
                                 return (
                                   <li key={c.criterionId} data-testid={`status-crit-${c.criterionId}`} className="flex items-center justify-between gap-3 px-5 py-3 border-t-2 border-[#eceef0] first:border-t-0">
                                     <span className="font-bold italic text-[#191c1e] min-w-0 truncate pr-1.5">{c.criterionName}</span>
@@ -784,6 +818,8 @@ export default function EvaluationsPage() {
                                       </span>
                                       {st.state === "submitted" ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1"><CheckCircle size={12} /> Preenchido</span>
+                                      ) : st.state === "partial" ? (
+                                        <span data-testid={`status-partial-${c.criterionId}`} title={`Falta: ${st.pendingNames.join(", ")}`} className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#fff4c2] text-[#5c4a00] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> {st.submittedCount}/{st.requiredCount} Parcial</span>
                                       ) : st.state === "draft" ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffdbd1] text-[#862200] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Rascunho</span>
                                       ) : (

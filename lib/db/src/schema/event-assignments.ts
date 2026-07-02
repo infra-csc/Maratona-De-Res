@@ -7,9 +7,11 @@ import { usersTable } from "./users";
 
 /**
  * Per-event, per-area evaluator assignment.
- * For a given event, RH chooses exactly ONE evaluator user for each area.
- * That user (not the user's fixed profile area) scores the criteria of that area
+ * For a given event, RH chooses one or more evaluator users for each area.
+ * Those users (not the user's fixed profile area) score the criteria of that area
  * for that event. Mandatory before the event's criteria can be confirmed/released.
+ * When more than one evaluator is assigned to an area, a criterion's final score
+ * is the average of all their submitted evaluations.
  */
 export const eventAreaAssignmentsTable = pgTable("event_area_assignments", {
   id: serial("id").primaryKey(),
@@ -17,7 +19,7 @@ export const eventAreaAssignmentsTable = pgTable("event_area_assignments", {
   areaId: integer("area_id").notNull().references(() => areasTable.id),
   evaluatorUserId: integer("evaluator_user_id").notNull().references(() => usersTable.id),
 }, (t) => ({
-  eventAreaUq: uniqueIndex("event_area_assignments_event_area_uq").on(t.eventId, t.areaId),
+  eventAreaEvaluatorUq: uniqueIndex("event_area_assignments_event_area_evaluator_uq").on(t.eventId, t.areaId, t.evaluatorUserId),
 }));
 
 export const insertEventAreaAssignmentSchema = createInsertSchema(eventAreaAssignmentsTable).omit({ id: true });

@@ -3,7 +3,7 @@ import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable,
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
-import { convertScoreToPercentage, calculateEventResult } from "../lib/calculations.js";
+import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 
@@ -24,15 +24,17 @@ router.get("/events", async (req, res) => {
   const eventIds = events.map(e => e.id);
 
   // Busca em lote para evitar N+1 (uma query por relação, não por evento).
-  const [participants, evals, eventCriteriaRows, calibrations] = await Promise.all([
+  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows] = await Promise.all([
     db.select({ eventId: eventParticipantsTable.eventId })
       .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
-    db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status })
+    db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
-    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight })
+    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId })
       .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id)).where(inArray(eventCriteriaTable.eventId, eventIds)),
     db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
+    db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
+      .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, eventIds)),
   ]);
 
   // Filtra eventos dentro do período do ciclo atual (se o ciclo tiver datas definidas;
@@ -47,7 +49,7 @@ router.get("/events", async (req, res) => {
     const evEvals = evals.filter(e => e.eventId === ev.id);
     const submitted = evEvals.filter(e => e.status === "submitted");
     const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active);
-    const progress = activeCriteria.length > 0 ? submitted.length / activeCriteria.length : 0;
+    const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentRows.filter(a => a.eventId === ev.id));
     const scored = submitted.filter(e => e.score != null);
     const avgRaw = scored.length > 0
       ? scored.reduce((s, e) => s + parseFloat(e.score as unknown as string), 0) / scored.length
@@ -56,22 +58,25 @@ router.get("/events", async (req, res) => {
 
     // Nota do time (mesma lógica de computeEventTeamResult): por critério ativo,
     // média das avaliações submetidas, substituída pela calibração quando existe.
+    // "Avaliado" exige que TODOS os avaliadores designados para a área do
+    // critério tenham enviado (não apenas um, quando há mais de um por área).
     const evCals = calibrations.filter(c => c.eventId === ev.id);
     let evaluatedCriteria = 0;
     let hasCalibration = false;
     const criteriaForCalc = activeCriteria.map((c) => {
       const weight = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
-      const critScores = submitted
-        .filter(e => e.criterionId === c.criterionId && e.score != null)
-        .map(e => parseFloat(e.score as unknown as string));
+      const critEvals = submitted.filter(e => e.criterionId === c.criterionId);
+      const critScores = critEvals.filter(e => e.score != null).map(e => parseFloat(e.score as unknown as string));
       const avgScore = critScores.length > 0 ? critScores.reduce((a, b) => a + b, 0) / critScores.length : null;
       const cal = evCals.find(x => x.criterionId === c.criterionId);
       const calibratedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
       if (calibratedScore !== null) hasCalibration = true;
-      if (calibratedScore !== null || avgScore !== null) evaluatedCriteria++;
+      const status = getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+      if (calibratedScore !== null || status.isEvaluated) evaluatedCriteria++;
       return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore };
     });
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
+    const progress = activeCriteria.length > 0 ? evaluatedCriteria / activeCriteria.length : 0;
 
     return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration };
   });
@@ -124,14 +129,6 @@ async function loadEventDetail(id: number) {
 
   const hasEvaluations = await eventHasEvaluations(id);
 
-  // Non-confidential progress: share of evaluations already submitted for this
-  // event. Mirrors the /events list metric so both views agree.
-  // Denominator = total active criteria (not evaluations created in DB), because
-  // criteria may exist without any evaluation record yet (submitted=0).
-  const allEvals = await db.select({ status: evaluationsTable.status }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
-  const submittedCount = allEvals.filter(e => e.status === "submitted").length;
-  const evaluationProgress = activeCriteria.length > 0 ? submittedCount / activeCriteria.length : 0;
-
   const areaAssignments = await db
     .select({
       id: eventAreaAssignmentsTable.id,
@@ -145,6 +142,20 @@ async function loadEventDetail(id: number) {
     .leftJoin(areasTable, eq(eventAreaAssignmentsTable.areaId, areasTable.id))
     .leftJoin(usersTable, eq(eventAreaAssignmentsTable.evaluatorUserId, usersTable.id))
     .where(eq(eventAreaAssignmentsTable.eventId, id));
+
+  // Non-confidential progress: share of ACTIVE CRITERIA fully evaluated for this
+  // event. Mirrors the /events list metric so both views agree. A criterion is
+  // "fully evaluated" once every evaluator assigned to its area has submitted
+  // (falls back to "any submission" for areas without an assignment configured).
+  const allEvals = await db.select({ criterionId: evaluationsTable.criterionId, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
+  const submittedEvals = allEvals.filter(e => e.status === "submitted");
+  const submittedCount = submittedEvals.length;
+  const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments.map(a => ({ areaId: a.areaId, evaluatorUserId: a.evaluatorUserId })));
+  const evaluatedCriteriaCount = activeCriteria.filter(c => {
+    const submittedIds = submittedEvals.filter(e => e.criterionId === c.criterionId).map(e => e.evaluatorUserId as number);
+    return getCriterionEvaluationStatus(c.responsibleAreaId, submittedIds, assignedByArea).isEvaluated;
+  }).length;
+  const evaluationProgress = activeCriteria.length > 0 ? evaluatedCriteriaCount / activeCriteria.length : 0;
 
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
 
@@ -515,9 +526,12 @@ router.delete("/events/:id/criteria/:eventCriterionId", requireRole("admin", "rh
 
 /**
  * PUT /events/:id/assignments
- * RH define, por área, qual avaliador dará a nota daquela área NESTE evento.
- * Body: { assignments: [{ areaId, evaluatorUserId }] }
- * Upsert por (eventId, areaId). evaluatorUserId null/0 remove a atribuição da área.
+ * RH define, por área, quais avaliadores darão a nota daquela área NESTE evento.
+ * Body: { assignments: [{ areaId, evaluatorUserIds: number[] }] }
+ * Substitui por completo a lista de avaliadores de cada área informada.
+ * evaluatorUserIds vazio remove todas as atribuições da área.
+ * Quando há mais de um avaliador por área, a nota final do critério é a média
+ * das avaliações submetidas por todos eles.
  */
 router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
@@ -528,38 +542,51 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
     return;
   }
 
-  const items = (req.body?.assignments ?? []) as { areaId: number; evaluatorUserId: number | null }[];
+  const items = (req.body?.assignments ?? []) as { areaId: number; evaluatorUserIds: (number | null)[] }[];
   if (!Array.isArray(items)) {
     res.status(400).json({ error: "Envie a lista de atribuições (assignments)" });
     return;
   }
 
+  const parsedItems: { areaId: number; evaluatorUserIds: number[] }[] = [];
   for (const item of items) {
     const areaId = Number(item.areaId);
     if (!areaId) continue;
-    const userId = item.evaluatorUserId ? Number(item.evaluatorUserId) : null;
+    const evaluatorUserIds = Array.from(new Set(
+      (Array.isArray(item.evaluatorUserIds) ? item.evaluatorUserIds : [])
+        .filter((v): v is number => v != null)
+        .map(Number)
+        .filter(v => v > 0),
+    ));
+    parsedItems.push({ areaId, evaluatorUserIds });
+  }
 
-    if (userId == null) {
-      await db.delete(eventAreaAssignmentsTable)
-        .where(and(eq(eventAreaAssignmentsTable.eventId, eventId), eq(eventAreaAssignmentsTable.areaId, areaId)));
-      continue;
-    }
-
-    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-    if (!target || target.role !== "avaliador") {
+  const allUserIds = Array.from(new Set(parsedItems.flatMap(i => i.evaluatorUserIds)));
+  if (allUserIds.length > 0) {
+    const evaluatorUsers = await db.select().from(usersTable).where(inArray(usersTable.id, allUserIds));
+    const invalid = allUserIds.filter(id => {
+      const u = evaluatorUsers.find(u => u.id === id);
+      return !u || u.role !== "avaliador";
+    });
+    if (invalid.length > 0) {
       res.status(400).json({ error: "O avaliador atribuído deve ser um usuário com papel de avaliador" });
       return;
     }
-
-    await db.insert(eventAreaAssignmentsTable)
-      .values({ eventId, areaId, evaluatorUserId: userId })
-      .onConflictDoUpdate({
-        target: [eventAreaAssignmentsTable.eventId, eventAreaAssignmentsTable.areaId],
-        set: { evaluatorUserId: userId },
-      });
   }
 
-  await audit(req.user!.userId, "set_assignments", "events", eventId, null, { assignments: items });
+  await db.transaction(async (tx) => {
+    for (const item of parsedItems) {
+      await tx.delete(eventAreaAssignmentsTable)
+        .where(and(eq(eventAreaAssignmentsTable.eventId, eventId), eq(eventAreaAssignmentsTable.areaId, item.areaId)));
+      if (item.evaluatorUserIds.length > 0) {
+        await tx.insert(eventAreaAssignmentsTable).values(
+          item.evaluatorUserIds.map(userId => ({ eventId, areaId: item.areaId, evaluatorUserId: userId })),
+        );
+      }
+    }
+  });
+
+  await audit(req.user!.userId, "set_assignments", "events", eventId, null, { assignments: parsedItems });
   res.json(await loadEventDetail(eventId));
 });
 
