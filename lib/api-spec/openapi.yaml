@@ -1489,7 +1489,7 @@ paths:
     post:
       operationId: resetAllData
       tags: [integration]
-      summary: Wipe all application data, keeping only the calling admin's own user
+      summary: Wipe operational data (events, evaluations, employees, users) keeping only the calling admin's own user and catalog config (areas, criteria, cycles, rules)
       requestBody:
         required: true
         content:

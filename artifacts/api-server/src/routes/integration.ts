@@ -1,9 +1,7 @@
 import { Router } from "express";
 import {
   db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable, eventCriteriaTable,
-  usersTable, areasTable, cyclesTable, evaluationsTable, calibrationsTable, eventConformitiesTable,
-  employeeEventResultsTable, absencesTable, quarterlyResultsTable, employeeCycleEligibilityTable,
-  auditLogsTable, platoonRulesTable, rulesTable, eventAreaAssignmentsTable,
+  usersTable, absencesTable, quarterlyResultsTable, employeeCycleEligibilityTable, auditLogsTable,
 } from "@workspace/db";
 import { isNotNull, inArray, eq, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -95,11 +93,15 @@ router.get("/integration/status", async (_req, res) => {
 
 const RESET_CONFIRM_PHRASE = "ZERAR TUDO";
 
-// Apaga TODOS os dados da aplicação, preservando apenas o próprio usuário admin
-// que disparou a ação (para que ele continue logado e possa recomeçar o
-// cadastro do zero). Ação extremamente destrutiva e irreversível — por isso
-// exige role admin (não admin+rh, mais restrito que o padrão do router) e uma
-// frase de confirmação exata digitada pelo usuário.
+// Apaga os dados operacionais de produção — eventos (e tudo que depende deles:
+// participantes, critérios do evento, atribuições, avaliações/notas,
+// calibrações, conformidade, resultados por evento), colaboradores e usuários
+// (menos o próprio admin que disparou a ação, para que ele continue logado e
+// possa recomeçar o cadastro do zero). NÃO apaga configuração/catálogo: áreas,
+// critérios (quesitos), ciclo atual, regras e pelotões permanecem intactos —
+// só o dado operacional/transacional sai. Ação destrutiva e irreversível — por
+// isso exige role admin (não admin+rh, mais restrito que o padrão do router) e
+// uma frase de confirmação exata digitada pelo usuário.
 router.post("/integration/reset", requireRole("admin"), async (req, res) => {
   const { confirm } = req.body ?? {};
   if (confirm !== RESET_CONFIRM_PHRASE) {
@@ -122,39 +124,39 @@ router.post("/integration/reset", requireRole("admin"), async (req, res) => {
 
   try {
     await db.transaction(async (tx) => {
-      // Remove as referências do próprio admin ANTES de apagar areas/employees,
-      // senão a FK impede a exclusão.
-      await tx.update(usersTable).set({ areaId: null, employeeId: null }).where(eq(usersTable.id, callerId));
+      // Libera a FK employee_id do próprio admin ANTES de apagar employees
+      // (areaId não precisa: areas não são apagadas nesse reset).
+      await tx.update(usersTable).set({ employeeId: null }).where(eq(usersTable.id, callerId));
 
-      await tx.delete(auditLogsTable);
-      await tx.delete(employeeCycleEligibilityTable);
-      await tx.delete(employeeEventResultsTable);
-      await tx.delete(quarterlyResultsTable);
-      await tx.delete(calibrationsTable);
-      await tx.delete(eventConformitiesTable);
-      await tx.delete(evaluationsTable);
+      // Ausências e resultados trimestrais referenciam employeeId sem cascade —
+      // precisam sair antes de events/employees.
       await tx.delete(absencesTable);
-      await tx.delete(eventCriteriaTable);
-      await tx.delete(eventAreaAssignmentsTable);
-      await tx.delete(eventParticipantsTable);
+      await tx.delete(quarterlyResultsTable);
+      // Referencia employeeId (cascade) e createdByUserId (sem cascade) — precisa
+      // sair explicitamente antes de apagar os usuários não-admin.
+      await tx.delete(employeeCycleEligibilityTable);
+
+      // Apagar eventos cascateia: event_participants, event_criteria,
+      // event_area_assignments, evaluations, calibrations, event_conformities,
+      // employee_event_results (todos com onDelete cascade em event_id).
       await tx.delete(eventsTable);
-      await tx.delete(cyclesTable);
-      await tx.delete(platoonRulesTable);
-      await tx.delete(rulesTable);
-      await tx.delete(criteriaTable);
+
+      // audit_logs.user_id referencia usuários sem cascade — desvincula os
+      // registros de quem será removido, mas preserva o histórico de auditoria.
+      await tx.update(auditLogsTable).set({ userId: null }).where(ne(auditLogsTable.userId, callerId));
+
       await tx.delete(usersTable).where(ne(usersTable.id, callerId));
       await tx.delete(employeesTable);
-      await tx.delete(areasTable);
     });
 
-    // audit() usa a conexão global (fora da transação) — chamado DEPOIS do
-    // commit, de propósito, para que este seja o ÚNICO registro sobrevivente
-    // em audit_logs (a tabela foi zerada dentro da transação acima).
     lastSyncAt = null;
     lastLogs = [];
-    await audit(callerId, "reset_all_data", "system", undefined, null, { resetBy: callerId });
+    await audit(callerId, "reset_operational_data", "system", undefined, null, { resetBy: callerId });
 
-    res.json({ success: true, message: "Todos os dados foram apagados. Apenas o seu usuário foi preservado." });
+    res.json({
+      success: true,
+      message: "Eventos, avaliações, colaboradores e usuários (exceto o seu) foram apagados. Áreas, quesitos, ciclo e regras foram preservados.",
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ success: false, message: `Falha ao resetar dados: ${msg}` });

@@ -34,3 +34,4 @@
 - [OpenAPI yaml is hand-maintained](openapi-yaml-manual-source.md) — route code changes alone don't reach the generated client; edit lib/api-spec/openapi.yaml then rerun codegen
 - [Tiered bonus + Matriz de Performance migration](tiered-bonus-matriz-migration.md) — platoon_rules got bonusPerExtraEvent (7 tiers); criteria catalog swapped to a 5-item set (weight sum 11); live-data migrations must be one-off SQL, never seed.ts rerun
 - [My-performance live penalty/merit math](my-performance-adjustments.md) — /my-performance computes penalties/merits live; math must mirror results.ts close rules; endpoint NOT in openapi.yaml (raw fetch + local interfaces)
+- [Admin operational data reset](admin-data-reset.md) — scope + exact FK delete order for wiping events/evaluations/employees/users while preserving areas/criteria/cycles/rules; agent has read-only prod DB, so this must be an in-app admin action

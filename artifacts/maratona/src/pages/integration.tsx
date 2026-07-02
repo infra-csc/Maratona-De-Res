@@ -1,13 +1,17 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, getGetIntegrationStatusQueryKey } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useResetAllData, getGetIntegrationStatusQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert } from "lucide-react";
 import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+const RESET_CONFIRM_PHRASE = "ZERAR TUDO";
 
 type SyncResult = {
   success: boolean;
@@ -19,12 +23,30 @@ type SyncResult = {
 
 export default function IntegrationPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "admin";
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
 
   const qKey = getGetIntegrationStatusQueryKey();
   const { data: status, isLoading } = useGetIntegrationStatus({ query: { queryKey: qKey } });
+
+  const resetMutation = useResetAllData({
+    mutation: {
+      onSuccess: (data) => {
+        toast({ title: "Dados apagados", description: data.message });
+        setResetDialogOpen(false);
+        setResetConfirmText("");
+        qc.invalidateQueries();
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha ao resetar dados", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
 
   const syncMutation = useTriggerSync({
     mutation: {
@@ -177,6 +199,34 @@ export default function IntegrationPage() {
         </Card>
       </div>
 
+      {isAdmin && (
+        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-red-500">
+          <CardHeader className="bg-red-50 border-b border-red-100 pb-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-red-700">
+              <ShieldAlert size={18} /> Zona de Risco
+            </CardTitle>
+            <CardDescription className="text-red-700/80">
+              Reset de dados operacionais de produção. Ação irreversível.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+              Apaga <strong>eventos, avaliações/notas, colaboradores e usuários</strong> (exceto o seu próprio login).
+              Áreas, quesitos, ciclo atual e regras de bonificação/pelotão <strong>são preservados</strong>.
+              Use para reiniciar o cadastro de produção do zero.
+            </p>
+            <Button
+              data-testid="button-open-reset-dialog"
+              variant="destructive"
+              className="w-full"
+              onClick={() => setResetDialogOpen(true)}
+            >
+              <Trash2 size={16} className="mr-2" /> Resetar Dados Operacionais
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {status?.logs && status.logs.length > 0 && (
         <Card className="border-none shadow-sm bg-black text-slate-300 font-mono text-xs overflow-hidden">
           <CardHeader className="border-b border-white/10 pb-3 py-3 px-4 bg-white/5">
@@ -250,6 +300,53 @@ export default function IntegrationPage() {
           <DialogFooter>
             <Button onClick={() => setResult(null)} className="w-full" data-testid="button-close-result">
               Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetDialogOpen} onOpenChange={(open) => { setResetDialogOpen(open); if (!open) setResetConfirmText(""); }}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-reset-confirm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <ShieldAlert className="text-red-600" size={20} />
+              Confirmar reset de dados
+            </DialogTitle>
+            <DialogDescription>
+              Isso vai apagar permanentemente <strong>todos os eventos, avaliações/notas, colaboradores e usuários</strong> (menos o seu login).
+              Áreas, quesitos, ciclo e regras não serão afetados. Não é possível desfazer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium text-slate-700">
+              Digite <span className="font-mono font-bold">{RESET_CONFIRM_PHRASE}</span> para confirmar
+            </label>
+            <Input
+              data-testid="input-reset-confirm"
+              value={resetConfirmText}
+              onChange={(e) => setResetConfirmText(e.target.value)}
+              placeholder={RESET_CONFIRM_PHRASE}
+              autoComplete="off"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setResetDialogOpen(false)}
+              disabled={resetMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              data-testid="button-confirm-reset"
+              variant="destructive"
+              disabled={resetConfirmText !== RESET_CONFIRM_PHRASE || resetMutation.isPending}
+              onClick={() => resetMutation.mutate({ data: { confirm: resetConfirmText } })}
+            >
+              <Trash2 size={16} className="mr-2" />
+              {resetMutation.isPending ? "Apagando..." : "Apagar dados"}
             </Button>
           </DialogFooter>
         </DialogContent>

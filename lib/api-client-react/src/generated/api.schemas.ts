@@ -790,6 +790,12 @@ export interface Cycle {
   isCurrent: boolean;
 }
 
+export interface CreateCycleInput {
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface RankingEntry {
   position: number;
   employeeId: number;
@@ -920,6 +926,11 @@ export interface SyncResult {
   eventsSync?: number;
   employeesSync?: number;
   participantsSync?: number;
+}
+
+export interface ResetDataInput {
+  /** Must equal the exact confirmation phrase "ZERAR TUDO" */
+  confirm: string;
 }
 
 export interface CsvImportInput {

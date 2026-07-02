@@ -1776,6 +1776,16 @@ export const GetCurrentCycleResponse = zod.object({
 
 
 /**
+ * @summary Create a new cycle and mark it as current
+ */
+export const CreateCycleBody = zod.object({
+  "name": zod.string(),
+  "startDate": zod.string(),
+  "endDate": zod.string()
+})
+
+
+/**
  * @summary Get ranking (Maratona de Resultados)
  */
 export const GetRankingQueryParams = zod.object({
@@ -1913,6 +1923,22 @@ export const GetIntegrationStatusResponse = zod.object({
  * @summary Trigger external sync
  */
 export const TriggerSyncResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string(),
+  "eventsSync": zod.number().optional(),
+  "employeesSync": zod.number().optional(),
+  "participantsSync": zod.number().optional()
+})
+
+
+/**
+ * @summary Wipe operational data (events, evaluations, employees, users) keeping only the calling admin's own user and catalog config (areas, criteria, cycles, rules)
+ */
+export const ResetAllDataBody = zod.object({
+  "confirm": zod.string().describe('Must equal the exact confirmation phrase \"ZERAR TUDO\"')
+})
+
+export const ResetAllDataResponse = zod.object({
   "success": zod.boolean(),
   "message": zod.string(),
   "eventsSync": zod.number().optional(),

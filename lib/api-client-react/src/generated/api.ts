@@ -31,6 +31,7 @@ import type {
   Calibration,
   CalibrationInput,
   CloseQuarterInput,
+  CreateCycleInput,
   Criterion,
   CriterionInput,
   CriterionUpdate,
@@ -88,6 +89,7 @@ import type {
   QuarterlyResult,
   RankingDetail,
   RankingEntry,
+  ResetDataInput,
   ResetPasswordInput,
   Rule,
   RuleUpdate,
@@ -5238,6 +5240,77 @@ export function useGetCurrentCycle<TData = Awaited<ReturnType<typeof getCurrentC
 
 
 
+export const getCreateCycleUrl = () => {
+
+
+
+
+  return `/cycles`
+}
+
+/**
+ * @summary Create a new cycle and mark it as current
+ */
+export const createCycle = async (createCycleInput: CreateCycleInput, options?: RequestInit): Promise<Cycle> => {
+
+  return customFetch<Cycle>(getCreateCycleUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createCycleInput,)
+  }
+);}
+
+
+
+
+export const getCreateCycleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCycle>>, TError,{data: BodyType<CreateCycleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCycle>>, TError,{data: BodyType<CreateCycleInput>}, TContext> => {
+
+const mutationKey = ['createCycle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCycle>>, {data: BodyType<CreateCycleInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCycle(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCycleMutationResult = NonNullable<Awaited<ReturnType<typeof createCycle>>>
+    export type CreateCycleMutationBody = BodyType<CreateCycleInput>
+    export type CreateCycleMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new cycle and mark it as current
+ */
+export const useCreateCycle = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCycle>>, TError,{data: BodyType<CreateCycleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCycle>>,
+        TError,
+        {data: BodyType<CreateCycleInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCycleMutationOptions(options));
+    }
+
 export const getGetRankingUrl = (params?: GetRankingParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -5635,6 +5708,77 @@ export const useTriggerSync = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getTriggerSyncMutationOptions(options));
+    }
+
+export const getResetAllDataUrl = () => {
+
+
+
+
+  return `/integration/reset`
+}
+
+/**
+ * @summary Wipe operational data (events, evaluations, employees, users) keeping only the calling admin's own user and catalog config (areas, criteria, cycles, rules)
+ */
+export const resetAllData = async (resetDataInput: ResetDataInput, options?: RequestInit): Promise<SyncResult> => {
+
+  return customFetch<SyncResult>(getResetAllDataUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      resetDataInput,)
+  }
+);}
+
+
+
+
+export const getResetAllDataMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetAllData>>, TError,{data: BodyType<ResetDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetAllData>>, TError,{data: BodyType<ResetDataInput>}, TContext> => {
+
+const mutationKey = ['resetAllData'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetAllData>>, {data: BodyType<ResetDataInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  resetAllData(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetAllDataMutationResult = NonNullable<Awaited<ReturnType<typeof resetAllData>>>
+    export type ResetAllDataMutationBody = BodyType<ResetDataInput>
+    export type ResetAllDataMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Wipe operational data (events, evaluations, employees, users) keeping only the calling admin's own user and catalog config (areas, criteria, cycles, rules)
+ */
+export const useResetAllData = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetAllData>>, TError,{data: BodyType<ResetDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetAllData>>,
+        TError,
+        {data: BodyType<ResetDataInput>},
+        TContext
+      > => {
+      return useMutation(getResetAllDataMutationOptions(options));
     }
 
 export const getImportEventsCSVUrl = () => {

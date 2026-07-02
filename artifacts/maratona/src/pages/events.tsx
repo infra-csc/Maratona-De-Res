@@ -1,9 +1,15 @@
 import { useState } from "react";
-import { useGetEvents, useReopenEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useReopenEvent, useCreateEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
+import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Unlock, Calendar, MapPin, ChevronRight, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Search, Unlock, Calendar, MapPin, ChevronRight, Users, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -23,10 +29,12 @@ function StatusChip({ confirmed }: { confirmed: boolean }) {
 
 export default function EventsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [cardFilter, setCardFilter] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -36,6 +44,20 @@ export default function EventsPage() {
 
   const reopenMutation = useReopenEvent({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
+  });
+
+  const { register, handleSubmit, reset } = useForm<EventInput>();
+
+  const createMutation = useCreateEvent({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey });
+        toast({ title: "Evento criado" });
+        setCreateOpen(false);
+        reset();
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    },
   });
 
   // O backend já retorna apenas os eventos do ciclo atual (getEvents filtra por
@@ -53,6 +75,7 @@ export default function EventsPage() {
   });
 
   const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
+  const canCreate = user && ["admin", "rh"].includes(user.role);
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -70,6 +93,68 @@ export default function EventsPage() {
             <div className="flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] bg-[#e6e8ea] border-2 border-[#191c1e] px-4 py-3 skew-x-[-4deg]">
               <span className="inline-block skew-x-[4deg]">Eventos sincronizados via integração</span>
             </div>
+            {canCreate && (
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <button
+                    data-testid="button-create-event"
+                    className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                  >
+                    <Plus size={18} /> Novo Evento
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Evento</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome do Evento <span className="text-[#ba1a1a]">*</span></Label>
+                      <Input data-testid="input-event-name" {...register("name", { required: true })} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cliente</Label>
+                      <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Início <span className="text-[#ba1a1a]">*</span></Label>
+                        <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Fim <span className="text-[#ba1a1a]">*</span></Label>
+                        <Input data-testid="input-event-end" type="date" {...register("endDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cidade</Label>
+                        <Input data-testid="input-event-city" {...register("city")} placeholder="Ex: São Paulo" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">UF</Label>
+                        <Input data-testid="input-event-state" {...register("state")} placeholder="Ex: SP" maxLength={2} className="h-11 rounded-none border-2 border-[#191c1e] uppercase" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Local</Label>
+                      <Input data-testid="input-event-location" {...register("location")} placeholder="Ex: Pavilhão de Exposições" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+                      <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+                      <button
+                        data-testid="button-submit-event"
+                        type="submit"
+                        disabled={createMutation.isPending}
+                        className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                      >
+                        {createMutation.isPending ? "Criando..." : "Criar Evento"}
+                      </button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </section>
 
