@@ -184,6 +184,7 @@ export interface Event {
   teamScore?: number | null;
   hasCalibration?: boolean;
   criteriaConfirmed?: boolean;
+  feedbackReleased?: boolean;
   createdAt?: string;
 }
 
@@ -292,6 +293,7 @@ export interface EventDetail {
   forcedCloseReason?: string | null;
   criteriaConfirmed?: boolean;
   hasEvaluations?: boolean;
+  feedbackReleased?: boolean;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   areaAssignments?: EventAreaAssignment[];
@@ -467,6 +469,8 @@ export interface Calibration {
   /** @nullable */
   calibratedByName?: string | null;
   calibratedAt?: string;
+  /** @nullable */
+  warnings?: string[] | null;
 }
 
 export interface CalibrationInput {

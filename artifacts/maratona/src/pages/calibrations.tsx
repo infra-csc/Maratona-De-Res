@@ -70,9 +70,15 @@ export default function CalibrationsPage() {
 
   const createMutation = useCreateCalibration({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: calQKey });
-        toast({ title: "Calibração registrada" });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        qc.invalidateQueries({ queryKey: fbQKey });
+        if (data.warnings && data.warnings.length > 0) {
+          toast({ title: "Calibração registrada", description: data.warnings.join(" "), variant: "destructive" });
+        } else {
+          toast({ title: "Calibração registrada" });
+        }
         setSavingCritId(null);
       },
       onError: (e: { message?: string }) => {
@@ -204,9 +210,10 @@ export default function CalibrationsPage() {
     let ok = 0;
     const failed: number[] = [];
     let firstError: string | null = null;
+    const allWarnings: string[] = [];
     for (const x of toSave) {
       try {
-        await bulkMutation.mutateAsync({
+        const result = await bulkMutation.mutateAsync({
           data: {
             eventId: selectedEventId!,
             criterionId: x.critId,
@@ -215,6 +222,7 @@ export default function CalibrationsPage() {
             originalAverageScore: getAvgScore(x.critId) ?? undefined,
           },
         });
+        if (result.warnings) allWarnings.push(...result.warnings);
         ok++;
       } catch (e) {
         failed.push(x.critId);
@@ -223,8 +231,15 @@ export default function CalibrationsPage() {
     }
     setSavingAll(false);
     qc.invalidateQueries({ queryKey: calQKey });
+    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    qc.invalidateQueries({ queryKey: fbQKey });
+    const uniqueWarnings = Array.from(new Set(allWarnings));
     if (failed.length === 0) {
-      toast({ title: `${ok} calibraç${ok === 1 ? "ão salva" : "ões salvas"}` });
+      toast({
+        title: `${ok} calibraç${ok === 1 ? "ão salva" : "ões salvas"}`,
+        description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined,
+        variant: uniqueWarnings.length > 0 ? "destructive" : undefined,
+      });
     } else {
       toast({ title: `${ok} salva(s), ${failed.length} com erro`, description: firstError ?? "Revise os critérios destacados e tente novamente.", variant: "destructive" });
     }
@@ -262,6 +277,8 @@ export default function CalibrationsPage() {
     }
     setSavingAll(false);
     qc.invalidateQueries({ queryKey: calQKey });
+    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    qc.invalidateQueries({ queryKey: fbQKey });
     if (failed.length === 0) {
       toast({ title: `${ok} calibraç${ok === 1 ? "ão enviada" : "ões enviadas"}`, description: "Pronto para fechar o evento e liberar as notas." });
       setFinalizeOpen(true);
@@ -391,6 +408,9 @@ export default function CalibrationsPage() {
                   <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${statusChip(pickedEvent.status).cls}`}>
                     <span className="inline-block skew-x-[8deg]">{statusChip(pickedEvent.status).label}</span>
                   </span>
+                  <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${alreadyReleased ? "bg-[#191c1e] text-[#ccff00]" : "bg-[#ffb5a0] text-[#3b0900]"}`}>
+                    <span className="inline-block skew-x-[8deg]">{alreadyReleased ? "Avaliação Final" : "Avaliação Parcial"}</span>
+                  </span>
                 </div>
               </div>
             )}
@@ -401,17 +421,25 @@ export default function CalibrationsPage() {
               </div>
             )}
 
-            {alreadyClosed && (
-              <div className="bg-[#d8dadc] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
-                <Lock size={20} className="text-[#444933] shrink-0" />
+            {alreadyReleased ? (
+              <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#ccff00]">
+                <CheckCircle size={20} className="text-[#ccff00] shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">Evento Fechado</p>
-                  <p className="text-[11px] font-bold italic uppercase text-[#444933] leading-tight">Este evento foi encerrado. As calibrações estão bloqueadas para edição.</p>
+                  <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Avaliação Final — notas liberadas</p>
+                  <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">Os funcionários já veem estas notas. Ajustes ainda são possíveis e recalculam os resultados automaticamente.</p>
+                </div>
+              </div>
+            ) : alreadyClosed && (
+              <div className="bg-[#d8dadc] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
+                <Info size={20} className="text-[#444933] shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">Avaliação Parcial — evento fechado</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#444933] leading-tight">As notas ainda não foram liberadas aos funcionários. Você pode continuar ajustando a calibração.</p>
                 </div>
               </div>
             )}
 
-            {activeCriteria.length > 0 && !alreadyReleased && !alreadyClosed && (
+            {activeCriteria.length > 0 && !alreadyReleased && (
               <div className="sticky top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
                 <div className="flex items-center gap-3 min-w-0">
                   <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
@@ -566,7 +594,6 @@ export default function CalibrationsPage() {
                               setCalScores(prev => ({ ...prev, [c.criterionId]: val }));
                             }}
                             placeholder="—"
-                            disabled={alreadyReleased || alreadyClosed}
                             className="h-11 mt-1 w-full px-3 border-2 border-[#191c1e] text-lg font-black italic disabled:opacity-60 disabled:bg-[#eceef0] focus:outline-none focus:ring-2 focus:ring-[#ccff00] focus:ring-offset-2 focus:ring-offset-[#fbfcfd]"
                           />
                         </div>
@@ -578,24 +605,21 @@ export default function CalibrationsPage() {
                             onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
                             placeholder="Por que a nota original foi alterada?"
                             rows={2}
-                            disabled={alreadyReleased || alreadyClosed}
                             className="mt-1 rounded-none border-2 border-[#191c1e] resize-none disabled:opacity-60 disabled:bg-[#eceef0]"
                           />
                         </div>
                       </div>
-                      {!alreadyReleased && !alreadyClosed && (
-                        <div className="mt-3 flex items-center justify-end">
-                          <button
-                            data-testid={`button-save-cal-${c.criterionId}`}
-                            type="button"
-                            disabled={isSaving || savingAll}
-                            onClick={() => saveCalibration(c.criterionId)}
-                            className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
-                          >
-                            <Save size={16} /> {isSaving ? "Salvando..." : cal ? "Atualizar Calibração" : "Salvar Calibração"}
-                          </button>
-                        </div>
-                      )}
+                      <div className="mt-3 flex items-center justify-end">
+                        <button
+                          data-testid={`button-save-cal-${c.criterionId}`}
+                          type="button"
+                          disabled={isSaving || savingAll}
+                          onClick={() => saveCalibration(c.criterionId)}
+                          className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
+                        >
+                          <Save size={16} /> {isSaving ? "Salvando..." : cal ? "Atualizar Calibração" : "Salvar Calibração"}
+                        </button>
+                      </div>
                       {cal && (
                         <div className="mt-3 text-xs italic text-[#444933] bg-[#f2f4f6] border-l-4 border-[#ff5722] p-3 relative">
                           <AlertCircle size={12} className="text-[#ff5722] absolute top-2 right-2" />
@@ -615,16 +639,25 @@ export default function CalibrationsPage() {
                   <div className="flex items-center gap-3 min-w-0">
                     <CheckCircle size={26} className="shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-base font-black italic uppercase tracking-tight leading-tight">Evento finalizado</p>
-                      <p className="text-xs font-bold italic uppercase text-[#ccff00]/70 leading-tight">As notas já foram liberadas para os funcionários.</p>
+                      <p className="text-base font-black italic uppercase tracking-tight leading-tight">Avaliação Final — evento finalizado</p>
+                      <p className="text-xs font-bold italic uppercase text-[#ccff00]/70 leading-tight">As notas já foram liberadas para os funcionários. Qualquer recalibração acima é aplicada imediatamente.</p>
                     </div>
                   </div>
+                  <button
+                    data-testid="button-save-all-cal-released"
+                    type="button"
+                    disabled={savingAll || fillableCount === 0}
+                    onClick={saveAllCalibrations}
+                    className="bg-[#ccff00] text-[#161e00] border-2 border-[#161e00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-all enabled:hover:bg-white"
+                  >
+                    <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Ajustes${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                  </button>
                 </div>
               ) : readyToFinalize ? (
                 <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-5 flex items-center gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
                   <CheckCircle size={26} className="text-[#ccff00] shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-base font-black italic uppercase tracking-tight leading-tight">{alreadyClosed ? "Evento fechado — notas não liberadas" : "Todas as calibrações salvas"}</p>
+                    <p className="text-base font-black italic uppercase tracking-tight leading-tight">{alreadyClosed ? "Avaliação Parcial — falta liberar as notas" : "Todas as calibrações salvas"}</p>
                     <p className="text-xs font-bold italic uppercase text-white/60 leading-tight">{alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}</p>
                   </div>
                 </div>

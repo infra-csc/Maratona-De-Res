@@ -41,6 +41,7 @@ interface EventSummary {
   location: string | null;
   startDate: string;
   status: string;
+  feedbackReleased?: boolean;
   eventScore: number;
   projectedPlatoon: string | null;
   projectedPlatoonColor: string | null;
@@ -77,7 +78,7 @@ function EventCard({ event }: { event: EventSummary }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-[10px] font-bold uppercase italic px-2 py-0.5 bg-[#ccff00] text-[#191c1e] border-2 border-[#191c1e]">
-                {event.status === "closed" ? "Avaliado" : "Em avaliação"}
+                {event.feedbackReleased ? "Avaliação Final" : "Avaliação Parcial"}
               </span>
             </div>
             <p className="font-bold text-base truncate text-[#191c1e]">{event.eventName}</p>

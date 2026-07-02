@@ -389,6 +389,7 @@ export const GetEventsResponseItem = zod.object({
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -431,6 +432,7 @@ export const GetEventResponse = zod.object({
   "forcedCloseReason": zod.string().nullish(),
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -536,6 +538,7 @@ export const UpdateEventResponse = zod.object({
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -583,6 +586,7 @@ export const CloseEventResponse = zod.object({
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -617,6 +621,7 @@ export const ReopenEventResponse = zod.object({
   "teamScore": zod.number().nullish(),
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -898,6 +903,7 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "forcedCloseReason": zod.string().nullish(),
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -989,6 +995,7 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "forcedCloseReason": zod.string().nullish(),
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -1090,6 +1097,7 @@ export const DeleteEventCriterionResponse = zod.object({
   "forcedCloseReason": zod.string().nullish(),
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -1346,7 +1354,8 @@ export const GetCalibrationsResponseItem = zod.object({
   "calibrationReason": zod.string().nullish(),
   "calibratedByUserId": zod.number().optional(),
   "calibratedByName": zod.string().nullish(),
-  "calibratedAt": zod.string().optional()
+  "calibratedAt": zod.string().optional(),
+  "warnings": zod.array(zod.string()).nullish()
 })
 export const GetCalibrationsResponse = zod.array(GetCalibrationsResponseItem)
 

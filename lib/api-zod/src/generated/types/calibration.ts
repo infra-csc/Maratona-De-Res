@@ -23,4 +23,6 @@ export interface Calibration {
   /** @nullable */
   calibratedByName?: string | null;
   calibratedAt?: string;
+  /** @nullable */
+  warnings?: string[] | null;
 }

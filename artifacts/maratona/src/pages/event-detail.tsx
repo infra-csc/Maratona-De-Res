@@ -299,14 +299,14 @@ export default function EventDetailPage() {
               </div>
 
               {result && result.eventScore > 0 && (() => {
-                const concluded = event.status === "closed";
+                const concluded = !!event.feedbackReleased;
                 const calibrated = (result.criteriaDetails ?? []).some(c => c.calibratedScore != null);
                 const displayScore = (result.conformityScore != null ? result.conformityScore : result.eventScore) as number;
                 const hasPenalty = (result.conformityPenalty ?? 0) > 0;
                 return (
                 <div className={`shrink-0 border-2 border-[#191c1e] p-6 flex flex-col items-center justify-center min-w-[160px] -skew-x-6 ${hasPenalty ? "bg-[#ffb300]" : "bg-[#ccff00]"}`}>
                   <div className="skew-x-6 flex flex-col items-center">
-                    <span className="text-[10px] font-black italic uppercase tracking-widest text-[#161e00] mb-1">{concluded ? "Score Final" : "Score Provisório"}</span>
+                    <span className="text-[10px] font-black italic uppercase tracking-widest text-[#161e00] mb-1">{concluded ? "Avaliação Final" : "Avaliação Parcial"}</span>
                     <div className="flex items-baseline gap-1">
                       <span className="text-5xl font-black italic text-[#161e00] leading-none">{fmt(displayScore)}</span>
                       <span className="text-sm font-black italic text-[#506600]">/100</span>

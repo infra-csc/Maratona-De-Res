@@ -27,11 +27,15 @@ runs calibration + finalization end-to-end; if any one of those three routes
 omits diretoria, the finalize flow breaks mid-way for them. Keep the three in
 lockstep when changing roles.
 
-**"Concluded" signal = `event.status === "closed"`**, NOT the presence of any
-calibration. A single calibrated criterion does not make an event final, and an
-event can be force-closed without calibration. UI that distinguishes
-provisional vs final score (e.g. events list card) must key the final/concluded
-state off `status === "closed"`; use `hasCalibration` only to refine wording.
+**"Final" signal (viewer-facing) = `event.feedbackReleased`**, NOT
+`status === "closed"` and NOT calibration presence. As of 2026-07,
+calibrations are never permanently locked: admin/rh/diretoria can recalibrate
+a criterion at any time, including after close and after release (recompute
+runs inline when the event is closed; audit action becomes
+`recalibrate_released` post-release). So "closed" is just a normal, still-
+editable state — only "released" means the score is shown to employees and
+labeled final. Any UI badge distinguishing "Avaliação Parcial" (provisional)
+vs "Avaliação Final" must key off `feedbackReleased`, not `status`.
 
 **Team-score parity:** the events list (`GET /events`) computes `teamScore` +
 `hasCalibration` in-memory (bulk `inArray` fetch, no per-event N+1) and MUST

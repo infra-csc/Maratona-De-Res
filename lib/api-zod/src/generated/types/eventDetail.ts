@@ -32,6 +32,7 @@ export interface EventDetail {
   forcedCloseReason?: string | null;
   criteriaConfirmed?: boolean;
   hasEvaluations?: boolean;
+  feedbackReleased?: boolean;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   areaAssignments?: EventAreaAssignment[];

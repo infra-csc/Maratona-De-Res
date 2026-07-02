@@ -36,5 +36,6 @@ export interface Event {
   teamScore?: number | null;
   hasCalibration?: boolean;
   criteriaConfirmed?: boolean;
+  feedbackReleased?: boolean;
   createdAt?: string;
 }

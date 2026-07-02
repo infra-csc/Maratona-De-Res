@@ -265,6 +265,14 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     // Preserva decisões de pagamento já acionadas manualmente.
     const prev = paymentByEmployee.get(employeeId);
     const keepPayment = !!prev && (!!prev.paidAt || PRESERVE_STATUSES.includes(prev.bonusStatus));
+    // Uma recalibração pode mudar o bônus calculado mesmo com o pagamento já
+    // decidido (aprovado/agendado/pago) — o status é preservado, mas o valor
+    // recalculado pode divergir do que já foi (ou será) efetivamente pago.
+    if (keepPayment && Math.abs(bonusValue - parseFloat(prev!.bonusValue as unknown as string)) > 0.01) {
+      warnings.push(
+        `${employee.name}: bônus recalculado para R$ ${bonusValue.toFixed(2)} diverge do valor com status "${prev!.bonusStatus}" (R$ ${parseFloat(prev!.bonusValue as unknown as string).toFixed(2)}). Revise o pagamento.`
+      );
+    }
 
     quarterlyInserts.push({
       employeeId,

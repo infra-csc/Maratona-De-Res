@@ -1978,6 +1978,8 @@ components:
           type: boolean
         criteriaConfirmed:
           type: boolean
+        feedbackReleased:
+          type: boolean
         createdAt:
           type: string
 
@@ -2014,6 +2016,8 @@ components:
         criteriaConfirmed:
           type: boolean
         hasEvaluations:
+          type: boolean
+        feedbackReleased:
           type: boolean
         participants:
           type: array
@@ -2414,6 +2418,10 @@ components:
           type: ["string", "null"]
         calibratedAt:
           type: string
+        warnings:
+          type: ["array", "null"]
+          items:
+            type: string
 
     CalibrationInput:
       type: object
