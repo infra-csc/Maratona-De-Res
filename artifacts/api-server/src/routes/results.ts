@@ -358,7 +358,8 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
   });
 });
 
-router.get("/results/quarterly", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+router.get("/results/quarterly", async (req, res) => {
+  const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const { employeeId, platoon } = req.query;
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json([]); return; }
@@ -404,7 +405,12 @@ router.get("/results/quarterly", requireRole("admin", "rh", "diretoria"), async 
     absencePenalty: parseFloat(r.absencePenalty),
     meritPoints: parseFloat(r.meritPoints),
     finalResult: parseFloat(r.finalResult),
-    bonusValue: parseFloat(r.bonusValue),
+    bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
+    bonusStatus: isManager ? r.bonusStatus : null,
+    paymentMethod: isManager ? r.paymentMethod : null,
+    paymentDueDate: isManager ? r.paymentDueDate : null,
+    paidAt: isManager ? r.paidAt : null,
+    paymentNotes: isManager ? r.paymentNotes : null,
     eventBreakdown: [],
   })));
 });

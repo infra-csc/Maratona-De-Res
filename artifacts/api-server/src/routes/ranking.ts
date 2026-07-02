@@ -15,6 +15,7 @@ router.use(requireAuth);
 
 router.get("/ranking", async (req, res) => {
   const { search } = req.query;
+  const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json([]); return; }
 
@@ -49,7 +50,7 @@ router.get("/ranking", async (req, res) => {
     finalResult: parseFloat(r.finalResult),
     platoon: r.platoon,
     platoonColor: r.platoonColor,
-    bonusValue: parseFloat(r.bonusValue),
+    bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
     eligible: r.eligible,
     eventsCount: r.eventsCount,
     participatedEventsCount: r.participatedEventsCount,
@@ -60,9 +61,11 @@ router.get("/ranking", async (req, res) => {
 /**
  * Detalhe do colaborador no ranking (drill-down).
  * Mostra como foi nas provas (nota do time por evento) + penalidades + méritos.
- * Restrito aos gestores.
+ * Disponível para todos os papéis autenticados; o valor do bônus (dado financeiro)
+ * só é retornado para gestores (admin/rh/diretoria).
  */
-router.get("/ranking-detail", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+router.get("/ranking-detail", async (req, res) => {
+  const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const employeeId = parseInt(req.query.employeeId as string);
   if (!employeeId) { res.status(400).json({ error: "employeeId obrigatório" }); return; }
   const cycle = await getCurrentCycle();
@@ -213,7 +216,7 @@ router.get("/ranking-detail", requireRole("admin", "rh", "diretoria"), async (re
       meritPoints,
       platoon: quarterResult?.platoon ?? null,
       platoonColor: quarterResult?.platoonColor ?? null,
-      bonusValue: quarterResult ? parseFloat(quarterResult.bonusValue as unknown as string) : null,
+      bonusValue: isManager && quarterResult ? parseFloat(quarterResult.bonusValue as unknown as string) : null,
       eventsCount: events.length,
       isQuarterClosed: !!quarterResult,
     },

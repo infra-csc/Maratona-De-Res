@@ -649,7 +649,7 @@ function EmployeeDetailSheet({
 /* CONSOLIDAÇÃO TAB                                                    */
 /* ------------------------------------------------------------------ */
 
-function ConsolidationTab() {
+function ConsolidationTab({ isManager }: { isManager: boolean }) {
   const { toast } = useToast();
   const { data: results, isLoading } = useGetQuarterlyResults(undefined, {
     query: { queryKey: getGetQuarterlyResultsQueryKey() },
@@ -710,15 +710,17 @@ function ConsolidationTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <button
-          data-testid="button-export-consolidation"
-          onClick={handleExport}
-          className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-        >
-          <Download size={15} /> Exportar
-        </button>
-      </div>
+      {isManager && (
+        <div className="flex justify-end">
+          <button
+            data-testid="button-export-consolidation"
+            onClick={handleExport}
+            className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+          >
+            <Download size={15} /> Exportar
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-20 text-[#747a60] italic uppercase font-bold">Carregando consolidação...</div>
@@ -1285,33 +1287,33 @@ export default function ResultsPage() {
           <CycleBadge />
         </section>
 
-        {isManager ? (
-          <Tabs value={tab} onValueChange={setTab} className="space-y-8">
-            <TabsList className="bg-white border-2 border-[#191c1e] rounded-none p-1 h-auto flex-wrap gap-1">
-              <TabsTrigger value="ranking" data-testid="tab-ranking" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
-                <ListOrdered size={15} /> Ranking
-              </TabsTrigger>
-              <TabsTrigger value="consolidacao" data-testid="tab-consolidacao" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
-                <Table2 size={15} /> Consolidação
-              </TabsTrigger>
+        <Tabs value={tab} onValueChange={setTab} className="space-y-8">
+          <TabsList className="bg-white border-2 border-[#191c1e] rounded-none p-1 h-auto flex-wrap gap-1">
+            <TabsTrigger value="ranking" data-testid="tab-ranking" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
+              <ListOrdered size={15} /> Ranking
+            </TabsTrigger>
+            <TabsTrigger value="consolidacao" data-testid="tab-consolidacao" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
+              <Table2 size={15} /> Consolidação
+            </TabsTrigger>
+            {isManager && (
               <TabsTrigger value="bonus" data-testid="tab-bonus" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
                 <Wallet size={15} /> Bônus &amp; Pagamentos
               </TabsTrigger>
-            </TabsList>
+            )}
+          </TabsList>
 
-            <TabsContent value="ranking" className="mt-0">
-              <RankingTab canViewDetail={isManager} />
-            </TabsContent>
-            <TabsContent value="consolidacao" className="mt-0">
-              <ConsolidationTab />
-            </TabsContent>
+          <TabsContent value="ranking" className="mt-0">
+            <RankingTab canViewDetail={true} />
+          </TabsContent>
+          <TabsContent value="consolidacao" className="mt-0">
+            <ConsolidationTab isManager={isManager} />
+          </TabsContent>
+          {isManager && (
             <TabsContent value="bonus" className="mt-0">
               <PaymentsTab canManage={canManage} />
             </TabsContent>
-          </Tabs>
-        ) : (
-          <RankingTab canViewDetail={false} />
-        )}
+          )}
+        </Tabs>
       </div>
     </div>
   );

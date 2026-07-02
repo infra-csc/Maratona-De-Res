@@ -52,8 +52,12 @@ router.use(rankingRouter);
 router.use(myPerformanceRouter);
 router.use(feedbackRouter);
 router.use(eligibilityRouter);
+// exportsRouter mounted early for the same reason as storageRouter/cyclesRouter:
+// it must come BEFORE auditRouter/integrationRouter (blanket requireRole("admin","rh")),
+// otherwise those guards 403 the non-manager-accessible exports
+// (/exports/ranking, /exports/event-results, /exports/absences).
+router.use(exportsRouter);
 router.use(auditRouter);
 router.use(integrationRouter);
-router.use(exportsRouter);
 
 export default router;

@@ -28,5 +28,7 @@ sub-router's declared routes.
   (requireAuth on POST upload-url; public GET for `<audio>` playback).
 - Better long-term fix (NOT yet done): mount guarded routers with explicit path
   prefixes (`router.use("/audit", auditRouter)`) or apply `requireRole` per-endpoint
-  instead of blanket `router.use`. Until then, `exports`, `my-performance`,
-  `feedback`, `eligibility` remain shadowed for non-admin/rh (pre-existing).
+  instead of blanket `router.use`. `exports` was moved before audit/integration
+  (2026-07-02) because it has non-admin/rh-accessible routes; `my-performance`,
+  `feedback`, `eligibility` are already mounted earlier and unaffected. Re-check this
+  ordering any time a new router adds a non-manager-facing route mounted after audit/integration.

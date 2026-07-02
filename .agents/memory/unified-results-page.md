@@ -11,9 +11,15 @@ tabbed page at `/results` (artifacts/maratona/src/pages/results.tsx). `pages/ran
 - `/ranking` redirects to `/results`.
 - Sidebar has a single "Resultados & Ranking" → /results item, visible to all; diretoria visibility list keeps /results (dropped /ranking).
 
-**Tab gating:** isManager = admin|rh|diretoria sees 3 tabs (Ranking · Consolidação · Bônus & Pagamentos);
-non-managers see only the Ranking tab. canManage = admin|rh gates close-cycle + payment edits.
-Ranking detail drawer (penalties/merits/bonus) opens only for managers (canViewDetail).
+**Tab gating (corrected 2026-07-02):** Ranking and Consolidação are visible to ALL authenticated roles.
+Only "Bônus & Pagamentos" is gated to isManager = admin|rh|diretoria. canManage = admin|rh gates
+close-cycle + payment edits. The ranking detail drawer opens for all roles (canViewDetail always true) —
+it shows team scores/penalties/merits, which are not financial data.
 
-**Why:** Ranking is public-ish; Consolidação and Bônus expose team scores/financials → must be manager-only,
-backed by server-side requireRole on the underlying endpoints (see confidential-endpoint-gating.md), not just the hidden tabs.
+**Why:** only bônus/payment VALUES are confidential (financial data), not the scores or the fact that a
+consolidation/ranking exists. The financial redaction must happen server-side per request, not via hiding
+a tab: `/ranking`, `/ranking-detail`, `/results/quarterly`, and `/exports/ranking` all now check
+`isManager = admin|rh|diretoria` per-request and null-out/zero bonusValue + payment fields for non-managers
+instead of blocking the whole endpoint with `requireRole`. `/exports/quarterly-results` (full CSV export
+with bonus column) and the Bônus tab's write endpoints remain fully manager-only.
+See confidential-endpoint-gating.md for the general principle.

@@ -43,7 +43,8 @@ router.get("/exports/quarterly-results", requireRole("admin", "rh", "diretoria")
   res.json({ filename: `resultados-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows as never) });
 });
 
-router.get("/exports/ranking", async (_req, res) => {
+router.get("/exports/ranking", async (req, res) => {
+  const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json({ filename: `ranking.csv`, data: "" }); return; }
 
@@ -59,14 +60,17 @@ router.get("/exports/ranking", async (_req, res) => {
     .where(eq(quarterlyResultsTable.cycleId, cycle.id));
 
   const sorted = results.sort((a, b) => parseFloat(b.finalResult) - parseFloat(a.finalResult));
-  const rows = sorted.map((r, i) => ({
-    "Posição": i + 1,
-    "Ciclo": cycle.name,
-    "Nome": r.employeeName,
-    "Resultado Final": r.finalResult,
-    "Pelotão": r.platoon ?? "",
-    "Bônus Caju (R$)": r.bonusValue,
-  }));
+  const rows = sorted.map((r, i) => {
+    const row: Record<string, unknown> = {
+      "Posição": i + 1,
+      "Ciclo": cycle.name,
+      "Nome": r.employeeName,
+      "Resultado Final": r.finalResult,
+      "Pelotão": r.platoon ?? "",
+    };
+    if (isManager) row["Bônus Caju (R$)"] = r.bonusValue;
+    return row;
+  });
 
   res.json({ filename: `ranking-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows) });
 });
