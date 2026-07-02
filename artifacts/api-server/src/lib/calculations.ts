@@ -147,21 +147,40 @@ export function calculateBonusByScore(score: number, rules: PlatoonRuleData[]): 
 }
 
 /**
- * Bônus do Simulador: valor base da faixa (para o mínimo de eventos exigido)
- * somado ao bônus por evento extra × quantidade de eventos além do mínimo.
- * Sem teto — cada evento extra soma linearmente o valor da faixa atual.
+ * Bônus do Simulador: valor base da faixa da nota geral (para o mínimo de
+ * eventos exigido) somado ao bônus de CADA evento adicional (além do mínimo).
+ * Os eventos adicionais são sempre os últimos cronologicamente (a partir do
+ * evento de nº mínimo+1); cada um usa a NOTA DAQUELE evento específico para
+ * definir sua própria faixa e o valor de "bônus por evento adicional" dela —
+ * não a faixa da nota geral. Sem teto — soma linear por evento extra.
  */
 export function calculateTieredBonus(
   score: number,
-  participatedEvents: number,
-  minEvents: number,
+  extraEventScores: number[],
   rules: PlatoonRuleData[],
 ): number {
   const platoon = getPlatoonByScore(score, rules);
   if (!platoon) return 0;
-  const extraEvents = Math.max(0, participatedEvents - minEvents);
-  const perExtra = platoon.bonusPerExtraEvent ?? 0;
-  return Math.round((platoon.bonusValue + extraEvents * perExtra) * 100) / 100;
+  let extraBonus = 0;
+  for (const extraScore of extraEventScores) {
+    const extraPlatoon = getPlatoonByScore(extraScore, rules);
+    extraBonus += extraPlatoon?.bonusPerExtraEvent ?? 0;
+  }
+  return Math.round((platoon.bonusValue + extraBonus) * 100) / 100;
+}
+
+/**
+ * Dado o conjunto de eventos pontuados (com nota e data) de um colaborador,
+ * separa os eventos "base" (os primeiros, cronologicamente, até o mínimo
+ * exigido) dos "adicionais" (os últimos, a partir do evento de nº mínimo+1).
+ * Eventos sem data conhecida não entram na ordenação de extras.
+ */
+export function selectExtraEventScores(
+  scoredEvents: { score: number; date: string }[],
+  minEvents: number,
+): number[] {
+  const sorted = [...scoredEvents].sort((a, b) => a.date.localeCompare(b.date));
+  return sorted.slice(minEvents).map(e => e.score);
 }
 
 /**

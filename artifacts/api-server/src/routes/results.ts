@@ -9,8 +9,8 @@ import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import {
   calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
-  calculateTieredBonus, validateCalculationExample, calculateConformitySubtotal, calculateConformityPenalty,
-  calculateFinalEventScore, validateConformityCalculationExample,
+  calculateTieredBonus, selectExtraEventScores, validateCalculationExample, calculateConformitySubtotal,
+  calculateConformityPenalty, calculateFinalEventScore, validateConformityCalculationExample,
 } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
@@ -163,10 +163,12 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
 
   // 1. Nota do TIME de cada evento fechado + linhas por evento.
   const eventScoreById = new Map<number, number>();
+  const eventDateById = new Map<number, string>();
   const eventResultInserts: (typeof employeeEventResultsTable.$inferInsert)[] = [];
   for (const ev of closedEvents) {
     const team = await computeEventTeamResult(ev.id);
     eventScoreById.set(ev.id, team.conformityScore);
+    eventDateById.set(ev.id, ev.startDate);
     const platoonProj = getPlatoonByScore(team.conformityScore, platoonRules);
 
     const eventParticipants = await db.select({ employeeId: eventParticipantsTable.employeeId })
@@ -208,10 +210,15 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
 
     // Eventos COM NOTA (score > 0) dentre os fechados que o colaborador participou.
     const eventScores: number[] = [];
+    const scoredEventsWithDate: { score: number; date: string }[] = [];
     for (const eventId of eventSet) {
       if (!closedEventIds.has(eventId)) continue;
       const s = eventScoreById.get(eventId);
-      if (s !== undefined && s > 0) eventScores.push(s);
+      if (s !== undefined && s > 0) {
+        eventScores.push(s);
+        const date = eventDateById.get(eventId);
+        if (date) scoredEventsWithDate.push({ score: s, date });
+      }
     }
     const scoredCount = eventScores.length;
     const scoreSum = Math.round(eventScores.reduce((a, b) => a + b, 0) * 100) / 100;
@@ -251,7 +258,8 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
       eligibilityReason = `Participou de ${participatedCount} de ${minEvents} eventos exigidos no ciclo`;
     }
 
-    const bonusValue = eligible ? calculateTieredBonus(finalResult, participatedCount, minEvents, platoonRules) : 0;
+    const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEvents) : [];
+    const bonusValue = eligible ? calculateTieredBonus(finalResult, extraEventScores, platoonRules) : 0;
     const autoStatus = eligible ? "projected" : "not_eligible";
 
     // Preserva decisões de pagamento já acionadas manualmente.
