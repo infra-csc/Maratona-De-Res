@@ -9,24 +9,27 @@ const router = Router();
 router.use(requireAuth);
 
 /**
- * Catálogo de penalidades (matriz de pontuação). Pontos fixos por tipo,
- * subtraídos da nota final (com clamp 0-100): Falta não justificada = 50,
- * Atraso = 10. (`points` segue como `number | null` por compatibilidade.)
+ * Catálogo de penalidades (matriz de pontuação oficial). Pontos fixos por
+ * tipo, subtraídos da nota final (com clamp 0-100): Ausência Não Comunicada
+ * = 50, Atraso > 30 Minutos = 10. (`points` segue `number | null` por
+ * compatibilidade.)
  */
 export const PENALTY_CATALOG: Record<string, { label: string; points: number | null }> = {
-  falta: { label: "Falta não justificada", points: 50 },
-  atraso: { label: "Atraso", points: 10 },
+  falta: { label: "Ausência Não Comunicada", points: 50 },
+  atraso: { label: "Atraso > 30 Minutos", points: 10 },
 };
 
 /**
- * Catálogo de méritos. Pontos positivos somados à nota final (com clamp 0-100).
- * Lançados manualmente pelo RH/admin. `merito_galpao` é por ciclo (sem evento);
- * `merito_evento` é eventual (por evento); `colega_top` reconhece indicação
- * de colega destaque (eventual, por evento).
+ * Catálogo de méritos (Pontos por Desempenho, matriz oficial). Pontos
+ * positivos somados à nota final (com clamp 0-100). Lançados manualmente
+ * pelo RH/admin. `merito_galpao` = Rei do Galpão, ao fim do período (por
+ * ciclo, sem evento); `merito_evento` = Estrela do Evento, ação
+ * extraordinária na prova; `colega_top` = Colega Top, postura exemplar na
+ * prova.
  */
 export const MERIT_CATALOG: Record<string, { label: string; points: number }> = {
-  merito_galpao: { label: "Mérito Galpão", points: 50 },
-  merito_evento: { label: "Mérito Evento", points: 25 },
+  merito_galpao: { label: "Rei do Galpão", points: 50 },
+  merito_evento: { label: "Estrela do Evento", points: 25 },
   colega_top: { label: "Colega Top", points: 10 },
 };
 

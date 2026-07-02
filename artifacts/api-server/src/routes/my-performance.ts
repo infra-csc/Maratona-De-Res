@@ -9,6 +9,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
+import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -214,7 +215,7 @@ router.get("/my-performance", async (req, res) => {
     .map(a => ({
       id: a.id,
       kind: a.kind === "merit" ? "merit" : "penalty",
-      penaltyType: a.penaltyType,
+      penaltyType: MERIT_CATALOG[a.penaltyType]?.label ?? PENALTY_CATALOG[a.penaltyType]?.label ?? a.penaltyType,
       points: a.points,
       quantity: a.quantity,
       totalPoints: Math.round(a.points * a.quantity * 100) / 100,
