@@ -712,9 +712,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/EventCriterion"
+                type: object
+                required: [criteria]
+                properties:
+                  criteria:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EventCriterion"
+                  warnings:
+                    type: array
+                    items:
+                      type: string
 
   /events/{id}/assignments:
     put:

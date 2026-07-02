@@ -92,6 +92,7 @@ import type {
   Rule,
   RuleUpdate,
   SyncResult,
+  UpdateEventCriteria200,
   UploadUrlRequest,
   UploadUrlResponse,
   User,
@@ -2716,9 +2717,9 @@ export const getUpdateEventCriteriaUrl = (id: number,) => {
  * @summary Update event active criteria
  */
 export const updateEventCriteria = async (id: number,
-    eventCriteriaUpdate: EventCriteriaUpdate, options?: RequestInit): Promise<EventCriterion[]> => {
+    eventCriteriaUpdate: EventCriteriaUpdate, options?: RequestInit): Promise<UpdateEventCriteria200> => {
 
-  return customFetch<EventCriterion[]>(getUpdateEventCriteriaUrl(id),
+  return customFetch<UpdateEventCriteria200>(getUpdateEventCriteriaUrl(id),
   {
     ...options,
     method: 'PUT',

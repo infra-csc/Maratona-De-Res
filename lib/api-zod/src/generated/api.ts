@@ -855,7 +855,8 @@ export const UpdateEventCriteriaBody = zod.object({
 }))
 })
 
-export const UpdateEventCriteriaResponseItem = zod.object({
+export const UpdateEventCriteriaResponse = zod.object({
+  "criteria": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
   "criterionId": zod.number(),
@@ -869,8 +870,9 @@ export const UpdateEventCriteriaResponseItem = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional()
+})),
+  "warnings": zod.array(zod.string()).optional()
 })
-export const UpdateEventCriteriaResponse = zod.array(UpdateEventCriteriaResponseItem)
 
 
 /**

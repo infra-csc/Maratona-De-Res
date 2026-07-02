@@ -1,28 +1,35 @@
 ---
-name: Criteria weight freeze on evaluation
-description: Why/when event criteria weights must be frozen, and the lock rule once an event has evaluations
+name: Criteria weights always editable, structure locked
+description: Weight edits vs structural edits on event criteria — what stays locked after evaluations, what stays open forever, and how weight changes recompute results
 ---
 
-# Event criteria lock & weight freeze
+# Event criteria lock: structure vs weight
 
-Effective event weight = `eventCriteria.weightOverride ?? criteria.defaultWeight`.
-Because `defaultWeight` is global, editing a global criterion would retroactively
-change the scoring of events that already have evaluations.
+Effective event weight = `eventCriteria.weightOverride ?? criteria.defaultWeight`
+(per-event override, not global — so editing one event's weight never touches others).
 
-## Rule
-Once an event has ANY evaluation:
-- RH can no longer edit its criteria/weights (block weight PUT and block reopening
-  of confirmed criteria — both return 409).
-- The event's weights must be frozen: fill every active row's null `weightOverride`
-  from the current `defaultWeight` so later global edits cannot drift it.
+## Current rule (supersedes the old "freeze weights" decision)
+Once an event has ANY evaluation, only the STRUCTURE is locked:
+- Cannot toggle a criterion's `active` flag (409 on PUT /events/:id/criteria).
+- Cannot duplicate/delete/rename criteria, cannot reopen confirmed criteria.
 
-**Why:** evaluations are scored against weights; allowing weight changes after the
-fact corrupts already-recorded results. Freezing makes each evaluated event
-self-contained.
+Weights (`weightOverride`) stay editable FOREVER — before confirmation, during
+active evaluation/calibration, and even after the event is `closed`. There is no
+freeze-on-confirm/freeze-on-first-evaluation step anymore.
 
-**How to apply:** freeze runs at TWO points — on criteria confirm, and on the
-first evaluation insert (covers admin/rh evaluating before confirmation, since the
-avaliador-only confirm gate doesn't stop them). The invariant to preserve:
-"event has evaluations ⇒ no active row has a null weightOverride."
-If you add another evaluation-creation path, freeze there too (or centralize the
-freeze helper). hasEvaluations is surfaced on EventDetail for the frontend lock.
+**Why:** business need — RH must be able to correct a miscalibrated weight at any
+point, including after close, and have it retroactively reflected in results/bonuses.
+
+**How to apply:**
+- If `event.status === "closed"`, saving new weights also runs
+  `recomputeCycleResults(event.cycleId, userId)` synchronously in the same request
+  (audit-logged as `update_weights_after_evaluations`) so quarterly_results/bonus
+  rows reflect the new weight immediately. Open events don't need this — they have
+  no cached quarterly_results yet, weights are read live.
+- `recomputeCycleResults` already preserves manually-set bonus_status rows
+  (approved/scheduled/paid/blocked) and returns `warnings` on divergence — surface
+  those warnings to the user (e.g. destructive toast) whenever weights are re-saved
+  post-close.
+- Frontend (event-detail.tsx): weight `<Input>` is only disabled by `!item.active`,
+  never by the confirmed/hasEvaluations lock. A "Salvar Pesos" action stays visible
+  whenever weights are dirty, independent of the structural lock state.

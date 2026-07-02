@@ -375,10 +375,10 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
     return;
   }
 
-  if (await eventHasEvaluations(eventId)) {
-    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem mais ser alterados." });
-    return;
-  }
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Não encontrado" }); return; }
+
+  const hasEvaluations = await eventHasEvaluations(eventId);
 
   const existing = await db
     .select({
@@ -391,6 +391,21 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(eq(eventCriteriaTable.eventId, eventId));
+
+  // Os pesos podem sempre ser editados (inclusive durante calibração/após o
+  // evento fechado) e o resultado é recalculado na hora. Mas a estrutura do
+  // evento (quais critérios estão ativos) fica travada após haver avaliação,
+  // pois isso muda a lógica de "critério avaliado" (getCriterionEvaluationStatus).
+  if (hasEvaluations) {
+    const changesActiveFlag = existing.some(ec => {
+      const item = items.find(i => i.criterionId === ec.criterionId);
+      return item && item.active !== ec.active;
+    });
+    if (changesActiveFlag) {
+      res.status(409).json({ error: "Este evento já possui avaliações. Critérios não podem ser ativados/desativados, mas os pesos continuam editáveis." });
+      return;
+    }
+  }
 
   // Validate the resulting persisted active-weight sum (merging unchanged rows
   // with the incoming payload), not just the payload itself.
@@ -419,6 +434,16 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
     }).where(eq(eventCriteriaTable.id, ec.id));
   }
 
+  // Alterar pesos depois que o evento já foi fechado muda o resultado do
+  // ciclo (dashboard/ranking/pagamentos), que foi calculado com os pesos
+  // anteriores — recalcula na hora para refletir o ajuste imediatamente.
+  let warnings: string[] = [];
+  if (event.status === "closed") {
+    await audit(req.user!.userId, "update_weights_after_evaluations", "events", eventId);
+    const recompute = await recomputeCycleResults(event.cycleId, req.user!.userId);
+    warnings = recompute.warnings;
+  }
+
   const updatedCriteria = await db
     .select({
       id: eventCriteriaTable.id,
@@ -435,16 +460,19 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
 
   const activeCriteria = updatedCriteria.filter(c => c.active);
   const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
-  res.json(updatedCriteria.map(c => {
-    const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return {
-      ...c,
-      originalWeight: parseFloat(c.originalWeight ?? "1"),
-      weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null,
-      normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0,
-      weight: c.active ? parseFloat(c.weightOverride ?? c.originalWeight ?? "1") : 0,
-    };
-  }));
+  res.json({
+    criteria: updatedCriteria.map(c => {
+      const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
+      return {
+        ...c,
+        originalWeight: parseFloat(c.originalWeight ?? "1"),
+        weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null,
+        normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0,
+        weight: c.active ? parseFloat(c.weightOverride ?? c.originalWeight ?? "1") : 0,
+      };
+    }),
+    warnings: warnings.length > 0 ? warnings : undefined,
+  });
 });
 
 /**

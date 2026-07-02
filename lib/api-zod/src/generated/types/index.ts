@@ -98,6 +98,7 @@ export * from './resetPasswordInput';
 export * from './rule';
 export * from './ruleUpdate';
 export * from './syncResult';
+export * from './updateEventCriteria200';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';
 export * from './user';

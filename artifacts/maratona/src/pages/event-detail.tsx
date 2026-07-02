@@ -97,7 +97,16 @@ export default function EventDetailPage() {
 
   const updateCriteria = useUpdateEventCriteria({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Pesos salvos" }); },
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
+        if (data.warnings && data.warnings.length > 0) {
+          toast({ title: "Pesos salvos", description: data.warnings.join(" "), variant: "destructive" });
+        } else {
+          toast({ title: "Pesos salvos" });
+        }
+      },
       onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
     },
   });
@@ -190,7 +199,16 @@ export default function EventDetailPage() {
   const sumValid = Math.abs(activeSum - targetWeightSum) <= 0.01;
   const criteriaConfirmed = event.criteriaConfirmed ?? false;
   const hasEvaluations = event.hasEvaluations ?? false;
+  // A estrutura do evento (ativar/desativar, duplicar, excluir, renomear
+  // quesito, trocar avaliador) trava após confirmação/avaliações. Os PESOS,
+  // porém, podem sempre ser editados — inclusive durante calibração ou com o
+  // evento fechado — e o resultado é recalculado ao salvar.
   const editLocked = criteriaConfirmed || hasEvaluations;
+  const weightsDirty = config.some(item => {
+    const meta = critMeta.get(item.criterionId);
+    const original = meta ? (meta.weightOverride ?? meta.originalWeight ?? 0) : item.weight;
+    return item.active !== meta?.active || Number(item.weight) !== Number(original);
+  });
 
   const setCriterionActive = (criterionId: number, active: boolean) =>
     setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, active } : c)));
@@ -529,7 +547,7 @@ export default function EventDetailPage() {
 
               {hasEvaluations && (
                 <div data-testid="notice-criteria-locked" className="flex items-center gap-2 bg-[#fff4e5] border-2 border-[#ff5722] text-[#7a2e00] px-4 py-3 text-xs font-bold italic uppercase">
-                  <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. Critérios, pesos e avaliadores estão bloqueados.
+                  <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. Critérios e avaliadores estão bloqueados, mas os pesos continuam editáveis — ao salvar, o resultado é recalculado.
                 </div>
               )}
 
@@ -599,7 +617,7 @@ export default function EventDetailPage() {
                               min="0"
                               step="1"
                               value={item.active ? item.weight : 0}
-                              disabled={!item.active || editLocked}
+                              disabled={!item.active}
                               onChange={e => setCriterionWeight(item.criterionId, Number(e.target.value))}
                               className="w-20 h-10 rounded-none border-2 border-[#191c1e] text-center font-black italic disabled:opacity-50 inline-block"
                             />
@@ -786,11 +804,12 @@ export default function EventDetailPage() {
               </AlertDialog>
 
               <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-                {hasEvaluations ? (
+                {hasEvaluations && (
                   <span data-testid="text-criteria-locked" className="flex items-center gap-2 text-xs font-bold italic uppercase text-[#747a60] bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-                    <Lock size={14} /> Critérios bloqueados — avaliações já registradas
+                    <Lock size={14} /> Critérios bloqueados — pesos continuam editáveis
                   </span>
-                ) : !criteriaConfirmed ? (
+                )}
+                {!criteriaConfirmed ? (
                   <>
                     <button
                       data-testid="button-save-criteria"
@@ -812,7 +831,7 @@ export default function EventDetailPage() {
                   </>
                 ) : (
                   <>
-                    {assignmentsDirty && (
+                    {!hasEvaluations && assignmentsDirty && (
                       <button
                         data-testid="button-save-assignments"
                         onClick={handleSaveAssignments}
@@ -822,14 +841,27 @@ export default function EventDetailPage() {
                         <Save size={16} /> {updateAssignments.isPending ? "Salvando..." : "Salvar Avaliadores"}
                       </button>
                     )}
-                    <button
-                      data-testid="button-reopen-criteria"
-                      onClick={() => handleConfirmCriteria(false)}
-                      disabled={confirmCriteria.isPending}
-                      className="bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <Unlock size={16} /> Reabrir Edição dos Critérios
-                    </button>
+                    {weightsDirty && (
+                      <button
+                        data-testid="button-save-weights"
+                        onClick={handleSaveCriteria}
+                        disabled={!sumValid || updateCriteria.isPending}
+                        title={!sumValid ? `A soma dos pesos ativos precisa ser ${fmt(targetWeightSum)}` : undefined}
+                        className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${HARD_SHADOW}`}
+                      >
+                        <Save size={16} /> {updateCriteria.isPending ? "Salvando..." : "Salvar Pesos"}
+                      </button>
+                    )}
+                    {!hasEvaluations && (
+                      <button
+                        data-testid="button-reopen-criteria"
+                        onClick={() => handleConfirmCriteria(false)}
+                        disabled={confirmCriteria.isPending}
+                        className="bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <Unlock size={16} /> Reabrir Edição dos Critérios
+                      </button>
+                    )}
                   </>
                 )}
               </div>

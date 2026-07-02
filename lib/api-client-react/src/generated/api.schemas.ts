@@ -944,6 +944,11 @@ export type GetEventsParams = {
 status?: string;
 };
 
+export type UpdateEventCriteria200 = {
+  criteria: EventCriterion[];
+  warnings?: string[];
+};
+
 export type GetEvaluationsParams = {
 eventId?: number;
 status?: string;

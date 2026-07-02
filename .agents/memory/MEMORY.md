@@ -11,7 +11,7 @@
 - [External API sync](integration-external-sync.md) — sync pulls employees/events/participations from external app via EXTERNAL_API_URL+TOKEN; contract the other app must expose
 - [Maratona auth 401 / empty data](maratona-auth-401.md) — expired JWT renders empty pages (guard ignores expiry); 401 handling belongs in QueryClient/package fetch
 
-- [Criteria weight freeze](criteria-weight-freeze.md) — evaluated event => weights frozen (fill null override from defaultWeight) + criteria edit/reopen blocked 409; freeze on confirm AND first evaluation
+- [Criteria weights always editable](criteria-weight-freeze.md) — weights never freeze, always editable incl. after close; saving on closed event recomputes cycle + surfaces warnings; only active-flag/structure locks post-evaluation
 - [Penalties & Merits model](penalties-model.md) — penalties+merits share /absences via `kind` col; points positive, sign from kind; final=clamp(gross-pen+merit,0,100); qty must be int≥1
 - [Orval path+query collision](orval-path-query-collision.md) — never mix a path param + query params on one op (dup `GetXParams` export breaks codegen); make the id a query param
 - [Event detail progress source](event-detail-progress.md) — loadEventDetail returns evaluationMatrix:[] always; use the evaluationProgress field (submitted/total evals) for any "% avaliado", never the matrix
