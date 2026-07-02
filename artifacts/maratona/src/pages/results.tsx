@@ -159,7 +159,6 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   });
 
   const top3 = filteredRanking.slice(0, 3);
-  const maxResult = filteredRanking.length > 0 ? Math.max(...filteredRanking.map(r => r.finalResult)) : 0;
   const activeRunners = filteredRanking.length;
   const avgResult = filteredRanking.length > 0 ? filteredRanking.reduce((acc, r) => acc + r.finalResult, 0) / filteredRanking.length : 0;
 
@@ -254,7 +253,11 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
               <div className="divide-y-2 divide-[#eceef0]">
                 {filteredRanking.map((entry) => {
                   const actualRank = entry.position;
-                  const pct = maxResult > 0 ? Math.min(100, Math.round((entry.finalResult / maxResult) * 100)) : 0;
+                  // Barra em escala absoluta (Nota Final já é 0–100) — mostra
+                  // o aproveitamento real da pessoa, não uma comparação com o
+                  // 1º colocado do filtro atual (que gerava 100% "cheio" para
+                  // vários empatados e confundia quem via o gráfico).
+                  const scorePct = Math.max(0, Math.min(100, entry.finalResult));
                   return (
                     <button
                       type="button"
@@ -286,9 +289,9 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                       </div>
                       <div className="hidden md:flex items-center gap-3 w-40 shrink-0">
                         <div className="flex-1 h-2.5 bg-[#eceef0] border border-[#191c1e]">
-                          <div className="h-full bg-[#ccff00]" style={{ width: `${pct}%` }} />
+                          <div className="h-full bg-[#ccff00]" style={{ width: `${scorePct}%` }} />
                         </div>
-                        <span className="text-[11px] font-bold italic w-9 text-right">{pct}%</span>
+                        <span className="text-[11px] font-bold italic w-14 text-right whitespace-nowrap">{fmtScore(entry.finalResult)}/100</span>
                       </div>
                       <div className="flex items-center gap-4 shrink-0 sm:pl-4 sm:w-[17rem] sm:justify-end">
                         <div className="text-right">
