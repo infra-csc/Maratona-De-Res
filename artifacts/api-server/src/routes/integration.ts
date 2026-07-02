@@ -1,6 +1,11 @@
 import { Router } from "express";
-import { db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable, eventCriteriaTable } from "@workspace/db";
-import { isNotNull, inArray, eq, and } from "drizzle-orm";
+import {
+  db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable, eventCriteriaTable,
+  usersTable, areasTable, cyclesTable, evaluationsTable, calibrationsTable, eventConformitiesTable,
+  employeeEventResultsTable, absencesTable, quarterlyResultsTable, employeeCycleEligibilityTable,
+  auditLogsTable, platoonRulesTable, rulesTable, eventAreaAssignmentsTable,
+} from "@workspace/db";
+import { isNotNull, inArray, eq, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -88,6 +93,74 @@ router.get("/integration/status", async (_req, res) => {
   });
 });
 
+const RESET_CONFIRM_PHRASE = "ZERAR TUDO";
+
+// Apaga TODOS os dados da aplicação, preservando apenas o próprio usuário admin
+// que disparou a ação (para que ele continue logado e possa recomeçar o
+// cadastro do zero). Ação extremamente destrutiva e irreversível — por isso
+// exige role admin (não admin+rh, mais restrito que o padrão do router) e uma
+// frase de confirmação exata digitada pelo usuário.
+router.post("/integration/reset", requireRole("admin"), async (req, res) => {
+  const { confirm } = req.body ?? {};
+  if (confirm !== RESET_CONFIRM_PHRASE) {
+    res.status(400).json({
+      success: false,
+      message: `Confirmação inválida. Digite exatamente "${RESET_CONFIRM_PHRASE}" para prosseguir.`,
+    });
+    return;
+  }
+
+  if (syncing) {
+    res.status(409).json({
+      success: false,
+      message: "Sincronização em andamento. Aguarde a conclusão antes de resetar os dados.",
+    });
+    return;
+  }
+
+  const callerId = req.user!.userId;
+
+  try {
+    await db.transaction(async (tx) => {
+      // Remove as referências do próprio admin ANTES de apagar areas/employees,
+      // senão a FK impede a exclusão.
+      await tx.update(usersTable).set({ areaId: null, employeeId: null }).where(eq(usersTable.id, callerId));
+
+      await tx.delete(auditLogsTable);
+      await tx.delete(employeeCycleEligibilityTable);
+      await tx.delete(employeeEventResultsTable);
+      await tx.delete(quarterlyResultsTable);
+      await tx.delete(calibrationsTable);
+      await tx.delete(eventConformitiesTable);
+      await tx.delete(evaluationsTable);
+      await tx.delete(absencesTable);
+      await tx.delete(eventCriteriaTable);
+      await tx.delete(eventAreaAssignmentsTable);
+      await tx.delete(eventParticipantsTable);
+      await tx.delete(eventsTable);
+      await tx.delete(cyclesTable);
+      await tx.delete(platoonRulesTable);
+      await tx.delete(rulesTable);
+      await tx.delete(criteriaTable);
+      await tx.delete(usersTable).where(ne(usersTable.id, callerId));
+      await tx.delete(employeesTable);
+      await tx.delete(areasTable);
+    });
+
+    // audit() usa a conexão global (fora da transação) — chamado DEPOIS do
+    // commit, de propósito, para que este seja o ÚNICO registro sobrevivente
+    // em audit_logs (a tabela foi zerada dentro da transação acima).
+    lastSyncAt = null;
+    lastLogs = [];
+    await audit(callerId, "reset_all_data", "system", undefined, null, { resetBy: callerId });
+
+    res.json({ success: true, message: "Todos os dados foram apagados. Apenas o seu usuário foi preservado." });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ success: false, message: `Falha ao resetar dados: ${msg}` });
+  }
+});
+
 router.post("/integration/sync", async (req, res) => {
   if (!isConfigured()) {
     res.status(400).json({
@@ -139,15 +212,25 @@ router.post("/integration/sync", async (req, res) => {
     const extParticipations = rawParticipations as ExtParticipation[];
     log(`Recebidos: ${extEmployees.length} colaboradores, ${extEvents.length} eventos, ${extParticipations.length} participações.`);
 
-    // 1) Eventos de TARGET_YEAR que JÁ FINALIZARAM (data de término no passado).
-    //    Só importamos eventos encerrados: com o evento concluído, a escalação de
-    //    funções não muda mais, então os dados importados são definitivos.
+    // 1) Eventos dentro do período do ciclo atual, que JÁ FINALIZARAM (data de
+    //    término no passado). Só importamos eventos encerrados: com o evento
+    //    concluído, a escalação de funções não muda mais, então os dados
+    //    importados são definitivos. O período do ciclo (startDate/endDate)
+    //    define a janela de importação; se o ciclo não tiver datas definidas,
+    //    caímos de volta no filtro por TARGET_YEAR (compatibilidade).
     const today = new Date().toISOString().slice(0, 10);
-    const allYearEvents = extEvents.filter(ev => {
-      const yq = deriveYearQuarter(ev.startDate);
-      return (ev.year ?? yq.year) === TARGET_YEAR;
-    });
-    const keptEvents = allYearEvents.filter(ev => {
+    const cycleStartDate = cycle.startDate;
+    const cycleEndDate = cycle.endDate;
+    const inCycleWindow = cycleStartDate && cycleEndDate
+      ? extEvents.filter(ev => {
+          const end = ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate);
+          return end >= cycleStartDate && end <= cycleEndDate;
+        })
+      : extEvents.filter(ev => {
+          const yq = deriveYearQuarter(ev.startDate);
+          return (ev.year ?? yq.year) === TARGET_YEAR;
+        });
+    const keptEvents = inCycleWindow.filter(ev => {
       const end = ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate);
       return end < today;
     });
@@ -170,7 +253,10 @@ router.post("/integration/sync", async (req, res) => {
       const id = extIdOf(e);
       return id != null && neededEmpIds.has(id);
     });
-    log(`Filtro: eventos ${TARGET_YEAR} finalizados (${keptEvents.length}/${allYearEvents.length} de ${TARGET_YEAR}; demais ainda não terminaram), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
+    const windowLabel = cycleStartDate && cycleEndDate
+      ? `ciclo ${cycleStartDate} a ${cycleEndDate}`
+      : `ano ${TARGET_YEAR} (ciclo sem datas definidas)`;
+    log(`Filtro: eventos do ${windowLabel} já finalizados (${keptEvents.length}/${inCycleWindow.length} na janela; demais ainda não terminaram ou estão fora do período), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
 
     await db.transaction(async (tx) => {
       // Colaboradores — upsert por externalId

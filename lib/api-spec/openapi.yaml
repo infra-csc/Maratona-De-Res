@@ -1359,6 +1359,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Cycle"
 
+  /cycles:
+    post:
+      operationId: createCycle
+      tags: [cycles]
+      summary: Create a new cycle and mark it as current
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCycleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cycle"
+
   /ranking:
     get:
       operationId: getRanking
@@ -1458,6 +1477,25 @@ paths:
       operationId: triggerSync
       tags: [integration]
       summary: Trigger external sync
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
+  /integration/reset:
+    post:
+      operationId: resetAllData
+      tags: [integration]
+      summary: Wipe all application data, keeping only the calling admin's own user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetDataInput"
       responses:
         "200":
           description: OK
@@ -2995,6 +3033,17 @@ components:
         isCurrent:
           type: boolean
 
+    CreateCycleInput:
+      type: object
+      required: [name, startDate, endDate]
+      properties:
+        name:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+
     RankingEntry:
       type: object
       required: [position, employeeId, employeeName, finalResult, platoon, bonusValue, eventsCount, absences, eligible]
@@ -3202,6 +3251,14 @@ components:
           type: integer
         participantsSync:
           type: integer
+
+    ResetDataInput:
+      type: object
+      required: [confirm]
+      properties:
+        confirm:
+          type: string
+          description: Must equal the exact confirmation phrase "ZERAR TUDO"
 
     CsvImportInput:
       type: object
