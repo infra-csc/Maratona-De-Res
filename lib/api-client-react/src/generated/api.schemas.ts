@@ -652,6 +652,7 @@ export interface QuarterlyResult {
   /** @nullable */
   platoonColor?: string | null;
   bonusValue: number;
+  extraBonusValue?: number;
   eligible?: boolean;
   /** @nullable */
   eligibilityReason?: string | null;

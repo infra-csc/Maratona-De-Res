@@ -20,6 +20,7 @@ export const quarterlyResultsTable = pgTable("quarterly_results", {
   platoon: text("platoon"),
   platoonColor: text("platoon_color"),
   bonusValue: numeric("bonus_value", { precision: 10, scale: 2 }).notNull().default("0"),
+  extraBonusValue: numeric("extra_bonus_value", { precision: 10, scale: 2 }).notNull().default("0"),
   // Elegibilidade e pagamento do bônus
   eligible: boolean("eligible").notNull().default(true),
   eligibilityReason: text("eligibility_reason"),

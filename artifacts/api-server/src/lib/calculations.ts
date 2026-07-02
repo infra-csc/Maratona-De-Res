@@ -220,12 +220,25 @@ export function calculateTieredBonus(
 ): number {
   const platoon = getPlatoonByScore(score, rules);
   if (!platoon) return 0;
+  const extraBonus = calculateExtraBonusValue(extraEventScores, rules);
+  return Math.round((platoon.bonusValue + extraBonus) * 100) / 100;
+}
+
+/**
+ * Soma apenas a parcela de "bônus extra" — o valor de `bonusPerExtraEvent`
+ * de cada evento participado além do mínimo de elegibilidade. Não inclui o
+ * bônus base da faixa da nota geral (ver `calculateTieredBonus`).
+ */
+export function calculateExtraBonusValue(
+  extraEventScores: number[],
+  rules: PlatoonRuleData[],
+): number {
   let extraBonus = 0;
   for (const extraScore of extraEventScores) {
     const extraPlatoon = getPlatoonByScore(extraScore, rules);
     extraBonus += extraPlatoon?.bonusPerExtraEvent ?? 0;
   }
-  return Math.round((platoon.bonusValue + extraBonus) * 100) / 100;
+  return Math.round(extraBonus * 100) / 100;
 }
 
 /**

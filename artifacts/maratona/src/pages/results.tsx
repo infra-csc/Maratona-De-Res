@@ -1119,6 +1119,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                   {payHeaderCell("Pelotão Oficial", "platoon")}
                   {payHeaderCell("Elegibilidade", "eligible")}
                   {payHeaderCell("Bônus", "bonusValue")}
+                  {payHeaderCell("Bônus Extra", "extraBonusValue")}
                   {payHeaderCell("Status do Pagamento", "bonusStatus")}
                   {canManage && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Ação</th>}
                 </tr>
@@ -1166,6 +1167,13 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                       <td className="px-6 py-4 text-center">
                         {r.bonusValue > 0 ? (
                           <span className="font-black italic text-[#161e00] bg-[#ccff00] px-3 py-1 border-2 border-[#191c1e]">{fmtBRL(r.bonusValue)}</span>
+                        ) : (
+                          <span className="text-[#c4c9ac] font-bold italic">R$ 0,00</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {(r.extraBonusValue ?? 0) > 0 ? (
+                          <span className="font-black italic text-[#191c1e] bg-[#eceef0] px-3 py-1 border-2 border-[#191c1e]">{fmtBRL(r.extraBonusValue ?? 0)}</span>
                         ) : (
                           <span className="text-[#c4c9ac] font-bold italic">R$ 0,00</span>
                         )}

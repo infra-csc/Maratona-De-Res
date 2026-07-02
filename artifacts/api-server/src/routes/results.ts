@@ -10,7 +10,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import {
   calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
-  calculateTieredBonus, selectExtraEventScores, validateCalculationExample, calculateConformitySubtotal,
+  calculateTieredBonus, calculateExtraBonusValue, selectExtraEventScores, validateCalculationExample, calculateConformitySubtotal,
   calculateConformityPenalty, calculateFinalEventScore, validateConformityCalculationExample,
   buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus,
 } from "../lib/calculations.js";
@@ -271,6 +271,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
 
     const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEvents) : [];
     const bonusValue = eligible ? calculateTieredBonus(finalResult, extraEventScores, platoonRules) : 0;
+    const extraBonusValue = eligible ? calculateExtraBonusValue(extraEventScores, platoonRules) : 0;
     const autoStatus = eligible ? "projected" : "not_eligible";
 
     // Preserva decisões de pagamento já acionadas manualmente.
@@ -299,6 +300,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
       platoon: platoon?.name ?? null,
       platoonColor: platoon?.color ?? null,
       bonusValue: String(bonusValue),
+      extraBonusValue: String(extraBonusValue),
       eligible,
       eligibilityReason,
       bonusStatus: keepPayment ? prev!.bonusStatus : autoStatus,
@@ -408,6 +410,7 @@ router.get("/results/quarterly", async (req, res) => {
       platoon: quarterlyResultsTable.platoon,
       platoonColor: quarterlyResultsTable.platoonColor,
       bonusValue: quarterlyResultsTable.bonusValue,
+      extraBonusValue: quarterlyResultsTable.extraBonusValue,
       eligible: quarterlyResultsTable.eligible,
       eligibilityReason: quarterlyResultsTable.eligibilityReason,
       bonusStatus: quarterlyResultsTable.bonusStatus,
@@ -433,6 +436,7 @@ router.get("/results/quarterly", async (req, res) => {
     meritPoints: parseFloat(r.meritPoints),
     finalResult: parseFloat(r.finalResult),
     bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
+    extraBonusValue: isManager ? parseFloat(r.extraBonusValue) : 0,
     bonusStatus: isManager ? r.bonusStatus : null,
     paymentMethod: isManager ? r.paymentMethod : null,
     paymentDueDate: isManager ? r.paymentDueDate : null,
@@ -527,6 +531,7 @@ router.patch("/results/quarterly/:id/payment", requireRole("admin", "rh"), async
     absencePenalty: parseFloat(updated.absencePenalty),
     finalResult: parseFloat(updated.finalResult),
     bonusValue: parseFloat(updated.bonusValue),
+    extraBonusValue: parseFloat(updated.extraBonusValue),
   });
 });
 

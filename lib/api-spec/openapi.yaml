@@ -2756,6 +2756,8 @@ components:
           type: ["string", "null"]
         bonusValue:
           type: number
+        extraBonusValue:
+          type: number
         eligible:
           type: boolean
         eligibilityReason:
