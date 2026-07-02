@@ -1,0 +1,306 @@
+Preciso ajustar apenas a lógica de cálculo da avaliação da Maratona de Resultados 2026.
+
+Não criar novas telas, não criar novos módulos e não alterar fluxo visual. Apenas garantir que os cálculos abaixo sejam aplicados corretamente.
+
+A avaliação de cada evento é composta por duas partes:
+
+1. Matriz de Conformidade
+2. Matriz de Performance
+
+Depois, essas duas partes formam a Pontuação Final do Evento.
+
+
+1. CÁLCULO DA MATRIZ DE CONFORMIDADE
+
+A Matriz de Conformidade possui 4 itens obrigatórios:
+
+- Uso de EPI
+- Estaiamento e aterramento
+- Guarda de equipamentos/ferramentas
+- Conduta e comportamento
+
+Cada item pode ser marcado como:
+
+- SIM
+- NÃO
+
+Cada item vale 25 pontos.
+
+Regra:
+
+- Se o item estiver como SIM, soma 25 pontos.
+- Se o item estiver como NÃO, soma 0 pontos.
+
+Fórmula:
+
+Subtotal Conformidade =
+(Soma dos pontos dos itens de conformidade)
+
+Exemplo:
+
+Uso de EPI = NÃO = 0 pontos
+Estaiamento e aterramento = SIM = 25 pontos
+Guarda de equipamentos/ferramentas = SIM = 25 pontos
+Conduta e comportamento = SIM = 25 pontos
+
+Subtotal Conformidade = 0 + 25 + 25 + 25
+Subtotal Conformidade = 75
+
+
+2. CÁLCULO DA MATRIZ DE PERFORMANCE
+
+A Matriz de Performance possui critérios com Peso e Nota.
+
+A nota é de 0 a 10.
+
+Para cada critério:
+
+Total do Critério = Peso x Nota
+
+Depois, calcular a média ponderada:
+
+Média Ponderada =
+Soma dos Totais dos Critérios / Soma dos Pesos
+
+Como o resultado final precisa ficar em escala de 0 a 100:
+
+Subtotal Performance =
+Média Ponderada x 10
+
+Fórmula completa:
+
+Subtotal Performance =
+((Soma de Peso x Nota) / Soma dos Pesos) x 10
+
+Exemplo:
+
+Carga na saída do galpão:
+Peso 2, Nota 7
+2 x 7 = 14
+
+Qualidade da entrega:
+Peso 3, Nota 7
+3 x 7 = 21
+
+Qualidade da entrega 2:
+Peso 3, Nota 7
+3 x 7 = 21
+
+Prazo e cronograma de entrega:
+Peso 2, Nota 7
+2 x 7 = 14
+
+Logística reversa:
+Peso 2, Nota 7
+2 x 7 = 14
+
+Retorno de material:
+Peso 2, Nota 7
+2 x 7 = 14
+
+Soma dos totais:
+14 + 21 + 21 + 14 + 14 + 14 = 98
+
+Soma dos pesos:
+2 + 3 + 3 + 2 + 2 + 2 = 14
+
+Média ponderada:
+98 / 14 = 7
+
+Subtotal Performance:
+7 x 10 = 70
+
+Subtotal Performance = 70
+
+
+3. CÁLCULO DA PENALIDADE DE CONFORMIDADE
+
+A conformidade não entra como média simples junto com a performance.
+
+Ela funciona como penalidade sobre a nota de performance.
+
+A lógica é:
+
+- A conformidade ideal é 100.
+- Quando a conformidade fica abaixo de 100, a diferença gera desconto.
+- O desconto aplicado na nota final é 40% da diferença entre 100 e o Subtotal Conformidade.
+
+Fórmula:
+
+Penalidade Conformidade =
+(100 - Subtotal Conformidade) x 0,40
+
+Exemplo:
+
+Subtotal Conformidade = 75
+
+Penalidade Conformidade =
+(100 - 75) x 0,40
+
+Penalidade Conformidade =
+25 x 0,40
+
+Penalidade Conformidade = 10
+
+
+4. CÁLCULO DA PONTUAÇÃO FINAL DO EVENTO
+
+A Pontuação Final do Evento é calculada assim:
+
+Pontuação Final Evento =
+Subtotal Performance - Penalidade Conformidade
+
+Exemplo:
+
+Subtotal Performance = 70
+Subtotal Conformidade = 75
+Penalidade Conformidade = 10
+
+Pontuação Final Evento =
+70 - 10
+
+Pontuação Final Evento = 60
+
+Portanto, nesse exemplo, o resultado final correto do evento é 60.
+
+
+5. OUTRO EXEMPLO COM BASE NA APRESENTAÇÃO
+
+Matriz de Conformidade:
+
+Uso de EPI = SIM
+Estaiamento e aterramento = NÃO
+Guarda de equipamentos/ferramentas = SIM
+Conduta e comportamento = SIM
+
+Pontuação:
+
+SIM = 25
+NÃO = 0
+
+Subtotal Conformidade:
+25 + 0 + 25 + 25 = 75
+
+Penalidade Conformidade:
+(100 - 75) x 0,40 = 10
+
+Matriz de Performance:
+
+Qualidade e acabamento da montagem:
+Peso 3, Nota 7
+3 x 7 = 21
+
+Logística reversa:
+Peso 2, Nota 6
+2 x 6 = 12
+
+Prazo de entrega:
+Peso 2, Nota 10
+2 x 10 = 20
+
+Carga na saída do galpão:
+Peso 2, Nota 6
+2 x 6 = 12
+
+Retorno de material:
+Peso 2, Nota 6
+2 x 6 = 12
+
+Soma dos totais:
+21 + 12 + 20 + 12 + 12 = 77
+
+Soma dos pesos:
+3 + 2 + 2 + 2 + 2 = 11
+
+Média ponderada:
+77 / 11 = 7
+
+Subtotal Performance:
+7 x 10 = 70
+
+Pontuação Final Evento:
+70 - 10 = 60
+
+Resultado final do evento = 60
+
+
+6. REGRAS IMPORTANTES
+
+- O Subtotal Conformidade deve ir de 0 a 100.
+- O Subtotal Performance deve ir de 0 a 100.
+- A Pontuação Final do Evento não pode ser menor que 0.
+- A Pontuação Final do Evento não pode ser maior que 100.
+- Se todos os itens de conformidade forem SIM, a penalidade será 0.
+- Se houver 1 item NÃO, o Subtotal Conformidade será 75 e a penalidade será 10.
+- Se houver 2 itens NÃO, o Subtotal Conformidade será 50 e a penalidade será 20.
+- Se houver 3 itens NÃO, o Subtotal Conformidade será 25 e a penalidade será 30.
+- Se houver 4 itens NÃO, o Subtotal Conformidade será 0 e a penalidade será 40.
+
+Tabela de referência:
+
+4 SIM / 0 NÃO:
+Subtotal Conformidade = 100
+Penalidade = 0
+
+3 SIM / 1 NÃO:
+Subtotal Conformidade = 75
+Penalidade = 10
+
+2 SIM / 2 NÃO:
+Subtotal Conformidade = 50
+Penalidade = 20
+
+1 SIM / 3 NÃO:
+Subtotal Conformidade = 25
+Penalidade = 30
+
+0 SIM / 4 NÃO:
+Subtotal Conformidade = 0
+Penalidade = 40
+
+
+7. CÁLCULO FINAL RESUMIDO
+
+Usar esta ordem:
+
+1. Calcular Subtotal Conformidade:
+Cada SIM vale 25 pontos.
+
+2. Calcular Penalidade Conformidade:
+(100 - Subtotal Conformidade) x 0,40
+
+3. Calcular Subtotal Performance:
+((Soma de Peso x Nota) / Soma dos Pesos) x 10
+
+4. Calcular Pontuação Final Evento:
+Subtotal Performance - Penalidade Conformidade
+
+5. Aplicar limites:
+Se resultado for menor que 0, considerar 0.
+Se resultado for maior que 100, considerar 100.
+
+
+8. EXEMPLO FINAL ESPERADO
+
+Entrada:
+
+Conformidade:
+Uso de EPI = NÃO
+Estaiamento e aterramento = SIM
+Guarda de equipamentos/ferramentas = SIM
+Conduta e comportamento = SIM
+
+Performance:
+Critério 1: Peso 2, Nota 7
+Critério 2: Peso 3, Nota 7
+Critério 3: Peso 3, Nota 7
+Critério 4: Peso 2, Nota 7
+Critério 5: Peso 2, Nota 7
+Critério 6: Peso 2, Nota 7
+
+Resultado esperado:
+
+Subtotal Conformidade = 75
+Penalidade Conformidade = 10
+Subtotal Performance = 70
+Pontuação Final Evento = 60

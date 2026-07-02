@@ -107,7 +107,7 @@ async function seed() {
   // 7 quesitos históricos (modelo antigo) — mantidos como registro (inactive:
   // não aparecem mais na lista global nem são anexados a eventos novos), mas
   // preservados para não quebrar dados históricos de eventos/avaliações.
-  // Pesos somavam 20 (Nota máx = 5 → resultado máx = 5×20 = 100).
+  // Pesos somavam 20; nota de 0 a 10 por critério (mesma fórmula normalizada).
   const criteria = await db.insert(criteriaTable).values([
     {
       name: "Perda de Material/Estrutura",
@@ -177,7 +177,8 @@ async function seed() {
   console.log(`✓ ${criteria.length} critérios históricos criados (inativos)`);
 
   // Matriz de Performance (novo modelo, vigente a partir do próximo período)
-  // Pesos somam 11 (Nota máx = 5 → resultado máx = 5×11 = 55, normalizado internamente).
+  // Nota de 0 a 10 por critério. Resultado = média ponderada dos critérios
+  // avaliados × 10 (0-100), independente da soma dos pesos (pesos atuais somam 11).
   const newCriteria = await db.insert(criteriaTable).values([
     {
       name: "Qualidade e Acabamento da Montagem",

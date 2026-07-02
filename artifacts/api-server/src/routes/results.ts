@@ -7,7 +7,11 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore, calculateTieredBonus, validateCalculationExample } from "../lib/calculations.js";
+import {
+  calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
+  calculateTieredBonus, validateCalculationExample, calculateConformitySubtotal, calculateConformityPenalty,
+  calculateFinalEventScore, validateConformityCalculationExample,
+} from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
 
@@ -17,6 +21,9 @@ router.use(requireAuth);
 // Log validation on startup
 if (!validateCalculationExample()) {
   console.error("❌ ERRO DE CÁLCULO: pesos=[3,3,2,3,3,3,3], notas=[4,4,4,3,2,3,5] deveria retornar 71");
+}
+if (!validateConformityCalculationExample()) {
+  console.error("❌ ERRO DE CÁLCULO: exemplo de conformidade+performance da especificação deveria retornar 60");
 }
 
 type PlatoonRuleMapped = {
@@ -97,17 +104,17 @@ export async function computeEventTeamResult(eventId: number) {
 
   let eventScore = calculateEventResult(criteriaForCalc);
 
-  // Matriz de Conformidade: cada "não" remove 10 pts (mínimo 0).
+  // Matriz de Conformidade: SIM=25/NÃO=0 por item (0-100), penalidade =
+  // (100 - Subtotal Conformidade) × 0,40, aplicada sobre o Subtotal Performance.
   const [conformity] = await db
     .select()
     .from(eventConformitiesTable)
     .where(eq(eventConformitiesTable.eventId, eventId));
-  const noCount = conformity
-    ? [conformity.epi, conformity.estaiamentos, conformity.guardaEquipamentos, conformity.conduta]
-        .filter(v => v === false).length
-    : 0;
-  const conformityPenalty = noCount * 10;
-  const conformityScore = Math.max(0, eventScore - conformityPenalty);
+  const conformitySubtotal = conformity
+    ? calculateConformitySubtotal([conformity.epi, conformity.estaiamentos, conformity.guardaEquipamentos, conformity.conduta])
+    : 100;
+  const conformityPenalty = calculateConformityPenalty(conformitySubtotal);
+  const conformityScore = calculateFinalEventScore(eventScore, conformitySubtotal);
 
   const hasCalibration = criteriaDetails.some(cd => cd.calibratedScore !== null);
   const pendingCriteria = criteriaDetails.filter(cd => cd.status === "pendente").length;

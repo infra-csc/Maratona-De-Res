@@ -51,6 +51,59 @@ export function validateCalculationExample(): boolean {
   return result === 71;
 }
 
+/**
+ * Matriz de Conformidade: 4 itens obrigatórios (Uso de EPI, Estaiamento e
+ * aterramento, Guarda de equipamentos/ferramentas, Conduta e comportamento).
+ * Cada item SIM = 25 pontos, NÃO = 0. Subtotal Conformidade vai de 0 a 100.
+ * Sem registro de conformidade = conformidade plena (100).
+ */
+export function calculateConformitySubtotal(items: (boolean | null | undefined)[]): number {
+  return items.reduce((sum: number, v) => sum + (v === true ? 25 : 0), 0);
+}
+
+/**
+ * Penalidade Conformidade = (100 - Subtotal Conformidade) × 0,40.
+ * A conformidade não entra como média simples: funciona como desconto sobre
+ * a nota de performance.
+ */
+export function calculateConformityPenalty(conformitySubtotal: number): number {
+  return Math.round((100 - conformitySubtotal) * 0.4 * 100) / 100;
+}
+
+/**
+ * Pontuação Final do Evento = Subtotal Performance - Penalidade Conformidade,
+ * limitada entre 0 e 100.
+ */
+export function calculateFinalEventScore(performanceSubtotal: number, conformitySubtotal: number): number {
+  const penalty = calculateConformityPenalty(conformitySubtotal);
+  return Math.min(100, Math.max(0, Math.round((performanceSubtotal - penalty) * 100) / 100));
+}
+
+/**
+ * Confere os exemplos da especificação "Mudanças para o Próximo Período":
+ * conformidade [NÃO, SIM, SIM, SIM] → subtotal 75, penalidade 10;
+ * performance pesos=[2,3,3,2,2,2] notas=[7,7,7,7,7,7] → subtotal 70;
+ * pontuação final = 70 - 10 = 60.
+ */
+export function validateConformityCalculationExample(): boolean {
+  const subtotal = calculateConformitySubtotal([false, true, true, true]);
+  if (subtotal !== 75) return false;
+  const penalty = calculateConformityPenalty(subtotal);
+  if (penalty !== 10) return false;
+  const weights = [2, 3, 3, 2, 2, 2];
+  const scores = [7, 7, 7, 7, 7, 7];
+  const criteria: CriterionData[] = weights.map((weight, i) => ({
+    criterionId: i + 1,
+    weight,
+    averageScore: scores[i],
+    calibratedScore: null,
+  }));
+  const performance = calculateEventResult(criteria);
+  if (performance !== 70) return false;
+  const final = calculateFinalEventScore(performance, subtotal);
+  return final === 60;
+}
+
 export function calculateQuarterGrossAverage(eventScores: number[]): number {
   if (eventScores.length === 0) return 0;
   return Math.round((eventScores.reduce((a, b) => a + b, 0) / eventScores.length) * 100) / 100;
