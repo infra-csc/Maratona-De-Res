@@ -26,11 +26,26 @@ interface PerformanceData {
     closedEvents: number;
     openEvents: number;
     totalAbsences: number;
+    penaltyPoints: number;
+    meritPoints: number;
     isQuarterClosed: boolean;
     finalResult: number | null;
     absencePenalty: number | null;
   };
+  adjustments: Adjustment[];
   events: EventSummary[];
+}
+
+interface Adjustment {
+  id: number;
+  kind: "penalty" | "merit";
+  penaltyType: string;
+  points: number;
+  quantity: number;
+  totalPoints: number;
+  date: string | null;
+  reason: string | null;
+  eventName: string | null;
 }
 
 interface EventSummary {
@@ -316,7 +331,7 @@ export default function MyPerformancePage() {
                   <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-1">{summary.openEvents} em avaliação</p>
                 )}
                 {summary.totalAbsences > 0 && (
-                  <p className="text-[10px] font-bold uppercase italic text-[#862200] mt-1">{summary.totalAbsences} faltas</p>
+                  <p className="text-[10px] font-bold uppercase italic text-[#862200] mt-1">{summary.totalAbsences} {summary.totalAbsences === 1 ? "penalidade" : "penalidades"}</p>
                 )}
               </div>
               <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
@@ -326,17 +341,57 @@ export default function MyPerformancePage() {
             </div>
           </div>
 
-          {/* Absence penalty info */}
-          {summary.absencePenalty !== null && summary.absencePenalty > 0 && (
-            <div className="bg-[#ffdbd1] border-2 border-[#191c1e] p-4 flex items-start gap-4">
-              <div className="bg-white text-[#862200] p-2 border-2 border-[#191c1e] shrink-0"><AlertTriangle size={20} /></div>
-              <div>
-                <h4 className="font-bold text-[#862200] mb-1 italic">Penalidade por Faltas</h4>
-                <p className="text-sm text-[#444933] font-medium italic">
-                  Foi aplicado um desconto de <strong>{summary.absencePenalty} pontos</strong> na sua nota final devido às faltas registradas no período.
-                  {summary.grossAverage !== null && ` (A média original era ${summary.grossAverage.toFixed(1)}).`}
-                </p>
+          {/* Penalidades e Méritos */}
+          {(data.adjustments?.length ?? 0) > 0 && (
+            <div className="pt-4">
+              <h2 className="text-xl font-black uppercase tracking-tight text-[#506600] flex items-center gap-2 mb-4">
+                <AlertTriangle size={22} />
+                Penalidades e Méritos
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                {(summary.penaltyPoints ?? 0) > 0 && (
+                  <div className="bg-[#ffdbd1] border-2 border-[#191c1e] p-4 flex items-center justify-between">
+                    <span className="text-xs font-black uppercase italic tracking-wider text-[#862200]">Penalidades</span>
+                    <span className="text-2xl font-black italic text-[#862200]">-{summary.penaltyPoints} pts</span>
+                  </div>
+                )}
+                {(summary.meritPoints ?? 0) > 0 && (
+                  <div className="bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between">
+                    <span className="text-xs font-black uppercase italic tracking-wider text-[#161e00]">Méritos</span>
+                    <span className="text-2xl font-black italic text-[#506600]">+{summary.meritPoints} pts</span>
+                  </div>
+                )}
               </div>
+              <div className="bg-white border-2 border-[#191c1e] divide-y-2 divide-[#eceef0]">
+                {data.adjustments.map(adj => (
+                  <div key={adj.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className={`text-[10px] font-black uppercase italic px-2 py-0.5 border-2 border-[#191c1e] ${
+                          adj.kind === "merit" ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"
+                        }`}>
+                          {adj.kind === "merit" ? "Mérito" : "Penalidade"}
+                        </span>
+                        <span className="text-xs font-bold italic uppercase text-[#444933]">{adj.penaltyType}</span>
+                        {adj.quantity > 1 && (
+                          <span className="text-[10px] font-bold italic uppercase text-[#747a60] bg-[#eceef0] border border-[#191c1e] px-1.5 py-0.5">x{adj.quantity}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold italic text-[#747a60]">
+                        {adj.date && <span>{new Date(`${adj.date}T00:00:00`).toLocaleDateString("pt-BR")}</span>}
+                        {adj.eventName && <span className="flex items-center gap-1"><Calendar size={12} /> {adj.eventName}</span>}
+                      </div>
+                      {adj.reason && <p className="text-xs text-[#444933] italic mt-1">"{adj.reason}"</p>}
+                    </div>
+                    <span className={`font-black italic text-lg shrink-0 ${adj.kind === "merit" ? "text-[#506600]" : "text-[#862200]"}`}>
+                      {adj.kind === "merit" ? "+" : "-"}{adj.totalPoints} pts
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-2">
+                Méritos somam e penalidades descontam pontos na sua nota final do ciclo (limitada entre 0 e 100).
+              </p>
             </div>
           )}
 

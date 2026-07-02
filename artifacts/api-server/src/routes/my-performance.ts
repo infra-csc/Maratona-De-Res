@@ -188,12 +188,41 @@ router.get("/my-performance", async (req, res) => {
     });
   }
 
-  const absences = await db.select().from(absencesTable)
+  const absences = await db.select({
+    id: absencesTable.id,
+    kind: absencesTable.kind,
+    penaltyType: absencesTable.penaltyType,
+    points: absencesTable.points,
+    quantity: absencesTable.quantity,
+    date: absencesTable.date,
+    reason: absencesTable.reason,
+    eventId: absencesTable.eventId,
+    eventName: eventsTable.name,
+  }).from(absencesTable)
+    .leftJoin(eventsTable, eq(absencesTable.eventId, eventsTable.id))
     .where(and(
       eq(absencesTable.employeeId, employeeId),
       eq(absencesTable.cycleId, cycle.id),
     ));
-  const totalAbsences = absences.reduce((s, a) => s + a.quantity, 0);
+  // Mesma regra do fechamento (results.ts): méritos NÃO contam como falta.
+  const penaltyRows = absences.filter(a => a.kind !== "merit");
+  const meritRows = absences.filter(a => a.kind === "merit");
+  const totalAbsences = penaltyRows.reduce((s, a) => s + a.quantity, 0);
+  const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
+  const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
+  const adjustments = absences
+    .map(a => ({
+      id: a.id,
+      kind: a.kind === "merit" ? "merit" : "penalty",
+      penaltyType: a.penaltyType,
+      points: a.points,
+      quantity: a.quantity,
+      totalPoints: Math.round(a.points * a.quantity * 100) / 100,
+      date: a.date,
+      reason: a.reason,
+      eventName: a.eventName,
+    }))
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
 
   const totalEvents = eventSummaries.length;
   const openEvents = eventSummaries.filter(e => e.status === "open").length;
@@ -249,11 +278,14 @@ router.get("/my-performance", async (req, res) => {
       closedEvents,
       openEvents,
       totalAbsences,
+      penaltyPoints: Math.round(penaltyPoints * 100) / 100,
+      meritPoints: Math.round(meritPoints * 100) / 100,
       isQuarterClosed: cycle.status === "closed" || !!cycle.closedAt,
       finalResult,
       absencePenalty: quarterResult ? parseFloat(quarterResult.absencePenalty as unknown as string) : null,
       paymentMethod: quarterResult ? quarterResult.paymentMethod : "Caju Saldo Livre",
     },
+    adjustments,
     events: eventSummaries,
   });
 });
