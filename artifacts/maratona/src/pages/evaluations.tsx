@@ -3,6 +3,7 @@ import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCr
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket } from "lucide-react";
@@ -573,24 +574,76 @@ export default function EvaluationsPage() {
           )}
         </section>
 
-        {/* STEP 01 — Selecionar Evento (managers/consultation pick from the full panel) */}
+        {/* STEP 01 — Filtros (managers/consultation pick from the full panel) */}
         {!isEvaluator && (
         <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 px-3 py-1.5 bg-[#ccff00] border-l-2 border-b-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider">ETAPA 01</div>
-          <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight mb-1">Selecionar Evento</h3>
-          <p className="text-sm text-[#444933] italic mb-5">{isConsultation ? "Busque pelo nome do evento ou do cliente e selecione para consultar o andamento." : "Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação."}</p>
+          <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight mb-1">{isConsultation ? "Filtros" : "Selecionar Evento"}</h3>
+          <p className="text-sm text-[#444933] italic mb-5">{isConsultation ? "Selecione o evento e refine a consulta por avaliador ou status." : "Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação."}</p>
 
-          <div className="w-full max-w-2xl">
-            {renderEventPicker(false)}
-
-            <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-              <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
-              <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#444933]">
-                {isConsultation
-                  ? "Modo consulta: acompanhe o status de cada avaliação por evento, sem editar notas."
-                  : "Apenas eventos já configurados e liberados pelo RH aparecem nesta lista."}
-              </p>
+          <div className={cn("grid grid-cols-1 gap-4", isConsultation && "md:grid-cols-3")}>
+            <div>
+              {isConsultation && (
+                <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
+                  <Calendar size={12} /> Evento
+                </p>
+              )}
+              {renderEventPicker(false)}
             </div>
+
+            {isConsultation && (
+              <>
+                <div>
+                  <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
+                    <User size={12} /> Avaliador
+                  </p>
+                  <Select
+                    value={selectedAvaliadorId != null ? String(selectedAvaliadorId) : "__all"}
+                    onValueChange={(v) => setSelectedAvaliadorId(v === "__all" ? null : Number(v))}
+                    disabled={!selectedEventId || avaliadorStats.length === 0}
+                  >
+                    <SelectTrigger data-testid="select-avaliador" className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0 disabled:opacity-50">
+                      <SelectValue placeholder={selectedEventId ? "Todos os avaliadores" : "Selecione um evento primeiro"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                      <SelectItem value="__all">Todos os avaliadores</SelectItem>
+                      {avaliadorStats.map(av => (
+                        <SelectItem key={av.id} value={String(av.id)}>{av.name} ({av.submitted}/{av.total})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
+                    <ListChecks size={12} /> Status
+                  </p>
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(v) => setStatusFilter(v as "all" | "pending" | "done")}
+                    disabled={!selectedEventId}
+                  >
+                    <SelectTrigger data-testid="select-status-filter" className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0 disabled:opacity-50">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="pending">Pendentes</SelectItem>
+                      <SelectItem value="done">Avaliadas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+            <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
+            <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#444933]">
+              {isConsultation
+                ? "Modo consulta: acompanhe o status de cada avaliação por evento, sem editar notas."
+                : "Apenas eventos já configurados e liberados pelo RH aparecem nesta lista."}
+            </p>
           </div>
         </section>
         )}
@@ -747,91 +800,6 @@ export default function EvaluationsPage() {
                 <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
                   {isConsultation ? (<><ListChecks size={22} /> Status das Avaliações</>) : "Critérios de Avaliação"}
                 </h3>
-
-                {isConsultation && (
-                  <div className="bg-white border-2 border-[#191c1e] p-4 md:p-5 space-y-4">
-                    {avaliadorStats.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-black italic uppercase tracking-wider text-[#747a60] mb-3 flex items-center gap-1.5">
-                          <User size={13} /> Selecionar Avaliador
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            data-testid="button-avaliador-todos"
-                            onClick={() => setSelectedAvaliadorId(null)}
-                            className={cn(
-                              "px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
-                              selectedAvaliadorId === null ? "bg-[#191c1e] text-white" : "bg-white hover:bg-[#f2f4f6]",
-                            )}
-                          >
-                            Todos
-                          </button>
-                          {avaliadorStats.map(av => (
-                            <button
-                              key={av.id}
-                              type="button"
-                              data-testid={`button-avaliador-${av.id}`}
-                              onClick={() => setSelectedAvaliadorId(cur => cur === av.id ? null : av.id)}
-                              className={cn(
-                                "flex items-center gap-2 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
-                                selectedAvaliadorId === av.id ? "bg-[#ccff00]" : "bg-white hover:bg-[#f2f4f6]",
-                              )}
-                            >
-                              {av.name}
-                              <span className={cn(
-                                "inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#191c1e]",
-                                av.done ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffdbd1] text-[#862200]",
-                              )}>
-                                {av.done ? <CheckCircle size={10} /> : <Clock size={10} />} {av.submitted}/{av.total}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-[11px] font-black italic uppercase tracking-wider text-[#747a60] mb-3 flex items-center gap-1.5">
-                        <ListChecks size={13} /> Status da Avaliação
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          data-testid="button-status-todas"
-                          onClick={() => setStatusFilter("all")}
-                          className={cn(
-                            "px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
-                            statusFilter === "all" ? "bg-[#191c1e] text-white" : "bg-white hover:bg-[#f2f4f6]",
-                          )}
-                        >
-                          Todas
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="button-status-pendentes"
-                          onClick={() => setStatusFilter(cur => cur === "pending" ? "all" : "pending")}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
-                            statusFilter === "pending" ? "bg-[#ffdbd1] text-[#862200]" : "bg-white hover:bg-[#f2f4f6]",
-                          )}
-                        >
-                          <Clock size={12} /> Pendentes
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="button-status-avaliadas"
-                          onClick={() => setStatusFilter(cur => cur === "done" ? "all" : "done")}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
-                            statusFilter === "done" ? "bg-[#ccff00] text-[#161e00]" : "bg-white hover:bg-[#f2f4f6]",
-                          )}
-                        >
-                          <CheckCircle size={12} /> Avaliadas
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {isConsultation ? (
                   filteredAreaGroups.length === 0 ? (
