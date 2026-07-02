@@ -129,6 +129,7 @@ export default function EvaluationsPage() {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   // Per-criterion audio override (objectPath). "" means the user cleared a
@@ -251,7 +252,7 @@ export default function EvaluationsPage() {
   useEffect(() => {
     if (selectedEventId == null || !events) return;
     const stillValid = events.some(e => e.id === selectedEventId && (e.status === "open" || e.status === "closed") && (isEvaluator ? e.criteriaConfirmed : true));
-    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorId(null); }
+    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorId(null); setStatusFilter("all"); }
   }, [selectedEventId, events, isEvaluator]);
   const canRelease = isManager;
   const eventComplete = eventResult?.isComplete ?? false;
@@ -351,9 +352,19 @@ export default function EvaluationsPage() {
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
 
   const selectedAvaliador = avaliadorStats.find(av => av.id === selectedAvaliadorId) ?? null;
-  const filteredAreaGroups = selectedAvaliador
-    ? groupByArea(activeCriteria.filter(c => c.responsibleAreaId != null && selectedAvaliador.areaIds.has(c.responsibleAreaId)))
-    : areaGroups;
+  // Com avaliador selecionado, "avaliado" = submissão DELE; sem seleção, usa a
+  // completude agregada do critério (todos os designados da área enviaram).
+  const isCriterionDone = (c: (typeof activeCriteria)[number]) =>
+    selectedAvaliador
+      ? (evaluations ?? []).some(e => e.criterionId === c.criterionId && e.evaluatorUserId === selectedAvaliador.id && e.status === "submitted")
+      : criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted";
+  const avaliadorFilteredCriteria = selectedAvaliador
+    ? activeCriteria.filter(c => c.responsibleAreaId != null && selectedAvaliador.areaIds.has(c.responsibleAreaId))
+    : activeCriteria;
+  const statusFilteredCriteria = statusFilter === "all"
+    ? avaliadorFilteredCriteria
+    : avaliadorFilteredCriteria.filter(c => (statusFilter === "done" ? isCriterionDone(c) : !isCriterionDone(c)));
+  const filteredAreaGroups = groupByArea(statusFilteredCriteria);
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
@@ -506,7 +517,7 @@ export default function EvaluationsPage() {
                   key={ev.id}
                   value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
                   data-testid={`option-event-${ev.id}`}
-                  onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorId(null); setEventPickerOpen(false); }}
+                  onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorId(null); setStatusFilter("all"); setEventPickerOpen(false); }}
                   className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
                 >
                   <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
@@ -737,43 +748,87 @@ export default function EvaluationsPage() {
                   {isConsultation ? (<><ListChecks size={22} /> Status das Avaliações</>) : "Critérios de Avaliação"}
                 </h3>
 
-                {isConsultation && avaliadorStats.length > 0 && (
-                  <div className="bg-white border-2 border-[#191c1e] p-4 md:p-5">
-                    <p className="text-[11px] font-black italic uppercase tracking-wider text-[#747a60] mb-3 flex items-center gap-1.5">
-                      <User size={13} /> Selecionar Avaliador
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        data-testid="button-avaliador-todos"
-                        onClick={() => setSelectedAvaliadorId(null)}
-                        className={cn(
-                          "px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
-                          selectedAvaliadorId === null ? "bg-[#191c1e] text-white" : "bg-white hover:bg-[#f2f4f6]",
-                        )}
-                      >
-                        Todos
-                      </button>
-                      {avaliadorStats.map(av => (
+                {isConsultation && (
+                  <div className="bg-white border-2 border-[#191c1e] p-4 md:p-5 space-y-4">
+                    {avaliadorStats.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-black italic uppercase tracking-wider text-[#747a60] mb-3 flex items-center gap-1.5">
+                          <User size={13} /> Selecionar Avaliador
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            data-testid="button-avaliador-todos"
+                            onClick={() => setSelectedAvaliadorId(null)}
+                            className={cn(
+                              "px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
+                              selectedAvaliadorId === null ? "bg-[#191c1e] text-white" : "bg-white hover:bg-[#f2f4f6]",
+                            )}
+                          >
+                            Todos
+                          </button>
+                          {avaliadorStats.map(av => (
+                            <button
+                              key={av.id}
+                              type="button"
+                              data-testid={`button-avaliador-${av.id}`}
+                              onClick={() => setSelectedAvaliadorId(cur => cur === av.id ? null : av.id)}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
+                                selectedAvaliadorId === av.id ? "bg-[#ccff00]" : "bg-white hover:bg-[#f2f4f6]",
+                              )}
+                            >
+                              {av.name}
+                              <span className={cn(
+                                "inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#191c1e]",
+                                av.done ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffdbd1] text-[#862200]",
+                              )}>
+                                {av.done ? <CheckCircle size={10} /> : <Clock size={10} />} {av.submitted}/{av.total}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[11px] font-black italic uppercase tracking-wider text-[#747a60] mb-3 flex items-center gap-1.5">
+                        <ListChecks size={13} /> Status da Avaliação
+                      </p>
+                      <div className="flex flex-wrap gap-2">
                         <button
-                          key={av.id}
                           type="button"
-                          data-testid={`button-avaliador-${av.id}`}
-                          onClick={() => setSelectedAvaliadorId(cur => cur === av.id ? null : av.id)}
+                          data-testid="button-status-todas"
+                          onClick={() => setStatusFilter("all")}
                           className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
-                            selectedAvaliadorId === av.id ? "bg-[#ccff00]" : "bg-white hover:bg-[#f2f4f6]",
+                            "px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
+                            statusFilter === "all" ? "bg-[#191c1e] text-white" : "bg-white hover:bg-[#f2f4f6]",
                           )}
                         >
-                          {av.name}
-                          <span className={cn(
-                            "inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#191c1e]",
-                            av.done ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffdbd1] text-[#862200]",
-                          )}>
-                            {av.done ? <CheckCircle size={10} /> : <Clock size={10} />} {av.submitted}/{av.total}
-                          </span>
+                          Todas
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          data-testid="button-status-pendentes"
+                          onClick={() => setStatusFilter(cur => cur === "pending" ? "all" : "pending")}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
+                            statusFilter === "pending" ? "bg-[#ffdbd1] text-[#862200]" : "bg-white hover:bg-[#f2f4f6]",
+                          )}
+                        >
+                          <Clock size={12} /> Pendentes
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="button-status-avaliadas"
+                          onClick={() => setStatusFilter(cur => cur === "done" ? "all" : "done")}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all",
+                            statusFilter === "done" ? "bg-[#ccff00] text-[#161e00]" : "bg-white hover:bg-[#f2f4f6]",
+                          )}
+                        >
+                          <CheckCircle size={12} /> Avaliadas
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -781,7 +836,13 @@ export default function EvaluationsPage() {
                 {isConsultation ? (
                   filteredAreaGroups.length === 0 ? (
                     <div className="text-center py-12 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">
-                      {selectedAvaliador ? "Este avaliador não tem critérios atribuídos neste evento." : "Nenhum critério ativo neste evento."}
+                      {statusFilter === "pending"
+                        ? "Nenhuma avaliação pendente com os filtros atuais."
+                        : statusFilter === "done"
+                          ? "Nenhuma avaliação concluída com os filtros atuais."
+                          : selectedAvaliador
+                            ? "Este avaliador não tem critérios atribuídos neste evento."
+                            : "Nenhum critério ativo neste evento."}
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -792,7 +853,7 @@ export default function EvaluationsPage() {
                         </div>
                       )}
                       {filteredAreaGroups.map(g => {
-                        const submittedInArea = g.criteria.filter(c => criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted").length;
+                        const submittedInArea = g.criteria.filter(c => isCriterionDone(c)).length;
                         const areaDone = submittedInArea === g.criteria.length;
                         return (
                           <div key={g.area} data-testid={`status-area-${g.area}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
