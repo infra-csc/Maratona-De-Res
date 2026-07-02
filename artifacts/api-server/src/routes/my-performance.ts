@@ -6,8 +6,8 @@ import {
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { calculateEventResult, getPlatoonByScore } from "../lib/calculations.js";
-import { getCurrentCycle } from "../lib/cycle.js";
+import { calculateEventResult, getPlatoonByScore, calculateTieredBonus } from "../lib/calculations.js";
+import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -75,6 +75,7 @@ router.get("/my-performance", async (req, res) => {
     maxScore: parseFloat(r.maxScore as unknown as string),
     minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
     bonusValue: parseFloat(r.bonusValue as unknown as string),
+    bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
   }));
 
   const eventSummaries = [];
@@ -209,7 +210,8 @@ router.get("/my-performance", async (req, res) => {
   } else if (grossAverage !== null) {
     const proj = getPlatoonByScore(grossAverage, platoonRulesMapped);
     currentPlatoon = proj?.name ?? null;
-    currentBonus = eligible ? (proj?.bonusValue ?? null) : 0;
+    const minEventsForProjection = await getMinEventsForEligibility();
+    currentBonus = eligible ? calculateTieredBonus(grossAverage, totalEvents, minEventsForProjection, platoonRulesMapped) : 0;
     bonusStatus = eligible ? "projected" : "not_eligible";
   }
 

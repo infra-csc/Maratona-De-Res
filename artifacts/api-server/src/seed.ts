@@ -104,8 +104,10 @@ async function seed() {
 
   console.log(`✓ ${employees.length} colaboradores criados`);
 
-  // 7 quesitos fixos — pesos somam 20
-  // Nota máx = 5 → resultado máx = 5×20 = 100
+  // 7 quesitos históricos (modelo antigo) — mantidos como registro (inactive:
+  // não aparecem mais na lista global nem são anexados a eventos novos), mas
+  // preservados para não quebrar dados históricos de eventos/avaliações.
+  // Pesos somavam 20 (Nota máx = 5 → resultado máx = 5×20 = 100).
   const criteria = await db.insert(criteriaTable).values([
     {
       name: "Perda de Material/Estrutura",
@@ -114,6 +116,7 @@ async function seed() {
       responsibleAreaLabel: "Logística",
       defaultWeight: "3",
       displayOrder: 1,
+      active: false,
     },
     {
       name: "Ferramentas & Case",
@@ -122,6 +125,7 @@ async function seed() {
       responsibleAreaLabel: "Ferramentas e case",
       defaultWeight: "2",
       displayOrder: 2,
+      active: false,
     },
     {
       name: "Qualidade da Entrega",
@@ -130,6 +134,7 @@ async function seed() {
       responsibleAreaLabel: "Atendimento",
       defaultWeight: "3",
       displayOrder: 3,
+      active: false,
     },
     {
       name: "Obrigações Estruturais",
@@ -138,6 +143,7 @@ async function seed() {
       responsibleAreaLabel: "Cenografia",
       defaultWeight: "3",
       displayOrder: 4,
+      active: false,
     },
     {
       name: "Logística Reversa",
@@ -146,6 +152,7 @@ async function seed() {
       responsibleAreaLabel: "Logística",
       defaultWeight: "3",
       displayOrder: 5,
+      active: false,
     },
     {
       name: "Prazo de Entrega",
@@ -154,6 +161,7 @@ async function seed() {
       responsibleAreaLabel: "Produção",
       defaultWeight: "3",
       displayOrder: 6,
+      active: false,
     },
     {
       name: "Conduta e Comportamento",
@@ -162,20 +170,78 @@ async function seed() {
       responsibleAreaLabel: "Cenografia",
       defaultWeight: "3",
       displayOrder: 7,
+      active: false,
     },
   ]).returning();
 
-  console.log(`✓ ${criteria.length} critérios criados`);
+  console.log(`✓ ${criteria.length} critérios históricos criados (inativos)`);
 
-  // Pelotões — escala 0-100 (Nota × Peso, max 5×20=100)
+  // Matriz de Performance (novo modelo, vigente a partir do próximo período)
+  // Pesos somam 11 (Nota máx = 5 → resultado máx = 5×11 = 55, normalizado internamente).
+  const newCriteria = await db.insert(criteriaTable).values([
+    {
+      name: "Qualidade e Acabamento da Montagem",
+      description: "Avalia acabamento, materiais em bom estado e qualidade visual da montagem entregue.",
+      responsibleAreaId: areas[0].id, // Cenografia
+      responsibleAreaLabel: "Cenografia",
+      defaultWeight: "3",
+      displayOrder: 8,
+      active: true,
+    },
+    {
+      name: "Logística Reversa/Carga da Desmontagem",
+      description: "Avalia se a carga de retorno da desmontagem foi feita adequadamente e conforme o alinhamento combinado.",
+      responsibleAreaId: areas[1].id, // Logística
+      responsibleAreaLabel: "Logística",
+      defaultWeight: "2",
+      displayOrder: 9,
+      active: true,
+    },
+    {
+      name: "Prazo de Entrega/Arena Pronta no Horário",
+      description: "Avalia se a arena ficou pronta dentro do prazo/horário combinado, sem atrasos.",
+      responsibleAreaId: areas[2].id, // Produção
+      responsibleAreaLabel: "Produção",
+      defaultWeight: "2",
+      displayOrder: 10,
+      active: true,
+    },
+    {
+      name: "Carga na Saída do Galpão",
+      description: "Avalia a conferência e organização da carga na saída do galpão antes do evento.",
+      responsibleAreaId: areas[1].id, // Logística
+      responsibleAreaLabel: "Logística",
+      defaultWeight: "2",
+      displayOrder: 11,
+      active: true,
+    },
+    {
+      name: "Retorno de Material/Perdas ou Avarias",
+      description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.",
+      responsibleAreaId: areas[3].id, // Ferramentas e case
+      responsibleAreaLabel: "Ferramentas e case",
+      defaultWeight: "2",
+      displayOrder: 12,
+      active: true,
+    },
+  ]).returning();
+
+  console.log(`✓ ${newCriteria.length} critérios da Matriz de Performance criados (ativos)`);
+
+  // Pelotões — 7 faixas (2 sub-faixas cada em Quênia/Azul/Verde + 1 em Branco),
+  // com bônus base + bônus por evento extra além do mínimo de elegibilidade,
+  // sem teto (Simulador de Bônus).
   await db.insert(platoonRulesTable).values([
-    { name: "Pelotão Quênia", color: "#dc2626", minScore: "90", maxScore: "100", minInclusive: true, maxInclusive: true, bonusValue: "3200.00", description: "Top performers — bônus máximo Caju", displayOrder: 1 },
-    { name: "Pelotão Azul",   color: "#2563eb", minScore: "80", maxScore: "90",  minInclusive: true, maxInclusive: false, bonusValue: "2400.00", description: "Alta performance",   displayOrder: 2 },
-    { name: "Pelotão Verde",  color: "#16a34a", minScore: "70", maxScore: "80",  minInclusive: true, maxInclusive: false, bonusValue: "1600.00", description: "Boa performance",    displayOrder: 3 },
-    { name: "Pelotão Branco", color: "#64748b", minScore: "0",  maxScore: "70",  minInclusive: true, maxInclusive: false, bonusValue: "0.00",    description: "Precisa melhorar",  displayOrder: 4 },
+    { name: "Pelotão Quênia", color: "#dc2626", minScore: "95", maxScore: "100", minInclusive: true, maxInclusive: true,  bonusValue: "3700.00", bonusPerExtraEvent: "450.00", description: "Top performers — bônus máximo Caju", displayOrder: 1 },
+    { name: "Pelotão Quênia", color: "#dc2626", minScore: "90", maxScore: "95",  minInclusive: true, maxInclusive: false, bonusValue: "3200.00", bonusPerExtraEvent: "400.00", description: "Top performers — bônus máximo Caju", displayOrder: 2 },
+    { name: "Pelotão Azul",   color: "#2563eb", minScore: "85", maxScore: "90",  minInclusive: true, maxInclusive: false, bonusValue: "2700.00", bonusPerExtraEvent: "350.00", description: "Alta performance",   displayOrder: 3 },
+    { name: "Pelotão Azul",   color: "#2563eb", minScore: "80", maxScore: "85",  minInclusive: true, maxInclusive: false, bonusValue: "2200.00", bonusPerExtraEvent: "300.00", description: "Alta performance",   displayOrder: 4 },
+    { name: "Pelotão Verde",  color: "#16a34a", minScore: "75", maxScore: "80",  minInclusive: true, maxInclusive: false, bonusValue: "1700.00", bonusPerExtraEvent: "250.00", description: "Boa performance",    displayOrder: 5 },
+    { name: "Pelotão Verde",  color: "#16a34a", minScore: "70", maxScore: "75",  minInclusive: true, maxInclusive: false, bonusValue: "1200.00", bonusPerExtraEvent: "200.00", description: "Boa performance",    displayOrder: 6 },
+    { name: "Pelotão Branco", color: "#64748b", minScore: "0",  maxScore: "70",  minInclusive: true, maxInclusive: false, bonusValue: "0.00",    bonusPerExtraEvent: "0.00",   description: "Precisa melhorar",  displayOrder: 7 },
   ]);
 
-  console.log("✓ Regras de pelotão criadas");
+  console.log("✓ Regras de pelotão criadas (Simulador de Bônus, 7 faixas)");
 
   await db.insert(rulesTable).values([
     { key: "absence_penalty_per_absence", value: "50", description: "Penalidade por falta (desconto em pontos no resultado final, escala 0-100)" },

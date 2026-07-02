@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore, validateCalculationExample } from "../lib/calculations.js";
+import { calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore, calculateTieredBonus, validateCalculationExample } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
 
@@ -21,7 +21,7 @@ if (!validateCalculationExample()) {
 
 type PlatoonRuleMapped = {
   name: string; color: string; minScore: number; maxScore: number;
-  minInclusive: boolean; maxInclusive: boolean; bonusValue: number;
+  minInclusive: boolean; maxInclusive: boolean; bonusValue: number; bonusPerExtraEvent: number;
 };
 
 async function loadPlatoonRules(): Promise<PlatoonRuleMapped[]> {
@@ -32,6 +32,7 @@ async function loadPlatoonRules(): Promise<PlatoonRuleMapped[]> {
     maxScore: parseFloat(r.maxScore as unknown as string),
     minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
     bonusValue: parseFloat(r.bonusValue as unknown as string),
+    bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
   }));
 }
 
@@ -243,7 +244,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
       eligibilityReason = `Participou de ${participatedCount} de ${minEvents} eventos exigidos no ciclo`;
     }
 
-    const bonusValue = eligible ? (platoon?.bonusValue ?? 0) : 0;
+    const bonusValue = eligible ? calculateTieredBonus(finalResult, participatedCount, minEvents, platoonRules) : 0;
     const autoStatus = eligible ? "projected" : "not_eligible";
 
     // Preserva decisões de pagamento já acionadas manualmente.

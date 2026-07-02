@@ -72,6 +72,7 @@ export interface PlatoonRuleData {
   minInclusive: boolean;
   maxInclusive: boolean;
   bonusValue: number;
+  bonusPerExtraEvent?: number;
 }
 
 export function getPlatoonByScore(
@@ -90,6 +91,24 @@ export function getPlatoonByScore(
 export function calculateBonusByScore(score: number, rules: PlatoonRuleData[]): number {
   const platoon = getPlatoonByScore(score, rules);
   return platoon ? platoon.bonusValue : 0;
+}
+
+/**
+ * Bônus do Simulador: valor base da faixa (para o mínimo de eventos exigido)
+ * somado ao bônus por evento extra × quantidade de eventos além do mínimo.
+ * Sem teto — cada evento extra soma linearmente o valor da faixa atual.
+ */
+export function calculateTieredBonus(
+  score: number,
+  participatedEvents: number,
+  minEvents: number,
+  rules: PlatoonRuleData[],
+): number {
+  const platoon = getPlatoonByScore(score, rules);
+  if (!platoon) return 0;
+  const extraEvents = Math.max(0, participatedEvents - minEvents);
+  const perExtra = platoon.bonusPerExtraEvent ?? 0;
+  return Math.round((platoon.bonusValue + extraEvents * perExtra) * 100) / 100;
 }
 
 /**

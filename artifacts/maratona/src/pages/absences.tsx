@@ -18,9 +18,10 @@ const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e]
 type EntryKind = "penalty" | "merit";
 const ENTRY_OPTIONS: { value: string; label: string; hint: string; kind: EntryKind }[] = [
   { value: "falta", label: "Falta não justificada", hint: "−50 pts", kind: "penalty" },
-  { value: "atraso", label: "Atraso", hint: "−20 pts", kind: "penalty" },
+  { value: "atraso", label: "Atraso", hint: "−10 pts", kind: "penalty" },
   { value: "merito_galpao", label: "Mérito Galpão", hint: "+50 pts", kind: "merit" },
   { value: "merito_evento", label: "Mérito Evento", hint: "+25 pts", kind: "merit" },
+  { value: "colega_top", label: "Colega Top", hint: "+10 pts", kind: "merit" },
 ];
 const penaltyLabel = (t: string) => ENTRY_OPTIONS.find(o => o.value === t)?.label ?? t;
 const optionKind = (t: string): EntryKind => ENTRY_OPTIONS.find(o => o.value === t)?.kind ?? "penalty";

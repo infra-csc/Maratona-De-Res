@@ -30,6 +30,7 @@ router.get("/platoon-rules", async (_req, res) => {
     minScore: parseFloat(r.minScore as unknown as string),
     maxScore: parseFloat(r.maxScore as unknown as string),
     bonusValue: parseFloat(r.bonusValue as unknown as string),
+    bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
   })));
 });
 
@@ -68,7 +69,7 @@ function validatePlatoonRanges(ranges: RangeRow[]): string | null {
 }
 
 router.post("/platoon-rules", requireRole("admin", "rh", "diretoria"), async (req, res) => {
-  const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, description, displayOrder } = req.body;
+  const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, bonusPerExtraEvent, description, displayOrder } = req.body;
   if (!name || minScore === undefined || maxScore === undefined) {
     res.status(400).json({ error: "Campos obrigatórios: name, minScore, maxScore" });
     return;
@@ -97,15 +98,16 @@ router.post("/platoon-rules", requireRole("admin", "rh", "diretoria"), async (re
     minScore: String(minScore), maxScore: String(maxScore),
     minInclusive: minInclusive ?? true, maxInclusive: maxInclusive ?? false,
     bonusValue: String(bonusValue ?? 0),
+    bonusPerExtraEvent: String(bonusPerExtraEvent ?? 0),
     description: description ?? null, displayOrder: displayOrder ?? 0,
   }).returning();
   await audit(req.user!.userId, "create", "platoon_rules", rule.id, null, rule);
-  res.status(201).json({ ...rule, minScore: parseFloat(rule.minScore as unknown as string), maxScore: parseFloat(rule.maxScore as unknown as string), bonusValue: parseFloat(rule.bonusValue as unknown as string) });
+  res.status(201).json({ ...rule, minScore: parseFloat(rule.minScore as unknown as string), maxScore: parseFloat(rule.maxScore as unknown as string), bonusValue: parseFloat(rule.bonusValue as unknown as string), bonusPerExtraEvent: parseFloat(rule.bonusPerExtraEvent as unknown as string) });
 });
 
 router.patch("/platoon-rules/:id", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, description, active, displayOrder } = req.body;
+  const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, bonusPerExtraEvent, description, active, displayOrder } = req.body;
   const [before] = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
 
@@ -148,12 +150,13 @@ router.patch("/platoon-rules/:id", requireRole("admin", "rh", "diretoria"), asyn
     ...(minInclusive !== undefined && { minInclusive }),
     ...(maxInclusive !== undefined && { maxInclusive }),
     ...(bonusValue !== undefined && { bonusValue: String(bonusValue) }),
+    ...(bonusPerExtraEvent !== undefined && { bonusPerExtraEvent: String(bonusPerExtraEvent) }),
     ...(description !== undefined && { description }),
     ...(active !== undefined && { active }),
     ...(displayOrder !== undefined && { displayOrder }),
   }).where(eq(platoonRulesTable.id, id)).returning();
   await audit(req.user!.userId, "update", "platoon_rules", id, before, rule);
-  res.json({ ...rule, minScore: parseFloat(rule.minScore as unknown as string), maxScore: parseFloat(rule.maxScore as unknown as string), bonusValue: parseFloat(rule.bonusValue as unknown as string) });
+  res.json({ ...rule, minScore: parseFloat(rule.minScore as unknown as string), maxScore: parseFloat(rule.maxScore as unknown as string), bonusValue: parseFloat(rule.bonusValue as unknown as string), bonusPerExtraEvent: parseFloat(rule.bonusPerExtraEvent as unknown as string) });
 });
 
 router.delete("/platoon-rules/:id", requireRole("admin", "rh"), async (req, res) => {

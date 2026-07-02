@@ -11,6 +11,9 @@ export const platoonRulesTable = pgTable("platoon_rules", {
   minInclusive: boolean("min_inclusive").notNull().default(true),
   maxInclusive: boolean("max_inclusive").notNull().default(false),
   bonusValue: numeric("bonus_value", { precision: 10, scale: 2 }).notNull().default("0"),
+  // Bônus adicional somado por cada evento participado além do mínimo de
+  // elegibilidade (min_events_eligibility). Sem teto — soma linear por evento extra.
+  bonusPerExtraEvent: numeric("bonus_per_extra_event", { precision: 10, scale: 2 }).notNull().default("0"),
   description: text("description"),
   active: boolean("active").notNull().default(true),
   displayOrder: integer("display_order").notNull().default(0),
