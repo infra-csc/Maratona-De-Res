@@ -28,6 +28,7 @@
 - [Router mount-order shadowing](router-mount-shadowing.md) — blanket router.use(requireRole) in audit/integration 403s every fall-through route mounted AFTER it; mount must-reach routers (storage, cycles) before them
 - [Mandatory audio on evaluations](mandatory-audio-eval.md) — every eval submit requires audioUrl matching /objects/uploads/<id> (validate POST+PATCH+submit); upload via presigned PUT, playback via authed GET /storage/objects/*
 - [Conformity matrix calculation](conformity-matrix-calc.md) — `computeEventTeamResult` returns both raw `eventScore` and penalized `conformityScore`; quarterly recomputation must use `conformityScore` for cycle aggregation; `employee_event_results.finalEventScore` stores the penalized score
+- [Calibration anytime](calibration-anytime.md) — calibration picker shows ALL cycle events; scoreless criteria calibratable; inline weight edit admin/rh only, finalize still needs all evals
 - [Tiered bonus base vs extra](tiered-bonus-extra.md) — extra bonus = sum of per-extra-event tier bonus (each event's OWN score, not overall); snapshot field, only refreshed on cycle close
 - [Stale project-reference typecheck cache](tsc-project-reference-stale-cache.md) — after editing a shared lib/* schema, rebuild it (`tsc -b --force`) before typechecking dependents, or phantom "property missing" errors appear
 - [OpenAPI yaml is hand-maintained](openapi-yaml-manual-source.md) — route code changes alone don't reach the generated client; edit lib/api-spec/openapi.yaml then rerun codegen

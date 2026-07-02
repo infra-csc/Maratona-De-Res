@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, useUpdateEventCriteria, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,10 @@ export default function CalibrationsPage() {
   const [calScores, setCalScores] = useState<Record<number, string>>({});
   const [calReasons, setCalReasons] = useState<Record<number, string>>({});
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
+  const [weightEdits, setWeightEdits] = useState<Record<number, string>>({});
+  const [savingWeightId, setSavingWeightId] = useState<number | null>(null);
+  // O backend restringe a edição de pesos do evento a admin/RH.
+  const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
   const { data: events } = useGetEvents();
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
@@ -52,21 +56,20 @@ export default function CalibrationsPage() {
     { query: { enabled: !!selectedEventId, queryKey: calQKey } }
   );
 
-  // Only events that finished all evaluations OR were closed by RH in event management.
-  // evaluationProgress is a 0–1 fraction (submitted / total evaluations).
-  const calibratableEvents = (events ?? []).filter(
-    e => (e.evaluationProgress ?? 0) >= 1 || e.status === "closed" || e.forcedClosed
-  );
+  // Todos os eventos do ciclo aparecem — a calibração pode começar a qualquer
+  // momento, inclusive antes de todas as avaliações serem enviadas.
+  const calibratableEvents = events ?? [];
   const pickedEvent = calibratableEvents.find(e => e.id === selectedEventId);
 
-  // Clear selection if the picked event is no longer calibratable (e.g. reopened by RH)
+  // Clear selection if the picked event no longer exists (e.g. removed/out of cycle)
   useEffect(() => {
-    if (selectedEventId && !calibratableEvents.some(e => e.id === selectedEventId)) {
+    if (selectedEventId && (events?.length ?? 0) > 0 && !calibratableEvents.some(e => e.id === selectedEventId)) {
       setSelectedEventId(null);
       setCalScores({});
       setCalReasons({});
+      setWeightEdits({});
     }
-  }, [selectedEventId, calibratableEvents]);
+  }, [selectedEventId, calibratableEvents, events]);
 
   const createMutation = useCreateCalibration({
     mutation: {
@@ -87,6 +90,51 @@ export default function CalibrationsPage() {
       },
     },
   });
+
+  // Edição de peso por critério, direto na calibração. O PUT aceita payload
+  // parcial (o backend mescla com as linhas não alteradas) e recalcula o
+  // resultado na hora se o evento já estiver fechado.
+  const updateWeightMutation = useUpdateEventCriteria({
+    mutation: {
+      onSuccess: (data, variables) => {
+        qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        qc.invalidateQueries({ queryKey: fbQKey });
+        setSavingWeightId(null);
+        const savedId = variables.data.criteria?.[0]?.criterionId;
+        if (savedId != null) {
+          setWeightEdits(prev => {
+            const next = { ...prev };
+            delete next[savedId];
+            return next;
+          });
+        }
+        if (data.warnings && data.warnings.length > 0) {
+          toast({ title: "Peso salvo", description: data.warnings.join(" "), variant: "destructive" });
+        } else {
+          toast({ title: "Peso salvo" });
+        }
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Erro ao salvar peso", description: e.message, variant: "destructive" });
+        setSavingWeightId(null);
+      },
+    },
+  });
+
+  function saveWeight(critId: number, active: boolean) {
+    const raw = (weightEdits[critId] ?? "").replace(",", ".").trim();
+    const w = Number(raw);
+    if (!raw || isNaN(w) || w <= 0) {
+      toast({ title: "Peso inválido", description: "Informe um peso maior que zero.", variant: "destructive" });
+      return;
+    }
+    setSavingWeightId(critId);
+    updateWeightMutation.mutate({
+      id: selectedEventId!,
+      data: { criteria: [{ criterionId: critId, active, weight: w }] },
+    });
+  }
 
   // Mutation usada na gravação em lote ("salvar todas") — sem toast por item,
   // para não disparar uma notificação por critério. O resumo é exibido no fim.
@@ -170,8 +218,10 @@ export default function CalibrationsPage() {
   }
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
+  // Todo critério ativo sem calibração conta como pendente — mesmo os que ainda
+  // não receberam nota da área (a calibração pode preencher a lacuna).
   const pendingCount = selectedEventId
-    ? activeCriteria.filter(c => getAvgScore(c.criterionId) != null && !getCalibration(c.criterionId)).length
+    ? activeCriteria.filter(c => !getCalibration(c.criterionId)).length
     : 0;
 
   // Quantos critérios têm uma nota calibrada preenchida (e válida) pronta para salvar.
@@ -342,7 +392,7 @@ export default function CalibrationsPage() {
                     </span>
                   ) : (
                     <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60]">
-                      {calibratableEvents.length === 0 ? "Nenhum evento pronto para calibração" : "Busque um evento para calibrar..."}
+                      {calibratableEvents.length === 0 ? "Nenhum evento no ciclo atual" : "Busque um evento para calibrar..."}
                     </span>
                   )}
                   <ChevronsUpDown size={18} className="shrink-0 text-[#191c1e]" />
@@ -359,13 +409,16 @@ export default function CalibrationsPage() {
                           key={ev.id}
                           value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
                           data-testid={`option-event-${ev.id}`}
-                          onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setEventPickerOpen(false); }}
+                          onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); }}
                           className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
                         >
                           <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
-                          <span className="flex flex-col min-w-0">
+                          <span className="flex flex-col min-w-0 flex-1">
                             <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
                             {formatEventSubtitle(ev) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
+                          </span>
+                          <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase shrink-0 ${statusChip(ev.status).cls}`}>
+                            {statusChip(ev.status).label}
                           </span>
                         </CommandItem>
                       ))}
@@ -378,7 +431,7 @@ export default function CalibrationsPage() {
             <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
               <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
               <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#444933]">
-                Apenas eventos com todas as avaliações concluídas ou já fechados pelo RH na gestão de eventos aparecem nesta lista.
+                Todos os eventos do ciclo aparecem nesta lista. É possível calibrar a qualquer momento — inclusive critérios que ainda não receberam nota da área — e ajustar os pesos de cada critério.
               </p>
             </div>
           </div>
@@ -511,7 +564,35 @@ export default function CalibrationsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
                     <div className="min-w-0">
                       <div className="font-black italic uppercase tracking-tight text-[#191c1e]">{c.criterionName}</div>
-                      <div className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
+                      {canEditWeights ? (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-[11px] font-bold italic uppercase text-[#747a60]">Peso</span>
+                          <input
+                            data-testid={`input-weight-${c.criterionId}`}
+                            type="text"
+                            inputMode="decimal"
+                            value={weightEdits[c.criterionId] ?? String(c.weightOverride ?? c.originalWeight ?? 0)}
+                            onChange={e => {
+                              const val = e.target.value.replace(/[^0-9.,]/g, "");
+                              setWeightEdits(prev => ({ ...prev, [c.criterionId]: val }));
+                            }}
+                            className="h-7 w-16 px-2 border-2 border-[#191c1e] text-sm font-black italic bg-white focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                          />
+                          {weightEdits[c.criterionId] != null && Number(weightEdits[c.criterionId].replace(",", ".")) !== Number(c.weightOverride ?? c.originalWeight ?? 0) && (
+                            <button
+                              data-testid={`button-save-weight-${c.criterionId}`}
+                              type="button"
+                              disabled={savingWeightId === c.criterionId && updateWeightMutation.isPending}
+                              onClick={() => saveWeight(c.criterionId, c.active)}
+                              className="h-7 px-2.5 bg-[#ccff00] border-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider disabled:opacity-50 hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors"
+                            >
+                              {savingWeightId === c.criterionId && updateWeightMutation.isPending ? "..." : "Salvar peso"}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {c.responsibleAreaName && (
@@ -523,9 +604,11 @@ export default function CalibrationsPage() {
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#506600] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1">
                           <CheckCircle size={12} /> Calibrado
                         </span>
-                      ) : avg != null ? (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border-2 border-[#191c1e] px-2 py-1">Pendente</span>
-                      ) : null}
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border-2 border-[#191c1e] px-2 py-1">
+                          {avg != null ? "Pendente" : "Sem nota da área"}
+                        </span>
+                      )}
                     </div>
                   </div>
 
