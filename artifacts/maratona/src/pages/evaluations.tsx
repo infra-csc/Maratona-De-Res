@@ -259,6 +259,61 @@ export default function EvaluationsPage() {
   const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
   const doneEvents = evaluatorEventStats.filter(s => s.done).map(s => s.event);
 
+  // Consultation mode: when a manager picks an Avaliador WITHOUT picking an
+  // Evento, the filter must still return something — a cross-event overview
+  // of that avaliador's assigned events, instead of the generic empty state.
+  // Same query-key pattern as the evaluator overview above (deduped/cached).
+  const crossEventLookupActive = isConsultation && selectedAvaliadorId != null && !selectedEventId;
+  const crossEventCriteriaQueries = useQueries({
+    queries: crossEventLookupActive
+      ? activeEvents.map(ev => ({
+          queryKey: ["event-criteria", ev.id] as unknown[],
+          queryFn: () => getEventCriteria(ev.id),
+        }))
+      : [],
+  });
+  const crossEventDetailQueries = useQueries({
+    queries: crossEventLookupActive
+      ? activeEvents.map(ev => ({
+          queryKey: getGetEventQueryKey(ev.id),
+          queryFn: () => getEvent(ev.id),
+        }))
+      : [],
+  });
+  const crossEventEvalQueries = useQueries({
+    queries: crossEventLookupActive
+      ? activeEvents.map(ev => ({
+          queryKey: getGetEvaluationsQueryKey({ eventId: ev.id }),
+          queryFn: () => getEvaluations({ eventId: ev.id }),
+        }))
+      : [],
+  });
+  const crossEventAvaliadorStats = crossEventLookupActive
+    ? activeEvents.map((ev, i) => {
+        const areaIds = new Set(
+          (crossEventDetailQueries[i]?.data?.areaAssignments ?? [])
+            .filter(a => a.evaluatorUserId === selectedAvaliadorId)
+            .map(a => a.areaId),
+        );
+        const crit = (crossEventCriteriaQueries[i]?.data ?? []).filter(
+          c => c.active && c.responsibleAreaId != null && areaIds.has(c.responsibleAreaId),
+        );
+        const evs = crossEventEvalQueries[i]?.data ?? [];
+        const submitted = crit.filter(
+          c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === selectedAvaliadorId)?.status === "submitted",
+        ).length;
+        const total = crit.length;
+        return { event: ev, total, submitted, done: total > 0 && submitted === total, relevant: total > 0 };
+      }).filter(s => s.relevant)
+    : [];
+  const crossEventAvaliadorFiltered = statusFilter === "all"
+    ? crossEventAvaliadorStats
+    : crossEventAvaliadorStats.filter(s => (statusFilter === "done" ? s.done : !s.done));
+  const crossEventAvaliadorEvents = [...crossEventAvaliadorFiltered]
+    .sort((a, b) => (a.event.name ?? "").localeCompare(b.event.name ?? "", "pt-BR", { sensitivity: "base" }))
+    .map(s => s.event);
+  const selectedAvaliadorName = allAvaliadores.find(a => a.id === selectedAvaliadorId)?.name ?? null;
+
   // If the selected event stops being selectable (closed or criteria unconfirmed
   // server-side), clear the selection so trigger text and loaded data stay in sync.
   useEffect(() => {
@@ -777,7 +832,38 @@ export default function EvaluationsPage() {
           </section>
         )}
 
-        {!selectedEventId ? (
+        {!selectedEventId && crossEventLookupActive ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <User size={22} />
+              <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">Avaliações de {selectedAvaliadorName}</h3>
+            </div>
+            <p className="text-sm text-[#444933] italic px-1 -mt-1">
+              Todos os eventos com avaliações atribuídas a este avaliador. Clique em um evento para consultar os critérios em detalhe.
+            </p>
+            {crossEventAvaliadorEvents.length === 0 ? (
+              <div className="text-center py-24 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
+                {statusFilter === "pending"
+                  ? `Nenhuma avaliação pendente para ${selectedAvaliadorName}.`
+                  : statusFilter === "done"
+                    ? `Nenhuma avaliação concluída para ${selectedAvaliadorName}.`
+                    : `Nenhum evento com avaliações atribuídas a ${selectedAvaliadorName}.`}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {crossEventAvaliadorEvents.map(ev => (
+                  <EvaluatorEventCard
+                    key={ev.id}
+                    event={ev}
+                    userId={selectedAvaliadorId ?? undefined}
+                    selected={false}
+                    onSelect={() => setSelectedEventId(ev.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : !selectedEventId ? (
           <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-[#191c1e] bg-white">
             <div className="w-16 h-16 border-2 border-[#191c1e] bg-[#ccff00] flex items-center justify-center mb-4 skew-x-[-6deg]">
               <CheckCircle className="text-[#161e00] skew-x-[6deg]" size={32} />
