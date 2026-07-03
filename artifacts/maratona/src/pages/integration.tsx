@@ -506,6 +506,17 @@ export default function IntegrationPage() {
                 </div>
               )}
 
+              {historicalPreview.cycleFallback && historicalPreview.cycleFallback.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-blue-700 uppercase mb-2 flex items-center gap-1.5">
+                    <Calendar size={14} /> {historicalPreview.cycleFallback.length} evento(s) fora do período do ciclo — serão vinculados ao ciclo atual
+                  </p>
+                  <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
+                    {historicalPreview.cycleFallback.map((msg, i) => <li key={i}>• {msg}</li>)}
+                  </ul>
+                </div>
+              )}
+
               {historicalPreview.events.length > 0 && (
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
                   <table className="w-full text-xs">

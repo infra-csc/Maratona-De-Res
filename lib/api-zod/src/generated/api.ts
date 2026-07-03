@@ -2021,6 +2021,7 @@ export const ImportHistoricalResultsResponse = zod.object({
   "matched": zod.number(),
   "unmatched": zod.array(zod.string()),
   "ambiguous": zod.array(zod.string()),
+  "cycleFallback": zod.array(zod.string()).optional().describe('Eventos cuja data não cai em nenhum ciclo cadastrado e que serão vinculados ao ciclo atual automaticamente.'),
   "events": zod.array(zod.object({
   "eventName": zod.string(),
   "date": zod.string(),

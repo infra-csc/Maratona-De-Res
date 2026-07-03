@@ -3365,6 +3365,11 @@ components:
           type: array
           items:
             type: string
+        cycleFallback:
+          type: array
+          items:
+            type: string
+          description: Eventos cuja data não cai em nenhum ciclo cadastrado e que serão vinculados ao ciclo atual automaticamente.
         events:
           type: array
           items:

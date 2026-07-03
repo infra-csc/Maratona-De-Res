@@ -984,6 +984,8 @@ export interface HistoricalImportResult {
   matched: number;
   unmatched: string[];
   ambiguous: string[];
+  /** Eventos cuja data não cai em nenhum ciclo cadastrado e que serão vinculados ao ciclo atual automaticamente. */
+  cycleFallback?: string[];
   events: HistoricalImportEventPlan[];
   /** Nomes de colaboradores não cadastrados que serão criados automaticamente ao confirmar. */
   employeesToCreate?: string[];

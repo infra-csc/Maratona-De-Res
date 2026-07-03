@@ -516,6 +516,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
   const errors: string[] = [...parseErrors];
   const unmatched: string[] = [];
   const ambiguous: string[] = [];
+  const cycleFallback: string[] = [];
 
   const allEmployees = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable);
   const employeesByName = new Map<string, { id: number; name: string }[]>();
@@ -575,6 +576,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
     ? await db.select().from(eventsTable).where(inArray(eventsTable.startDate, distinctDates))
     : [];
   const allCycles = await db.select().from(cyclesTable);
+  const fallbackCycle = await getCurrentCycle();
 
   type GroupPlan = {
     eventName: string; date: string; score: number | null; participantsCount: number;
@@ -613,12 +615,16 @@ router.post("/integration/import/historical-results", async (req, res) => {
       }
     } else {
       const cycle = allCycles.find(c => c.startDate && c.endDate && g.date >= c.startDate && g.date <= c.endDate);
-      if (!cycle) {
-        errors.push(`Evento "${g.eventName}" (${g.date}): nenhum ciclo cobre esta data — configure o ciclo antes de importar`);
-        action = "conflict";
-      } else {
+      if (cycle) {
         action = "create";
         cycleId = cycle.id;
+      } else if (fallbackCycle) {
+        cycleFallback.push(`Evento "${g.eventName}" (${g.date}): nenhum ciclo cobre esta data — será vinculado ao ciclo atual (${fallbackCycle.name ?? fallbackCycle.id})`);
+        action = "create";
+        cycleId = fallbackCycle.id;
+      } else {
+        errors.push(`Evento "${g.eventName}" (${g.date}): nenhum ciclo cobre esta data e não há ciclo cadastrado — configure um ciclo antes de importar`);
+        action = "conflict";
       }
     }
 
@@ -631,6 +637,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
     matched: parsed.filter(r => r.employeeId !== null).length,
     unmatched,
     ambiguous,
+    cycleFallback,
     events: plans,
     employeesToCreate: Array.from(toCreateNames.values()),
   };
