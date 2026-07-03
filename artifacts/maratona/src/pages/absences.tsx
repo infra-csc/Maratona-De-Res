@@ -5,12 +5,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, UserMinus, Download, Search, AlertTriangle, Award } from "lucide-react";
+import { Plus, Trash2, UserMinus, Download, Search, AlertTriangle, Award, ChevronsUpDown, Check, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
+import { cn } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -32,6 +35,8 @@ export default function AbsencesPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
+  const [eventPickerOpen, setEventPickerOpen] = useState(false);
 
   const qKey = getGetAbsencesQueryKey();
   const { data: absences, isLoading } = useGetAbsences(undefined, { query: { queryKey: qKey } });
@@ -42,6 +47,10 @@ export default function AbsencesPage() {
     defaultValues: { quantity: 1, penaltyType: "atraso" },
   });
   const selectedType = watch("penaltyType");
+  const watchedEmployeeId = watch("employeeId");
+  const watchedEventId = watch("eventId");
+  const selectedEmployee = (employees ?? []).find(e => e.id === Number(watchedEmployeeId));
+  const selectedEvent = (events ?? []).find(e => e.id === Number(watchedEventId));
 
   const createMutation = useCreateAbsence({
     mutation: {
@@ -159,27 +168,92 @@ export default function AbsencesPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento <span className="text-[#747a60] not-italic normal-case">(opcional p/ mérito galpão e falta no ciclo)</span></Label>
-                      <Select onValueChange={handleEventChange}>
-                        <SelectTrigger data-testid="select-penalty-event" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
-                          <SelectValue placeholder="Selecione o evento..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(events ?? []).map(e => (
-                            <SelectItem key={e.id} value={String(e.id)}>{e.name}{e.cycleName ? ` (${e.cycleName})` : ""}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            role="combobox"
+                            aria-expanded={eventPickerOpen}
+                            data-testid="select-penalty-event"
+                            className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-none border-2 border-[#191c1e] bg-white text-left"
+                          >
+                            <span className={cn("truncate text-sm", selectedEvent ? "font-bold italic text-[#191c1e]" : "font-bold italic uppercase text-xs tracking-wider text-[#747a60]")}>
+                              {selectedEvent ? `${selectedEvent.name}${selectedEvent.cycleName ? ` (${selectedEvent.cycleName})` : ""}` : "Selecione o evento..."}
+                            </span>
+                            <span className="flex items-center gap-1 shrink-0">
+                              {selectedEvent && (
+                                <X
+                                  size={14}
+                                  className="text-[#747a60] hover:text-[#ba1a1a]"
+                                  onClick={e => { e.stopPropagation(); setValue("eventId", null); }}
+                                />
+                              )}
+                              <ChevronsUpDown size={16} className="text-[#191c1e] opacity-60" />
+                            </span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                          <Command className="rounded-none">
+                            <CommandInput data-testid="input-event-search" placeholder="Buscar por evento..." className="italic" />
+                            <CommandList className="max-h-[280px]">
+                              <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                {(events ?? []).map(e => (
+                                  <CommandItem
+                                    key={e.id}
+                                    value={`${e.name} ${e.cycleName ?? ""}`}
+                                    data-testid={`option-event-${e.id}`}
+                                    onSelect={() => { handleEventChange(String(e.id)); setEventPickerOpen(false); }}
+                                    className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2 items-start"
+                                  >
+                                    <Check size={16} className={cn("mt-0.5 shrink-0", Number(watchedEventId) === e.id ? "opacity-100" : "opacity-0")} />
+                                    <span className="flex flex-col min-w-0">
+                                      <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{e.name}</span>
+                                      {e.cycleName && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{e.cycleName}</span>}
+                                    </span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Colaborador <span className="text-[#ba1a1a]">*</span></Label>
-                      <Select onValueChange={v => setValue("employeeId", Number(v))}>
-                        <SelectTrigger data-testid="select-absence-employee" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
-                          <SelectValue placeholder="Busque pelo nome..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(employees ?? []).map(e => (
-                            <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                          ))}
+                      <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            role="combobox"
+                            aria-expanded={employeePickerOpen}
+                            data-testid="select-absence-employee"
+                            className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-none border-2 border-[#191c1e] bg-white text-left"
+                          >
+                            <span className={cn("truncate text-sm", selectedEmployee ? "font-black italic uppercase text-[#191c1e]" : "font-bold italic uppercase text-xs tracking-wider text-[#747a60]")}>
+                              {selectedEmployee ? selectedEmployee.name : "Busque pelo nome..."}
+                            </span>
+                            <ChevronsUpDown size={16} className="text-[#191c1e] opacity-60 shrink-0" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                          <Command className="rounded-none">
+                            <CommandInput data-testid="input-employee-search" placeholder="Buscar pelo nome..." className="italic" />
+                            <CommandList className="max-h-[280px]">
+                              <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum colaborador encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                {(employees ?? []).map(e => (
+                                  <CommandItem
+                                    key={e.id}
+                                    value={e.name}
+                                    data-testid={`option-employee-${e.id}`}
+                                    onSelect={() => { setValue("employeeId", e.id); setEmployeePickerOpen(false); }}
+                                    className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2"
+                                  >
+                                    <Check size={16} className={cn("shrink-0", Number(watchedEmployeeId) === e.id ? "opacity-100" : "opacity-0")} />
+                                    <span className="font-black italic uppercase text-sm truncate">{e.name}</span>
+                                  </CommandItem>
+                                ))}
                         </SelectContent>
                       </Select>
                     </div>
