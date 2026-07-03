@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -141,6 +141,16 @@ export default function EvaluationsPage() {
   const [launching, setLaunching] = useState(false);
 
   const { data: events } = useGetEvents({});
+
+  // Lista global de avaliadores (independe do evento selecionado) para permitir
+  // filtrar por Avaliador antes ou sem escolher um Evento.
+  const { data: allUsers } = useGetUsers({
+    query: { enabled: isConsultation, queryKey: ["users"] as unknown[] },
+  });
+  const allAvaliadores = (allUsers ?? [])
+    .filter(u => u.role === "avaliador" && u.active)
+    .map(u => ({ id: u.id, name: u.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
 
   const { data: participants } = useGetEventParticipants(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-participants", selectedEventId] as unknown[] },
@@ -518,7 +528,7 @@ export default function EvaluationsPage() {
                   key={ev.id}
                   value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
                   data-testid={`option-event-${ev.id}`}
-                  onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorId(null); setStatusFilter("all"); setEventPickerOpen(false); }}
+                  onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setEventPickerOpen(false); }}
                   className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
                 >
                   <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
@@ -600,16 +610,19 @@ export default function EvaluationsPage() {
                   <Select
                     value={selectedAvaliadorId != null ? String(selectedAvaliadorId) : "__all"}
                     onValueChange={(v) => setSelectedAvaliadorId(v === "__all" ? null : Number(v))}
-                    disabled={!selectedEventId || avaliadorStats.length === 0}
                   >
                     <SelectTrigger data-testid="select-avaliador" className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0 disabled:opacity-50">
-                      <SelectValue placeholder={selectedEventId ? "Todos os avaliadores" : "Selecione um evento primeiro"} />
+                      <SelectValue placeholder="Todos os avaliadores" />
                     </SelectTrigger>
                     <SelectContent className="rounded-none border-2 border-[#191c1e]">
                       <SelectItem value="__all">Todos os avaliadores</SelectItem>
-                      {avaliadorStats.map(av => (
-                        <SelectItem key={av.id} value={String(av.id)}>{av.name} ({av.submitted}/{av.total})</SelectItem>
-                      ))}
+                      {selectedEventId && avaliadorStats.length > 0
+                        ? avaliadorStats.map(av => (
+                            <SelectItem key={av.id} value={String(av.id)}>{av.name} ({av.submitted}/{av.total})</SelectItem>
+                          ))
+                        : allAvaliadores.map(av => (
+                            <SelectItem key={av.id} value={String(av.id)}>{av.name}</SelectItem>
+                          ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -621,7 +634,6 @@ export default function EvaluationsPage() {
                   <Select
                     value={statusFilter}
                     onValueChange={(v) => setStatusFilter(v as "all" | "pending" | "done")}
-                    disabled={!selectedEventId}
                   >
                     <SelectTrigger data-testid="select-status-filter" className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0 disabled:opacity-50">
                       <SelectValue placeholder="Todas" />
