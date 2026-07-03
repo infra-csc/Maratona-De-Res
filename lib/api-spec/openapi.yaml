@@ -2693,7 +2693,7 @@ components:
           type: ["integer", "null"]
         penaltyType:
           type: string
-          enum: [falta, atraso, merito_galpao, merito_evento]
+          enum: [falta, atraso, inconformidade_ponto, merito_galpao, merito_evento, colega_top]
         date:
           type: string
         quantity:

@@ -1518,7 +1518,7 @@ export const GetAbsencesResponse = zod.array(GetAbsencesResponseItem)
 export const CreateAbsenceBody = zod.object({
   "employeeId": zod.number(),
   "eventId": zod.number().nullish(),
-  "penaltyType": zod.enum(['falta', 'atraso', 'merito_galpao', 'merito_evento']),
+  "penaltyType": zod.enum(['falta', 'atraso', 'inconformidade_ponto', 'merito_galpao', 'merito_evento', 'colega_top']),
   "date": zod.string(),
   "quantity": zod.number().min(1).optional(),
   "reason": zod.string().optional()

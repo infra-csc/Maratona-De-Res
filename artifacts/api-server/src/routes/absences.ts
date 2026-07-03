@@ -17,7 +17,14 @@ router.use(requireAuth);
 export const PENALTY_CATALOG: Record<string, { label: string; points: number | null }> = {
   falta: { label: "Ausência Não Comunicada", points: 50 },
   atraso: { label: "Atraso > 30 Minutos", points: 10 },
+  inconformidade_ponto: { label: "Inconformidade de Ponto", points: 10 },
 };
+
+/**
+ * Tipos de lançamento que exigem um evento vinculado (não podem ser
+ * lançados apenas no ciclo, sem uma prova/evento específico).
+ */
+export const EVENT_REQUIRED_TYPES = new Set(["inconformidade_ponto"]);
 
 /**
  * Catálogo de méritos (Pontos por Desempenho, matriz oficial). Pontos
@@ -86,6 +93,10 @@ router.post("/absences", requireRole("admin", "rh", "diretoria"), async (req, re
   const kind = catalogKind(type);
   if (!kind) {
     res.status(400).json({ error: "Tipo de lançamento inválido" });
+    return;
+  }
+  if (EVENT_REQUIRED_TYPES.has(type) && !eventId) {
+    res.status(400).json({ error: "Este tipo de lançamento exige um evento vinculado" });
     return;
   }
   const qty = quantity ?? 1;

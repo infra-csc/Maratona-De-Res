@@ -19,15 +19,17 @@ const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
 type EntryKind = "penalty" | "merit";
-const ENTRY_OPTIONS: { value: string; label: string; hint: string; kind: EntryKind }[] = [
+const ENTRY_OPTIONS: { value: string; label: string; hint: string; kind: EntryKind; requiresEvent?: boolean }[] = [
   { value: "falta", label: "Ausência Não Comunicada", hint: "−50 pts", kind: "penalty" },
   { value: "atraso", label: "Atraso > 30 Minutos", hint: "−10 pts", kind: "penalty" },
+  { value: "inconformidade_ponto", label: "Inconformidade de Ponto", hint: "−10 pts", kind: "penalty", requiresEvent: true },
   { value: "merito_galpao", label: "Rei do Galpão", hint: "+50 pts", kind: "merit" },
   { value: "merito_evento", label: "Estrela do Evento", hint: "+25 pts", kind: "merit" },
   { value: "colega_top", label: "Colega Top", hint: "+10 pts", kind: "merit" },
 ];
 const penaltyLabel = (t: string) => ENTRY_OPTIONS.find(o => o.value === t)?.label ?? t;
 const optionKind = (t: string): EntryKind => ENTRY_OPTIONS.find(o => o.value === t)?.kind ?? "penalty";
+const optionRequiresEvent = (t: string) => ENTRY_OPTIONS.find(o => o.value === t)?.requiresEvent ?? false;
 
 export default function AbsencesPage() {
   const { user } = useAuth();
@@ -143,9 +145,15 @@ export default function AbsencesPage() {
                     </DialogTitle>
                   </DialogHeader>
                   <form
-                    onSubmit={handleSubmit(d => createMutation.mutate({
-                      data: { ...d, employeeId: Number(d.employeeId), eventId: d.eventId ? Number(d.eventId) : null, quantity: Number(d.quantity) },
-                    }))}
+                    onSubmit={handleSubmit(d => {
+                      if (optionRequiresEvent(d.penaltyType) && !d.eventId) {
+                        toast({ title: "Evento obrigatório", description: `${penaltyLabel(d.penaltyType)} exige um evento vinculado.`, variant: "destructive" });
+                        return;
+                      }
+                      createMutation.mutate({
+                        data: { ...d, employeeId: Number(d.employeeId), eventId: d.eventId ? Number(d.eventId) : null, quantity: Number(d.quantity) },
+                      });
+                    })}
                     className="space-y-4 pt-4"
                   >
                     <div className="space-y-1.5">
@@ -167,7 +175,13 @@ export default function AbsencesPage() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento <span className="text-[#747a60] not-italic normal-case">(opcional p/ mérito galpão e falta no ciclo)</span></Label>
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">
+                        Evento {optionRequiresEvent(selectedType) ? (
+                          <span className="text-[#ba1a1a]">*</span>
+                        ) : (
+                          <span className="text-[#747a60] not-italic normal-case">(opcional p/ mérito galpão e falta no ciclo)</span>
+                        )}
+                      </Label>
                       <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
                         <PopoverTrigger asChild>
                           <button
