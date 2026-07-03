@@ -16,12 +16,14 @@ import { useQuery } from "@tanstack/react-query";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 
 interface PerformanceData {
-  employee: { id: number; name: string; department: string; functionName: string };
+  employee: { id: number; name: string; department: string; functionName: string; eligible?: boolean; eligibilityStatus?: string | null };
   cycle: { id: number; name: string };
   summary: {
     grossAverage: number | null;
     currentPlatoon: string | null;
     projectedBonus: number | null;
+    bonusStatus: string | null;
+    eligible: boolean;
     totalEvents: number;
     closedEvents: number;
     openEvents: number;
@@ -80,6 +82,17 @@ interface CriterionDetail {
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null): string {
+  if (!isQuarterClosed) return "Valor parcial — projeção do ciclo em andamento";
+  switch (bonusStatus) {
+    case "paid": return "Bônus pago";
+    case "approved": return "Aprovado — aguardando pagamento";
+    case "scheduled": return "Pagamento agendado";
+    case "blocked": return "Bloqueado — contate o RH";
+    default: return "Resultado final — aguardando aprovação do RH";
+  }
 }
 
 function EventCard({ event }: { event: EventSummary }) {
@@ -257,6 +270,18 @@ export default function MyPerformancePage() {
           <span className="text-xs font-bold uppercase italic text-[#747a60]">{data?.employee.functionName}</span>
         </div>
 
+      {data && summary && (
+        <div className={cn(
+          "border-2 border-[#191c1e] px-4 py-3 text-xs font-bold italic uppercase flex items-center gap-2",
+          summary.isQuarterClosed ? "bg-[#e3f5cf] text-[#506600]" : "bg-[#fff3cd] text-[#664d03]"
+        )}>
+          {summary.isQuarterClosed ? <CheckCircle2 size={16} /> : <Clock size={16} />}
+          {summary.isQuarterClosed
+            ? "Ciclo fechado — resultado oficial"
+            : "Ciclo em andamento — nota, pelotão e bônus são projeções parciais e podem mudar até o fechamento oficial"}
+        </div>
+      )}
+
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -281,12 +306,17 @@ export default function MyPerformancePage() {
               <div className="z-10">
                 <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Média do Ciclo</p>
                 {result !== null ? (
-                  <h2 className="text-[40px] leading-none italic font-black mt-2">{result.toFixed(1)}<span className="text-[18px] text-[#747a60]">/100</span></h2>
+                  <>
+                    <h2 className="text-[40px] leading-none italic font-black mt-2">{result.toFixed(1)}<span className="text-[18px] text-[#747a60]">/100</span></h2>
+                    <p className={cn(
+                      "text-[10px] font-bold uppercase italic mt-2",
+                      summary.isQuarterClosed ? "text-[#506600]" : "text-[#a15c00]"
+                    )}>
+                      {summary.isQuarterClosed ? "Avaliado Oficialmente" : "Projeção Parcial"}
+                    </p>
+                  </>
                 ) : (
                   <div className="text-lg font-medium text-[#747a60] mt-4 italic">-</div>
-                )}
-                {summary.isQuarterClosed && (
-                  <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Avaliado Oficialmente</p>
                 )}
               </div>
               <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
@@ -320,10 +350,15 @@ export default function MyPerformancePage() {
             <div className="bg-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden shadow-[4px_4px_0px_0px_#191c1e]">
               <div className="z-10">
                 <p className="text-xs font-bold uppercase italic tracking-wider text-[#161e00]">Bônus Caju</p>
-                {summary.projectedBonus !== null ? (
+                {!summary.eligible ? (
+                  <>
+                    <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</h2>
+                    <p className="text-[10px] font-bold uppercase italic text-[#862200] mt-2">Não elegível para bônus neste ciclo</p>
+                  </>
+                ) : summary.projectedBonus !== null ? (
                   <>
                     <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">{fmtBRL(summary.projectedBonus)}</h2>
-                    <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">Valor parcial — validado apenas ao fim do ciclo</p>
+                    <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">{bonusStatusLabel(summary.isQuarterClosed, summary.bonusStatus)}</p>
                   </>
                 ) : (
                   <div className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</div>

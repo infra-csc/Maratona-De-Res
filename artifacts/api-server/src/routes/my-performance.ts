@@ -165,7 +165,9 @@ router.get("/my-performance", async (req, res) => {
       calibratedScore: null,
     }));
     const eventScore = calculateEventResult(criteriaForCalc);
-    const platoon = getPlatoonByScore(eventScore, platoonRulesMapped);
+    // Sem nota (nenhum critério avaliado ainda) não tem pelotão — evita
+    // mostrar "Pelotão Branco" para um evento com Quesitos 0/N.
+    const platoon = eventScore > 0 ? getPlatoonByScore(eventScore, platoonRulesMapped) : null;
     const evaluatedCriteria = criteriaDetails.filter(c => c.evaluated).length;
     const totalExpected = eventCriteriaRows.length;
     const isComplete = totalExpected > 0 && evaluatedCriteria === totalExpected;
