@@ -1,14 +1,14 @@
 import { Router } from "express";
 import {
   db, quarterlyResultsTable, employeesTable, absencesTable, eventsTable,
-  eventParticipantsTable, evaluationsTable, calibrationsTable,
-  eventCriteriaTable, criteriaTable, platoonRulesTable,
+  eventParticipantsTable, platoonRulesTable,
 } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { calculateEventResult, getPlatoonByScore } from "../lib/calculations.js";
+import { getPlatoonByScore } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
+import { computeEventTeamResult } from "./results.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -133,42 +133,13 @@ router.get("/ranking-detail", async (req, res) => {
       continue;
     }
 
-    const eventCriteriaRows = await db
-      .select({
-        criterionId: eventCriteriaTable.criterionId,
-        weight: eventCriteriaTable.weightOverride,
-        defaultWeight: criteriaTable.defaultWeight,
-      })
-      .from(eventCriteriaTable)
-      .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-      .where(and(eq(eventCriteriaTable.eventId, p.eventId), eq(eventCriteriaTable.active, true)));
-
-    const allEvals = await db.select({
-      criterionId: evaluationsTable.criterionId,
-      score: evaluationsTable.score,
-      status: evaluationsTable.status,
-    }).from(evaluationsTable).where(eq(evaluationsTable.eventId, p.eventId));
-
-    const allCalibrations = await db.select({
-      criterionId: calibrationsTable.criterionId,
-      calibratedScore: calibrationsTable.calibratedScore,
-    }).from(calibrationsTable).where(eq(calibrationsTable.eventId, p.eventId));
-
-    let evaluatedCriteria = 0;
-    const criteriaForCalc = eventCriteriaRows.map(c => {
-      const weight = parseFloat(c.weight ?? c.defaultWeight ?? "1");
-      const evalScores = allEvals
-        .filter(e => e.criterionId === c.criterionId && e.status === "submitted")
-        .map(e => parseFloat(e.score as unknown as string));
-      const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
-      const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
-      const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
-      const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
-      if (scoreUsed !== null) evaluatedCriteria++;
-      return { criterionId: c.criterionId!, weight, averageScore: scoreUsed, calibratedScore: null };
-    });
-
-    const eventScore = calculateEventResult(criteriaForCalc);
+    // Cálculo CANÔNICO — o mesmo usado pelo fechamento do ciclo
+    // (recomputeCycleResults): média por critério com calibração
+    // substituindo, completude por área designada e penalidade da Matriz
+    // de Conformidade aplicada (conformityScore). Garante que o drawer
+    // mostre exatamente os mesmos números do ranking/consolidação.
+    const teamResult = await computeEventTeamResult(p.eventId);
+    const eventScore = teamResult.conformityScore;
     const platoon = getPlatoonByScore(eventScore, platoonRulesMapped);
 
     events.push({
@@ -181,8 +152,8 @@ router.get("/ranking-detail", async (req, res) => {
       eventScore,
       platoon: platoon?.name ?? null,
       platoonColor: platoon?.color ?? null,
-      evaluatedCriteria,
-      totalCriteria: eventCriteriaRows.length,
+      evaluatedCriteria: teamResult.evaluatedCriteria,
+      totalCriteria: teamResult.totalCriteria,
       isHistorical: false,
     });
   }
@@ -223,7 +194,11 @@ router.get("/ranking-detail", async (req, res) => {
   const merits = absenceRows.filter(a => a.kind === "merit").map(mapRow);
   const penaltyPoints = penalties.reduce((s, p) => s + p.total, 0);
   const meritPoints = merits.reduce((s, m) => s + m.total, 0);
-  const scored = events.filter(e => e.eventScore > 0);
+  // Média bruta ALINHADA ao snapshot oficial (recomputeCycleResults):
+  // só eventos FECHADOS e com nota (> 0) entram na base — igual ao
+  // eventsCount/grossAverage da consolidação. Eventos abertos aparecem na
+  // lista como andamento, mas não entram na média.
+  const scored = events.filter(e => e.status === "closed" && e.eventScore > 0);
   const grossAverage = scored.length > 0 ? Math.round((scored.reduce((s, e) => s + e.eventScore, 0) / scored.length) * 100) / 100 : null;
 
   res.json({
