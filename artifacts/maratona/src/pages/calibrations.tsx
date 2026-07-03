@@ -34,6 +34,7 @@ export default function CalibrationsPage() {
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [eventStatusFilter, setEventStatusFilter] = useState<"all" | "open" | "closed">("all");
   const [calScores, setCalScores] = useState<Record<number, string>>({});
   const [calReasons, setCalReasons] = useState<Record<number, string>>({});
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
@@ -59,6 +60,9 @@ export default function CalibrationsPage() {
   // Todos os eventos do ciclo aparecem — a calibração pode começar a qualquer
   // momento, inclusive antes de todas as avaliações serem enviadas.
   const calibratableEvents = events ?? [];
+  const filteredCalibratableEvents = eventStatusFilter === "all"
+    ? calibratableEvents
+    : calibratableEvents.filter(e => e.status === eventStatusFilter);
   const pickedEvent = calibratableEvents.find(e => e.id === selectedEventId);
 
   // Clear selection if the picked event no longer exists (e.g. removed/out of cycle)
@@ -375,6 +379,26 @@ export default function CalibrationsPage() {
           </Label>
 
           <div className="w-full max-w-2xl">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {([
+                { value: "all", label: "Todos" },
+                { value: "open", label: "Em avaliação" },
+                { value: "closed", label: "Fechado" },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  data-testid={`button-filter-status-${opt.value}`}
+                  onClick={() => setEventStatusFilter(opt.value)}
+                  className={cn(
+                    "px-3 py-1.5 border-2 border-[#191c1e] font-bold italic uppercase text-[11px] tracking-wider transition-all",
+                    eventStatusFilter === opt.value ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#444933] hover:bg-[#f7f9fb]"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -404,7 +428,7 @@ export default function CalibrationsPage() {
                   <CommandList className="max-h-[320px]">
                     <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
                     <CommandGroup>
-                      {calibratableEvents.map(ev => (
+                      {filteredCalibratableEvents.map(ev => (
                         <CommandItem
                           key={ev.id}
                           value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
