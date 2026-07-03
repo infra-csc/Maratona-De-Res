@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
+import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
 
@@ -252,15 +252,21 @@ router.get("/my-performance", async (req, res) => {
     bonusStatus = quarterResult.bonusStatus;
     finalResult = parseFloat(quarterResult.finalResult as unknown as string);
   } else if (grossAverage !== null) {
-    const proj = getPlatoonByScore(grossAverage, platoonRulesMapped);
+    // Espelha a regra de fechamento (results.ts): méritos somam, penalidades
+    // subtraem, resultado travado entre 0 e 100 — projeção precisa refletir
+    // os ajustes ao vivo, senão o colaborador vê uma nota/pelotão/bônus que
+    // não bate com o que será oficializado no fechamento.
+    const projectedFinalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints);
+    const proj = getPlatoonByScore(projectedFinalResult, platoonRulesMapped);
     currentPlatoon = proj?.name ?? null;
     const minEventsForProjection = await getMinEventsForEligibility();
     const scoredEventsWithDate = scoredEvents
       .filter(e => !!e.startDate)
       .map(e => ({ score: e.eventScore, date: e.startDate as string }));
     const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEventsForProjection) : [];
-    currentBonus = eligible ? calculateTieredBonus(grossAverage, extraEventScores, platoonRulesMapped) : 0;
+    currentBonus = eligible ? calculateTieredBonus(projectedFinalResult, extraEventScores, platoonRulesMapped) : 0;
     bonusStatus = eligible ? "projected" : "not_eligible";
+    finalResult = projectedFinalResult;
   }
 
   res.json({
