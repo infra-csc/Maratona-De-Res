@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, integer, numeric } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, numeric, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areasTable } from "./areas";
@@ -25,6 +25,10 @@ export const eventCriteriaTable = pgTable("event_criteria", {
   criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
   active: boolean("active").notNull().default(true),
   weightOverride: numeric("weight_override", { precision: 5, scale: 2 }),
+  // Snapshot explícito de publicação parcial deste critério (antes da
+  // liberação final do evento). Pode ser republicado várias vezes
+  // (sobrescreve a data); a liberação final continua sendo por evento.
+  partialPublishedAt: timestamp("partial_published_at"),
 });
 
 export const insertCriterionSchema = createInsertSchema(criteriaTable).omit({ id: true });

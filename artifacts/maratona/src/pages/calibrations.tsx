@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishPartialFeedback, useUpdateEventCriteria, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, useUpdateEventCriteria, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -167,18 +167,24 @@ export default function CalibrationsPage() {
   });
   const closeMutation = useCloseEvent();
   const releaseMutation = useReleaseEventFeedback();
-  const publishPartialMutation = usePublishPartialFeedback();
+  const [publishingCritId, setPublishingCritId] = useState<number | null>(null);
+  const publishCriterionPartialMutation = usePublishCriterionPartialFeedback();
   const finalizing = closeMutation.isPending || releaseMutation.isPending;
 
-  async function handlePublishPartial() {
+  async function handlePublishCriterionPartial(criterionId: number) {
     if (!selectedEventId) return;
+    setPublishingCritId(criterionId);
     try {
-      await publishPartialMutation.mutateAsync({ id: selectedEventId });
+      await publishCriterionPartialMutation.mutateAsync({ id: selectedEventId, criterionId });
+      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
       qc.invalidateQueries({ queryKey: fbQKey });
-      toast({ title: "Avaliação parcial publicada", description: "Os funcionários agora veem esta prévia como a última publicação." });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      toast({ title: "Critério publicado parcialmente", description: "Os funcionários agora veem esta prévia deste critério." });
     } catch (e) {
       const msg = (e as { message?: string })?.message;
       toast({ title: "Não foi possível publicar", description: msg, variant: "destructive" });
+    } finally {
+      setPublishingCritId(null);
     }
   }
 
@@ -539,8 +545,8 @@ export default function CalibrationsPage() {
               <div className="bg-[#ffb5a0] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
                 <Info size={20} className="text-[#3b0900] shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-black italic uppercase tracking-tight text-[#3b0900] leading-tight">Avaliação Parcial — publicada em {formatDateTime(partialPublishedAtDate)}</p>
-                  <p className="text-[11px] font-bold italic uppercase text-[#3b0900]/70 leading-tight">Os funcionários veem esta prévia como a última publicação enviada. Publique de novo a qualquer momento para atualizar, ou finalize quando estiver pronto.</p>
+                  <p className="text-sm font-black italic uppercase tracking-tight text-[#3b0900] leading-tight">Avaliação Parcial — critério mais recente publicado em {formatDateTime(partialPublishedAtDate)}</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#3b0900]/70 leading-tight">Os funcionários veem, para cada critério, a última publicação parcial daquele critério. Publique cada critério individualmente abaixo, ou finalize o evento quando estiver pronto.</p>
                 </div>
               </div>
             ) : (
@@ -549,7 +555,7 @@ export default function CalibrationsPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">Ainda não publicada</p>
                   <p className="text-[11px] font-bold italic uppercase text-[#444933] leading-tight">
-                    Os funcionários ainda não receberam nenhuma publicação deste evento{alreadyClosed ? " — evento fechado, aguardando liberação" : ""}. Use "Publicar Parcial" para enviar uma prévia a qualquer momento.
+                    Os funcionários ainda não receberam nenhuma publicação deste evento{alreadyClosed ? " — evento fechado, aguardando liberação" : ""}. Use "Publicar Parcial" em cada critério abaixo para enviar uma prévia a qualquer momento.
                   </p>
                 </div>
               </div>
@@ -578,17 +584,6 @@ export default function CalibrationsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                  {canFinalize && (
-                    <button
-                      data-testid="button-publish-partial"
-                      type="button"
-                      disabled={publishPartialMutation.isPending}
-                      onClick={handlePublishPartial}
-                      className="bg-transparent text-white border-2 border-white px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:text-[#191c1e]"
-                    >
-                      <Send size={16} /> {publishPartialMutation.isPending ? "Publicando..." : "Publicar Parcial"}
-                    </button>
-                  )}
                   {readyToFinalize ? (
                     <button
                       data-testid="button-open-finalize"
@@ -668,7 +663,7 @@ export default function CalibrationsPage() {
                         <div className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       {c.responsibleAreaName && (
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1 skew-x-[-6deg]">
                           <span className="inline-flex items-center gap-1.5 skew-x-[6deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
@@ -682,6 +677,26 @@ export default function CalibrationsPage() {
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border-2 border-[#191c1e] px-2 py-1">
                           {avg != null ? "Pendente" : "Sem nota da área"}
                         </span>
+                      )}
+                      {!alreadyReleased && c.partialPublishedAt && (
+                        <span
+                          data-testid={`badge-criterion-partial-${c.criterionId}`}
+                          title={`Publicado em ${formatDateTime(new Date(c.partialPublishedAt))}`}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border-2 border-[#191c1e] px-2 py-1"
+                        >
+                          <Send size={12} /> Parcial · {formatDateTime(new Date(c.partialPublishedAt))}
+                        </span>
+                      )}
+                      {canFinalize && !alreadyReleased && (
+                        <button
+                          data-testid={`button-publish-criterion-partial-${c.criterionId}`}
+                          type="button"
+                          disabled={publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending}
+                          onClick={() => handlePublishCriterionPartial(c.criterionId)}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white text-[#191c1e] border-2 border-[#191c1e] px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#191c1e] enabled:hover:text-white"
+                        >
+                          <Send size={12} /> {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "Publicando..." : "Publicar Parcial"}
+                        </button>
                       )}
                     </div>
                   </div>

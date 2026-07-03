@@ -2340,20 +2340,22 @@ export const useReleaseEventFeedback = <TError = ErrorType<unknown>,
       return useMutation(getReleaseEventFeedbackMutationOptions(options));
     }
 
-export const getPublishPartialFeedbackUrl = (id: number,) => {
+export const getPublishCriterionPartialFeedbackUrl = (id: number,
+    criterionId: number,) => {
 
 
 
 
-  return `/events/${id}/feedback/publish-partial`
+  return `/events/${id}/criteria/${criterionId}/publish-partial`
 }
 
 /**
- * @summary Publish a partial (in-progress) feedback snapshot to participants
+ * @summary Publish a partial (in-progress) feedback snapshot for a single criterion
  */
-export const publishPartialFeedback = async (id: number, options?: RequestInit): Promise<EventFeedback> => {
+export const publishCriterionPartialFeedback = async (id: number,
+    criterionId: number, options?: RequestInit): Promise<EventFeedback> => {
 
-  return customFetch<EventFeedback>(getPublishPartialFeedbackUrl(id),
+  return customFetch<EventFeedback>(getPublishCriterionPartialFeedbackUrl(id,criterionId),
   {
     ...options,
     method: 'POST'
@@ -2365,11 +2367,11 @@ export const publishPartialFeedback = async (id: number, options?: RequestInit):
 
 
 
-export const getPublishPartialFeedbackMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishPartialFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof publishPartialFeedback>>, TError,{id: number}, TContext> => {
+export const getPublishCriterionPartialFeedbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishCriterionPartialFeedback>>, TError,{id: number;criterionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishCriterionPartialFeedback>>, TError,{id: number;criterionId: number}, TContext> => {
 
-const mutationKey = ['publishPartialFeedback'];
+const mutationKey = ['publishCriterionPartialFeedback'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2379,10 +2381,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishPartialFeedback>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishCriterionPartialFeedback>>, {id: number;criterionId: number}> = (props) => {
+          const {id,criterionId} = props ?? {};
 
-          return  publishPartialFeedback(id,requestOptions)
+          return  publishCriterionPartialFeedback(id,criterionId,requestOptions)
         }
 
 
@@ -2392,22 +2394,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PublishPartialFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof publishPartialFeedback>>>
+    export type PublishCriterionPartialFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof publishCriterionPartialFeedback>>>
 
-    export type PublishPartialFeedbackMutationError = ErrorType<unknown>
+    export type PublishCriterionPartialFeedbackMutationError = ErrorType<unknown>
 
     /**
- * @summary Publish a partial (in-progress) feedback snapshot to participants
+ * @summary Publish a partial (in-progress) feedback snapshot for a single criterion
  */
-export const usePublishPartialFeedback = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishPartialFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const usePublishCriterionPartialFeedback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishCriterionPartialFeedback>>, TError,{id: number;criterionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof publishPartialFeedback>>,
+        Awaited<ReturnType<typeof publishCriterionPartialFeedback>>,
         TError,
-        {id: number},
+        {id: number;criterionId: number},
         TContext
       > => {
-      return useMutation(getPublishPartialFeedbackMutationOptions(options));
+      return useMutation(getPublishCriterionPartialFeedbackMutationOptions(options));
     }
 
 export const getGetEventParticipantsUrl = (id: number,) => {

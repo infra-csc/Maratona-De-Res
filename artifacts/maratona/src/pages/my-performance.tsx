@@ -78,6 +78,7 @@ interface CriterionDetail {
   criterionTotal: number | null;
   publicComments: string[];
   evaluated: boolean;
+  partialPublishedAt?: string | null;
 }
 
 function formatDateTime(value: string): string {
@@ -160,11 +161,19 @@ function EventCard({ event }: { event: EventSummary }) {
               <div key={c.criterionId} className="bg-white border-2 border-[#191c1e] p-4 relative overflow-hidden">
                 <div className="flex justify-between items-start gap-4 mb-3">
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-[10px] font-bold uppercase italic text-[#747a60] bg-[#f2f4f6] border border-[#191c1e] px-2 py-0.5">Peso {c.weight}</span>
                       {c.evaluated && (
                         <span className="text-[10px] font-bold uppercase italic text-[#506600] flex items-center gap-1">
                           <CheckCircle2 size={12}/> Avaliado
+                        </span>
+                      )}
+                      {!event.feedbackReleased && c.partialPublishedAt && (
+                        <span
+                          title={`Publicado em ${formatDateTime(c.partialPublishedAt)}`}
+                          className="text-[10px] font-bold uppercase italic text-[#a15c00] bg-[#fff3cd] border border-[#191c1e] px-2 py-0.5"
+                        >
+                          Parcial · {formatDateTime(c.partialPublishedAt)}
                         </span>
                       )}
                     </div>

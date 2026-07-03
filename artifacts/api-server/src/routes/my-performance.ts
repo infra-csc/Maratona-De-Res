@@ -61,7 +61,6 @@ router.get("/my-performance", async (req, res) => {
       eventStatus: eventsTable.status,
       feedbackReleased: eventsTable.feedbackReleased,
       feedbackReleasedAt: eventsTable.feedbackReleasedAt,
-      partialPublishedAt: eventsTable.partialPublishedAt,
       startDate: eventsTable.startDate,
       endDate: eventsTable.endDate,
     })
@@ -97,6 +96,7 @@ router.get("/my-performance", async (req, res) => {
         active: eventCriteriaTable.active,
         weight: eventCriteriaTable.weightOverride,
         defaultWeight: criteriaTable.defaultWeight,
+        partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       })
       .from(eventCriteriaTable)
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -155,6 +155,7 @@ router.get("/my-performance", async (req, res) => {
         publicComments,
         evaluated: isEvaluated,
         status: isEvaluated ? "avaliado" : "pendente",
+        partialPublishedAt: c.partialPublishedAt ?? null,
       };
     });
 
@@ -172,6 +173,13 @@ router.get("/my-performance", async (req, res) => {
     const totalExpected = eventCriteriaRows.length;
     const isComplete = totalExpected > 0 && evaluatedCriteria === totalExpected;
 
+    // Rollup do evento = publicação parcial mais recente entre os critérios
+    // (a fonte real agora é por critério, ver criteriaDetails[].partialPublishedAt).
+    const partialTimestamps = eventCriteriaRows.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
+    const partialPublishedAt = partialTimestamps.length > 0
+      ? new Date(Math.max(...partialTimestamps.map(d => d.getTime())))
+      : null;
+
     eventSummaries.push({
       eventId: p.eventId,
       eventName: p.eventName,
@@ -183,7 +191,7 @@ router.get("/my-performance", async (req, res) => {
       status: p.eventStatus,
       feedbackReleased: p.feedbackReleased ?? false,
       feedbackReleasedAt: p.feedbackReleasedAt ?? null,
-      partialPublishedAt: p.partialPublishedAt ?? null,
+      partialPublishedAt,
       eventScore,
       teamScore: eventScore,
       projectedPlatoon: platoon?.name ?? null,

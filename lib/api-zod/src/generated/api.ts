@@ -470,7 +470,8 @@ export const GetEventResponse = zod.object({
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional()
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -806,13 +807,14 @@ export const ReleaseEventFeedbackResponse = zod.object({
 
 
 /**
- * @summary Publish a partial (in-progress) feedback snapshot to participants
+ * @summary Publish a partial (in-progress) feedback snapshot for a single criterion
  */
-export const PublishPartialFeedbackParams = zod.object({
-  "id": zod.coerce.number()
+export const PublishCriterionPartialFeedbackParams = zod.object({
+  "id": zod.coerce.number(),
+  "criterionId": zod.coerce.number()
 })
 
-export const PublishPartialFeedbackResponse = zod.object({
+export const PublishCriterionPartialFeedbackResponse = zod.object({
   "eventId": zod.number(),
   "eventName": zod.string(),
   "eventScore": zod.number(),
@@ -938,7 +940,8 @@ export const GetEventCriteriaResponseItem = zod.object({
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional()
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
 })
 export const GetEventCriteriaResponse = zod.array(GetEventCriteriaResponseItem)
 
@@ -972,7 +975,8 @@ export const UpdateEventCriteriaResponse = zod.object({
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional()
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
 })),
   "warnings": zod.array(zod.string()).optional()
 })
@@ -1033,7 +1037,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional()
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1127,7 +1132,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional()
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1231,7 +1237,8 @@ export const DeleteEventCriterionResponse = zod.object({
   "weightOverride": zod.number().nullish(),
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
-  "eventScoped": zod.boolean().optional()
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),

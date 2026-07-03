@@ -581,13 +581,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventFeedback"
 
-  /events/{id}/feedback/publish-partial:
+  /events/{id}/criteria/{criterionId}/publish-partial:
     post:
-      operationId: publishPartialFeedback
+      operationId: publishCriterionPartialFeedback
       tags: [results]
-      summary: Publish a partial (in-progress) feedback snapshot to participants
+      summary: Publish a partial (in-progress) feedback snapshot for a single criterion
       parameters:
         - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: criterionId
           in: path
           required: true
           schema:
@@ -2447,6 +2452,8 @@ components:
           type: number
         eventScoped:
           type: boolean
+        partialPublishedAt:
+          type: ["string", "null"]
 
     EventCriteriaUpdate:
       type: object

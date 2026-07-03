@@ -29,7 +29,7 @@ router.get("/events", async (req, res) => {
       .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
-    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId })
+    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt })
       .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id)).where(inArray(eventCriteriaTable.eventId, eventIds)),
     db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
@@ -51,7 +51,7 @@ router.get("/events", async (req, res) => {
     // critérios/avaliações para calcular — usa importedScore diretamente.
     if (ev.isHistorical) {
       const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
-      return { ...ev, participantCount, evaluationProgress: 1, totalCriteria: 0, submittedCount: 0, averageScore: score, teamScore: score, hasCalibration: true };
+      return { ...ev, participantCount, evaluationProgress: 1, totalCriteria: 0, submittedCount: 0, averageScore: score, teamScore: score, hasCalibration: true, partialPublishedAt: null };
     }
 
     const evEvals = evals.filter(e => e.eventId === ev.id);
@@ -86,7 +86,14 @@ router.get("/events", async (req, res) => {
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
     const progress = activeCriteria.length > 0 ? evaluatedCriteria / activeCriteria.length : 0;
 
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration };
+    // Rollup do evento = mais recente publicação parcial entre os critérios
+    // ativos (a granularidade real agora é por critério, ver /events/:id/criteria).
+    const partialTimestamps = activeCriteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
+    const partialPublishedAt = partialTimestamps.length > 0
+      ? new Date(Math.max(...partialTimestamps.map(d => d.getTime())))
+      : null;
+
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration, partialPublishedAt };
   });
   res.json(enriched);
 });
@@ -122,6 +129,7 @@ async function loadEventDetail(id: number) {
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
       eventScoped: criteriaTable.eventScoped,
+      partialPublishedAt: eventCriteriaTable.partialPublishedAt,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -460,6 +468,7 @@ router.get("/events/:id/criteria", async (req, res) => {
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
       eventScoped: criteriaTable.eventScoped,
+      partialPublishedAt: eventCriteriaTable.partialPublishedAt,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))

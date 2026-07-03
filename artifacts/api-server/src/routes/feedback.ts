@@ -26,6 +26,7 @@ async function buildEventFeedback(eventId: number) {
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
       displayOrder: criteriaTable.displayOrder,
+      partialPublishedAt: eventCriteriaTable.partialPublishedAt,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -50,8 +51,15 @@ async function buildEventFeedback(eventId: number) {
     const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
     const isEvaluated = calibratedScore !== null || completion.isEvaluated;
     const scoreUsed = isEvaluated ? (calibratedScore !== null ? calibratedScore : averageScore) : null;
-    return { name: c.criterionName ?? "", weight, averageScore, calibratedScore, scoreUsed };
+    return { criterionId: c.criterionId, name: c.criterionName ?? "", weight, averageScore, calibratedScore, scoreUsed, partialPublishedAt: c.partialPublishedAt };
   });
+
+  // Rollup do evento = publicação parcial mais recente entre os critérios
+  // ativos (a fonte real agora é por critério — ver /events/:id/criteria/:criterionId/publish-partial).
+  const partialTimestamps = criteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
+  const partialPublishedAt = partialTimestamps.length > 0
+    ? new Date(Math.max(...partialTimestamps.map(d => d.getTime())))
+    : null;
 
   const criteriaForCalc = criteria.map(c => ({ criterionId: 0, weight: c.weight, averageScore: c.averageScore, calibratedScore: c.calibratedScore }));
   const eventScore = calculateEventResult(criteriaForCalc);
@@ -111,7 +119,7 @@ async function buildEventFeedback(eventId: number) {
     isComplete,
     feedbackReleased: event.feedbackReleased,
     feedbackReleasedAt: event.feedbackReleasedAt,
-    partialPublishedAt: event.partialPublishedAt,
+    partialPublishedAt,
     highlights,
     attentionPoints,
     text: lines.join("\n"),
@@ -159,25 +167,36 @@ router.post("/events/:id/feedback/release", requireRole("admin", "rh", "diretori
 });
 
 /**
- * POST /events/:id/feedback/publish-partial
- * Publica um retrato PARCIAL do feedback (sem exigir conclusão de todas as
- * avaliações e sem fechar o evento). Pode ser chamado várias vezes — cada
+ * POST /events/:id/criteria/:criterionId/publish-partial
+ * Publica um retrato PARCIAL do feedback de UM critério específico (sem
+ * exigir conclusão das avaliações desse ou de outros critérios, e sem
+ * fechar o evento). Pode ser chamado várias vezes por critério — cada
  * chamada apenas atualiza a data. Bloqueado depois que a avaliação final
- * (release) já foi publicada, pois final é terminal.
+ * do evento (release) já foi publicada, pois final é terminal.
  */
-router.post("/events/:id/feedback/publish-partial", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const feedback = await buildEventFeedback(eventId);
-  if (!feedback) { res.status(404).json({ error: "Evento não encontrado" }); return; }
-  if (feedback.feedbackReleased) {
+  const criterionId = parseInt(req.params.criterionId as string);
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  if (event.feedbackReleased) {
     res.status(400).json({ error: "A avaliação final já foi publicada para este evento e não pode voltar a ser parcial" });
     return;
   }
-  const [updated] = await db.update(eventsTable).set({
+
+  const [link] = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId), eq(eventCriteriaTable.active, true)))
+    .limit(1);
+  if (!link) { res.status(404).json({ error: "Critério não encontrado ou inativo neste evento" }); return; }
+
+  const [updated] = await db.update(eventCriteriaTable).set({
     partialPublishedAt: new Date(),
-  }).where(eq(eventsTable.id, eventId)).returning();
-  await audit(req.user!.userId, "publish_partial_feedback", "events", eventId);
-  res.json({ ...feedback, partialPublishedAt: updated.partialPublishedAt });
+  }).where(eq(eventCriteriaTable.id, link.id)).returning();
+  await audit(req.user!.userId, "publish_partial_feedback", "event_criteria", updated.id, null, { eventId, criterionId });
+
+  const feedback = await buildEventFeedback(eventId);
+  res.json({ ...feedback, criterionId, criterionPartialPublishedAt: updated.partialPublishedAt });
 });
 
 export default router;
