@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { HistoricalImportEventPlanAction } from './historicalImportEventPlanAction';
+import type { HistoricalImportOverlapCandidate } from './historicalImportOverlapCandidate';
 
 export interface HistoricalImportEventPlan {
   eventName: string;
@@ -21,4 +22,8 @@ export interface HistoricalImportEventPlan {
   cycleFallback?: boolean;
   /** Nomes de colaboradores deste evento específico que serão cadastrados automaticamente. */
   newEmployeeNames?: string[];
+  /** Identificador estável do grupo (evento normalizado + data), usado em linkOverrides. */
+  groupKey: string;
+  /** Apenas quando action=create. Eventos já cadastrados cujo período cobre esta data — possíveis duplicatas com nome diferente. Não bloqueiam a importação; o admin pode escolher vincular a um deles via linkOverrides em vez de criar um evento novo. */
+  overlapCandidates?: HistoricalImportOverlapCandidate[];
 }

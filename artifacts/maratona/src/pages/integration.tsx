@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History } from "lucide-react";
@@ -35,6 +36,7 @@ export default function IntegrationPage() {
   const [historicalCsvData, setHistoricalCsvData] = useState<string | null>(null);
   const [historicalPreview, setHistoricalPreview] = useState<HistoricalImportResult | null>(null);
   const [historicalDialogOpen, setHistoricalDialogOpen] = useState(false);
+  const [linkOverrides, setLinkOverrides] = useState<Record<string, number>>({});
 
   const qKey = getGetIntegrationStatusQueryKey();
   const { data: status, isLoading } = useGetIntegrationStatus({ query: { queryKey: qKey } });
@@ -134,6 +136,7 @@ export default function IntegrationPage() {
     reader.onload = (ev) => {
       const csvData = ev.target?.result as string;
       setHistoricalCsvData(csvData);
+      setLinkOverrides({});
       historicalPreviewMutation.mutate({ data: { csvData, dryRun: true } });
     };
     reader.readAsText(file);
@@ -142,7 +145,7 @@ export default function IntegrationPage() {
 
   function handleHistoricalConfirm() {
     if (!historicalCsvData) return;
-    historicalCommitMutation.mutate({ data: { csvData: historicalCsvData, dryRun: false } });
+    historicalCommitMutation.mutate({ data: { csvData: historicalCsvData, dryRun: false, linkOverrides } });
   }
 
   return (
@@ -579,9 +582,41 @@ export default function IntegrationPage() {
                               )}
                             </td>
                             <td className="p-2">
-                              {ev.action === "create" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Criar</Badge>}
+                              {ev.action === "create" && !linkOverrides[ev.groupKey] && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Criar</Badge>}
+                              {ev.action === "create" && linkOverrides[ev.groupKey] && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Vincular</Badge>}
                               {ev.action === "update" && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Atualizar</Badge>}
                               {ev.action === "conflict" && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Conflito</Badge>}
+                              {ev.action === "create" && ev.overlapCandidates && ev.overlapCandidates.length > 0 && (
+                                <div className="mt-1.5 min-w-[220px]" data-testid={`select-link-override-${i}`}>
+                                  <p className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-1 mb-1 flex items-start gap-1">
+                                    <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+                                    Já existe {ev.overlapCandidates.length === 1 ? "1 evento" : `${ev.overlapCandidates.length} eventos`} nessa data — pode ser a mesma corrida com nome diferente.
+                                  </p>
+                                  <Select
+                                    value={linkOverrides[ev.groupKey] ? String(linkOverrides[ev.groupKey]) : "none"}
+                                    onValueChange={(val) => {
+                                      setLinkOverrides(prev => {
+                                        const next = { ...prev };
+                                        if (val === "none") delete next[ev.groupKey];
+                                        else next[ev.groupKey] = Number(val);
+                                        return next;
+                                      });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 text-[11px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">Criar evento novo</SelectItem>
+                                      {ev.overlapCandidates.map(c => (
+                                        <SelectItem key={c.id} value={String(c.id)}>
+                                          Vincular a "{c.name}" ({c.isHistorical ? "histórico" : "manual"})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -591,6 +626,7 @@ export default function IntegrationPage() {
                   <p className="text-[11px] text-slate-500 mt-2 space-y-0.5">
                     <span className="block"><Badge className="bg-green-100 text-green-700 hover:bg-green-100 mr-1">Criar</Badge>evento novo, ainda não existe no sistema.</span>
                     <span className="block"><Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 mr-1">Atualizar</Badge>já existe um evento histórico com este nome/data — a nota será substituída pela da planilha.</span>
+                    <span className="block"><Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 mr-1">Vincular</Badge>você escolheu ligar esse evento a um já existente (veja o alerta laranja e o seletor na linha) em vez de criar um novo.</span>
                     <span className="block"><Badge className="bg-red-100 text-red-700 hover:bg-red-100 mr-1">Conflito</Badge>não será importado (veja o motivo nos erros acima).</span>
                   </p>
                 </div>

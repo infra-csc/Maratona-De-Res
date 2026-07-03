@@ -508,9 +508,11 @@ function parseHistoricalCsv(csvData: string): { rows: HistoricalRow[]; parseErro
 }
 
 router.post("/integration/import/historical-results", async (req, res) => {
-  const { csvData, dryRun } = req.body ?? {};
+  const { csvData, dryRun, linkOverrides } = req.body ?? {};
   const isDryRun = dryRun !== false;
   if (!csvData || typeof csvData !== "string") { res.status(400).json({ error: "csvData obrigatório" }); return; }
+  const overrideMap: Record<string, number> =
+    linkOverrides && typeof linkOverrides === "object" ? linkOverrides : {};
 
   const { rows, parseErrors } = parseHistoricalCsv(csvData);
   const errors: string[] = [...parseErrors];
@@ -575,12 +577,22 @@ router.post("/integration/import/historical-results", async (req, res) => {
   const existingEventsByDate = distinctDates.length > 0
     ? await db.select().from(eventsTable).where(inArray(eventsTable.startDate, distinctDates))
     : [];
+  // Busca TODOS os eventos (não só os com startDate exato) para detectar possíveis
+  // duplicatas por sobreposição de datas — o nome do evento no CSV muitas vezes não
+  // bate exatamente com o nome do evento já cadastrado manualmente (abreviação,
+  // apelido, digitação diferente), então o match exato de nome+data não pega tudo.
+  const allEventsForOverlap = await db.select({
+    id: eventsTable.id, name: eventsTable.name, startDate: eventsTable.startDate,
+    endDate: eventsTable.endDate, isHistorical: eventsTable.isHistorical, cycleId: eventsTable.cycleId,
+  }).from(eventsTable);
   const allCycles = await db.select().from(cyclesTable);
   const fallbackCycle = await getCurrentCycle();
 
+  type OverlapCandidate = { id: number; name: string; startDate: string; endDate: string; isHistorical: boolean };
   type GroupPlan = {
     eventName: string; date: string; score: number | null; participantsCount: number;
     matchedCount: number; action: "create" | "update" | "conflict"; existingEventId?: number; cycleId?: number; cycleName?: string; cycleFallback?: boolean; newEmployeeNames?: string[];
+    groupKey: string; overlapCandidates?: OverlapCandidate[];
   };
   const plans: GroupPlan[] = [];
   const cyclesById = new Map(allCycles.map(c => [c.id, c]));
@@ -598,6 +610,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
 
     const matchedCount = g.participants.filter(p => p.employeeId !== null || p.toCreateKey !== null).length;
     const existing = existingEventsByDate.filter(e => e.startDate === g.date && normalizeImportText(e.name) === g.normalizedEvent);
+    const groupKey = `${g.normalizedEvent}|${g.date}`;
 
     let action: GroupPlan["action"];
     let existingEventId: number | undefined;
@@ -631,6 +644,21 @@ router.post("/integration/import/historical-results", async (req, res) => {
       }
     }
 
+    // Quando vai criar um evento novo, verifica se já existe algum evento
+    // (de qualquer nome/status) cujo período cobre esta data — pode ser o
+    // mesmo evento cadastrado manualmente com um nome diferente. Não bloqueia
+    // nem decide sozinho (nomes parecidos podem ser corridas diferentes na
+    // mesma semana); só sugere, e o admin escolhe vincular via linkOverrides.
+    let overlapCandidates: OverlapCandidate[] | undefined;
+    if (action === "create") {
+      const candidates = allEventsForOverlap.filter(e => e.startDate <= g.date && e.endDate >= g.date);
+      if (candidates.length > 0) {
+        overlapCandidates = candidates.map(e => ({
+          id: e.id, name: e.name, startDate: e.startDate, endDate: e.endDate, isHistorical: e.isHistorical,
+        }));
+      }
+    }
+
     const cycleName = cycleId ? cyclesById.get(cycleId)?.name : undefined;
     const newEmployeeNames = Array.from(new Set(
       g.participants.filter(p => p.toCreateKey !== null).map(p => toCreateNames.get(p.toCreateKey!) ?? p.name)
@@ -639,6 +667,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
       eventName: g.eventName, date: g.date, score, participantsCount: g.participants.length,
       matchedCount, action, existingEventId, cycleId, cycleName, cycleFallback: isCycleFallback,
       newEmployeeNames: newEmployeeNames.length > 0 ? newEmployeeNames : undefined,
+      groupKey, overlapCandidates,
     };
     plans.push(planEntry);
     (g as Group & { _plan?: GroupPlan })._plan = planEntry;
@@ -683,7 +712,23 @@ router.post("/integration/import/historical-results", async (req, res) => {
     for (const g of groups.values()) {
       const plan = (g as Group & { _plan?: GroupPlan })._plan!;
       let eventId: number;
-      if (plan.action === "create") {
+      const overrideEventId = plan.action === "create" ? overrideMap[plan.groupKey] : undefined;
+      const overrideTarget = overrideEventId != null
+        ? plan.overlapCandidates?.find(c => c.id === overrideEventId)
+        : undefined;
+      if (overrideTarget) {
+        // Admin optou por vincular este grupo a um evento já existente
+        // (em vez de criar um novo) — mesmo tratamento do fluxo "update".
+        eventId = overrideTarget.id;
+        const targetCycleId = allEventsForOverlap.find(e => e.id === overrideTarget.id)?.cycleId ?? plan.cycleId!;
+        await tx.update(eventsTable).set({
+          importedScore: String(plan.score),
+          status: "closed",
+          isHistorical: true,
+        }).where(eq(eventsTable.id, eventId));
+        eventsUpdated++;
+        affectedCycleIds.add(targetCycleId);
+      } else if (plan.action === "create") {
         const [created] = await tx.insert(eventsTable).values({
           name: g.eventName,
           startDate: g.date,

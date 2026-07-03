@@ -3317,10 +3317,35 @@ components:
         dryRun:
           type: boolean
           description: Defaults to true. Set to false to commit (only applied when there are zero errors).
+        linkOverrides:
+          type: object
+          additionalProperties:
+            type: integer
+          description: >-
+            Mapa opcional de groupKey (de HistoricalImportEventPlan) para o id de um evento
+            existente ao qual esse grupo deve ser vinculado, em vez de criar um evento novo.
+            Usado quando o admin identifica manualmente que um evento com action=create do
+            preview é, na verdade, a mesma corrida de um dos overlapCandidates sugeridos
+            (nome diferente do cadastrado manualmente).
+
+    HistoricalImportOverlapCandidate:
+      type: object
+      required: [id, name, startDate, endDate, isHistorical]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        isHistorical:
+          type: boolean
 
     HistoricalImportEventPlan:
       type: object
-      required: [eventName, date, score, participantsCount, matchedCount, action]
+      required: [eventName, date, score, participantsCount, matchedCount, action, groupKey]
       properties:
         eventName:
           type: string
@@ -3350,6 +3375,17 @@ components:
           items:
             type: string
           description: Nomes de colaboradores deste evento específico que serão cadastrados automaticamente.
+        groupKey:
+          type: string
+          description: Identificador estável do grupo (evento normalizado + data), usado em linkOverrides.
+        overlapCandidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoricalImportOverlapCandidate"
+          description: >-
+            Apenas quando action=create. Eventos já cadastrados cujo período cobre esta data —
+            possíveis duplicatas com nome diferente. Não bloqueiam a importação; o admin pode
+            escolher vincular a um deles via linkOverrides em vez de criar um evento novo.
 
     HistoricalImportResult:
       type: object

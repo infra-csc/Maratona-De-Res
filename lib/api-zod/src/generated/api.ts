@@ -2010,7 +2010,8 @@ export const ImportParticipantsCSVResponse = zod.object({
  */
 export const ImportHistoricalResultsBody = zod.object({
   "csvData": zod.string().describe('CSV\/TSV with columns nome, nota, evento, data (header optional, auto-detected)'),
-  "dryRun": zod.boolean().optional().describe('Defaults to true. Set to false to commit (only applied when there are zero errors).')
+  "dryRun": zod.boolean().optional().describe('Defaults to true. Set to false to commit (only applied when there are zero errors).'),
+  "linkOverrides": zod.record(zod.string(), zod.number()).optional().describe('Mapa opcional de groupKey (de HistoricalImportEventPlan) para o id de um evento existente ao qual esse grupo deve ser vinculado, em vez de criar um evento novo. Usado quando o admin identifica manualmente que um evento com action=create do preview é, na verdade, a mesma corrida de um dos overlapCandidates sugeridos (nome diferente do cadastrado manualmente).')
 })
 
 export const ImportHistoricalResultsResponse = zod.object({
@@ -2033,7 +2034,15 @@ export const ImportHistoricalResultsResponse = zod.object({
   "cycleId": zod.number().optional(),
   "cycleName": zod.string().optional(),
   "cycleFallback": zod.boolean().optional().describe('true quando a data do evento não cai no período de nenhum ciclo cadastrado e o evento será vinculado ao ciclo atual como alternativa.'),
-  "newEmployeeNames": zod.array(zod.string()).optional().describe('Nomes de colaboradores deste evento específico que serão cadastrados automaticamente.')
+  "newEmployeeNames": zod.array(zod.string()).optional().describe('Nomes de colaboradores deste evento específico que serão cadastrados automaticamente.'),
+  "groupKey": zod.string().describe('Identificador estável do grupo (evento normalizado + data), usado em linkOverrides.'),
+  "overlapCandidates": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "isHistorical": zod.boolean()
+})).optional().describe('Apenas quando action=create. Eventos já cadastrados cujo período cobre esta data — possíveis duplicatas com nome diferente. Não bloqueiam a importação; o admin pode escolher vincular a um deles via linkOverrides em vez de criar um evento novo.')
 })),
   "employeesToCreate": zod.array(zod.string()).optional().describe('Nomes de colaboradores não cadastrados que serão criados automaticamente ao confirmar.'),
   "employeesCreated": zod.number().optional().describe('Quantidade de colaboradores criados automaticamente (apenas no commit).'),

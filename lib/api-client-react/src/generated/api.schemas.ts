@@ -949,11 +949,26 @@ export interface ImportResult {
   errors: string[];
 }
 
+/**
+ * Mapa opcional de groupKey (de HistoricalImportEventPlan) para o id de um evento existente ao qual esse grupo deve ser vinculado, em vez de criar um evento novo. Usado quando o admin identifica manualmente que um evento com action=create do preview é, na verdade, a mesma corrida de um dos overlapCandidates sugeridos (nome diferente do cadastrado manualmente).
+ */
+export type HistoricalImportInputLinkOverrides = {[key: string]: number};
+
 export interface HistoricalImportInput {
   /** CSV/TSV with columns nome, nota, evento, data (header optional, auto-detected) */
   csvData: string;
   /** Defaults to true. Set to false to commit (only applied when there are zero errors). */
   dryRun?: boolean;
+  /** Mapa opcional de groupKey (de HistoricalImportEventPlan) para o id de um evento existente ao qual esse grupo deve ser vinculado, em vez de criar um evento novo. Usado quando o admin identifica manualmente que um evento com action=create do preview é, na verdade, a mesma corrida de um dos overlapCandidates sugeridos (nome diferente do cadastrado manualmente). */
+  linkOverrides?: HistoricalImportInputLinkOverrides;
+}
+
+export interface HistoricalImportOverlapCandidate {
+  id: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isHistorical: boolean;
 }
 
 export type HistoricalImportEventPlanAction = typeof HistoricalImportEventPlanAction[keyof typeof HistoricalImportEventPlanAction];
@@ -979,6 +994,10 @@ export interface HistoricalImportEventPlan {
   cycleFallback?: boolean;
   /** Nomes de colaboradores deste evento específico que serão cadastrados automaticamente. */
   newEmployeeNames?: string[];
+  /** Identificador estável do grupo (evento normalizado + data), usado em linkOverrides. */
+  groupKey: string;
+  /** Apenas quando action=create. Eventos já cadastrados cujo período cobre esta data — possíveis duplicatas com nome diferente. Não bloqueiam a importação; o admin pode escolher vincular a um deles via linkOverrides em vez de criar um evento novo. */
+  overlapCandidates?: HistoricalImportOverlapCandidate[];
 }
 
 export interface HistoricalImportResult {

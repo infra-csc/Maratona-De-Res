@@ -5,10 +5,13 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { HistoricalImportInputLinkOverrides } from './historicalImportInputLinkOverrides';
 
 export interface HistoricalImportInput {
   /** CSV/TSV with columns nome, nota, evento, data (header optional, auto-detected) */
   csvData: string;
   /** Defaults to true. Set to false to commit (only applied when there are zero errors). */
   dryRun?: boolean;
+  /** Mapa opcional de groupKey (de HistoricalImportEventPlan) para o id de um evento existente ao qual esse grupo deve ser vinculado, em vez de criar um evento novo. Usado quando o admin identifica manualmente que um evento com action=create do preview é, na verdade, a mesma corrida de um dos overlapCandidates sugeridos (nome diferente do cadastrado manualmente). */
+  linkOverrides?: HistoricalImportInputLinkOverrides;
 }

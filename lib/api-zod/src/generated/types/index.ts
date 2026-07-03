@@ -78,6 +78,8 @@ export * from './healthStatus';
 export * from './historicalImportEventPlan';
 export * from './historicalImportEventPlanAction';
 export * from './historicalImportInput';
+export * from './historicalImportInputLinkOverrides';
+export * from './historicalImportOverlapCandidate';
 export * from './historicalImportResult';
 export * from './impersonateInput';
 export * from './importResult';
