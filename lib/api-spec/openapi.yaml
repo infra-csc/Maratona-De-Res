@@ -1654,6 +1654,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/SurveyImportResult"
 
+  /integration/evaluations/dedupe:
+    post:
+      operationId: dedupeEvaluations
+      tags: [integration]
+      summary: >-
+        Remove duplicate evaluations: exact copies (same event, criterion,
+        evaluator, score and comment) keeping the first recorded one.
+        Duplicates with different content are never touched. Recomputes
+        affected cycle results after cleanup. Runs as preview (dryRun)
+        unless dryRun=false.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DedupeEvaluationsInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupeEvaluationsResult"
+
   /exports/event-results:
     get:
       operationId: exportEventResults
@@ -3718,6 +3742,36 @@ components:
           items:
             $ref: "#/components/schemas/SurveyCreatedAvaliador"
           description: Apenas no commit — credenciais provisórias dos avaliadores criados.
+
+    DedupeEvaluationsInput:
+      type: object
+      properties:
+        dryRun:
+          type: boolean
+          description: Quando true (padrão), apenas conta as duplicatas sem apagar nada.
+
+    DedupeEvaluationsResult:
+      type: object
+      required: [success, dryRun, duplicatesFound, groupsAffected, eventsAffected, duplicatesRemoved, warnings]
+      properties:
+        success:
+          type: boolean
+        dryRun:
+          type: boolean
+        duplicatesFound:
+          type: integer
+          description: Cópias exatas encontradas além da primeira gravada.
+        groupsAffected:
+          type: integer
+          description: Combinações (evento, quesito, avaliador, conteúdo) com duplicatas.
+        eventsAffected:
+          type: integer
+        duplicatesRemoved:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
 
     CsvExport:
       type: object

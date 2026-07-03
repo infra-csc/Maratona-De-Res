@@ -30,6 +30,8 @@ export * from './csvExport';
 export * from './csvImportInput';
 export * from './cycle';
 export * from './dashboardSummary';
+export * from './dedupeEvaluationsInput';
+export * from './dedupeEvaluationsResult';
 export * from './employee';
 export * from './employeeEventResult';
 export * from './employeeInput';

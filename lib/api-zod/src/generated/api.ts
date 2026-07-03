@@ -2189,6 +2189,24 @@ export const ImportSurveyResponse = zod.object({
 
 
 /**
+ * @summary Remove duplicate evaluations: exact copies (same event, criterion, evaluator, score and comment) keeping the first recorded one. Duplicates with different content are never touched. Recomputes affected cycle results after cleanup. Runs as preview (dryRun) unless dryRun=false.
+ */
+export const DedupeEvaluationsBody = zod.object({
+  "dryRun": zod.boolean().optional().describe('Quando true (padrão), apenas conta as duplicatas sem apagar nada.')
+})
+
+export const DedupeEvaluationsResponse = zod.object({
+  "success": zod.boolean(),
+  "dryRun": zod.boolean(),
+  "duplicatesFound": zod.number().describe('Cópias exatas encontradas além da primeira gravada.'),
+  "groupsAffected": zod.number().describe('Combinações (evento, quesito, avaliador, conteúdo) com duplicatas.'),
+  "eventsAffected": zod.number(),
+  "duplicatesRemoved": zod.number(),
+  "warnings": zod.array(zod.string())
+})
+
+
+/**
  * @summary Export event results CSV
  */
 export const ExportEventResultsQueryParams = zod.object({

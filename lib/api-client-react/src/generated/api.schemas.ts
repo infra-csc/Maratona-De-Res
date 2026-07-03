@@ -1127,6 +1127,23 @@ export interface SurveyImportResult {
   createdAvaliadores?: SurveyCreatedAvaliador[];
 }
 
+export interface DedupeEvaluationsInput {
+  /** Quando true (padrão), apenas conta as duplicatas sem apagar nada. */
+  dryRun?: boolean;
+}
+
+export interface DedupeEvaluationsResult {
+  success: boolean;
+  dryRun: boolean;
+  /** Cópias exatas encontradas além da primeira gravada. */
+  duplicatesFound: number;
+  /** Combinações (evento, quesito, avaliador, conteúdo) com duplicatas. */
+  groupsAffected: number;
+  eventsAffected: number;
+  duplicatesRemoved: number;
+  warnings: string[];
+}
+
 export interface CsvExport {
   filename: string;
   data: string;

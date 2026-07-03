@@ -39,6 +39,8 @@ import type {
   CsvImportInput,
   Cycle,
   DashboardSummary,
+  DedupeEvaluationsInput,
+  DedupeEvaluationsResult,
   Employee,
   EmployeeInput,
   EmployeeUpdate,
@@ -6282,6 +6284,77 @@ export const useImportSurvey = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getImportSurveyMutationOptions(options));
+    }
+
+export const getDedupeEvaluationsUrl = () => {
+
+
+
+
+  return `/integration/evaluations/dedupe`
+}
+
+/**
+ * @summary Remove duplicate evaluations: exact copies (same event, criterion, evaluator, score and comment) keeping the first recorded one. Duplicates with different content are never touched. Recomputes affected cycle results after cleanup. Runs as preview (dryRun) unless dryRun=false.
+ */
+export const dedupeEvaluations = async (dedupeEvaluationsInput: DedupeEvaluationsInput, options?: RequestInit): Promise<DedupeEvaluationsResult> => {
+
+  return customFetch<DedupeEvaluationsResult>(getDedupeEvaluationsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dedupeEvaluationsInput,)
+  }
+);}
+
+
+
+
+export const getDedupeEvaluationsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dedupeEvaluations>>, TError,{data: BodyType<DedupeEvaluationsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dedupeEvaluations>>, TError,{data: BodyType<DedupeEvaluationsInput>}, TContext> => {
+
+const mutationKey = ['dedupeEvaluations'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dedupeEvaluations>>, {data: BodyType<DedupeEvaluationsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  dedupeEvaluations(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DedupeEvaluationsMutationResult = NonNullable<Awaited<ReturnType<typeof dedupeEvaluations>>>
+    export type DedupeEvaluationsMutationBody = BodyType<DedupeEvaluationsInput>
+    export type DedupeEvaluationsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove duplicate evaluations: exact copies (same event, criterion, evaluator, score and comment) keeping the first recorded one. Duplicates with different content are never touched. Recomputes affected cycle results after cleanup. Runs as preview (dryRun) unless dryRun=false.
+ */
+export const useDedupeEvaluations = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dedupeEvaluations>>, TError,{data: BodyType<DedupeEvaluationsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof dedupeEvaluations>>,
+        TError,
+        {data: BodyType<DedupeEvaluationsInput>},
+        TContext
+      > => {
+      return useMutation(getDedupeEvaluationsMutationOptions(options));
     }
 
 export const getExportEventResultsUrl = (params: ExportEventResultsParams,) => {

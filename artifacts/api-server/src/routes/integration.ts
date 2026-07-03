@@ -1358,4 +1358,79 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
   });
 });
 
+// Remove avaliações duplicadas: cópias EXATAS (mesmo evento, quesito, avaliador,
+// nota e comentário) mantendo a primeira gravada. Duplicatas com conteúdo
+// diferente (ex.: duas perguntas do Forms que mapeiam para o mesmo quesito)
+// NÃO são tocadas. Após a limpeza, os resultados dos ciclos afetados são
+// recalculados.
+router.post("/integration/evaluations/dedupe", requireRole("admin"), async (req, res) => {
+  const userId = req.user!.userId;
+  const { dryRun } = req.body ?? {};
+  const isDryRun = dryRun !== false;
+
+  const all = await db.select({
+    id: evaluationsTable.id,
+    eventId: evaluationsTable.eventId,
+    criterionId: evaluationsTable.criterionId,
+    evaluatorUserId: evaluationsTable.evaluatorUserId,
+    score: evaluationsTable.score,
+    comments: evaluationsTable.comments,
+    status: evaluationsTable.status,
+    audioUrl: evaluationsTable.audioUrl,
+  }).from(evaluationsTable);
+
+  const byContent = new Map<string, number[]>();
+  for (const e of all) {
+    const key = `${e.eventId}|${e.criterionId}|${e.evaluatorUserId}|${e.score}|${e.comments ?? ""}|${e.status}|${e.audioUrl ?? ""}`;
+    if (!byContent.has(key)) byContent.set(key, []);
+    byContent.get(key)!.push(e.id);
+  }
+
+  const idsToDelete: number[] = [];
+  const affectedEventIds = new Set<number>();
+  let groupsAffected = 0;
+  const idToEventId = new Map(all.map(e => [e.id, e.eventId]));
+  for (const ids of byContent.values()) {
+    if (ids.length <= 1) continue;
+    groupsAffected++;
+    const sorted = [...ids].sort((a, b) => a - b);
+    for (const id of sorted.slice(1)) {
+      idsToDelete.push(id);
+      const evId = idToEventId.get(id);
+      if (evId != null) affectedEventIds.add(evId);
+    }
+  }
+
+  if (isDryRun || idsToDelete.length === 0) {
+    res.json({
+      success: true, dryRun: true,
+      duplicatesFound: idsToDelete.length, groupsAffected, eventsAffected: affectedEventIds.size,
+      duplicatesRemoved: 0, warnings: [],
+    });
+    return;
+  }
+
+  const affectedEvents = await db.select({ id: eventsTable.id, cycleId: eventsTable.cycleId })
+    .from(eventsTable).where(inArray(eventsTable.id, Array.from(affectedEventIds)));
+  const affectedCycleIds = new Set(affectedEvents.map(e => e.cycleId));
+
+  await db.delete(evaluationsTable).where(inArray(evaluationsTable.id, idsToDelete));
+
+  const cycleWarnings: string[] = [];
+  for (const cycleId of affectedCycleIds) {
+    const { warnings: w } = await recomputeCycleResults(cycleId, userId);
+    cycleWarnings.push(...w);
+  }
+
+  await audit(userId, "dedupe_evaluations", "evaluations", undefined, null, {
+    duplicatesRemoved: idsToDelete.length, groupsAffected, eventsAffected: affectedEventIds.size,
+  });
+
+  res.json({
+    success: true, dryRun: false,
+    duplicatesFound: idsToDelete.length, groupsAffected, eventsAffected: affectedEventIds.size,
+    duplicatesRemoved: idsToDelete.length, warnings: cycleWarnings,
+  });
+});
+
 export default router;

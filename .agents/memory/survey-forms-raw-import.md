@@ -21,3 +21,7 @@ The survey import feature accepts the raw MS Forms export directly (any sheet, a
 3. That existing-pairs set is intentionally **not** mutated mid-loop, because a single Forms row can legitimately produce two evaluations for the same target criterion (two Forms questions — e.g. "Qualidade da Entrega" and its "(2)" variant for a different área — both map to one catalog criterion "Qualidade e Acabamento da Montagem"). Mutating the set during insertion would wrongly skip the second one on a first-ever import.
 
 **Why:** the import can be re-run (corrections, re-uploads) without creating duplicate evaluations or double-counting a criterion, while still preserving the intentional two-questions-one-criterion case on a clean import.
+
+---
+
+**Admin dedupe cleanup.** An admin-only "dedupe evaluations" action (dry-run preview → confirm) removes exact-copy evaluation rows keeping the lowest id, then recomputes affected cycles. The group key must include ALL content columns — score/comments AND status/audioUrl — otherwise a draft+submitted identical pair could keep the draft and delete the submitted row (silently un-evaluating a criterion, since only submitted rows count). Deleting one of N identical copies is numerically neutral for the two-questions-one-criterion case (mean and evaluator-completeness unchanged).
