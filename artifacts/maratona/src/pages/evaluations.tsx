@@ -130,6 +130,7 @@ export default function EvaluationsPage() {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
+  const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
@@ -607,24 +608,61 @@ export default function EvaluationsPage() {
                   <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
                     <User size={12} /> Avaliador
                   </p>
-                  <Select
-                    value={selectedAvaliadorId != null ? String(selectedAvaliadorId) : "__all"}
-                    onValueChange={(v) => setSelectedAvaliadorId(v === "__all" ? null : Number(v))}
-                  >
-                    <SelectTrigger data-testid="select-avaliador" className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0 disabled:opacity-50">
-                      <SelectValue placeholder="Todos os avaliadores" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                      <SelectItem value="__all">Todos os avaliadores</SelectItem>
-                      {selectedEventId && avaliadorStats.length > 0
-                        ? avaliadorStats.map(av => (
-                            <SelectItem key={av.id} value={String(av.id)}>{av.name} ({av.submitted}/{av.total})</SelectItem>
-                          ))
-                        : allAvaliadores.map(av => (
-                            <SelectItem key={av.id} value={String(av.id)}>{av.name}</SelectItem>
-                          ))}
-                    </SelectContent>
-                  </Select>
+                  {(() => {
+                    const avaliadorOptions = selectedEventId && avaliadorStats.length > 0
+                      ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
+                      : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
+                    const pickedAvaliador = avaliadorOptions.find(av => av.id === selectedAvaliadorId);
+                    return (
+                      <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            role="combobox"
+                            aria-expanded={avaliadorPickerOpen}
+                            data-testid="select-avaliador"
+                            className="w-full h-[3.25rem] px-4 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase transition-all hover:bg-[#f7f9fb] disabled:opacity-50"
+                          >
+                            <span className="truncate text-[#191c1e]">
+                              {pickedAvaliador ? `${pickedAvaliador.name}${pickedAvaliador.suffix ? ` (${pickedAvaliador.suffix})` : ""}` : "Todos os avaliadores"}
+                            </span>
+                            <ChevronsUpDown size={16} className="shrink-0 text-[#191c1e]" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                          <Command className="rounded-none">
+                            <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic" />
+                            <CommandList className="max-h-[320px]">
+                              <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum avaliador encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="Todos os avaliadores"
+                                  data-testid="option-avaliador-all"
+                                  onSelect={() => { setSelectedAvaliadorId(null); setAvaliadorPickerOpen(false); }}
+                                  className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3"
+                                >
+                                  <Check size={16} className={cn("shrink-0", selectedAvaliadorId == null ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-bold italic uppercase text-xs">Todos os avaliadores</span>
+                                </CommandItem>
+                                {avaliadorOptions.map(av => (
+                                  <CommandItem
+                                    key={av.id}
+                                    value={av.name}
+                                    data-testid={`option-avaliador-${av.id}`}
+                                    onSelect={() => { setSelectedAvaliadorId(av.id); setAvaliadorPickerOpen(false); }}
+                                    className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3"
+                                  >
+                                    <Check size={16} className={cn("shrink-0", selectedAvaliadorId === av.id ? "opacity-100" : "opacity-0")} />
+                                    <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  })()}
                 </div>
 
                 <div>
