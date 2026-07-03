@@ -37,3 +37,4 @@
 - [Admin operational data reset](admin-data-reset.md) — scope + exact FK delete order for wiping events/evaluations/employees/users while preserving areas/criteria/cycles/rules; agent has read-only prod DB, so this must be an in-app admin action
 - [Independent filters pattern](independent-filters-pattern.md) — "filters must be independent" = no disabling on other filters + no resetting siblings on change; use global fallback option list when scoped list is empty
 - [Historical results import](historical-results-import.md) — pre-calibrated events (isHistorical+importedScore) bypass computeEventTeamResult everywhere; bulk import needs dry-run/create/update/conflict pattern; also covers date-overlap duplicate detection + admin merge-events endpoint
+- [Survey event-match quality](survey-event-match-quality.md) — substring-based suggestion matching under-matches free-text event labels; verify against full events table, prefer non-historical duplicate for real scores
