@@ -26,7 +26,9 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
+// 2mb: acomoda a importação da planilha de pesquisa de avaliadores (239+ linhas
+// em JSON), que ultrapassa o limite padrão de 100kb do express.json().
+app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

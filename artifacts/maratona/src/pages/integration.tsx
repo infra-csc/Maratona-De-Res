@@ -1,5 +1,6 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useResetAllData, getGetIntegrationStatusQueryKey, type HistoricalImportResult } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -8,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History } from "lucide-react";
-import { useRef, useState } from "react";
+import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History, ClipboardList, KeyRound } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -37,9 +38,21 @@ export default function IntegrationPage() {
   const [historicalPreview, setHistoricalPreview] = useState<HistoricalImportResult | null>(null);
   const [historicalDialogOpen, setHistoricalDialogOpen] = useState(false);
   const [linkOverrides, setLinkOverrides] = useState<Record<string, number>>({});
+  const surveyFileRef = useRef<HTMLInputElement>(null);
+  const [surveyRows, setSurveyRows] = useState<(string | number | null)[][] | null>(null);
+  const [surveyPreview, setSurveyPreview] = useState<SurveyImportResult | null>(null);
+  const [surveyDialogOpen, setSurveyDialogOpen] = useState(false);
+  const [surveyLinkOverrides, setSurveyLinkOverrides] = useState<Record<string, number>>({});
+  const [surveyCommitResult, setSurveyCommitResult] = useState<SurveyImportResult | null>(null);
 
   const qKey = getGetIntegrationStatusQueryKey();
   const { data: status, isLoading } = useGetIntegrationStatus({ query: { queryKey: qKey } });
+  const eventsQueryKey = getGetEventsQueryKey();
+  const { data: allEventsForLink } = useGetEvents(undefined, { query: { queryKey: eventsQueryKey, enabled: surveyDialogOpen } });
+  const eventLinkOptions = useMemo(
+    () => [...(allEventsForLink ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [allEventsForLink],
+  );
 
   const resetMutation = useResetAllData({
     mutation: {
@@ -147,6 +160,70 @@ export default function IntegrationPage() {
     if (!historicalCsvData) return;
     historicalCommitMutation.mutate({ data: { csvData: historicalCsvData, dryRun: false, linkOverrides } });
   }
+
+  const surveyPreviewMutation = useImportSurvey({
+    mutation: {
+      onSuccess: (data) => {
+        setSurveyPreview(data);
+        setSurveyDialogOpen(true);
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha ao ler arquivo", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
+
+  const surveyCommitMutation = useImportSurvey({
+    mutation: {
+      onSuccess: (data) => {
+        toast({
+          title: "Pesquisa de avaliadores importada",
+          description: `${data.usersCreated ?? 0} avaliador(es) criado(s), ${data.evaluationsCreated ?? 0} avaliação(ões) gravada(s), ${data.conformitiesUpserted ?? 0} conformidade(s) atualizada(s), ${data.eventsUpdated ?? 0} evento(s) atualizado(s).`,
+        });
+        if (data.warnings && data.warnings.length > 0) {
+          toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
+        }
+        setSurveyDialogOpen(false);
+        setSurveyPreview(null);
+        setSurveyRows(null);
+        setSurveyLinkOverrides({});
+        if (data.createdAvaliadores && data.createdAvaliadores.length > 0) {
+          setSurveyCommitResult(data);
+        }
+        qc.invalidateQueries();
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha ao importar", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
+
+  async function handleSurveyFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const allRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(sheet, { header: 1, raw: false, defval: "" });
+      const rows = allRows
+        .slice(1)
+        .filter((r) => Array.isArray(r) && r.some((cell) => String(cell ?? "").trim() !== ""));
+      setSurveyRows(rows);
+      setSurveyLinkOverrides({});
+      surveyPreviewMutation.mutate({ data: { rows, dryRun: true } });
+    } catch {
+      toast({ title: "Falha ao ler arquivo", description: "Verifique se o arquivo é uma planilha .xlsx válida.", variant: "destructive" });
+    }
+    e.target.value = "";
+  }
+
+  function handleSurveyConfirm() {
+    if (!surveyRows) return;
+    surveyCommitMutation.mutate({ data: { rows: surveyRows, dryRun: false, linkOverrides: surveyLinkOverrides } });
+  }
+
+  const surveyAllResolved = !!surveyPreview && surveyPreview.groups.every((g) => !!surveyLinkOverrides[g.groupKey]);
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto bg-slate-50/30 min-h-full">
@@ -301,6 +378,42 @@ export default function IntegrationPage() {
           >
             <Upload size={16} className="mr-2 text-amber-600" />
             {historicalPreviewMutation.isPending ? "Lendo arquivo..." : "Selecionar arquivo (pré-visualizar)"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-none shadow-sm bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <ClipboardList size={18} className="text-blue-600" /> Pesquisa de Avaliadores
+          </CardTitle>
+          <CardDescription>
+            Importa a planilha de respostas da pesquisa (uma linha por avaliador/evento) — cria avaliadores, vincula a eventos já cadastrados e grava notas por critério e conformidade.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            Cada evento da planilha precisa ser <strong>vinculado manualmente</strong> a um evento já existente no sistema — esta importação nunca cria eventos novos.
+            Também atualiza o catálogo de critérios (ativa "Carga na Saída do Galpão" e desativa 3 critérios antigos). Sempre mostra uma <strong>pré-visualização</strong> antes de gravar qualquer coisa.
+          </p>
+
+          <input
+            ref={surveyFileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleSurveyFileUpload}
+            data-testid="input-survey-xlsx-file"
+          />
+          <Button
+            data-testid="button-import-survey"
+            variant="outline"
+            className="w-full bg-white shadow-sm border-dashed border-2 border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+            onClick={() => surveyFileRef.current?.click()}
+            disabled={surveyPreviewMutation.isPending}
+          >
+            <Upload size={16} className="mr-2 text-blue-600" />
+            {surveyPreviewMutation.isPending ? "Lendo planilha..." : "Selecionar planilha (pré-visualizar)"}
           </Button>
         </CardContent>
       </Card>
@@ -647,6 +760,215 @@ export default function IntegrationPage() {
             >
               <CheckCircle2 size={16} className="mr-2" />
               {historicalCommitMutation.isPending ? "Importando..." : "Confirmar e importar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={surveyDialogOpen} onOpenChange={(open) => { setSurveyDialogOpen(open); if (!open) { setSurveyPreview(null); setSurveyRows(null); setSurveyLinkOverrides({}); } }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList size={20} className="text-blue-600" />
+              Pré-visualização da pesquisa de avaliadores
+            </DialogTitle>
+            <DialogDescription>
+              Nada foi gravado no banco ainda. Vincule <strong>cada evento</strong> da planilha a um evento já existente no sistema antes de confirmar. Nenhum evento novo será criado.
+            </DialogDescription>
+          </DialogHeader>
+
+          {surveyPreview && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xl font-black text-slate-800" data-testid="text-survey-total-rows">{surveyPreview.totalRows}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Linhas na planilha</p>
+                </div>
+                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xl font-black text-slate-800">{surveyPreview.groups.length}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos na planilha</p>
+                </div>
+                <div className="text-center p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <p className="text-xl font-black text-blue-700">{surveyPreview.avaliadoresToCreate.length}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Avaliadores novos</p>
+                </div>
+              </div>
+
+              {surveyPreview.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-red-700 uppercase mb-1 flex items-center gap-1.5">
+                    <AlertTriangle size={14} /> Erros ({surveyPreview.errors.length}) — bloqueiam a importação
+                  </p>
+                  <ul className="text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                    {surveyPreview.errors.map((err, i) => <li key={i}>• {err}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {(surveyPreview.catalogChanges.toDeactivate.length > 0 || surveyPreview.catalogChanges.toCreateOrActivate.length > 0) && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-purple-700 uppercase mb-1 flex items-center gap-1.5">
+                    <Briefcase size={14} /> Mudanças no catálogo de critérios
+                  </p>
+                  {surveyPreview.catalogChanges.toCreateOrActivate.length > 0 && (
+                    <p className="text-[11px] text-purple-700 mb-1">
+                      <strong>Ativar/criar:</strong> {surveyPreview.catalogChanges.toCreateOrActivate.join(", ")}
+                    </p>
+                  )}
+                  {surveyPreview.catalogChanges.toDeactivate.length > 0 && (
+                    <p className="text-[11px] text-purple-700">
+                      <strong>Desativar:</strong> {surveyPreview.catalogChanges.toDeactivate.join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {surveyPreview.avaliadoresToCreate.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
+                    <Users size={14} /> {surveyPreview.avaliadoresToCreate.length} avaliador(es) novo(s) serão cadastrados
+                  </p>
+                  <p className="text-[11px] text-blue-600 mb-2">Ao confirmar, cada um recebe um usuário com senha provisória (mostrada uma única vez logo após a importação).</p>
+                  <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
+                    {surveyPreview.avaliadoresToCreate.map((name, i) => <li key={i}>• {name}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {surveyPreview.warnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-amber-700 uppercase mb-1 flex items-center gap-1.5">
+                    <AlertTriangle size={14} /> Avisos ({surveyPreview.warnings.length})
+                  </p>
+                  <ul className="text-xs text-amber-700 space-y-1 max-h-32 overflow-y-auto">
+                    {surveyPreview.warnings.map((w, i) => <li key={i}>• {w}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Vincular cada evento da planilha</p>
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                      <tr>
+                        <th className="text-left p-2">Evento (planilha)</th>
+                        <th className="text-left p-2">Linhas</th>
+                        <th className="text-left p-2">Avaliadores</th>
+                        <th className="text-left p-2 min-w-[240px]">Vincular a evento existente</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {surveyPreview.groups.map((g, i) => {
+                        const selectedId = surveyLinkOverrides[g.groupKey];
+                        const selectedEvent = selectedId
+                          ? (g.suggestions.find(s => s.id === selectedId) ?? eventLinkOptions.find(e => e.id === selectedId))
+                          : undefined;
+                        return (
+                          <tr key={g.groupKey} className="border-t border-slate-100 align-top" data-testid={`row-survey-group-${i}`}>
+                            <td className="p-2 font-medium text-slate-800">{g.eventLabel}</td>
+                            <td className="p-2 text-slate-600">{g.rowCount}</td>
+                            <td className="p-2 text-slate-600">{g.distinctEvaluators}</td>
+                            <td className="p-2">
+                              <Select
+                                value={selectedId ? String(selectedId) : "none"}
+                                onValueChange={(val) => {
+                                  setSurveyLinkOverrides(prev => {
+                                    const next = { ...prev };
+                                    if (val === "none") delete next[g.groupKey];
+                                    else next[g.groupKey] = Number(val);
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="h-7 text-[11px] w-full" data-testid={`select-survey-link-${i}`}>
+                                  <SelectValue placeholder="Selecione um evento..." />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-64">
+                                  <SelectItem value="none">— nenhum vínculo —</SelectItem>
+                                  {g.suggestions.length > 0 && g.suggestions.map(s => (
+                                    <SelectItem key={`sug-${s.id}`} value={String(s.id)}>
+                                      ★ {s.name}{s.isHistorical ? " (histórico)" : ""}
+                                    </SelectItem>
+                                  ))}
+                                  {eventLinkOptions.filter(e => !g.suggestions.some(s => s.id === e.id)).map(e => (
+                                    <SelectItem key={e.id} value={String(e.id)}>
+                                      {e.name}{e.isHistorical ? " (histórico)" : ""}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {!selectedId && (
+                                <p className="text-[10px] text-red-600 mt-1">Obrigatório — selecione um evento.</p>
+                              )}
+                              {selectedEvent?.isHistorical && (
+                                <p className="text-[10px] text-amber-700 mt-1">Evento histórico: só os comentários serão salvos como referência, sem notas.</p>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">★ = sugestão por semelhança de nome/cidade/data.</p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setSurveyDialogOpen(false)} disabled={surveyCommitMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              data-testid="button-confirm-survey-import"
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={!surveyPreview?.success || surveyPreview.errors.length > 0 || !surveyAllResolved || surveyCommitMutation.isPending}
+              onClick={handleSurveyConfirm}
+            >
+              <CheckCircle2 size={16} className="mr-2" />
+              {surveyCommitMutation.isPending ? "Importando..." : "Confirmar e importar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!surveyCommitResult} onOpenChange={(open) => { if (!open) setSurveyCommitResult(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound size={20} className="text-blue-600" />
+              Credenciais dos avaliadores criados
+            </DialogTitle>
+            <DialogDescription>
+              Estas senhas provisórias são exibidas <strong>apenas uma vez</strong>. Copie e distribua para cada avaliador antes de fechar esta janela.
+            </DialogDescription>
+          </DialogHeader>
+          {surveyCommitResult?.createdAvaliadores && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                  <tr>
+                    <th className="text-left p-2">Nome</th>
+                    <th className="text-left p-2">E-mail</th>
+                    <th className="text-left p-2">Senha provisória</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {surveyCommitResult.createdAvaliadores.map((a, i) => (
+                    <tr key={i} className="border-t border-slate-100" data-testid={`row-created-avaliador-${i}`}>
+                      <td className="p-2 font-medium text-slate-800">{a.name}</td>
+                      <td className="p-2 text-slate-600 font-mono">{a.email}</td>
+                      <td className="p-2 text-slate-600 font-mono">{a.tempPassword}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setSurveyCommitResult(null)}>
+              Já distribuí as senhas
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2099,6 +2099,62 @@ export const ImportHistoricalResultsResponse = zod.object({
 
 
 /**
+ * @summary Import the evaluator survey spreadsheet (one row = one evaluator's answer for one event). Creates avaliador users (deduped by name), never auto-creates events (every spreadsheet event must be linked to an existing event via linkOverrides), converts numeric 0-10 answers into real per-criterion evaluations for non-historical events, turns the four Sim/Não questions into event_conformities (worst case wins), and stores historical-event comments as importedNotes only. Also runs the criteria catalog migration (activate "Carga na Saída do Galpão", deactivate 3 retired criteria) inside the commit transaction. Always previews (dryRun) unless dryRun=false and there are zero validation errors and every group is linked.
+ */
+export const ImportSurveyBody = zod.object({
+  "rows": zod.array(zod.array(zod.unknown())).describe('Linhas da planilha (sem cabeçalho), cada uma um array de 29 células na ordem original das colunas do xlsx.'),
+  "dryRun": zod.boolean().optional().describe('Defaults to true. Set to false to commit (only applied when there are zero errors and every group is linked).'),
+  "linkOverrides": zod.record(zod.string(), zod.number()).optional().describe('Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.')
+})
+
+export const ImportSurveyResponse = zod.object({
+  "success": zod.boolean(),
+  "dryRun": zod.boolean(),
+  "errors": zod.array(zod.string()),
+  "totalRows": zod.number(),
+  "groups": zod.array(zod.object({
+  "groupKey": zod.string().describe('Identificador estável do grupo (texto do evento normalizado), usado em linkOverrides.'),
+  "eventLabel": zod.string().describe('Texto original da coluna Evento+cidade+data da planilha.'),
+  "rowCount": zod.number(),
+  "distinctEvaluators": zod.number(),
+  "linkedEventId": zod.number().optional(),
+  "linkedEvent": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string(),
+  "isHistorical": zod.boolean(),
+  "status": zod.string(),
+  "cycleId": zod.number()
+}).optional(),
+  "suggestions": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string(),
+  "isHistorical": zod.boolean()
+})).describe('Eventos já cadastrados sugeridos por semelhança de nome\/cidade, para ajudar a escolher o vínculo.'),
+  "resolved": zod.boolean().describe('true quando um linkOverride válido foi informado para este grupo.')
+})),
+  "unresolvedGroups": zod.array(zod.string()).describe('groupKeys ainda sem vínculo — precisam de linkOverrides antes do commit.'),
+  "avaliadoresToCreate": zod.array(zod.string()).describe('Nomes de avaliadores que serão criados como usuários novos ao confirmar.'),
+  "catalogChanges": zod.object({
+  "toDeactivate": zod.array(zod.string()).describe('Nomes de critérios que serão desativados (active=false) no commit.'),
+  "toCreateOrActivate": zod.array(zod.string()).describe('Nomes de critérios que serão criados ou reativados no commit.')
+}),
+  "warnings": zod.array(zod.string()),
+  "usersCreated": zod.number().optional(),
+  "evaluationsCreated": zod.number().optional(),
+  "assignmentsCreated": zod.number().optional(),
+  "conformitiesUpserted": zod.number().optional(),
+  "eventsUpdated": zod.number().optional(),
+  "createdAvaliadores": zod.array(zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "tempPassword": zod.string().describe('Senha provisória em texto puro, retornada apenas uma vez neste response para o RH distribuir ao avaliador.')
+})).optional().describe('Apenas no commit — credenciais provisórias dos avaliadores criados.')
+})
+
+
+/**
  * @summary Export event results CSV
  */
 export const ExportEventResultsQueryParams = zod.object({

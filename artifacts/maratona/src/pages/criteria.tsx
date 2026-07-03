@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, AlertCircle, Building2, Zap } from "lucide-react";
+import { Plus, Building2, Zap } from "lucide-react";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -48,21 +48,11 @@ export default function CriteriaPage() {
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
   const totalWeight = activeCriteria.reduce((s, c) => s + Number(c.defaultWeight), 0);
-  const isWeightValid = totalWeight === 20;
-
-  const weightPct = Math.min((totalWeight / 20) * 100, 100);
-  let weightMessage: string;
-  let weightMessageClass: string;
-  if (totalWeight === 20) {
-    weightMessage = "META ATINGIDA! PESO IDEAL";
-    weightMessageClass = "text-[#506600]";
-  } else if (totalWeight > 20) {
-    weightMessage = `LIMITE EXCEDIDO (${totalWeight - 20} pts acima)`;
-    weightMessageClass = "text-[#ba1a1a]";
-  } else {
-    weightMessage = `FALTAM ${20 - totalWeight} PONTOS PARA A META`;
-    weightMessageClass = "text-[#b02f00]";
-  }
+  // Não existe uma meta fixa global: cada evento define seu próprio alvo de
+  // soma de pesos a partir dos critérios ativos no momento em que foi criado
+  // (ver event-detail.tsx / targetWeightSum). Esta soma aqui é apenas
+  // informativa — o que valer quando um evento novo for criado vira o alvo
+  // daquele evento.
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -86,19 +76,15 @@ export default function CriteriaPage() {
             </div>
             <div className="skew-x-[3deg]">
               <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933] mb-1 flex items-center gap-1.5">
-                {!isWeightValid && <AlertCircle size={14} className="text-[#ba1a1a]" />} Soma dos Pesos
+                Soma dos Pesos Ativos
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="text-[40px] leading-none italic font-black">{totalWeight}</span>
-                <span className="text-2xl italic font-bold text-[#747a60]">/ 20</span>
+                <span className="text-2xl italic font-bold text-[#747a60]">pts</span>
               </div>
-              <div className="w-full h-3 bg-[#eceef0] border-2 border-[#191c1e] mt-4 overflow-hidden">
-                <div
-                  className={`h-full transition-[width] duration-500 ${totalWeight > 20 ? "bg-[#ba1a1a]" : "bg-[#ccff00]"}`}
-                  style={{ width: `${weightPct}%` }}
-                />
-              </div>
-              <p className={`text-[10px] font-bold uppercase italic mt-2 ${weightMessageClass}`}>{weightMessage}</p>
+              <p className="text-[10px] font-bold uppercase italic mt-2 text-[#747a60]">
+                Vira o alvo de peso dos próximos eventos criados
+              </p>
             </div>
           </div>
         </section>

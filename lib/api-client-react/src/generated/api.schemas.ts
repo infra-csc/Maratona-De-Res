@@ -1032,6 +1032,86 @@ export interface HistoricalImportResult {
   warnings?: string[];
 }
 
+/**
+ * Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.
+ */
+export type SurveyImportInputLinkOverrides = {[key: string]: number};
+
+export interface SurveyImportInput {
+  /** Linhas da planilha (sem cabeçalho), cada uma um array de 29 células na ordem original das colunas do xlsx. */
+  rows: unknown[][];
+  /** Defaults to true. Set to false to commit (only applied when there are zero errors and every group is linked). */
+  dryRun?: boolean;
+  /** Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos. */
+  linkOverrides?: SurveyImportInputLinkOverrides;
+}
+
+export interface SurveyEventSuggestion {
+  id: number;
+  name: string;
+  startDate: string;
+  isHistorical: boolean;
+}
+
+export interface SurveyLinkedEventSummary {
+  id: number;
+  name: string;
+  startDate: string;
+  isHistorical: boolean;
+  status: string;
+  cycleId: number;
+}
+
+export interface SurveyGroupPlan {
+  /** Identificador estável do grupo (texto do evento normalizado), usado em linkOverrides. */
+  groupKey: string;
+  /** Texto original da coluna Evento+cidade+data da planilha. */
+  eventLabel: string;
+  rowCount: number;
+  distinctEvaluators: number;
+  linkedEventId?: number;
+  linkedEvent?: SurveyLinkedEventSummary;
+  /** Eventos já cadastrados sugeridos por semelhança de nome/cidade, para ajudar a escolher o vínculo. */
+  suggestions: SurveyEventSuggestion[];
+  /** true quando um linkOverride válido foi informado para este grupo. */
+  resolved: boolean;
+}
+
+export interface SurveyCatalogChanges {
+  /** Nomes de critérios que serão desativados (active=false) no commit. */
+  toDeactivate: string[];
+  /** Nomes de critérios que serão criados ou reativados no commit. */
+  toCreateOrActivate: string[];
+}
+
+export interface SurveyCreatedAvaliador {
+  name: string;
+  email: string;
+  /** Senha provisória em texto puro, retornada apenas uma vez neste response para o RH distribuir ao avaliador. */
+  tempPassword: string;
+}
+
+export interface SurveyImportResult {
+  success: boolean;
+  dryRun: boolean;
+  errors: string[];
+  totalRows: number;
+  groups: SurveyGroupPlan[];
+  /** groupKeys ainda sem vínculo — precisam de linkOverrides antes do commit. */
+  unresolvedGroups: string[];
+  /** Nomes de avaliadores que serão criados como usuários novos ao confirmar. */
+  avaliadoresToCreate: string[];
+  catalogChanges: SurveyCatalogChanges;
+  warnings: string[];
+  usersCreated?: number;
+  evaluationsCreated?: number;
+  assignmentsCreated?: number;
+  conformitiesUpserted?: number;
+  eventsUpdated?: number;
+  /** Apenas no commit — credenciais provisórias dos avaliadores criados. */
+  createdAvaliadores?: SurveyCreatedAvaliador[];
+}
+
 export interface CsvExport {
   filename: string;
   data: string;

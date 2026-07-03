@@ -1,8 +1,10 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import {
   db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable, eventCriteriaTable,
   usersTable, absencesTable, quarterlyResultsTable, employeeCycleEligibilityTable, auditLogsTable,
-  cyclesTable,
+  cyclesTable, areasTable, eventAreaAssignmentsTable, eventConformitiesTable, evaluationsTable,
 } from "@workspace/db";
 import { isNotNull, inArray, eq, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -777,6 +779,483 @@ router.post("/integration/import/historical-results", async (req, res) => {
   });
 
   res.json({ success: true, dryRun: false, eventsCreated, eventsUpdated, participantsLinked, employeesCreated, warnings, errors: [], ...preview });
+});
+
+// ---------------------------------------------------------------------------
+// Importação da pesquisa de avaliadores (planilha xlsx, 1 linha = 1 resposta
+// de 1 avaliador sobre 1 evento). Diferente da importação histórica: aqui a
+// nota é POR CRITÉRIO (escala 0-10, mesma escala usada nas avaliações
+// normais — NÃO multiplicar por 10) e vira uma avaliação de verdade
+// (evaluations), não uma nota pronta de time. Também:
+//  - cria usuários avaliadores (role="avaliador"), com deduplicação por nome
+//    normalizado — nunca cria duplicata para o mesmo avaliador;
+//  - NUNCA cria eventos: cada "evento da planilha" (texto livre da coluna
+//    Evento+cidade+data) precisa ser explicitamente vinculado pelo admin a um
+//    evento já existente via linkOverrides (revisão manual, sem fallback de
+//    auto-criação — evita duplicar eventos por causa de nomes divergentes);
+//  - se o evento vinculado é histórico (isHistorical=true, nota pronta vinda
+//    de outra fonte), NÃO grava avaliação nem conformidade — só concatena os
+//    comentários da planilha em importedNotes, como referência;
+//  - as 4 perguntas Sim/Não viram itens da Matriz de Conformidade
+//    (event_conformities), com "pior caso vence": se qualquer resposta para
+//    aquele item for "Não" para o evento, o item fica reprovado, mesmo que
+//    outro avaliador tenha respondido "Sim";
+//  - embutida aqui está a migração do catálogo de critérios (visto que a
+//    pesquisa só faz sentido com o catálogo novo): desativa os 3 quesitos
+//    retirados e cria/reativa "Carga na Saída do Galpão". Resolvida por NOME
+//    normalizado (não por id) para não depender da ordem de inserção do seed.
+//    Só roda de fato no commit (dryRun=false); a pré-visualização apenas
+//    mostra o que vai mudar.
+// SEMPRE roda em modo de pré-visualização (dryRun) por padrão — só grava
+// quando dryRun=false, todos os grupos estão vinculados e não há erros.
+// ---------------------------------------------------------------------------
+
+const SURVEY_COL = {
+  NAME: 2,
+  EVENT_LABEL: 3,
+  AREA: 4,
+  PERDA_MATERIAL: 5, PERDA_MATERIAL_COMMENT: 6,
+  LOGISTICA_REVERSA: 7, LOGISTICA_REVERSA_COMMENT: 8,
+  QUALIDADE_ATENDIMENTO: 9, QUALIDADE_ATENDIMENTO_COMMENT: 10,
+  QUALIDADE_ATIVACAO: 11, QUALIDADE_ATIVACAO_COMMENT: 12,
+  PRAZO_ENTREGA: 13, PRAZO_ENTREGA_COMMENT: 14,
+  GUARDA_EQUIPAMENTOS: 15, GUARDA_EQUIPAMENTOS_COMMENT: 16,
+  CARGA_GALPAO: 17, CARGA_GALPAO_COMMENT: 18,
+  EPI: 19, EPI_COMMENT: 20,
+  ESTAIAMENTOS: 21, ESTAIAMENTOS_COMMENT: 22,
+  CONDUTA: 23, CONDUTA_COMMENT: 24,
+  FALTOU_ATRASOU: 25,
+  DESTAQUE: 26,
+  QUEM_DESTACOU: 27,
+  NIVEL_DESEMPENHO: 28,
+} as const;
+
+const SURVEY_CRITERIA_KEPT = ["Perda de Material/Estrutura", "Logística Reversa", "Qualidade da Entrega", "Prazo de Entrega"];
+const SURVEY_CRITERION_NEW = "Carga na Saída do Galpão";
+const SURVEY_CRITERIA_RETIRED = ["Ferramentas & Case", "Obrigações Estruturais", "Conduta e Comportamento"];
+
+const SURVEY_SCORE_COLUMNS: { col: number; commentCol: number; criterionName: string }[] = [
+  { col: SURVEY_COL.PERDA_MATERIAL, commentCol: SURVEY_COL.PERDA_MATERIAL_COMMENT, criterionName: "Perda de Material/Estrutura" },
+  { col: SURVEY_COL.LOGISTICA_REVERSA, commentCol: SURVEY_COL.LOGISTICA_REVERSA_COMMENT, criterionName: "Logística Reversa" },
+  { col: SURVEY_COL.QUALIDADE_ATENDIMENTO, commentCol: SURVEY_COL.QUALIDADE_ATENDIMENTO_COMMENT, criterionName: "Qualidade da Entrega" },
+  { col: SURVEY_COL.QUALIDADE_ATIVACAO, commentCol: SURVEY_COL.QUALIDADE_ATIVACAO_COMMENT, criterionName: "Qualidade da Entrega" },
+  { col: SURVEY_COL.PRAZO_ENTREGA, commentCol: SURVEY_COL.PRAZO_ENTREGA_COMMENT, criterionName: "Prazo de Entrega" },
+  { col: SURVEY_COL.CARGA_GALPAO, commentCol: SURVEY_COL.CARGA_GALPAO_COMMENT, criterionName: SURVEY_CRITERION_NEW },
+];
+
+type ConformityField = "epi" | "estaiamentos" | "guardaEquipamentos" | "conduta";
+const SURVEY_CONFORMITY_COLUMNS: { col: number; field: ConformityField }[] = [
+  { col: SURVEY_COL.GUARDA_EQUIPAMENTOS, field: "guardaEquipamentos" },
+  { col: SURVEY_COL.EPI, field: "epi" },
+  { col: SURVEY_COL.ESTAIAMENTOS, field: "estaiamentos" },
+  { col: SURVEY_COL.CONDUTA, field: "conduta" },
+];
+
+const SURVEY_NOTE_COLUMNS = [
+  SURVEY_COL.PERDA_MATERIAL_COMMENT, SURVEY_COL.LOGISTICA_REVERSA_COMMENT,
+  SURVEY_COL.QUALIDADE_ATENDIMENTO_COMMENT, SURVEY_COL.QUALIDADE_ATIVACAO_COMMENT,
+  SURVEY_COL.PRAZO_ENTREGA_COMMENT, SURVEY_COL.CARGA_GALPAO_COMMENT,
+  SURVEY_COL.FALTOU_ATRASOU, SURVEY_COL.QUEM_DESTACOU, SURVEY_COL.NIVEL_DESEMPENHO,
+];
+
+// Rótulo de área declarado pelo avaliador na planilha -> nome da área no
+// cadastro, usado só para dar um perfil (areaId) padrão ao usuário avaliador
+// criado. Não decide a qual área o avaliador fica ATRIBUÍDO no evento (isso é
+// feito pela área RESPONSÁVEL do critério que ele efetivamente pontuou).
+const SURVEY_AREA_LABEL_TO_AREA_NAME: Record<string, string> = {
+  [normalizeImportText("Logística")]: "Logística",
+  [normalizeImportText("Produção")]: "Produção",
+  [normalizeImportText("Atendimento")]: "Atendimento",
+  [normalizeImportText("Ativação")]: "Ativação",
+  [normalizeImportText("Cenografia")]: "Cenografia",
+  [normalizeImportText("Ferramentas e Case (Cenografia)")]: "Ferramentas e case",
+};
+
+type SurveyRawRow = (string | number | null | undefined)[];
+
+interface ParsedSurveyRow {
+  line: number;
+  evaluatorName: string;
+  eventLabel: string;
+  normalizedEventLabel: string;
+  areaLabelNormalized: string;
+  scores: { criterionName: string; score: number; comment: string | null }[];
+  conformity: Partial<Record<ConformityField, boolean>>;
+  noteText: string | null;
+}
+
+function surveyCell(row: SurveyRawRow, idx: number): string {
+  const v = row[idx];
+  return v == null ? "" : String(v).trim();
+}
+
+function parseScore10(raw: string): number | null {
+  const s = raw.trim().replace(",", ".");
+  if (!s) return null;
+  const n = parseFloat(s);
+  if (!Number.isFinite(n) || n < 0 || n > 10) return null;
+  return Math.round(n * 100) / 100;
+}
+
+function parseSimNao(raw: string): boolean | null {
+  const n = normalizeImportText(raw);
+  if (!n) return null;
+  if (n.startsWith("sim")) return true;
+  if (n.startsWith("nao")) return false;
+  return null;
+}
+
+function parseSurveyRow(raw: SurveyRawRow, line: number): ParsedSurveyRow | null {
+  const evaluatorName = surveyCell(raw, SURVEY_COL.NAME);
+  const eventLabel = surveyCell(raw, SURVEY_COL.EVENT_LABEL);
+  if (!evaluatorName && !eventLabel) return null;
+
+  const areaLabelNormalized = normalizeImportText(surveyCell(raw, SURVEY_COL.AREA));
+
+  const scores: ParsedSurveyRow["scores"] = [];
+  for (const map of SURVEY_SCORE_COLUMNS) {
+    const rawScore = surveyCell(raw, map.col);
+    if (!rawScore) continue;
+    const score = parseScore10(rawScore);
+    if (score === null) continue;
+    scores.push({ criterionName: map.criterionName, score, comment: surveyCell(raw, map.commentCol) || null });
+  }
+
+  const conformity: ParsedSurveyRow["conformity"] = {};
+  for (const c of SURVEY_CONFORMITY_COLUMNS) {
+    const rawAnswer = surveyCell(raw, c.col);
+    if (!rawAnswer) continue;
+    const v = parseSimNao(rawAnswer);
+    if (v !== null) conformity[c.field] = v;
+  }
+
+  const noteParts = SURVEY_NOTE_COLUMNS.map(idx => surveyCell(raw, idx)).filter(Boolean);
+  const noteText = noteParts.length > 0 ? Array.from(new Set(noteParts)).join(" | ") : null;
+
+  return { line, evaluatorName, eventLabel, normalizedEventLabel: normalizeImportText(eventLabel), areaLabelNormalized, scores, conformity, noteText };
+}
+
+function slugifyForEmail(name: string): string {
+  return normalizeImportText(name).replace(/[^a-z0-9]+/g, ".").replace(/^\.+|\.+$/g, "") || "avaliador";
+}
+
+function generateTempPassword(): string {
+  return crypto.randomBytes(6).toString("hex");
+}
+
+function buildUniqueEmail(name: string, used: Set<string>): string {
+  const base = slugifyForEmail(name);
+  let candidate = `${base}@avaliador.importado`;
+  let n = 2;
+  while (used.has(candidate)) {
+    candidate = `${base}${n}@avaliador.importado`;
+    n++;
+  }
+  return candidate;
+}
+
+type SurveyEventCandidate = { id: number; name: string; startDate: string; endDate: string; isHistorical: boolean; status: string; cycleId: number; city: string | null };
+
+function suggestSurveyEventMatches(label: string, events: SurveyEventCandidate[]): SurveyEventCandidate[] {
+  const normLabel = normalizeImportText(label);
+  if (!normLabel) return [];
+  return events
+    .filter(e => {
+      const normName = normalizeImportText(e.name);
+      if (!normName) return false;
+      return normLabel.includes(normName) || normName.includes(normLabel) || (!!e.city && normLabel.includes(normalizeImportText(e.city)));
+    })
+    .slice(0, 5);
+}
+
+router.post("/integration/import/survey", requireRole("admin"), async (req, res) => {
+  const { rows: rawRows, dryRun, linkOverrides } = req.body ?? {};
+  const isDryRun = dryRun !== false;
+  if (!Array.isArray(rawRows)) { res.status(400).json({ error: "rows obrigatório (array de linhas da planilha)" }); return; }
+  const overrideMap: Record<string, number> = linkOverrides && typeof linkOverrides === "object" ? linkOverrides : {};
+
+  const errors: string[] = [];
+  const parsedRows: ParsedSurveyRow[] = [];
+  rawRows.forEach((raw: unknown, i: number) => {
+    const line = i + 2;
+    if (!Array.isArray(raw)) return;
+    const parsed = parseSurveyRow(raw as SurveyRawRow, line);
+    if (!parsed) return;
+    if (!parsed.evaluatorName) { errors.push(`Linha ${line}: nome do avaliador ausente`); return; }
+    if (!parsed.eventLabel) { errors.push(`Linha ${line}: evento ausente`); return; }
+    parsedRows.push(parsed);
+  });
+
+  type SurveyGroup = { eventLabel: string; normalizedEventLabel: string; rows: ParsedSurveyRow[] };
+  const groups = new Map<string, SurveyGroup>();
+  for (const r of parsedRows) {
+    if (!groups.has(r.normalizedEventLabel)) groups.set(r.normalizedEventLabel, { eventLabel: r.eventLabel, normalizedEventLabel: r.normalizedEventLabel, rows: [] });
+    groups.get(r.normalizedEventLabel)!.rows.push(r);
+  }
+
+  const allEvents: SurveyEventCandidate[] = await db.select({
+    id: eventsTable.id, name: eventsTable.name, startDate: eventsTable.startDate, endDate: eventsTable.endDate,
+    isHistorical: eventsTable.isHistorical, status: eventsTable.status, cycleId: eventsTable.cycleId, city: eventsTable.city,
+  }).from(eventsTable);
+  const eventsById = new Map(allEvents.map(e => [e.id, e]));
+
+  type SurveyGroupPlan = {
+    groupKey: string; eventLabel: string; rowCount: number; distinctEvaluators: number;
+    linkedEventId?: number; linkedEvent?: { id: number; name: string; startDate: string; isHistorical: boolean; status: string; cycleId: number };
+    suggestions: { id: number; name: string; startDate: string; isHistorical: boolean }[];
+    resolved: boolean;
+  };
+  const groupPlans: SurveyGroupPlan[] = [];
+  for (const g of groups.values()) {
+    const distinctEvaluators = new Set(g.rows.map(r => normalizeImportText(r.evaluatorName))).size;
+    const overrideId = overrideMap[g.normalizedEventLabel];
+    const linkedEvent = overrideId != null ? eventsById.get(overrideId) : undefined;
+    if (overrideId != null && !linkedEvent) errors.push(`Evento "${g.eventLabel}": vínculo informado (id ${overrideId}) não existe`);
+    groupPlans.push({
+      groupKey: g.normalizedEventLabel, eventLabel: g.eventLabel, rowCount: g.rows.length, distinctEvaluators,
+      linkedEventId: linkedEvent?.id,
+      linkedEvent: linkedEvent ? { id: linkedEvent.id, name: linkedEvent.name, startDate: linkedEvent.startDate, isHistorical: linkedEvent.isHistorical, status: linkedEvent.status, cycleId: linkedEvent.cycleId } : undefined,
+      suggestions: suggestSurveyEventMatches(g.eventLabel, allEvents).map(e => ({ id: e.id, name: e.name, startDate: e.startDate, isHistorical: e.isHistorical })),
+      resolved: !!linkedEvent,
+    });
+  }
+
+  const allUsers = await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role }).from(usersTable);
+  const usersByName = new Map<string, typeof allUsers>();
+  for (const u of allUsers) {
+    const key = normalizeImportText(u.name);
+    if (!usersByName.has(key)) usersByName.set(key, []);
+    usersByName.get(key)!.push(u);
+  }
+  const usedEmails = new Set(allUsers.map(u => u.email.toLowerCase()));
+
+  const evaluatorResolution = new Map<string, number>();
+  const toCreateAvaliadorNames = new Map<string, { originalName: string; areaLabel: string | null }>();
+  for (const r of parsedRows) {
+    const key = normalizeImportText(r.evaluatorName);
+    if (evaluatorResolution.has(key) || toCreateAvaliadorNames.has(key)) continue;
+    const matches = usersByName.get(key) ?? [];
+    if (matches.length === 1) {
+      evaluatorResolution.set(key, matches[0].id);
+    } else if (matches.length > 1) {
+      errors.push(`Avaliador "${r.evaluatorName}": corresponde a ${matches.length} usuários já cadastrados — resolva manualmente antes de importar`);
+    } else {
+      toCreateAvaliadorNames.set(key, { originalName: r.evaluatorName, areaLabel: r.areaLabelNormalized || null });
+    }
+  }
+
+  const allCriteria = await db.select().from(criteriaTable);
+  const criteriaByName = new Map(allCriteria.map(c => [normalizeImportText(c.name), c]));
+  for (const name of SURVEY_CRITERIA_KEPT) {
+    if (!criteriaByName.has(normalizeImportText(name))) errors.push(`Critério obrigatório "${name}" não encontrado no catálogo — não é possível continuar`);
+  }
+  const allAreas = await db.select().from(areasTable);
+  const areaByName = new Map(allAreas.map(a => [normalizeImportText(a.name), a]));
+  const cenografiaArea = areaByName.get(normalizeImportText("Cenografia"));
+  if (!cenografiaArea) errors.push('Área "Cenografia" não encontrada — necessária para o novo critério "Carga na Saída do Galpão"');
+
+  const existingNewCriterion = criteriaByName.get(normalizeImportText(SURVEY_CRITERION_NEW));
+  const catalogChanges = {
+    toDeactivate: SURVEY_CRITERIA_RETIRED.filter(name => criteriaByName.get(normalizeImportText(name))?.active),
+    toCreateOrActivate: (!existingNewCriterion || !existingNewCriterion.active) ? [SURVEY_CRITERION_NEW] : [],
+  };
+
+  const retiredCriteriaIdsForWarnings = SURVEY_CRITERIA_RETIRED
+    .map(n => criteriaByName.get(normalizeImportText(n))?.id)
+    .filter((id): id is number => id != null);
+  const warnings: string[] = [];
+  for (const gp of groupPlans) {
+    if (!gp.resolved || !gp.linkedEvent || gp.linkedEvent.isHistorical) continue;
+    if (retiredCriteriaIdsForWarnings.length > 0) {
+      const existingEvals = await db.select({ id: evaluationsTable.id }).from(evaluationsTable)
+        .where(and(eq(evaluationsTable.eventId, gp.linkedEvent.id), inArray(evaluationsTable.criterionId, retiredCriteriaIdsForWarnings), eq(evaluationsTable.status, "submitted")));
+      if (existingEvals.length > 0) {
+        warnings.push(`Evento "${gp.linkedEvent.name}": ${existingEvals.length} avaliação(ões) já enviada(s) em critérios que serão retirados do catálogo — essas notas deixarão de contar no cálculo após esta importação.`);
+      }
+    }
+    if (gp.linkedEvent.status === "closed") {
+      warnings.push(`Evento "${gp.linkedEvent.name}" já está fechado — a nota final será recalculada após esta importação.`);
+    }
+  }
+
+  const preview = {
+    totalRows: parsedRows.length,
+    groups: groupPlans,
+    unresolvedGroups: groupPlans.filter(g => !g.resolved).map(g => g.groupKey),
+    avaliadoresToCreate: Array.from(toCreateAvaliadorNames.values()).map(v => v.originalName),
+    catalogChanges,
+    warnings,
+  };
+
+  if (isDryRun) {
+    res.json({ success: errors.length === 0, dryRun: true, errors, ...preview });
+    return;
+  }
+
+  if (errors.length > 0) {
+    res.status(400).json({ success: false, dryRun: false, errors, ...preview });
+    return;
+  }
+  const unresolved = groupPlans.filter(g => !g.resolved);
+  if (unresolved.length > 0) {
+    res.status(400).json({ success: false, dryRun: false, errors: [`Vincule todos os eventos da planilha a um evento existente antes de confirmar (${unresolved.length} pendente(s)).`], ...preview });
+    return;
+  }
+
+  const userId = req.user!.userId;
+  const createdAvaliadores: { name: string; email: string; tempPassword: string }[] = [];
+  let usersCreated = 0, evaluationsCreated = 0, assignmentsCreated = 0, conformitiesUpserted = 0, eventsUpdated = 0;
+  const affectedCycleIds = new Set<number>();
+
+  await db.transaction(async (tx) => {
+    const txCriteria = await tx.select().from(criteriaTable);
+    const txCriteriaByName = new Map(txCriteria.map(c => [normalizeImportText(c.name), c]));
+
+    for (const name of SURVEY_CRITERIA_RETIRED) {
+      const c = txCriteriaByName.get(normalizeImportText(name));
+      if (c && c.active) await tx.update(criteriaTable).set({ active: false }).where(eq(criteriaTable.id, c.id));
+    }
+
+    let novoCriterio = txCriteriaByName.get(normalizeImportText(SURVEY_CRITERION_NEW));
+    if (!novoCriterio) {
+      const [created] = await tx.insert(criteriaTable).values({
+        name: SURVEY_CRITERION_NEW,
+        description: "Avalia a conferência, organização e integridade da carga no momento da saída do galpão, antes do embarque para o evento.",
+        responsibleAreaId: cenografiaArea!.id,
+        responsibleAreaLabel: "Cenografia",
+        defaultWeight: "3",
+        displayOrder: (Math.max(0, ...txCriteria.map(c => c.displayOrder)) + 1),
+        active: true,
+      }).returning();
+      novoCriterio = created;
+    } else if (!novoCriterio.active) {
+      await tx.update(criteriaTable).set({ active: true }).where(eq(criteriaTable.id, novoCriterio.id));
+      novoCriterio = { ...novoCriterio, active: true };
+    }
+
+    const keptCriteriaByName = new Map<string, typeof txCriteria[number]>();
+    for (const name of SURVEY_CRITERIA_KEPT) {
+      const c = txCriteriaByName.get(normalizeImportText(name));
+      if (c) keptCriteriaByName.set(normalizeImportText(name), c);
+    }
+    keptCriteriaByName.set(normalizeImportText(SURVEY_CRITERION_NEW), novoCriterio!);
+    const retiredCriteriaIds = SURVEY_CRITERIA_RETIRED
+      .map(n => txCriteriaByName.get(normalizeImportText(n))?.id)
+      .filter((id): id is number => id != null);
+
+    const evaluatorIdByNormalizedName = new Map<string, number>(evaluatorResolution);
+    for (const [key, info] of toCreateAvaliadorNames) {
+      const areaName = info.areaLabel ? SURVEY_AREA_LABEL_TO_AREA_NAME[info.areaLabel] : undefined;
+      const profileAreaId = areaName ? areaByName.get(normalizeImportText(areaName))?.id ?? null : null;
+      const email = buildUniqueEmail(info.originalName, usedEmails);
+      usedEmails.add(email);
+      const tempPassword = generateTempPassword();
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+      const [createdUser] = await tx.insert(usersTable).values({
+        name: info.originalName, email, passwordHash, role: "avaliador", areaId: profileAreaId ?? null,
+      }).returning();
+      evaluatorIdByNormalizedName.set(key, createdUser.id);
+      createdAvaliadores.push({ name: info.originalName, email, tempPassword });
+      usersCreated++;
+    }
+
+    const rowsByEventId = new Map<number, ParsedSurveyRow[]>();
+    for (const gp of groupPlans) {
+      if (!gp.linkedEventId) continue;
+      const g = groups.get(gp.groupKey)!;
+      if (!rowsByEventId.has(gp.linkedEventId)) rowsByEventId.set(gp.linkedEventId, []);
+      rowsByEventId.get(gp.linkedEventId)!.push(...g.rows);
+    }
+
+    for (const [eventId, eventRows] of rowsByEventId) {
+      const targetEvent = eventsById.get(eventId)!;
+
+      if (targetEvent.isHistorical) {
+        const noteTexts = eventRows.map(r => r.noteText).filter((t): t is string => !!t);
+        if (noteTexts.length > 0) {
+          const combined = Array.from(new Set(noteTexts)).join(" / ");
+          const [current] = await tx.select({ importedNotes: eventsTable.importedNotes }).from(eventsTable).where(eq(eventsTable.id, eventId));
+          const merged = current?.importedNotes ? `${current.importedNotes} / ${combined}` : combined;
+          await tx.update(eventsTable).set({ importedNotes: merged }).where(eq(eventsTable.id, eventId));
+          eventsUpdated++;
+        }
+        continue;
+      }
+
+      const existingEventCriteria = await tx.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, eventId));
+      const existingCriterionIds = new Set(existingEventCriteria.map(ec => ec.criterionId));
+      for (const c of keptCriteriaByName.values()) {
+        if (!existingCriterionIds.has(c.id)) {
+          await tx.insert(eventCriteriaTable).values({ eventId, criterionId: c.id, active: true });
+        }
+      }
+      if (retiredCriteriaIds.length > 0) {
+        await tx.delete(eventCriteriaTable).where(and(eq(eventCriteriaTable.eventId, eventId), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)));
+      }
+
+      const areaAssignmentPairs = new Set<string>();
+      for (const r of eventRows) {
+        const evaluatorUserId = evaluatorIdByNormalizedName.get(normalizeImportText(r.evaluatorName));
+        if (!evaluatorUserId) continue;
+
+        for (const s of r.scores) {
+          const criterion = keptCriteriaByName.get(normalizeImportText(s.criterionName));
+          if (!criterion) continue;
+          await tx.insert(evaluationsTable).values({
+            eventId, criterionId: criterion.id, evaluatorUserId,
+            score: String(s.score), comments: s.comment, commentVisibility: "internal",
+            status: "submitted", submittedAt: new Date(),
+          });
+          evaluationsCreated++;
+          if (criterion.responsibleAreaId) areaAssignmentPairs.add(`${criterion.responsibleAreaId}:${evaluatorUserId}`);
+        }
+      }
+
+      for (const pair of areaAssignmentPairs) {
+        const [areaIdStr, userIdStr] = pair.split(":");
+        await tx.insert(eventAreaAssignmentsTable).values({
+          eventId, areaId: Number(areaIdStr), evaluatorUserId: Number(userIdStr),
+        }).onConflictDoNothing({ target: [eventAreaAssignmentsTable.eventId, eventAreaAssignmentsTable.areaId, eventAreaAssignmentsTable.evaluatorUserId] });
+        assignmentsCreated++;
+      }
+
+      const conformityAnswers: Partial<Record<ConformityField, boolean>> = {};
+      for (const r of eventRows) {
+        for (const field of ["epi", "estaiamentos", "guardaEquipamentos", "conduta"] as const) {
+          const v = r.conformity[field];
+          if (v === undefined) continue;
+          conformityAnswers[field] = conformityAnswers[field] === false ? false : v;
+        }
+      }
+      if (Object.keys(conformityAnswers).length > 0) {
+        const [existingConformity] = await tx.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
+        if (existingConformity) {
+          await tx.update(eventConformitiesTable).set({ ...conformityAnswers, updatedAt: new Date() }).where(eq(eventConformitiesTable.eventId, eventId));
+        } else {
+          await tx.insert(eventConformitiesTable).values({ eventId, createdByUserId: userId, ...conformityAnswers });
+        }
+        conformitiesUpserted++;
+      }
+
+      affectedCycleIds.add(targetEvent.cycleId);
+      eventsUpdated++;
+    }
+  });
+
+  const cycleWarnings: string[] = [];
+  for (const cycleId of affectedCycleIds) {
+    const { warnings: w } = await recomputeCycleResults(cycleId, userId);
+    cycleWarnings.push(...w);
+  }
+
+  await audit(userId, "import_survey", "events", undefined, null, {
+    usersCreated, evaluationsCreated, assignmentsCreated, conformitiesUpserted, eventsUpdated,
+  });
+
+  res.json({
+    success: true, dryRun: false, usersCreated, evaluationsCreated, assignmentsCreated, conformitiesUpserted, eventsUpdated,
+    createdAvaliadores, errors: [], ...preview, warnings: [...warnings, ...cycleWarnings],
+  });
 });
 
 export default router;

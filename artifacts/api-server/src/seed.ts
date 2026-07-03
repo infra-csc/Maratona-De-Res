@@ -104,36 +104,19 @@ async function seed() {
 
   console.log(`✓ ${employees.length} colaboradores criados`);
 
-  // 7 quesitos históricos (modelo antigo) — mantidos como registro (inactive:
-  // não aparecem mais na lista global nem são anexados a eventos novos), mas
-  // preservados para não quebrar dados históricos de eventos/avaliações.
-  // Pesos somavam 20; nota de 0 a 10 por critério (mesma fórmula normalizada).
-  const criteria = await db.insert(criteriaTable).values([
-    {
-      name: "Perda de Material/Estrutura",
-      description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.",
-      responsibleAreaId: areas[1].id, // Logística
-      responsibleAreaLabel: "Logística",
-      defaultWeight: "3",
-      displayOrder: 1,
-      active: false,
-    },
+  // Quesitos retirados da Matriz de Performance — viraram itens da Matriz de
+  // Conformidade (Sim/Não) ou foram substituídos por um critério novo.
+  // Mantidos como registro (inactive), preservados para não quebrar dados
+  // históricos de eventos/avaliações antigos, mas não são mais anexados a
+  // eventos novos.
+  const historicalCriteria = await db.insert(criteriaTable).values([
     {
       name: "Ferramentas & Case",
       description: "Todas as ferramentas e cases devem retornar à base corretamente, sem perdas ou danos.",
       responsibleAreaId: areas[3].id, // Ferramentas e case
       responsibleAreaLabel: "Ferramentas e case",
       defaultWeight: "2",
-      displayOrder: 2,
-      active: false,
-    },
-    {
-      name: "Qualidade da Entrega",
-      description: "Avalia acabamento, materiais em bom estado, qualidade visual e satisfação na ativação/atendimento.",
-      responsibleAreaId: areas[4].id, // Atendimento
-      responsibleAreaLabel: "Atendimento",
-      defaultWeight: "3",
-      displayOrder: 3,
+      displayOrder: 6,
       active: false,
     },
     {
@@ -142,25 +125,7 @@ async function seed() {
       responsibleAreaId: areas[0].id, // Cenografia
       responsibleAreaLabel: "Cenografia",
       defaultWeight: "3",
-      displayOrder: 4,
-      active: false,
-    },
-    {
-      name: "Logística Reversa",
-      description: "Avalia se a carga de retorno foi feita adequadamente e conforme o alinhamento combinado.",
-      responsibleAreaId: areas[1].id, // Logística
-      responsibleAreaLabel: "Logística",
-      defaultWeight: "3",
-      displayOrder: 5,
-      active: false,
-    },
-    {
-      name: "Prazo de Entrega",
-      description: "Avalia se as entregas ocorreram dentro do cronograma, sem atrasos e sem custos adicionais de mão de obra.",
-      responsibleAreaId: areas[2].id, // Produção
-      responsibleAreaLabel: "Produção",
-      defaultWeight: "3",
-      displayOrder: 6,
+      displayOrder: 7,
       active: false,
     },
     {
@@ -169,65 +134,66 @@ async function seed() {
       responsibleAreaId: areas[0].id, // Cenografia
       responsibleAreaLabel: "Cenografia",
       defaultWeight: "3",
-      displayOrder: 7,
+      displayOrder: 8,
       active: false,
     },
   ]).returning();
 
-  console.log(`✓ ${criteria.length} critérios históricos criados (inativos)`);
+  console.log(`✓ ${historicalCriteria.length} critérios retirados criados (inativos, viraram Matriz de Conformidade)`);
 
-  // Matriz de Performance (novo modelo, vigente a partir do próximo período)
-  // Nota de 0 a 10 por critério. Resultado = média ponderada dos critérios
-  // avaliados × 10 (0-100), independente da soma dos pesos (pesos atuais somam 11).
-  const newCriteria = await db.insert(criteriaTable).values([
+  // Matriz de Performance vigente — 5 quesitos, peso 3 cada (soma 15). Nota de
+  // 0 a 10 por critério. Resultado = média ponderada dos critérios avaliados
+  // × 10 (0-100). A soma-alvo é dinâmica por evento (ver targetWeightSum em
+  // event-detail.tsx) — não há mais um total fixo global.
+  const criteria = await db.insert(criteriaTable).values([
     {
-      name: "Qualidade e Acabamento da Montagem",
-      description: "Avalia acabamento, materiais em bom estado e qualidade visual da montagem entregue.",
-      responsibleAreaId: areas[0].id, // Cenografia
-      responsibleAreaLabel: "Cenografia",
-      defaultWeight: "3",
-      displayOrder: 8,
-      active: true,
-    },
-    {
-      name: "Logística Reversa/Carga da Desmontagem",
-      description: "Avalia se a carga de retorno da desmontagem foi feita adequadamente e conforme o alinhamento combinado.",
+      name: "Perda de Material/Estrutura",
+      description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.",
       responsibleAreaId: areas[1].id, // Logística
       responsibleAreaLabel: "Logística",
-      defaultWeight: "2",
-      displayOrder: 9,
+      defaultWeight: "3",
+      displayOrder: 1,
       active: true,
     },
     {
-      name: "Prazo de Entrega/Arena Pronta no Horário",
-      description: "Avalia se a arena ficou pronta dentro do prazo/horário combinado, sem atrasos.",
+      name: "Logística Reversa",
+      description: "Avalia se a carga de retorno foi feita adequadamente e conforme o alinhamento combinado.",
+      responsibleAreaId: areas[1].id, // Logística
+      responsibleAreaLabel: "Logística",
+      defaultWeight: "3",
+      displayOrder: 2,
+      active: true,
+    },
+    {
+      name: "Qualidade da Entrega",
+      description: "Avalia acabamento, materiais em bom estado, qualidade visual e satisfação na ativação/atendimento.",
+      responsibleAreaId: areas[4].id, // Atendimento
+      responsibleAreaLabel: "Atendimento",
+      defaultWeight: "3",
+      displayOrder: 3,
+      active: true,
+    },
+    {
+      name: "Prazo de Entrega",
+      description: "Avalia se as entregas ocorreram dentro do cronograma, sem atrasos e sem custos adicionais de mão de obra.",
       responsibleAreaId: areas[2].id, // Produção
       responsibleAreaLabel: "Produção",
-      defaultWeight: "2",
-      displayOrder: 10,
+      defaultWeight: "3",
+      displayOrder: 4,
       active: true,
     },
     {
       name: "Carga na Saída do Galpão",
-      description: "Avalia a conferência e organização da carga na saída do galpão antes do evento.",
-      responsibleAreaId: areas[1].id, // Logística
-      responsibleAreaLabel: "Logística",
-      defaultWeight: "2",
-      displayOrder: 11,
-      active: true,
-    },
-    {
-      name: "Retorno de Material/Perdas ou Avarias",
-      description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.",
-      responsibleAreaId: areas[3].id, // Ferramentas e case
-      responsibleAreaLabel: "Ferramentas e case",
-      defaultWeight: "2",
-      displayOrder: 12,
+      description: "Avalia a conferência, organização e integridade da carga no momento da saída do galpão, antes do embarque para o evento.",
+      responsibleAreaId: areas[0].id, // Cenografia
+      responsibleAreaLabel: "Cenografia",
+      defaultWeight: "3",
+      displayOrder: 5,
       active: true,
     },
   ]).returning();
 
-  console.log(`✓ ${newCriteria.length} critérios da Matriz de Performance criados (ativos)`);
+  console.log(`✓ ${criteria.length} critérios da Matriz de Performance criados (ativos)`);
 
   // Pelotões — 7 faixas (2 sub-faixas cada em Quênia/Azul/Verde + 1 em Branco),
   // com bônus base + bônus por evento extra além do mínimo de elegibilidade,
@@ -335,9 +301,9 @@ async function seed() {
 
   // Avaliação por TIME do evento: uma nota por (evento, critério, avaliador).
   // Todos os participantes do time recebem a MESMA nota do evento.
-  // pesos oficiais=[3,2,3,3,3,3,3] (soma 20), notas (0-10)=[8,8,8,6,4,6,10]
-  //   média ponderada = (3×8+2×8+3×8+3×6+3×4+3×6+3×10)/20 ×10 = 142/20 ×10 = 71
-  const exampleScores = [8, 8, 8, 6, 4, 6, 10];
+  // pesos oficiais=[3,3,3,3,3] (soma 15), notas (0-10)=[8,8,6,4,10]
+  //   média ponderada = (3×8+3×8+3×6+3×4+3×10)/15 ×10 = 108/15 ×10 = 72
+  const exampleScores = [8, 8, 6, 4, 10];
   const closedEvents = events.filter(e => e.status === "closed");
 
   for (const ev of closedEvents) {
@@ -392,13 +358,13 @@ async function seed() {
   console.log("\n✅ Seed concluído com sucesso!");
   console.log("\n📊 Validação de cálculo (escala 0–10, média ponderada ×10 → 0–100):");
   {
-    const exWeights = [3, 3, 2, 3, 3, 3, 3];
-    const exScores = [8, 8, 8, 6, 4, 6, 10];
+    const exWeights = [3, 3, 3, 3, 3];
+    const exScores = [8, 8, 6, 4, 10];
     const exResult = calculateEventResult(
       exWeights.map((weight, i) => ({ criterionId: i + 1, weight, averageScore: exScores[i], calibratedScore: null })),
     );
     console.log(`   Pesos: [${exWeights.join(",")}], Notas: [${exScores.join(",")}]`);
-    console.log(`   Esperado: 71 | Resultado: ${exResult}`);
+    console.log(`   Esperado: 72 | Resultado: ${exResult}`);
   }
   console.log("\n👤 Usuários criados (senha: 123456):");
   users.forEach((u: typeof users[number]) => console.log(`   ${u.email} — ${u.role}`));

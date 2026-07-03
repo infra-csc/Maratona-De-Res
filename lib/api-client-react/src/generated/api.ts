@@ -97,6 +97,8 @@ import type {
   ResetPasswordInput,
   Rule,
   RuleUpdate,
+  SurveyImportInput,
+  SurveyImportResult,
   SyncResult,
   UpdateEventCriteria200,
   UploadUrlRequest,
@@ -6139,6 +6141,77 @@ export const useImportHistoricalResults = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getImportHistoricalResultsMutationOptions(options));
+    }
+
+export const getImportSurveyUrl = () => {
+
+
+
+
+  return `/integration/import/survey`
+}
+
+/**
+ * @summary Import the evaluator survey spreadsheet (one row = one evaluator's answer for one event). Creates avaliador users (deduped by name), never auto-creates events (every spreadsheet event must be linked to an existing event via linkOverrides), converts numeric 0-10 answers into real per-criterion evaluations for non-historical events, turns the four Sim/Não questions into event_conformities (worst case wins), and stores historical-event comments as importedNotes only. Also runs the criteria catalog migration (activate "Carga na Saída do Galpão", deactivate 3 retired criteria) inside the commit transaction. Always previews (dryRun) unless dryRun=false and there are zero validation errors and every group is linked.
+ */
+export const importSurvey = async (surveyImportInput: SurveyImportInput, options?: RequestInit): Promise<SurveyImportResult> => {
+
+  return customFetch<SurveyImportResult>(getImportSurveyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      surveyImportInput,)
+  }
+);}
+
+
+
+
+export const getImportSurveyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importSurvey>>, TError,{data: BodyType<SurveyImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importSurvey>>, TError,{data: BodyType<SurveyImportInput>}, TContext> => {
+
+const mutationKey = ['importSurvey'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importSurvey>>, {data: BodyType<SurveyImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importSurvey(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportSurveyMutationResult = NonNullable<Awaited<ReturnType<typeof importSurvey>>>
+    export type ImportSurveyMutationBody = BodyType<SurveyImportInput>
+    export type ImportSurveyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Import the evaluator survey spreadsheet (one row = one evaluator's answer for one event). Creates avaliador users (deduped by name), never auto-creates events (every spreadsheet event must be linked to an existing event via linkOverrides), converts numeric 0-10 answers into real per-criterion evaluations for non-historical events, turns the four Sim/Não questions into event_conformities (worst case wins), and stores historical-event comments as importedNotes only. Also runs the criteria catalog migration (activate "Carga na Saída do Galpão", deactivate 3 retired criteria) inside the commit transaction. Always previews (dryRun) unless dryRun=false and there are zero validation errors and every group is linked.
+ */
+export const useImportSurvey = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importSurvey>>, TError,{data: BodyType<SurveyImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importSurvey>>,
+        TError,
+        {data: BodyType<SurveyImportInput>},
+        TContext
+      > => {
+      return useMutation(getImportSurveyMutationOptions(options));
     }
 
 export const getExportEventResultsUrl = (params: ExportEventResultsParams,) => {
