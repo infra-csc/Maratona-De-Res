@@ -2031,6 +2031,8 @@ export const ImportHistoricalResultsResponse = zod.object({
   "existingEventId": zod.number().optional(),
   "cycleId": zod.number().optional()
 })),
+  "employeesToCreate": zod.array(zod.string()).optional().describe('Nomes de colaboradores não cadastrados que serão criados automaticamente ao confirmar.'),
+  "employeesCreated": zod.number().optional().describe('Quantidade de colaboradores criados automaticamente (apenas no commit).'),
   "eventsCreated": zod.number().optional(),
   "eventsUpdated": zod.number().optional(),
   "participantsLinked": zod.number().optional(),

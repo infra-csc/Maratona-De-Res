@@ -97,9 +97,10 @@ export default function IntegrationPage() {
   const historicalCommitMutation = useImportHistoricalResults({
     mutation: {
       onSuccess: (data) => {
+        const employeesCreatedMsg = data.employeesCreated ? `, ${data.employeesCreated} colaborador(es) novo(s) cadastrado(s)` : "";
         toast({
           title: "Resultados históricos importados",
-          description: `${data.eventsCreated ?? 0} evento(s) criado(s), ${data.eventsUpdated ?? 0} atualizado(s), ${data.participantsLinked ?? 0} participação(ões) vinculada(s).`,
+          description: `${data.eventsCreated ?? 0} evento(s) criado(s), ${data.eventsUpdated ?? 0} atualizado(s), ${data.participantsLinked ?? 0} participação(ões) vinculada(s)${employeesCreatedMsg}.`,
         });
         if (data.warnings && data.warnings.length > 0) {
           toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
@@ -490,6 +491,17 @@ export default function IntegrationPage() {
                   </p>
                   <ul className="text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
                     {historicalPreview.errors.map((err, i) => <li key={i}>• {err}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {historicalPreview.employeesToCreate && historicalPreview.employeesToCreate.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-blue-700 uppercase mb-2 flex items-center gap-1.5">
+                    <Users size={14} /> {historicalPreview.employeesToCreate.length} colaborador(es) novo(s) serão cadastrados
+                  </p>
+                  <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
+                    {historicalPreview.employeesToCreate.map((name, i) => <li key={i}>• {name}</li>)}
                   </ul>
                 </div>
               )}

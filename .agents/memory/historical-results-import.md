@@ -12,6 +12,7 @@ Some events (e.g. imported historical race results) arrive with a single final s
 Import endpoint pattern (bulk CSV/TSV import with dry-run):
 - Always require an explicit `dryRun: true` preview pass before allowing commit; the same validation/matching code path must run for both dry-run and commit so the preview is trustworthy.
 - Group input rows by (event name + date) since one event has many employee rows.
-- Employee matching: normalize (NFD strip + lowercase + trim) and require an exact match; treat ambiguous matches as a hard error rather than guessing.
+- Employee matching: normalize (NFD strip + lowercase + trim) and require an exact match. A name with zero matches is NOT a hard error — auto-create the employee record (name only, defaults for the rest) at commit time and link it as a participant; only a name matching 2+ existing employees (genuinely ambiguous, can't guess which) is a hard error requiring manual resolution.
 - Detect three actions per event group: create (new), update (existing event already `isHistorical`), conflict (existing event with same name+date is NOT historical — likely a duplicate of a real evaluated event; abort that group rather than silently overwriting real evaluation data).
 - After commit, call the same `recomputeCycleResults` used elsewhere so cycle-level aggregates/snapshots stay in sync — don't hand-roll a separate aggregation.
+- Bulk-created employees during import must go through the same insert path (defaults for department/function/sourceType) as any other manual employee, so they behave normally afterward (visible in employee lists, eligible for future cycles, etc.).

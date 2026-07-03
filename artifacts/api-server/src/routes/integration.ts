@@ -525,7 +525,12 @@ router.post("/integration/import/historical-results", async (req, res) => {
     employeesByName.get(key)!.push(e);
   }
 
-  type ParsedRow = HistoricalRow & { normalizedEvent: string; date: string | null; score: number | null; employeeId: number | null };
+  // Colaboradores que não existem ainda serão criados automaticamente no commit
+  // (não bloqueiam a importação). Ambíguos (nome bate com mais de um cadastro)
+  // continuam bloqueando, pois não dá para adivinhar qual colaborador é o certo.
+  const toCreateNames = new Map<string, string>(); // normalizedKey -> nome original (primeira ocorrência)
+
+  type ParsedRow = HistoricalRow & { normalizedEvent: string; date: string | null; score: number | null; employeeId: number | null; toCreateKey: string | null };
   const parsed: ParsedRow[] = rows.map(r => {
     const date = parseImportDate(r.dateRaw);
     if (!date) errors.push(`Linha ${r.line}: data inválida "${r.dateRaw}" (use dd/mm/aaaa ou aaaa-mm-dd)`);
@@ -535,22 +540,25 @@ router.post("/integration/import/historical-results", async (req, res) => {
     const key = normalizeImportText(r.name);
     const matches = employeesByName.get(key) ?? [];
     let employeeId: number | null = null;
+    let toCreateKey: string | null = null;
     if (matches.length === 0) {
-      unmatched.push(`Linha ${r.line}: colaborador "${r.name}" não encontrado`);
+      unmatched.push(`Linha ${r.line}: colaborador "${r.name}" será criado automaticamente`);
+      if (!toCreateNames.has(key)) toCreateNames.set(key, r.name);
+      toCreateKey = key;
     } else if (matches.length > 1) {
       ambiguous.push(`Linha ${r.line}: "${r.name}" corresponde a ${matches.length} colaboradores cadastrados — resolva manualmente`);
     } else {
       employeeId = matches[0].id;
     }
 
-    return { ...r, normalizedEvent: normalizeImportText(r.eventName), date, score, employeeId };
+    return { ...r, normalizedEvent: normalizeImportText(r.eventName), date, score, employeeId, toCreateKey };
   });
-  errors.push(...unmatched, ...ambiguous);
+  errors.push(...ambiguous);
 
   // Agrupa por (evento normalizado + data) — nota do TIME, igual para todos.
   type Group = {
     eventName: string; normalizedEvent: string; date: string; scores: number[];
-    participants: { line: number; name: string; employeeId: number | null }[];
+    participants: { line: number; name: string; employeeId: number | null; toCreateKey: string | null }[];
   };
   const groups = new Map<string, Group>();
   for (const r of parsed) {
@@ -559,7 +567,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
     if (!groups.has(key)) groups.set(key, { eventName: r.eventName, normalizedEvent: r.normalizedEvent, date: r.date, scores: [], participants: [] });
     const g = groups.get(key)!;
     if (r.score !== null) g.scores.push(r.score);
-    g.participants.push({ line: r.line, name: r.name, employeeId: r.employeeId });
+    g.participants.push({ line: r.line, name: r.name, employeeId: r.employeeId, toCreateKey: r.toCreateKey });
   }
 
   const distinctDates = Array.from(new Set(Array.from(groups.values()).map(g => g.date)));
@@ -585,7 +593,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
       score = uniqueScores[0];
     }
 
-    const matchedCount = g.participants.filter(p => p.employeeId !== null).length;
+    const matchedCount = g.participants.filter(p => p.employeeId !== null || p.toCreateKey !== null).length;
     const existing = existingEventsByDate.filter(e => e.startDate === g.date && normalizeImportText(e.name) === g.normalizedEvent);
 
     let action: GroupPlan["action"];
@@ -624,6 +632,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
     unmatched,
     ambiguous,
     events: plans,
+    employeesToCreate: Array.from(toCreateNames.values()),
   };
 
   if (isDryRun) {
@@ -637,10 +646,21 @@ router.post("/integration/import/historical-results", async (req, res) => {
   }
 
   const userId = req.user!.userId;
-  let eventsCreated = 0, eventsUpdated = 0, participantsLinked = 0;
+  let eventsCreated = 0, eventsUpdated = 0, participantsLinked = 0, employeesCreated = 0;
   const affectedCycleIds = new Set<number>();
 
   await db.transaction(async (tx) => {
+    // Cria primeiro os colaboradores que não existiam, para poder vinculá-los aos eventos abaixo.
+    const createdEmployeeIdByKey = new Map<string, number>();
+    for (const [key, originalName] of toCreateNames) {
+      const [created] = await tx.insert(employeesTable).values({
+        name: originalName,
+        sourceType: "manual",
+      }).returning({ id: employeesTable.id });
+      createdEmployeeIdByKey.set(key, created.id);
+      employeesCreated++;
+    }
+
     for (const g of groups.values()) {
       const plan = (g as Group & { _plan?: GroupPlan })._plan!;
       let eventId: number;
@@ -670,7 +690,9 @@ router.post("/integration/import/historical-results", async (req, res) => {
         affectedCycleIds.add(plan.cycleId!);
       }
 
-      const employeeIds = Array.from(new Set(g.participants.map(p => p.employeeId).filter((id): id is number => id !== null)));
+      const employeeIds = Array.from(new Set(g.participants
+        .map(p => p.employeeId ?? (p.toCreateKey ? createdEmployeeIdByKey.get(p.toCreateKey) ?? null : null))
+        .filter((id): id is number => id !== null)));
       for (const employeeId of employeeIds) {
         await tx.insert(eventParticipantsTable)
           .values({ eventId, employeeId })
@@ -687,10 +709,10 @@ router.post("/integration/import/historical-results", async (req, res) => {
   }
 
   await audit(userId, "import_historical_results", "events", undefined, null, {
-    eventsCreated, eventsUpdated, participantsLinked, matched: preview.matched,
+    eventsCreated, eventsUpdated, participantsLinked, employeesCreated, matched: preview.matched,
   });
 
-  res.json({ success: true, dryRun: false, eventsCreated, eventsUpdated, participantsLinked, warnings, errors: [], ...preview });
+  res.json({ success: true, dryRun: false, eventsCreated, eventsUpdated, participantsLinked, employeesCreated, warnings, errors: [], ...preview });
 });
 
 export default router;

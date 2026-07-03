@@ -985,6 +985,10 @@ export interface HistoricalImportResult {
   unmatched: string[];
   ambiguous: string[];
   events: HistoricalImportEventPlan[];
+  /** Nomes de colaboradores não cadastrados que serão criados automaticamente ao confirmar. */
+  employeesToCreate?: string[];
+  /** Quantidade de colaboradores criados automaticamente (apenas no commit). */
+  employeesCreated?: number;
   eventsCreated?: number;
   eventsUpdated?: number;
   participantsLinked?: number;

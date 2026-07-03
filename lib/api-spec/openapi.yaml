@@ -3369,6 +3369,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HistoricalImportEventPlan"
+        employeesToCreate:
+          type: array
+          items:
+            type: string
+          description: Nomes de colaboradores não cadastrados que serão criados automaticamente ao confirmar.
+        employeesCreated:
+          type: integer
+          description: Quantidade de colaboradores criados automaticamente (apenas no commit).
         eventsCreated:
           type: integer
         eventsUpdated:
