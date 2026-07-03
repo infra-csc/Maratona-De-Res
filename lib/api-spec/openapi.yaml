@@ -1946,6 +1946,8 @@ components:
           type: ["string", "null"]
         employeeId:
           type: ["integer", "null"]
+        employeeName:
+          type: ["string", "null"]
         active:
           type: boolean
         createdAt:
@@ -1963,6 +1965,8 @@ components:
           type: string
         areaId:
           type: ["integer", "null"]
+        employeeId:
+          type: ["integer", "null"]
         password:
           type: string
 
@@ -1976,6 +1980,8 @@ components:
         role:
           type: string
         areaId:
+          type: ["integer", "null"]
+        employeeId:
           type: ["integer", "null"]
         active:
           type: boolean

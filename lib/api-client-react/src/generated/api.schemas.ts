@@ -59,6 +59,8 @@ export interface User {
   areaName?: string | null;
   /** @nullable */
   employeeId?: number | null;
+  /** @nullable */
+  employeeName?: string | null;
   active: boolean;
   createdAt?: string;
 }
@@ -74,6 +76,8 @@ export interface UserInput {
   role: string;
   /** @nullable */
   areaId?: number | null;
+  /** @nullable */
+  employeeId?: number | null;
   password: string;
 }
 
@@ -83,6 +87,8 @@ export interface UserUpdate {
   role?: string;
   /** @nullable */
   areaId?: number | null;
+  /** @nullable */
+  employeeId?: number | null;
   active?: boolean;
 }
 

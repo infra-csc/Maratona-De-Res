@@ -12,5 +12,7 @@ export interface UserUpdate {
   role?: string;
   /** @nullable */
   areaId?: number | null;
+  /** @nullable */
+  employeeId?: number | null;
   active?: boolean;
 }

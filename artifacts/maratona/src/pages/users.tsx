@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser, useDeleteUser, useResetUserPassword, useGetAreas, useImpersonate, getGetUsersQueryKey } from "@workspace/api-client-react";
+import { useGetUsers, useCreateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, getGetUsersQueryKey } from "@workspace/api-client-react";
 import type { UserInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,8 @@ export default function UsersPage() {
   const qKey = getGetUsersQueryKey();
   const { data: users, isLoading } = useGetUsers({ query: { queryKey: qKey } });
   const { data: areas } = useGetAreas();
+  const { data: employees } = useGetEmployees({ active: true });
+  const sortedEmployees = [...(employees ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   const { register, handleSubmit, reset, setValue } = useForm<UserInput & { role: string }>({
     defaultValues: { role: "avaliador" },
@@ -178,6 +180,21 @@ export default function UsersPage() {
                     </Select>
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Vincular a Colaborador (Opcional)</Label>
+                  <Select onValueChange={v => setValue("employeeId", v === "__none" ? null : Number(v))}>
+                    <SelectTrigger data-testid="select-user-employee" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+                      <SelectValue placeholder="Nenhum" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Nenhum</SelectItem>
+                      {sortedEmployees.map(e => (
+                        <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-[#747a60] italic">Necessário para o usuário ver a página "Meu Desempenho" com os próprios resultados.</p>
+                </div>
                 <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
                   <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
                   <button
@@ -258,6 +275,9 @@ export default function UsersPage() {
                             <div>
                               <p className="font-bold italic text-[#191c1e]">{u.name}</p>
                               <p className="text-xs text-[#747a60] mt-0.5">{u.email}</p>
+                              {u.employeeName && (
+                                <p className="text-[11px] text-[#506600] font-bold italic uppercase mt-0.5">↳ {u.employeeName}</p>
+                              )}
                             </div>
                           </div>
                         </td>

@@ -12,5 +12,7 @@ export interface UserInput {
   role: string;
   /** @nullable */
   areaId?: number | null;
+  /** @nullable */
+  employeeId?: number | null;
   password: string;
 }

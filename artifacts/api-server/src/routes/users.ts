@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, areasTable } from "@workspace/db";
+import { db, usersTable, areasTable, employeesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -18,11 +18,14 @@ router.get("/users", requireRole("admin", "rh", "diretoria"), async (_req, res) 
       role: usersTable.role,
       areaId: usersTable.areaId,
       areaName: areasTable.name,
+      employeeId: usersTable.employeeId,
+      employeeName: employeesTable.name,
       active: usersTable.active,
       createdAt: usersTable.createdAt,
     })
     .from(usersTable)
-    .leftJoin(areasTable, eq(usersTable.areaId, areasTable.id));
+    .leftJoin(areasTable, eq(usersTable.areaId, areasTable.id))
+    .leftJoin(employeesTable, eq(usersTable.employeeId, employeesTable.id));
   res.json(users);
 });
 
@@ -48,30 +51,40 @@ router.get("/users/:id", requireRole("admin", "rh"), async (req, res) => {
 });
 
 router.post("/users", requireRole("admin", "rh"), async (req, res) => {
-  const { name, email, role, areaId, password } = req.body;
+  const { name, email, role, areaId, password, employeeId } = req.body;
   if (!name || !email || !role || !password) {
     res.status(400).json({ error: "Campos obrigatórios: name, email, role, password" });
     return;
   }
+  if (employeeId != null) {
+    const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+    if (!emp) { res.status(400).json({ error: "Colaborador não encontrado" }); return; }
+  }
   const passwordHash = await bcrypt.hash(password, 12);
   const [user] = await db.insert(usersTable).values({
     name, email: email.toLowerCase(), passwordHash, role, areaId: areaId ?? null,
+    employeeId: employeeId ?? null,
   }).returning();
-  await audit(req.user!.userId, "create", "users", user.id, null, { email, role });
+  await audit(req.user!.userId, "create", "users", user.id, null, { email, role, employeeId: employeeId ?? null });
   res.status(201).json({ ...user, passwordHash: undefined });
 });
 
 router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const { name, email, role, areaId, active } = req.body;
+  const { name, email, role, areaId, active, employeeId } = req.body;
   const [before] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (employeeId != null) {
+    const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+    if (!emp) { res.status(400).json({ error: "Colaborador não encontrado" }); return; }
+  }
   const [user] = await db.update(usersTable).set({
     ...(name !== undefined && { name }),
     ...(email !== undefined && { email: email.toLowerCase() }),
     ...(role !== undefined && { role }),
     ...(areaId !== undefined && { areaId }),
     ...(active !== undefined && { active }),
+    ...(employeeId !== undefined && { employeeId }),
   }).where(eq(usersTable.id, id)).returning();
   await audit(req.user!.userId, "update", "users", id, before, { ...user, passwordHash: undefined });
   res.json({ ...user, passwordHash: undefined });
@@ -83,7 +96,19 @@ router.delete("/users/:id", requireRole("admin"), async (req, res) => {
     res.status(400).json({ error: "Não é possível excluir seu próprio usuário" });
     return;
   }
-  await db.delete(usersTable).where(eq(usersTable.id, id));
+  try {
+    await db.delete(usersTable).where(eq(usersTable.id, id));
+  } catch (err: unknown) {
+    const e = err as { code?: string; cause?: { code?: string } };
+    const code = e.code ?? e.cause?.code;
+    if (code === "23503") {
+      res.status(400).json({
+        error: "Este usuário possui histórico no sistema (logins, avaliações ou registros) e não pode ser excluído. Desative o acesso em vez de excluir.",
+      });
+      return;
+    }
+    throw err;
+  }
   await audit(req.user!.userId, "delete", "users", id);
   res.status(204).end();
 });

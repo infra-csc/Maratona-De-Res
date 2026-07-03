@@ -34,6 +34,7 @@ export const LoginResponse = zod.object({
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -51,6 +52,7 @@ export const GetMeResponse = zod.object({
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -73,6 +75,7 @@ export const ImpersonateResponse = zod.object({
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -90,6 +93,7 @@ export const GetUsersResponseItem = zod.object({
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -104,6 +108,7 @@ export const CreateUserBody = zod.object({
   "email": zod.string(),
   "role": zod.string(),
   "areaId": zod.number().nullish(),
+  "employeeId": zod.number().nullish(),
   "password": zod.string()
 })
 
@@ -123,6 +128,7 @@ export const GetUserResponse = zod.object({
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
@@ -140,6 +146,7 @@ export const UpdateUserBody = zod.object({
   "email": zod.string().optional(),
   "role": zod.string().optional(),
   "areaId": zod.number().nullish(),
+  "employeeId": zod.number().nullish(),
   "active": zod.boolean().optional()
 })
 
@@ -151,6 +158,7 @@ export const UpdateUserResponse = zod.object({
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.string().optional()
 })
