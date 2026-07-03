@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock } from "lucide-react";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -54,8 +54,18 @@ export default function CalibrationsPage() {
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
   const [weightEdits, setWeightEdits] = useState<Record<number, string>>({});
   const [savingWeightId, setSavingWeightId] = useState<number | null>(null);
+  const [collapsedCriteria, setCollapsedCriteria] = useState<Set<number>>(new Set());
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
+
+  function toggleCriterionCollapsed(criterionId: number) {
+    setCollapsedCriteria(prev => {
+      const next = new Set(prev);
+      if (next.has(criterionId)) next.delete(criterionId);
+      else next.add(criterionId);
+      return next;
+    });
+  }
 
   const { data: events } = useGetEvents();
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
@@ -623,15 +633,28 @@ export default function CalibrationsPage() {
               const areaScores = getAreaScores(c.criterionId);
               const avg = getAvgScore(c.criterionId);
               const cal = getCalibration(c.criterionId);
+              const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+              const finalVal = calVal ?? avg;
               const scoreVal = calScores[c.criterionId] ?? (cal ? String(parseFloat(cal.calibratedScore as unknown as string)) : "");
               const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
               const isSaving = savingCritId === c.criterionId && createMutation.isPending;
+              const isCollapsed = collapsedCriteria.has(c.criterionId);
 
               return (
                 <article key={c.criterionId} data-testid={`row-cal-${c.criterionId}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                   {/* Criterion header */}
                   <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <button
+                        data-testid={`button-toggle-collapse-${c.criterionId}`}
+                        type="button"
+                        onClick={() => toggleCriterionCollapsed(c.criterionId)}
+                        title={isCollapsed ? "Expandir critério" : "Recolher critério"}
+                        className="shrink-0 h-6 w-6 flex items-center justify-center border-2 border-[#191c1e] bg-white hover:bg-[#191c1e] hover:text-white transition-colors"
+                      >
+                        {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                      </button>
+                      <div className="min-w-0">
                       <div className="font-black italic uppercase tracking-tight text-[#191c1e]">{c.criterionName}</div>
                       {canEditWeights ? (
                         <div className="flex items-center gap-1.5 mt-1">
@@ -661,6 +684,16 @@ export default function CalibrationsPage() {
                         </div>
                       ) : (
                         <div className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
+                      )}
+                      </div>
+                      {isCollapsed && (
+                        <span
+                          data-testid={`badge-collapsed-score-${c.criterionId}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-black italic bg-white border-2 border-[#191c1e] px-2 py-1"
+                        >
+                          <span className="text-[10px] font-bold uppercase text-[#747a60] not-italic">Nota</span>
+                          {finalVal != null ? finalVal.toFixed(2) : "—"}
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
@@ -701,6 +734,7 @@ export default function CalibrationsPage() {
                     </div>
                   </div>
 
+                  {!isCollapsed && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 divide-y-2 lg:divide-y-0 lg:divide-x-2 divide-[#191c1e]">
                     {/* Left: scores from the area */}
                     <div className="p-5">
@@ -800,6 +834,7 @@ export default function CalibrationsPage() {
                       )}
                     </div>
                   </div>
+                  )}
                 </article>
               );
             })}
