@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, getGetUsersQueryKey } from "@workspace/api-client-react";
-import type { UserInput } from "@workspace/api-client-react";
+import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, getGetUsersQueryKey } from "@workspace/api-client-react";
+import type { UserInput, User } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye } from "lucide-react";
+import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye, Pencil, LineChart } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -36,6 +37,8 @@ export default function UsersPage() {
   const [open, setOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [impersonateTarget, setImpersonateTarget] = useState<string>("/");
 
   const qKey = getGetUsersQueryKey();
   const { data: users, isLoading } = useGetUsers({ query: { queryKey: qKey } });
@@ -74,9 +77,20 @@ export default function UsersPage() {
       onSuccess: (res) => {
         impersonate(res.token, res.user);
         const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-        window.location.assign(`${base}/`);
+        window.location.assign(`${base}${impersonateTarget}`);
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao entrar no modo dev", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const updateUserMutation = useUpdateUser({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: qKey });
+        toast({ title: "Usuário atualizado com sucesso" });
+        setEditUser(null);
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -306,10 +320,27 @@ export default function UsersPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {isAdmin && u.employeeId != null && u.active && (
+                              <button
+                                data-testid={`button-view-performance-${u.id}`}
+                                onClick={() => {
+                                  setImpersonateTarget("/meu-desempenho");
+                                  impersonateMutation.mutate({ data: { userId: u.id } });
+                                }}
+                                disabled={impersonateMutation.isPending}
+                                title={`Ver perfil de desempenho de ${u.employeeName}`}
+                                className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ccff00] transition-all disabled:opacity-50"
+                              >
+                                <LineChart size={14} />
+                              </button>
+                            )}
                             {isAdmin && u.id !== currentUser?.id && u.active && (
                               <button
                                 data-testid={`button-impersonate-${u.id}`}
-                                onClick={() => impersonateMutation.mutate({ data: { userId: u.id } })}
+                                onClick={() => {
+                                  setImpersonateTarget("/");
+                                  impersonateMutation.mutate({ data: { userId: u.id } });
+                                }}
                                 disabled={impersonateMutation.isPending}
                                 title="Visualizar como este usuário (modo dev)"
                                 className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ccff00] transition-all disabled:opacity-50"
@@ -317,6 +348,14 @@ export default function UsersPage() {
                                 <Eye size={14} />
                               </button>
                             )}
+                            <button
+                              data-testid={`button-edit-user-${u.id}`}
+                              onClick={() => setEditUser(u)}
+                              title="Editar usuário"
+                              className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#eceef0] transition-all"
+                            >
+                              <Pencil size={14} />
+                            </button>
                             <button
                               data-testid={`button-reset-pw-${u.id}`}
                               onClick={() => setResetOpen(u.id)}
@@ -404,6 +443,152 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={editUser !== null} onOpenChange={v => !v && setEditUser(null)}>
+        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Editar Usuário</DialogTitle>
+          </DialogHeader>
+          {editUser && (
+            <EditUserForm
+              key={editUser.id}
+              user={editUser}
+              areas={areas ?? []}
+              employees={sortedEmployees}
+              isSelf={editUser.id === currentUser?.id}
+              isPending={updateUserMutation.isPending}
+              onCancel={() => setEditUser(null)}
+              onSubmit={data => updateUserMutation.mutate({ id: editUser.id, data })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+interface EditUserFormValues {
+  name: string;
+  email: string;
+  role: string;
+  areaId: number | null;
+  employeeId: number | null;
+  active: boolean;
+}
+
+function EditUserForm({
+  user,
+  areas,
+  employees,
+  isSelf,
+  isPending,
+  onCancel,
+  onSubmit,
+}: {
+  user: User;
+  areas: { id: number; name: string }[];
+  employees: { id: number; name: string }[];
+  isSelf: boolean;
+  isPending: boolean;
+  onCancel: () => void;
+  onSubmit: (data: EditUserFormValues) => void;
+}) {
+  const { register, handleSubmit, setValue, watch } = useForm<EditUserFormValues>({
+    defaultValues: {
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      areaId: user.areaId ?? null,
+      employeeId: user.employeeId ?? null,
+      active: user.active,
+    },
+  });
+  const active = watch("active");
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-4">
+      <div className="space-y-1.5">
+        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
+        <div className="relative">
+          <UserCircle size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+          <Input data-testid="input-edit-user-name" {...register("name", { required: true })} placeholder="Nome do usuário" className="pl-10 h-11 rounded-none border-2 border-[#191c1e]" />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">E-mail Corporativo <span className="text-[#ba1a1a]">*</span></Label>
+        <div className="relative">
+          <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+          <Input data-testid="input-edit-user-email" type="email" {...register("email", { required: true })} placeholder="email@cenografica.com.br" className="pl-10 h-11 rounded-none border-2 border-[#191c1e]" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nível de Permissão <span className="text-[#ba1a1a]">*</span></Label>
+          <Select defaultValue={user.role} onValueChange={v => setValue("role", v)} disabled={isSelf}>
+            <SelectTrigger data-testid="select-edit-user-role" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROLES.map(r => (
+                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isSelf && <p className="text-[11px] text-[#747a60] italic">Você não pode alterar seu próprio nível de permissão.</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Área Responsável (Opcional)</Label>
+          <Select defaultValue={user.areaId != null ? String(user.areaId) : "__none"} onValueChange={v => setValue("areaId", v === "__none" ? null : Number(v))}>
+            <SelectTrigger data-testid="select-edit-user-area" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+              <SelectValue placeholder="Selecione..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none">Nenhuma</SelectItem>
+              {areas.map(a => (
+                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Vincular a Colaborador (Opcional)</Label>
+        <Select defaultValue={user.employeeId != null ? String(user.employeeId) : "__none"} onValueChange={v => setValue("employeeId", v === "__none" ? null : Number(v))}>
+          <SelectTrigger data-testid="select-edit-user-employee" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+            <SelectValue placeholder="Nenhum" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none">Nenhum</SelectItem>
+            {employees.map(e => (
+              <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] text-[#747a60] italic">Necessário para o usuário ver a página "Meu Desempenho" com os próprios resultados.</p>
+      </div>
+      <div className="flex items-center justify-between border-2 border-[#191c1e] px-4 py-3 bg-[#f7f9fb]">
+        <div>
+          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Acesso Ativo</Label>
+          <p className="text-[11px] text-[#747a60] italic">{active ? "Usuário pode acessar a plataforma normalmente." : "Usuário fica bloqueado, sem excluir seu histórico."}</p>
+        </div>
+        <Switch
+          data-testid="switch-edit-user-active"
+          checked={active}
+          disabled={isSelf}
+          onCheckedChange={v => setValue("active", v)}
+        />
+      </div>
+      <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+        <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={onCancel}>Cancelar</Button>
+        <button
+          data-testid="button-submit-edit-user"
+          type="submit"
+          disabled={isPending}
+          className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+        >
+          {isPending ? "Salvando..." : "Salvar Alterações"}
+        </button>
+      </div>
+    </form>
   );
 }
