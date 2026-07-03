@@ -3569,6 +3569,7 @@ components:
           description: >-
             Mapa de groupKey (de SurveyGroupPlan) para o id do evento já
             cadastrado ao qual esse grupo da planilha deve ser vinculado.
+            Use -1 para IGNORAR o grupo (linhas não são importadas).
             Obrigatório para todos os grupos antes do commit — este import
             nunca cria eventos novos.
 
@@ -3627,7 +3628,10 @@ components:
           description: Eventos já cadastrados sugeridos por semelhança de nome/cidade, para ajudar a escolher o vínculo.
         resolved:
           type: boolean
-          description: true quando um linkOverride válido foi informado para este grupo.
+          description: true quando um linkOverride válido (evento ou -1/ignorar) foi informado para este grupo.
+        ignored:
+          type: boolean
+          description: true quando o grupo foi marcado para ser ignorado (linkOverride -1).
 
     SurveyCatalogChanges:
       type: object
@@ -3690,10 +3694,19 @@ components:
           type: array
           items:
             type: string
+        duplicateRowsIgnored:
+          type: integer
+          description: Respostas repetidas do mesmo avaliador para o mesmo evento — só a mais recente é importada.
+        evaluationsAlreadyInApp:
+          type: integer
+          description: Notas da planilha que já existem no app (mesmo evento, quesito e avaliador) e serão puladas.
         usersCreated:
           type: integer
         evaluationsCreated:
           type: integer
+        evaluationsSkipped:
+          type: integer
+          description: Notas puladas no commit por já existirem no app (mesmo evento, quesito e avaliador).
         assignmentsCreated:
           type: integer
         conformitiesUpserted:

@@ -7,6 +7,6 @@
  */
 
 /**
- * Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.
+ * Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Use -1 para IGNORAR o grupo (linhas não são importadas). Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.
  */
 export type SurveyImportInputLinkOverrides = {[key: string]: number};

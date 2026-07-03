@@ -1016,24 +1016,32 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
   }).from(eventsTable);
   const eventsById = new Map(allEvents.map(e => [e.id, e]));
 
+  // linkOverrides[groupKey] === -1 significa "ignorar este grupo": as linhas
+  // não são importadas (útil p.ex. para respostas de provas históricas que o
+  // admin decidiu não trazer para o app).
+  const SURVEY_IGNORE_GROUP = -1;
+
   type SurveyGroupPlan = {
     groupKey: string; eventLabel: string; rowCount: number; distinctEvaluators: number;
     linkedEventId?: number; linkedEvent?: { id: number; name: string; startDate: string; isHistorical: boolean; status: string; cycleId: number };
     suggestions: { id: number; name: string; startDate: string; isHistorical: boolean }[];
     resolved: boolean;
+    ignored: boolean;
   };
   const groupPlans: SurveyGroupPlan[] = [];
   for (const g of groups.values()) {
     const distinctEvaluators = new Set(g.rows.map(r => normalizeImportText(r.evaluatorName))).size;
     const overrideId = overrideMap[g.normalizedEventLabel];
-    const linkedEvent = overrideId != null ? eventsById.get(overrideId) : undefined;
-    if (overrideId != null && !linkedEvent) errors.push(`Evento "${g.eventLabel}": vínculo informado (id ${overrideId}) não existe`);
+    const ignored = overrideId === SURVEY_IGNORE_GROUP;
+    const linkedEvent = overrideId != null && !ignored ? eventsById.get(overrideId) : undefined;
+    if (overrideId != null && !ignored && !linkedEvent) errors.push(`Evento "${g.eventLabel}": vínculo informado (id ${overrideId}) não existe`);
     groupPlans.push({
       groupKey: g.normalizedEventLabel, eventLabel: g.eventLabel, rowCount: g.rows.length, distinctEvaluators,
       linkedEventId: linkedEvent?.id,
       linkedEvent: linkedEvent ? { id: linkedEvent.id, name: linkedEvent.name, startDate: linkedEvent.startDate, isHistorical: linkedEvent.isHistorical, status: linkedEvent.status, cycleId: linkedEvent.cycleId } : undefined,
       suggestions: suggestSurveyEventMatches(g.eventLabel, allEvents).map(e => ({ id: e.id, name: e.name, startDate: e.startDate, isHistorical: e.isHistorical })),
-      resolved: !!linkedEvent,
+      resolved: !!linkedEvent || ignored,
+      ignored,
     });
   }
 
@@ -1046,9 +1054,12 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
   }
   const usedEmails = new Set(allUsers.map(u => u.email.toLowerCase()));
 
+  const ignoredGroupKeys = new Set(groupPlans.filter(gp => gp.ignored).map(gp => gp.groupKey));
+
   const evaluatorResolution = new Map<string, number>();
   const toCreateAvaliadorNames = new Map<string, { originalName: string; areaLabel: string | null }>();
   for (const r of parsedRows) {
+    if (ignoredGroupKeys.has(r.normalizedEventLabel)) continue;
     const key = normalizeImportText(r.evaluatorName);
     if (evaluatorResolution.has(key) || toCreateAvaliadorNames.has(key)) continue;
     const matches = usersByName.get(key) ?? [];
@@ -1079,10 +1090,38 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       }),
   };
 
+  // Linhas efetivamente importáveis, agrupadas pelo evento vinculado (grupos
+  // ignorados ficam de fora). Deduplicação: se o MESMO avaliador respondeu o
+  // MESMO evento mais de uma vez (reenvio do Forms, ou dois rótulos distintos
+  // vinculados ao mesmo evento), só a resposta mais recente (última linha da
+  // planilha) é considerada — nunca importamos a mesma avaliação duas vezes.
+  const rowsByEventId = new Map<number, ParsedSurveyRow[]>();
+  for (const gp of groupPlans) {
+    if (gp.ignored || !gp.linkedEventId) continue;
+    const g = groups.get(gp.groupKey)!;
+    if (!rowsByEventId.has(gp.linkedEventId)) rowsByEventId.set(gp.linkedEventId, []);
+    rowsByEventId.get(gp.linkedEventId)!.push(...g.rows);
+  }
+  let duplicateRowsIgnored = 0;
+  const duplicateWarnings: string[] = [];
+  for (const [eventId, eventRows] of rowsByEventId) {
+    const byEvaluator = new Map<string, ParsedSurveyRow>();
+    for (const r of [...eventRows].sort((a, b) => a.line - b.line)) {
+      byEvaluator.set(normalizeImportText(r.evaluatorName), r);
+    }
+    const dropped = eventRows.length - byEvaluator.size;
+    if (dropped > 0) {
+      duplicateRowsIgnored += dropped;
+      const eventName = eventsById.get(eventId)?.name ?? String(eventId);
+      duplicateWarnings.push(`Evento "${eventName}": ${dropped} resposta(s) repetida(s) do mesmo avaliador — apenas a mais recente será importada.`);
+    }
+    rowsByEventId.set(eventId, Array.from(byEvaluator.values()));
+  }
+
   const retiredCriteriaIdsForWarnings = SURVEY_CRITERIA_RETIRED
     .map(n => criteriaByName.get(normalizeImportText(n))?.id)
     .filter((id): id is number => id != null);
-  const warnings: string[] = [];
+  const warnings: string[] = [...duplicateWarnings];
   for (const gp of groupPlans) {
     if (!gp.resolved || !gp.linkedEvent || gp.linkedEvent.isHistorical) continue;
     if (retiredCriteriaIdsForWarnings.length > 0) {
@@ -1097,6 +1136,33 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
     }
   }
 
+  // Notas que já existem no app para o mesmo (evento, quesito, avaliador):
+  // serão PULADAS no commit para não contar em dobro — o que foi lançado
+  // dentro do app prevalece sobre a planilha.
+  let evaluationsAlreadyInApp = 0;
+  for (const [eventId, eventRows] of rowsByEventId) {
+    const targetEvent = eventsById.get(eventId);
+    if (!targetEvent || targetEvent.isHistorical) continue;
+    const existing = await db.select({ criterionId: evaluationsTable.criterionId, evaluatorUserId: evaluationsTable.evaluatorUserId })
+      .from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
+    if (existing.length === 0) continue;
+    const existingPairs = new Set(existing.map(e => `${e.criterionId}:${e.evaluatorUserId}`));
+    let skippedHere = 0;
+    for (const r of eventRows) {
+      const evaluatorUserId = evaluatorResolution.get(normalizeImportText(r.evaluatorName));
+      if (!evaluatorUserId) continue;
+      for (const s of r.scores) {
+        const criterion = criteriaByName.get(normalizeImportText(s.criterionName));
+        if (!criterion) continue;
+        if (existingPairs.has(`${criterion.id}:${evaluatorUserId}`)) skippedHere++;
+      }
+    }
+    if (skippedHere > 0) {
+      evaluationsAlreadyInApp += skippedHere;
+      warnings.push(`Evento "${targetEvent.name}": ${skippedHere} nota(s) da planilha já existem no app (mesmo avaliador e quesito) e serão puladas — as notas lançadas no app prevalecem.`);
+    }
+  }
+
   const preview = {
     totalRows: parsedRows.length,
     groups: groupPlans,
@@ -1104,6 +1170,8 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
     avaliadoresToCreate: Array.from(toCreateAvaliadorNames.values()).map(v => v.originalName),
     catalogChanges,
     warnings,
+    duplicateRowsIgnored,
+    evaluationsAlreadyInApp,
   };
 
   if (isDryRun) {
@@ -1123,7 +1191,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
 
   const userId = req.user!.userId;
   const createdAvaliadores: { name: string; email: string; tempPassword: string }[] = [];
-  let usersCreated = 0, evaluationsCreated = 0, assignmentsCreated = 0, conformitiesUpserted = 0, eventsUpdated = 0;
+  let usersCreated = 0, evaluationsCreated = 0, evaluationsSkipped = 0, assignmentsCreated = 0, conformitiesUpserted = 0, eventsUpdated = 0;
   const affectedCycleIds = new Set<number>();
 
   await db.transaction(async (tx) => {
@@ -1179,14 +1247,6 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       usersCreated++;
     }
 
-    const rowsByEventId = new Map<number, ParsedSurveyRow[]>();
-    for (const gp of groupPlans) {
-      if (!gp.linkedEventId) continue;
-      const g = groups.get(gp.groupKey)!;
-      if (!rowsByEventId.has(gp.linkedEventId)) rowsByEventId.set(gp.linkedEventId, []);
-      rowsByEventId.get(gp.linkedEventId)!.push(...g.rows);
-    }
-
     for (const [eventId, eventRows] of rowsByEventId) {
       const targetEvent = eventsById.get(eventId)!;
 
@@ -1213,6 +1273,13 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
         await tx.delete(eventCriteriaTable).where(and(eq(eventCriteriaTable.eventId, eventId), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)));
       }
 
+      // Notas que já existem no app para (evento, quesito, avaliador) NÃO são
+      // regravadas — evita contagem dupla quando o avaliador já lançou a
+      // avaliação dentro do app ou quando a planilha é reimportada.
+      const existingEvalRows = await tx.select({ criterionId: evaluationsTable.criterionId, evaluatorUserId: evaluationsTable.evaluatorUserId })
+        .from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
+      const existingEvalPairs = new Set(existingEvalRows.map(e => `${e.criterionId}:${e.evaluatorUserId}`));
+
       const areaAssignmentPairs = new Set<string>();
       for (const r of eventRows) {
         const evaluatorUserId = evaluatorIdByNormalizedName.get(normalizeImportText(r.evaluatorName));
@@ -1221,6 +1288,10 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
         for (const s of r.scores) {
           const criterion = targetCriteriaByName.get(normalizeImportText(s.criterionName));
           if (!criterion) continue;
+          if (existingEvalPairs.has(`${criterion.id}:${evaluatorUserId}`)) {
+            evaluationsSkipped++;
+            continue;
+          }
           await tx.insert(evaluationsTable).values({
             eventId, criterionId: criterion.id, evaluatorUserId,
             score: String(s.score), comments: s.comment, commentVisibility: "internal",
@@ -1278,11 +1349,11 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
   }
 
   await audit(userId, "import_survey", "events", undefined, null, {
-    usersCreated, evaluationsCreated, assignmentsCreated, conformitiesUpserted, eventsUpdated,
+    usersCreated, evaluationsCreated, evaluationsSkipped, assignmentsCreated, conformitiesUpserted, eventsUpdated,
   });
 
   res.json({
-    success: true, dryRun: false, usersCreated, evaluationsCreated, assignmentsCreated, conformitiesUpserted, eventsUpdated,
+    success: true, dryRun: false, usersCreated, evaluationsCreated, evaluationsSkipped, assignmentsCreated, conformitiesUpserted, eventsUpdated,
     createdAvaliadores, errors: [], ...preview, warnings: [...warnings, ...cycleWarnings],
   });
 });

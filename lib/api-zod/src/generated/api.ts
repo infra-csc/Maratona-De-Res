@@ -2134,7 +2134,7 @@ export const ImportHistoricalResultsResponse = zod.object({
 export const ImportSurveyBody = zod.object({
   "rows": zod.array(zod.array(zod.unknown())).describe('Linhas da planilha (sem cabeçalho), cada uma um array de 29 células na ordem original das colunas do xlsx.'),
   "dryRun": zod.boolean().optional().describe('Defaults to true. Set to false to commit (only applied when there are zero errors and every group is linked).'),
-  "linkOverrides": zod.record(zod.string(), zod.number()).optional().describe('Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.')
+  "linkOverrides": zod.record(zod.string(), zod.number()).optional().describe('Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Use -1 para IGNORAR o grupo (linhas não são importadas). Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.')
 })
 
 export const ImportSurveyResponse = zod.object({
@@ -2162,7 +2162,8 @@ export const ImportSurveyResponse = zod.object({
   "startDate": zod.string(),
   "isHistorical": zod.boolean()
 })).describe('Eventos já cadastrados sugeridos por semelhança de nome\/cidade, para ajudar a escolher o vínculo.'),
-  "resolved": zod.boolean().describe('true quando um linkOverride válido foi informado para este grupo.')
+  "resolved": zod.boolean().describe('true quando um linkOverride válido (evento ou -1\/ignorar) foi informado para este grupo.'),
+  "ignored": zod.boolean().optional().describe('true quando o grupo foi marcado para ser ignorado (linkOverride -1).')
 })),
   "unresolvedGroups": zod.array(zod.string()).describe('groupKeys ainda sem vínculo — precisam de linkOverrides antes do commit.'),
   "avaliadoresToCreate": zod.array(zod.string()).describe('Nomes de avaliadores que serão criados como usuários novos ao confirmar.'),
@@ -2171,8 +2172,11 @@ export const ImportSurveyResponse = zod.object({
   "toCreateOrActivate": zod.array(zod.string()).describe('Nomes de critérios que serão criados ou reativados no commit.')
 }),
   "warnings": zod.array(zod.string()),
+  "duplicateRowsIgnored": zod.number().optional().describe('Respostas repetidas do mesmo avaliador para o mesmo evento — só a mais recente é importada.'),
+  "evaluationsAlreadyInApp": zod.number().optional().describe('Notas da planilha que já existem no app (mesmo evento, quesito e avaliador) e serão puladas.'),
   "usersCreated": zod.number().optional(),
   "evaluationsCreated": zod.number().optional(),
+  "evaluationsSkipped": zod.number().optional().describe('Notas puladas no commit por já existirem no app (mesmo evento, quesito e avaliador).'),
   "assignmentsCreated": zod.number().optional(),
   "conformitiesUpserted": zod.number().optional(),
   "eventsUpdated": zod.number().optional(),

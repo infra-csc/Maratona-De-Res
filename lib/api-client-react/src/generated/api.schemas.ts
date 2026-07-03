@@ -1040,7 +1040,7 @@ export interface HistoricalImportResult {
 }
 
 /**
- * Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.
+ * Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Use -1 para IGNORAR o grupo (linhas não são importadas). Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos.
  */
 export type SurveyImportInputLinkOverrides = {[key: string]: number};
 
@@ -1049,7 +1049,7 @@ export interface SurveyImportInput {
   rows: unknown[][];
   /** Defaults to true. Set to false to commit (only applied when there are zero errors and every group is linked). */
   dryRun?: boolean;
-  /** Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos. */
+  /** Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Use -1 para IGNORAR o grupo (linhas não são importadas). Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos. */
   linkOverrides?: SurveyImportInputLinkOverrides;
 }
 
@@ -1080,8 +1080,10 @@ export interface SurveyGroupPlan {
   linkedEvent?: SurveyLinkedEventSummary;
   /** Eventos já cadastrados sugeridos por semelhança de nome/cidade, para ajudar a escolher o vínculo. */
   suggestions: SurveyEventSuggestion[];
-  /** true quando um linkOverride válido foi informado para este grupo. */
+  /** true quando um linkOverride válido (evento ou -1/ignorar) foi informado para este grupo. */
   resolved: boolean;
+  /** true quando o grupo foi marcado para ser ignorado (linkOverride -1). */
+  ignored?: boolean;
 }
 
 export interface SurveyCatalogChanges {
@@ -1110,8 +1112,14 @@ export interface SurveyImportResult {
   avaliadoresToCreate: string[];
   catalogChanges: SurveyCatalogChanges;
   warnings: string[];
+  /** Respostas repetidas do mesmo avaliador para o mesmo evento — só a mais recente é importada. */
+  duplicateRowsIgnored?: number;
+  /** Notas da planilha que já existem no app (mesmo evento, quesito e avaliador) e serão puladas. */
+  evaluationsAlreadyInApp?: number;
   usersCreated?: number;
   evaluationsCreated?: number;
+  /** Notas puladas no commit por já existirem no app (mesmo evento, quesito e avaliador). */
+  evaluationsSkipped?: number;
   assignmentsCreated?: number;
   conformitiesUpserted?: number;
   eventsUpdated?: number;

@@ -16,6 +16,83 @@ import { ptBR } from "date-fns/locale";
 
 const RESET_CONFIRM_PHRASE = "ZERAR TUDO";
 
+// -----------------------------------------------------------------------------
+// Leitura da planilha da pesquisa de avaliadores (export do MS Forms).
+// Em vez de exigir um layout fixo de colunas, localizamos a aba de respostas
+// (aquela cujo cabeçalho tem "Evento que está avaliando...") e mapeamos cada
+// coluna pelo TEXTO do cabeçalho, remontando as linhas no layout canônico de
+// 29 colunas que a API espera. Isso permite subir o arquivo bruto exportado
+// do Forms, mesmo com colunas extras (Hora de início/conclusão/Email) ou em
+// ordem diferente.
+// -----------------------------------------------------------------------------
+
+const SURVEY_CANONICAL_COLS = 29;
+
+function normalizeHeaderText(v: unknown): string {
+  return String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ") // inclui espaços não-quebráveis (U+00A0) que o Forms usa
+    .toLowerCase()
+    .trim();
+}
+
+// target = índice no layout canônico (SURVEY_COL do servidor);
+// hasComment = a coluna imediatamente à direita é o "Comentários ou Justificativa" dela.
+const SURVEY_HEADER_MAP: { target: number; hasComment?: boolean; match: (h: string) => boolean }[] = [
+  { target: 2, match: (h) => h.startsWith("seu nome") },
+  { target: 3, match: (h) => h.startsWith("evento que esta avaliando") },
+  { target: 4, match: (h) => h.startsWith("selecione a area") },
+  { target: 5, hasComment: true, match: (h) => h.startsWith("perda de material") },
+  { target: 7, hasComment: true, match: (h) => h.startsWith("logistica reversa") },
+  { target: 9, hasComment: true, match: (h) => h.startsWith("qualidade da entrega") && !h.includes("(2)") },
+  { target: 11, hasComment: true, match: (h) => h.startsWith("qualidade da entrega") && h.includes("(2)") },
+  { target: 13, hasComment: true, match: (h) => h.startsWith("prazo de entrega") },
+  { target: 15, hasComment: true, match: (h) => h.startsWith("todos os equipamentos") },
+  { target: 17, hasComment: true, match: (h) => h.startsWith("carga na saida do galpao") },
+  { target: 19, hasComment: true, match: (h) => h.startsWith("todos usaram epi") },
+  { target: 21, hasComment: true, match: (h) => h.startsWith("estaiamento") },
+  { target: 23, hasComment: true, match: (h) => h.startsWith("conduta e comportamento") },
+  { target: 25, match: (h) => h.startsWith("alguem faltou") },
+  { target: 26, match: (h) => h.startsWith("algum profissional") },
+  { target: 27, match: (h) => h.startsWith("conte quem se destacou") },
+  { target: 28, match: (h) => h.startsWith("classifique o nivel") },
+];
+
+function extractSurveyRows(workbook: XLSX.WorkBook): (string | number | null)[][] | null {
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+    const allRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(sheet, { header: 1, raw: false, defval: "" });
+    for (let headerIdx = 0; headerIdx < Math.min(3, allRows.length); headerIdx++) {
+      const headers = (allRows[headerIdx] ?? []).map(normalizeHeaderText);
+      if (!headers.some((h) => h.startsWith("evento que esta avaliando"))) continue;
+      const used = new Set<number>();
+      const sourceByTarget: { target: number; src: number; hasComment: boolean }[] = [];
+      let complete = true;
+      for (const spec of SURVEY_HEADER_MAP) {
+        const src = headers.findIndex((h, i) => !used.has(i) && h !== "" && spec.match(h));
+        if (src === -1) { complete = false; break; }
+        used.add(src);
+        sourceByTarget.push({ target: spec.target, src, hasComment: !!spec.hasComment });
+      }
+      if (!complete) continue;
+      return allRows
+        .slice(headerIdx + 1)
+        .filter((r) => Array.isArray(r) && r.some((cell) => String(cell ?? "").trim() !== ""))
+        .map((r) => {
+          const out: (string | number | null)[] = new Array(SURVEY_CANONICAL_COLS).fill("");
+          for (const { target, src, hasComment } of sourceByTarget) {
+            out[target] = r[src] ?? "";
+            if (hasComment) out[target + 1] = r[src + 1] ?? "";
+          }
+          return out;
+        });
+    }
+  }
+  return null;
+}
+
 type SyncResult = {
   success: boolean;
   message: string;
@@ -204,11 +281,16 @@ export default function IntegrationPage() {
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const allRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(sheet, { header: 1, raw: false, defval: "" });
-      const rows = allRows
-        .slice(1)
-        .filter((r) => Array.isArray(r) && r.some((cell) => String(cell ?? "").trim() !== ""));
+      const rows = extractSurveyRows(workbook);
+      if (!rows || rows.length === 0) {
+        toast({
+          title: "Planilha não reconhecida",
+          description: 'Não encontrei a aba de respostas do Forms (cabeçalho "Evento que está avaliando..."). Verifique se o arquivo é o export correto.',
+          variant: "destructive",
+        });
+        e.target.value = "";
+        return;
+      }
       setSurveyRows(rows);
       setSurveyLinkOverrides({});
       surveyPreviewMutation.mutate({ data: { rows, dryRun: true } });
@@ -861,7 +943,8 @@ export default function IntegrationPage() {
                     <tbody>
                       {surveyPreview.groups.map((g, i) => {
                         const selectedId = surveyLinkOverrides[g.groupKey];
-                        const selectedEvent = selectedId
+                        const isIgnored = selectedId === -1;
+                        const selectedEvent = selectedId && !isIgnored
                           ? (g.suggestions.find(s => s.id === selectedId) ?? eventLinkOptions.find(e => e.id === selectedId))
                           : undefined;
                         return (
@@ -886,6 +969,7 @@ export default function IntegrationPage() {
                                 </SelectTrigger>
                                 <SelectContent className="max-h-64">
                                   <SelectItem value="none">— nenhum vínculo —</SelectItem>
+                                  <SelectItem value="-1">✕ Ignorar estas respostas (não importar)</SelectItem>
                                   {g.suggestions.length > 0 && g.suggestions.map(s => (
                                     <SelectItem key={`sug-${s.id}`} value={String(s.id)}>
                                       ★ {s.name}{s.isHistorical ? " (histórico)" : ""}
@@ -899,7 +983,10 @@ export default function IntegrationPage() {
                                 </SelectContent>
                               </Select>
                               {!selectedId && (
-                                <p className="text-[10px] text-red-600 mt-1">Obrigatório — selecione um evento.</p>
+                                <p className="text-[10px] text-red-600 mt-1">Obrigatório — selecione um evento ou "Ignorar".</p>
+                              )}
+                              {isIgnored && (
+                                <p className="text-[10px] text-slate-500 mt-1">Estas respostas serão ignoradas na importação.</p>
                               )}
                               {selectedEvent?.isHistorical && (
                                 <p className="text-[10px] text-amber-700 mt-1">Evento histórico: só os comentários serão salvos como referência, sem notas.</p>

@@ -12,6 +12,6 @@ export interface SurveyImportInput {
   rows: unknown[][];
   /** Defaults to true. Set to false to commit (only applied when there are zero errors and every group is linked). */
   dryRun?: boolean;
-  /** Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos. */
+  /** Mapa de groupKey (de SurveyGroupPlan) para o id do evento já cadastrado ao qual esse grupo da planilha deve ser vinculado. Use -1 para IGNORAR o grupo (linhas não são importadas). Obrigatório para todos os grupos antes do commit — este import nunca cria eventos novos. */
   linkOverrides?: SurveyImportInputLinkOverrides;
 }

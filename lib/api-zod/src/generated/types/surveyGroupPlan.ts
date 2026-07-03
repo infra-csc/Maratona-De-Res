@@ -19,6 +19,8 @@ export interface SurveyGroupPlan {
   linkedEvent?: SurveyLinkedEventSummary;
   /** Eventos já cadastrados sugeridos por semelhança de nome/cidade, para ajudar a escolher o vínculo. */
   suggestions: SurveyEventSuggestion[];
-  /** true quando um linkOverride válido foi informado para este grupo. */
+  /** true quando um linkOverride válido (evento ou -1/ignorar) foi informado para este grupo. */
   resolved: boolean;
+  /** true quando o grupo foi marcado para ser ignorado (linkOverride -1). */
+  ignored?: boolean;
 }

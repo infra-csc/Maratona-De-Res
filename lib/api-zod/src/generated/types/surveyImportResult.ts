@@ -21,8 +21,14 @@ export interface SurveyImportResult {
   avaliadoresToCreate: string[];
   catalogChanges: SurveyCatalogChanges;
   warnings: string[];
+  /** Respostas repetidas do mesmo avaliador para o mesmo evento — só a mais recente é importada. */
+  duplicateRowsIgnored?: number;
+  /** Notas da planilha que já existem no app (mesmo evento, quesito e avaliador) e serão puladas. */
+  evaluationsAlreadyInApp?: number;
   usersCreated?: number;
   evaluationsCreated?: number;
+  /** Notas puladas no commit por já existirem no app (mesmo evento, quesito e avaliador). */
+  evaluationsSkipped?: number;
   assignmentsCreated?: number;
   conformitiesUpserted?: number;
   eventsUpdated?: number;
