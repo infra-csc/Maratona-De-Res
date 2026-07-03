@@ -28,6 +28,9 @@ export const eventsTable = pgTable("events", {
   // recomputeCycleResults, pulando computeEventTeamResult inteiramente.
   isHistorical: boolean("is_historical").notNull().default(false),
   importedScore: numeric("imported_score", { precision: 6, scale: 2 }),
+  // Observações livres trazidas de uma importação em massa (ex.: planilha de
+  // pesquisa com avaliadores) — texto de referência, nunca entra em cálculo.
+  importedNotes: text("imported_notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   externalIdUq: uniqueIndex("events_external_id_uq").on(t.externalId),
