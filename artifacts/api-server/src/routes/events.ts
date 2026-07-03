@@ -274,8 +274,12 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
   const [merge] = await db.select().from(eventsTable).where(eq(eventsTable.id, mergeEventId)).limit(1);
   if (!keep || !merge) { res.status(404).json({ error: "Evento não encontrado" }); return; }
 
+  // Só conta avaliações SUBMETIDAS como dado real — rascunhos (status="draft",
+  // criados automaticamente ao digitar uma nota antes de enviar) não podem
+  // travar a mesclagem, pois não representam avaliação de fato registrada.
   const [[evalCount], [calibCount], [confCount], [resultCount]] = await Promise.all([
-    db.select({ n: sql<number>`count(*)::int` }).from(evaluationsTable).where(eq(evaluationsTable.eventId, mergeEventId)),
+    db.select({ n: sql<number>`count(*)::int` }).from(evaluationsTable)
+      .where(and(eq(evaluationsTable.eventId, mergeEventId), eq(evaluationsTable.status, "submitted"))),
     db.select({ n: sql<number>`count(*)::int` }).from(calibrationsTable).where(eq(calibrationsTable.eventId, mergeEventId)),
     db.select({ n: sql<number>`count(*)::int` }).from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, mergeEventId)),
     db.select({ n: sql<number>`count(*)::int` }).from(employeeEventResultsTable).where(eq(employeeEventResultsTable.eventId, mergeEventId)),
@@ -285,6 +289,8 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
     return;
   }
 
+  // Rascunhos de avaliação (não submetidos) que restarem no evento removido são
+  // descartados automaticamente pelo ON DELETE CASCADE ao apagar o evento abaixo.
   const before = { keep, merge };
   await db.transaction(async (tx) => {
     const patch: Record<string, unknown> = {};
