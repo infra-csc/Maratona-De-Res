@@ -7,7 +7,8 @@ import { getCurrentCycle } from "../lib/cycle.js";
 const router = Router();
 router.use(requireAuth);
 
-router.get("/dashboard/summary", async (_req, res) => {
+router.get("/dashboard/summary", async (req, res) => {
+  const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const cycle = await getCurrentCycle();
   if (!cycle) {
     res.json({
@@ -47,7 +48,9 @@ router.get("/dashboard/summary", async (_req, res) => {
     ? scoredQuarterResults.reduce((s, r) => s + parseFloat(r.finalResult), 0) / scoredQuarterResults.length
     : null;
 
-  const totalBonusPreview = quarterResults.reduce((s, r) => s + parseFloat(r.bonusValue), 0);
+  const totalBonusPreview = isManager
+    ? quarterResults.reduce((s, r) => s + parseFloat(r.bonusValue), 0)
+    : 0;
   const eventsInCalibration = events.filter(e => e.status === "calibration").length;
 
   const openEvents = events.filter(e => e.status === "open");
@@ -116,7 +119,8 @@ router.get("/dashboard/platoon-distribution", async (_req, res) => {
   })));
 });
 
-router.get("/dashboard/top-employees", async (_req, res) => {
+router.get("/dashboard/top-employees", async (req, res) => {
+  const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json([]); return; }
 
@@ -145,7 +149,7 @@ router.get("/dashboard/top-employees", async (_req, res) => {
     grossAverage: parseFloat(r.grossAverage),
     absencePenalty: parseFloat(r.absencePenalty),
     finalResult: parseFloat(r.finalResult),
-    bonusValue: parseFloat(r.bonusValue),
+    bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
     eventBreakdown: [],
   })));
 });
