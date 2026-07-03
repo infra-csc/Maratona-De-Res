@@ -1909,7 +1909,8 @@ export const GetRankingDetailResponse = zod.object({
   "platoon": zod.string().nullish(),
   "platoonColor": zod.string().nullish(),
   "evaluatedCriteria": zod.number(),
-  "totalCriteria": zod.number()
+  "totalCriteria": zod.number(),
+  "isHistorical": zod.boolean()
 })),
   "penalties": zod.array(zod.object({
   "id": zod.number(),

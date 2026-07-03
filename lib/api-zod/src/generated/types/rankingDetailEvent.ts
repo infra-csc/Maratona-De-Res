@@ -24,4 +24,5 @@ export interface RankingDetailEvent {
   platoonColor?: string | null;
   evaluatedCriteria: number;
   totalCriteria: number;
+  isHistorical: boolean;
 }

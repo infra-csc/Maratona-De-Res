@@ -3176,7 +3176,7 @@ components:
 
     RankingDetailEvent:
       type: object
-      required: [eventId, eventName, eventScore, evaluatedCriteria, totalCriteria]
+      required: [eventId, eventName, eventScore, evaluatedCriteria, totalCriteria, isHistorical]
       properties:
         eventId:
           type: integer
@@ -3200,6 +3200,8 @@ components:
           type: integer
         totalCriteria:
           type: integer
+        isHistorical:
+          type: boolean
 
     RankingDetailRow:
       type: object

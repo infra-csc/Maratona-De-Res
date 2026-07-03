@@ -403,7 +403,11 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                               {(ev.city || ev.state) && (
                                 <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
                               )}
-                              <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
+                              {ev.isHistorical ? (
+                                <span className="uppercase">Evento histórico</span>
+                              ) : (
+                                <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
+                              )}
                             </div>
                           </div>
                           <div className="text-right shrink-0">
@@ -573,7 +577,11 @@ function EmployeeDetailSheet({
                             {(ev.city || ev.state) && (
                               <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
                             )}
-                            <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
+                            {ev.isHistorical ? (
+                              <span className="uppercase">Evento histórico</span>
+                            ) : (
+                              <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right shrink-0">

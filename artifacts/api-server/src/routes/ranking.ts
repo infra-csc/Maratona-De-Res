@@ -97,6 +97,8 @@ router.get("/ranking-detail", async (req, res) => {
       eventState: eventsTable.state,
       eventStatus: eventsTable.status,
       startDate: eventsTable.startDate,
+      isHistorical: eventsTable.isHistorical,
+      importedScore: eventsTable.importedScore,
     })
     .from(eventParticipantsTable)
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
@@ -108,6 +110,28 @@ router.get("/ranking-detail", async (req, res) => {
   const events = [];
   for (const p of participations) {
     if (!p.eventId) continue;
+
+    // Evento histórico: nota já vem pronta (importedScore) de fora, sem
+    // critérios/avaliações — não passar pelo cálculo por quesitos.
+    if (p.isHistorical) {
+      const historicalScore = p.importedScore != null ? parseFloat(p.importedScore as unknown as string) : 0;
+      const platoon = getPlatoonByScore(historicalScore, platoonRulesMapped);
+      events.push({
+        eventId: p.eventId,
+        eventName: p.eventName ?? "",
+        city: p.eventCity ?? null,
+        state: p.eventState ?? null,
+        startDate: p.startDate ?? null,
+        status: p.eventStatus ?? null,
+        eventScore: historicalScore,
+        platoon: platoon?.name ?? null,
+        platoonColor: platoon?.color ?? null,
+        evaluatedCriteria: 0,
+        totalCriteria: 0,
+        isHistorical: true,
+      });
+      continue;
+    }
 
     const eventCriteriaRows = await db
       .select({
@@ -159,6 +183,7 @@ router.get("/ranking-detail", async (req, res) => {
       platoonColor: platoon?.color ?? null,
       evaluatedCriteria,
       totalCriteria: eventCriteriaRows.length,
+      isHistorical: false,
     });
   }
   events.sort((a, b) => b.eventScore - a.eventScore);
