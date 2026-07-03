@@ -929,32 +929,40 @@ export default function EventDetailPage() {
                 {conformityItems.map(item => {
                   const value = conformityForm[item.key];
                   return (
-                    <div key={item.key} className="flex items-center justify-between gap-3">
+                    <div
+                      key={item.key}
+                      className={`flex items-center justify-between gap-3 -mx-4 px-4 py-1.5 ${!value ? "bg-[#fdece6] border-l-4 border-[#862200]" : ""}`}
+                    >
                       <span className="text-sm font-bold italic text-[#191c1e]">{item.label}</span>
-                      {canManage ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = { ...conformityForm, [item.key]: !value };
-                            setConformityForm(next);
-                            setConformity.mutate({ id, data: { [item.key]: !value } });
-                          }}
-                          className={`text-[11px] font-black italic uppercase px-3 py-1 border-2 border-[#191c1e] transition-all ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}
-                        >
-                          {value ? "Sim" : "Não"}
-                        </button>
-                      ) : (
-                        <span className={`text-[11px] font-black italic uppercase px-2 py-1 border border-[#191c1e] ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}>
-                          {value ? "Sim" : "Não"}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!value && (
+                          <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>
+                        )}
+                        {canManage ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = { ...conformityForm, [item.key]: !value };
+                              setConformityForm(next);
+                              setConformity.mutate({ id, data: { [item.key]: !value } });
+                            }}
+                            className={`text-[11px] font-black italic uppercase px-3 py-1 border-2 border-[#191c1e] transition-all ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}
+                          >
+                            {value ? "Sim" : "Não"}
+                          </button>
+                        ) : (
+                          <span className={`text-[11px] font-black italic uppercase px-2 py-1 border border-[#191c1e] ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}>
+                            {value ? "Sim" : "Não"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
                 {(result?.conformityPenalty ?? 0) > 0 && (
-                  <div className="pt-2 border-t-2 border-[#eceef0]">
-                    <p className="text-xs font-bold italic uppercase text-[#862200]">
-                      Penalidade: -{result?.conformityPenalty} pts
+                  <div className="pt-3 border-t-2 border-[#eceef0]">
+                    <p className="text-xs font-bold italic uppercase text-[#862200] flex items-center gap-1.5">
+                      <AlertTriangle size={13} /> Desconto na nota final do evento: -{result?.conformityPenalty} pts
                     </p>
                   </div>
                 )}
