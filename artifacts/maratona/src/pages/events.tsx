@@ -7,12 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Unlock, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge } from "lucide-react";
+import { Search, Unlock, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
+import { cn } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -37,6 +40,7 @@ export default function EventsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeForEvent, setMergeForEvent] = useState<{ id: number; name: string } | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>("");
+  const [mergeTargetPickerOpen, setMergeTargetPickerOpen] = useState(false);
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -385,18 +389,62 @@ export default function EventsPage() {
             </p>
             <div className="space-y-1.5">
               <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento duplicado a remover</Label>
-              <Select value={mergeTargetId} onValueChange={setMergeTargetId}>
-                <SelectTrigger data-testid="select-merge-target" className="h-11 rounded-none border-2 border-[#191c1e]">
-                  <SelectValue placeholder="Selecione o evento duplicado..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(events ?? []).filter(e => e.id !== mergeForEvent?.id).map(e => (
-                    <SelectItem key={e.id} value={String(e.id)}>
-                      {e.name} — {new Date(e.startDate).toLocaleDateString('pt-BR')} {e.isHistorical ? "(histórico)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {(() => {
+                const mergeCandidates = (events ?? [])
+                  .filter(e => e.id !== mergeForEvent?.id)
+                  .slice()
+                  .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+                const selectedMergeTarget = mergeCandidates.find(e => String(e.id) === mergeTargetId);
+                return (
+                  <Popover open={mergeTargetPickerOpen} onOpenChange={setMergeTargetPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        role="combobox"
+                        aria-expanded={mergeTargetPickerOpen}
+                        data-testid="select-merge-target"
+                        className="w-full h-11 px-3 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white hover:bg-[#f7f9fb] transition-all"
+                      >
+                        {selectedMergeTarget ? (
+                          <span className="truncate text-sm font-bold italic uppercase text-[#191c1e]">
+                            {selectedMergeTarget.name} — {new Date(selectedMergeTarget.startDate).toLocaleDateString('pt-BR')}{selectedMergeTarget.isHistorical ? " (histórico)" : ""}
+                          </span>
+                        ) : (
+                          <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60] truncate">Selecione o evento duplicado...</span>
+                        )}
+                        <ChevronsUpDown size={16} className="shrink-0 text-[#191c1e]" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                      <Command className="rounded-none" filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+                        <CommandInput data-testid="input-merge-target-search" placeholder="Buscar por nome do evento..." className="italic" />
+                        <CommandList className="max-h-[320px]">
+                          <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {mergeCandidates.map(e => (
+                              <CommandItem
+                                key={e.id}
+                                value={`${e.name} ${e.city ?? ""} ${e.state ?? ""}`}
+                                data-testid={`option-merge-target-${e.id}`}
+                                onSelect={() => { setMergeTargetId(String(e.id)); setMergeTargetPickerOpen(false); }}
+                                className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
+                              >
+                                <Check size={16} className={cn("mt-0.5 shrink-0", mergeTargetId === String(e.id) ? "opacity-100" : "opacity-0")} />
+                                <span className="flex flex-col min-w-0">
+                                  <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{e.name}</span>
+                                  <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">
+                                    {new Date(e.startDate).toLocaleDateString('pt-BR')}{e.isHistorical ? " · histórico" : ""}
+                                  </span>
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                );
+              })()}
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
               <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setMergeForEvent(null); setMergeTargetId(""); }}>Cancelar</Button>
