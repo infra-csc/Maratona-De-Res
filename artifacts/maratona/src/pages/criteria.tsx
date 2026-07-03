@@ -25,7 +25,7 @@ export default function CriteriaPage() {
   const { data: areas } = useGetAreas();
 
   const { register, handleSubmit, reset, setValue } = useForm<CriterionInput>({
-    defaultValues: { defaultWeight: 1 },
+    defaultValues: { defaultWeight: 3 },
   });
 
   const createMutation = useCreateCriterion({
