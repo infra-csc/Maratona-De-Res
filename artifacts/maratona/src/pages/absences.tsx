@@ -254,8 +254,11 @@ export default function AbsencesPage() {
                                     <span className="font-black italic uppercase text-sm truncate">{e.name}</span>
                                   </CommandItem>
                                 ))}
-                        </SelectContent>
-                      </Select>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
