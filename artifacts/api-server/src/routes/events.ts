@@ -308,16 +308,6 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
   // o evento abaixo. Os dados do evento mantido nunca são tocados.
   const before = { keep, merge };
   await db.transaction(async (tx) => {
-    const patch: Record<string, unknown> = {};
-    if (!keep.clientName && merge.clientName) patch.clientName = merge.clientName;
-    if (!keep.location && merge.location) patch.location = merge.location;
-    if (!keep.city && merge.city) patch.city = merge.city;
-    if (!keep.state && merge.state) patch.state = merge.state;
-    if (!keep.externalId && merge.externalId) patch.externalId = merge.externalId;
-    if (Object.keys(patch).length > 0) {
-      await tx.update(eventsTable).set(patch).where(eq(eventsTable.id, keepId));
-    }
-
     const mergeParticipants = await tx.select().from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, mergeEventId));
     for (const p of mergeParticipants) {
       await tx.insert(eventParticipantsTable).values({
@@ -331,7 +321,20 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
 
     await tx.update(absencesTable).set({ eventId: keepId }).where(eq(absencesTable.eventId, mergeEventId));
 
+    // O duplicado precisa ser removido ANTES de copiar campos para o evento
+    // mantido: `external_id` tem índice único (events_external_id_uq), então
+    // copiá-lo enquanto o duplicado ainda existe viola a constraint (HTTP 500).
     await tx.delete(eventsTable).where(eq(eventsTable.id, mergeEventId));
+
+    const patch: Record<string, unknown> = {};
+    if (!keep.clientName && merge.clientName) patch.clientName = merge.clientName;
+    if (!keep.location && merge.location) patch.location = merge.location;
+    if (!keep.city && merge.city) patch.city = merge.city;
+    if (!keep.state && merge.state) patch.state = merge.state;
+    if (!keep.externalId && merge.externalId) patch.externalId = merge.externalId;
+    if (Object.keys(patch).length > 0) {
+      await tx.update(eventsTable).set(patch).where(eq(eventsTable.id, keepId));
+    }
   });
 
   const affectedCycles = Array.from(new Set([keep.cycleId, merge.cycleId]));
