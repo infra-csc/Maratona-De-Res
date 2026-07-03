@@ -9,4 +9,6 @@
 export interface MergeEventInput {
   /** Id of the duplicate event to absorb into and delete. */
   mergeEventId: number;
+  /** When the duplicate event already has real evaluations/calibration/results recorded, the merge is blocked by default (400 with requiresConfirmation). Pass force=true after the admin confirms to proceed anyway; that data is discarded (the kept event's own data is never touched). */
+  force?: boolean;
 }

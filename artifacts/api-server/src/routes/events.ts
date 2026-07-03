@@ -261,6 +261,7 @@ router.delete("/events/:id", requireRole("admin"), async (req, res) => {
 router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
   const keepId = parseInt(req.params.id as string);
   const mergeEventId = parseInt(req.body?.mergeEventId);
+  const force = req.body?.force === true;
   if (!mergeEventId || Number.isNaN(mergeEventId)) {
     res.status(400).json({ error: "mergeEventId obrigatório" });
     return;
@@ -284,13 +285,27 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
     db.select({ n: sql<number>`count(*)::int` }).from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, mergeEventId)),
     db.select({ n: sql<number>`count(*)::int` }).from(employeeEventResultsTable).where(eq(employeeEventResultsTable.eventId, mergeEventId)),
   ]);
-  if (evalCount.n > 0 || calibCount.n > 0 || confCount.n > 0 || resultCount.n > 0) {
-    res.status(400).json({ error: "O evento a ser removido já possui avaliações, calibração ou resultados gravados — não é possível mesclar automaticamente." });
+  const hasRealData = evalCount.n > 0 || calibCount.n > 0 || confCount.n > 0 || resultCount.n > 0;
+
+  // Casos legítimos de duplicata (ex.: mesma corrida importada/fechada duas vezes)
+  // podem ter avaliação, calibração e resultado gravados NOS DOIS eventos — isso
+  // não é dado extra a preservar, é redundância do mesmo evento. Por isso não
+  // bloqueamos mais de forma definitiva: na primeira tentativa (sem `force`)
+  // avisamos o que será descartado para o admin confirmar conscientemente;
+  // com `force=true` o admin já confirmou e a mesclagem segue.
+  if (hasRealData && !force) {
+    res.status(400).json({
+      error: "O evento a ser removido já possui avaliações, calibração ou resultados gravados. Confirme se deseja mesclar mesmo assim — esses dados do duplicado serão descartados (os dados do evento mantido não são afetados).",
+      requiresConfirmation: true,
+      details: { evaluations: evalCount.n, calibrations: calibCount.n, conformities: confCount.n, results: resultCount.n },
+    });
     return;
   }
 
-  // Rascunhos de avaliação (não submetidos) que restarem no evento removido são
-  // descartados automaticamente pelo ON DELETE CASCADE ao apagar o evento abaixo.
+  // Rascunhos de avaliação (não submetidos), e — quando `force=true` — também
+  // avaliações submetidas, calibrações, conformidade e resultados do evento
+  // removido são descartados automaticamente pelo ON DELETE CASCADE ao apagar
+  // o evento abaixo. Os dados do evento mantido nunca são tocados.
   const before = { keep, merge };
   await db.transaction(async (tx) => {
     const patch: Record<string, unknown> = {};
@@ -321,6 +336,9 @@ router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
 
   const affectedCycles = Array.from(new Set([keep.cycleId, merge.cycleId]));
   const warnings: string[] = [];
+  if (hasRealData && force) {
+    warnings.push(`Descartados dados do evento duplicado: ${evalCount.n} avaliação(ões), ${calibCount.n} calibração(ões), ${confCount.n} conformidade(s) e ${resultCount.n} resultado(s).`);
+  }
   for (const cycleId of affectedCycles) {
     const result = await recomputeCycleResults(cycleId, req.user!.userId);
     warnings.push(...result.warnings);

@@ -566,7 +566,8 @@ export const MergeEventParams = zod.object({
 })
 
 export const MergeEventBody = zod.object({
-  "mergeEventId": zod.number().describe('Id of the duplicate event to absorb into and delete.')
+  "mergeEventId": zod.number().describe('Id of the duplicate event to absorb into and delete.'),
+  "force": zod.boolean().optional().describe('When the duplicate event already has real evaluations\/calibration\/results recorded, the merge is blocked by default (400 with requiresConfirmation). Pass force=true after the admin confirms to proceed anyway; that data is discarded (the kept event\'s own data is never touched).')
 })
 
 export const MergeEventResponse = zod.object({

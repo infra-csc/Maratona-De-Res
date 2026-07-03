@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetEvents, useReopenEvent, useCreateEvent, useMergeEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useReopenEvent, useCreateEvent, useMergeEvent, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -41,6 +41,7 @@ export default function EventsPage() {
   const [mergeForEvent, setMergeForEvent] = useState<{ id: number; name: string } | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>("");
   const [mergeTargetPickerOpen, setMergeTargetPickerOpen] = useState(false);
+  const [mergeConflict, setMergeConflict] = useState<{ evaluations: number; calibrations: number; conformities: number; results: number } | null>(null);
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -62,8 +63,16 @@ export default function EventsPage() {
         });
         setMergeForEvent(null);
         setMergeTargetId("");
+        setMergeConflict(null);
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao mesclar", description: e.message, variant: "destructive" }),
+      onError: (e: ApiError) => {
+        const data = e.data as { requiresConfirmation?: boolean; details?: { evaluations: number; calibrations: number; conformities: number; results: number }; error?: string } | null;
+        if (data?.requiresConfirmation && data.details) {
+          setMergeConflict(data.details);
+          return;
+        }
+        toast({ title: "Erro ao mesclar", description: data?.error ?? e.message, variant: "destructive" });
+      },
     },
   });
 
@@ -378,7 +387,7 @@ export default function EventsPage() {
         )}
       </div>
 
-      <Dialog open={!!mergeForEvent} onOpenChange={(open) => { if (!open) { setMergeForEvent(null); setMergeTargetId(""); } }}>
+      <Dialog open={!!mergeForEvent} onOpenChange={(open) => { if (!open) { setMergeForEvent(null); setMergeTargetId(""); setMergeConflict(null); } }}>
         <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
           <DialogHeader>
             <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Mesclar Evento Duplicado</DialogTitle>
@@ -426,7 +435,7 @@ export default function EventsPage() {
                                 key={e.id}
                                 value={`${e.name} ${e.city ?? ""} ${e.state ?? ""}`}
                                 data-testid={`option-merge-target-${e.id}`}
-                                onSelect={() => { setMergeTargetId(String(e.id)); setMergeTargetPickerOpen(false); }}
+                                onSelect={() => { setMergeTargetId(String(e.id)); setMergeTargetPickerOpen(false); setMergeConflict(null); }}
                                 className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
                               >
                                 <Check size={16} className={cn("mt-0.5 shrink-0", mergeTargetId === String(e.id) ? "opacity-100" : "opacity-0")} />
@@ -446,19 +455,33 @@ export default function EventsPage() {
                 );
               })()}
             </div>
+
+            {mergeConflict && (
+              <div data-testid="alert-merge-conflict" className="border-2 border-[#191c1e] bg-[#fff3cd] p-3 text-sm italic text-[#5c4400] space-y-1">
+                <p className="font-bold uppercase">O duplicado já tem dado gravado:</p>
+                <p>
+                  {mergeConflict.evaluations} avaliação(ões), {mergeConflict.calibrations} calibração(ões), {mergeConflict.conformities} conformidade(s) e {mergeConflict.results} resultado(s).
+                </p>
+                <p>Esses dados do duplicado serão descartados; os dados do evento mantido não são afetados. Confirma a mesclagem mesmo assim?</p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-              <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setMergeForEvent(null); setMergeTargetId(""); }}>Cancelar</Button>
+              <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setMergeForEvent(null); setMergeTargetId(""); setMergeConflict(null); }}>Cancelar</Button>
               <button
                 data-testid="button-confirm-merge"
                 type="button"
                 disabled={!mergeTargetId || mergeMutation.isPending}
-                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                className={cn(
+                  "border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50",
+                  mergeConflict ? "bg-[#ff5722] text-white" : "bg-[#ccff00]",
+                )}
                 onClick={() => {
                   if (!mergeForEvent || !mergeTargetId) return;
-                  mergeMutation.mutate({ id: mergeForEvent.id, data: { mergeEventId: parseInt(mergeTargetId) } });
+                  mergeMutation.mutate({ id: mergeForEvent.id, data: { mergeEventId: parseInt(mergeTargetId), force: !!mergeConflict } });
                 }}
               >
-                {mergeMutation.isPending ? "Mesclando..." : "Mesclar e Excluir Duplicado"}
+                {mergeMutation.isPending ? "Mesclando..." : mergeConflict ? "Mesclar Mesmo Assim" : "Mesclar e Excluir Duplicado"}
               </button>
             </div>
           </div>

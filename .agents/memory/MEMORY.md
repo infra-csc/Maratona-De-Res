@@ -3,6 +3,7 @@
 - [Calculation scale](calculation-scale.md) — score×weight directly (0-100), weights sum to 20, no normalization
 - [JWT_SECRET env](jwt-secret-env.md) — keep in encrypted Secrets store; auth.ts throws at startup if missing (no fallback)
 - [API client /api prefix](api-client-prefix.md) — generated paths must be BARE; single /api prefix owned by runtime setBaseUrl, else double-prefix → 401
+- [Event duplicate-merge guard](event-merge-duplicate.md) — merge blocks discarding real data on removed duplicate unless force=true; 400 returns requiresConfirmation+details for a UI confirm step
 - [Event finalize flow](event-finalize-flow.md) — finalize = close then release; release needs feedback.isComplete; keep close/release/createCalibration RBAC in lockstep (admin|rh|diretoria)
 - [Confidential endpoint gating](confidential-endpoint-gating.md) — manager-only data must be gated with requireRole server-side; UI hiding is not a security boundary (shared pages have no route guard)
 - [Auth/impersonation storage cleanup](auth-storage-cleanup.md) — every auth-teardown path (401 handler, logout, stopImpersonating) must clear ALL session keys incl. preserved real-admin keys
