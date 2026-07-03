@@ -160,7 +160,12 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 
   const top3 = filteredRanking.slice(0, 3);
   const activeRunners = filteredRanking.length;
-  const avgResult = filteredRanking.length > 0 ? filteredRanking.reduce((acc, r) => acc + r.finalResult, 0) / filteredRanking.length : 0;
+  // Só entram na média colaboradores com pelo menos 1 evento pontuado no ciclo
+  // (eventsCount > 0) — mesmo critério do "Média do Ciclo" no Dashboard. Quem
+  // ainda não tem nota (0 eventos fechados/pontuados) tem finalResult=0 "por
+  // enquanto" e distorceria a média para baixo mesmo sem ninguém ter ido mal.
+  const scoredRanking = filteredRanking.filter(r => r.eventsCount > 0);
+  const avgResult = scoredRanking.length > 0 ? scoredRanking.reduce((acc, r) => acc + r.finalResult, 0) / scoredRanking.length : 0;
 
   function openDetail(id: number) {
     if (!canViewDetail) return;
