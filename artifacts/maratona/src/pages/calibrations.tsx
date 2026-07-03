@@ -27,6 +27,16 @@ function statusChip(status: string): { label: string; cls: string } {
   return map[status] ?? { label: status, cls: "bg-[#d8dadc] text-[#444933]" };
 }
 
+// Badge do seletor de eventos: eventos históricos sempre "Fechado"; demais mostram
+// o estado real da publicação de feedback (final > parcial), nunca o status
+// bruto do evento — sem publicação nenhuma, continua "Em Avaliação" mesmo fechado.
+function calibrationEventChip(ev: { isHistorical?: boolean; feedbackReleased?: boolean; partialPublishedAt?: string | null }): { label: string; cls: string } {
+  if (ev.isHistorical) return { label: "Fechado", cls: "bg-[#d8dadc] text-[#444933]" };
+  if (ev.feedbackReleased) return { label: "Avaliação Final", cls: "bg-[#191c1e] text-[#ccff00]" };
+  if (ev.partialPublishedAt) return { label: "Avaliação Parcial", cls: "bg-[#ffb5a0] text-[#3b0900]" };
+  return { label: "Em Avaliação", cls: "bg-[#ccff00] text-[#161e00]" };
+}
+
 function formatDateTime(d: Date): string {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
@@ -460,8 +470,8 @@ export default function CalibrationsPage() {
                             <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
                             {formatEventSubtitle(ev) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
                           </span>
-                          <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase shrink-0 ${statusChip(ev.status).cls}`}>
-                            {statusChip(ev.status).label}
+                          <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase shrink-0 ${calibrationEventChip(ev).cls}`}>
+                            {calibrationEventChip(ev).label}
                           </span>
                         </CommandItem>
                       ))}

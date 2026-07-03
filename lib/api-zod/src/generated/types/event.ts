@@ -37,6 +37,10 @@ export interface Event {
   hasCalibration?: boolean;
   criteriaConfirmed?: boolean;
   feedbackReleased?: boolean;
+  /** @nullable */
+  feedbackReleasedAt?: string | null;
+  /** @nullable */
+  partialPublishedAt?: string | null;
   isHistorical?: boolean;
   /** @nullable */
   importedScore?: number | null;

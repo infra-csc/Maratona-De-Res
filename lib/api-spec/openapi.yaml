@@ -2149,6 +2149,10 @@ components:
           type: boolean
         feedbackReleased:
           type: boolean
+        feedbackReleasedAt:
+          type: ["string", "null"]
+        partialPublishedAt:
+          type: ["string", "null"]
         isHistorical:
           type: boolean
         importedScore:

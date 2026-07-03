@@ -399,6 +399,8 @@ export const GetEventsResponseItem = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
@@ -552,6 +554,8 @@ export const UpdateEventResponse = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
@@ -604,6 +608,8 @@ export const MergeEventResponse = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
@@ -648,6 +654,8 @@ export const CloseEventResponse = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
@@ -685,6 +693,8 @@ export const ReopenEventResponse = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
