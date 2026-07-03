@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -252,6 +252,77 @@ router.delete("/events/:id", requireRole("admin"), async (req, res) => {
   await db.delete(eventsTable).where(eq(eventsTable.id, id));
   await audit(req.user!.userId, "delete", "events", id);
   res.status(204).end();
+});
+
+// Mescla dois eventos que representam a mesma corrida (duplicata por nome divergente):
+// preenche em `id` (mantido) os campos vazios com dados de `mergeEventId`, migra
+// participantes/faltas e remove o evento duplicado. Bloqueia se o duplicado já tiver
+// avaliação/calibração/resultado gravado, para nunca descartar dado real em silêncio.
+router.post("/events/:id/merge", requireRole("admin"), async (req, res) => {
+  const keepId = parseInt(req.params.id as string);
+  const mergeEventId = parseInt(req.body?.mergeEventId);
+  if (!mergeEventId || Number.isNaN(mergeEventId)) {
+    res.status(400).json({ error: "mergeEventId obrigatório" });
+    return;
+  }
+  if (mergeEventId === keepId) {
+    res.status(400).json({ error: "Não é possível mesclar um evento com ele mesmo" });
+    return;
+  }
+
+  const [keep] = await db.select().from(eventsTable).where(eq(eventsTable.id, keepId)).limit(1);
+  const [merge] = await db.select().from(eventsTable).where(eq(eventsTable.id, mergeEventId)).limit(1);
+  if (!keep || !merge) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+
+  const [[evalCount], [calibCount], [confCount], [resultCount]] = await Promise.all([
+    db.select({ n: sql<number>`count(*)::int` }).from(evaluationsTable).where(eq(evaluationsTable.eventId, mergeEventId)),
+    db.select({ n: sql<number>`count(*)::int` }).from(calibrationsTable).where(eq(calibrationsTable.eventId, mergeEventId)),
+    db.select({ n: sql<number>`count(*)::int` }).from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, mergeEventId)),
+    db.select({ n: sql<number>`count(*)::int` }).from(employeeEventResultsTable).where(eq(employeeEventResultsTable.eventId, mergeEventId)),
+  ]);
+  if (evalCount.n > 0 || calibCount.n > 0 || confCount.n > 0 || resultCount.n > 0) {
+    res.status(400).json({ error: "O evento a ser removido já possui avaliações, calibração ou resultados gravados — não é possível mesclar automaticamente." });
+    return;
+  }
+
+  const before = { keep, merge };
+  await db.transaction(async (tx) => {
+    const patch: Record<string, unknown> = {};
+    if (!keep.clientName && merge.clientName) patch.clientName = merge.clientName;
+    if (!keep.location && merge.location) patch.location = merge.location;
+    if (!keep.city && merge.city) patch.city = merge.city;
+    if (!keep.state && merge.state) patch.state = merge.state;
+    if (!keep.externalId && merge.externalId) patch.externalId = merge.externalId;
+    if (Object.keys(patch).length > 0) {
+      await tx.update(eventsTable).set(patch).where(eq(eventsTable.id, keepId));
+    }
+
+    const mergeParticipants = await tx.select().from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, mergeEventId));
+    for (const p of mergeParticipants) {
+      await tx.insert(eventParticipantsTable).values({
+        eventId: keepId,
+        employeeId: p.employeeId,
+        functionName: p.functionName,
+        teamName: p.teamName,
+        confirmed: p.confirmed,
+      }).onConflictDoNothing({ target: [eventParticipantsTable.eventId, eventParticipantsTable.employeeId] });
+    }
+
+    await tx.update(absencesTable).set({ eventId: keepId }).where(eq(absencesTable.eventId, mergeEventId));
+
+    await tx.delete(eventsTable).where(eq(eventsTable.id, mergeEventId));
+  });
+
+  const affectedCycles = Array.from(new Set([keep.cycleId, merge.cycleId]));
+  const warnings: string[] = [];
+  for (const cycleId of affectedCycles) {
+    const result = await recomputeCycleResults(cycleId, req.user!.userId);
+    warnings.push(...result.warnings);
+  }
+
+  const [after] = await db.select().from(eventsTable).where(eq(eventsTable.id, keepId)).limit(1);
+  await audit(req.user!.userId, "merge", "events", keepId, before, after);
+  res.json({ success: true, event: after, warnings });
 });
 
 router.post("/events/:id/close", requireRole("admin", "rh", "diretoria"), async (req, res) => {

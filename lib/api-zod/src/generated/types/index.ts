@@ -85,6 +85,8 @@ export * from './impersonateInput';
 export * from './importResult';
 export * from './integrationStatus';
 export * from './loginInput';
+export * from './mergeEventInput';
+export * from './mergeEventResult';
 export * from './platoonDistribution';
 export * from './platoonRule';
 export * from './platoonRuleInput';

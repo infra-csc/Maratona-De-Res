@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetEvents, useReopenEvent, useCreateEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useReopenEvent, useCreateEvent, useMergeEvent, getGetEventsQueryKey } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Unlock, Calendar, MapPin, ChevronRight, Users, Plus } from "lucide-react";
+import { Search, Unlock, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -35,6 +35,8 @@ export default function EventsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [cardFilter, setCardFilter] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [mergeForEvent, setMergeForEvent] = useState<{ id: number; name: string } | null>(null);
+  const [mergeTargetId, setMergeTargetId] = useState<string>("");
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -44,6 +46,21 @@ export default function EventsPage() {
 
   const reopenMutation = useReopenEvent({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
+  });
+
+  const mergeMutation = useMergeEvent({
+    mutation: {
+      onSuccess: (result) => {
+        qc.invalidateQueries({ queryKey });
+        toast({
+          title: "Eventos mesclados",
+          description: result.warnings.length > 0 ? result.warnings.join(" ") : "Dados combinados com sucesso.",
+        });
+        setMergeForEvent(null);
+        setMergeTargetId("");
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao mesclar", description: e.message, variant: "destructive" }),
+    },
   });
 
   const { register, handleSubmit, reset } = useForm<EventInput>();
@@ -324,6 +341,16 @@ export default function EventsPage() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      {user?.role === "admin" && (
+                        <button
+                          data-testid={`button-merge-event-${ev.id}`}
+                          title="Mesclar com evento duplicado"
+                          className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-xs font-bold italic uppercase transition-all"
+                          onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
+                        >
+                          <GitMerge size={14} />
+                        </button>
+                      )}
                       {canEdit && ev.status === "closed" && (
                         <button
                           data-testid={`button-reopen-event-${ev.id}`}
@@ -346,6 +373,49 @@ export default function EventsPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!mergeForEvent} onOpenChange={(open) => { if (!open) { setMergeForEvent(null); setMergeTargetId(""); } }}>
+        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Mesclar Evento Duplicado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm italic text-[#444933]">
+              Este evento (<strong>{mergeForEvent?.name}</strong>) será <strong>mantido</strong>. Escolha o evento duplicado abaixo — os dados vazios (cidade, local, UF, cliente) serão preenchidos com os dele, os participantes serão migrados e o duplicado será <strong>excluído</strong>.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento duplicado a remover</Label>
+              <Select value={mergeTargetId} onValueChange={setMergeTargetId}>
+                <SelectTrigger data-testid="select-merge-target" className="h-11 rounded-none border-2 border-[#191c1e]">
+                  <SelectValue placeholder="Selecione o evento duplicado..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(events ?? []).filter(e => e.id !== mergeForEvent?.id).map(e => (
+                    <SelectItem key={e.id} value={String(e.id)}>
+                      {e.name} — {new Date(e.startDate).toLocaleDateString('pt-BR')} {e.isHistorical ? "(histórico)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+              <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setMergeForEvent(null); setMergeTargetId(""); }}>Cancelar</Button>
+              <button
+                data-testid="button-confirm-merge"
+                type="button"
+                disabled={!mergeTargetId || mergeMutation.isPending}
+                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                onClick={() => {
+                  if (!mergeForEvent || !mergeTargetId) return;
+                  mergeMutation.mutate({ id: mergeForEvent.id, data: { mergeEventId: parseInt(mergeTargetId) } });
+                }}
+              >
+                {mergeMutation.isPending ? "Mesclando..." : "Mesclar e Excluir Duplicado"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

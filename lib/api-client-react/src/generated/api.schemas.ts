@@ -334,6 +334,17 @@ export interface ForceCloseInput {
   reason?: string;
 }
 
+export interface MergeEventInput {
+  /** Id of the duplicate event to absorb into and delete. */
+  mergeEventId: number;
+}
+
+export interface MergeEventResult {
+  success: boolean;
+  event: Event;
+  warnings: string[];
+}
+
 export interface EventParticipantInput {
   employeeId: number;
   functionName?: string;

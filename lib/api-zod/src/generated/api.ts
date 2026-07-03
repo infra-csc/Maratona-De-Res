@@ -559,6 +559,51 @@ export const DeleteEventParams = zod.object({
 
 
 /**
+ * @summary Merge a duplicate event into this one
+ */
+export const MergeEventParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MergeEventBody = zod.object({
+  "mergeEventId": zod.number().describe('Id of the duplicate event to absorb into and delete.')
+})
+
+export const MergeEventResponse = zod.object({
+  "success": zod.boolean(),
+  "event": zod.object({
+  "id": zod.number(),
+  "externalId": zod.string().nullish(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
+  "status": zod.string(),
+  "eventWeight": zod.number().optional(),
+  "forcedClosed": zod.boolean().optional(),
+  "participantCount": zod.number().optional(),
+  "evaluationProgress": zod.number().optional(),
+  "totalCriteria": zod.number().optional(),
+  "submittedCount": zod.number().optional(),
+  "averageScore": zod.number().nullish(),
+  "teamScore": zod.number().nullish(),
+  "hasCalibration": zod.boolean().optional(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "createdAt": zod.string().optional()
+}),
+  "warnings": zod.array(zod.string())
+})
+
+
+/**
  * @summary Close event
  */
 export const CloseEventParams = zod.object({

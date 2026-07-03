@@ -80,6 +80,8 @@ import type {
   ImportResult,
   IntegrationStatus,
   LoginInput,
+  MergeEventInput,
+  MergeEventResult,
   PlatoonDistribution,
   PlatoonRule,
   PlatoonRuleInput,
@@ -1894,6 +1896,78 @@ export const useDeleteEvent = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteEventMutationOptions(options));
+    }
+
+export const getMergeEventUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/merge`
+}
+
+/**
+ * @summary Merge a duplicate event into this one
+ */
+export const mergeEvent = async (id: number,
+    mergeEventInput: MergeEventInput, options?: RequestInit): Promise<MergeEventResult> => {
+
+  return customFetch<MergeEventResult>(getMergeEventUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mergeEventInput,)
+  }
+);}
+
+
+
+
+export const getMergeEventMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeEvent>>, TError,{id: number;data: BodyType<MergeEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mergeEvent>>, TError,{id: number;data: BodyType<MergeEventInput>}, TContext> => {
+
+const mutationKey = ['mergeEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mergeEvent>>, {id: number;data: BodyType<MergeEventInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  mergeEvent(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MergeEventMutationResult = NonNullable<Awaited<ReturnType<typeof mergeEvent>>>
+    export type MergeEventMutationBody = BodyType<MergeEventInput>
+    export type MergeEventMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Merge a duplicate event into this one
+ */
+export const useMergeEvent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeEvent>>, TError,{id: number;data: BodyType<MergeEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mergeEvent>>,
+        TError,
+        {id: number;data: BodyType<MergeEventInput>},
+        TContext
+      > => {
+      return useMutation(getMergeEventMutationOptions(options));
     }
 
 export const getCloseEventUrl = (id: number,) => {

@@ -455,6 +455,31 @@ paths:
         "204":
           description: Deleted
 
+  /events/{id}/merge:
+    post:
+      operationId: mergeEvent
+      tags: [events]
+      summary: Merge a duplicate event into this one
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MergeEventInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MergeEventResult"
+
   /events/{id}/close:
     post:
       operationId: closeEvent
@@ -2161,6 +2186,27 @@ components:
           type: boolean
         reason:
           type: string
+
+    MergeEventInput:
+      type: object
+      required: [mergeEventId]
+      properties:
+        mergeEventId:
+          type: integer
+          description: Id of the duplicate event to absorb into and delete.
+
+    MergeEventResult:
+      type: object
+      required: [success, event, warnings]
+      properties:
+        success:
+          type: boolean
+        event:
+          $ref: "#/components/schemas/Event"
+        warnings:
+          type: array
+          items:
+            type: string
 
     EventParticipant:
       type: object
