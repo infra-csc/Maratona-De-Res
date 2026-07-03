@@ -800,12 +800,15 @@ router.post("/integration/import/historical-results", async (req, res) => {
 //    (event_conformities), com "pior caso vence": se qualquer resposta para
 //    aquele item for "Não" para o evento, o item fica reprovado, mesmo que
 //    outro avaliador tenha respondido "Sim";
-//  - embutida aqui está a migração do catálogo de critérios (visto que a
-//    pesquisa só faz sentido com o catálogo novo): desativa os 3 quesitos
-//    retirados e cria/reativa "Carga na Saída do Galpão". Resolvida por NOME
-//    normalizado (não por id) para não depender da ordem de inserção do seed.
-//    Só roda de fato no commit (dryRun=false); a pré-visualização apenas
-//    mostra o que vai mudar.
+//  - embutida aqui está a migração completa do catálogo de critérios para o
+//    catálogo novo da Matriz de Performance (mesmo já adotado no ambiente de
+//    dev por outra frente de trabalho, mas ainda não replicado em produção):
+//    desativa os 7 quesitos antigos e cria/reativa os 5 novos (mesmos nomes,
+//    pesos e áreas responsáveis já usados em dev), pois a pesquisa só faz
+//    sentido pontuada contra o catálogo novo. Resolvida por NOME normalizado
+//    (não por id) para não depender da ordem de inserção do seed. Só roda de
+//    fato no commit (dryRun=false); a pré-visualização apenas mostra o que
+//    vai mudar.
 // SEMPRE roda em modo de pré-visualização (dryRun) por padrão — só grava
 // quando dryRun=false, todos os grupos estão vinculados e não há erros.
 // ---------------------------------------------------------------------------
@@ -830,17 +833,31 @@ const SURVEY_COL = {
   NIVEL_DESEMPENHO: 28,
 } as const;
 
-const SURVEY_CRITERIA_KEPT = ["Perda de Material/Estrutura", "Logística Reversa", "Qualidade da Entrega", "Prazo de Entrega"];
-const SURVEY_CRITERION_NEW = "Carga na Saída do Galpão";
-const SURVEY_CRITERIA_RETIRED = ["Ferramentas & Case", "Obrigações Estruturais", "Conduta e Comportamento"];
+// Critérios antigos (catálogo pré-Matriz de Performance) — todos são
+// retirados nesta importação, substituídos pelos 5 novos abaixo.
+const SURVEY_CRITERIA_RETIRED = [
+  "Perda de Material/Estrutura", "Logística Reversa", "Qualidade da Entrega", "Prazo de Entrega",
+  "Ferramentas & Case", "Obrigações Estruturais", "Conduta e Comportamento",
+];
+
+// Catálogo novo (Matriz de Performance) — mesmos nomes/pesos/áreas já
+// estabelecidos no ambiente de dev por outra frente de trabalho, replicados
+// aqui em produção para manter os dois ambientes consistentes.
+const SURVEY_TARGET_CRITERIA: { name: string; description: string; areaName: string; weight: string }[] = [
+  { name: "Qualidade e Acabamento da Montagem", description: "Avalia acabamento, materiais em bom estado e qualidade visual da montagem entregue.", areaName: "Cenografia", weight: "3" },
+  { name: "Logística Reversa/Carga da Desmontagem", description: "Avalia se a carga de retorno da desmontagem foi feita adequadamente e conforme o alinhamento combinado.", areaName: "Logística", weight: "2" },
+  { name: "Prazo de Entrega/Arena Pronta no Horário", description: "Avalia se a arena ficou pronta dentro do prazo/horário combinado, sem atrasos.", areaName: "Produção", weight: "2" },
+  { name: "Carga na Saída do Galpão", description: "Avalia a conferência e organização da carga na saída do galpão antes do evento.", areaName: "Logística", weight: "2" },
+  { name: "Retorno de Material/Perdas ou Avarias", description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.", areaName: "Ferramentas e case", weight: "2" },
+];
 
 const SURVEY_SCORE_COLUMNS: { col: number; commentCol: number; criterionName: string }[] = [
-  { col: SURVEY_COL.PERDA_MATERIAL, commentCol: SURVEY_COL.PERDA_MATERIAL_COMMENT, criterionName: "Perda de Material/Estrutura" },
-  { col: SURVEY_COL.LOGISTICA_REVERSA, commentCol: SURVEY_COL.LOGISTICA_REVERSA_COMMENT, criterionName: "Logística Reversa" },
-  { col: SURVEY_COL.QUALIDADE_ATENDIMENTO, commentCol: SURVEY_COL.QUALIDADE_ATENDIMENTO_COMMENT, criterionName: "Qualidade da Entrega" },
-  { col: SURVEY_COL.QUALIDADE_ATIVACAO, commentCol: SURVEY_COL.QUALIDADE_ATIVACAO_COMMENT, criterionName: "Qualidade da Entrega" },
-  { col: SURVEY_COL.PRAZO_ENTREGA, commentCol: SURVEY_COL.PRAZO_ENTREGA_COMMENT, criterionName: "Prazo de Entrega" },
-  { col: SURVEY_COL.CARGA_GALPAO, commentCol: SURVEY_COL.CARGA_GALPAO_COMMENT, criterionName: SURVEY_CRITERION_NEW },
+  { col: SURVEY_COL.PERDA_MATERIAL, commentCol: SURVEY_COL.PERDA_MATERIAL_COMMENT, criterionName: "Retorno de Material/Perdas ou Avarias" },
+  { col: SURVEY_COL.LOGISTICA_REVERSA, commentCol: SURVEY_COL.LOGISTICA_REVERSA_COMMENT, criterionName: "Logística Reversa/Carga da Desmontagem" },
+  { col: SURVEY_COL.QUALIDADE_ATENDIMENTO, commentCol: SURVEY_COL.QUALIDADE_ATENDIMENTO_COMMENT, criterionName: "Qualidade e Acabamento da Montagem" },
+  { col: SURVEY_COL.QUALIDADE_ATIVACAO, commentCol: SURVEY_COL.QUALIDADE_ATIVACAO_COMMENT, criterionName: "Qualidade e Acabamento da Montagem" },
+  { col: SURVEY_COL.PRAZO_ENTREGA, commentCol: SURVEY_COL.PRAZO_ENTREGA_COMMENT, criterionName: "Prazo de Entrega/Arena Pronta no Horário" },
+  { col: SURVEY_COL.CARGA_GALPAO, commentCol: SURVEY_COL.CARGA_GALPAO_COMMENT, criterionName: "Carga na Saída do Galpão" },
 ];
 
 type ConformityField = "epi" | "estaiamentos" | "guardaEquipamentos" | "conduta";
@@ -1046,18 +1063,20 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
 
   const allCriteria = await db.select().from(criteriaTable);
   const criteriaByName = new Map(allCriteria.map(c => [normalizeImportText(c.name), c]));
-  for (const name of SURVEY_CRITERIA_KEPT) {
-    if (!criteriaByName.has(normalizeImportText(name))) errors.push(`Critério obrigatório "${name}" não encontrado no catálogo — não é possível continuar`);
-  }
   const allAreas = await db.select().from(areasTable);
   const areaByName = new Map(allAreas.map(a => [normalizeImportText(a.name), a]));
-  const cenografiaArea = areaByName.get(normalizeImportText("Cenografia"));
-  if (!cenografiaArea) errors.push('Área "Cenografia" não encontrada — necessária para o novo critério "Carga na Saída do Galpão"');
+  for (const tc of SURVEY_TARGET_CRITERIA) {
+    if (!areaByName.has(normalizeImportText(tc.areaName))) errors.push(`Área "${tc.areaName}" não encontrada — necessária para o critério "${tc.name}"`);
+  }
 
-  const existingNewCriterion = criteriaByName.get(normalizeImportText(SURVEY_CRITERION_NEW));
   const catalogChanges = {
     toDeactivate: SURVEY_CRITERIA_RETIRED.filter(name => criteriaByName.get(normalizeImportText(name))?.active),
-    toCreateOrActivate: (!existingNewCriterion || !existingNewCriterion.active) ? [SURVEY_CRITERION_NEW] : [],
+    toCreateOrActivate: SURVEY_TARGET_CRITERIA
+      .map(tc => tc.name)
+      .filter(name => {
+        const existing = criteriaByName.get(normalizeImportText(name));
+        return !existing || !existing.active;
+      }),
   };
 
   const retiredCriteriaIdsForWarnings = SURVEY_CRITERIA_RETIRED
@@ -1116,29 +1135,30 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       if (c && c.active) await tx.update(criteriaTable).set({ active: false }).where(eq(criteriaTable.id, c.id));
     }
 
-    let novoCriterio = txCriteriaByName.get(normalizeImportText(SURVEY_CRITERION_NEW));
-    if (!novoCriterio) {
-      const [created] = await tx.insert(criteriaTable).values({
-        name: SURVEY_CRITERION_NEW,
-        description: "Avalia a conferência, organização e integridade da carga no momento da saída do galpão, antes do embarque para o evento.",
-        responsibleAreaId: cenografiaArea!.id,
-        responsibleAreaLabel: "Cenografia",
-        defaultWeight: "3",
-        displayOrder: (Math.max(0, ...txCriteria.map(c => c.displayOrder)) + 1),
-        active: true,
-      }).returning();
-      novoCriterio = created;
-    } else if (!novoCriterio.active) {
-      await tx.update(criteriaTable).set({ active: true }).where(eq(criteriaTable.id, novoCriterio.id));
-      novoCriterio = { ...novoCriterio, active: true };
+    let nextDisplayOrder = Math.max(0, ...txCriteria.map(c => c.displayOrder)) + 1;
+    const targetCriteriaByName = new Map<string, typeof txCriteria[number]>();
+    for (const tc of SURVEY_TARGET_CRITERIA) {
+      const key = normalizeImportText(tc.name);
+      let criterion = txCriteriaByName.get(key);
+      if (!criterion) {
+        const area = areaByName.get(normalizeImportText(tc.areaName))!;
+        const [created] = await tx.insert(criteriaTable).values({
+          name: tc.name,
+          description: tc.description,
+          responsibleAreaId: area.id,
+          responsibleAreaLabel: tc.areaName,
+          defaultWeight: tc.weight,
+          displayOrder: nextDisplayOrder++,
+          active: true,
+        }).returning();
+        criterion = created;
+      } else if (!criterion.active) {
+        await tx.update(criteriaTable).set({ active: true }).where(eq(criteriaTable.id, criterion.id));
+        criterion = { ...criterion, active: true };
+      }
+      targetCriteriaByName.set(key, criterion);
     }
 
-    const keptCriteriaByName = new Map<string, typeof txCriteria[number]>();
-    for (const name of SURVEY_CRITERIA_KEPT) {
-      const c = txCriteriaByName.get(normalizeImportText(name));
-      if (c) keptCriteriaByName.set(normalizeImportText(name), c);
-    }
-    keptCriteriaByName.set(normalizeImportText(SURVEY_CRITERION_NEW), novoCriterio!);
     const retiredCriteriaIds = SURVEY_CRITERIA_RETIRED
       .map(n => txCriteriaByName.get(normalizeImportText(n))?.id)
       .filter((id): id is number => id != null);
@@ -1184,7 +1204,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
 
       const existingEventCriteria = await tx.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, eventId));
       const existingCriterionIds = new Set(existingEventCriteria.map(ec => ec.criterionId));
-      for (const c of keptCriteriaByName.values()) {
+      for (const c of targetCriteriaByName.values()) {
         if (!existingCriterionIds.has(c.id)) {
           await tx.insert(eventCriteriaTable).values({ eventId, criterionId: c.id, active: true });
         }
@@ -1199,7 +1219,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
         if (!evaluatorUserId) continue;
 
         for (const s of r.scores) {
-          const criterion = keptCriteriaByName.get(normalizeImportText(s.criterionName));
+          const criterion = targetCriteriaByName.get(normalizeImportText(s.criterionName));
           if (!criterion) continue;
           await tx.insert(evaluationsTable).values({
             eventId, criterionId: criterion.id, evaluatorUserId,
@@ -1230,7 +1250,16 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       if (Object.keys(conformityAnswers).length > 0) {
         const [existingConformity] = await tx.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
         if (existingConformity) {
-          await tx.update(eventConformitiesTable).set({ ...conformityAnswers, updatedAt: new Date() }).where(eq(eventConformitiesTable.eventId, eventId));
+          const mergedAnswers: Partial<Record<ConformityField, boolean>> = { ...conformityAnswers };
+          for (const field of ["epi", "estaiamentos", "guardaEquipamentos", "conduta"] as const) {
+            const existingValue = existingConformity[field];
+            if (existingValue === false) {
+              mergedAnswers[field] = false;
+            } else if (existingValue === true && mergedAnswers[field] === undefined) {
+              mergedAnswers[field] = true;
+            }
+          }
+          await tx.update(eventConformitiesTable).set({ ...mergedAnswers, updatedAt: new Date() }).where(eq(eventConformitiesTable.eventId, eventId));
         } else {
           await tx.insert(eventConformitiesTable).values({ eventId, createdByUserId: userId, ...conformityAnswers });
         }
