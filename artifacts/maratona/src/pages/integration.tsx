@@ -1,12 +1,13 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useResetAllData, getGetIntegrationStatusQueryKey } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useResetAllData, getGetIntegrationStatusQueryKey, type HistoricalImportResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert } from "lucide-react";
+import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History } from "lucide-react";
 import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -27,9 +28,13 @@ export default function IntegrationPage() {
   const isAdmin = currentUser?.role === "admin";
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const historicalFileRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
+  const [historicalCsvData, setHistoricalCsvData] = useState<string | null>(null);
+  const [historicalPreview, setHistoricalPreview] = useState<HistoricalImportResult | null>(null);
+  const [historicalDialogOpen, setHistoricalDialogOpen] = useState(false);
 
   const qKey = getGetIntegrationStatusQueryKey();
   const { data: status, isLoading } = useGetIntegrationStatus({ query: { queryKey: qKey } });
@@ -77,6 +82,39 @@ export default function IntegrationPage() {
     },
   });
 
+  const historicalPreviewMutation = useImportHistoricalResults({
+    mutation: {
+      onSuccess: (data) => {
+        setHistoricalPreview(data);
+        setHistoricalDialogOpen(true);
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha ao ler arquivo", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
+
+  const historicalCommitMutation = useImportHistoricalResults({
+    mutation: {
+      onSuccess: (data) => {
+        toast({
+          title: "Resultados históricos importados",
+          description: `${data.eventsCreated ?? 0} evento(s) criado(s), ${data.eventsUpdated ?? 0} atualizado(s), ${data.participantsLinked ?? 0} participação(ões) vinculada(s).`,
+        });
+        if (data.warnings && data.warnings.length > 0) {
+          toast({ title: "Avisos", description: data.warnings.slice(0, 3).join(", "), variant: "destructive" });
+        }
+        setHistoricalDialogOpen(false);
+        setHistoricalPreview(null);
+        setHistoricalCsvData(null);
+        qc.invalidateQueries();
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha ao importar", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
+
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -86,6 +124,24 @@ export default function IntegrationPage() {
       importMutation.mutate({ data: { csvData } });
     };
     reader.readAsText(file);
+  }
+
+  function handleHistoricalFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const csvData = ev.target?.result as string;
+      setHistoricalCsvData(csvData);
+      historicalPreviewMutation.mutate({ data: { csvData, dryRun: true } });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  function handleHistoricalConfirm() {
+    if (!historicalCsvData) return;
+    historicalCommitMutation.mutate({ data: { csvData: historicalCsvData, dryRun: false } });
   }
 
   return (
@@ -198,6 +254,52 @@ export default function IntegrationPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-none shadow-sm bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <History size={18} className="text-amber-600" /> Resultados Históricos
+          </CardTitle>
+          <CardDescription>
+            Importa provas antigas cuja nota final já veio pronta/calibrada de fora (sem avaliação por critério).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            Cria eventos já <strong>fechados</strong> com a nota informada aplicada diretamente ao time.
+            Sempre mostra uma <strong>pré-visualização</strong> antes de gravar qualquer coisa.
+          </p>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 font-mono text-xs text-slate-600 mb-6">
+            <p className="text-[10px] uppercase font-bold text-slate-400 mb-2 font-sans tracking-widest">Colunas (Header opcional)</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="bg-white px-2 py-1 rounded border shadow-sm">nome</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-sm">nota</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-sm">evento</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-sm">data</span>
+            </div>
+          </div>
+
+          <input
+            ref={historicalFileRef}
+            type="file"
+            accept=".csv,.tsv,.txt"
+            className="hidden"
+            onChange={handleHistoricalFileUpload}
+            data-testid="input-historical-csv-file"
+          />
+          <Button
+            data-testid="button-import-historical"
+            variant="outline"
+            className="w-full bg-white shadow-sm border-dashed border-2 border-amber-300 hover:border-amber-500 hover:bg-amber-50 transition-colors"
+            onClick={() => historicalFileRef.current?.click()}
+            disabled={historicalPreviewMutation.isPending}
+          >
+            <Upload size={16} className="mr-2 text-amber-600" />
+            {historicalPreviewMutation.isPending ? "Lendo arquivo..." : "Selecionar arquivo (pré-visualizar)"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {isAdmin && (
         <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-red-500">
@@ -347,6 +449,96 @@ export default function IntegrationPage() {
             >
               <Trash2 size={16} className="mr-2" />
               {resetMutation.isPending ? "Apagando..." : "Apagar dados"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historicalDialogOpen} onOpenChange={(open) => { setHistoricalDialogOpen(open); if (!open) { setHistoricalPreview(null); setHistoricalCsvData(null); } }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="dialog-historical-preview">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History size={20} className="text-amber-600" />
+              Pré-visualização da importação
+            </DialogTitle>
+            <DialogDescription>
+              Nada foi gravado ainda. Revise os eventos abaixo antes de confirmar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {historicalPreview && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xl font-black text-slate-800" data-testid="text-preview-total-rows">{historicalPreview.totalRows}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Linhas</p>
+                </div>
+                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xl font-black text-slate-800" data-testid="text-preview-matched">{historicalPreview.matched}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores encontrados</p>
+                </div>
+                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xl font-black text-slate-800">{historicalPreview.events.length}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos</p>
+                </div>
+              </div>
+
+              {historicalPreview.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-red-700 uppercase mb-2 flex items-center gap-1.5">
+                    <AlertTriangle size={14} /> Erros ({historicalPreview.errors.length}) — corrija e reenvie
+                  </p>
+                  <ul className="text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                    {historicalPreview.errors.map((err, i) => <li key={i}>• {err}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {historicalPreview.events.length > 0 && (
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                      <tr>
+                        <th className="text-left p-2">Evento</th>
+                        <th className="text-left p-2">Data</th>
+                        <th className="text-left p-2">Nota</th>
+                        <th className="text-left p-2">Participantes</th>
+                        <th className="text-left p-2">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historicalPreview.events.map((ev, i) => (
+                        <tr key={i} className="border-t border-slate-100" data-testid={`row-preview-event-${i}`}>
+                          <td className="p-2 font-medium text-slate-800">{ev.eventName}</td>
+                          <td className="p-2 text-slate-600">{ev.date}</td>
+                          <td className="p-2 text-slate-600">{ev.score ?? "—"}</td>
+                          <td className="p-2 text-slate-600">{ev.matchedCount}/{ev.participantsCount}</td>
+                          <td className="p-2">
+                            {ev.action === "create" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Criar</Badge>}
+                            {ev.action === "update" && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Atualizar</Badge>}
+                            {ev.action === "conflict" && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Conflito</Badge>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setHistoricalDialogOpen(false)} disabled={historicalCommitMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              data-testid="button-confirm-historical-import"
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={!historicalPreview?.success || historicalPreview.errors.length > 0 || historicalCommitMutation.isPending}
+              onClick={handleHistoricalConfirm}
+            >
+              <CheckCircle2 size={16} className="mr-2" />
+              {historicalCommitMutation.isPending ? "Importando..." : "Confirmar e importar"}
             </Button>
           </DialogFooter>
         </DialogContent>

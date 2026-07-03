@@ -391,6 +391,8 @@ export const GetEventsResponseItem = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -434,6 +436,8 @@ export const GetEventResponse = zod.object({
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -540,6 +544,8 @@ export const UpdateEventResponse = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -588,6 +594,8 @@ export const CloseEventResponse = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -623,6 +631,8 @@ export const ReopenEventResponse = zod.object({
   "hasCalibration": zod.boolean().optional(),
   "criteriaConfirmed": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -907,6 +917,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -999,6 +1011,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -1101,6 +1115,8 @@ export const DeleteEventCriterionResponse = zod.object({
   "criteriaConfirmed": zod.boolean().optional(),
   "hasEvaluations": zod.boolean().optional(),
   "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
   "participants": zod.array(zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
@@ -1986,6 +2002,39 @@ export const ImportParticipantsCSVResponse = zod.object({
   "success": zod.boolean(),
   "inserted": zod.number(),
   "errors": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Import historical event results (no per-criterion evaluation, score applied directly). Always previews (dryRun) unless dryRun=false and there are zero validation errors.
+ */
+export const ImportHistoricalResultsBody = zod.object({
+  "csvData": zod.string().describe('CSV\/TSV with columns nome, nota, evento, data (header optional, auto-detected)'),
+  "dryRun": zod.boolean().optional().describe('Defaults to true. Set to false to commit (only applied when there are zero errors).')
+})
+
+export const ImportHistoricalResultsResponse = zod.object({
+  "success": zod.boolean(),
+  "dryRun": zod.boolean(),
+  "errors": zod.array(zod.string()),
+  "totalRows": zod.number(),
+  "matched": zod.number(),
+  "unmatched": zod.array(zod.string()),
+  "ambiguous": zod.array(zod.string()),
+  "events": zod.array(zod.object({
+  "eventName": zod.string(),
+  "date": zod.string(),
+  "score": zod.number().nullable(),
+  "participantsCount": zod.number(),
+  "matchedCount": zod.number(),
+  "action": zod.enum(['create', 'update', 'conflict']),
+  "existingEventId": zod.number().optional(),
+  "cycleId": zod.number().optional()
+})),
+  "eventsCreated": zod.number().optional(),
+  "eventsUpdated": zod.number().optional(),
+  "participantsLinked": zod.number().optional(),
+  "warnings": zod.array(zod.string()).optional()
 })
 
 

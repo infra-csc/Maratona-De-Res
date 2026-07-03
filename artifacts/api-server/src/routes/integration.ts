@@ -2,11 +2,13 @@ import { Router } from "express";
 import {
   db, eventsTable, employeesTable, eventParticipantsTable, criteriaTable, eventCriteriaTable,
   usersTable, absencesTable, quarterlyResultsTable, employeeCycleEligibilityTable, auditLogsTable,
+  cyclesTable,
 } from "@workspace/db";
 import { isNotNull, inArray, eq, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
+import { recomputeCycleResults } from "./results.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -414,6 +416,281 @@ router.post("/integration/import/events", async (_req, res) => {
 
 router.post("/integration/import/participants", async (_req, res) => {
   res.json({ success: true, inserted: 0, errors: [] });
+});
+
+// ---------------------------------------------------------------------------
+// Importação de resultados históricos (provas anteriores, sem avaliação
+// individual por critério — a nota já vem PRONTA/calibrada de uma planilha
+// externa e é aplicada diretamente a todos os colaboradores daquela prova).
+// Colunas esperadas (com ou sem cabeçalho): nome, nota, evento, data.
+// Cria um evento por (nome do evento normalizado + data) já FECHADO e marcado
+// isHistorical=true, com importedScore = nota, e vincula os participantes.
+// recomputeCycleResults então usa importedScore direto (ver results.ts),
+// então esses resultados sobrevivem a qualquer recomputação futura do ciclo.
+// SEMPRE roda em modo de pré-visualização (dryRun) por padrão — só grava
+// quando dryRun=false E não há nenhum erro (tudo-ou-nada).
+// ---------------------------------------------------------------------------
+
+function normalizeImportText(s?: string | null): string {
+  return (s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function parseImportDate(raw: string): string | null {
+  const s = raw.trim();
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  if (m) {
+    const [, y, mo, d] = m;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(s);
+  if (m) {
+    const [, d, mo, y] = m;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return null;
+}
+
+function parseImportScore(raw: string): number | null {
+  const s = raw.trim().replace(",", ".");
+  if (!s) return null;
+  const n = parseFloat(s);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  return n;
+}
+
+type HistoricalRow = { line: number; name: string; scoreRaw: string; eventName: string; dateRaw: string };
+
+function parseHistoricalCsv(csvData: string): { rows: HistoricalRow[]; parseErrors: string[] } {
+  const rawLines = csvData.split("\n").map(l => l.replace(/\r$/, "")).filter(l => l.trim());
+  const parseErrors: string[] = [];
+  if (rawLines.length === 0) return { rows: [], parseErrors: ["Arquivo vazio"] };
+
+  const delimiter = rawLines[0].includes("\t") ? "\t" : ",";
+  const splitLine = (l: string) => l.split(delimiter).map(c => c.trim());
+
+  const headerCells = splitLine(rawLines[0]).map(c => normalizeImportText(c));
+  const headerKeywords = ["nome", "nota", "evento", "prova", "data", "score", "pontuacao", "race", "date", "name"];
+  const looksLikeHeader = headerCells.some(c => headerKeywords.includes(c));
+
+  let nameIdx = 0, scoreIdx = 1, eventIdx = 2, dateIdx = 3;
+  let dataLines = rawLines;
+  if (looksLikeHeader) {
+    dataLines = rawLines.slice(1);
+    const idxOf = (preds: string[]) => headerCells.findIndex(h => preds.some(p => h.includes(p)));
+    const n = idxOf(["nome", "name"]); if (n >= 0) nameIdx = n;
+    const s = idxOf(["nota", "score", "pontuacao"]); if (s >= 0) scoreIdx = s;
+    const e = idxOf(["evento", "prova", "race"]); if (e >= 0) eventIdx = e;
+    const d = idxOf(["data", "date"]); if (d >= 0) dateIdx = d;
+  }
+
+  const rows: HistoricalRow[] = [];
+  dataLines.forEach((line, i) => {
+    const lineNumber = looksLikeHeader ? i + 2 : i + 1;
+    const cols = splitLine(line);
+    const name = cols[nameIdx]?.trim();
+    const scoreRaw = cols[scoreIdx]?.trim();
+    const eventName = cols[eventIdx]?.trim();
+    const dateRaw = cols[dateIdx]?.trim();
+    if (!name && !scoreRaw && !eventName && !dateRaw) return;
+    if (!name || !scoreRaw || !eventName || !dateRaw) {
+      parseErrors.push(`Linha ${lineNumber}: colunas incompletas (esperado nome, nota, evento, data)`);
+      return;
+    }
+    rows.push({ line: lineNumber, name, scoreRaw, eventName, dateRaw });
+  });
+
+  return { rows, parseErrors };
+}
+
+router.post("/integration/import/historical-results", async (req, res) => {
+  const { csvData, dryRun } = req.body ?? {};
+  const isDryRun = dryRun !== false;
+  if (!csvData || typeof csvData !== "string") { res.status(400).json({ error: "csvData obrigatório" }); return; }
+
+  const { rows, parseErrors } = parseHistoricalCsv(csvData);
+  const errors: string[] = [...parseErrors];
+  const unmatched: string[] = [];
+  const ambiguous: string[] = [];
+
+  const allEmployees = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable);
+  const employeesByName = new Map<string, { id: number; name: string }[]>();
+  for (const e of allEmployees) {
+    const key = normalizeImportText(e.name);
+    if (!employeesByName.has(key)) employeesByName.set(key, []);
+    employeesByName.get(key)!.push(e);
+  }
+
+  type ParsedRow = HistoricalRow & { normalizedEvent: string; date: string | null; score: number | null; employeeId: number | null };
+  const parsed: ParsedRow[] = rows.map(r => {
+    const date = parseImportDate(r.dateRaw);
+    if (!date) errors.push(`Linha ${r.line}: data inválida "${r.dateRaw}" (use dd/mm/aaaa ou aaaa-mm-dd)`);
+    const score = parseImportScore(r.scoreRaw);
+    if (score === null) errors.push(`Linha ${r.line}: nota inválida "${r.scoreRaw}" (esperado número de 0 a 100)`);
+
+    const key = normalizeImportText(r.name);
+    const matches = employeesByName.get(key) ?? [];
+    let employeeId: number | null = null;
+    if (matches.length === 0) {
+      unmatched.push(`Linha ${r.line}: colaborador "${r.name}" não encontrado`);
+    } else if (matches.length > 1) {
+      ambiguous.push(`Linha ${r.line}: "${r.name}" corresponde a ${matches.length} colaboradores cadastrados — resolva manualmente`);
+    } else {
+      employeeId = matches[0].id;
+    }
+
+    return { ...r, normalizedEvent: normalizeImportText(r.eventName), date, score, employeeId };
+  });
+  errors.push(...unmatched, ...ambiguous);
+
+  // Agrupa por (evento normalizado + data) — nota do TIME, igual para todos.
+  type Group = {
+    eventName: string; normalizedEvent: string; date: string; scores: number[];
+    participants: { line: number; name: string; employeeId: number | null }[];
+  };
+  const groups = new Map<string, Group>();
+  for (const r of parsed) {
+    if (!r.date) continue;
+    const key = `${r.normalizedEvent}|${r.date}`;
+    if (!groups.has(key)) groups.set(key, { eventName: r.eventName, normalizedEvent: r.normalizedEvent, date: r.date, scores: [], participants: [] });
+    const g = groups.get(key)!;
+    if (r.score !== null) g.scores.push(r.score);
+    g.participants.push({ line: r.line, name: r.name, employeeId: r.employeeId });
+  }
+
+  const distinctDates = Array.from(new Set(Array.from(groups.values()).map(g => g.date)));
+  const existingEventsByDate = distinctDates.length > 0
+    ? await db.select().from(eventsTable).where(inArray(eventsTable.startDate, distinctDates))
+    : [];
+  const allCycles = await db.select().from(cyclesTable);
+
+  type GroupPlan = {
+    eventName: string; date: string; score: number | null; participantsCount: number;
+    matchedCount: number; action: "create" | "update" | "conflict"; existingEventId?: number; cycleId?: number;
+  };
+  const plans: GroupPlan[] = [];
+
+  for (const g of groups.values()) {
+    const uniqueScores = Array.from(new Set(g.scores.map(s => Math.round(s * 100) / 100)));
+    let score: number | null = null;
+    if (uniqueScores.length === 0) {
+      // já reportado como erro de nota inválida acima
+    } else if (uniqueScores.length > 1) {
+      errors.push(`Evento "${g.eventName}" (${g.date}): notas divergentes entre colaboradores (${uniqueScores.join(", ")}) — nota do time deve ser única`);
+    } else {
+      score = uniqueScores[0];
+    }
+
+    const matchedCount = g.participants.filter(p => p.employeeId !== null).length;
+    const existing = existingEventsByDate.filter(e => e.startDate === g.date && normalizeImportText(e.name) === g.normalizedEvent);
+
+    let action: GroupPlan["action"];
+    let existingEventId: number | undefined;
+    let cycleId: number | undefined;
+    if (existing.length > 1) {
+      errors.push(`Evento "${g.eventName}" (${g.date}): múltiplos eventos existentes com o mesmo nome/data — ambíguo, resolva manualmente`);
+      action = "conflict";
+    } else if (existing.length === 1) {
+      if (!existing[0].isHistorical) {
+        errors.push(`Evento "${g.eventName}" (${g.date}) já existe (id ${existing[0].id}) e não é histórico — possível duplicata, importação abortada`);
+        action = "conflict";
+      } else {
+        action = "update";
+        existingEventId = existing[0].id;
+        cycleId = existing[0].cycleId;
+      }
+    } else {
+      const cycle = allCycles.find(c => c.startDate && c.endDate && g.date >= c.startDate && g.date <= c.endDate);
+      if (!cycle) {
+        errors.push(`Evento "${g.eventName}" (${g.date}): nenhum ciclo cobre esta data — configure o ciclo antes de importar`);
+        action = "conflict";
+      } else {
+        action = "create";
+        cycleId = cycle.id;
+      }
+    }
+
+    plans.push({ eventName: g.eventName, date: g.date, score, participantsCount: g.participants.length, matchedCount, action, existingEventId, cycleId });
+    (g as Group & { _plan?: GroupPlan })._plan = { eventName: g.eventName, date: g.date, score, participantsCount: g.participants.length, matchedCount, action, existingEventId, cycleId };
+  }
+
+  const preview = {
+    totalRows: rows.length,
+    matched: parsed.filter(r => r.employeeId !== null).length,
+    unmatched,
+    ambiguous,
+    events: plans,
+  };
+
+  if (isDryRun) {
+    res.json({ success: errors.length === 0, dryRun: true, errors, ...preview });
+    return;
+  }
+
+  if (errors.length > 0) {
+    res.status(400).json({ success: false, dryRun: false, errors, ...preview });
+    return;
+  }
+
+  const userId = req.user!.userId;
+  let eventsCreated = 0, eventsUpdated = 0, participantsLinked = 0;
+  const affectedCycleIds = new Set<number>();
+
+  await db.transaction(async (tx) => {
+    for (const g of groups.values()) {
+      const plan = (g as Group & { _plan?: GroupPlan })._plan!;
+      let eventId: number;
+      if (plan.action === "create") {
+        const [created] = await tx.insert(eventsTable).values({
+          name: g.eventName,
+          startDate: g.date,
+          endDate: g.date,
+          cycleId: plan.cycleId!,
+          status: "closed",
+          isHistorical: true,
+          importedScore: String(plan.score),
+          forcedClosed: false,
+          feedbackReleased: false,
+        }).returning();
+        eventId = created.id;
+        eventsCreated++;
+        affectedCycleIds.add(plan.cycleId!);
+      } else {
+        eventId = plan.existingEventId!;
+        await tx.update(eventsTable).set({
+          importedScore: String(plan.score),
+          status: "closed",
+          isHistorical: true,
+        }).where(eq(eventsTable.id, eventId));
+        eventsUpdated++;
+        affectedCycleIds.add(plan.cycleId!);
+      }
+
+      const employeeIds = Array.from(new Set(g.participants.map(p => p.employeeId).filter((id): id is number => id !== null)));
+      for (const employeeId of employeeIds) {
+        await tx.insert(eventParticipantsTable)
+          .values({ eventId, employeeId })
+          .onConflictDoNothing({ target: [eventParticipantsTable.eventId, eventParticipantsTable.employeeId] });
+        participantsLinked++;
+      }
+    }
+  });
+
+  const warnings: string[] = [];
+  for (const cycleId of affectedCycleIds) {
+    const { warnings: w } = await recomputeCycleResults(cycleId, userId);
+    warnings.push(...w);
+  }
+
+  await audit(userId, "import_historical_results", "events", undefined, null, {
+    eventsCreated, eventsUpdated, participantsLinked, matched: preview.matched,
+  });
+
+  res.json({ success: true, dryRun: false, eventsCreated, eventsUpdated, participantsLinked, warnings, errors: [], ...preview });
 });
 
 export default router;

@@ -185,6 +185,9 @@ export interface Event {
   hasCalibration?: boolean;
   criteriaConfirmed?: boolean;
   feedbackReleased?: boolean;
+  isHistorical?: boolean;
+  /** @nullable */
+  importedScore?: number | null;
   createdAt?: string;
 }
 
@@ -294,6 +297,9 @@ export interface EventDetail {
   criteriaConfirmed?: boolean;
   hasEvaluations?: boolean;
   feedbackReleased?: boolean;
+  isHistorical?: boolean;
+  /** @nullable */
+  importedScore?: number | null;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   areaAssignments?: EventAreaAssignment[];
@@ -941,6 +947,48 @@ export interface ImportResult {
   success: boolean;
   inserted: number;
   errors: string[];
+}
+
+export interface HistoricalImportInput {
+  /** CSV/TSV with columns nome, nota, evento, data (header optional, auto-detected) */
+  csvData: string;
+  /** Defaults to true. Set to false to commit (only applied when there are zero errors). */
+  dryRun?: boolean;
+}
+
+export type HistoricalImportEventPlanAction = typeof HistoricalImportEventPlanAction[keyof typeof HistoricalImportEventPlanAction];
+
+
+export const HistoricalImportEventPlanAction = {
+  create: 'create',
+  update: 'update',
+  conflict: 'conflict',
+} as const;
+
+export interface HistoricalImportEventPlan {
+  eventName: string;
+  date: string;
+  score: number | null;
+  participantsCount: number;
+  matchedCount: number;
+  action: HistoricalImportEventPlanAction;
+  existingEventId?: number;
+  cycleId?: number;
+}
+
+export interface HistoricalImportResult {
+  success: boolean;
+  dryRun: boolean;
+  errors: string[];
+  totalRows: number;
+  matched: number;
+  unmatched: string[];
+  ambiguous: string[];
+  events: HistoricalImportEventPlan[];
+  eventsCreated?: number;
+  eventsUpdated?: number;
+  participantsLinked?: number;
+  warnings?: string[];
 }
 
 export interface CsvExport {

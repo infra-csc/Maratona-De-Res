@@ -173,17 +173,41 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   // única transação (rebuild atômico: nunca deixa o ciclo vazio em caso de erro).
 
   // 1. Nota do TIME de cada evento fechado + linhas por evento.
+  //    Eventos históricos (isHistorical=true) já trazem a nota final PRONTA
+  //    (calibrada), importada de fora — pulamos computeEventTeamResult (que
+  //    exigiria critérios/avaliações que esses eventos não têm) e usamos
+  //    importedScore diretamente para eventScore/calibratedEventScore/
+  //    finalEventScore, sem aplicar penalidade de conformidade.
   const eventScoreById = new Map<number, number>();
   const eventDateById = new Map<number, string>();
   const eventResultInserts: (typeof employeeEventResultsTable.$inferInsert)[] = [];
   for (const ev of closedEvents) {
+    const eventParticipants = await db.select({ employeeId: eventParticipantsTable.employeeId })
+      .from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, ev.id));
+
+    if (ev.isHistorical) {
+      const historicalScore = parseFloat(ev.importedScore as unknown as string);
+      eventScoreById.set(ev.id, historicalScore);
+      eventDateById.set(ev.id, ev.startDate);
+      const platoonProj = getPlatoonByScore(historicalScore, platoonRules);
+      for (const p of eventParticipants) {
+        eventResultInserts.push({
+          eventId: ev.id,
+          employeeId: p.employeeId,
+          eventScore: String(historicalScore),
+          calibratedEventScore: String(historicalScore),
+          finalEventScore: String(historicalScore),
+          platoonProjected: platoonProj?.name ?? null,
+          updatedAt: new Date(),
+        });
+      }
+      continue;
+    }
+
     const team = await computeEventTeamResult(ev.id);
     eventScoreById.set(ev.id, team.conformityScore);
     eventDateById.set(ev.id, ev.startDate);
     const platoonProj = getPlatoonByScore(team.conformityScore, platoonRules);
-
-    const eventParticipants = await db.select({ employeeId: eventParticipantsTable.employeeId })
-      .from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, ev.id));
 
     for (const p of eventParticipants) {
       eventResultInserts.push({
@@ -343,8 +367,6 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
 
   const platoonRules = await loadPlatoonRules();
-  const team = await computeEventTeamResult(eventId);
-  const platoon = getPlatoonByScore(team.conformityScore, platoonRules);
 
   const participants = await db
     .select({
@@ -359,11 +381,51 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
     .where(eq(eventParticipantsTable.eventId, eventId));
 
+  // Evento histórico: não há critérios/avaliações — a nota já vem pronta
+  // (calibrada) de fora. Responde direto com importedScore, sem chamar
+  // computeEventTeamResult (que dependeria de eventCriteria inexistente).
+  if (event.isHistorical) {
+    const score = parseFloat(event.importedScore as unknown as string);
+    const platoon = getPlatoonByScore(score, platoonRules);
+    res.json({
+      eventId,
+      eventName: event.name,
+      eventStatus: event.status,
+      feedbackReleased: event.feedbackReleased,
+      isHistorical: true,
+      eventScore: score,
+      conformity: null,
+      conformityPenalty: 0,
+      conformityScore: score,
+      projectedPlatoon: platoon?.name ?? null,
+      projectedPlatoonColor: platoon?.color ?? null,
+      projectedBonus: platoon?.bonusValue ?? 0,
+      totalCriteria: 0,
+      evaluatedCriteria: 0,
+      pendingCriteria: 0,
+      isComplete: true,
+      hasCalibration: true,
+      criteriaDetails: [],
+      participants: participants.map(p => ({
+        employeeId: p.employeeId!,
+        employeeName: p.employeeName ?? "",
+        functionName: p.functionName ?? p.employeeFunction ?? "",
+        eligible: (p.eligibleForBonus ?? true) && (p.eligibilityStatus ?? "eligible") === "eligible",
+        eventScore: score,
+      })),
+    });
+    return;
+  }
+
+  const team = await computeEventTeamResult(eventId);
+  const platoon = getPlatoonByScore(team.conformityScore, platoonRules);
+
   res.json({
     eventId,
     eventName: event.name,
     eventStatus: event.status,
     feedbackReleased: event.feedbackReleased,
+    isHistorical: false,
     eventScore: team.eventScore,
     conformity: team.conformity ?? null,
     conformityPenalty: team.conformityPenalty,

@@ -247,6 +247,11 @@ export default function EventsPage() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
+                          {ev.isHistorical && (
+                            <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
+                              <span className="inline-block skew-x-[8deg]">Histórico</span>
+                            </span>
+                          )}
                           {ev.forcedClosed && (
                             <span className="bg-[#ff5722] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
                               <span className="inline-block skew-x-[8deg]">Fechamento Forçado</span>

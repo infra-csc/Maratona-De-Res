@@ -74,6 +74,8 @@ import type {
   GetRankingDetailParams,
   GetRankingParams,
   HealthStatus,
+  HistoricalImportInput,
+  HistoricalImportResult,
   ImpersonateInput,
   ImportResult,
   IntegrationStatus,
@@ -5992,6 +5994,77 @@ export const useImportParticipantsCSV = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getImportParticipantsCSVMutationOptions(options));
+    }
+
+export const getImportHistoricalResultsUrl = () => {
+
+
+
+
+  return `/integration/import/historical-results`
+}
+
+/**
+ * @summary Import historical event results (no per-criterion evaluation, score applied directly). Always previews (dryRun) unless dryRun=false and there are zero validation errors.
+ */
+export const importHistoricalResults = async (historicalImportInput: HistoricalImportInput, options?: RequestInit): Promise<HistoricalImportResult> => {
+
+  return customFetch<HistoricalImportResult>(getImportHistoricalResultsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      historicalImportInput,)
+  }
+);}
+
+
+
+
+export const getImportHistoricalResultsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importHistoricalResults>>, TError,{data: BodyType<HistoricalImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importHistoricalResults>>, TError,{data: BodyType<HistoricalImportInput>}, TContext> => {
+
+const mutationKey = ['importHistoricalResults'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importHistoricalResults>>, {data: BodyType<HistoricalImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importHistoricalResults(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportHistoricalResultsMutationResult = NonNullable<Awaited<ReturnType<typeof importHistoricalResults>>>
+    export type ImportHistoricalResultsMutationBody = BodyType<HistoricalImportInput>
+    export type ImportHistoricalResultsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Import historical event results (no per-criterion evaluation, score applied directly). Always previews (dryRun) unless dryRun=false and there are zero validation errors.
+ */
+export const useImportHistoricalResults = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importHistoricalResults>>, TError,{data: BodyType<HistoricalImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importHistoricalResults>>,
+        TError,
+        {data: BodyType<HistoricalImportInput>},
+        TContext
+      > => {
+      return useMutation(getImportHistoricalResultsMutationOptions(options));
     }
 
 export const getExportEventResultsUrl = (params: ExportEventResultsParams,) => {

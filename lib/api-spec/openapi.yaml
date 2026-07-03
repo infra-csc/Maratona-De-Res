@@ -1561,6 +1561,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImportResult"
 
+  /integration/import/historical-results:
+    post:
+      operationId: importHistoricalResults
+      tags: [integration]
+      summary: Import historical event results (no per-criterion evaluation, score applied directly). Always previews (dryRun) unless dryRun=false and there are zero validation errors.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HistoricalImportInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoricalImportResult"
+
   /exports/event-results:
     get:
       operationId: exportEventResults
@@ -2026,6 +2045,10 @@ components:
           type: boolean
         feedbackReleased:
           type: boolean
+        isHistorical:
+          type: boolean
+        importedScore:
+          type: ["number", "null"]
         createdAt:
           type: string
 
@@ -2065,6 +2088,10 @@ components:
           type: boolean
         feedbackReleased:
           type: boolean
+        isHistorical:
+          type: boolean
+        importedScore:
+          type: ["number", "null"]
         participants:
           type: array
           items:
@@ -3276,6 +3303,79 @@ components:
         inserted:
           type: integer
         errors:
+          type: array
+          items:
+            type: string
+
+    HistoricalImportInput:
+      type: object
+      required: [csvData]
+      properties:
+        csvData:
+          type: string
+          description: CSV/TSV with columns nome, nota, evento, data (header optional, auto-detected)
+        dryRun:
+          type: boolean
+          description: Defaults to true. Set to false to commit (only applied when there are zero errors).
+
+    HistoricalImportEventPlan:
+      type: object
+      required: [eventName, date, score, participantsCount, matchedCount, action]
+      properties:
+        eventName:
+          type: string
+        date:
+          type: string
+        score:
+          type: number
+          nullable: true
+        participantsCount:
+          type: integer
+        matchedCount:
+          type: integer
+        action:
+          type: string
+          enum: [create, update, conflict]
+        existingEventId:
+          type: integer
+        cycleId:
+          type: integer
+
+    HistoricalImportResult:
+      type: object
+      required: [success, dryRun, errors, totalRows, matched, unmatched, ambiguous, events]
+      properties:
+        success:
+          type: boolean
+        dryRun:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        totalRows:
+          type: integer
+        matched:
+          type: integer
+        unmatched:
+          type: array
+          items:
+            type: string
+        ambiguous:
+          type: array
+          items:
+            type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoricalImportEventPlan"
+        eventsCreated:
+          type: integer
+        eventsUpdated:
+          type: integer
+        participantsLinked:
+          type: integer
+        warnings:
           type: array
           items:
             type: string

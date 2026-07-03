@@ -33,6 +33,9 @@ export interface EventDetail {
   criteriaConfirmed?: boolean;
   hasEvaluations?: boolean;
   feedbackReleased?: boolean;
+  isHistorical?: boolean;
+  /** @nullable */
+  importedScore?: number | null;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   areaAssignments?: EventAreaAssignment[];

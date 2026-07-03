@@ -22,6 +22,12 @@ export const eventsTable = pgTable("events", {
   feedbackReleasedAt: timestamp("feedback_released_at"),
   criteriaConfirmed: boolean("criteria_confirmed").notNull().default(false),
   criteriaConfirmedAt: timestamp("criteria_confirmed_at"),
+  // Evento histórico importado sem avaliação individual por critério: a nota
+  // já vem pronta (calibrada) de uma planilha/fonte externa e é usada
+  // diretamente como eventScore/calibratedEventScore/finalEventScore em
+  // recomputeCycleResults, pulando computeEventTeamResult inteiramente.
+  isHistorical: boolean("is_historical").notNull().default(false),
+  importedScore: numeric("imported_score", { precision: 6, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   externalIdUq: uniqueIndex("events_external_id_uq").on(t.externalId),

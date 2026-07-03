@@ -46,6 +46,14 @@ router.get("/events", async (req, res) => {
 
   const enriched = cycleEvents.map((ev) => {
     const participantCount = participants.filter(p => p.eventId === ev.id).length;
+
+    // Evento histórico importado: nota já vem pronta (calibrada) de fora, sem
+    // critérios/avaliações para calcular — usa importedScore diretamente.
+    if (ev.isHistorical) {
+      const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
+      return { ...ev, participantCount, evaluationProgress: 1, totalCriteria: 0, submittedCount: 0, averageScore: score, teamScore: score, hasCalibration: true };
+    }
+
     const evEvals = evals.filter(e => e.eventId === ev.id);
     const submitted = evEvals.filter(e => e.status === "submitted");
     const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active);
@@ -155,11 +163,14 @@ async function loadEventDetail(id: number) {
     const submittedIds = submittedEvals.filter(e => e.criterionId === c.criterionId).map(e => e.evaluatorUserId as number);
     return getCriterionEvaluationStatus(c.responsibleAreaId, submittedIds, assignedByArea).isEvaluated;
   }).length;
-  const evaluationProgress = activeCriteria.length > 0 ? evaluatedCriteriaCount / activeCriteria.length : 0;
+
+  // Evento histórico importado: nota já pronta, sem critérios/avaliações a
+  // acompanhar — trata como 100% avaliado (mesma lógica do enriquecimento em GET /events).
+  const evaluationProgress = ev.isHistorical ? 1 : (activeCriteria.length > 0 ? evaluatedCriteriaCount / activeCriteria.length : 0);
 
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
 
-  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null };
+  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null };
 }
 
 /**
