@@ -2030,7 +2030,10 @@ export const ImportHistoricalResultsResponse = zod.object({
   "matchedCount": zod.number(),
   "action": zod.enum(['create', 'update', 'conflict']),
   "existingEventId": zod.number().optional(),
-  "cycleId": zod.number().optional()
+  "cycleId": zod.number().optional(),
+  "cycleName": zod.string().optional(),
+  "cycleFallback": zod.boolean().optional().describe('true quando a data do evento não cai no período de nenhum ciclo cadastrado e o evento será vinculado ao ciclo atual como alternativa.'),
+  "newEmployeeNames": zod.array(zod.string()).optional().describe('Nomes de colaboradores deste evento específico que serão cadastrados automaticamente.')
 })),
   "employeesToCreate": zod.array(zod.string()).optional().describe('Nomes de colaboradores não cadastrados que serão criados automaticamente ao confirmar.'),
   "employeesCreated": zod.number().optional().describe('Quantidade de colaboradores criados automaticamente (apenas no commit).'),

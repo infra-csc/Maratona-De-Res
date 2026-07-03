@@ -16,4 +16,9 @@ export interface HistoricalImportEventPlan {
   action: HistoricalImportEventPlanAction;
   existingEventId?: number;
   cycleId?: number;
+  cycleName?: string;
+  /** true quando a data do evento não cai no período de nenhum ciclo cadastrado e o evento será vinculado ao ciclo atual como alternativa. */
+  cycleFallback?: boolean;
+  /** Nomes de colaboradores deste evento específico que serão cadastrados automaticamente. */
+  newEmployeeNames?: string[];
 }

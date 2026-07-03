@@ -580,9 +580,10 @@ router.post("/integration/import/historical-results", async (req, res) => {
 
   type GroupPlan = {
     eventName: string; date: string; score: number | null; participantsCount: number;
-    matchedCount: number; action: "create" | "update" | "conflict"; existingEventId?: number; cycleId?: number;
+    matchedCount: number; action: "create" | "update" | "conflict"; existingEventId?: number; cycleId?: number; cycleName?: string; cycleFallback?: boolean; newEmployeeNames?: string[];
   };
   const plans: GroupPlan[] = [];
+  const cyclesById = new Map(allCycles.map(c => [c.id, c]));
 
   for (const g of groups.values()) {
     const uniqueScores = Array.from(new Set(g.scores.map(s => Math.round(s * 100) / 100)));
@@ -601,6 +602,7 @@ router.post("/integration/import/historical-results", async (req, res) => {
     let action: GroupPlan["action"];
     let existingEventId: number | undefined;
     let cycleId: number | undefined;
+    let isCycleFallback = false;
     if (existing.length > 1) {
       errors.push(`Evento "${g.eventName}" (${g.date}): múltiplos eventos existentes com o mesmo nome/data — ambíguo, resolva manualmente`);
       action = "conflict";
@@ -622,14 +624,24 @@ router.post("/integration/import/historical-results", async (req, res) => {
         cycleFallback.push(`Evento "${g.eventName}" (${g.date}): nenhum ciclo cobre esta data — será vinculado ao ciclo atual (${fallbackCycle.name ?? fallbackCycle.id})`);
         action = "create";
         cycleId = fallbackCycle.id;
+        isCycleFallback = true;
       } else {
         errors.push(`Evento "${g.eventName}" (${g.date}): nenhum ciclo cobre esta data e não há ciclo cadastrado — configure um ciclo antes de importar`);
         action = "conflict";
       }
     }
 
-    plans.push({ eventName: g.eventName, date: g.date, score, participantsCount: g.participants.length, matchedCount, action, existingEventId, cycleId });
-    (g as Group & { _plan?: GroupPlan })._plan = { eventName: g.eventName, date: g.date, score, participantsCount: g.participants.length, matchedCount, action, existingEventId, cycleId };
+    const cycleName = cycleId ? cyclesById.get(cycleId)?.name : undefined;
+    const newEmployeeNames = Array.from(new Set(
+      g.participants.filter(p => p.toCreateKey !== null).map(p => toCreateNames.get(p.toCreateKey!) ?? p.name)
+    ));
+    const planEntry: GroupPlan = {
+      eventName: g.eventName, date: g.date, score, participantsCount: g.participants.length,
+      matchedCount, action, existingEventId, cycleId, cycleName, cycleFallback: isCycleFallback,
+      newEmployeeNames: newEmployeeNames.length > 0 ? newEmployeeNames : undefined,
+    };
+    plans.push(planEntry);
+    (g as Group & { _plan?: GroupPlan })._plan = planEntry;
   }
 
   const preview = {

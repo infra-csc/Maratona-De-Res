@@ -3340,6 +3340,16 @@ components:
           type: integer
         cycleId:
           type: integer
+        cycleName:
+          type: string
+        cycleFallback:
+          type: boolean
+          description: true quando a data do evento não cai no período de nenhum ciclo cadastrado e o evento será vinculado ao ciclo atual como alternativa.
+        newEmployeeNames:
+          type: array
+          items:
+            type: string
+          description: Nomes de colaboradores deste evento específico que serão cadastrados automaticamente.
 
     HistoricalImportResult:
       type: object

@@ -463,32 +463,56 @@ export default function IntegrationPage() {
               Pré-visualização da importação
             </DialogTitle>
             <DialogDescription>
-              Nada foi gravado ainda. Revise os eventos abaixo antes de confirmar.
+              Nada foi gravado no banco ainda. Confira com atenção tudo o que vai acontecer — evento por evento — antes de confirmar. Depois de confirmar, os eventos entram como resultados históricos (nota já fechada, sem avaliação por critério).
             </DialogDescription>
           </DialogHeader>
 
-          {historicalPreview && (
+          {historicalPreview && (() => {
+            const eventsToCreate = historicalPreview.events.filter(ev => ev.action === "create").length;
+            const eventsToUpdate = historicalPreview.events.filter(ev => ev.action === "update").length;
+            const eventsBlocked = historicalPreview.events.filter(ev => ev.action === "conflict").length;
+            const participantsToLink = historicalPreview.events.reduce((sum, ev) => sum + ev.matchedCount, 0);
+            return (
             <div className="space-y-4 py-2">
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <p className="text-xl font-black text-slate-800" data-testid="text-preview-total-rows">{historicalPreview.totalRows}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Linhas</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Linhas na planilha</p>
                 </div>
                 <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <p className="text-xl font-black text-slate-800" data-testid="text-preview-matched">{historicalPreview.matched}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores encontrados</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores já cadastrados</p>
                 </div>
                 <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-slate-800">{historicalPreview.events.length}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos</p>
+                  <p className="text-xl font-black text-blue-700">{historicalPreview.employeesToCreate?.length ?? 0}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores novos</p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-xl border border-green-100">
+                  <p className="text-xl font-black text-green-700">{eventsToCreate}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos a criar</p>
+                </div>
+                <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-100">
+                  <p className="text-xl font-black text-amber-700">{eventsToUpdate}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos a atualizar</p>
+                </div>
+                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xl font-black text-slate-800">{participantsToLink}</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Participações a vincular</p>
                 </div>
               </div>
 
+              {eventsBlocked > 0 && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <strong>{eventsBlocked} evento(s) não serão importados</strong> por causa dos erros listados abaixo — corrija a planilha e reenvie.
+                </p>
+              )}
+
               {historicalPreview.errors.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-red-700 uppercase mb-2 flex items-center gap-1.5">
-                    <AlertTriangle size={14} /> Erros ({historicalPreview.errors.length}) — corrija e reenvie
+                  <p className="text-xs font-bold text-red-700 uppercase mb-1 flex items-center gap-1.5">
+                    <AlertTriangle size={14} /> Erros ({historicalPreview.errors.length}) — bloqueiam a importação
                   </p>
+                  <p className="text-[11px] text-red-600 mb-2">Enquanto houver erros abaixo, o botão de confirmar fica desabilitado. Corrija a planilha (ou os cadastros) e envie novamente.</p>
                   <ul className="text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
                     {historicalPreview.errors.map((err, i) => <li key={i}>• {err}</li>)}
                   </ul>
@@ -497,9 +521,10 @@ export default function IntegrationPage() {
 
               {historicalPreview.employeesToCreate && historicalPreview.employeesToCreate.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-700 uppercase mb-2 flex items-center gap-1.5">
+                  <p className="text-xs font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
                     <Users size={14} /> {historicalPreview.employeesToCreate.length} colaborador(es) novo(s) serão cadastrados
                   </p>
+                  <p className="text-[11px] text-blue-600 mb-2">Esses nomes não bateram com nenhum colaborador já cadastrado. Ao confirmar, eles serão criados automaticamente (cadastro básico, sem área/função definida) e já entram participando do evento correspondente na tabela abaixo. Se algum nome estiver digitado errado, cancele e corrija a planilha antes de confirmar.</p>
                   <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
                     {historicalPreview.employeesToCreate.map((name, i) => <li key={i}>• {name}</li>)}
                   </ul>
@@ -508,9 +533,10 @@ export default function IntegrationPage() {
 
               {historicalPreview.cycleFallback && historicalPreview.cycleFallback.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-700 uppercase mb-2 flex items-center gap-1.5">
-                    <Calendar size={14} /> {historicalPreview.cycleFallback.length} evento(s) fora do período do ciclo — serão vinculados ao ciclo atual
+                  <p className="text-xs font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
+                    <Calendar size={14} /> {historicalPreview.cycleFallback.length} evento(s) fora do período do ciclo cadastrado
                   </p>
+                  <p className="text-[11px] text-blue-600 mb-2">A data desses eventos não cai dentro do período de nenhum ciclo configurado. Em vez de bloquear, eles serão vinculados ao ciclo atual (indicado na tabela abaixo) para que os resultados entrem normalmente nos relatórios.</p>
                   <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
                     {historicalPreview.cycleFallback.map((msg, i) => <li key={i}>• {msg}</li>)}
                   </ul>
@@ -518,37 +544,60 @@ export default function IntegrationPage() {
               )}
 
               {historicalPreview.events.length > 0 && (
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
-                      <tr>
-                        <th className="text-left p-2">Evento</th>
-                        <th className="text-left p-2">Data</th>
-                        <th className="text-left p-2">Nota</th>
-                        <th className="text-left p-2">Participantes</th>
-                        <th className="text-left p-2">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {historicalPreview.events.map((ev, i) => (
-                        <tr key={i} className="border-t border-slate-100" data-testid={`row-preview-event-${i}`}>
-                          <td className="p-2 font-medium text-slate-800">{ev.eventName}</td>
-                          <td className="p-2 text-slate-600">{ev.date}</td>
-                          <td className="p-2 text-slate-600">{ev.score ?? "—"}</td>
-                          <td className="p-2 text-slate-600">{ev.matchedCount}/{ev.participantsCount}</td>
-                          <td className="p-2">
-                            {ev.action === "create" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Criar</Badge>}
-                            {ev.action === "update" && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Atualizar</Badge>}
-                            {ev.action === "conflict" && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Conflito</Badge>}
-                          </td>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-2">Detalhe evento por evento</p>
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                        <tr>
+                          <th className="text-left p-2">Evento</th>
+                          <th className="text-left p-2">Data</th>
+                          <th className="text-left p-2">Nota</th>
+                          <th className="text-left p-2">Participantes</th>
+                          <th className="text-left p-2">Ciclo</th>
+                          <th className="text-left p-2">Ação</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {historicalPreview.events.map((ev, i) => (
+                          <tr key={i} className="border-t border-slate-100 align-top" data-testid={`row-preview-event-${i}`}>
+                            <td className="p-2 font-medium text-slate-800">{ev.eventName}</td>
+                            <td className="p-2 text-slate-600">{ev.date}</td>
+                            <td className="p-2 text-slate-600">{ev.score ?? "—"}</td>
+                            <td className="p-2 text-slate-600">
+                              {ev.matchedCount}/{ev.participantsCount}
+                              {ev.newEmployeeNames && ev.newEmployeeNames.length > 0 && (
+                                <div className="text-[10px] text-blue-600 mt-0.5">
+                                  {ev.newEmployeeNames.length} novo(s): {ev.newEmployeeNames.join(", ")}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-2 text-slate-600">
+                              {ev.cycleName ?? "—"}
+                              {ev.cycleFallback && (
+                                <div className="text-[10px] text-blue-600 mt-0.5">fora do período (ciclo atual)</div>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              {ev.action === "create" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Criar</Badge>}
+                              {ev.action === "update" && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Atualizar</Badge>}
+                              {ev.action === "conflict" && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Conflito</Badge>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2 space-y-0.5">
+                    <span className="block"><Badge className="bg-green-100 text-green-700 hover:bg-green-100 mr-1">Criar</Badge>evento novo, ainda não existe no sistema.</span>
+                    <span className="block"><Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 mr-1">Atualizar</Badge>já existe um evento histórico com este nome/data — a nota será substituída pela da planilha.</span>
+                    <span className="block"><Badge className="bg-red-100 text-red-700 hover:bg-red-100 mr-1">Conflito</Badge>não será importado (veja o motivo nos erros acima).</span>
+                  </p>
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setHistoricalDialogOpen(false)} disabled={historicalCommitMutation.isPending}>
