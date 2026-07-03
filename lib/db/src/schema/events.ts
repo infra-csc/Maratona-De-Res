@@ -20,6 +20,10 @@ export const eventsTable = pgTable("events", {
   forcedCloseReason: text("forced_close_reason"),
   feedbackReleased: boolean("feedback_released").notNull().default(false),
   feedbackReleasedAt: timestamp("feedback_released_at"),
+  // Snapshot explícito de publicação parcial (antes da liberação final).
+  // Pode ser republicado várias vezes (sobrescreve a data); vira irrelevante
+  // assim que feedbackReleased é setado, que é terminal.
+  partialPublishedAt: timestamp("partial_published_at"),
   criteriaConfirmed: boolean("criteria_confirmed").notNull().default(false),
   criteriaConfirmedAt: timestamp("criteria_confirmed_at"),
   // Evento histórico importado sem avaliação individual por critério: a nota

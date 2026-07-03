@@ -755,6 +755,8 @@ export const GetEventFeedbackResponse = zod.object({
   "evaluatedCriteria": zod.number().optional(),
   "isComplete": zod.boolean(),
   "feedbackReleased": zod.boolean(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
   "highlights": zod.array(zod.string()).optional(),
   "attentionPoints": zod.array(zod.string()).optional(),
   "text": zod.string()
@@ -777,6 +779,32 @@ export const ReleaseEventFeedbackResponse = zod.object({
   "evaluatedCriteria": zod.number().optional(),
   "isComplete": zod.boolean(),
   "feedbackReleased": zod.boolean(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
+  "highlights": zod.array(zod.string()).optional(),
+  "attentionPoints": zod.array(zod.string()).optional(),
+  "text": zod.string()
+})
+
+
+/**
+ * @summary Publish a partial (in-progress) feedback snapshot to participants
+ */
+export const PublishPartialFeedbackParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PublishPartialFeedbackResponse = zod.object({
+  "eventId": zod.number(),
+  "eventName": zod.string(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "totalCriteria": zod.number().optional(),
+  "evaluatedCriteria": zod.number().optional(),
+  "isComplete": zod.boolean(),
+  "feedbackReleased": zod.boolean(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
   "highlights": zod.array(zod.string()).optional(),
   "attentionPoints": zod.array(zod.string()).optional(),
   "text": zod.string()

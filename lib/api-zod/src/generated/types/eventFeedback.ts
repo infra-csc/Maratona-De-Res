@@ -16,6 +16,10 @@ export interface EventFeedback {
   evaluatedCriteria?: number;
   isComplete: boolean;
   feedbackReleased: boolean;
+  /** @nullable */
+  feedbackReleasedAt?: string | null;
+  /** @nullable */
+  partialPublishedAt?: string | null;
   highlights?: string[];
   attentionPoints?: string[];
   text: string;

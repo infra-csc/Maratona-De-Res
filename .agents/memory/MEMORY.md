@@ -39,3 +39,4 @@
 - [Independent filters pattern](independent-filters-pattern.md) — "filters must be independent" = no disabling on other filters + no resetting siblings on change; use global fallback option list when scoped list is empty
 - [Historical results import](historical-results-import.md) — pre-calibrated events (isHistorical+importedScore) bypass computeEventTeamResult everywhere; bulk import needs dry-run/create/update/conflict pattern; also covers date-overlap duplicate detection + admin merge-events endpoint
 - [Survey event-match quality](survey-event-match-quality.md) — substring-based suggestion matching under-matches free-text event labels; verify against full events table, prefer non-historical duplicate for real scores
+- [Partial vs final feedback publish](partial-final-publish.md) — 2 independent publish actions (partialPublishedAt repeatable, feedbackReleased terminal); badges must derive 3-state final>partial>none, never 2-state

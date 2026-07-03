@@ -110,6 +110,8 @@ async function buildEventFeedback(eventId: number) {
     evaluatedCriteria: criteria.length - pending.length,
     isComplete,
     feedbackReleased: event.feedbackReleased,
+    feedbackReleasedAt: event.feedbackReleasedAt,
+    partialPublishedAt: event.partialPublishedAt,
     highlights,
     attentionPoints,
     text: lines.join("\n"),
@@ -153,7 +155,29 @@ router.post("/events/:id/feedback/release", requireRole("admin", "rh", "diretori
   }).where(eq(eventsTable.id, eventId)).returning();
   await audit(req.user!.userId, "release_feedback", "events", eventId);
   await recomputeCycleResults(updated.cycleId, req.user!.userId);
-  res.json({ ...feedback, feedbackReleased: updated.feedbackReleased });
+  res.json({ ...feedback, feedbackReleased: updated.feedbackReleased, feedbackReleasedAt: updated.feedbackReleasedAt });
+});
+
+/**
+ * POST /events/:id/feedback/publish-partial
+ * Publica um retrato PARCIAL do feedback (sem exigir conclusão de todas as
+ * avaliações e sem fechar o evento). Pode ser chamado várias vezes — cada
+ * chamada apenas atualiza a data. Bloqueado depois que a avaliação final
+ * (release) já foi publicada, pois final é terminal.
+ */
+router.post("/events/:id/feedback/publish-partial", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const feedback = await buildEventFeedback(eventId);
+  if (!feedback) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  if (feedback.feedbackReleased) {
+    res.status(400).json({ error: "A avaliação final já foi publicada para este evento e não pode voltar a ser parcial" });
+    return;
+  }
+  const [updated] = await db.update(eventsTable).set({
+    partialPublishedAt: new Date(),
+  }).where(eq(eventsTable.id, eventId)).returning();
+  await audit(req.user!.userId, "publish_partial_feedback", "events", eventId);
+  res.json({ ...feedback, partialPublishedAt: updated.partialPublishedAt });
 });
 
 export default router;

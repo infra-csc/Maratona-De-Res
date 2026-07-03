@@ -2338,6 +2338,76 @@ export const useReleaseEventFeedback = <TError = ErrorType<unknown>,
       return useMutation(getReleaseEventFeedbackMutationOptions(options));
     }
 
+export const getPublishPartialFeedbackUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/feedback/publish-partial`
+}
+
+/**
+ * @summary Publish a partial (in-progress) feedback snapshot to participants
+ */
+export const publishPartialFeedback = async (id: number, options?: RequestInit): Promise<EventFeedback> => {
+
+  return customFetch<EventFeedback>(getPublishPartialFeedbackUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPublishPartialFeedbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishPartialFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishPartialFeedback>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['publishPartialFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishPartialFeedback>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  publishPartialFeedback(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishPartialFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof publishPartialFeedback>>>
+
+    export type PublishPartialFeedbackMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Publish a partial (in-progress) feedback snapshot to participants
+ */
+export const usePublishPartialFeedback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishPartialFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof publishPartialFeedback>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPublishPartialFeedbackMutationOptions(options));
+    }
+
 export const getGetEventParticipantsUrl = (id: number,) => {
 
 

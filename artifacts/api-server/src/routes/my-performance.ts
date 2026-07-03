@@ -60,6 +60,8 @@ router.get("/my-performance", async (req, res) => {
       eventLocation: eventsTable.location,
       eventStatus: eventsTable.status,
       feedbackReleased: eventsTable.feedbackReleased,
+      feedbackReleasedAt: eventsTable.feedbackReleasedAt,
+      partialPublishedAt: eventsTable.partialPublishedAt,
       startDate: eventsTable.startDate,
       endDate: eventsTable.endDate,
     })
@@ -178,6 +180,8 @@ router.get("/my-performance", async (req, res) => {
       endDate: p.endDate,
       status: p.eventStatus,
       feedbackReleased: p.feedbackReleased ?? false,
+      feedbackReleasedAt: p.feedbackReleasedAt ?? null,
+      partialPublishedAt: p.partialPublishedAt ?? null,
       eventScore,
       teamScore: eventScore,
       projectedPlatoon: platoon?.name ?? null,

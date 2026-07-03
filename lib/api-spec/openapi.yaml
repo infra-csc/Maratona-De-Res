@@ -581,6 +581,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventFeedback"
 
+  /events/{id}/feedback/publish-partial:
+    post:
+      operationId: publishPartialFeedback
+      tags: [results]
+      summary: Publish a partial (in-progress) feedback snapshot to participants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventFeedback"
+
   /events/{id}/participants:
     get:
       operationId: getEventParticipants
@@ -3045,6 +3064,10 @@ components:
           type: boolean
         feedbackReleased:
           type: boolean
+        feedbackReleasedAt:
+          type: ["string", "null"]
+        partialPublishedAt:
+          type: ["string", "null"]
         highlights:
           type: array
           items:

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, useUpdateEventCriteria, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishPartialFeedback, useUpdateEventCriteria, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,10 @@ function statusChip(status: string): { label: string; cls: string } {
     pending: { label: "Pendente", cls: "bg-[#ffb5a0] text-[#3b0900]" },
   };
   return map[status] ?? { label: status, cls: "bg-[#d8dadc] text-[#444933]" };
+}
+
+function formatDateTime(d: Date): string {
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function CalibrationsPage() {
@@ -153,7 +157,20 @@ export default function CalibrationsPage() {
   });
   const closeMutation = useCloseEvent();
   const releaseMutation = useReleaseEventFeedback();
+  const publishPartialMutation = usePublishPartialFeedback();
   const finalizing = closeMutation.isPending || releaseMutation.isPending;
+
+  async function handlePublishPartial() {
+    if (!selectedEventId) return;
+    try {
+      await publishPartialMutation.mutateAsync({ id: selectedEventId });
+      qc.invalidateQueries({ queryKey: fbQKey });
+      toast({ title: "Avaliação parcial publicada", description: "Os funcionários agora veem esta prévia como a última publicação." });
+    } catch (e) {
+      const msg = (e as { message?: string })?.message;
+      toast({ title: "Não foi possível publicar", description: msg, variant: "destructive" });
+    }
+  }
 
   async function handleFinalize() {
     if (!selectedEventId) return;
@@ -242,6 +259,8 @@ export default function CalibrationsPage() {
   const scoredCriteria = activeCriteria.filter(c => getAvgScore(c.criterionId) != null);
   const allCalibrated = scoredCriteria.length > 0 && scoredCriteria.every(c => getCalibration(c.criterionId));
   const alreadyReleased = !!feedback?.feedbackReleased;
+  const feedbackReleasedAtDate = feedback?.feedbackReleasedAt ? new Date(feedback.feedbackReleasedAt) : null;
+  const partialPublishedAtDate = feedback?.partialPublishedAt ? new Date(feedback.partialPublishedAt) : null;
   // Recuperação de falha parcial: evento já fechado, porém notas ainda não liberadas.
   const alreadyClosed = pickedEvent?.status === "closed";
   // O backend só libera o feedback se TODAS as avaliações foram concluídas
@@ -485,8 +504,8 @@ export default function CalibrationsPage() {
                   <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${statusChip(pickedEvent.status).cls}`}>
                     <span className="inline-block skew-x-[8deg]">{statusChip(pickedEvent.status).label}</span>
                   </span>
-                  <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${alreadyReleased ? "bg-[#191c1e] text-[#ccff00]" : "bg-[#ffb5a0] text-[#3b0900]"}`}>
-                    <span className="inline-block skew-x-[8deg]">{alreadyReleased ? "Avaliação Final" : "Avaliação Parcial"}</span>
+                  <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${alreadyReleased ? "bg-[#191c1e] text-[#ccff00]" : partialPublishedAtDate ? "bg-[#ffb5a0] text-[#3b0900]" : "bg-[#d8dadc] text-[#444933]"}`}>
+                    <span className="inline-block skew-x-[8deg]">{alreadyReleased ? "Avaliação Final" : partialPublishedAtDate ? "Avaliação Parcial" : "Não Publicada"}</span>
                   </span>
                 </div>
               </div>
@@ -502,16 +521,26 @@ export default function CalibrationsPage() {
               <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#ccff00]">
                 <CheckCircle size={20} className="text-[#ccff00] shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Avaliação Final — notas liberadas</p>
+                  <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Avaliação Final — notas liberadas{feedbackReleasedAtDate ? ` em ${formatDateTime(feedbackReleasedAtDate)}` : ""}</p>
                   <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">Os funcionários já veem estas notas. Ajustes ainda são possíveis e recalculam os resultados automaticamente.</p>
                 </div>
               </div>
-            ) : alreadyClosed && (
+            ) : partialPublishedAtDate ? (
+              <div className="bg-[#ffb5a0] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
+                <Info size={20} className="text-[#3b0900] shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black italic uppercase tracking-tight text-[#3b0900] leading-tight">Avaliação Parcial — publicada em {formatDateTime(partialPublishedAtDate)}</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#3b0900]/70 leading-tight">Os funcionários veem esta prévia como a última publicação enviada. Publique de novo a qualquer momento para atualizar, ou finalize quando estiver pronto.</p>
+                </div>
+              </div>
+            ) : (
               <div className="bg-[#d8dadc] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
                 <Info size={20} className="text-[#444933] shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">Avaliação Parcial — evento fechado</p>
-                  <p className="text-[11px] font-bold italic uppercase text-[#444933] leading-tight">As notas ainda não foram liberadas aos funcionários. Você pode continuar ajustando a calibração.</p>
+                  <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">Ainda não publicada</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#444933] leading-tight">
+                    Os funcionários ainda não receberam nenhuma publicação deste evento{alreadyClosed ? " — evento fechado, aguardando liberação" : ""}. Use "Publicar Parcial" para enviar uma prévia a qualquer momento.
+                  </p>
                 </div>
               </div>
             )}
@@ -538,7 +567,18 @@ export default function CalibrationsPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                  {canFinalize && (
+                    <button
+                      data-testid="button-publish-partial"
+                      type="button"
+                      disabled={publishPartialMutation.isPending}
+                      onClick={handlePublishPartial}
+                      className="bg-transparent text-white border-2 border-white px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:text-[#191c1e]"
+                    >
+                      <Send size={16} /> {publishPartialMutation.isPending ? "Publicando..." : "Publicar Parcial"}
+                    </button>
+                  )}
                   {readyToFinalize ? (
                     <button
                       data-testid="button-open-finalize"

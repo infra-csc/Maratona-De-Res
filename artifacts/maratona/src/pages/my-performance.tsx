@@ -57,6 +57,8 @@ interface EventSummary {
   startDate: string;
   status: string;
   feedbackReleased?: boolean;
+  feedbackReleasedAt?: string | null;
+  partialPublishedAt?: string | null;
   eventScore: number;
   projectedPlatoon: string | null;
   projectedPlatoonColor: string | null;
@@ -76,8 +78,17 @@ interface CriterionDetail {
   evaluated: boolean;
 }
 
+function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
+  const publishLabel = event.feedbackReleased
+    ? `Avaliação Final${event.feedbackReleasedAt ? ` · ${formatDateTime(event.feedbackReleasedAt)}` : ""}`
+    : event.partialPublishedAt
+      ? `Avaliação Parcial · ${formatDateTime(event.partialPublishedAt)}`
+      : "Ainda não publicada";
 
   return (
     <div className="bg-white border-2 border-[#191c1e] mb-4">
@@ -92,8 +103,11 @@ function EventCard({ event }: { event: EventSummary }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-[10px] font-bold uppercase italic px-2 py-0.5 bg-[#ccff00] text-[#191c1e] border-2 border-[#191c1e]">
-                {event.feedbackReleased ? "Avaliação Final" : "Avaliação Parcial"}
+              <span className={cn(
+                "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
+                event.feedbackReleased ? "bg-[#191c1e] text-[#ccff00]" : event.partialPublishedAt ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#d8dadc] text-[#444933]"
+              )}>
+                {publishLabel}
               </span>
             </div>
             <p className="font-bold text-base text-[#191c1e]">{event.eventName}</p>
