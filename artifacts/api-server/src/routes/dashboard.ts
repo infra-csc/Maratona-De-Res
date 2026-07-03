@@ -37,8 +37,14 @@ router.get("/dashboard/summary", async (_req, res) => {
   const quarterResults = await db.select().from(quarterlyResultsTable).where(eq(quarterlyResultsTable.cycleId, cycle.id));
   const totalEmployeesEvaluated = quarterResults.length;
 
-  const quarterAverage = quarterResults.length > 0
-    ? quarterResults.reduce((s, r) => s + parseFloat(r.finalResult), 0) / quarterResults.length
+  // Só entram na média colaboradores com pelo menos 1 evento FECHADO e pontuado
+  // (eventsCount > 0) neste ciclo. Quem só participou de eventos ainda abertos
+  // tem finalResult=0 "por enquanto" — incluí-los distorceria a média para
+  // baixo mesmo quando ninguém de fato tirou nota ruim, então são excluídos
+  // até terem alguma nota real registrada.
+  const scoredQuarterResults = quarterResults.filter(r => r.eventsCount > 0);
+  const quarterAverage = scoredQuarterResults.length > 0
+    ? scoredQuarterResults.reduce((s, r) => s + parseFloat(r.finalResult), 0) / scoredQuarterResults.length
     : null;
 
   const totalBonusPreview = quarterResults.reduce((s, r) => s + parseFloat(r.bonusValue), 0);

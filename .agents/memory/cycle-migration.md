@@ -16,3 +16,8 @@ all routes default to the current cycle (no year/quarter params). UI labels say 
 Falling short sets eligible=false with reason like "Participou de 4 de 8 eventos exigidos no ciclo".
 
 **Why:** participation (showing up) and scoring (getting graded) are different gates; bonus needs enough participation.
+
+**KPI averages must filter by `eventsCount > 0`:** any dashboard/summary metric that averages `finalResult`
+across `quarterly_results` rows must exclude rows with `eventsCount === 0` (employee has participated but no
+event has closed/scored yet — `finalResult` is 0 by construction, not a real low score). Including them
+silently tanks the displayed average whenever many events in the cycle are still open.
