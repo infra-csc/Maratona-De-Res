@@ -93,6 +93,8 @@ export default function UsersPage() {
     return ROLES.find(r => r.value === role) ?? { label: role, chip: "bg-[#f2f4f6] text-[#444933]" };
   }
 
+  const sortedUsers = [...(users ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
   const stats = {
     total: users?.length ?? 0,
     ativos: users?.filter(u => u.active).length ?? 0,
@@ -244,7 +246,7 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
-                  {(users ?? []).map(u => {
+                  {sortedUsers.map(u => {
                     const roleInfo = getRoleInfo(u.role);
                     return (
                       <tr key={u.id} data-testid={`row-user-${u.id}`} className="hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group">
