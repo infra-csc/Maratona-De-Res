@@ -214,16 +214,15 @@ router.post("/integration/sync", async (req, res) => {
     const extParticipations = rawParticipations as ExtParticipation[];
     log(`Recebidos: ${extEmployees.length} colaboradores, ${extEvents.length} eventos, ${extParticipations.length} participações.`);
 
-    // 1) Eventos dentro do período do ciclo atual, que JÁ FINALIZARAM (data de
-    //    término no passado). Só importamos eventos encerrados: com o evento
-    //    concluído, a escalação de funções não muda mais, então os dados
-    //    importados são definitivos. O período do ciclo (startDate/endDate)
-    //    define a janela de importação; se o ciclo não tiver datas definidas,
-    //    caímos de volta no filtro por TARGET_YEAR (compatibilidade).
-    const today = new Date().toISOString().slice(0, 10);
+    // 1) Eventos dentro do período do ciclo atual (startDate/endDate do
+    //    ciclo). Importamos TODOS os eventos da janela, independente de já
+    //    terem terminado ou não — a sincronização pode ser rodada durante o
+    //    ciclo para trazer eventos futuros/em andamento. Se o ciclo não tiver
+    //    datas definidas, caímos de volta no filtro por TARGET_YEAR
+    //    (compatibilidade).
     const cycleStartDate = cycle.startDate;
     const cycleEndDate = cycle.endDate;
-    const inCycleWindow = cycleStartDate && cycleEndDate
+    const keptEvents = cycleStartDate && cycleEndDate
       ? extEvents.filter(ev => {
           const end = ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate);
           return end >= cycleStartDate && end <= cycleEndDate;
@@ -232,10 +231,6 @@ router.post("/integration/sync", async (req, res) => {
           const yq = deriveYearQuarter(ev.startDate);
           return (ev.year ?? yq.year) === TARGET_YEAR;
         });
-    const keptEvents = inCycleWindow.filter(ev => {
-      const end = ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate);
-      return end < today;
-    });
     const keptEventIds = new Set(keptEvents.map(ev => extIdOf(ev)).filter((v): v is string => !!v));
 
     // 2) Participações nesses eventos com função Cenotécnica / Cenotécnica Local.
@@ -258,7 +253,7 @@ router.post("/integration/sync", async (req, res) => {
     const windowLabel = cycleStartDate && cycleEndDate
       ? `ciclo ${cycleStartDate} a ${cycleEndDate}`
       : `ano ${TARGET_YEAR} (ciclo sem datas definidas)`;
-    log(`Filtro: eventos do ${windowLabel} já finalizados (${keptEvents.length}/${inCycleWindow.length} na janela; demais ainda não terminaram ou estão fora do período), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
+    log(`Filtro: eventos do ${windowLabel} (${keptEvents.length}/${extEvents.length} na janela; demais fora do período do ciclo), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
 
     await db.transaction(async (tx) => {
       // Colaboradores — upsert por externalId
