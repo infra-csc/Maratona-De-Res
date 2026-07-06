@@ -340,7 +340,7 @@ export default function AreasPage() {
                             className="rounded-none border-2 border-[#191c1e] data-[state=checked]:bg-[#ccff00] data-[state=checked]:text-[#191c1e]"
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold italic text-sm text-[#191c1e] truncate">{u.name}</p>
+                            <p className="font-bold italic text-sm text-[#191c1e] break-words">{u.name}</p>
                             <p className="text-[11px] text-[#747a60] truncate">{u.email}</p>
                             {elsewhere && (
                               <p className="text-[11px] text-[#b02f00] italic flex items-center gap-1 mt-0.5">

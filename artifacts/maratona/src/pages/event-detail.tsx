@@ -1171,7 +1171,7 @@ export default function EventDetailPage() {
                           </div>
                           <div className="flex-1 min-w-0 space-y-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</p>
+                              <p className="font-black italic uppercase text-sm text-[#191c1e] break-words">{p.employeeName}</p>
                               <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
                                 <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
                               </span>

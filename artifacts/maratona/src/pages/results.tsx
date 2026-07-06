@@ -107,7 +107,7 @@ function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: numb
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm italic uppercase font-black tracking-tight truncate" data-testid={`text-podium-name-${entry.employeeId}`}>{entry.employeeName}</h3>
+        <h3 className="text-sm italic uppercase font-black tracking-tight break-words" data-testid={`text-podium-name-${entry.employeeId}`}>{entry.employeeName}</h3>
         <div className="mt-1"><PlatoonBadge platoon={entry.platoon} colorHex={entry.platoonColor} /></div>
       </div>
       <div className="text-right shrink-0">
@@ -279,7 +279,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                         <span className="skew-x-[6deg] text-xl font-black italic leading-none mt-0.5">{String(actualRank).padStart(2, "0")}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-black italic uppercase text-base md:text-lg truncate" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
+                        <p className="font-black italic uppercase text-base md:text-lg break-words" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
                           <PlatoonBadge platoon={entry.platoon} colorHex={entry.platoonColor} />
                           <span className="text-[11px] font-bold uppercase italic text-[#444933] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">

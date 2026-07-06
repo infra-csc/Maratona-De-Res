@@ -203,7 +203,7 @@ export default function DashboardPage() {
                 <div className="space-y-2">
                   {summary.atRiskEmployees.map(emp => (
                     <div key={emp.employeeId} className="flex items-center justify-between p-3 border-2 border-[#ffdad6] bg-[#ffdad6]/30">
-                      <span className="text-sm font-bold italic uppercase truncate flex-1 pr-2">{emp.employeeName}</span>
+                      <span className="text-sm font-bold italic uppercase break-words flex-1 pr-2">{emp.employeeName}</span>
                       <span className="text-sm font-black italic text-white bg-[#ba1a1a] px-2 py-0.5">{fmt(emp.currentScore ?? 0)}</span>
                     </div>
                   ))}
