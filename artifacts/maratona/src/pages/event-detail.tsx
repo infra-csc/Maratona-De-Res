@@ -39,6 +39,30 @@ function formatDiariaDate(dateStr: string): string {
   return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
 }
 
+function splitImportedNoteLines(note: string): string[] {
+  return note
+    .split(/(?<=[.;])\s+|\s*\|\s*|\n+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function ImportedNotesList({ notes }: { notes: string }) {
+  const lines = splitImportedNoteLines(notes);
+  if (lines.length <= 1) {
+    return <p className="text-xs font-semibold italic text-[#191c1e] whitespace-pre-wrap">{notes}</p>;
+  }
+  return (
+    <ul className="space-y-1">
+      {lines.map((line, i) => (
+        <li key={i} className="text-xs font-semibold italic text-[#191c1e] flex items-start gap-1.5">
+          <span className="text-[#862200] mt-[1px]">•</span>
+          <span>{line}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ParticipantDiariaDialog({
   employeeId, employeeName, candidateDates, scheduledStart, scheduledEnd, scheduledCount,
   currentDates, isSaving, onSave,
@@ -377,7 +401,7 @@ function HistoricalResultPanel({
     return (
       <div data-testid="panel-historical-notes-readonly" className="mt-4 p-3 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-2">
         <MessageSquare size={14} className="text-[#444933] shrink-0 mt-[2px]" />
-        <p className="text-xs font-semibold italic text-[#191c1e] whitespace-pre-wrap">{currentNotes}</p>
+        <div className="flex-1"><ImportedNotesList notes={currentNotes} /></div>
       </div>
     );
   }
@@ -388,7 +412,7 @@ function HistoricalResultPanel({
         {currentNotes && (
           <div data-testid="panel-historical-notes-readonly" className="p-3 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-2 w-full">
             <MessageSquare size={14} className="text-[#444933] shrink-0 mt-[2px]" />
-            <p className="text-xs font-semibold italic text-[#191c1e] whitespace-pre-wrap">{currentNotes}</p>
+            <div className="flex-1"><ImportedNotesList notes={currentNotes} /></div>
           </div>
         )}
         <button
