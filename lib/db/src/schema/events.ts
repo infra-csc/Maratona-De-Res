@@ -66,6 +66,11 @@ export const eventParticipantsTable = pgTable("event_participants", {
   // participações informativas (countsForScore === false).
   actualDiariaDates: date("actual_diaria_dates").array(),
   actualDiariaCount: integer("actual_diaria_count"),
+  // Comentário livre sobre o colaborador nesse evento (ex.: justificativa de
+  // diárias não cumpridas ou de marcação como inativo). Preenchido manualmente
+  // por admin/RH; exibido na UI apenas quando há descumprimento de diárias
+  // previstas ou quando o participante está inativo.
+  comment: text("comment"),
 }, (t) => ({
   eventEmployeeUq: uniqueIndex("event_participants_event_employee_uq").on(t.eventId, t.employeeId),
 }));

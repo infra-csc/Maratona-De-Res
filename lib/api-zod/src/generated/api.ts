@@ -473,6 +473,7 @@ export const GetEventResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({
@@ -955,6 +956,7 @@ export const GetEventParticipantsResponseItem = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
 export const GetEventParticipantsResponse = zod.array(GetEventParticipantsResponseItem)
@@ -993,7 +995,8 @@ export const UpdateEventParticipantParams = zod.object({
 
 export const UpdateEventParticipantBody = zod.object({
   "confirmed": zod.boolean().optional(),
-  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Diárias realizadas (preenchidas manualmente pelo RH com base na presença real). As diárias previstas (scheduledDiaria\*) não são editáveis por aqui — vêm apenas da sincronização com a logística interna.')
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Diárias realizadas (preenchidas manualmente pelo RH com base na presença real). As diárias previstas (scheduledDiaria\*) não são editáveis por aqui — vêm apenas da sincronização com a logística interna.'),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).')
 })
 
 export const UpdateEventParticipantResponse = zod.object({
@@ -1010,6 +1013,7 @@ export const UpdateEventParticipantResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
 
@@ -1173,6 +1177,7 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({
@@ -1278,6 +1283,7 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({
@@ -1393,6 +1399,7 @@ export const DeleteEventCriterionResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({

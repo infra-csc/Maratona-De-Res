@@ -13,4 +13,9 @@ export interface EventParticipantUpdate {
      * @nullable
      */
   actualDiariaDates?: string[] | null;
+  /**
+     * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).
+     * @nullable
+     */
+  comment?: string | null;
 }

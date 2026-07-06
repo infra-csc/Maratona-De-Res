@@ -2,11 +2,12 @@ import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -36,6 +37,53 @@ function eventDateRange(startDate: string, endDate: string): string[] {
 function formatDiariaDate(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00`);
   return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
+}
+
+function ParticipantCommentBox({
+  participantId, employeeId, initialComment, canManage, reason, onSave, isSaving,
+}: {
+  participantId: number; employeeId: number; initialComment: string | null | undefined;
+  canManage: boolean; reason: string; onSave: (value: string) => void; isSaving: boolean;
+}) {
+  const [value, setValue] = useState(initialComment ?? "");
+  useEffect(() => { setValue(initialComment ?? ""); }, [initialComment, participantId]);
+  const dirty = value.trim() !== (initialComment ?? "").trim();
+
+  if (!canManage) {
+    if (!initialComment) return null;
+    return (
+      <div className="mt-1 p-2 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-1.5">
+        <MessageSquare size={12} className="text-[#444933] shrink-0 mt-[2px]" />
+        <p className="text-[11px] font-semibold italic text-[#191c1e] whitespace-pre-wrap">{initialComment}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1 p-2 border-2 border-[#191c1e] bg-[#fff8e1] space-y-1.5">
+      <p className="text-[10px] font-black italic uppercase text-[#862200] flex items-center gap-1.5">
+        <MessageSquare size={12} /> {reason}
+      </p>
+      <Textarea
+        data-testid={`textarea-participant-comment-${employeeId}`}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Comentário / justificativa..."
+        className="text-xs rounded-none border-2 border-[#191c1e] bg-white min-h-[60px]"
+      />
+      {dirty && (
+        <button
+          type="button"
+          data-testid={`button-save-participant-comment-${employeeId}`}
+          disabled={isSaving}
+          onClick={() => onSave(value.trim())}
+          className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b3e600] transition-colors disabled:opacity-50"
+        >
+          {isSaving ? "Salvando..." : "Salvar comentário"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function EventDetailPage() {
@@ -1156,6 +1204,11 @@ export default function EventDetailPage() {
                       const selectedDates = p.actualDiariaDates ?? [];
                       const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
                       const candidateDates = eventDateRange(event.startDate, event.endDate);
+                      const daysMismatch = !isInformational && p.scheduledDiariaCount != null && realizadasCount != null && realizadasCount < p.scheduledDiariaCount;
+                      const showCommentBox = isInactive || daysMismatch;
+                      const commentReason = isInactive
+                        ? "Colaborador inativo — justifique"
+                        : "Diárias previstas não cumpridas — justifique";
                       return (
                         <div
                           key={p.id}
@@ -1252,6 +1305,17 @@ export default function EventDetailPage() {
                                   </span>
                                 ) : null}
                               </div>
+                            )}
+                            {showCommentBox && (
+                              <ParticipantCommentBox
+                                participantId={p.id}
+                                employeeId={p.employeeId}
+                                initialComment={p.comment}
+                                canManage={canManage}
+                                reason={commentReason}
+                                isSaving={updateParticipant.isPending}
+                                onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
+                              />
                             )}
                           </div>
                           {canManage && (

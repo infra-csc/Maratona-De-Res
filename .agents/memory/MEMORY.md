@@ -53,3 +53,4 @@
 - [Scored/syncable function prefix match](scored-function-prefix-match.md) — isScoredFunction must startsWith, not exact-match Set; new external function-name variants (e.g. "cenotecnica sp2") were silently dropped from sync
 - [Event-result informational leak](event-result-informational-leak.md) — GET /events/:id/result must filter by participantCountsForScore too, or Sup Ceno/freela show team score + "Elegível" in event-detail UI despite no real employee_event_results row
 - [Calibration comment missing from event-detail](calibration-comment-missing.md) — computeEventTeamResult's criteriaDetails never carried calibrationReason; event-detail page had nowhere to render calibration comments even after saving
+- [api-server dev is build+start, not watch](api-server-dev-no-watch.md) — `pnpm dev` builds once then runs dist; backend route/schema edits need a workflow restart to take effect, unlike the maratona vite frontend which hot-reloads

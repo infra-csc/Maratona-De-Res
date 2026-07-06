@@ -308,6 +308,11 @@ export interface EventParticipant {
   actualDiariaDates?: string[] | null;
   /** @nullable */
   actualDiariaCount?: number | null;
+  /**
+     * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).
+     * @nullable
+     */
+  comment?: string | null;
   /** Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade. */
   countsForScore: boolean;
 }
@@ -477,6 +482,11 @@ export interface EventParticipantUpdate {
      * @nullable
      */
   actualDiariaDates?: string[] | null;
+  /**
+     * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).
+     * @nullable
+     */
+  comment?: string | null;
 }
 
 export interface EventConformity {

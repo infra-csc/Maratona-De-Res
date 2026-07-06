@@ -2523,6 +2523,11 @@ components:
             do tamanho desta lista.
         actualDiariaCount:
           type: ["integer", "null"]
+        comment:
+          type: ["string", "null"]
+          description: >-
+            Comentário livre sobre o colaborador nesse evento (ex.:
+            justificativa de diárias não cumpridas ou de inatividade).
         countsForScore:
           type: boolean
           description: >-
@@ -2554,6 +2559,11 @@ components:
             presença real). As diárias previstas (scheduledDiaria*) não são
             editáveis por aqui — vêm apenas da sincronização com a logística
             interna.
+        comment:
+          type: ["string", "null"]
+          description: >-
+            Comentário livre sobre o colaborador nesse evento (ex.:
+            justificativa de diárias não cumpridas ou de inatividade).
 
     EventConformity:
       type: object

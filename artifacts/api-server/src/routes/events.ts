@@ -118,6 +118,7 @@ async function loadEventDetail(id: number) {
       scheduledDiariaEnd: eventParticipantsTable.scheduledDiariaEnd,
       actualDiariaDates: eventParticipantsTable.actualDiariaDates,
       actualDiariaCount: eventParticipantsTable.actualDiariaCount,
+      comment: eventParticipantsTable.comment,
     })
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
@@ -435,6 +436,7 @@ router.get("/events/:id/participants", async (req, res) => {
       scheduledDiariaEnd: eventParticipantsTable.scheduledDiariaEnd,
       actualDiariaDates: eventParticipantsTable.actualDiariaDates,
       actualDiariaCount: eventParticipantsTable.actualDiariaCount,
+      comment: eventParticipantsTable.comment,
     })
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
@@ -468,12 +470,13 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
-  const { confirmed, actualDiariaDates } = req.body;
-  if (confirmed === undefined && actualDiariaDates === undefined) {
-    res.status(400).json({ error: "informe confirmed e/ou actualDiariaDates" });
+  const { confirmed, actualDiariaDates, comment } = req.body;
+  if (confirmed === undefined && actualDiariaDates === undefined && comment === undefined) {
+    res.status(400).json({ error: "informe confirmed, actualDiariaDates e/ou comment" });
     return;
   }
   if (confirmed !== undefined && typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed deve ser boolean" }); return; }
+  if (comment !== undefined && comment !== null && typeof comment !== "string") { res.status(400).json({ error: "comment deve ser string ou null" }); return; }
 
   let normalizedDates: string[] | null | undefined = undefined;
   if (actualDiariaDates !== undefined) {
@@ -516,6 +519,7 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
         actualDiariaDates: normalizedDates,
         actualDiariaCount: normalizedDates ? normalizedDates.length : null,
       }),
+      ...(comment !== undefined && { comment: comment === null ? null : comment.trim() || null }),
     })
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();
