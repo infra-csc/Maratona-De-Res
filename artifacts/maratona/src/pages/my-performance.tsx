@@ -8,6 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter, DialogClose,
+} from "@/components/ui/dialog";
+import {
   Trophy, Target, Calendar, TrendingUp, AlertTriangle,
   CheckCircle2, Clock, ChevronDown, ChevronRight,
   MapPin, DollarSign, Search, Flag, Send,
@@ -110,7 +114,8 @@ function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null):
 
 function EventReviewRequest({ event }: { event: EventSummary }) {
   const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [resubmitting, setResubmitting] = useState(false);
   const [comment, setComment] = useState(event.reviewRequest?.comment ?? "");
 
   const mutation = useMutation({
@@ -128,84 +133,118 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
       return res.json();
     },
     onSuccess: () => {
-      setShowForm(false);
+      setOpen(false);
+      setResubmitting(false);
       queryClient.invalidateQueries({ queryKey: ["my-performance"] });
     },
   });
 
-  if (event.reviewRequest && !showForm) {
-    return (
-      <div className="mt-4 pt-3 border-t-2 border-[#191c1e]/20">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-start gap-2 min-w-0">
-            <Flag size={14} className="mt-0.5 shrink-0 text-[#862200]" />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className={cn(
-                  "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
-                  event.reviewRequest.status === "resolved" ? "bg-[#506600] text-white" : "bg-[#fff3cd] text-[#862200]"
-                )}>
-                  {event.reviewRequest.status === "resolved" ? "Revisão resolvida" : "Revisão sinalizada"}
-                </span>
-                <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(event.reviewRequest.createdAt)}</span>
-              </div>
-              <p className="text-xs text-[#444933] italic">"{event.reviewRequest.comment}"</p>
-              {event.reviewRequest.status === "resolved" && event.reviewRequest.resolutionNotes && (
-                <p className="text-xs text-[#506600] font-bold mt-1">Resposta: {event.reviewRequest.resolutionNotes}</p>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={() => { setComment(""); setShowForm(true); }}
-            className="text-[10px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e] underline shrink-0"
-          >
-            Sinalizar novamente
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const hasRequest = !!event.reviewRequest;
+  const showForm = !hasRequest || resubmitting;
+  const isResolved = event.reviewRequest?.status === "resolved";
 
   return (
-    <div className="mt-4 pt-3 border-t-2 border-[#191c1e]/20">
-      {!showForm ? (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) { setResubmitting(false); setComment(event.reviewRequest?.comment ?? ""); }
+      }}
+    >
+      <DialogTrigger asChild>
         <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 text-[10px] font-bold uppercase italic px-3 py-2 border-2 border-[#862200] text-[#862200] hover:bg-[#862200]/10 transition-colors"
-        >
-          <Flag size={14} /> Sinalizar Revisão
-        </button>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-[10px] font-black uppercase italic text-[#747a60]">Descreva o motivo da revisão</p>
-          <Textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Ex: acredito que a nota do critério X não reflete minha participação..."
-            className="bg-white text-sm"
-            rows={3}
-          />
-          {mutation.isError && (
-            <p className="text-xs font-bold text-[#862200]">{(mutation.error as Error).message}</p>
+          data-testid="button-open-review-request"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "flex items-center gap-1.5 text-[10px] font-bold uppercase italic px-2 py-1 border-2 shrink-0 transition-colors",
+            hasRequest
+              ? isResolved
+                ? "border-[#506600] text-[#506600] bg-[#506600]/10"
+                : "border-[#862200] text-[#862200] bg-[#862200]/10"
+              : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
           )}
-          <div className="flex items-center gap-2">
+        >
+          <Flag size={12} /> {hasRequest ? (isResolved ? "Revisão resolvida" : "Revisão sinalizada") : "Sinalizar Revisão"}
+        </button>
+      </DialogTrigger>
+      <DialogContent onClick={(e) => e.stopPropagation()} className="bg-white border-2 border-[#191c1e]">
+        <DialogHeader>
+          <DialogTitle className="italic uppercase font-black flex items-center gap-2 text-[#191c1e]">
+            <Flag size={16} className="text-[#862200]" /> Sinalizar Revisão
+          </DialogTitle>
+          <DialogDescription className="italic text-[#444933]">{event.eventName}</DialogDescription>
+        </DialogHeader>
+
+        {hasRequest && !showForm && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn(
+                "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
+                isResolved ? "bg-[#506600] text-white" : "bg-[#fff3cd] text-[#862200]"
+              )}>
+                {isResolved ? "Revisão resolvida" : "Revisão sinalizada"}
+              </span>
+              <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(event.reviewRequest!.createdAt)}</span>
+            </div>
+            <p className="text-sm text-[#444933] italic">"{event.reviewRequest!.comment}"</p>
+            {isResolved && event.reviewRequest!.resolutionNotes && (
+              <p className="text-sm text-[#506600] font-bold">Resposta: {event.reviewRequest!.resolutionNotes}</p>
+            )}
             <button
-              onClick={() => mutation.mutate(comment)}
-              disabled={!comment.trim() || mutation.isPending}
-              className="flex items-center gap-2 text-[10px] font-bold uppercase italic px-3 py-2 bg-[#191c1e] text-[#ccff00] hover:bg-[#191c1e]/90 transition-colors disabled:opacity-50"
+              data-testid="button-review-request-again"
+              onClick={() => { setComment(""); setResubmitting(true); }}
+              className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e] underline"
             >
-              <Send size={14} /> {mutation.isPending ? "Enviando..." : "Enviar"}
-            </button>
-            <button
-              onClick={() => { setShowForm(false); setComment(event.reviewRequest?.comment ?? ""); }}
-              className="text-[10px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e]"
-            >
-              Cancelar
+              Sinalizar novamente
             </button>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {showForm && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase italic text-[#747a60]">Descreva o motivo da revisão</p>
+            <Textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Ex: acredito que a nota do critério X não reflete minha participação..."
+              className="bg-white text-sm"
+              rows={4}
+              autoFocus
+            />
+            {mutation.isError && (
+              <p className="text-xs font-bold text-[#862200]">{(mutation.error as Error).message}</p>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="flex-row items-center gap-2 sm:justify-end">
+          {showForm ? (
+            <>
+              {hasRequest && (
+                <button
+                  onClick={() => { setResubmitting(false); setComment(event.reviewRequest?.comment ?? ""); }}
+                  className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e]"
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                data-testid="button-confirm-review-request"
+                onClick={() => mutation.mutate(comment)}
+                disabled={!comment.trim() || mutation.isPending}
+                className="flex items-center gap-2 text-[11px] font-bold uppercase italic px-4 py-2 bg-[#191c1e] text-[#ccff00] hover:bg-[#191c1e]/90 transition-colors disabled:opacity-50"
+              >
+                <Send size={14} /> {mutation.isPending ? "Enviando..." : "Confirmar Revisão"}
+              </button>
+            </>
+          ) : (
+            <DialogClose asChild>
+              <button className="text-[11px] font-bold uppercase italic px-4 py-2 border-2 border-[#191c1e]">Fechar</button>
+            </DialogClose>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -220,9 +259,12 @@ function EventCard({ event }: { event: EventSummary }) {
   return (
     <div className="bg-white border-2 border-[#191c1e] mb-4">
       {/* Header do evento */}
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen(v => !v)}
-        className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-[#f2f4f6] transition-colors text-left gap-4"
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setOpen(v => !v); }}
+        className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-[#f2f4f6] transition-colors text-left gap-4 cursor-pointer"
       >
         <div className="flex items-start gap-4 min-w-0 w-full">
           <div className="mt-1 shrink-0 bg-[#ccff00] border-2 border-[#191c1e] p-2 text-[#191c1e]">
@@ -245,7 +287,10 @@ function EventCard({ event }: { event: EventSummary }) {
                 </span>
               )}
             </div>
-            <p className="font-bold text-base text-[#191c1e]">{event.eventName}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-base text-[#191c1e]">{event.eventName}</p>
+              <EventReviewRequest event={event} />
+            </div>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold italic text-[#747a60]">
               {(event.city || event.location) && (
                 <span className="flex items-center gap-1"><MapPin size={12} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
@@ -271,7 +316,7 @@ function EventCard({ event }: { event: EventSummary }) {
             </div>
           )}
         </div>
-      </button>
+      </div>
 
       {/* Detalhamento dos critérios */}
       {open && (
@@ -289,14 +334,21 @@ function EventCard({ event }: { event: EventSummary }) {
                           <CheckCircle2 size={12}/> Avaliado
                         </span>
                       )}
-                      {!event.feedbackReleased && c.partialPublishedAt && (
+                      {event.feedbackReleased ? (
+                        <span
+                          title={event.feedbackReleasedAt ? `Publicado em ${formatDateTime(event.feedbackReleasedAt)}` : undefined}
+                          className="text-[10px] font-bold uppercase italic text-[#ccff00] bg-[#191c1e] border border-[#191c1e] px-2 py-0.5"
+                        >
+                          Final
+                        </span>
+                      ) : c.partialPublishedAt ? (
                         <span
                           title={`Publicado em ${formatDateTime(c.partialPublishedAt)}`}
                           className="text-[10px] font-bold uppercase italic text-[#a15c00] bg-[#fff3cd] border border-[#191c1e] px-2 py-0.5"
                         >
                           Parcial · {formatDateTime(c.partialPublishedAt)}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <p className="font-bold text-sm text-[#191c1e] leading-tight italic">{c.criterionName}</p>
                   </div>
@@ -326,8 +378,6 @@ function EventCard({ event }: { event: EventSummary }) {
               </div>
             ))}
           </div>
-
-          <EventReviewRequest event={event} />
         </div>
       )}
     </div>
