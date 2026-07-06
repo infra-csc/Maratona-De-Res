@@ -152,7 +152,11 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: (_data, vars) => {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
-        toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
+        if (vars.data.confirmed !== undefined) {
+          toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
+        } else if (vars.data.actualDiariaCount !== undefined) {
+          toast({ title: "Diárias realizadas atualizadas" });
+        }
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
     },
@@ -1035,10 +1039,47 @@ export default function EventDetailPage() {
                             {p.employeeName.split(' ').map((n:string)=>n[0]).slice(0,2).join('').toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</p>
+                              <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
+                                <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
+                              </span>
+                            </div>
                             <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
                               {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}
                             </p>
+                            {(p.scheduledDiariaCount != null || p.actualDiariaCount != null || canManage) && (
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {p.scheduledDiariaCount != null && (
+                                  <span className="text-[10px] font-bold italic uppercase text-[#444933]">
+                                    Diárias previstas: {p.scheduledDiariaCount}
+                                  </span>
+                                )}
+                                {canManage ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Realizadas:</span>
+                                    <Input
+                                      data-testid={`input-actual-diaria-${p.employeeId}`}
+                                      type="number"
+                                      min={0}
+                                      step={1}
+                                      defaultValue={p.actualDiariaCount ?? ""}
+                                      onBlur={(e) => {
+                                        const raw = e.target.value;
+                                        const val = raw === "" ? null : Number(raw);
+                                        if (val === (p.actualDiariaCount ?? null)) return;
+                                        updateParticipant.mutate({ id, participantId: p.id, data: { actualDiariaCount: val } });
+                                      }}
+                                      className="h-6 w-16 text-[10px] font-bold rounded-none border-2 border-[#191c1e] px-1.5"
+                                    />
+                                  </div>
+                                ) : p.actualDiariaCount != null ? (
+                                  <span className="text-[10px] font-bold italic uppercase text-[#747a60]">
+                                    Diárias realizadas: {p.actualDiariaCount}
+                                  </span>
+                                ) : null}
+                              </div>
+                            )}
                           </div>
                           {canManage && (
                             <>

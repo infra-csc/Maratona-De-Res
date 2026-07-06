@@ -43,6 +43,15 @@ export const eventParticipantsTable = pgTable("event_participants", {
   functionName: text("function_name"),
   teamName: text("team_name"),
   confirmed: boolean("confirmed").notNull().default(true),
+  // Diárias previstas — vêm da aba Escalação do Logística Interna (sync); nunca
+  // editadas manualmente. Ausentes até o app externo expor esses campos.
+  scheduledDiariaCount: integer("scheduled_diaria_count"),
+  scheduledDiariaStart: date("scheduled_diaria_start"),
+  scheduledDiariaEnd: date("scheduled_diaria_end"),
+  // Diárias realmente cumpridas — preenchido manualmente por admin/RH dentro da
+  // Maratona (o Logística Interna não informa comparecimento real). Nunca
+  // sobrescrito pelo sync.
+  actualDiariaCount: integer("actual_diaria_count"),
 }, (t) => ({
   eventEmployeeUq: uniqueIndex("event_participants_event_employee_uq").on(t.eventId, t.employeeId),
 }));

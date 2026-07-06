@@ -228,15 +228,36 @@ export interface Event {
   createdAt?: string;
 }
 
+/**
+ * @nullable
+ */
+export type EventParticipantEmploymentType = typeof EventParticipantEmploymentType[keyof typeof EventParticipantEmploymentType] | null;
+
+
+export const EventParticipantEmploymentType = {
+  casa: 'casa',
+  freela: 'freela',
+} as const;
+
 export interface EventParticipant {
   id: number;
   eventId: number;
   employeeId: number;
   employeeName: string;
+  /** @nullable */
+  employmentType?: EventParticipantEmploymentType;
   functionName: string;
   /** @nullable */
   teamName?: string | null;
   confirmed?: boolean;
+  /** @nullable */
+  scheduledDiariaCount?: number | null;
+  /** @nullable */
+  scheduledDiariaStart?: string | null;
+  /** @nullable */
+  scheduledDiariaEnd?: string | null;
+  /** @nullable */
+  actualDiariaCount?: number | null;
 }
 
 export interface EventCriterion {
@@ -393,7 +414,9 @@ export interface EventParticipantInput {
 }
 
 export interface EventParticipantUpdate {
-  confirmed: boolean;
+  confirmed?: boolean;
+  /** @nullable */
+  actualDiariaCount?: number | null;
 }
 
 export interface EventConformity {

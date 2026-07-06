@@ -66,6 +66,9 @@ type ExtEmployee = {
   externalId?: string | number; id?: string | number; name: string;
   document?: string; email?: string; phone?: string;
   department?: string; functionName?: string; function?: string; active?: boolean;
+  // Tipo de vínculo (Freela/Casa) — ainda não exposto pelo Logística Interna hoje;
+  // mapeado tolerantemente assim que o campo existir (ver normalizeEmploymentType).
+  employmentType?: string; tipo?: string; type?: string;
 };
 type ExtEvent = {
   externalId?: string | number; id?: string | number; name: string;
@@ -76,7 +79,23 @@ type ExtParticipation = {
   eventExternalId?: string | number; eventId?: string | number;
   employeeExternalId?: string | number; employeeId?: string | number;
   functionName?: string; function?: string; teamName?: string; team?: string; confirmed?: boolean;
+  // Diária prevista (aba Escalação) — ainda não exposta pelo Logística Interna
+  // hoje; mapeada tolerantemente assim que os campos existirem.
+  diariaCount?: number; diariaStartDate?: string; diariaEndDate?: string;
 };
+
+// Normaliza o campo de tipo de vínculo vindo do Logística Interna para o
+// domínio interno "freela" | "casa". Retorna undefined quando o campo ainda
+// não vem preenchido (o app externo não expõe isso hoje) para nunca
+// sobrescrever silenciosamente um valor já corrigido manualmente na Maratona.
+function normalizeEmploymentType(raw?: string): "freela" | "casa" | undefined {
+  if (!raw) return undefined;
+  const s = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  if (!s) return undefined;
+  if (s.includes("freela") || s.includes("externo")) return "freela";
+  if (s.includes("casa") || s.includes("interno") || s.includes("funcionario") || s.includes("clt")) return "casa";
+  return undefined;
+}
 
 router.get("/integration/status", async (_req, res) => {
   const [eventsCount, employeesCount, participantsCount] = await Promise.all([
@@ -273,9 +292,13 @@ router.post("/integration/sync", async (req, res) => {
           functionName: e.functionName || e.function || "Colaborador",
           active: e.active ?? true,
         };
+        // employmentType só entra quando o Logística Interna realmente mandar o
+        // campo (ainda não manda hoje) — nunca sobrescreve um valor já corrigido
+        // manualmente na Maratona com o default "casa".
+        const employmentType = normalizeEmploymentType(e.employmentType ?? e.tipo ?? e.type);
         await tx.insert(employeesTable)
-          .values({ externalId, sourceType: "erp", ...fields })
-          .onConflictDoUpdate({ target: employeesTable.externalId, set: fields });
+          .values({ externalId, sourceType: "erp", ...fields, ...(employmentType && { employmentType }) })
+          .onConflictDoUpdate({ target: employeesTable.externalId, set: { ...fields, ...(employmentType && { employmentType }) } });
         employeesSync++;
       }
 
@@ -323,11 +346,19 @@ router.post("/integration/sync", async (req, res) => {
           teamName: p.teamName ?? p.team ?? null,
           confirmed: p.confirmed ?? true,
         };
+        // Diária prevista (aba Escalação) — ainda não vem do Logística Interna
+        // hoje; quando vier, entra aqui como dado só de sync. actualDiariaCount
+        // nunca é tocado pelo sync — é reconciliado manualmente na Maratona.
+        const diariaFields = {
+          ...(typeof p.diariaCount === "number" && { scheduledDiariaCount: p.diariaCount }),
+          ...(p.diariaStartDate && { scheduledDiariaStart: normalizeDate(p.diariaStartDate) }),
+          ...(p.diariaEndDate && { scheduledDiariaEnd: normalizeDate(p.diariaEndDate) }),
+        };
         await tx.insert(eventParticipantsTable)
-          .values({ eventId, employeeId, ...fields })
+          .values({ eventId, employeeId, ...fields, ...diariaFields })
           .onConflictDoUpdate({
             target: [eventParticipantsTable.eventId, eventParticipantsTable.employeeId],
-            set: fields,
+            set: { ...fields, ...diariaFields },
           });
         participantsSync++;
       }

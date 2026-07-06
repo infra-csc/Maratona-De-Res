@@ -458,9 +458,14 @@ export const GetEventResponse = zod.object({
   "eventId": zod.number(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
   "functionName": zod.string(),
   "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional()
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaCount": zod.number().nullish()
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),
@@ -848,9 +853,14 @@ export const GetEventParticipantsResponseItem = zod.object({
   "eventId": zod.number(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
   "functionName": zod.string(),
   "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional()
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaCount": zod.number().nullish()
 })
 export const GetEventParticipantsResponse = zod.array(GetEventParticipantsResponseItem)
 
@@ -887,7 +897,8 @@ export const UpdateEventParticipantParams = zod.object({
 })
 
 export const UpdateEventParticipantBody = zod.object({
-  "confirmed": zod.boolean()
+  "confirmed": zod.boolean().optional(),
+  "actualDiariaCount": zod.number().nullish()
 })
 
 export const UpdateEventParticipantResponse = zod.object({
@@ -895,9 +906,14 @@ export const UpdateEventParticipantResponse = zod.object({
   "eventId": zod.number(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
   "functionName": zod.string(),
   "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional()
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaCount": zod.number().nullish()
 })
 
 
@@ -1048,9 +1064,14 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "eventId": zod.number(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
   "functionName": zod.string(),
   "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional()
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaCount": zod.number().nullish()
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),
@@ -1143,9 +1164,14 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "eventId": zod.number(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
   "functionName": zod.string(),
   "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional()
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaCount": zod.number().nullish()
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),
@@ -1248,9 +1274,14 @@ export const DeleteEventCriterionResponse = zod.object({
   "eventId": zod.number(),
   "employeeId": zod.number(),
   "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
   "functionName": zod.string(),
   "teamName": zod.string().nullish(),
-  "confirmed": zod.boolean().optional()
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaCount": zod.number().nullish()
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),

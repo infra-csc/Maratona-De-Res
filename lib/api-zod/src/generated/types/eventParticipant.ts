@@ -5,14 +5,25 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { EventParticipantEmploymentType } from './eventParticipantEmploymentType';
 
 export interface EventParticipant {
   id: number;
   eventId: number;
   employeeId: number;
   employeeName: string;
+  /** @nullable */
+  employmentType?: EventParticipantEmploymentType;
   functionName: string;
   /** @nullable */
   teamName?: string | null;
   confirmed?: boolean;
+  /** @nullable */
+  scheduledDiariaCount?: number | null;
+  /** @nullable */
+  scheduledDiariaStart?: string | null;
+  /** @nullable */
+  scheduledDiariaEnd?: string | null;
+  /** @nullable */
+  actualDiariaCount?: number | null;
 }

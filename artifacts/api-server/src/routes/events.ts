@@ -108,9 +108,14 @@ async function loadEventDetail(id: number) {
       eventId: eventParticipantsTable.eventId,
       employeeId: eventParticipantsTable.employeeId,
       employeeName: employeesTable.name,
+      employmentType: employeesTable.employmentType,
       functionName: eventParticipantsTable.functionName,
       teamName: eventParticipantsTable.teamName,
       confirmed: eventParticipantsTable.confirmed,
+      scheduledDiariaCount: eventParticipantsTable.scheduledDiariaCount,
+      scheduledDiariaStart: eventParticipantsTable.scheduledDiariaStart,
+      scheduledDiariaEnd: eventParticipantsTable.scheduledDiariaEnd,
+      actualDiariaCount: eventParticipantsTable.actualDiariaCount,
     })
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
@@ -391,9 +396,14 @@ router.get("/events/:id/participants", async (req, res) => {
       eventId: eventParticipantsTable.eventId,
       employeeId: eventParticipantsTable.employeeId,
       employeeName: employeesTable.name,
+      employmentType: employeesTable.employmentType,
       functionName: eventParticipantsTable.functionName,
       teamName: eventParticipantsTable.teamName,
       confirmed: eventParticipantsTable.confirmed,
+      scheduledDiariaCount: eventParticipantsTable.scheduledDiariaCount,
+      scheduledDiariaStart: eventParticipantsTable.scheduledDiariaStart,
+      scheduledDiariaEnd: eventParticipantsTable.scheduledDiariaEnd,
+      actualDiariaCount: eventParticipantsTable.actualDiariaCount,
     })
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
@@ -409,7 +419,7 @@ router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, 
   const [participant] = await db.insert(eventParticipantsTable).values({
     eventId, employeeId, functionName: functionName ?? emp?.functionName ?? null, teamName: teamName ?? null,
   }).returning();
-  res.status(201).json({ ...participant, employeeName: emp?.name ?? "" });
+  res.status(201).json({ ...participant, employeeName: emp?.name ?? "", employmentType: emp?.employmentType ?? "casa" });
 });
 
 router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
@@ -420,16 +430,27 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
 
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
   const participantId = parseInt(req.params.participantId as string);
-  const { confirmed } = req.body;
-  if (typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed (boolean) obrigatório" }); return; }
+  const { confirmed, actualDiariaCount } = req.body;
+  if (confirmed === undefined && actualDiariaCount === undefined) {
+    res.status(400).json({ error: "informe confirmed (boolean) e/ou actualDiariaCount (número)" });
+    return;
+  }
+  if (confirmed !== undefined && typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed deve ser boolean" }); return; }
+  if (actualDiariaCount !== undefined && actualDiariaCount !== null && (!Number.isInteger(actualDiariaCount) || actualDiariaCount < 0)) {
+    res.status(400).json({ error: "actualDiariaCount deve ser um número inteiro >= 0" });
+    return;
+  }
   const [updated] = await db
     .update(eventParticipantsTable)
-    .set({ confirmed })
+    .set({
+      ...(confirmed !== undefined && { confirmed }),
+      ...(actualDiariaCount !== undefined && { actualDiariaCount }),
+    })
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();
   if (!updated) { res.status(404).json({ error: "Participante não encontrado" }); return; }
   const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, updated.employeeId)).limit(1);
-  res.json({ ...updated, employeeName: emp?.name ?? "" });
+  res.json({ ...updated, employeeName: emp?.name ?? "", employmentType: emp?.employmentType ?? "casa" });
 });
 
 // Matriz de Conformidade

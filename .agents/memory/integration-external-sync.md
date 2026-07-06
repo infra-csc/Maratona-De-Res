@@ -9,9 +9,9 @@ Maratona's `POST /api/integration/sync` pulls data from an external Replit app a
 
 - Config: `EXTERNAL_API_URL` (env, e.g. https://logistica-interna.replit.app) + `EXTERNAL_API_TOKEN` (secret). Both must be set or sync returns "não configurada".
 - The external app must expose three JSON GET endpoints, all requiring `Authorization: Bearer <EXTERNAL_API_TOKEN>` (same token value on both apps):
-  - `/api/integration/employees` → `[{ externalId, name, document?, email?, phone?, department?, functionName?, active? }]`
+  - `/api/integration/employees` → `[{ externalId, name, document?, email?, phone?, department?, functionName?, active?, employmentType?|tipo?|type? }]`
   - `/api/integration/events` → `[{ externalId, name, clientName?, location?, city?, state?, startDate(YYYY-MM-DD), endDate?, year?, quarter? }]`
-  - `/api/integration/participations` → `[{ eventExternalId, employeeExternalId, functionName?, teamName?, confirmed? }]`
+  - `/api/integration/participations` → `[{ eventExternalId, employeeExternalId, functionName?, teamName?, confirmed?, diariaCount?, diariaStartDate?, diariaEndDate? }]`
 
 **Why:** `externalId` is the upsert key (employees/events); participations upsert by resolved `(eventId, employeeId)`. A participation whose event/employee externalId isn't found is skipped and logged.
 

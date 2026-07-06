@@ -7,5 +7,7 @@
  */
 
 export interface EventParticipantUpdate {
-  confirmed: boolean;
+  confirmed?: boolean;
+  /** @nullable */
+  actualDiariaCount?: number | null;
 }

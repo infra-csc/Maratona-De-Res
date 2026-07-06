@@ -42,4 +42,5 @@
 - [Partial vs final feedback publish](partial-final-publish.md) — 2 independent publish actions (partialPublishedAt repeatable, feedbackReleased terminal); badges must derive 3-state final>partial>none, never 2-state
 - [Merge vs unique indexes](merge-unique-index-ordering.md) — in dedupe merges, copy unique-indexed fields (external_id) only AFTER deleting the duplicate in the same txn
 - [Survey Forms raw import](survey-forms-raw-import.md) — parse MS Forms exports by header text (not fixed column position); -1 sentinel = ignore group; last-row-wins per evaluator+event; skip pairs already in app
+- [Employment type + diária sync](employment-type-diaria-sync.md) — set employmentType only when external payload provides it (never default), or it clobbers manual RH edits
 - [Drizzle wraps pg error codes](drizzle-error-codes.md) — pg error code (23503 etc.) is in err.cause.code, not err.code; users with history can't be hard-deleted, deactivate instead

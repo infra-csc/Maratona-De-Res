@@ -2352,12 +2352,23 @@ components:
           type: integer
         employeeName:
           type: string
+        employmentType:
+          type: ["string", "null"]
+          enum: [casa, freela, null]
         functionName:
           type: string
         teamName:
           type: ["string", "null"]
         confirmed:
           type: boolean
+        scheduledDiariaCount:
+          type: ["integer", "null"]
+        scheduledDiariaStart:
+          type: ["string", "null"]
+        scheduledDiariaEnd:
+          type: ["string", "null"]
+        actualDiariaCount:
+          type: ["integer", "null"]
 
     EventParticipantInput:
       type: object
@@ -2372,10 +2383,11 @@ components:
 
     EventParticipantUpdate:
       type: object
-      required: [confirmed]
       properties:
         confirmed:
           type: boolean
+        actualDiariaCount:
+          type: ["integer", "null"]
 
     EventConformity:
       type: object

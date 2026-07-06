@@ -61,6 +61,7 @@ export * from './eventDetail';
 export * from './eventFeedback';
 export * from './eventInput';
 export * from './eventParticipant';
+export * from './eventParticipantEmploymentType';
 export * from './eventParticipantInput';
 export * from './eventParticipantUpdate';
 export * from './eventPendency';
