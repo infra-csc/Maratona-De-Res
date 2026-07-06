@@ -67,6 +67,7 @@ interface EventSummary {
   evaluatedCriteria: number;
   totalCriteria: number;
   criteriaDetails: CriterionDetail[];
+  countsForScore: boolean;
 }
 
 interface CriterionDetail {
@@ -123,6 +124,14 @@ function EventCard({ event }: { event: EventSummary }) {
               )}>
                 {publishLabel}
               </span>
+              {!event.countsForScore && (
+                <span
+                  title="Participação apenas histórica/informativa — não entra na sua média nem na elegibilidade."
+                  className="text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200]"
+                >
+                  Não conta p/ nota
+                </span>
+              )}
             </div>
             <p className="font-bold text-base text-[#191c1e]">{event.eventName}</p>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold italic text-[#747a60]">

@@ -401,9 +401,20 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                   ) : (
                     <div className="space-y-2">
                       {detail.events.map(ev => (
-                        <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
+                        <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")}>
                           <div className="flex-1 min-w-0">
-                            <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
+                              {!ev.countsForScore && (
+                                <span
+                                  data-testid={`detail-event-no-score-${ev.eventId}`}
+                                  className="px-1.5 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
+                                  title="Participação apenas histórica/informativa — não entra na nota."
+                                >
+                                  <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
+                                </span>
+                              )}
+                            </div>
                             <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold italic text-[#747a60]">
                               {(ev.city || ev.state) && (
                                 <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
@@ -575,9 +586,20 @@ function EmployeeDetailSheet({
                 ) : (
                   <div className="space-y-2">
                     {detail.events.map(ev => (
-                      <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
+                      <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")}>
                         <div className="flex-1 min-w-0">
-                          <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
+                            {!ev.countsForScore && (
+                              <span
+                                data-testid={`detail-event-no-score-${ev.eventId}`}
+                                className="px-1.5 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
+                                title="Participação apenas histórica/informativa — não entra na nota."
+                              >
+                                <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
+                              </span>
+                            )}
+                          </div>
                           <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold italic text-[#747a60]">
                             {(ev.city || ev.state) && (
                               <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
