@@ -1319,7 +1319,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
 export default function ResultsPage() {
   const { user } = useAuth();
   const isManager = !!user && ["admin", "rh", "diretoria"].includes(user.role);
-  const canManage = !!user && ["admin", "rh"].includes(user.role);
+  const canManage = !!user && ["admin", "rh", "diretoria"].includes(user.role);
   const [tab, setTab] = useState("ranking");
 
   return (
