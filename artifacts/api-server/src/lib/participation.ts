@@ -27,12 +27,20 @@ export function normalizeFunction(s?: string | null): string {
     .trim();
 }
 
-const SCORED_FUNCTIONS = new Set(["cenotecnica", "cenotecnica local"]);
+const SCORED_FUNCTION_PREFIXES = ["cenotecnica", "cenotecnico"];
 const INFORMATIONAL_FUNCTION_PREFIX = "sup ceno";
 
-/** Funções explicitamente destinadas a serem avaliadas (usado na sincronização). */
+/**
+ * Funções explicitamente destinadas a serem avaliadas (usado na sincronização).
+ * Prefixo, não match exato: a Logística Interna usa variantes como "Cenotécnica
+ * Local", "Cenotécnica SP", "Cenotécnica SP1/SP2" (times/squads) e a grafia
+ * masculina "Cenotécnico - Casa/Freela" — um match exato só em
+ * "cenotecnica"/"cenotecnica local" descartava silenciosamente essas
+ * participações (e os dados de diária junto) na sincronização externa.
+ */
 export function isScoredFunction(functionName?: string | null): boolean {
-  return SCORED_FUNCTIONS.has(normalizeFunction(functionName));
+  const n = normalizeFunction(functionName);
+  return SCORED_FUNCTION_PREFIXES.some(p => n.startsWith(p));
 }
 
 /**
