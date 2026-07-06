@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
 import { cyclesTable } from "./cycles";
+import { usersTable } from "./users";
 
 export const eventsTable = pgTable("events", {
   id: serial("id").primaryKey(),
@@ -31,6 +32,15 @@ export const eventsTable = pgTable("events", {
   // Observações livres trazidas de uma importação em massa (ex.: planilha de
   // pesquisa com avaliadores) — texto de referência, nunca entra em cálculo.
   importedNotes: text("imported_notes"),
+  // Trava mestra: um evento só passa a contar para nota/elegibilidade dos
+  // colaboradores (participatedEventsCount E score) depois que admin/RH
+  // confirma explicitamente os resultados aqui — independente de status
+  // (pode confirmar antes ou depois de fechar). Fica em false por padrão
+  // (inclusive eventos já existentes/fechados/pagos): nada conta até ser
+  // confirmado manualmente. Ver recomputeCycleResults em routes/results.ts.
+  resultsConfirmed: boolean("results_confirmed").notNull().default(false),
+  resultsConfirmedAt: timestamp("results_confirmed_at"),
+  resultsConfirmedBy: integer("results_confirmed_by").references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   externalIdUq: uniqueIndex("events_external_id_uq").on(t.externalId),

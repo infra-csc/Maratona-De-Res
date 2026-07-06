@@ -65,6 +65,7 @@ router.get("/my-performance", async (req, res) => {
       startDate: eventsTable.startDate,
       endDate: eventsTable.endDate,
       functionName: eventParticipantsTable.functionName,
+      resultsConfirmed: eventsTable.resultsConfirmed,
     })
     .from(eventParticipantsTable)
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
@@ -206,6 +207,9 @@ router.get("/my-performance", async (req, res) => {
       // no histórico mas não conta para a média/bônus — mesma regra do
       // fechamento (recomputeCycleResults, ver lib/participation.ts).
       countsForScore: participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName }),
+      // Trava mestra: evento só conta para média/elegibilidade depois de
+      // confirmado por admin/RH (mesma regra de recomputeCycleResults).
+      resultsConfirmed: p.resultsConfirmed ?? false,
     });
   }
 
@@ -249,7 +253,7 @@ router.get("/my-performance", async (req, res) => {
   const openEvents = eventSummaries.filter(e => e.status === "open").length;
   const closedEvents = eventSummaries.filter(e => e.status === "closed").length;
 
-  const scoredEvents = eventSummaries.filter(e => e.eventScore > 0 && e.countsForScore);
+  const scoredEvents = eventSummaries.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
   const grossAverage = scoredEvents.length > 0
     ? scoredEvents.reduce((s, e) => s + e.eventScore, 0) / scoredEvents.length
     : null;

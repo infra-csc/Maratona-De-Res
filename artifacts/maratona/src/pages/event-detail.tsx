@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -138,6 +138,34 @@ export default function EventDetailPage() {
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
     },
   });
+
+  const confirmResults = useConfirmEventResults({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
+        if (data.warnings && data.warnings.length > 0) {
+          toast({ title: "Resultados confirmados", description: data.warnings.join(" "), variant: "destructive" });
+        } else {
+          toast({ title: "Resultados confirmados", description: "O evento agora conta na elegibilidade e na nota dos colaboradores." });
+        }
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao confirmar resultados", description: e.message, variant: "destructive" }),
+    },
+  });
+  const unconfirmResults = useUnconfirmEventResults({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
+        toast({ title: "Confirmação revertida", description: "O evento deixou de contar na elegibilidade e na nota dos colaboradores." });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao reverter confirmação", description: e.message, variant: "destructive" }),
+    },
+  });
+  const resultsConfirmBusy = confirmResults.isPending || unconfirmResults.isPending;
 
   const duplicateCriterion = useDuplicateEventCriterion({
     mutation: {
@@ -371,6 +399,15 @@ export default function EventDetailPage() {
                   {event.forcedClosed && (
                     <span className="bg-[#ff5722] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
                       <span className="inline-flex items-center gap-1 skew-x-[8deg]"><ShieldAlert size={10} /> Fechamento Forçado</span>
+                    </span>
+                  )}
+                  {event.resultsConfirmed ? (
+                    <span data-testid="badge-results-confirmed" className="bg-[#ccff00] text-[#161e00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1 skew-x-[8deg]"><CheckCircle2 size={10} /> Resultados Confirmados</span>
+                    </span>
+                  ) : (
+                    <span data-testid="badge-results-pending" className="bg-[#ff5722] text-white px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1 skew-x-[8deg]"><AlertCircle size={10} /> Resultados Não Confirmados</span>
                     </span>
                   )}
                 </div>
@@ -926,6 +963,57 @@ export default function EventDetailPage() {
                       </button>
                     )}
                   </>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {canManage && (
+          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className={`px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic ${event.resultsConfirmed ? "bg-[#191c1e] text-[#ccff00]" : "bg-[#ff5722] text-white"}`}>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={18} />
+                <span className="font-black uppercase tracking-tight">Confirmação de Resultados</span>
+              </div>
+              {event.resultsConfirmed ? (
+                <span data-testid="badge-results-confirmed-section" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
+                  <Lock size={12} /> Confirmado
+                </span>
+              ) : (
+                <span data-testid="badge-results-pending-section" className="inline-flex items-center gap-1.5 bg-white text-[#ba1a1a] border-2 border-white px-3 py-1 text-[11px] font-black uppercase">
+                  <AlertCircle size={12} /> Não Confirmado
+                </span>
+              )}
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm italic text-[#444933]">
+                Enquanto os resultados não forem confirmados, este evento <strong>não conta</strong> na elegibilidade nem na nota final dos colaboradores — mesmo que já esteja fechado. Confirme após revisar as notas e a calibragem. Admin/RH pode confirmar ou reverter a qualquer momento.
+              </p>
+              {event.resultsConfirmed && event.resultsConfirmedAt && (
+                <p className="text-xs italic text-[#747a60]">
+                  Confirmado em {new Date(event.resultsConfirmedAt).toLocaleString('pt-BR')}
+                </p>
+              )}
+              <div className="flex justify-end">
+                {event.resultsConfirmed ? (
+                  <button
+                    data-testid="button-unconfirm-results"
+                    onClick={() => unconfirmResults.mutate({ id })}
+                    disabled={resultsConfirmBusy}
+                    className="bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Unlock size={16} /> {resultsConfirmBusy ? "Revertendo..." : "Desconfirmar Resultados"}
+                  </button>
+                ) : (
+                  <button
+                    data-testid="button-confirm-results"
+                    onClick={() => confirmResults.mutate({ id })}
+                    disabled={resultsConfirmBusy}
+                    className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW}`}
+                  >
+                    <CheckCircle2 size={16} /> {resultsConfirmBusy ? "Confirmando..." : "Confirmar Resultados"}
+                  </button>
                 )}
               </div>
             </div>

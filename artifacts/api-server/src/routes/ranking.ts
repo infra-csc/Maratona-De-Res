@@ -101,6 +101,7 @@ router.get("/ranking-detail", async (req, res) => {
       isHistorical: eventsTable.isHistorical,
       importedScore: eventsTable.importedScore,
       functionName: eventParticipantsTable.functionName,
+      resultsConfirmed: eventsTable.resultsConfirmed,
     })
     .from(eventParticipantsTable)
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
@@ -136,6 +137,7 @@ router.get("/ranking-detail", async (req, res) => {
         totalCriteria: 0,
         isHistorical: true,
         countsForScore,
+        resultsConfirmed: p.resultsConfirmed ?? false,
       });
       continue;
     }
@@ -163,6 +165,7 @@ router.get("/ranking-detail", async (req, res) => {
       totalCriteria: teamResult.totalCriteria,
       isHistorical: false,
       countsForScore,
+      resultsConfirmed: p.resultsConfirmed ?? false,
     });
   }
   events.sort((a, b) => b.eventScore - a.eventScore);
@@ -207,7 +210,7 @@ router.get("/ranking-detail", async (req, res) => {
   // nem função informativa tipo "Sup Ceno *") entram na base — igual ao
   // eventsCount/grossAverage da consolidação. Eventos abertos ou que não
   // contam para nota aparecem na lista como histórico, mas não entram na média.
-  const scored = events.filter(e => e.status === "closed" && e.eventScore > 0 && e.countsForScore);
+  const scored = events.filter(e => e.status === "closed" && e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
   const grossAverage = scored.length > 0 ? Math.round((scored.reduce((s, e) => s + e.eventScore, 0) / scored.length) * 100) / 100 : null;
 
   res.json({

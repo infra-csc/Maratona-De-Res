@@ -62,6 +62,7 @@ import type {
   EventParticipant,
   EventParticipantInput,
   EventParticipantUpdate,
+  EventResultsConfirmationResponse,
   EventTeamResult,
   EventUpdate,
   ExportEventResultsParams,
@@ -2115,6 +2116,146 @@ export const useReopenEvent = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getReopenEventMutationOptions(options));
+    }
+
+export const getConfirmEventResultsUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/confirm-results`
+}
+
+/**
+ * @summary Confirm event results (only after this does the event count toward employees' score/eligibility)
+ */
+export const confirmEventResults = async (id: number, options?: RequestInit): Promise<EventResultsConfirmationResponse> => {
+
+  return customFetch<EventResultsConfirmationResponse>(getConfirmEventResultsUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getConfirmEventResultsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmEventResults>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmEventResults>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['confirmEventResults'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmEventResults>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  confirmEventResults(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmEventResultsMutationResult = NonNullable<Awaited<ReturnType<typeof confirmEventResults>>>
+
+    export type ConfirmEventResultsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm event results (only after this does the event count toward employees' score/eligibility)
+ */
+export const useConfirmEventResults = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmEventResults>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmEventResults>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getConfirmEventResultsMutationOptions(options));
+    }
+
+export const getUnconfirmEventResultsUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/unconfirm-results`
+}
+
+/**
+ * @summary Revert event results confirmation (event stops counting toward employees' score/eligibility)
+ */
+export const unconfirmEventResults = async (id: number, options?: RequestInit): Promise<EventResultsConfirmationResponse> => {
+
+  return customFetch<EventResultsConfirmationResponse>(getUnconfirmEventResultsUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getUnconfirmEventResultsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unconfirmEventResults>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unconfirmEventResults>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['unconfirmEventResults'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unconfirmEventResults>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unconfirmEventResults(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnconfirmEventResultsMutationResult = NonNullable<Awaited<ReturnType<typeof unconfirmEventResults>>>
+
+    export type UnconfirmEventResultsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Revert event results confirmation (event stops counting toward employees' score/eligibility)
+ */
+export const useUnconfirmEventResults = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unconfirmEventResults>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unconfirmEventResults>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUnconfirmEventResultsMutationOptions(options));
     }
 
 export const getGetEventResultUrl = (id: number,) => {

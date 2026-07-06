@@ -5,14 +5,11 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
-import type { EmployeeEventResult } from './employeeEventResult';
-import type { EvaluationMatrixRow } from './evaluationMatrixRow';
-import type { EventAreaAssignment } from './eventAreaAssignment';
-import type { EventCriterion } from './eventCriterion';
-import type { EventParticipant } from './eventParticipant';
 
-export interface EventDetail {
+export interface EventResultsConfirmationResponse {
   id: number;
+  /** @nullable */
+  externalId?: string | null;
   name: string;
   /** @nullable */
   clientName?: string | null;
@@ -25,26 +22,26 @@ export interface EventDetail {
   startDate: string;
   endDate: string;
   cycleId: number;
-  cycleName?: string;
   status: string;
   forcedClosed?: boolean;
   /** @nullable */
   forcedCloseReason?: string | null;
-  criteriaConfirmed?: boolean;
-  hasEvaluations?: boolean;
   feedbackReleased?: boolean;
+  /** @nullable */
+  feedbackReleasedAt?: string | null;
+  criteriaConfirmed?: boolean;
+  /** @nullable */
+  criteriaConfirmedAt?: string | null;
   isHistorical?: boolean;
   /** @nullable */
   importedScore?: number | null;
+  /** @nullable */
+  importedNotes?: string | null;
   resultsConfirmed?: boolean;
   /** @nullable */
   resultsConfirmedAt?: string | null;
   /** @nullable */
   resultsConfirmedBy?: number | null;
-  participants?: EventParticipant[];
-  criteria?: EventCriterion[];
-  areaAssignments?: EventAreaAssignment[];
-  evaluationMatrix?: EvaluationMatrixRow[];
-  results?: EmployeeEventResult[];
-  evaluationProgress?: number;
+  createdAt?: string;
+  warnings?: string[];
 }

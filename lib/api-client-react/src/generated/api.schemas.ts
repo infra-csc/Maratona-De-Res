@@ -225,7 +225,52 @@ export interface Event {
   isHistorical?: boolean;
   /** @nullable */
   importedScore?: number | null;
+  resultsConfirmed?: boolean;
+  /** @nullable */
+  resultsConfirmedAt?: string | null;
+  /** @nullable */
+  resultsConfirmedBy?: number | null;
   createdAt?: string;
+}
+
+export interface EventResultsConfirmationResponse {
+  id: number;
+  /** @nullable */
+  externalId?: string | null;
+  name: string;
+  /** @nullable */
+  clientName?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  state?: string | null;
+  startDate: string;
+  endDate: string;
+  cycleId: number;
+  status: string;
+  forcedClosed?: boolean;
+  /** @nullable */
+  forcedCloseReason?: string | null;
+  feedbackReleased?: boolean;
+  /** @nullable */
+  feedbackReleasedAt?: string | null;
+  criteriaConfirmed?: boolean;
+  /** @nullable */
+  criteriaConfirmedAt?: string | null;
+  isHistorical?: boolean;
+  /** @nullable */
+  importedScore?: number | null;
+  /** @nullable */
+  importedNotes?: string | null;
+  resultsConfirmed?: boolean;
+  /** @nullable */
+  resultsConfirmedAt?: string | null;
+  /** @nullable */
+  resultsConfirmedBy?: number | null;
+  createdAt?: string;
+  warnings?: string[];
 }
 
 /**
@@ -367,6 +412,11 @@ export interface EventDetail {
   isHistorical?: boolean;
   /** @nullable */
   importedScore?: number | null;
+  resultsConfirmed?: boolean;
+  /** @nullable */
+  resultsConfirmedAt?: string | null;
+  /** @nullable */
+  resultsConfirmedBy?: number | null;
   participants?: EventParticipant[];
   criteria?: EventCriterion[];
   areaAssignments?: EventAreaAssignment[];

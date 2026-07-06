@@ -44,5 +44,10 @@ export interface Event {
   isHistorical?: boolean;
   /** @nullable */
   importedScore?: number | null;
+  resultsConfirmed?: boolean;
+  /** @nullable */
+  resultsConfirmedAt?: string | null;
+  /** @nullable */
+  resultsConfirmedBy?: number | null;
   createdAt?: string;
 }

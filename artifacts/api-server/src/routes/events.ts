@@ -391,6 +391,33 @@ router.post("/events/:id/reopen", requireRole("admin", "rh"), async (req, res) =
   res.json(ev);
 });
 
+// Trava mestra de contagem: o evento só passa a contar para elegibilidade e
+// nota dos colaboradores depois de confirmado aqui — independente de status
+// (open/closed/calibration). Ver comentário em recomputeCycleResults.
+router.post("/events/:id/confirm-results", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  const [ev] = await db.update(eventsTable).set({
+    resultsConfirmed: true, resultsConfirmedAt: new Date(), resultsConfirmedBy: req.user!.userId,
+  }).where(eq(eventsTable.id, id)).returning();
+  await audit(req.user!.userId, "confirm-results", "events", id, before, ev);
+  const { warnings } = await recomputeCycleResults(ev.cycleId, req.user!.userId);
+  res.json({ ...ev, warnings });
+});
+
+router.post("/events/:id/unconfirm-results", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  const [ev] = await db.update(eventsTable).set({
+    resultsConfirmed: false, resultsConfirmedAt: null, resultsConfirmedBy: null,
+  }).where(eq(eventsTable.id, id)).returning();
+  await audit(req.user!.userId, "unconfirm-results", "events", id, before, ev);
+  const { warnings } = await recomputeCycleResults(ev.cycleId, req.user!.userId);
+  res.json({ ...ev, warnings });
+});
+
 router.get("/events/:id/participants", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const participants = await db

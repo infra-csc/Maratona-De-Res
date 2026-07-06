@@ -156,8 +156,13 @@ export async function computeEventTeamResult(eventId: number) {
  */
 export async function recomputeCycleResults(cycleId: number, userId: number) {
   const cycleEvents = await db.select().from(eventsTable).where(eq(eventsTable.cycleId, cycleId));
-  const allCycleEventIds = cycleEvents.map(e => e.id);
-  const closedEvents = cycleEvents.filter(e => e.status === "closed");
+  // Trava mestra: eventos sem resultsConfirmed=true não contam para NADA —
+  // nem participatedEventsCount/elegibilidade, nem nota — mesmo se fechados.
+  // Filtra aqui, na origem, para que todo o resto da função (participação e
+  // pontuação) já opere só sobre eventos confirmados.
+  const confirmedCycleEvents = cycleEvents.filter(e => e.resultsConfirmed);
+  const allCycleEventIds = confirmedCycleEvents.map(e => e.id);
+  const closedEvents = confirmedCycleEvents.filter(e => e.status === "closed");
   const closedEventIds = new Set(closedEvents.map(e => e.id));
   const platoonRules = await loadPlatoonRules();
   const minEvents = await getMinEventsForEligibility();

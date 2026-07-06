@@ -65,6 +65,7 @@ export * from './eventParticipantEmploymentType';
 export * from './eventParticipantInput';
 export * from './eventParticipantUpdate';
 export * from './eventPendency';
+export * from './eventResultsConfirmationResponse';
 export * from './eventTeamCriterion';
 export * from './eventTeamParticipant';
 export * from './eventTeamResult';

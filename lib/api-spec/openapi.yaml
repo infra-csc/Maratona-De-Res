@@ -524,6 +524,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/Event"
 
+  /events/{id}/confirm-results:
+    post:
+      operationId: confirmEventResults
+      tags: [events]
+      summary: Confirm event results (only after this does the event count toward employees' score/eligibility)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResultsConfirmationResponse"
+
+  /events/{id}/unconfirm-results:
+    post:
+      operationId: unconfirmEventResults
+      tags: [events]
+      summary: Revert event results confirmation (event stops counting toward employees' score/eligibility)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResultsConfirmationResponse"
+
   /events/{id}/result:
     get:
       operationId: getEventResult
@@ -2199,8 +2237,71 @@ components:
           type: boolean
         importedScore:
           type: ["number", "null"]
+        resultsConfirmed:
+          type: boolean
+        resultsConfirmedAt:
+          type: ["string", "null"]
+        resultsConfirmedBy:
+          type: ["integer", "null"]
         createdAt:
           type: string
+
+    EventResultsConfirmationResponse:
+      type: object
+      required: [id, name, startDate, endDate, cycleId, status]
+      properties:
+        id:
+          type: integer
+        externalId:
+          type: ["string", "null"]
+        name:
+          type: string
+        clientName:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        cycleId:
+          type: integer
+        status:
+          type: string
+        forcedClosed:
+          type: boolean
+        forcedCloseReason:
+          type: ["string", "null"]
+        feedbackReleased:
+          type: boolean
+        feedbackReleasedAt:
+          type: ["string", "null"]
+        criteriaConfirmed:
+          type: boolean
+        criteriaConfirmedAt:
+          type: ["string", "null"]
+        isHistorical:
+          type: boolean
+        importedScore:
+          type: ["number", "null"]
+        importedNotes:
+          type: ["string", "null"]
+        resultsConfirmed:
+          type: boolean
+        resultsConfirmedAt:
+          type: ["string", "null"]
+        resultsConfirmedBy:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string
 
     EventDetail:
       type: object
@@ -2242,6 +2343,12 @@ components:
           type: boolean
         importedScore:
           type: ["number", "null"]
+        resultsConfirmed:
+          type: boolean
+        resultsConfirmedAt:
+          type: ["string", "null"]
+        resultsConfirmedBy:
+          type: ["integer", "null"]
         participants:
           type: array
           items:
