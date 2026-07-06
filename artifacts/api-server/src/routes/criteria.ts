@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, criteriaTable, areasTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, criteriaTable, areasTable, eventCriteriaTable, eventsTable } from "@workspace/db";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -53,6 +53,27 @@ router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(active !== undefined && { active }),
     ...(displayOrder !== undefined && { displayOrder }),
   }).where(eq(criteriaTable.id, id)).returning();
+
+  // Se um critério global for desativado, ele não deve continuar aparecendo
+  // como pendente de peso/avaliador em eventos que ainda não travaram os
+  // critérios (RH ainda não confirmou). Eventos já confirmados/avaliados
+  // mantêm o snapshot histórico intacto.
+  if (active === false && before.active !== false) {
+    const openEvents = await db
+      .select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(eq(eventsTable.criteriaConfirmed, false));
+    const openEventIds = openEvents.map(e => e.id);
+    if (openEventIds.length > 0) {
+      await db.update(eventCriteriaTable)
+        .set({ active: false })
+        .where(and(
+          eq(eventCriteriaTable.criterionId, id),
+          inArray(eventCriteriaTable.eventId, openEventIds),
+        ));
+    }
+  }
+
   await audit(req.user!.userId, "update", "criteria", id, before, criterion);
   res.json(criterion);
 });

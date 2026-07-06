@@ -887,6 +887,68 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
   res.json(await loadEventDetail(eventId));
 });
 
+/**
+ * POST /events/:id/criteria/resync
+ * Corrige eventos "presos" no catálogo antigo de critérios: se um critério
+ * global foi desativado depois que o evento foi criado, ele fica orfão no
+ * evento (event_criteria.active continua true mesmo sem existir mais no
+ * catálogo ativo). Isso pode deixar o evento sem NENHUM critério realmente
+ * ativo. Este endpoint, disponível apenas enquanto o evento não travou os
+ * critérios (criteriaConfirmed=false), sincroniza o evento com o catálogo
+ * global atual: desativa vínculos para critérios hoje inativos e cria
+ * vínculos para critérios ativos que ainda não estão no evento. Critérios
+ * criados sob medida para o evento (eventScoped) nunca são tocados.
+ */
+router.post("/events/:id/criteria/resync", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Não encontrado" }); return; }
+
+  if (event.criteriaConfirmed) {
+    res.status(409).json({ error: "Este evento já confirmou os critérios. Reabra a confirmação antes de sincronizar." });
+    return;
+  }
+  if (await eventHasEvaluations(eventId)) {
+    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem ser sincronizados automaticamente." });
+    return;
+  }
+
+  const globalActive = await db
+    .select({ id: criteriaTable.id })
+    .from(criteriaTable)
+    .where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
+  const globalActiveIds = new Set(globalActive.map(c => c.id));
+
+  const existing = await db
+    .select({
+      id: eventCriteriaTable.id,
+      criterionId: eventCriteriaTable.criterionId,
+      active: eventCriteriaTable.active,
+      criterionActive: criteriaTable.active,
+      eventScoped: criteriaTable.eventScoped,
+    })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .where(eq(eventCriteriaTable.eventId, eventId));
+
+  const existingCriterionIds = new Set(existing.map(e => e.criterionId));
+
+  const toDeactivate = existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
+  const toAdd = [...globalActiveIds].filter(cid => !existingCriterionIds.has(cid));
+
+  await db.transaction(async (tx) => {
+    for (const row of toDeactivate) {
+      await tx.update(eventCriteriaTable).set({ active: false }).where(eq(eventCriteriaTable.id, row.id));
+    }
+    if (toAdd.length > 0) {
+      await tx.insert(eventCriteriaTable).values(toAdd.map(criterionId => ({ eventId, criterionId, active: true })));
+    }
+  });
+
+  await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated: toDeactivate.length, added: toAdd.length }, null);
+  res.json({ ...(await loadEventDetail(eventId)), removedStale: toDeactivate.length, addedNew: toAdd.length });
+});
+
 router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const confirmed = req.body?.confirmed !== false;
