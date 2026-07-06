@@ -162,6 +162,10 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   // pontuação) já opere só sobre eventos confirmados.
   const confirmedCycleEvents = cycleEvents.filter(e => e.resultsConfirmed);
   const allCycleEventIds = confirmedCycleEvents.map(e => e.id);
+  // Todos os IDs do ciclo (confirmados ou não) — usado só para limpar
+  // employee_event_results por completo no rebuild, senão eventos que
+  // ficaram desconfirmados deixariam linhas antigas "fantasma" para trás.
+  const allCycleEventIdsUnfiltered = cycleEvents.map(e => e.id);
   const closedEvents = confirmedCycleEvents.filter(e => e.status === "closed");
   const closedEventIds = new Set(closedEvents.map(e => e.id));
   const platoonRules = await loadPlatoonRules();
@@ -379,9 +383,9 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
 
   // FASE DE ESCRITA — rebuild atômico de todo o ciclo.
   await db.transaction(async (tx) => {
-    if (allCycleEventIds.length > 0) {
+    if (allCycleEventIdsUnfiltered.length > 0) {
       await tx.delete(employeeEventResultsTable)
-        .where(inArray(employeeEventResultsTable.eventId, allCycleEventIds));
+        .where(inArray(employeeEventResultsTable.eventId, allCycleEventIdsUnfiltered));
     }
     if (eventResultInserts.length > 0) {
       await tx.insert(employeeEventResultsTable).values(eventResultInserts);

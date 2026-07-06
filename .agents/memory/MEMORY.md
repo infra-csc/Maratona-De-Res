@@ -46,3 +46,4 @@
 - [Participation scoring exclusion](participation-scoring-exclusion.md) — freela + "Sup Ceno *" functions participate but never score; negative-match rule, single source `participantCountsForScore()`, live UI join, no PATCH-triggered recompute
 - [Employment type + diária sync](employment-type-diaria-sync.md) — set employmentType only when external payload provides it (never default), or it clobbers manual RH edits
 - [Drizzle wraps pg error codes](drizzle-error-codes.md) — pg error code (23503 etc.) is in err.cause.code, not err.code; users with history can't be hard-deleted, deactivate instead
+- [resultsConfirmed gating flag](results-confirmed-gating.md) — event-level flag gates score+eligibility; defaults false (incl. existing/paid events = intentional reset); filter at recompute source + mirror in any live-compute path
