@@ -115,6 +115,14 @@ export interface AreaUpdate {
   active?: boolean;
 }
 
+export type EmployeeEmploymentType = typeof EmployeeEmploymentType[keyof typeof EmployeeEmploymentType];
+
+
+export const EmployeeEmploymentType = {
+  casa: 'casa',
+  freela: 'freela',
+} as const;
+
 export interface Employee {
   id: number;
   /** @nullable */
@@ -128,6 +136,7 @@ export interface Employee {
   phone?: string | null;
   department: string;
   functionName: string;
+  employmentType?: EmployeeEmploymentType;
   active: boolean;
   eligibleForBonus?: boolean;
   /** @nullable */
@@ -138,6 +147,14 @@ export interface Employee {
   createdAt?: string;
 }
 
+export type EmployeeInputEmploymentType = typeof EmployeeInputEmploymentType[keyof typeof EmployeeInputEmploymentType];
+
+
+export const EmployeeInputEmploymentType = {
+  casa: 'casa',
+  freela: 'freela',
+} as const;
+
 export interface EmployeeInput {
   name: string;
   document?: string;
@@ -145,7 +162,16 @@ export interface EmployeeInput {
   phone?: string;
   department: string;
   functionName: string;
+  employmentType?: EmployeeInputEmploymentType;
 }
+
+export type EmployeeUpdateEmploymentType = typeof EmployeeUpdateEmploymentType[keyof typeof EmployeeUpdateEmploymentType];
+
+
+export const EmployeeUpdateEmploymentType = {
+  casa: 'casa',
+  freela: 'freela',
+} as const;
 
 export interface EmployeeUpdate {
   name?: string;
@@ -154,6 +180,7 @@ export interface EmployeeUpdate {
   phone?: string;
   department?: string;
   functionName?: string;
+  employmentType?: EmployeeUpdateEmploymentType;
   active?: boolean;
   eligibleForBonus?: boolean;
   eligibilityStatus?: string;

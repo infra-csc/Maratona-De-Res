@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { EmployeeUpdateEmploymentType } from './employeeUpdateEmploymentType';
 
 export interface EmployeeUpdate {
   name?: string;
@@ -13,6 +14,7 @@ export interface EmployeeUpdate {
   phone?: string;
   department?: string;
   functionName?: string;
+  employmentType?: EmployeeUpdateEmploymentType;
   active?: boolean;
   eligibleForBonus?: boolean;
   eligibilityStatus?: string;

@@ -11,6 +11,7 @@ export const employeesTable = pgTable("employees", {
   phone: text("phone"),
   department: text("department").notNull().default("Geral"),
   functionName: text("function_name").notNull().default("Colaborador"),
+  employmentType: text("employment_type").notNull().default("casa"), // casa | freela
   active: boolean("active").notNull().default(true),
   // Elegibilidade ao programa de bonificação
   eligibleForBonus: boolean("eligible_for_bonus").notNull().default(true),

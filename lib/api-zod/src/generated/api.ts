@@ -242,6 +242,7 @@ export const GetEmployeesResponseItem = zod.object({
   "phone": zod.string().nullish(),
   "department": zod.string(),
   "functionName": zod.string(),
+  "employmentType": zod.enum(['casa', 'freela']).optional(),
   "active": zod.boolean(),
   "eligibleForBonus": zod.boolean().optional(),
   "eligibilityStatus": zod.string().nullish(),
@@ -261,7 +262,8 @@ export const CreateEmployeeBody = zod.object({
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
   "department": zod.string(),
-  "functionName": zod.string()
+  "functionName": zod.string(),
+  "employmentType": zod.enum(['casa', 'freela']).optional()
 })
 
 
@@ -281,6 +283,7 @@ export const GetEmployeeResponse = zod.object({
   "phone": zod.string().nullish(),
   "department": zod.string(),
   "functionName": zod.string(),
+  "employmentType": zod.enum(['casa', 'freela']).optional(),
   "active": zod.boolean(),
   "eligibleForBonus": zod.boolean().optional(),
   "eligibilityStatus": zod.string().nullish(),
@@ -304,6 +307,7 @@ export const UpdateEmployeeBody = zod.object({
   "phone": zod.string().optional(),
   "department": zod.string().optional(),
   "functionName": zod.string().optional(),
+  "employmentType": zod.enum(['casa', 'freela']).optional(),
   "active": zod.boolean().optional(),
   "eligibleForBonus": zod.boolean().optional(),
   "eligibilityStatus": zod.string().optional(),
@@ -319,6 +323,7 @@ export const UpdateEmployeeResponse = zod.object({
   "phone": zod.string().nullish(),
   "department": zod.string(),
   "functionName": zod.string(),
+  "employmentType": zod.enum(['casa', 'freela']).optional(),
   "active": zod.boolean(),
   "eligibleForBonus": zod.boolean().optional(),
   "eligibilityStatus": zod.string().nullish(),

@@ -1,15 +1,19 @@
-import { useState } from "react";
-import { useGetEmployees, useCreateEmployee, getGetEmployeesQueryKey } from "@workspace/api-client-react";
-import type { EmployeeInput } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useGetEmployees, useCreateEmployee, useUpdateEmployee, getGetEmployeesQueryKey } from "@workspace/api-client-react";
+import type { EmployeeInput, Employee } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+
+type EmploymentType = "casa" | "freela";
+const employmentTypeLabel = (t?: string) => (t === "freela" ? "Freela" : "Casa");
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -24,7 +28,9 @@ export default function EmployeesPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "true" | "false">("true");
+  const [filterType, setFilterType] = useState<"all" | EmploymentType>("all");
   const [open, setOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
   const qKey = getGetEmployeesQueryKey({ active: filterActive === "all" ? undefined : filterActive === "true" });
   const { data: employees, isLoading } = useGetEmployees(
@@ -32,9 +38,10 @@ export default function EmployeesPage() {
     { query: { queryKey: qKey } }
   );
 
-  const { register, handleSubmit, reset } = useForm<EmployeeInput>({
-    defaultValues: { department: "Geral", functionName: "Colaborador" },
+  const { register, handleSubmit, reset, setValue, watch } = useForm<EmployeeInput>({
+    defaultValues: { department: "Geral", functionName: "Colaborador", employmentType: "casa" },
   });
+  const watchedEmploymentType = watch("employmentType");
 
   const createMutation = useCreateEmployee({
     mutation: {
@@ -48,11 +55,45 @@ export default function EmployeesPage() {
     },
   });
 
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditSubmit,
+    reset: resetEdit,
+    setValue: setValueEdit,
+    watch: watchEdit,
+  } = useForm<EmployeeInput>();
+  const watchedEditEmploymentType = watchEdit("employmentType");
+
+  useEffect(() => {
+    if (editingEmployee) {
+      resetEdit({
+        name: editingEmployee.name,
+        department: editingEmployee.department,
+        functionName: editingEmployee.functionName,
+        email: editingEmployee.email ?? "",
+        phone: editingEmployee.phone ?? "",
+        employmentType: (editingEmployee.employmentType as EmploymentType) ?? "casa",
+      });
+    }
+  }, [editingEmployee, resetEdit]);
+
+  const updateMutation = useUpdateEmployee({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: qKey });
+        toast({ title: "Colaborador atualizado" });
+        setEditingEmployee(null);
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
+    },
+  });
+
   const canEdit = user && ["admin", "rh"].includes(user.role);
   const filtered = (employees ?? []).filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.department.toLowerCase().includes(search.toLowerCase()) ||
-    e.functionName.toLowerCase().includes(search.toLowerCase())
+    (filterType === "all" || (e.employmentType ?? "casa") === filterType) &&
+    (e.name.toLowerCase().includes(search.toLowerCase()) ||
+      e.department.toLowerCase().includes(search.toLowerCase()) ||
+      e.functionName.toLowerCase().includes(search.toLowerCase()))
   );
 
   const stats = {
@@ -110,6 +151,18 @@ export default function EmployeesPage() {
                       <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-none border-2 border-[#191c1e]" />
                     </div>
                   </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo de Contratação</Label>
+                    <Select defaultValue="casa" value={watchedEmploymentType} onValueChange={v => setValue("employmentType", v as EmploymentType)}>
+                      <SelectTrigger data-testid="select-employment-type" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
+                        <SelectValue placeholder="Selecione o tipo..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="casa">Casa</SelectItem>
+                        <SelectItem value="freela">Freela</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
                     <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
                     <button
@@ -126,6 +179,73 @@ export default function EmployeesPage() {
             </Dialog>
           )}
         </section>
+
+        {/* Edit dialog */}
+        <Dialog open={!!editingEmployee} onOpenChange={o => { if (!o) setEditingEmployee(null); }}>
+          <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Editar Colaborador</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={handleEditSubmit(d => {
+                if (!editingEmployee) return;
+                updateMutation.mutate({ id: editingEmployee.id, data: d });
+              })}
+              className="space-y-5 pt-4"
+            >
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
+                <Input data-testid="input-edit-employee-name" {...registerEdit("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-none border-2 border-[#191c1e]" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Departamento</Label>
+                  <Input data-testid="input-edit-employee-dept" {...registerEdit("department")} placeholder="Ex: Cenografia" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função</Label>
+                  <Input data-testid="input-edit-employee-func" {...registerEdit("functionName")} placeholder="Ex: Montador" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">E-mail</Label>
+                  <Input data-testid="input-edit-employee-email" type="email" {...registerEdit("email")} placeholder="email@exemplo.com" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Telefone</Label>
+                  <Input data-testid="input-edit-employee-phone" {...registerEdit("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo de Contratação</Label>
+                <Select
+                  value={watchedEditEmploymentType}
+                  onValueChange={v => setValueEdit("employmentType", v as EmploymentType)}
+                >
+                  <SelectTrigger data-testid="select-edit-employment-type" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
+                    <SelectValue placeholder="Selecione o tipo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="casa">Casa</SelectItem>
+                    <SelectItem value="freela">Freela</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+                <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setEditingEmployee(null)}>Cancelar</Button>
+                <button
+                  data-testid="button-submit-edit-employee"
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+                </button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* KPIs */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -182,6 +302,18 @@ export default function EmployeesPage() {
               </button>
             ))}
           </div>
+          <div className="flex border-2 border-[#191c1e] bg-white">
+            {(["all", "casa", "freela"] as const).map(v => (
+              <button
+                key={v}
+                data-testid={`filter-type-${v}`}
+                onClick={() => setFilterType(v)}
+                className={`px-5 py-2.5 text-xs font-bold italic uppercase tracking-wider transition-all ${filterType === v ? "bg-[#191c1e] text-[#ccff00]" : "text-[#444933] hover:bg-[#eceef0]"}`}
+              >
+                {v === "all" ? "Todos os Tipos" : employmentTypeLabel(v)}
+              </button>
+            ))}
+          </div>
         </section>
 
         {/* Table */}
@@ -200,8 +332,10 @@ export default function EmployeesPage() {
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Atleta / Colaborador</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Departamento</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Cargo</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Tipo</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Status</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Elegibilidade</th>
+                    {canEdit && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Ações</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
@@ -220,6 +354,11 @@ export default function EmployeesPage() {
                       </td>
                       <td className="px-6 py-4 font-bold italic uppercase text-sm">{emp.department}</td>
                       <td className="px-6 py-4 text-[#444933]">{emp.functionName}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block ${emp.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
+                          <span className="inline-block skew-x-[8deg]">{employmentTypeLabel(emp.employmentType)}</span>
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-center">
                         {emp.active ? (
                           <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
@@ -240,10 +379,21 @@ export default function EmployeesPage() {
                           )}
                         </div>
                       </td>
+                      {canEdit && (
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            data-testid={`button-edit-employee-${emp.id}`}
+                            onClick={() => setEditingEmployee(emp)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase hover:bg-[#eceef0] transition-all"
+                          >
+                            <Pencil size={14} /> Editar
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
+                    <tr><td colSpan={canEdit ? 6 : 5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
                   )}
                 </tbody>
               </table>

@@ -24,9 +24,15 @@ router.get("/employees/:id", async (req, res) => {
   res.json(employee);
 });
 
+const EMPLOYMENT_TYPES = ["casa", "freela"];
+
 router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
-  const { name, document, email, phone, department, functionName } = req.body;
+  const { name, document, email, phone, department, functionName, employmentType } = req.body;
   if (!name) { res.status(400).json({ error: "Nome obrigatório" }); return; }
+  if (employmentType !== undefined && !EMPLOYMENT_TYPES.includes(employmentType)) {
+    res.status(400).json({ error: "employmentType inválido" });
+    return;
+  }
   const [employee] = await db.insert(employeesTable).values({
     name,
     document: document ?? null,
@@ -34,6 +40,7 @@ router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
     phone: phone ?? null,
     department: department ?? "Geral",
     functionName: functionName ?? "Colaborador",
+    employmentType: employmentType ?? "casa",
   }).returning();
   await audit(req.user!.userId, "create", "employees", employee.id, null, employee);
   res.status(201).json(employee);
@@ -41,11 +48,15 @@ router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
 
 router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const { name, document, email, phone, department, functionName, active, eligibleForBonus, eligibilityStatus, eligibilityReason } = req.body;
+  const { name, document, email, phone, department, functionName, employmentType, active, eligibleForBonus, eligibilityStatus, eligibilityReason } = req.body;
   const [before] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
   if (eligibilityStatus !== undefined && !["eligible", "not_eligible", "suspended", "terminated"].includes(eligibilityStatus)) {
     res.status(400).json({ error: "eligibilityStatus inválido" });
+    return;
+  }
+  if (employmentType !== undefined && !EMPLOYMENT_TYPES.includes(employmentType)) {
+    res.status(400).json({ error: "employmentType inválido" });
     return;
   }
   const [employee] = await db.update(employeesTable).set({
@@ -55,6 +66,7 @@ router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(phone !== undefined && { phone }),
     ...(department !== undefined && { department }),
     ...(functionName !== undefined && { functionName }),
+    ...(employmentType !== undefined && { employmentType }),
     ...(active !== undefined && { active }),
     ...(eligibleForBonus !== undefined && { eligibleForBonus }),
     ...(eligibilityStatus !== undefined && { eligibilityStatus }),

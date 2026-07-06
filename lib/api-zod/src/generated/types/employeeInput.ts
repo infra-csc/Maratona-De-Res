@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { EmployeeInputEmploymentType } from './employeeInputEmploymentType';
 
 export interface EmployeeInput {
   name: string;
@@ -13,4 +14,5 @@ export interface EmployeeInput {
   phone?: string;
   department: string;
   functionName: string;
+  employmentType?: EmployeeInputEmploymentType;
 }
