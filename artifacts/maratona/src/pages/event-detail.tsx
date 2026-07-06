@@ -71,17 +71,15 @@ function ParticipantCommentBox({
         placeholder="Comentário / justificativa..."
         className="text-xs rounded-none border-2 border-[#191c1e] bg-white min-h-[60px]"
       />
-      {dirty && (
-        <button
-          type="button"
-          data-testid={`button-save-participant-comment-${employeeId}`}
-          disabled={isSaving}
-          onClick={() => onSave(value.trim())}
-          className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b3e600] transition-colors disabled:opacity-50"
-        >
-          {isSaving ? "Salvando..." : "Salvar comentário"}
-        </button>
-      )}
+      <button
+        type="button"
+        data-testid={`button-save-participant-comment-${employeeId}`}
+        disabled={isSaving || !dirty}
+        onClick={() => onSave(value.trim())}
+        className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b3e600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isSaving ? "Salvando..." : "Salvar comentário"}
+      </button>
     </div>
   );
 }
