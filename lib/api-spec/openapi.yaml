@@ -940,6 +940,41 @@ paths:
                       addedNew:
                         type: integer
 
+  /events/criteria/resync-all:
+    post:
+      operationId: resyncAllEventsCriteria
+      tags: [events]
+      summary: Bulk-sync every unconfirmed event in the current cycle with the active global criteria catalog
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed:
+                    type: integer
+                  skipped:
+                    type: integer
+                  totalAdded:
+                    type: integer
+                  totalDeactivated:
+                    type: integer
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        added:
+                          type: integer
+                        deactivated:
+                          type: integer
+
   /events/{id}/comments:
     get:
       operationId: getEventComments

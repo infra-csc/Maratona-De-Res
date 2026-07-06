@@ -1493,6 +1493,23 @@ export const ResyncEventCriteriaResponse = zod.object({
 
 
 /**
+ * @summary Bulk-sync every unconfirmed event in the current cycle with the active global criteria catalog
+ */
+export const ResyncAllEventsCriteriaResponse = zod.object({
+  "processed": zod.number().optional(),
+  "skipped": zod.number().optional(),
+  "totalAdded": zod.number().optional(),
+  "totalDeactivated": zod.number().optional(),
+  "events": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "name": zod.string().optional(),
+  "added": zod.number().optional(),
+  "deactivated": zod.number().optional()
+})).optional()
+})
+
+
+/**
  * @summary List an event's general comment thread (visible to all users)
  */
 export const GetEventCommentsParams = zod.object({

@@ -1366,6 +1366,21 @@ export type ResyncEventCriteria200 = EventDetail & {
   addedNew?: number;
 };
 
+export type ResyncAllEventsCriteria200EventsItem = {
+  id?: number;
+  name?: string;
+  added?: number;
+  deactivated?: number;
+};
+
+export type ResyncAllEventsCriteria200 = {
+  processed?: number;
+  skipped?: number;
+  totalAdded?: number;
+  totalDeactivated?: number;
+  events?: ResyncAllEventsCriteria200EventsItem[];
+};
+
 export type GetEvaluationsParams = {
 eventId?: number;
 status?: string;

@@ -102,6 +102,7 @@ import type {
   RankingEntry,
   ResetDataInput,
   ResetPasswordInput,
+  ResyncAllEventsCriteria200,
   ResyncEventCriteria200,
   ReviewRequest,
   ReviewRequestResolve,
@@ -3437,6 +3438,76 @@ export const useResyncEventCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getResyncEventCriteriaMutationOptions(options));
+    }
+
+export const getResyncAllEventsCriteriaUrl = () => {
+
+
+
+
+  return `/events/criteria/resync-all`
+}
+
+/**
+ * @summary Bulk-sync every unconfirmed event in the current cycle with the active global criteria catalog
+ */
+export const resyncAllEventsCriteria = async ( options?: RequestInit): Promise<ResyncAllEventsCriteria200> => {
+
+  return customFetch<ResyncAllEventsCriteria200>(getResyncAllEventsCriteriaUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResyncAllEventsCriteriaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resyncAllEventsCriteria>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resyncAllEventsCriteria>>, TError,void, TContext> => {
+
+const mutationKey = ['resyncAllEventsCriteria'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resyncAllEventsCriteria>>, void> = () => {
+
+
+          return  resyncAllEventsCriteria(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResyncAllEventsCriteriaMutationResult = NonNullable<Awaited<ReturnType<typeof resyncAllEventsCriteria>>>
+
+    export type ResyncAllEventsCriteriaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Bulk-sync every unconfirmed event in the current cycle with the active global criteria catalog
+ */
+export const useResyncAllEventsCriteria = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resyncAllEventsCriteria>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resyncAllEventsCriteria>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getResyncAllEventsCriteriaMutationOptions(options));
     }
 
 export const getGetEventCommentsUrl = (id: number,) => {

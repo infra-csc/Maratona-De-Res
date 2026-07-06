@@ -216,6 +216,55 @@ async function eventHasEvaluations(eventId: number) {
   return Number(count) > 0;
 }
 
+class ResyncBlockedError extends Error {
+  constructor(public reason: "confirmed" | "has_evaluations") { super(reason); }
+}
+
+async function resyncEventCriteriaOnce(eventId: number) {
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) throw new Error("not_found");
+  if (event.criteriaConfirmed) throw new ResyncBlockedError("confirmed");
+  if (await eventHasEvaluations(eventId)) throw new ResyncBlockedError("has_evaluations");
+
+  const globalActive = await db
+    .select({ id: criteriaTable.id })
+    .from(criteriaTable)
+    .where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
+  const globalActiveIds = new Set(globalActive.map(c => c.id));
+
+  const existing = await db
+    .select({
+      id: eventCriteriaTable.id,
+      criterionId: eventCriteriaTable.criterionId,
+      active: eventCriteriaTable.active,
+      criterionActive: criteriaTable.active,
+      eventScoped: criteriaTable.eventScoped,
+    })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .where(eq(eventCriteriaTable.eventId, eventId));
+
+  const existingCriterionIds = new Set(existing.map(e => e.criterionId));
+
+  const toDeactivate = existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
+  const toAdd = [...globalActiveIds].filter(cid => !existingCriterionIds.has(cid));
+
+  if (toDeactivate.length === 0 && toAdd.length === 0) {
+    return { deactivated: 0, added: 0 };
+  }
+
+  await db.transaction(async (tx) => {
+    for (const row of toDeactivate) {
+      await tx.update(eventCriteriaTable).set({ active: false }).where(eq(eventCriteriaTable.id, row.id));
+    }
+    if (toAdd.length > 0) {
+      await tx.insert(eventCriteriaTable).values(toAdd.map(criterionId => ({ eventId, criterionId, active: true })));
+    }
+  });
+
+  return { deactivated: toDeactivate.length, added: toAdd.length };
+}
+
 router.get("/events/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const detail = await loadEventDetail(id);
@@ -901,52 +950,58 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
  */
 router.post("/events/:id/criteria/resync", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
-  if (!event) { res.status(404).json({ error: "Não encontrado" }); return; }
-
-  if (event.criteriaConfirmed) {
-    res.status(409).json({ error: "Este evento já confirmou os critérios. Reabra a confirmação antes de sincronizar." });
-    return;
-  }
-  if (await eventHasEvaluations(eventId)) {
-    res.status(409).json({ error: "Este evento já possui avaliações. Os critérios não podem ser sincronizados automaticamente." });
-    return;
-  }
-
-  const globalActive = await db
-    .select({ id: criteriaTable.id })
-    .from(criteriaTable)
-    .where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
-  const globalActiveIds = new Set(globalActive.map(c => c.id));
-
-  const existing = await db
-    .select({
-      id: eventCriteriaTable.id,
-      criterionId: eventCriteriaTable.criterionId,
-      active: eventCriteriaTable.active,
-      criterionActive: criteriaTable.active,
-      eventScoped: criteriaTable.eventScoped,
-    })
-    .from(eventCriteriaTable)
-    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-    .where(eq(eventCriteriaTable.eventId, eventId));
-
-  const existingCriterionIds = new Set(existing.map(e => e.criterionId));
-
-  const toDeactivate = existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
-  const toAdd = [...globalActiveIds].filter(cid => !existingCriterionIds.has(cid));
-
-  await db.transaction(async (tx) => {
-    for (const row of toDeactivate) {
-      await tx.update(eventCriteriaTable).set({ active: false }).where(eq(eventCriteriaTable.id, row.id));
+  try {
+    const { deactivated, added } = await resyncEventCriteriaOnce(eventId);
+    await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated, added }, null);
+    res.json({ ...(await loadEventDetail(eventId)), removedStale: deactivated, addedNew: added });
+  } catch (err) {
+    if (err instanceof ResyncBlockedError) {
+      const message = err.reason === "confirmed"
+        ? "Este evento já confirmou os critérios. Reabra a confirmação antes de sincronizar."
+        : "Este evento já possui avaliações. Os critérios não podem ser sincronizados automaticamente.";
+      res.status(409).json({ error: message });
+      return;
     }
-    if (toAdd.length > 0) {
-      await tx.insert(eventCriteriaTable).values(toAdd.map(criterionId => ({ eventId, criterionId, active: true })));
-    }
-  });
+    res.status(404).json({ error: "Não encontrado" });
+  }
+});
 
-  await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated: toDeactivate.length, added: toAdd.length }, null);
-  res.json({ ...(await loadEventDetail(eventId)), removedStale: toDeactivate.length, addedNew: toAdd.length });
+/**
+ * POST /events/criteria/resync-all
+ * Versão em massa do resync acima: percorre todos os eventos do ciclo atual
+ * ainda não travados (criteriaConfirmed=false, sem avaliações) e sincroniza
+ * cada um individualmente com o catálogo global de critérios ativos. Eventos
+ * já confirmados ou com avaliações são pulados (não é erro, só ficam fora do
+ * resumo de "processados").
+ */
+router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.json({ processed: 0, skipped: 0, totalAdded: 0, totalDeactivated: 0, events: [] }); return; }
+
+  const events = await db
+    .select({ id: eventsTable.id, name: eventsTable.name })
+    .from(eventsTable)
+    .where(eq(eventsTable.cycleId, cycle.id));
+
+  let processed = 0, skipped = 0, totalAdded = 0, totalDeactivated = 0;
+  const details: { id: number; name: string; added: number; deactivated: number }[] = [];
+
+  for (const ev of events) {
+    try {
+      const { added, deactivated } = await resyncEventCriteriaOnce(ev.id);
+      if (added > 0 || deactivated > 0) {
+        processed += 1;
+        totalAdded += added;
+        totalDeactivated += deactivated;
+        details.push({ id: ev.id, name: ev.name, added, deactivated });
+        await audit(req.user!.userId, "resync_criteria", "events", ev.id, { deactivated, added, bulk: true }, null);
+      }
+    } catch (err) {
+      if (err instanceof ResyncBlockedError) { skipped += 1; continue; }
+    }
+  }
+
+  res.json({ processed, skipped, totalAdded, totalDeactivated, events: details });
 });
 
 router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (req, res) => {

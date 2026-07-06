@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetCriteria, useCreateCriterion, useUpdateCriterion, useGetAreas, getGetCriteriaQueryKey } from "@workspace/api-client-react";
+import { useGetCriteria, useCreateCriterion, useUpdateCriterion, useGetAreas, useResyncAllEventsCriteria, getGetCriteriaQueryKey } from "@workspace/api-client-react";
 import type { CriterionInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -7,13 +7,66 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Building2, Zap } from "lucide-react";
+import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw } from "lucide-react";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+
+function CriterionWeightCell({
+  criterionId, weight, isSaving, onSave,
+}: {
+  criterionId: number; weight: number; isSaving: boolean; onSave: (value: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(weight));
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        data-testid={`button-edit-weight-${criterionId}`}
+        onClick={() => { setValue(String(weight)); setEditing(true); }}
+        className="bg-[#eceef0] border-2 border-[#191c1e] px-3 py-1.5 inline-flex items-center gap-2 min-w-[48px] hover:bg-[#e0e3e5] transition-colors group/weight"
+      >
+        <span className="text-lg font-black italic">{weight.toFixed(0)}</span>
+        <Pencil size={11} className="text-[#747a60] opacity-0 group-hover/weight:opacity-100 transition-opacity" />
+      </button>
+    );
+  }
+
+  const submit = () => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) { setEditing(false); return; }
+    if (parsed !== weight) onSave(parsed);
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        data-testid={`input-edit-weight-${criterionId}`}
+        type="number"
+        min="0"
+        step="1"
+        autoFocus
+        value={value}
+        disabled={isSaving}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") setEditing(false); }}
+        className="h-9 w-20 rounded-none border-2 border-[#191c1e] text-center font-black italic"
+      />
+      <button type="button" data-testid={`button-save-weight-${criterionId}`} onClick={submit} className="p-1.5 border-2 border-[#191c1e] bg-[#ccff00] hover:translate-y-[1px] transition-all">
+        <Check size={14} />
+      </button>
+      <button type="button" onClick={() => setEditing(false)} className="p-1.5 border-2 border-[#191c1e] bg-white hover:bg-[#eceef0] transition-colors">
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
 
 export default function CriteriaPage() {
   const { toast } = useToast();
@@ -43,6 +96,25 @@ export default function CriteriaPage() {
   const updateMutation = useUpdateCriterion({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
+    },
+  });
+
+  const [resyncSummary, setResyncSummary] = useState<{ processed: number; skipped: number; totalAdded: number; totalDeactivated: number; events: { id: number; name: string; added: number; deactivated: number }[] } | null>(null);
+  const resyncAllMutation = useResyncAllEventsCriteria({
+    mutation: {
+      onSuccess: (data) => {
+        setResyncSummary({
+          processed: data.processed ?? 0,
+          skipped: data.skipped ?? 0,
+          totalAdded: data.totalAdded ?? 0,
+          totalDeactivated: data.totalDeactivated ?? 0,
+          events: (data.events ?? []).map(ev => ({
+            id: ev.id ?? 0, name: ev.name ?? "", added: ev.added ?? 0, deactivated: ev.deactivated ?? 0,
+          })),
+        });
+        toast({ title: `Sincronização concluída — ${data.processed ?? 0} evento(s) atualizado(s)` });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao sincronizar", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -90,7 +162,17 @@ export default function CriteriaPage() {
         </section>
 
         {/* Create criterion dialog */}
-        <section className="flex justify-end">
+        <section className="flex justify-end gap-3">
+          <button
+            type="button"
+            data-testid="button-resync-all-events"
+            disabled={resyncAllMutation.isPending}
+            onClick={() => resyncAllMutation.mutate()}
+            className={`bg-white border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+          >
+            <RefreshCw size={16} className={resyncAllMutation.isPending ? "animate-spin" : ""} />
+            {resyncAllMutation.isPending ? "Sincronizando..." : "Sincronizar Todos os Eventos"}
+          </button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <button
@@ -178,9 +260,12 @@ export default function CriteriaPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className="bg-[#eceef0] border-2 border-[#191c1e] px-3 py-1.5 inline-flex items-baseline justify-center min-w-[48px]">
-                          <span className="text-lg font-black italic">{Number(c.defaultWeight).toFixed(0)}</span>
-                        </div>
+                        <CriterionWeightCell
+                          criterionId={c.id}
+                          weight={Number(c.defaultWeight)}
+                          isSaving={updateMutation.isPending}
+                          onSave={(value) => updateMutation.mutate({ id: c.id, data: { defaultWeight: value } })}
+                        />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-3">
@@ -206,6 +291,56 @@ export default function CriteriaPage() {
           </section>
         )}
       </div>
+
+      <Dialog open={resyncSummary != null} onOpenChange={(v) => { if (!v) setResyncSummary(null); }}>
+        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Sincronização em Massa</DialogTitle>
+          </DialogHeader>
+          {resyncSummary && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic">{resyncSummary.processed}</p>
+                  <p className="text-[10px] font-bold uppercase italic text-[#747a60]">Atualizados</p>
+                </div>
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic">{resyncSummary.totalAdded}</p>
+                  <p className="text-[10px] font-bold uppercase italic text-[#747a60]">Adicionados</p>
+                </div>
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic">{resyncSummary.totalDeactivated}</p>
+                  <p className="text-[10px] font-bold uppercase italic text-[#747a60]">Desativados</p>
+                </div>
+              </div>
+              <p className="text-xs text-[#747a60] italic">
+                {resyncSummary.skipped} evento(s) ficaram de fora (já confirmados ou já com avaliações enviadas).
+              </p>
+              {resyncSummary.events.length > 0 && (
+                <div className="max-h-64 overflow-y-auto border-2 border-[#191c1e] divide-y-2 divide-[#eceef0]">
+                  {resyncSummary.events.map(ev => (
+                    <div key={ev.id} className="px-4 py-2 flex items-center justify-between gap-3">
+                      <span className="font-bold italic uppercase text-xs text-[#191c1e] truncate">{ev.name}</span>
+                      <span className="text-[10px] font-bold uppercase italic text-[#747a60] whitespace-nowrap">
+                        +{ev.added} / -{ev.deactivated}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setResyncSummary(null)}
+              className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase"
+            >
+              Fechar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
