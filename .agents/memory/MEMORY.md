@@ -55,3 +55,4 @@
 - [Calibration comment missing from event-detail](calibration-comment-missing.md) — computeEventTeamResult's criteriaDetails never carried calibrationReason; event-detail page had nowhere to render calibration comments even after saving
 - [api-server dev is build+start, not watch](api-server-dev-no-watch.md) — `pnpm dev` builds once then runs dist; backend route/schema edits need a workflow restart to take effect, unlike the maratona vite frontend which hot-reloads
 - [Global criterion deactivation orphans pending events](criteria-deactivation-orphan.md) — event_criteria snapshot isn't touched when the global criterion later goes inactive; a whole catalog swap can leave dozens of unconfirmed events with zero real active criteria; use resync endpoint + cascade-on-deactivate
+- [Event general comments thread](event-comments-thread.md) — new no-role-gate `event_comments` table; new tables pushed to dev DB need the same push to prod DB before/at deploy or routes 500

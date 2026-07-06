@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -81,6 +81,126 @@ function ParticipantCommentBox({
         {isSaving ? "Salvando..." : "Salvar comentário"}
       </button>
     </div>
+  );
+}
+
+const COMMENT_ROLE_LABELS: Record<string, string> = {
+  admin: "Admin", rh: "RH", diretoria: "Diretoria", gestor: "Gestor", avaliador: "Avaliador", visualizador: "Visualizador",
+};
+
+function formatCommentTimestamp(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function EventCommentsPanel({ eventId }: { eventId: number }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [message, setMessage] = useState("");
+
+  const { data: comments, isLoading } = useGetEventComments(eventId, {
+    query: { enabled: !!eventId, queryKey: getGetEventCommentsQueryKey(eventId) },
+  });
+
+  const createComment = useCreateEventComment({
+    mutation: {
+      onSuccess: () => {
+        setMessage("");
+        qc.invalidateQueries({ queryKey: getGetEventCommentsQueryKey(eventId) });
+      },
+      onError: () => toast({ title: "Erro ao enviar comentário", variant: "destructive" }),
+    },
+  });
+
+  const deleteComment = useDeleteEventComment({
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: getGetEventCommentsQueryKey(eventId) }),
+      onError: () => toast({ title: "Erro ao excluir comentário", variant: "destructive" }),
+    },
+  });
+
+  const canManage = !!user && ["admin", "rh"].includes(user.role);
+  const trimmed = message.trim();
+
+  const submit = () => {
+    if (!trimmed || createComment.isPending) return;
+    createComment.mutate({ id: eventId, data: { message: trimmed } });
+  };
+
+  return (
+    <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+      <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+        <MessageSquare size={18} />
+        <span className="font-black uppercase tracking-tight">Comentários do Evento</span>
+      </div>
+      <div className="p-6 space-y-4">
+        <div data-testid="list-event-comments" className="max-h-96 overflow-y-auto space-y-3 pr-1">
+          {isLoading ? (
+            <p className="text-xs italic font-bold uppercase text-[#747a60] text-center py-4">Carregando...</p>
+          ) : !comments || comments.length === 0 ? (
+            <p className="text-xs italic font-bold uppercase text-[#747a60] text-center py-4">Nenhum comentário ainda. Seja o primeiro a comentar.</p>
+          ) : (
+            comments.map(c => {
+              const isOwner = !!user && user.id === c.userId;
+              const canDelete = isOwner || canManage;
+              return (
+                <div key={c.id} data-testid={`comment-${c.id}`} className="border-2 border-[#eceef0] p-3 flex items-start gap-3 group">
+                  <div className="w-8 h-8 shrink-0 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-[10px] text-[#191c1e]">
+                    {c.userName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black italic uppercase text-xs text-[#191c1e]">{c.userName}</span>
+                      {c.userRole && (
+                        <span className="px-1.5 py-0.5 border border-[#191c1e] font-bold text-[9px] italic uppercase text-[#444933]">
+                          {COMMENT_ROLE_LABELS[c.userRole] ?? c.userRole}
+                        </span>
+                      )}
+                      <span className="text-[10px] font-semibold text-[#9aa088]">{formatCommentTimestamp(c.createdAt)}</span>
+                    </div>
+                    <p className="text-sm text-[#191c1e] whitespace-pre-wrap mt-1 break-words">{c.message}</p>
+                  </div>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      data-testid={`button-delete-comment-${c.id}`}
+                      onClick={() => deleteComment.mutate({ id: eventId, commentId: c.id })}
+                      disabled={deleteComment.isPending}
+                      className="p-1 text-[#9aa088] hover:text-[#862200] transition-colors opacity-0 group-hover:opacity-100 shrink-0 disabled:opacity-40"
+                      title="Excluir comentário"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div className="flex items-start gap-2 pt-3 border-t-2 border-[#eceef0]">
+          <Textarea
+            data-testid="textarea-new-comment"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+            }}
+            placeholder="Escreva um comentário para toda a equipe..."
+            className="text-sm rounded-none border-2 border-[#191c1e] min-h-[44px]"
+          />
+          <button
+            type="button"
+            data-testid="button-send-comment"
+            disabled={!trimmed || createComment.isPending}
+            onClick={submit}
+            className="h-11 px-4 shrink-0 bg-[#191c1e] text-[#ccff00] font-black italic uppercase tracking-tight text-xs disabled:opacity-40 hover:bg-[#ccff00] hover:text-[#191c1e] border-2 border-[#191c1e] transition-colors"
+          >
+            {createComment.isPending ? "Enviando..." : "Enviar"}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1577,6 +1697,8 @@ export default function EventDetailPage() {
             </Dialog>
           </div>
         </div>
+
+        <EventCommentsPanel eventId={id} />
       </div>
     </div>
   );
