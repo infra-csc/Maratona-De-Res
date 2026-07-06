@@ -1195,15 +1195,6 @@ export default function EventDetailPage() {
                                     )}
                                   </div>
                                 </div>
-                                {p.scheduledDiariaCount != null && realizadasCount != null && realizadasCount < p.scheduledDiariaCount && (
-                                  <span
-                                    data-testid={`badge-diaria-gap-${p.employeeId}`}
-                                    className="self-center px-1.5 py-1 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-black text-[10px] italic uppercase whitespace-nowrap"
-                                    title="Diárias previstas ainda não cobertas pelas realizadas."
-                                  >
-                                    Faltam {p.scheduledDiariaCount - realizadasCount}
-                                  </span>
-                                )}
                                 {canManage ? (
                                   <Popover>
                                     <PopoverTrigger asChild>
