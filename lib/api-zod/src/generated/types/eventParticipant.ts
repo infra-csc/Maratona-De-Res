@@ -24,6 +24,11 @@ export interface EventParticipant {
   scheduledDiariaStart?: string | null;
   /** @nullable */
   scheduledDiariaEnd?: string | null;
+  /**
+     * Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.
+     * @nullable
+     */
+  actualDiariaDates?: string[] | null;
   /** @nullable */
   actualDiariaCount?: number | null;
   /** Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade. */

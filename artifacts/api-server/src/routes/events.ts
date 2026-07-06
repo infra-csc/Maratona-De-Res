@@ -116,6 +116,7 @@ async function loadEventDetail(id: number) {
       scheduledDiariaCount: eventParticipantsTable.scheduledDiariaCount,
       scheduledDiariaStart: eventParticipantsTable.scheduledDiariaStart,
       scheduledDiariaEnd: eventParticipantsTable.scheduledDiariaEnd,
+      actualDiariaDates: eventParticipantsTable.actualDiariaDates,
       actualDiariaCount: eventParticipantsTable.actualDiariaCount,
     })
     .from(eventParticipantsTable)
@@ -405,6 +406,7 @@ router.get("/events/:id/participants", async (req, res) => {
       scheduledDiariaCount: eventParticipantsTable.scheduledDiariaCount,
       scheduledDiariaStart: eventParticipantsTable.scheduledDiariaStart,
       scheduledDiariaEnd: eventParticipantsTable.scheduledDiariaEnd,
+      actualDiariaDates: eventParticipantsTable.actualDiariaDates,
       actualDiariaCount: eventParticipantsTable.actualDiariaCount,
     })
     .from(eventParticipantsTable)
@@ -434,32 +436,65 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
   res.status(204).end();
 });
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
-  const { confirmed, actualDiariaCount } = req.body;
-  if (confirmed === undefined && actualDiariaCount === undefined) {
-    res.status(400).json({ error: "informe confirmed (boolean) e/ou actualDiariaCount (número)" });
+  const { confirmed, actualDiariaDates } = req.body;
+  if (confirmed === undefined && actualDiariaDates === undefined) {
+    res.status(400).json({ error: "informe confirmed (boolean) e/ou actualDiariaDates (lista de datas)" });
     return;
   }
   if (confirmed !== undefined && typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed deve ser boolean" }); return; }
-  if (actualDiariaCount !== undefined && actualDiariaCount !== null && (!Number.isInteger(actualDiariaCount) || actualDiariaCount < 0)) {
-    res.status(400).json({ error: "actualDiariaCount deve ser um número inteiro >= 0" });
+
+  let normalizedDates: string[] | null | undefined = undefined;
+  if (actualDiariaDates !== undefined) {
+    if (actualDiariaDates !== null) {
+      if (!Array.isArray(actualDiariaDates) || actualDiariaDates.some((d: unknown) => typeof d !== "string" || !ISO_DATE_RE.test(d))) {
+        res.status(400).json({ error: "actualDiariaDates deve ser uma lista de datas no formato YYYY-MM-DD" });
+        return;
+      }
+      normalizedDates = Array.from(new Set(actualDiariaDates as string[])).sort();
+    } else {
+      normalizedDates = null;
+    }
+  }
+
+  const [existing] = await db.select().from(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Participante não encontrado" }); return; }
+  const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, existing.employeeId)).limit(1);
+  const employmentType = emp?.employmentType ?? "casa";
+  const countsForScore = participantCountsForScore({ employmentType, functionName: existing.functionName });
+
+  if (normalizedDates !== undefined && !countsForScore) {
+    res.status(400).json({ error: "Participação informativa (não conta para nota) não permite registro de diárias realizadas." });
     return;
   }
+
+  if (normalizedDates) {
+    const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (ev && normalizedDates.some(d => d < ev.startDate || d > ev.endDate)) {
+      res.status(400).json({ error: `As datas devem estar dentro do período do evento (${ev.startDate} a ${ev.endDate}).` });
+      return;
+    }
+  }
+
   const [updated] = await db
     .update(eventParticipantsTable)
     .set({
       ...(confirmed !== undefined && { confirmed }),
-      ...(actualDiariaCount !== undefined && { actualDiariaCount }),
+      ...(normalizedDates !== undefined && {
+        actualDiariaDates: normalizedDates,
+        actualDiariaCount: normalizedDates ? normalizedDates.length : null,
+      }),
     })
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();
   if (!updated) { res.status(404).json({ error: "Participante não encontrado" }); return; }
-  const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, updated.employeeId)).limit(1);
-  const employmentType = emp?.employmentType ?? "casa";
   res.json({
     ...updated, employeeName: emp?.name ?? "", employmentType,
-    countsForScore: participantCountsForScore({ employmentType, functionName: updated.functionName }),
+    countsForScore,
   });
 });
 

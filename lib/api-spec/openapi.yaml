@@ -2367,6 +2367,14 @@ components:
           type: ["string", "null"]
         scheduledDiariaEnd:
           type: ["string", "null"]
+        actualDiariaDates:
+          type: ["array", "null"]
+          items:
+            type: string
+          description: >-
+            Datas (YYYY-MM-DD) dentro do período do evento em que o
+            colaborador realmente participou. actualDiariaCount é derivado
+            do tamanho desta lista.
         actualDiariaCount:
           type: ["integer", "null"]
         countsForScore:
@@ -2391,8 +2399,10 @@ components:
       properties:
         confirmed:
           type: boolean
-        actualDiariaCount:
-          type: ["integer", "null"]
+        actualDiariaDates:
+          type: ["array", "null"]
+          items:
+            type: string
 
     EventConformity:
       type: object

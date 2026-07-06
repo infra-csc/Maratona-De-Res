@@ -465,6 +465,7 @@ export const GetEventResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -861,6 +862,7 @@ export const GetEventParticipantsResponseItem = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
@@ -900,7 +902,7 @@ export const UpdateEventParticipantParams = zod.object({
 
 export const UpdateEventParticipantBody = zod.object({
   "confirmed": zod.boolean().optional(),
-  "actualDiariaCount": zod.number().nullish()
+  "actualDiariaDates": zod.array(zod.string()).nullish()
 })
 
 export const UpdateEventParticipantResponse = zod.object({
@@ -915,6 +917,7 @@ export const UpdateEventParticipantResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
@@ -1074,6 +1077,7 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1175,6 +1179,7 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1286,6 +1291,7 @@ export const DeleteEventCriterionResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),

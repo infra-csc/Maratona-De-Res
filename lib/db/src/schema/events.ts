@@ -50,7 +50,11 @@ export const eventParticipantsTable = pgTable("event_participants", {
   scheduledDiariaEnd: date("scheduled_diaria_end"),
   // Diárias realmente cumpridas — preenchido manualmente por admin/RH dentro da
   // Maratona (o Logística Interna não informa comparecimento real). Nunca
-  // sobrescrito pelo sync.
+  // sobrescrito pelo sync. actualDiariaCount é derivado de
+  // actualDiariaDates.length e mantido em sincronia pelo backend; datas fora
+  // do range do evento são rejeitadas na validação. Não aplicável a
+  // participações informativas (countsForScore === false).
+  actualDiariaDates: date("actual_diaria_dates").array(),
   actualDiariaCount: integer("actual_diaria_count"),
 }, (t) => ({
   eventEmployeeUq: uniqueIndex("event_participants_event_employee_uq").on(t.eventId, t.employeeId),

@@ -8,6 +8,7 @@ import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -20,6 +21,22 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
+
+function eventDateRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  while (cursor <= end) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+
+function formatDiariaDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
+}
 
 export default function EventDetailPage() {
   const [, params] = useRoute("/events/:id");
@@ -154,7 +171,7 @@ export default function EventDetailPage() {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
         if (vars.data.confirmed !== undefined) {
           toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
-        } else if (vars.data.actualDiariaCount !== undefined) {
+        } else if (vars.data.actualDiariaDates !== undefined) {
           toast({ title: "Diárias realizadas atualizadas" });
         }
       },
@@ -1033,21 +1050,33 @@ export default function EventDetailPage() {
                   <div className="divide-y-2 divide-[#eceef0]">
                     {event.participants.map(p => {
                       const isInactive = p.confirmed === false;
+                      const isInformational = p.countsForScore === false;
+                      const selectedDates = p.actualDiariaDates ?? [];
+                      const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
+                      const candidateDates = eventDateRange(event.startDate, event.endDate);
                       return (
-                        <div key={p.id} data-testid={`chip-participant-${p.employeeId}`} className={cn("flex items-center gap-3 p-4 hover:bg-[#f2f4f6] transition-colors", isInactive && "opacity-50")}>
+                        <div
+                          key={p.id}
+                          data-testid={`chip-participant-${p.employeeId}`}
+                          className={cn(
+                            "flex items-center gap-4 p-5 transition-colors",
+                            isInformational ? "bg-[#862200]/[0.06] border-l-4 border-l-[#862200]" : "hover:bg-[#f2f4f6]",
+                            isInactive && "opacity-50"
+                          )}
+                        >
                           <div className="w-9 h-9 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-xs text-[#191c1e] shrink-0">
                             {p.employeeName.split(' ').map((n:string)=>n[0]).slice(0,2).join('').toUpperCase()}
                           </div>
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 space-y-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</p>
                               <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
                                 <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
                               </span>
-                              {p.countsForScore === false && (
+                              {isInformational && (
                                 <span
                                   data-testid={`badge-no-score-${p.employeeId}`}
-                                  className="px-2 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
+                                  className="px-2 py-0.5 border-2 border-[#862200] bg-[#862200] text-white font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
                                   title="Participação apenas histórica/informativa — não entra na nota nem na elegibilidade."
                                 >
                                   <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
@@ -1057,41 +1086,67 @@ export default function EventDetailPage() {
                             <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
                               {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}
                             </p>
-                            {(p.scheduledDiariaCount != null || p.actualDiariaCount != null || canManage) && (
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {isInformational ? (
+                              <p className="text-[10px] font-bold italic uppercase text-[#862200]/80">
+                                Participação informativa — sem controle de diárias.
+                              </p>
+                            ) : (p.scheduledDiariaCount != null || realizadasCount != null || canManage) && (
+                              <div className="flex items-center gap-3 flex-wrap pt-0.5">
                                 {p.scheduledDiariaCount != null && (
                                   <span className="text-[10px] font-bold italic uppercase text-[#444933]">
-                                    Diárias previstas: {p.scheduledDiariaCount}
+                                    Previstas: {p.scheduledDiariaCount}
+                                    {p.scheduledDiariaStart && p.scheduledDiariaEnd && (
+                                      <span className="text-[#747a60]"> ({formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)})</span>
+                                    )}
                                   </span>
                                 )}
                                 {canManage ? (
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Realizadas:</span>
-                                    <Input
-                                      data-testid={`input-actual-diaria-${p.employeeId}`}
-                                      type="number"
-                                      min={0}
-                                      step={1}
-                                      defaultValue={p.actualDiariaCount ?? ""}
-                                      onBlur={(e) => {
-                                        const raw = e.target.value;
-                                        const val = raw === "" ? null : Number(raw);
-                                        if (val === (p.actualDiariaCount ?? null)) return;
-                                        updateParticipant.mutate({ id, participantId: p.id, data: { actualDiariaCount: val } });
-                                      }}
-                                      className="h-6 w-16 text-[10px] font-bold rounded-none border-2 border-[#191c1e] px-1.5"
-                                    />
-                                  </div>
-                                ) : p.actualDiariaCount != null ? (
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        data-testid={`button-diaria-dates-${p.employeeId}`}
+                                        type="button"
+                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors"
+                                      >
+                                        <Calendar size={11} className="text-[#444933]" />
+                                        <span className="text-[10px] font-bold italic uppercase text-[#191c1e]">
+                                          Realizadas: {realizadasCount ?? 0}
+                                        </span>
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" className="w-64 p-3 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e]">
+                                      <p className="text-[10px] font-black italic uppercase text-[#444933] mb-2">Dias em que realmente participou</p>
+                                      <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                                        {candidateDates.map(dateStr => {
+                                          const checked = selectedDates.includes(dateStr);
+                                          return (
+                                            <label key={dateStr} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
+                                              <Checkbox
+                                                data-testid={`checkbox-diaria-${p.employeeId}-${dateStr}`}
+                                                checked={checked}
+                                                onCheckedChange={(checkedVal) => {
+                                                  const next = new Set(selectedDates);
+                                                  if (checkedVal) next.add(dateStr); else next.delete(dateStr);
+                                                  updateParticipant.mutate({ id, participantId: p.id, data: { actualDiariaDates: Array.from(next).sort() } });
+                                                }}
+                                              />
+                                              <span className="font-bold italic uppercase text-[#191c1e]">{formatDiariaDate(dateStr)}</span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                ) : realizadasCount != null ? (
                                   <span className="text-[10px] font-bold italic uppercase text-[#747a60]">
-                                    Diárias realizadas: {p.actualDiariaCount}
+                                    Diárias realizadas: {realizadasCount}
                                   </span>
                                 ) : null}
                               </div>
                             )}
                           </div>
                           {canManage && (
-                            <>
+                            <div className="flex items-center gap-2 shrink-0">
                               <button
                                 data-testid={`button-toggle-participant-${p.employeeId}`}
                                 onClick={() => updateParticipant.mutate({ id, participantId: p.id, data: { confirmed: isInactive } })}
@@ -1111,7 +1166,7 @@ export default function EventDetailPage() {
                               >
                                 <Trash2 size={14} />
                               </button>
-                            </>
+                            </div>
                           )}
                         </div>
                       );
