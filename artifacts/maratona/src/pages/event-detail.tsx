@@ -1,5 +1,5 @@
 import { useRoute, Link } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw } from "lucide-react";
@@ -44,6 +44,54 @@ function splitImportedNoteLines(note: string): string[] {
     .split(/(?<=[.;])\s+|\s*\|\s*|\n+/)
     .map(s => s.trim())
     .filter(Boolean);
+}
+
+function parseImportedConformityRatio(notes: string): { sim: number; total: number } | null {
+  const m = notes.match(/Conformidade:\s*(\d+)\s*\/\s*(\d+)\s*itens/i);
+  if (!m) return null;
+  return { sim: parseInt(m[1], 10), total: parseInt(m[2], 10) };
+}
+
+function parseImportedCriteriaScores(notes: string): { rawName: string; score: number; scale: number; excluded: boolean; comment?: string }[] {
+  const marker = notes.match(/Performance\s*\(peso\/nota\):\s*([\s\S]*?)(?:\.\s*Performance\s*=|\.\s*Pontua[çc][ãa]o|$)/i);
+  const segment = marker ? marker[1] : "";
+  if (!segment) return [];
+  return segment
+    .split(";")
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(entry => {
+      const m = entry.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)\s*(?:-\s*(.*))?$/);
+      if (!m) return null;
+      const score = parseFloat(m[2].replace(",", "."));
+      const scale = parseFloat(m[3].replace(",", "."));
+      return { rawName: m[1].trim(), score, scale, excluded: scale === 0, comment: m[4]?.trim() || undefined };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+}
+
+function normalizeForMatch(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function matchCriterionByName(rawName: string, criteria: { criterionId: number; criterionName: string }[]): number | null {
+  const norm = normalizeForMatch(rawName);
+  if (!norm) return null;
+  let best: { id: number; score: number } | null = null;
+  for (const c of criteria) {
+    const cn = normalizeForMatch(c.criterionName);
+    if (cn === norm) return c.criterionId;
+    if (cn.includes(norm) || norm.includes(cn)) {
+      const score = Math.min(cn.length, norm.length);
+      if (!best || score > best.score) best = { id: c.criterionId, score };
+    }
+  }
+  return best?.id ?? null;
 }
 
 function ImportedNotesList({ notes }: { notes: string }) {
@@ -532,6 +580,18 @@ export default function EventDetailPage() {
     { key: "guardaEquipamentos" as const, label: "Guarda de Equipamentos" },
     { key: "conduta" as const, label: "Conduta" },
   ];
+  const importedConformityRatio = useMemo(
+    () => (event?.isHistorical && event.importedNotes ? parseImportedConformityRatio(event.importedNotes) : null),
+    [event?.isHistorical, event?.importedNotes]
+  );
+  const importedConformityAllValue = importedConformityRatio
+    ? importedConformityRatio.sim === importedConformityRatio.total
+      ? true
+      : importedConformityRatio.sim === 0
+        ? false
+        : null
+    : null;
+
   useEffect(() => {
     if (conformityData) {
       setConformityForm({
@@ -540,8 +600,30 @@ export default function EventDetailPage() {
         guardaEquipamentos: conformityData.guardaEquipamentos,
         conduta: conformityData.conduta,
       });
+    } else if (importedConformityAllValue !== null) {
+      setConformityForm({
+        epi: importedConformityAllValue,
+        estaiamentos: importedConformityAllValue,
+        guardaEquipamentos: importedConformityAllValue,
+        conduta: importedConformityAllValue,
+      });
     }
-  }, [conformityData?.id]);
+  }, [conformityData?.id, importedConformityAllValue]);
+
+  const importedCriteriaScores = useMemo(
+    () => (event?.isHistorical && event.importedNotes ? parseImportedCriteriaScores(event.importedNotes) : []),
+    [event?.isHistorical, event?.importedNotes]
+  );
+  const importedCriteriaMap = useMemo(() => {
+    const map = new Map<number, { rawName: string; score: number; scale: number; excluded: boolean; comment?: string }>();
+    if (importedCriteriaScores.length === 0 || !result?.criteriaDetails) return map;
+    const catalog = result.criteriaDetails.map(c => ({ criterionId: c.criterionId, criterionName: c.criterionName }));
+    for (const p of importedCriteriaScores) {
+      const id = matchCriterionByName(p.rawName, catalog);
+      if (id != null && !map.has(id)) map.set(id, p);
+    }
+    return map;
+  }, [importedCriteriaScores, result?.criteriaDetails]);
 
   const [config, setConfig] = useState<{ id: number; criterionId: number; active: boolean; weight: number; name: string; eventScoped: boolean }[]>([]);
   const [pendingRemoval, setPendingRemoval] = useState<number | null>(null);
@@ -1039,7 +1121,27 @@ export default function EventDetailPage() {
                         </td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">{fmt(c.weight)}</td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">
-                          {c.averageScore != null ? fmt(c.averageScore) : "—"}
+                          {(() => {
+                            if (c.averageScore != null) return fmt(c.averageScore);
+                            const imp = importedCriteriaMap.get(c.criterionId);
+                            if (!imp) return "—";
+                            if (imp.excluded) {
+                              return (
+                                <span className="text-[10px] uppercase font-bold italic text-[#9aa088]" title={imp.comment}>
+                                  Não avaliado
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex flex-col items-center gap-0.5">
+                                <span className="text-[#862200]">
+                                  {fmt(imp.score)}
+                                  <span className="text-[10px] font-normal not-italic text-[#9aa088]">/{fmt(imp.scale)}</span>
+                                </span>
+                                <span className="text-[9px] uppercase font-black italic text-[#9aa088]">importado</span>
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-4 text-center">
                           {calibrated ? (
@@ -1579,6 +1681,13 @@ export default function EventDetailPage() {
                 <ShieldAlert size={18} />
                 <span className="font-black uppercase tracking-tight">Matriz de Conformidade</span>
               </div>
+              {!conformityData && importedConformityRatio && (
+                <p className="px-4 pt-3 text-[10px] font-bold italic uppercase text-[#9aa088]">
+                  {importedConformityAllValue !== null
+                    ? `Inferido das observações importadas (${importedConformityRatio.sim}/${importedConformityRatio.total} itens "Sim")`
+                    : `Observações importadas indicam ${importedConformityRatio.sim}/${importedConformityRatio.total} itens "Sim" — não é possível identificar qual item pelo texto`}
+                </p>
+              )}
               <div className="p-4 space-y-3">
                 {conformityItems.map(item => {
                   const value = conformityForm[item.key];
