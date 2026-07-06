@@ -472,17 +472,11 @@ export interface EventParticipantInput {
 
 export interface EventParticipantUpdate {
   confirmed?: boolean;
-  /** @nullable */
-  actualDiariaDates?: string[] | null;
   /**
-     * Diárias previstas (definidas manualmente pelo RH com base na escalação, para comparar com as realizadas).
+     * Diárias realizadas (preenchidas manualmente pelo RH com base na presença real). As diárias previstas (scheduledDiaria*) não são editáveis por aqui — vêm apenas da sincronização com a logística interna.
      * @nullable
      */
-  scheduledDiariaCount?: number | null;
-  /** @nullable */
-  scheduledDiariaStart?: string | null;
-  /** @nullable */
-  scheduledDiariaEnd?: string | null;
+  actualDiariaDates?: string[] | null;
 }
 
 export interface EventConformity {

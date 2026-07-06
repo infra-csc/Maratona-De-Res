@@ -38,106 +38,6 @@ function formatDiariaDate(dateStr: string): string {
   return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
 }
 
-function PrevistasEditor({
-  employeeId,
-  scheduledDiariaCount,
-  scheduledDiariaStart,
-  scheduledDiariaEnd,
-  onSave,
-}: {
-  employeeId: number;
-  scheduledDiariaCount?: number | null;
-  scheduledDiariaStart?: string | null;
-  scheduledDiariaEnd?: string | null;
-  onSave: (data: { scheduledDiariaCount: number | null; scheduledDiariaStart: string | null; scheduledDiariaEnd: string | null }) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [count, setCount] = useState(scheduledDiariaCount != null ? String(scheduledDiariaCount) : "");
-  const [start, setStart] = useState(scheduledDiariaStart ?? "");
-  const [end, setEnd] = useState(scheduledDiariaEnd ?? "");
-
-  useEffect(() => {
-    if (open) {
-      setCount(scheduledDiariaCount != null ? String(scheduledDiariaCount) : "");
-      setStart(scheduledDiariaStart ?? "");
-      setEnd(scheduledDiariaEnd ?? "");
-    }
-  }, [open, scheduledDiariaCount, scheduledDiariaStart, scheduledDiariaEnd]);
-
-  const handleSave = () => {
-    const trimmed = count.trim();
-    const parsed = trimmed === "" ? null : parseInt(trimmed, 10);
-    onSave({
-      scheduledDiariaCount: parsed !== null && Number.isFinite(parsed) ? parsed : null,
-      scheduledDiariaStart: start || null,
-      scheduledDiariaEnd: end || null,
-    });
-    setOpen(false);
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          data-testid={`button-scheduled-diaria-${employeeId}`}
-          className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors"
-        >
-          <Calendar size={11} className="text-[#444933]" />
-          <span className="text-[10px] font-bold italic uppercase text-[#191c1e]">
-            Previstas: {scheduledDiariaCount ?? "—"}
-          </span>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-3 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] space-y-2.5">
-        <p className="text-[10px] font-black italic uppercase text-[#444933]">Diárias previstas (escalação)</p>
-        <div className="space-y-1">
-          <Label className="text-[10px] font-bold italic uppercase text-[#747a60]">Quantidade</Label>
-          <Input
-            type="number"
-            min={0}
-            step={1}
-            value={count}
-            onChange={(e) => setCount(e.target.value)}
-            data-testid={`input-scheduled-count-${employeeId}`}
-            className="rounded-none border-2 border-[#191c1e] h-8 text-xs"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label className="text-[10px] font-bold italic uppercase text-[#747a60]">Início</Label>
-            <Input
-              type="date"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              data-testid={`input-scheduled-start-${employeeId}`}
-              className="rounded-none border-2 border-[#191c1e] h-8 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] font-bold italic uppercase text-[#747a60]">Fim</Label>
-            <Input
-              type="date"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-              data-testid={`input-scheduled-end-${employeeId}`}
-              className="rounded-none border-2 border-[#191c1e] h-8 text-xs"
-            />
-          </div>
-        </div>
-        <button
-          type="button"
-          data-testid={`button-save-scheduled-${employeeId}`}
-          onClick={handleSave}
-          className="w-full py-1.5 border-2 border-[#191c1e] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[10px] font-black italic uppercase tracking-tight"
-        >
-          Salvar
-        </button>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 export default function EventDetailPage() {
   const [, params] = useRoute("/events/:id");
   const id = params ? parseInt(params.id) : 0;
@@ -301,8 +201,6 @@ export default function EventDetailPage() {
           toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
         } else if (vars.data.actualDiariaDates !== undefined) {
           toast({ title: "Diárias realizadas atualizadas" });
-        } else if (vars.data.scheduledDiariaCount !== undefined || vars.data.scheduledDiariaStart !== undefined || vars.data.scheduledDiariaEnd !== undefined) {
-          toast({ title: "Diárias previstas atualizadas" });
         }
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
@@ -1282,22 +1180,28 @@ export default function EventDetailPage() {
                               </p>
                             ) : (p.scheduledDiariaCount != null || realizadasCount != null || canManage) && (
                               <div className="flex items-center gap-3 flex-wrap pt-0.5">
-                                {canManage ? (
-                                  <PrevistasEditor
-                                    employeeId={p.employeeId}
-                                    scheduledDiariaCount={p.scheduledDiariaCount}
-                                    scheduledDiariaStart={p.scheduledDiariaStart}
-                                    scheduledDiariaEnd={p.scheduledDiariaEnd}
-                                    onSave={(data) => updateParticipant.mutate({ id, participantId: p.id, data })}
-                                  />
-                                ) : p.scheduledDiariaCount != null ? (
-                                  <span className="text-[10px] font-bold italic uppercase text-[#444933]">
+                                {p.scheduledDiariaCount != null ? (
+                                  <span
+                                    data-testid={`text-scheduled-diaria-${p.employeeId}`}
+                                    className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white text-[10px] font-bold italic uppercase text-[#444933]"
+                                    title="Diárias previstas vêm da escalação (logística interna)."
+                                  >
+                                    <Calendar size={11} className="text-[#444933]" />
                                     Previstas: {p.scheduledDiariaCount}
                                     {p.scheduledDiariaStart && p.scheduledDiariaEnd && (
                                       <span className="text-[#747a60]"> ({formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)})</span>
                                     )}
                                   </span>
-                                ) : null}
+                                ) : (
+                                  <span
+                                    data-testid={`text-scheduled-diaria-${p.employeeId}`}
+                                    className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white text-[10px] font-bold italic uppercase text-[#444933]"
+                                    title="Diárias previstas vêm da escalação (logística interna)."
+                                  >
+                                    <Calendar size={11} className="text-[#444933]" />
+                                    Previstas: —
+                                  </span>
+                                )}
                                 {p.scheduledDiariaCount != null && realizadasCount != null && realizadasCount < p.scheduledDiariaCount && (
                                   <span
                                     data-testid={`badge-diaria-gap-${p.employeeId}`}

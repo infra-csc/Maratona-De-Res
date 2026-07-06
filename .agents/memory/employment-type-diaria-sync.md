@@ -22,18 +22,17 @@ a no-op until the external app's contract is extended (see
 `integration-external-sync.md`) — auto-populates once it is, zero code changes
 needed here.
 
-As of 2026-07, `scheduledDiariaCount`/`Start`/`End` are ALSO manually editable by
-admin/rh directly in the event-detail participant list (PATCH
-`/events/:id/participants/:participantId`), because the external app's UI
-("Escalação") already shows this per-participant, but its sync API doesn't expose
-it yet — RH types in the same number they see there as a stand-in, to compare
-against "realizadas". Manual edits and a future sync are NOT mutually exclusive:
-whichever wrote last wins (same last-write-wins pattern as everywhere else), so once
-sync starts sending real data it will simply overwrite any manual entries on the
-next run — no reconciliation needed.
+As of 2026-07, `scheduledDiariaCount`/`Start`/`End` ("previstas") are sync-only
+again — the manual RH edit UI/endpoint support that briefly existed was removed
+per explicit product direction: previstas must always come from Logística
+Interna's escalação data, never be hand-typed in Maratona. `PATCH
+/events/:id/participants/:participantId` only accepts `confirmed` and
+`actualDiariaDates` now; sending `scheduledDiaria*` there is rejected with 400.
+Until the external sync contract actually exposes this data, "Previstas" will
+keep showing "—" in the UI — that is expected, not a bug.
 
-`actualDiariaCount` is the mirror-image case: it is manual-only (RH reconciles
-real attendance in Maratona) and must NEVER be touched by the sync loop, since
-the external app has no way to report real attendance, only the planned
-schedule. Same informational-participant gate (400 if `countsForScore===false`)
-applies to both scheduled and actual diária fields.
+`actualDiariaCount` ("realizadas") remains the RH-manual side of this pair:
+reconciled by hand in Maratona event-detail, and must NEVER be touched by the
+sync loop, since the external app has no way to report real attendance, only
+the planned schedule. Same informational-participant gate (400 if
+`countsForScore===false`) applies to both scheduled and actual diária fields.
