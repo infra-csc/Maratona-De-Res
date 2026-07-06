@@ -47,4 +47,4 @@
 - [Employment type + diária sync](employment-type-diaria-sync.md) — set employmentType only when external payload provides it (never default); scheduledDiaria fields are sync-OR-manual (RH can now type "previstas" too), last-write-wins
 - [Drizzle wraps pg error codes](drizzle-error-codes.md) — pg error code (23503 etc.) is in err.cause.code, not err.code; users with history can't be hard-deleted, deactivate instead
 - [resultsConfirmed gating flag](results-confirmed-gating.md) — event-level flag gates score+eligibility; defaults false (incl. existing/paid events = intentional reset); filter at recompute source + mirror in any live-compute path
-- [Seed test credentials & employee linkage](seed-test-credentials.md) — all seed users share password "123456"; users.employee_id is NULL for all seeds, temp-link+revert to test employee-scoped endpoints
+- [Seed test credentials & employee linkage](seed-test-credentials.md) — all seed users share one hardcoded password (see seed.ts); users.employee_id is NULL for all seeds, temp-link+revert to test employee-scoped endpoints

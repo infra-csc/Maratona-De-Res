@@ -86,7 +86,7 @@ router.get("/exports/event-results", async (req, res) => {
   const rows: Record<string, unknown>[] = team.criteriaDetails.map(cd => ({
     "Critério": cd.criterionName,
     "Área Responsável": cd.responsibleAreaLabel ?? "",
-    "Nota da Equipe (1-5)": cd.scoreUsed != null ? cd.scoreUsed.toFixed(2) : "",
+    "Nota da Equipe": cd.scoreUsed != null ? cd.scoreUsed.toFixed(2) : "",
     "Peso": cd.weight,
     "Total Ponderado": cd.criterionTotal != null ? cd.criterionTotal.toFixed(2) : "",
     "Status": cd.status,
@@ -94,7 +94,7 @@ router.get("/exports/event-results", async (req, res) => {
   rows.push({
     "Critério": "RESULTADO DO EVENTO",
     "Área Responsável": "",
-    "Nota da Equipe (1-5)": "",
+    "Nota da Equipe": "",
     "Peso": "",
     "Total Ponderado": team.eventScore.toFixed(2),
     "Status": team.isComplete ? "completo" : "pendente",
