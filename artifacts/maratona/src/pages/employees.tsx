@@ -126,20 +126,17 @@ export default function EmployeesPage() {
                 <DialogHeader>
                   <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Colaborador</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
+                <form
+                  onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, department: "Geral", functionName: "Colaborador" } }))}
+                  className="space-y-5 pt-4"
+                >
                   <div className="space-y-1.5">
                     <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
                     <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-none border-2 border-[#191c1e]" />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Departamento</Label>
-                      <Input data-testid="input-employee-dept" {...register("department")} placeholder="Ex: Cenografia" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função</Label>
-                      <Input data-testid="input-employee-func" {...register("functionName")} placeholder="Ex: Montador" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">CPF</Label>
+                    <Input data-testid="input-employee-document" {...register("document")} placeholder="000.000.000-00" className="h-11 rounded-none border-2 border-[#191c1e]" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
