@@ -50,3 +50,4 @@
 - [resultsConfirmed gating flag](results-confirmed-gating.md) — event-level flag gates score+eligibility AND avaliador "Concluída" status in Central de Avaliações; defaults false; filter at recompute source + mirror in any live-compute path
 - [Seed test credentials & employee linkage](seed-test-credentials.md) — all seed users share one hardcoded password (see seed.ts); users.employee_id is NULL for all seeds, temp-link+revert to test employee-scoped endpoints
 - [Dialog trigger in clickable header](dialog-trigger-in-clickable-header.md) — nest trigger inside div (not button) accordion header; stopPropagation on BOTH the trigger AND DialogContent (portals bubble via React tree, not DOM)
+- [Scored/syncable function prefix match](scored-function-prefix-match.md) — isScoredFunction must startsWith, not exact-match Set; new external function-name variants (e.g. "cenotecnica sp2") were silently dropped from sync

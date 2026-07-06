@@ -636,7 +636,7 @@ export default function IntegrationPage() {
             </DialogTitle>
             <DialogDescription>
               {result?.success
-                ? "Apenas eventos de 2026 já finalizados e participações de Cenotécnica / Cenotécnica Local foram importados. Registros existentes são atualizados, nunca duplicados."
+                ? "Apenas eventos de 2026 já finalizados e participações de Cenotécnica / Cenotécnico (e variantes) / Sup Ceno foram importados. Registros existentes são atualizados, nunca duplicados."
                 : result?.message}
             </DialogDescription>
           </DialogHeader>

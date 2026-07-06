@@ -52,8 +52,9 @@ function deriveYearQuarter(dateStr?: string) {
 // Ano do programa da Maratona: só importamos eventos deste ano.
 const TARGET_YEAR = 2026;
 // Apenas estas funções são relevantes para a Maratona: as avaliadas
-// (Cenotécnica/Cenotécnica Local) e as informativas "Sup Ceno *" (ver
-// lib/participation.ts — participam mas nunca contam para nota).
+// (Cenotécnica/Cenotécnico, incluindo variantes como SP/SP1/SP2/Local) e as
+// informativas "Sup Ceno *" (ver lib/participation.ts — participam mas nunca
+// contam para nota).
 function isAllowedFunction(s?: string): boolean {
   return isSyncableFunction(s);
 }
@@ -255,7 +256,7 @@ router.post("/integration/sync", async (req, res) => {
         });
     const keptEventIds = new Set(keptEvents.map(ev => extIdOf(ev)).filter((v): v is string => !!v));
 
-    // 2) Participações nesses eventos com função Cenotécnica / Cenotécnica Local.
+    // 2) Participações nesses eventos com função Cenotécnica/Cenotécnico (e variantes) ou Sup Ceno.
     const keptParticipations = extParticipations.filter(p => {
       if (!isAllowedFunction(p.functionName ?? p.function)) return false;
       const evExt = p.eventExternalId != null ? String(p.eventExternalId) : (p.eventId != null ? String(p.eventId) : null);
@@ -275,7 +276,7 @@ router.post("/integration/sync", async (req, res) => {
     const windowLabel = cycleStartDate && cycleEndDate
       ? `ciclo ${cycleStartDate} a ${cycleEndDate}`
       : `ano ${TARGET_YEAR} (ciclo sem datas definidas)`;
-    log(`Filtro: eventos do ${windowLabel} (${keptEvents.length}/${extEvents.length} na janela; demais fora do período do ciclo), participações Cenotécnica/Cenotécnica Local (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
+    log(`Filtro: eventos do ${windowLabel} (${keptEvents.length}/${extEvents.length} na janela; demais fora do período do ciclo), participações Cenotécnica/Cenotécnico/Sup Ceno (${keptParticipations.length}/${extParticipations.length}), colaboradores participantes (${keptEmployees.length}/${extEmployees.length}).`);
 
     await db.transaction(async (tx) => {
       // Colaboradores — upsert por externalId
