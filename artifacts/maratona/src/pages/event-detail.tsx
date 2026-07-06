@@ -106,6 +106,7 @@ function HistoricalResultPanel({
       onSuccess: () => {
         toast({ title: "Resultado importado atualizado" });
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        qc.invalidateQueries({ queryKey: ["event-result", eventId] });
         setEditing(false);
       },
       onError: (err: unknown) => {
