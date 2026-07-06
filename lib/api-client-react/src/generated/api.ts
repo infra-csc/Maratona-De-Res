@@ -50,6 +50,8 @@ import type {
   EvaluationUpdate,
   Event,
   EventAssignmentsUpdate,
+  EventComment,
+  EventCommentInput,
   EventConformity,
   EventConformityInput,
   EventCriteriaConfirm,
@@ -3435,6 +3437,227 @@ export const useResyncEventCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getResyncEventCriteriaMutationOptions(options));
+    }
+
+export const getGetEventCommentsUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/comments`
+}
+
+/**
+ * @summary List an event's general comment thread (visible to all users)
+ */
+export const getEventComments = async (id: number, options?: RequestInit): Promise<EventComment[]> => {
+
+  return customFetch<EventComment[]>(getGetEventCommentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEventCommentsQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/comments`
+    ] as const;
+    }
+
+
+export const getGetEventCommentsQueryOptions = <TData = Awaited<ReturnType<typeof getEventComments>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventComments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEventCommentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEventComments>>> = ({ signal }) => getEventComments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEventComments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEventCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof getEventComments>>>
+export type GetEventCommentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List an event's general comment thread (visible to all users)
+ */
+
+export function useGetEventComments<TData = Awaited<ReturnType<typeof getEventComments>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventComments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEventCommentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateEventCommentUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/comments`
+}
+
+/**
+ * @summary Post a comment to an event's general comment thread
+ */
+export const createEventComment = async (id: number,
+    eventCommentInput: EventCommentInput, options?: RequestInit): Promise<EventComment> => {
+
+  return customFetch<EventComment>(getCreateEventCommentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eventCommentInput,)
+  }
+);}
+
+
+
+
+export const getCreateEventCommentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEventComment>>, TError,{id: number;data: BodyType<EventCommentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEventComment>>, TError,{id: number;data: BodyType<EventCommentInput>}, TContext> => {
+
+const mutationKey = ['createEventComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEventComment>>, {id: number;data: BodyType<EventCommentInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createEventComment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEventCommentMutationResult = NonNullable<Awaited<ReturnType<typeof createEventComment>>>
+    export type CreateEventCommentMutationBody = BodyType<EventCommentInput>
+    export type CreateEventCommentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Post a comment to an event's general comment thread
+ */
+export const useCreateEventComment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEventComment>>, TError,{id: number;data: BodyType<EventCommentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createEventComment>>,
+        TError,
+        {id: number;data: BodyType<EventCommentInput>},
+        TContext
+      > => {
+      return useMutation(getCreateEventCommentMutationOptions(options));
+    }
+
+export const getDeleteEventCommentUrl = (id: number,
+    commentId: number,) => {
+
+
+
+
+  return `/events/${id}/comments/${commentId}`
+}
+
+/**
+ * @summary Delete a comment (author or admin/rh only)
+ */
+export const deleteEventComment = async (id: number,
+    commentId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteEventCommentUrl(id,commentId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteEventCommentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEventComment>>, TError,{id: number;commentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEventComment>>, TError,{id: number;commentId: number}, TContext> => {
+
+const mutationKey = ['deleteEventComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEventComment>>, {id: number;commentId: number}> = (props) => {
+          const {id,commentId} = props ?? {};
+
+          return  deleteEventComment(id,commentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteEventCommentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteEventComment>>>
+
+    export type DeleteEventCommentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a comment (author or admin/rh only)
+ */
+export const useDeleteEventComment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEventComment>>, TError,{id: number;commentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteEventComment>>,
+        TError,
+        {id: number;commentId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteEventCommentMutationOptions(options));
     }
 
 export const getDuplicateEventCriterionUrl = (id: number,) => {

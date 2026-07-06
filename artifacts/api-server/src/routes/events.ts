@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -1004,6 +1004,52 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
   }).where(eq(eventsTable.id, id)).returning();
   await audit(req.user!.userId, confirmed ? "confirm_criteria" : "reopen_criteria", "events", id, before, ev);
   res.json(await loadEventDetail(id));
+});
+
+// Mural de comentários — chat geral do evento, aberto a qualquer usuário
+// autenticado (não é gated por role nem por confidencialidade).
+router.get("/events/:id/comments", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const comments = await db
+    .select({
+      id: eventCommentsTable.id,
+      eventId: eventCommentsTable.eventId,
+      userId: eventCommentsTable.userId,
+      userName: usersTable.name,
+      userRole: usersTable.role,
+      message: eventCommentsTable.message,
+      createdAt: eventCommentsTable.createdAt,
+    })
+    .from(eventCommentsTable)
+    .leftJoin(usersTable, eq(eventCommentsTable.userId, usersTable.id))
+    .where(eq(eventCommentsTable.eventId, eventId))
+    .orderBy(eventCommentsTable.createdAt);
+  res.json(comments);
+});
+
+router.post("/events/:id/comments", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const { message } = req.body;
+  if (typeof message !== "string" || !message.trim()) { res.status(400).json({ error: "message obrigatório" }); return; }
+  if (message.trim().length > 2000) { res.status(400).json({ error: "message deve ter no máximo 2000 caracteres" }); return; }
+  const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!ev) { res.status(404).json({ error: "evento não encontrado" }); return; }
+  const [comment] = await db.insert(eventCommentsTable).values({
+    eventId, userId: req.user!.userId, message: message.trim(),
+  }).returning();
+  const [author] = await db.select({ name: usersTable.name, role: usersTable.role }).from(usersTable).where(eq(usersTable.id, req.user!.userId)).limit(1);
+  res.status(201).json({ ...comment, userName: author?.name ?? "", userRole: author?.role ?? "" });
+});
+
+router.delete("/events/:id/comments/:commentId", async (req, res) => {
+  const commentId = parseInt(req.params.commentId as string);
+  const [comment] = await db.select().from(eventCommentsTable).where(eq(eventCommentsTable.id, commentId)).limit(1);
+  if (!comment) { res.status(404).json({ error: "comentário não encontrado" }); return; }
+  const isOwner = comment.userId === req.user!.userId;
+  const isModerator = ["admin", "rh"].includes(req.user!.role);
+  if (!isOwner && !isModerator) { res.status(403).json({ error: "sem permissão para excluir este comentário" }); return; }
+  await db.delete(eventCommentsTable).where(eq(eventCommentsTable.id, commentId));
+  res.status(204).end();
 });
 
 export default router;

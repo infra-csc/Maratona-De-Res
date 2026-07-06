@@ -75,8 +75,21 @@ export const eventParticipantsTable = pgTable("event_participants", {
   eventEmployeeUq: uniqueIndex("event_participants_event_employee_uq").on(t.eventId, t.employeeId),
 }));
 
+// Mural de comentários do evento — chat aberto, visível e editável por
+// qualquer usuário autenticado (não é confidencial nem específico de RH).
+// Serve para discussão geral sobre o evento (logística, avisos, dúvidas).
+export const eventCommentsTable = pgTable("event_comments", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => usersTable.id),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertEventSchema = createInsertSchema(eventsTable).omit({ id: true, createdAt: true });
 export const insertEventParticipantSchema = createInsertSchema(eventParticipantsTable).omit({ id: true });
+export const insertEventCommentSchema = createInsertSchema(eventCommentsTable).omit({ id: true, createdAt: true });
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof eventsTable.$inferSelect;
 export type EventParticipant = typeof eventParticipantsTable.$inferSelect;
+export type EventComment = typeof eventCommentsTable.$inferSelect;

@@ -481,6 +481,21 @@ export interface MergeEventResult {
   warnings: string[];
 }
 
+export interface EventComment {
+  id: number;
+  eventId: number;
+  userId: number;
+  userName: string;
+  /** @nullable */
+  userRole?: string | null;
+  message: string;
+  createdAt: string;
+}
+
+export interface EventCommentInput {
+  message: string;
+}
+
 export interface EventParticipantInput {
   employeeId: number;
   functionName?: string;

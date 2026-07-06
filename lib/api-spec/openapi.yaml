@@ -940,6 +940,70 @@ paths:
                       addedNew:
                         type: integer
 
+  /events/{id}/comments:
+    get:
+      operationId: getEventComments
+      tags: [events]
+      summary: List an event's general comment thread (visible to all users)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventComment"
+    post:
+      operationId: createEventComment
+      tags: [events]
+      summary: Post a comment to an event's general comment thread
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCommentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventComment"
+
+  /events/{id}/comments/{commentId}:
+    delete:
+      operationId: deleteEventComment
+      tags: [events]
+      summary: Delete a comment (author or admin/rh only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+
   /events/{id}/criteria/duplicate:
     post:
       operationId: duplicateEventCriterion
@@ -2596,6 +2660,32 @@ components:
           description: >-
             Se false, a participação é apenas histórica/informativa (freela
             ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade.
+
+    EventComment:
+      type: object
+      required: [id, eventId, userId, userName, message, createdAt]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userRole:
+          type: ["string", "null"]
+        message:
+          type: string
+        createdAt:
+          type: string
+
+    EventCommentInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
 
     EventParticipantInput:
       type: object

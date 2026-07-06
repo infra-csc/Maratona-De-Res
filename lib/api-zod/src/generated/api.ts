@@ -1493,6 +1493,46 @@ export const ResyncEventCriteriaResponse = zod.object({
 
 
 /**
+ * @summary List an event's general comment thread (visible to all users)
+ */
+export const GetEventCommentsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEventCommentsResponseItem = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "userRole": zod.string().nullish(),
+  "message": zod.string(),
+  "createdAt": zod.string()
+})
+export const GetEventCommentsResponse = zod.array(GetEventCommentsResponseItem)
+
+
+/**
+ * @summary Post a comment to an event's general comment thread
+ */
+export const CreateEventCommentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateEventCommentBody = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Delete a comment (author or admin/rh only)
+ */
+export const DeleteEventCommentParams = zod.object({
+  "id": zod.coerce.number(),
+  "commentId": zod.coerce.number()
+})
+
+
+/**
  * @summary Duplicate a criterion within an event with a custom name
  */
 export const DuplicateEventCriterionParams = zod.object({

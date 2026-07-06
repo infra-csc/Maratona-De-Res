@@ -50,6 +50,8 @@ export * from './eventAreaAssignment';
 export * from './eventAssignmentsUpdate';
 export * from './eventAssignmentsUpdateAssignmentsItem';
 export * from './eventBreakdown';
+export * from './eventComment';
+export * from './eventCommentInput';
 export * from './eventConformity';
 export * from './eventConformityInput';
 export * from './eventCriteriaConfirm';
