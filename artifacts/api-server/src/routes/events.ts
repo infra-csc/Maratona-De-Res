@@ -6,6 +6,7 @@ import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
 import { getCurrentCycle } from "../lib/cycle.js";
+import { participantCountsForScore } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -119,7 +120,8 @@ async function loadEventDetail(id: number) {
     })
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
-    .where(eq(eventParticipantsTable.eventId, id));
+    .where(eq(eventParticipantsTable.eventId, id))
+    .then(rows => rows.map(p => ({ ...p, countsForScore: participantCountsForScore(p) })));
 
   const criteria = await db
     .select({
@@ -408,7 +410,7 @@ router.get("/events/:id/participants", async (req, res) => {
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
     .where(eq(eventParticipantsTable.eventId, id));
-  res.json(participants);
+  res.json(participants.map(p => ({ ...p, countsForScore: participantCountsForScore(p) })));
 });
 
 router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, res) => {
@@ -419,7 +421,11 @@ router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, 
   const [participant] = await db.insert(eventParticipantsTable).values({
     eventId, employeeId, functionName: functionName ?? emp?.functionName ?? null, teamName: teamName ?? null,
   }).returning();
-  res.status(201).json({ ...participant, employeeName: emp?.name ?? "", employmentType: emp?.employmentType ?? "casa" });
+  const employmentType = emp?.employmentType ?? "casa";
+  res.status(201).json({
+    ...participant, employeeName: emp?.name ?? "", employmentType,
+    countsForScore: participantCountsForScore({ employmentType, functionName: participant.functionName }),
+  });
 });
 
 router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
@@ -450,7 +456,11 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
     .returning();
   if (!updated) { res.status(404).json({ error: "Participante não encontrado" }); return; }
   const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, updated.employeeId)).limit(1);
-  res.json({ ...updated, employeeName: emp?.name ?? "", employmentType: emp?.employmentType ?? "casa" });
+  const employmentType = emp?.employmentType ?? "casa";
+  res.json({
+    ...updated, employeeName: emp?.name ?? "", employmentType,
+    countsForScore: participantCountsForScore({ employmentType, functionName: updated.functionName }),
+  });
 });
 
 // Matriz de Conformidade

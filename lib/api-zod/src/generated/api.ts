@@ -465,7 +465,8 @@ export const GetEventResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaCount": zod.number().nullish()
+  "actualDiariaCount": zod.number().nullish(),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),
@@ -860,7 +861,8 @@ export const GetEventParticipantsResponseItem = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaCount": zod.number().nullish()
+  "actualDiariaCount": zod.number().nullish(),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
 export const GetEventParticipantsResponse = zod.array(GetEventParticipantsResponseItem)
 
@@ -913,7 +915,8 @@ export const UpdateEventParticipantResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaCount": zod.number().nullish()
+  "actualDiariaCount": zod.number().nullish(),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
 
 
@@ -1071,7 +1074,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaCount": zod.number().nullish()
+  "actualDiariaCount": zod.number().nullish(),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),
@@ -1171,7 +1175,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaCount": zod.number().nullish()
+  "actualDiariaCount": zod.number().nullish(),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),
@@ -1281,7 +1286,8 @@ export const DeleteEventCriterionResponse = zod.object({
   "scheduledDiariaCount": zod.number().nullish(),
   "scheduledDiariaStart": zod.string().nullish(),
   "scheduledDiariaEnd": zod.string().nullish(),
-  "actualDiariaCount": zod.number().nullish()
+  "actualDiariaCount": zod.number().nullish(),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
   "criteria": zod.array(zod.object({
   "id": zod.number(),
@@ -2023,7 +2029,8 @@ export const GetRankingDetailResponse = zod.object({
   "platoonColor": zod.string().nullish(),
   "evaluatedCriteria": zod.number(),
   "totalCriteria": zod.number(),
-  "isHistorical": zod.boolean()
+  "isHistorical": zod.boolean(),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e não entra na média\/elegibilidade.')
 })),
   "penalties": zod.array(zod.object({
   "id": zod.number(),

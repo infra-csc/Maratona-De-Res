@@ -258,6 +258,8 @@ export interface EventParticipant {
   scheduledDiariaEnd?: string | null;
   /** @nullable */
   actualDiariaCount?: number | null;
+  /** Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade. */
+  countsForScore: boolean;
 }
 
 export interface EventCriterion {
@@ -922,6 +924,8 @@ export interface RankingDetailEvent {
   evaluatedCriteria: number;
   totalCriteria: number;
   isHistorical: boolean;
+  /** Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e não entra na média/elegibilidade. */
+  countsForScore: boolean;
 }
 
 export interface RankingDetailRow {

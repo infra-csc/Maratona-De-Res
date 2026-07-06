@@ -25,4 +25,6 @@ export interface RankingDetailEvent {
   evaluatedCriteria: number;
   totalCriteria: number;
   isHistorical: boolean;
+  /** Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e não entra na média/elegibilidade. */
+  countsForScore: boolean;
 }

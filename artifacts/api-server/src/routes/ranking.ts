@@ -9,6 +9,7 @@ import { getPlatoonByScore } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
 import { computeEventTeamResult } from "./results.js";
+import { participantCountsForScore } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -99,6 +100,7 @@ router.get("/ranking-detail", async (req, res) => {
       startDate: eventsTable.startDate,
       isHistorical: eventsTable.isHistorical,
       importedScore: eventsTable.importedScore,
+      functionName: eventParticipantsTable.functionName,
     })
     .from(eventParticipantsTable)
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
@@ -110,6 +112,10 @@ router.get("/ranking-detail", async (req, res) => {
   const events = [];
   for (const p of participations) {
     if (!p.eventId) continue;
+    // Freela/função informativa (ex.: "Sup Ceno *"): participação aparece no
+    // histórico do colaborador mas não conta para nota — mesma regra do
+    // fechamento (recomputeCycleResults, ver lib/participation.ts).
+    const countsForScore = participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName });
 
     // Evento histórico: nota já vem pronta (importedScore) de fora, sem
     // critérios/avaliações — não passar pelo cálculo por quesitos.
@@ -129,6 +135,7 @@ router.get("/ranking-detail", async (req, res) => {
         evaluatedCriteria: 0,
         totalCriteria: 0,
         isHistorical: true,
+        countsForScore,
       });
       continue;
     }
@@ -155,6 +162,7 @@ router.get("/ranking-detail", async (req, res) => {
       evaluatedCriteria: teamResult.evaluatedCriteria,
       totalCriteria: teamResult.totalCriteria,
       isHistorical: false,
+      countsForScore,
     });
   }
   events.sort((a, b) => b.eventScore - a.eventScore);
@@ -195,10 +203,11 @@ router.get("/ranking-detail", async (req, res) => {
   const penaltyPoints = penalties.reduce((s, p) => s + p.total, 0);
   const meritPoints = merits.reduce((s, m) => s + m.total, 0);
   // Média bruta ALINHADA ao snapshot oficial (recomputeCycleResults):
-  // só eventos FECHADOS e com nota (> 0) entram na base — igual ao
-  // eventsCount/grossAverage da consolidação. Eventos abertos aparecem na
-  // lista como andamento, mas não entram na média.
-  const scored = events.filter(e => e.status === "closed" && e.eventScore > 0);
+  // só eventos FECHADOS, com nota (> 0) e que contam para nota (não freela
+  // nem função informativa tipo "Sup Ceno *") entram na base — igual ao
+  // eventsCount/grossAverage da consolidação. Eventos abertos ou que não
+  // contam para nota aparecem na lista como histórico, mas não entram na média.
+  const scored = events.filter(e => e.status === "closed" && e.eventScore > 0 && e.countsForScore);
   const grossAverage = scored.length > 0 ? Math.round((scored.reduce((s, e) => s + e.eventScore, 0) / scored.length) * 100) / 100 : null;
 
   res.json({

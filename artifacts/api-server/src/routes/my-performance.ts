@@ -10,6 +10,7 @@ import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
+import { participantCountsForScore } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -63,6 +64,7 @@ router.get("/my-performance", async (req, res) => {
       feedbackReleasedAt: eventsTable.feedbackReleasedAt,
       startDate: eventsTable.startDate,
       endDate: eventsTable.endDate,
+      functionName: eventParticipantsTable.functionName,
     })
     .from(eventParticipantsTable)
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
@@ -200,6 +202,10 @@ router.get("/my-performance", async (req, res) => {
       totalCriteria: totalExpected,
       // isPending removed — not shown to collaborators
       criteriaDetails,
+      // Freela/função informativa (ex.: "Sup Ceno *"): participação aparece
+      // no histórico mas não conta para a média/bônus — mesma regra do
+      // fechamento (recomputeCycleResults, ver lib/participation.ts).
+      countsForScore: participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName }),
     });
   }
 
@@ -243,7 +249,7 @@ router.get("/my-performance", async (req, res) => {
   const openEvents = eventSummaries.filter(e => e.status === "open").length;
   const closedEvents = eventSummaries.filter(e => e.status === "closed").length;
 
-  const scoredEvents = eventSummaries.filter(e => e.eventScore > 0);
+  const scoredEvents = eventSummaries.filter(e => e.eventScore > 0 && e.countsForScore);
   const grossAverage = scoredEvents.length > 0
     ? scoredEvents.reduce((s, e) => s + e.eventScore, 0) / scoredEvents.length
     : null;

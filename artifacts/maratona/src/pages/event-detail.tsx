@@ -1044,6 +1044,15 @@ export default function EventDetailPage() {
                               <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
                                 <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
                               </span>
+                              {p.countsForScore === false && (
+                                <span
+                                  data-testid={`badge-no-score-${p.employeeId}`}
+                                  className="px-2 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
+                                  title="Participação apenas histórica/informativa — não entra na nota nem na elegibilidade."
+                                >
+                                  <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
+                                </span>
+                              )}
                             </div>
                             <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
                               {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}

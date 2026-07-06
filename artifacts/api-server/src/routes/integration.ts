@@ -11,6 +11,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
+import { isSyncableFunction } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -50,13 +51,11 @@ function deriveYearQuarter(dateStr?: string) {
 
 // Ano do programa da Maratona: só importamos eventos deste ano.
 const TARGET_YEAR = 2026;
-// Apenas estas funções são relevantes para a Maratona.
-const ALLOWED_FUNCTIONS = new Set(["cenotecnica", "cenotecnica local"]);
-function normalizeFunction(s?: string): string {
-  return (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-}
+// Apenas estas funções são relevantes para a Maratona: as avaliadas
+// (Cenotécnica/Cenotécnica Local) e as informativas "Sup Ceno *" (ver
+// lib/participation.ts — participam mas nunca contam para nota).
 function isAllowedFunction(s?: string): boolean {
-  return ALLOWED_FUNCTIONS.has(normalizeFunction(s));
+  return isSyncableFunction(s);
 }
 function extIdOf(o: { externalId?: string | number; id?: string | number }): string | null {
   return o.externalId != null ? String(o.externalId) : (o.id != null ? String(o.id) : null);

@@ -16,6 +16,7 @@ import {
 } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
+import { participantCountsForScore } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -182,8 +183,18 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   const eventDateById = new Map<number, string>();
   const eventResultInserts: (typeof employeeEventResultsTable.$inferInsert)[] = [];
   for (const ev of closedEvents) {
-    const eventParticipants = await db.select({ employeeId: eventParticipantsTable.employeeId })
-      .from(eventParticipantsTable).where(eq(eventParticipantsTable.eventId, ev.id));
+    const eventParticipantsRaw = await db.select({
+      employeeId: eventParticipantsTable.employeeId,
+      functionName: eventParticipantsTable.functionName,
+      employmentType: employeesTable.employmentType,
+    })
+      .from(eventParticipantsTable)
+      .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
+      .where(eq(eventParticipantsTable.eventId, ev.id));
+    // Freelancers e funções informativas ("Sup Ceno *") participam do evento
+    // (aparecem na Equipe Alocada) mas NUNCA contam para nota — não geram
+    // linha em employee_event_results (ver lib/participation.ts).
+    const eventParticipants = eventParticipantsRaw.filter(p => participantCountsForScore(p));
 
     if (ev.isHistorical) {
       const historicalScore = parseFloat(ev.importedScore as unknown as string);
@@ -223,14 +234,24 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   }
 
   // 2. Participação por colaborador em TODOS os eventos do ciclo (qualquer status).
+  //    Mesma exclusão de freela/funções informativas: essas participações não
+  //    contam para participatedEventsCount nem para a elegibilidade por nº
+  //    mínimo de eventos, já que nunca recebem nota.
   const participationRows = allCycleEventIds.length > 0
-    ? await db.select({ employeeId: eventParticipantsTable.employeeId, eventId: eventParticipantsTable.eventId })
+    ? await db.select({
+        employeeId: eventParticipantsTable.employeeId,
+        eventId: eventParticipantsTable.eventId,
+        functionName: eventParticipantsTable.functionName,
+        employmentType: employeesTable.employmentType,
+      })
         .from(eventParticipantsTable)
+        .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
         .where(inArray(eventParticipantsTable.eventId, allCycleEventIds))
     : [];
   const participatedByEmployee = new Map<number, Set<number>>();
   for (const r of participationRows) {
     if (!r.employeeId) continue;
+    if (!participantCountsForScore(r)) continue;
     if (!participatedByEmployee.has(r.employeeId)) participatedByEmployee.set(r.employeeId, new Set());
     participatedByEmployee.get(r.employeeId)!.add(r.eventId);
   }
@@ -335,6 +356,20 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
       closedAt: new Date(),
       closedByUserId: userId,
     });
+  }
+
+  // Alerta: colaborador com pagamento já decidido (aprovado/agendado/pago) que
+  // ficou sem NENHUMA participação que conta para nota neste ciclo (ex.: virou
+  // freela, ou todas as suas participações passaram a ser função informativa
+  // tipo "Sup Ceno *"). O rebuild atômico abaixo removeria essa linha de
+  // quarterly_results silenciosamente — avisa em vez de apagar sem aviso.
+  for (const [employeeId, prev] of paymentByEmployee) {
+    if (participatedByEmployee.has(employeeId)) continue;
+    if (!prev.paidAt && !PRESERVE_STATUSES.includes(prev.bonusStatus)) continue;
+    const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+    warnings.push(
+      `${employee?.name ?? `Colaborador #${employeeId}`}: pagamento com status "${prev.bonusStatus}" será removido deste ciclo — não há mais participações que contam para nota (verifique se o employmentType ou a função mudou).`
+    );
   }
 
   // FASE DE ESCRITA — rebuild atômico de todo o ciclo.
