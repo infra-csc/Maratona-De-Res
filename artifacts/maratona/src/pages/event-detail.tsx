@@ -1628,7 +1628,7 @@ export default function EventDetailPage() {
           </section>
         )}
 
-        <div className={`grid grid-cols-1 gap-6 ${hasPerformanceTable ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        <div className={`grid grid-cols-1 gap-6 ${hasPerformanceTable ? "lg:grid-cols-3" : ""}`}>
           {hasPerformanceTable && (
           <div className="lg:col-span-2 space-y-6">
             {result && result.eventScore > 0 && participantResults.length > 0 && (
@@ -1674,7 +1674,7 @@ export default function EventDetailPage() {
           </div>
           )}
 
-          <div className={hasPerformanceTable ? "space-y-6" : "space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0 lg:items-start"}>
+          <div className={hasPerformanceTable ? "" : "lg:max-w-xl"}>
             {/* Matriz de Conformidade */}
             <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
               <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
@@ -1731,8 +1731,10 @@ export default function EventDetailPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
 
-            {((event.participants && event.participants.length > 0) || canManage) && (
+        {((event.participants && event.participants.length > 0) || canManage) && (
               <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
                 <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center justify-between gap-2 italic">
                   <div className="flex items-center gap-2">
@@ -1752,7 +1754,7 @@ export default function EventDetailPage() {
                 {(!event.participants || event.participants.length === 0) ? (
                   <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum colaborador alocado.</div>
                 ) : (
-                  <div className="divide-y-2 divide-[#eceef0]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
                     {event.participants.map(p => {
                       const isInactive = p.confirmed === false;
                       const isInformational = p.countsForScore === false;
@@ -1769,8 +1771,8 @@ export default function EventDetailPage() {
                           key={p.id}
                           data-testid={`chip-participant-${p.employeeId}`}
                           className={cn(
-                            "flex items-center gap-4 p-5 transition-colors",
-                            isInformational ? "bg-[#862200]/[0.06] border-l-4 border-l-[#862200]" : "hover:bg-[#f2f4f6]",
+                            "flex items-start gap-4 p-4 border-2 border-[#eceef0] transition-colors",
+                            isInformational ? "bg-[#862200]/[0.06] border-l-4 border-l-[#862200]" : "hover:bg-[#f2f4f6] hover:border-[#191c1e]",
                             isInactive && "opacity-50"
                           )}
                         >
@@ -1962,8 +1964,6 @@ export default function EventDetailPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
 
         {!event.isHistorical && <EventCommentsPanel eventId={id} />}
       </div>
