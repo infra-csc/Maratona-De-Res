@@ -992,7 +992,10 @@ export const UpdateEventParticipantParams = zod.object({
 
 export const UpdateEventParticipantBody = zod.object({
   "confirmed": zod.boolean().optional(),
-  "actualDiariaDates": zod.array(zod.string()).nullish()
+  "actualDiariaDates": zod.array(zod.string()).nullish(),
+  "scheduledDiariaCount": zod.number().nullish().describe('Diárias previstas (definidas manualmente pelo RH com base na escalação, para comparar com as realizadas).'),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish()
 })
 
 export const UpdateEventParticipantResponse = zod.object({

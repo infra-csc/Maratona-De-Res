@@ -2510,6 +2510,15 @@ components:
           type: ["array", "null"]
           items:
             type: string
+        scheduledDiariaCount:
+          type: ["integer", "null"]
+          description: >-
+            Diárias previstas (definidas manualmente pelo RH com base na
+            escalação, para comparar com as realizadas).
+        scheduledDiariaStart:
+          type: ["string", "null"]
+        scheduledDiariaEnd:
+          type: ["string", "null"]
 
     EventConformity:
       type: object

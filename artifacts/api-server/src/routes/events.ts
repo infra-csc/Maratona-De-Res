@@ -468,9 +468,9 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
-  const { confirmed, actualDiariaDates } = req.body;
-  if (confirmed === undefined && actualDiariaDates === undefined) {
-    res.status(400).json({ error: "informe confirmed (boolean) e/ou actualDiariaDates (lista de datas)" });
+  const { confirmed, actualDiariaDates, scheduledDiariaCount, scheduledDiariaStart, scheduledDiariaEnd } = req.body;
+  if (confirmed === undefined && actualDiariaDates === undefined && scheduledDiariaCount === undefined && scheduledDiariaStart === undefined && scheduledDiariaEnd === undefined) {
+    res.status(400).json({ error: "informe confirmed, actualDiariaDates, scheduledDiariaCount, scheduledDiariaStart e/ou scheduledDiariaEnd" });
     return;
   }
   if (confirmed !== undefined && typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed deve ser boolean" }); return; }
@@ -488,14 +488,52 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
     }
   }
 
+  let normalizedScheduledCount: number | null | undefined = undefined;
+  if (scheduledDiariaCount !== undefined) {
+    if (scheduledDiariaCount === null) {
+      normalizedScheduledCount = null;
+    } else if (typeof scheduledDiariaCount !== "number" || !Number.isInteger(scheduledDiariaCount) || scheduledDiariaCount < 0) {
+      res.status(400).json({ error: "scheduledDiariaCount deve ser um número inteiro maior ou igual a 0" });
+      return;
+    } else {
+      normalizedScheduledCount = scheduledDiariaCount;
+    }
+  }
+
+  let normalizedScheduledStart: string | null | undefined = undefined;
+  if (scheduledDiariaStart !== undefined) {
+    if (scheduledDiariaStart !== null && (typeof scheduledDiariaStart !== "string" || !ISO_DATE_RE.test(scheduledDiariaStart))) {
+      res.status(400).json({ error: "scheduledDiariaStart deve ser uma data no formato YYYY-MM-DD" });
+      return;
+    }
+    normalizedScheduledStart = scheduledDiariaStart;
+  }
+
+  let normalizedScheduledEnd: string | null | undefined = undefined;
+  if (scheduledDiariaEnd !== undefined) {
+    if (scheduledDiariaEnd !== null && (typeof scheduledDiariaEnd !== "string" || !ISO_DATE_RE.test(scheduledDiariaEnd))) {
+      res.status(400).json({ error: "scheduledDiariaEnd deve ser uma data no formato YYYY-MM-DD" });
+      return;
+    }
+    normalizedScheduledEnd = scheduledDiariaEnd;
+  }
+
+  const effectiveStart = normalizedScheduledStart !== undefined ? normalizedScheduledStart : undefined;
+  const effectiveEnd = normalizedScheduledEnd !== undefined ? normalizedScheduledEnd : undefined;
+  if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
+    res.status(400).json({ error: "scheduledDiariaStart não pode ser depois de scheduledDiariaEnd" });
+    return;
+  }
+
   const [existing] = await db.select().from(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId)).limit(1);
   if (!existing) { res.status(404).json({ error: "Participante não encontrado" }); return; }
   const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, existing.employeeId)).limit(1);
   const employmentType = emp?.employmentType ?? "casa";
   const countsForScore = participantCountsForScore({ employmentType, functionName: existing.functionName });
 
-  if (normalizedDates !== undefined && !countsForScore) {
-    res.status(400).json({ error: "Participação informativa (não conta para nota) não permite registro de diárias realizadas." });
+  const changesDiaria = normalizedDates !== undefined || normalizedScheduledCount !== undefined || normalizedScheduledStart !== undefined || normalizedScheduledEnd !== undefined;
+  if (changesDiaria && !countsForScore) {
+    res.status(400).json({ error: "Participação informativa (não conta para nota) não permite registro de diárias." });
     return;
   }
 
@@ -515,6 +553,9 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
         actualDiariaDates: normalizedDates,
         actualDiariaCount: normalizedDates ? normalizedDates.length : null,
       }),
+      ...(normalizedScheduledCount !== undefined && { scheduledDiariaCount: normalizedScheduledCount }),
+      ...(normalizedScheduledStart !== undefined && { scheduledDiariaStart: normalizedScheduledStart }),
+      ...(normalizedScheduledEnd !== undefined && { scheduledDiariaEnd: normalizedScheduledEnd }),
     })
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();
