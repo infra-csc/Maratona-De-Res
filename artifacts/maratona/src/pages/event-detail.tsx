@@ -726,15 +726,6 @@ export default function EventDetailPage() {
                     <span className={evaluationProgress === 100 ? "text-[#506600] font-black" : ""}>{evaluationProgress}% Avaliado</span>
                   </div>
                 </div>
-
-                {event.isHistorical && (
-                  <HistoricalResultPanel
-                    eventId={event.id}
-                    currentScore={event.importedScore}
-                    currentNotes={event.importedNotes}
-                    canManage={canManage}
-                  />
-                )}
               </div>
 
               {result && result.eventScore > 0 && (() => {
@@ -922,8 +913,8 @@ export default function EventDetailPage() {
           </section>
         )}
 
-        {/* HR criteria configuration + evaluator assignment (merged) */}
-        {canManage && (
+        {/* HR criteria configuration + evaluator assignment (merged) — não se aplica a eventos históricos/importados */}
+        {canManage && !event.isHistorical && (
           <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
             <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
               <div className="flex items-center gap-2">
@@ -1288,6 +1279,28 @@ export default function EventDetailPage() {
                   </>
                 )}
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* Eventos históricos/importados: sem atribuição de avaliadores — só observações importadas + mural de comentários */}
+        {event.isHistorical && (
+          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+              <MessageSquare size={18} />
+              <span className="font-black uppercase tracking-tight">Observações Importadas e Comentários</span>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm italic text-[#444933]">
+                Este é um evento histórico com resultado importado — não é necessário atribuir avaliadores. Use as observações e o mural de comentários abaixo para registrar contexto adicional.
+              </p>
+              <HistoricalResultPanel
+                eventId={event.id}
+                currentScore={event.importedScore}
+                currentNotes={event.importedNotes}
+                canManage={canManage}
+              />
+              <EventCommentsPanel eventId={id} />
             </div>
           </section>
         )}
@@ -1698,7 +1711,7 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        <EventCommentsPanel eventId={id} />
+        {!event.isHistorical && <EventCommentsPanel eventId={id} />}
       </div>
     </div>
   );
