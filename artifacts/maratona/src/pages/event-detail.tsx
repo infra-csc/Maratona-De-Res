@@ -990,6 +990,12 @@ export default function EventDetailPage() {
               <p className="text-sm italic text-[#444933]">
                 Enquanto os resultados não forem confirmados, este evento <strong>não conta</strong> na elegibilidade nem na nota final dos colaboradores — mesmo que já esteja fechado. Confirme após revisar as notas e a calibragem. Admin/RH pode confirmar ou reverter a qualquer momento.
               </p>
+              {event.status !== "closed" && !event.resultsConfirmed && (
+                <p data-testid="text-confirm-requires-closed" className="text-sm italic text-[#ba1a1a] bg-[#ffedea] border-2 border-[#ba1a1a] px-3 py-2 flex items-start gap-2">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  Este evento ainda está <strong>aberto</strong>. A confirmação só tem efeito depois que o evento for fechado (na tela de Calibração, em "Fechar Evento e Liberar Notas") — confirmar agora não muda nada nos resultados.
+                </p>
+              )}
               {event.resultsConfirmed && event.resultsConfirmedAt && (
                 <p className="text-xs italic text-[#747a60]">
                   Confirmado em {new Date(event.resultsConfirmedAt).toLocaleString('pt-BR')}
@@ -1009,7 +1015,8 @@ export default function EventDetailPage() {
                   <button
                     data-testid="button-confirm-results"
                     onClick={() => confirmResults.mutate({ id })}
-                    disabled={resultsConfirmBusy}
+                    disabled={resultsConfirmBusy || event.status !== "closed"}
+                    title={event.status !== "closed" ? "Feche o evento antes de confirmar os resultados" : undefined}
                     className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW}`}
                   >
                     <CheckCircle2 size={16} /> {resultsConfirmBusy ? "Confirmando..." : "Confirmar Resultados"}
