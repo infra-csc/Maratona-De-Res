@@ -3317,6 +3317,8 @@ components:
           type: ["number", "null"]
         calibratedScore:
           type: ["number", "null"]
+        calibrationReason:
+          type: ["string", "null"]
         scoreUsed:
           type: ["number", "null"]
         criterionTotal:

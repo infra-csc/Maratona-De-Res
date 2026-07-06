@@ -846,6 +846,7 @@ export const GetEventResultResponse = zod.object({
   "weight": zod.number(),
   "averageScore": zod.number().nullish(),
   "calibratedScore": zod.number().nullish(),
+  "calibrationReason": zod.string().nullish(),
   "scoreUsed": zod.number().nullish(),
   "criterionTotal": zod.number().nullish(),
   "status": zod.string()

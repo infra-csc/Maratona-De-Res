@@ -868,6 +868,8 @@ export interface EventTeamCriterion {
   /** @nullable */
   calibratedScore?: number | null;
   /** @nullable */
+  calibrationReason?: string | null;
+  /** @nullable */
   scoreUsed?: number | null;
   /** @nullable */
   criterionTotal?: number | null;

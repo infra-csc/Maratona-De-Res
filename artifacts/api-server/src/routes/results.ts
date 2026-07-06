@@ -85,6 +85,7 @@ export async function computeEventTeamResult(eventId: number) {
     const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
     const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
     const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
+    const calibrationReason = calibration?.calibrationReason ?? null;
     const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
     const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
     // "Avaliado" exige que TODOS os avaliadores designados para a área do
@@ -99,6 +100,7 @@ export async function computeEventTeamResult(eventId: number) {
       weight,
       averageScore,
       calibratedScore,
+      calibrationReason,
       scoreUsed,
       criterionTotal,
       requiredEvaluators: completion.requiredEvaluators,

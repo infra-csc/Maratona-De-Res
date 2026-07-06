@@ -584,9 +584,16 @@ export default function EventDetailPage() {
                         </td>
                         <td className="px-4 py-4 text-center">
                           {calibrated ? (
-                            <span className="inline-flex items-center gap-1 text-xs uppercase font-black italic bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1">
-                              <Check size={10} /> {fmt(c.calibratedScore as number)}
-                            </span>
+                            <div className="flex flex-col items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-xs uppercase font-black italic bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1">
+                                <Check size={10} /> {fmt(c.calibratedScore as number)}
+                              </span>
+                              {c.calibrationReason && (
+                                <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words text-left max-w-[220px] border-l-2 border-[#191c1e] bg-[#f7f9fb] px-2 py-1">
+                                  {c.calibrationReason}
+                                </p>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-[10px] uppercase font-bold italic text-[#747a60]">Sem calibração</span>
                           )}
