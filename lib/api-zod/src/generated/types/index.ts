@@ -114,6 +114,7 @@ export * from './rankingDetailSummary';
 export * from './rankingEntry';
 export * from './resetDataInput';
 export * from './resetPasswordInput';
+export * from './resyncEventCriteria200';
 export * from './reviewRequest';
 export * from './reviewRequestResolve';
 export * from './reviewRequestStatus';

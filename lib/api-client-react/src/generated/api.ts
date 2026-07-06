@@ -100,6 +100,7 @@ import type {
   RankingEntry,
   ResetDataInput,
   ResetPasswordInput,
+  ResyncEventCriteria200,
   ReviewRequest,
   ReviewRequestResolve,
   Rule,
@@ -3364,6 +3365,76 @@ export const useConfirmEventCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConfirmEventCriteriaMutationOptions(options));
+    }
+
+export const getResyncEventCriteriaUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/resync`
+}
+
+/**
+ * @summary Sync an unconfirmed event's criteria with the current active global catalog
+ */
+export const resyncEventCriteria = async (id: number, options?: RequestInit): Promise<ResyncEventCriteria200> => {
+
+  return customFetch<ResyncEventCriteria200>(getResyncEventCriteriaUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResyncEventCriteriaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resyncEventCriteria>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resyncEventCriteria>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['resyncEventCriteria'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resyncEventCriteria>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  resyncEventCriteria(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResyncEventCriteriaMutationResult = NonNullable<Awaited<ReturnType<typeof resyncEventCriteria>>>
+
+    export type ResyncEventCriteriaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Sync an unconfirmed event's criteria with the current active global catalog
+ */
+export const useResyncEventCriteria = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resyncEventCriteria>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resyncEventCriteria>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getResyncEventCriteriaMutationOptions(options));
     }
 
 export const getDuplicateEventCriterionUrl = (id: number,) => {

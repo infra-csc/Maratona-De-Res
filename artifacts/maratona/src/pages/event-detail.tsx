@@ -1,8 +1,8 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
@@ -299,6 +299,21 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); },
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    },
+  });
+  const resyncCriteria = useResyncEventCriteria({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        const removed = data.removedStale ?? 0;
+        const added = data.addedNew ?? 0;
+        if (removed === 0 && added === 0) {
+          toast({ title: "Já está sincronizado", description: "Este evento já usa somente os critérios ativos." });
+        } else {
+          toast({ title: "Critérios sincronizados", description: `${added} critério(s) ativo(s) adicionado(s), ${removed} critério(s) desativado(s) (não fazem mais parte do catálogo ativo).` });
+        }
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao sincronizar", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -1090,6 +1105,17 @@ export default function EventDetailPage() {
                 )}
                 {!criteriaConfirmed ? (
                   <>
+                    {!hasEvaluations && (
+                      <button
+                        data-testid="button-resync-criteria"
+                        onClick={() => resyncCriteria.mutate({ id })}
+                        disabled={resyncCriteria.isPending}
+                        title="Remove critérios que não fazem mais parte do catálogo ativo e adiciona os que faltam"
+                        className="bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
+                      >
+                        <RefreshCw size={16} /> {resyncCriteria.isPending ? "Sincronizando..." : "Sincronizar Critérios Ativos"}
+                      </button>
+                    )}
                     <button
                       data-testid="button-save-criteria"
                       onClick={handleSaveAll}

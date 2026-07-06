@@ -1346,6 +1346,11 @@ export type UpdateEventCriteria200 = {
   warnings?: string[];
 };
 
+export type ResyncEventCriteria200 = EventDetail & {
+  removedStale?: number;
+  addedNew?: number;
+};
+
 export type GetEvaluationsParams = {
 eventId?: number;
 status?: string;

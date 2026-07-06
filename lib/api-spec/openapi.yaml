@@ -914,6 +914,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventDetail"
 
+  /events/{id}/criteria/resync:
+    post:
+      operationId: resyncEventCriteria
+      tags: [events]
+      summary: Sync an unconfirmed event's criteria with the current active global catalog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/EventDetail"
+                  - type: object
+                    properties:
+                      removedStale:
+                        type: integer
+                      addedNew:
+                        type: integer
+
   /events/{id}/criteria/duplicate:
     post:
       operationId: duplicateEventCriterion
