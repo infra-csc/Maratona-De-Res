@@ -309,7 +309,7 @@ export default function EventsPage() {
                       {score != null && (
                         <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[78px] shrink-0 ${concluded ? "bg-[#ccff00]" : "bg-white"}`}>
                           <span className="block text-[10px] uppercase font-bold italic text-[#161e00] mb-0.5">{concluded ? "Score Final" : "Provisório"}</span>
-                          <span className="text-2xl font-black italic text-[#191c1e] leading-none">{score.toFixed(0)}</span>
+                          <span className="text-2xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
                           <span className={`block text-[8px] uppercase font-bold italic mt-0.5 leading-none ${concluded ? "text-[#506600]" : "text-[#a06a00]"}`}>{concluded ? (calibrated ? "Pós-calibração" : "Evento fechado") : (calibrated ? "Calibração parcial" : "Sem calibração")}</span>
                         </div>
                       )}
