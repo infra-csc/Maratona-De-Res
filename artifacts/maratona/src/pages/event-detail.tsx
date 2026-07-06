@@ -496,6 +496,7 @@ export default function EventDetailPage() {
     query: { enabled: !!id && canViewResult, queryKey: ["event-result", id] as unknown[] },
   });
   const participantResults = result?.participants ?? [];
+  const hasPerformanceTable = !!result && result.eventScore > 0 && participantResults.length > 0;
 
   const { data: evaluations } = useGetEvaluations(
     { eventId: id },
@@ -1525,7 +1526,8 @@ export default function EventDetailPage() {
           </section>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`grid grid-cols-1 gap-6 ${hasPerformanceTable ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+          {hasPerformanceTable && (
           <div className="lg:col-span-2 space-y-6">
             {result && result.eventScore > 0 && participantResults.length > 0 && (
               <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
@@ -1568,8 +1570,9 @@ export default function EventDetailPage() {
               </div>
             )}
           </div>
+          )}
 
-          <div className="space-y-6">
+          <div className={hasPerformanceTable ? "space-y-6" : "space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0 lg:items-start"}>
             {/* Matriz de Conformidade */}
             <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
               <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
