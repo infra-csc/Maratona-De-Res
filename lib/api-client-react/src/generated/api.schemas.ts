@@ -365,6 +365,10 @@ export interface EventParticipantInput {
   teamName?: string;
 }
 
+export interface EventParticipantUpdate {
+  confirmed: boolean;
+}
+
 export interface EventConformity {
   id: number;
   eventId: number;

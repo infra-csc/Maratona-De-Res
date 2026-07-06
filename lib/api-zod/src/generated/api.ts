@@ -874,6 +874,29 @@ export const RemoveEventParticipantParams = zod.object({
 
 
 /**
+ * @summary Update participant (e.g. mark as confirmed/inactive)
+ */
+export const UpdateEventParticipantParams = zod.object({
+  "id": zod.coerce.number(),
+  "participantId": zod.coerce.number()
+})
+
+export const UpdateEventParticipantBody = zod.object({
+  "confirmed": zod.boolean()
+})
+
+export const UpdateEventParticipantResponse = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional()
+})
+
+
+/**
  * @summary Get event conformity matrix
  */
 export const GetEventConformityParams = zod.object({

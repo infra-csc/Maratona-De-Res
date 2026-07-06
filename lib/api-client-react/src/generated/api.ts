@@ -61,6 +61,7 @@ import type {
   EventInput,
   EventParticipant,
   EventParticipantInput,
+  EventParticipantUpdate,
   EventTeamResult,
   EventUpdate,
   ExportEventResultsParams,
@@ -2631,6 +2632,80 @@ export const useRemoveEventParticipant = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRemoveEventParticipantMutationOptions(options));
+    }
+
+export const getUpdateEventParticipantUrl = (id: number,
+    participantId: number,) => {
+
+
+
+
+  return `/events/${id}/participants/${participantId}`
+}
+
+/**
+ * @summary Update participant (e.g. mark as confirmed/inactive)
+ */
+export const updateEventParticipant = async (id: number,
+    participantId: number,
+    eventParticipantUpdate: EventParticipantUpdate, options?: RequestInit): Promise<EventParticipant> => {
+
+  return customFetch<EventParticipant>(getUpdateEventParticipantUrl(id,participantId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eventParticipantUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateEventParticipantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventParticipant>>, TError,{id: number;participantId: number;data: BodyType<EventParticipantUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEventParticipant>>, TError,{id: number;participantId: number;data: BodyType<EventParticipantUpdate>}, TContext> => {
+
+const mutationKey = ['updateEventParticipant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEventParticipant>>, {id: number;participantId: number;data: BodyType<EventParticipantUpdate>}> = (props) => {
+          const {id,participantId,data} = props ?? {};
+
+          return  updateEventParticipant(id,participantId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEventParticipantMutationResult = NonNullable<Awaited<ReturnType<typeof updateEventParticipant>>>
+    export type UpdateEventParticipantMutationBody = BodyType<EventParticipantUpdate>
+    export type UpdateEventParticipantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update participant (e.g. mark as confirmed/inactive)
+ */
+export const useUpdateEventParticipant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventParticipant>>, TError,{id: number;participantId: number;data: BodyType<EventParticipantUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEventParticipant>>,
+        TError,
+        {id: number;participantId: number;data: BodyType<EventParticipantUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateEventParticipantMutationOptions(options));
     }
 
 export const getGetEventConformityUrl = (id: number,) => {

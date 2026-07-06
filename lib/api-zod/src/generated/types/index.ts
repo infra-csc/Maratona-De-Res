@@ -59,6 +59,7 @@ export * from './eventFeedback';
 export * from './eventInput';
 export * from './eventParticipant';
 export * from './eventParticipantInput';
+export * from './eventParticipantUpdate';
 export * from './eventPendency';
 export * from './eventTeamCriterion';
 export * from './eventTeamParticipant';

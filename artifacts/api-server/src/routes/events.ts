@@ -418,6 +418,20 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
   res.status(204).end();
 });
 
+router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
+  const participantId = parseInt(req.params.participantId as string);
+  const { confirmed } = req.body;
+  if (typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed (boolean) obrigatório" }); return; }
+  const [updated] = await db
+    .update(eventParticipantsTable)
+    .set({ confirmed })
+    .where(eq(eventParticipantsTable.id, participantId))
+    .returning();
+  if (!updated) { res.status(404).json({ error: "Participante não encontrado" }); return; }
+  const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, updated.employeeId)).limit(1);
+  res.json({ ...updated, employeeName: emp?.name ?? "" });
+});
+
 // Matriz de Conformidade
 router.get("/events/:id/conformity", async (req, res) => {
   const id = parseInt(req.params.id as string);

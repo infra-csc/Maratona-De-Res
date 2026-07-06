@@ -1,18 +1,23 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useGetEventConformity, useSetEventConformity, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, ClipboardList, Copy, Check } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 
@@ -140,6 +145,38 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) }); toast({ title: "Participante removido" }); },
       onError: (e: { message?: string }) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const updateParticipant = useUpdateEventParticipant({
+    mutation: {
+      onSuccess: (_data, vars) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
+  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
+  const [newParticipantEmployeeId, setNewParticipantEmployeeId] = useState<number | null>(null);
+  const [newParticipantFunction, setNewParticipantFunction] = useState("");
+  const { data: allEmployees } = useGetEmployees({ active: true }, { query: { enabled: canManage, queryKey: ["employees", "active"] as unknown[] } });
+  const alreadyAllocatedIds = new Set((event?.participants ?? []).map(p => p.employeeId));
+  const availableEmployees = (allEmployees ?? []).filter(e => !alreadyAllocatedIds.has(e.id));
+  const selectedNewEmployee = availableEmployees.find(e => e.id === newParticipantEmployeeId);
+
+  const addParticipant = useAddEventParticipant({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        toast({ title: "Colaborador adicionado à equipe" });
+        setAddParticipantOpen(false);
+        setNewParticipantEmployeeId(null);
+        setNewParticipantFunction("");
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao adicionar", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -969,37 +1006,149 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            {event.participants && event.participants.length > 0 && (
+            {((event.participants && event.participants.length > 0) || canManage) && (
               <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-                <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-                  <Users size={18} />
-                  <span className="font-black uppercase tracking-tight">Equipe Alocada</span>
+                <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center justify-between gap-2 italic">
+                  <div className="flex items-center gap-2">
+                    <Users size={18} />
+                    <span className="font-black uppercase tracking-tight">Equipe Alocada</span>
+                  </div>
+                  {canManage && (
+                    <button
+                      data-testid="button-add-participant"
+                      onClick={() => setAddParticipantOpen(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 border-2 border-[#ccff00] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[11px] font-black uppercase tracking-tight"
+                    >
+                      <UserPlus size={14} /> Adicionar
+                    </button>
+                  )}
                 </div>
-                <div className="divide-y-2 divide-[#eceef0]">
-                  {event.participants.map(p => (
-                    <div key={p.id} data-testid={`chip-participant-${p.employeeId}`} className="flex items-center gap-3 p-4 hover:bg-[#f2f4f6] transition-colors">
-                      <div className="w-9 h-9 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-xs text-[#191c1e] shrink-0">
-                        {p.employeeName.split(' ').map((n:string)=>n[0]).slice(0,2).join('').toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</p>
-                        <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">{p.functionName}</p>
-                      </div>
-                      {canManage && (
-                        <button
-                          data-testid={`button-remove-participant-${p.employeeId}`}
-                          onClick={() => setPendingRemoveParticipant(p.id)}
-                          className="p-1.5 border-2 border-[#191c1e] bg-white text-[#862200] hover:bg-[#862200] hover:text-white transition-colors shrink-0"
-                          title="Remover do evento"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {(!event.participants || event.participants.length === 0) ? (
+                  <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum colaborador alocado.</div>
+                ) : (
+                  <div className="divide-y-2 divide-[#eceef0]">
+                    {event.participants.map(p => {
+                      const isInactive = p.confirmed === false;
+                      return (
+                        <div key={p.id} data-testid={`chip-participant-${p.employeeId}`} className={cn("flex items-center gap-3 p-4 hover:bg-[#f2f4f6] transition-colors", isInactive && "opacity-50")}>
+                          <div className="w-9 h-9 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-xs text-[#191c1e] shrink-0">
+                            {p.employeeName.split(' ').map((n:string)=>n[0]).slice(0,2).join('').toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</p>
+                            <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
+                              {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}
+                            </p>
+                          </div>
+                          {canManage && (
+                            <>
+                              <button
+                                data-testid={`button-toggle-participant-${p.employeeId}`}
+                                onClick={() => updateParticipant.mutate({ id, participantId: p.id, data: { confirmed: isInactive } })}
+                                className={cn(
+                                  "p-1.5 border-2 border-[#191c1e] bg-white transition-colors shrink-0",
+                                  isInactive ? "text-[#191c1e] hover:bg-[#ccff00]" : "text-[#862200] hover:bg-[#862200] hover:text-white"
+                                )}
+                                title={isInactive ? "Reativar colaborador" : "Marcar como inativo (não compareceu)"}
+                              >
+                                {isInactive ? <UserCheck size={14} /> : <UserX size={14} />}
+                              </button>
+                              <button
+                                data-testid={`button-remove-participant-${p.employeeId}`}
+                                onClick={() => setPendingRemoveParticipant(p.id)}
+                                className="p-1.5 border-2 border-[#191c1e] bg-white text-[#862200] hover:bg-[#862200] hover:text-white transition-colors shrink-0"
+                                title="Remover do evento"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
+
+            <Dialog open={addParticipantOpen} onOpenChange={(o) => { setAddParticipantOpen(o); if (!o) { setNewParticipantEmployeeId(null); setNewParticipantFunction(""); } }}>
+              <DialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+                <DialogHeader>
+                  <DialogTitle className="font-black italic uppercase tracking-tight text-[#191c1e]">Adicionar Colaborador</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-1.5">
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Colaborador <span className="text-[#ba1a1a]">*</span></Label>
+                    <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          role="combobox"
+                          aria-expanded={employeePickerOpen}
+                          data-testid="select-new-participant-employee"
+                          className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-none border-2 border-[#191c1e] bg-white text-left"
+                        >
+                          <span className={cn("truncate text-sm", selectedNewEmployee ? "font-black italic uppercase text-[#191c1e]" : "font-bold italic uppercase text-xs tracking-wider text-[#747a60]")}>
+                            {selectedNewEmployee ? selectedNewEmployee.name : "Busque pelo nome..."}
+                          </span>
+                          <ChevronsUpDown size={16} className="text-[#191c1e] opacity-60 shrink-0" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                        <Command className="rounded-none">
+                          <CommandInput data-testid="input-new-participant-search" placeholder="Buscar pelo nome..." className="italic" />
+                          <CommandList className="max-h-[280px]">
+                            <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum colaborador disponível.</CommandEmpty>
+                            <CommandGroup>
+                              {availableEmployees.map(e => (
+                                <CommandItem
+                                  key={e.id}
+                                  value={e.name}
+                                  data-testid={`option-new-participant-${e.id}`}
+                                  onSelect={() => {
+                                    setNewParticipantEmployeeId(e.id);
+                                    setNewParticipantFunction(e.functionName ?? "");
+                                    setEmployeePickerOpen(false);
+                                  }}
+                                  className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2"
+                                >
+                                  <Check size={16} className={cn("shrink-0", newParticipantEmployeeId === e.id ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-black italic uppercase text-sm truncate">{e.name}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função no Evento</Label>
+                    <Input
+                      data-testid="input-new-participant-function"
+                      value={newParticipantFunction}
+                      onChange={(e) => setNewParticipantFunction(e.target.value)}
+                      placeholder="Ex: Operador, Auxiliar..."
+                      className="h-11 rounded-none border-2 border-[#191c1e]"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <button
+                    type="button"
+                    data-testid="button-confirm-add-participant"
+                    disabled={!newParticipantEmployeeId || addParticipant.isPending}
+                    onClick={() => {
+                      if (!newParticipantEmployeeId) return;
+                      addParticipant.mutate({ id, data: { employeeId: newParticipantEmployeeId, functionName: newParticipantFunction || undefined } });
+                    }}
+                    className="w-full h-11 bg-[#191c1e] text-[#ccff00] font-black italic uppercase tracking-tight disabled:opacity-40 hover:bg-[#ccff00] hover:text-[#191c1e] border-2 border-[#191c1e] transition-colors"
+                  >
+                    {addParticipant.isPending ? "Adicionando..." : "Adicionar à Equipe"}
+                  </button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>

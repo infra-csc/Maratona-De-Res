@@ -668,6 +668,34 @@ paths:
       responses:
         "204":
           description: Deleted
+    patch:
+      operationId: updateEventParticipant
+      tags: [events]
+      summary: Update participant (e.g. mark as confirmed/inactive)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: participantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventParticipantUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventParticipant"
 
   /events/{id}/conformity:
     get:
@@ -2332,6 +2360,13 @@ components:
           type: string
         teamName:
           type: string
+
+    EventParticipantUpdate:
+      type: object
+      required: [confirmed]
+      properties:
+        confirmed:
+          type: boolean
 
     EventConformity:
       type: object
