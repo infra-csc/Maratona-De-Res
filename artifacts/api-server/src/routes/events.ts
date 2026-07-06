@@ -264,6 +264,45 @@ router.patch("/events/:id", requireRole("admin", "rh"), async (req, res) => {
   res.json(ev);
 });
 
+// Edita diretamente a nota e as observações de um evento histórico (isHistorical=true).
+// Eventos históricos não têm avaliação por critério — a nota final vem só de
+// importedScore — então correções pós-importação (recalibração de planilha,
+// comentários de conformidade/performance) precisam de uma via direta, sem
+// reimportar CSV. Sempre recalcula o ciclo, pois a nota afeta o resultado agregado.
+router.patch("/events/:id/historical-result", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const { importedScore, importedNotes } = req.body ?? {};
+  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (!before.isHistorical) {
+    res.status(400).json({ error: "Só é possível editar nota/observações diretamente em eventos históricos." });
+    return;
+  }
+  if (importedScore === undefined && importedNotes === undefined) {
+    res.status(400).json({ error: "Informe importedScore e/ou importedNotes" });
+    return;
+  }
+  if (importedScore !== undefined) {
+    if (typeof importedScore !== "number" || Number.isNaN(importedScore) || importedScore < 0 || importedScore > 100) {
+      res.status(400).json({ error: "importedScore deve ser um número entre 0 e 100" });
+      return;
+    }
+  }
+  if (importedNotes !== undefined && importedNotes !== null && typeof importedNotes !== "string") {
+    res.status(400).json({ error: "importedNotes deve ser string ou null" });
+    return;
+  }
+
+  const [ev] = await db.update(eventsTable).set({
+    ...(importedScore !== undefined && { importedScore: String(importedScore) }),
+    ...(importedNotes !== undefined && { importedNotes: importedNotes === null ? null : (importedNotes.trim() || null) }),
+  }).where(eq(eventsTable.id, id)).returning();
+
+  await audit(req.user!.userId, "update-historical-result", "events", id, before, ev);
+  const { warnings } = await recomputeCycleResults(ev.cycleId, req.user!.userId);
+  res.json({ ...ev, warnings });
+});
+
 router.delete("/events/:id", requireRole("admin"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   await db.delete(eventsTable).where(eq(eventsTable.id, id));

@@ -417,6 +417,8 @@ export interface EventDetail {
   isHistorical?: boolean;
   /** @nullable */
   importedScore?: number | null;
+  /** @nullable */
+  importedNotes?: string | null;
   resultsConfirmed?: boolean;
   /** @nullable */
   resultsConfirmedAt?: string | null;
@@ -454,6 +456,16 @@ export interface EventUpdate {
 export interface ForceCloseInput {
   forced?: boolean;
   reason?: string;
+}
+
+export interface HistoricalResultUpdate {
+  /** New score (0-100) for the historical event. */
+  importedScore?: number;
+  /**
+     * Free-text notes/comments for the historical event (conformity + performance breakdown).
+     * @nullable
+     */
+  importedNotes?: string | null;
 }
 
 export interface MergeEventInput {

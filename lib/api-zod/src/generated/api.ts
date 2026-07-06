@@ -456,6 +456,7 @@ export const GetEventResponse = zod.object({
   "feedbackReleased": zod.boolean().optional(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
@@ -590,6 +591,47 @@ export const UpdateEventResponse = zod.object({
  */
 export const DeleteEventParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Directly edit the imported score/notes of a historical event
+ */
+export const UpdateHistoricalResultParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateHistoricalResultBody = zod.object({
+  "importedScore": zod.number().optional().describe('New score (0-100) for the historical event.'),
+  "importedNotes": zod.string().nullish().describe('Free-text notes\/comments for the historical event (conformity + performance breakdown).')
+})
+
+export const UpdateHistoricalResultResponse = zod.object({
+  "id": zod.number(),
+  "externalId": zod.string().nullish(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.number(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "feedbackReleased": zod.boolean().optional(),
+  "feedbackReleasedAt": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "criteriaConfirmedAt": zod.string().nullish(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
+  "resultsConfirmed": zod.boolean().optional(),
+  "resultsConfirmedAt": zod.string().nullish(),
+  "resultsConfirmedBy": zod.number().nullish(),
+  "createdAt": zod.string().optional(),
+  "warnings": zod.array(zod.string()).optional()
 })
 
 
@@ -1160,6 +1202,7 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "feedbackReleased": zod.boolean().optional(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
@@ -1266,6 +1309,7 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "feedbackReleased": zod.boolean().optional(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
@@ -1382,6 +1426,7 @@ export const DeleteEventCriterionResponse = zod.object({
   "feedbackReleased": zod.boolean().optional(),
   "isHistorical": zod.boolean().optional(),
   "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),

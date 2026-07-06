@@ -455,6 +455,31 @@ paths:
         "204":
           description: Deleted
 
+  /events/{id}/historical-result:
+    patch:
+      operationId: updateHistoricalResult
+      tags: [events]
+      summary: Directly edit the imported score/notes of a historical event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HistoricalResultUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResultsConfirmationResponse"
+
   /events/{id}/merge:
     post:
       operationId: mergeEvent
@@ -2382,6 +2407,8 @@ components:
           type: boolean
         importedScore:
           type: ["number", "null"]
+        importedNotes:
+          type: ["string", "null"]
         resultsConfirmed:
           type: boolean
         resultsConfirmedAt:
@@ -2457,6 +2484,16 @@ components:
           type: boolean
         reason:
           type: string
+
+    HistoricalResultUpdate:
+      type: object
+      properties:
+        importedScore:
+          type: number
+          description: New score (0-100) for the historical event.
+        importedNotes:
+          type: ["string", "null"]
+          description: Free-text notes/comments for the historical event (conformity + performance breakdown).
 
     MergeEventInput:
       type: object

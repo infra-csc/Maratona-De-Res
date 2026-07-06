@@ -80,6 +80,7 @@ import type {
   HealthStatus,
   HistoricalImportInput,
   HistoricalImportResult,
+  HistoricalResultUpdate,
   ImpersonateInput,
   ImportResult,
   IntegrationStatus,
@@ -1904,6 +1905,78 @@ export const useDeleteEvent = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteEventMutationOptions(options));
+    }
+
+export const getUpdateHistoricalResultUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/historical-result`
+}
+
+/**
+ * @summary Directly edit the imported score/notes of a historical event
+ */
+export const updateHistoricalResult = async (id: number,
+    historicalResultUpdate: HistoricalResultUpdate, options?: RequestInit): Promise<EventResultsConfirmationResponse> => {
+
+  return customFetch<EventResultsConfirmationResponse>(getUpdateHistoricalResultUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      historicalResultUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateHistoricalResultMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHistoricalResult>>, TError,{id: number;data: BodyType<HistoricalResultUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateHistoricalResult>>, TError,{id: number;data: BodyType<HistoricalResultUpdate>}, TContext> => {
+
+const mutationKey = ['updateHistoricalResult'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHistoricalResult>>, {id: number;data: BodyType<HistoricalResultUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateHistoricalResult(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateHistoricalResultMutationResult = NonNullable<Awaited<ReturnType<typeof updateHistoricalResult>>>
+    export type UpdateHistoricalResultMutationBody = BodyType<HistoricalResultUpdate>
+    export type UpdateHistoricalResultMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Directly edit the imported score/notes of a historical event
+ */
+export const useUpdateHistoricalResult = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHistoricalResult>>, TError,{id: number;data: BodyType<HistoricalResultUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateHistoricalResult>>,
+        TError,
+        {id: number;data: BodyType<HistoricalResultUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateHistoricalResultMutationOptions(options));
     }
 
 export const getMergeEventUrl = (id: number,) => {

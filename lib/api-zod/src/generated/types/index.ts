@@ -89,6 +89,7 @@ export * from './historicalImportInput';
 export * from './historicalImportInputLinkOverrides';
 export * from './historicalImportOverlapCandidate';
 export * from './historicalImportResult';
+export * from './historicalResultUpdate';
 export * from './impersonateInput';
 export * from './importResult';
 export * from './integrationStatus';

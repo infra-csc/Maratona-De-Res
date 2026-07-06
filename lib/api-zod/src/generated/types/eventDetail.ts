@@ -36,6 +36,8 @@ export interface EventDetail {
   isHistorical?: boolean;
   /** @nullable */
   importedScore?: number | null;
+  /** @nullable */
+  importedNotes?: string | null;
   resultsConfirmed?: boolean;
   /** @nullable */
   resultsConfirmedAt?: string | null;

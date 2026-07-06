@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -81,6 +81,120 @@ function ParticipantCommentBox({
         >
           {isSaving ? "Salvando..." : "Salvar comentário"}
         </button>
+      )}
+    </div>
+  );
+}
+
+function HistoricalResultPanel({
+  eventId, currentScore, currentNotes, canManage,
+}: {
+  eventId: number; currentScore: number | null | undefined; currentNotes: string | null | undefined; canManage: boolean;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [score, setScore] = useState(currentScore != null ? String(currentScore) : "");
+  const [notes, setNotes] = useState(currentNotes ?? "");
+  useEffect(() => {
+    setScore(currentScore != null ? String(currentScore) : "");
+    setNotes(currentNotes ?? "");
+  }, [currentScore, currentNotes, eventId, editing]);
+
+  const updateHistorical = useUpdateHistoricalResult({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Resultado importado atualizado" });
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        setEditing(false);
+      },
+      onError: (err: unknown) => {
+        const message = (err as { message?: string })?.message ?? "Erro ao atualizar resultado";
+        toast({ title: message, variant: "destructive" });
+      },
+    },
+  });
+
+  if (!canManage) {
+    if (!currentNotes) return null;
+    return (
+      <div data-testid="panel-historical-notes-readonly" className="mt-4 p-3 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-2">
+        <MessageSquare size={14} className="text-[#444933] shrink-0 mt-[2px]" />
+        <p className="text-xs font-semibold italic text-[#191c1e] whitespace-pre-wrap">{currentNotes}</p>
+      </div>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <div className="mt-4 flex flex-col items-start gap-2">
+        {currentNotes && (
+          <div data-testid="panel-historical-notes-readonly" className="p-3 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-2 w-full">
+            <MessageSquare size={14} className="text-[#444933] shrink-0 mt-[2px]" />
+            <p className="text-xs font-semibold italic text-[#191c1e] whitespace-pre-wrap">{currentNotes}</p>
+          </div>
+        )}
+        <button
+          type="button"
+          data-testid="button-edit-historical-result"
+          onClick={() => setEditing(true)}
+          className="px-3 py-1.5 border-2 border-[#191c1e] bg-white text-[#191c1e] font-black italic uppercase text-[10px] hover:bg-[#eceef0] transition-colors"
+        >
+          Editar nota/observações importadas
+        </button>
+      </div>
+    );
+  }
+
+  const parsedScore = parseFloat(score.replace(",", "."));
+  const scoreValid = score.trim() !== "" && !Number.isNaN(parsedScore) && parsedScore >= 0 && parsedScore <= 100;
+
+  return (
+    <div data-testid="panel-historical-result-edit" className="mt-4 p-3 border-2 border-[#191c1e] bg-[#fff8e1] space-y-2 w-full max-w-md">
+      <p className="text-[10px] font-black italic uppercase text-[#862200]">Evento Histórico — editar nota e observações importadas</p>
+      <div>
+        <Label className="text-[10px] font-bold italic uppercase text-[#444933]">Nota (0-100)</Label>
+        <Input
+          data-testid="input-historical-score"
+          type="text"
+          inputMode="decimal"
+          value={score}
+          onChange={(e) => setScore(e.target.value)}
+          className="text-sm rounded-none border-2 border-[#191c1e] bg-white mt-1"
+        />
+      </div>
+      <div>
+        <Label className="text-[10px] font-bold italic uppercase text-[#444933]">Observações</Label>
+        <Textarea
+          data-testid="textarea-historical-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Comentários de conformidade/performance da planilha..."
+          className="text-xs rounded-none border-2 border-[#191c1e] bg-white min-h-[80px] mt-1"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          data-testid="button-save-historical-result"
+          disabled={!scoreValid || updateHistorical.isPending}
+          onClick={() => updateHistorical.mutate({ id: eventId, data: { importedScore: parsedScore, importedNotes: notes.trim() || null } })}
+          className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b3e600] transition-colors disabled:opacity-50"
+        >
+          {updateHistorical.isPending ? "Salvando..." : "Salvar"}
+        </button>
+        <button
+          type="button"
+          data-testid="button-cancel-historical-result"
+          disabled={updateHistorical.isPending}
+          onClick={() => setEditing(false)}
+          className="px-3 py-1 border-2 border-[#191c1e] bg-white text-[#191c1e] font-black italic uppercase text-[10px] hover:bg-[#eceef0] transition-colors disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+      </div>
+      {!scoreValid && score.trim() !== "" && (
+        <p className="text-[10px] font-bold italic text-[#862200]">Nota deve ser um número entre 0 e 100</p>
       )}
     </div>
   );
@@ -478,6 +592,15 @@ export default function EventDetailPage() {
                     <span className={evaluationProgress === 100 ? "text-[#506600] font-black" : ""}>{evaluationProgress}% Avaliado</span>
                   </div>
                 </div>
+
+                {event.isHistorical && (
+                  <HistoricalResultPanel
+                    eventId={event.id}
+                    currentScore={event.importedScore}
+                    currentNotes={event.importedNotes}
+                    canManage={canManage}
+                  />
+                )}
               </div>
 
               {result && result.eventScore > 0 && (() => {
