@@ -72,14 +72,21 @@ function EvaluatorEventCard({
   const total = myCriteria.length;
   const submitted = myCriteria.filter(c => myEval(c.criterionId)?.status === "submitted").length;
   const drafts = myCriteria.filter(c => myEval(c.criterionId)?.status === "draft").length;
-  const done = submitted === total;
-  const inProgress = !done && (submitted > 0 || drafts > 0);
+  const allSubmitted = submitted === total;
+  // Submeter todos os critérios não basta: só conta como "Concluída" para o
+  // avaliador depois que RH/Admin confirmar os resultados do evento (mesma
+  // trava usada para colaboradores em resultados/ranking/my-performance).
+  const done = allSubmitted && !!detail?.resultsConfirmed;
+  const awaitingConfirmation = allSubmitted && !detail?.resultsConfirmed;
+  const inProgress = !allSubmitted && (submitted > 0 || drafts > 0);
 
   const badge = done
     ? { label: "Concluída", cls: "bg-[#506600] text-[#ccff00]", Icon: CheckCircle }
-    : inProgress
-      ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
-      : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
+    : awaitingConfirmation
+      ? { label: "Aguardando confirmação", cls: "bg-[#fff4c2] text-[#5c4a00]", Icon: Clock }
+      : inProgress
+        ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
+        : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
   const Badge = badge.Icon;
   const pct = Math.round((submitted / total) * 100);
 
@@ -253,7 +260,9 @@ export default function EvaluationsPage() {
           c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === user?.id)?.status === "submitted",
         ).length;
         const total = myCrit.length;
-        return { event: ev, total, submitted, done: total > 0 && submitted === total, relevant: total > 0 };
+        // Só conta como concluído para o avaliador depois que os resultados do
+        // evento forem confirmados por RH/Admin — enviar tudo não basta.
+        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
       }).filter(s => s.relevant)
     : [];
   const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
@@ -303,7 +312,9 @@ export default function EvaluationsPage() {
           c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === selectedAvaliadorId)?.status === "submitted",
         ).length;
         const total = crit.length;
-        return { event: ev, total, submitted, done: total > 0 && submitted === total, relevant: total > 0 };
+        // Mesma trava: consulta de RH/gestores também só marca como concluído
+        // depois que os resultados do evento forem confirmados.
+        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
       }).filter(s => s.relevant)
     : [];
   const crossEventAvaliadorFiltered = statusFilter === "all"
