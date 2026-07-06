@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetEvents, useReopenEvent, useCreateEvent, useMergeEvent, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
+import { useGetEvents, useCreateEvent, useMergeEvent, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Unlock, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check } from "lucide-react";
+import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -48,10 +48,6 @@ export default function EventsPage() {
     undefined,
     { query: { queryKey, refetchInterval: 15000, refetchOnWindowFocus: true } }
   );
-
-  const reopenMutation = useReopenEvent({
-    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey }) },
-  });
 
   const mergeMutation = useMergeEvent({
     mutation: {
@@ -95,16 +91,17 @@ export default function EventsPage() {
   // para que o card atualize ao vivo conforme os avaliadores forem enviando notas.
   const filtered = (events ?? []).filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchConfig = filterStatus === "all" || (filterStatus === "configured" ? !!ev.criteriaConfirmed : !ev.criteriaConfirmed);
+    const matchConfig = filterStatus === "all"
+      || (filterStatus === "configured" ? !!ev.criteriaConfirmed : filterStatus === "confirmed" ? !!ev.resultsConfirmed : !ev.resultsConfirmed);
     const matchCard = cardFilter === null
       || (cardFilter === "configured" && ev.criteriaConfirmed)
-      || (cardFilter === "pendingRH" && !ev.criteriaConfirmed)
+      || (cardFilter === "confirmed" && ev.resultsConfirmed)
+      || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
       || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.hasCalibration)
       || (cardFilter === "fullyEval" && ev.evaluationProgress === 1);
     return matchSearch && matchConfig && matchCard;
   });
 
-  const canEdit = user && ["admin", "rh", "avaliador"].includes(user.role);
   const canCreate = user && ["admin", "rh"].includes(user.role);
 
   return (
@@ -190,16 +187,18 @@ export default function EventsPage() {
 
         {/* Summary cards */}
         {events && events.length > 0 && (
-          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {(() => {
               const all = events ?? [];
               const configured = all.filter(e => e.criteriaConfirmed).length;
-              const pendingRH = all.filter(e => !e.criteriaConfirmed).length;
+              const confirmed = all.filter(e => e.resultsConfirmed).length;
+              const unconfirmed = all.filter(e => !e.resultsConfirmed).length;
               const pendingCal = all.filter(e => e.status === "closed" && !e.hasCalibration).length;
               const fullyEval = all.filter(e => e.evaluationProgress === 1).length;
               const cards = [
                 { key: "configured", label: "Configurados", value: configured, color: "#506600" },
-                { key: "pendingRH", label: "Aguardando RH", value: pendingRH, color: "#ff5722" },
+                { key: "confirmed", label: "Confirmados", value: confirmed, color: "#506600" },
+                { key: "unconfirmed", label: "Não Confirmados", value: unconfirmed, color: "#ff5722" },
                 { key: "pendingCal", label: "Falta Calibrar", value: pendingCal, color: "#ffb300" },
                 { key: "fullyEval", label: "Avaliação 100%", value: fullyEval, color: "#ccff00" },
               ];
@@ -245,7 +244,8 @@ export default function EventsPage() {
               <SelectContent>
                 <SelectItem value="all">Todos Status</SelectItem>
                 <SelectItem value="configured">Configurados</SelectItem>
-                <SelectItem value="pending">Aguardando RH</SelectItem>
+                <SelectItem value="confirmed">Confirmados</SelectItem>
+                <SelectItem value="unconfirmed">Não Confirmados</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -362,15 +362,6 @@ export default function EventsPage() {
                           onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
                         >
                           <GitMerge size={14} />
-                        </button>
-                      )}
-                      {canEdit && ev.status === "closed" && (
-                        <button
-                          data-testid={`button-reopen-event-${ev.id}`}
-                          className="h-8 px-3 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-xs font-bold italic uppercase transition-all"
-                          onClick={() => reopenMutation.mutate({ id: ev.id })}
-                        >
-                          <Unlock size={14} className="mr-1.5" /> Reabrir
                         </button>
                       )}
                       <Link href={`/events/${ev.id}`}>
