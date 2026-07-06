@@ -12,3 +12,4 @@ export * from "./platoon-rules";
 export * from "./quarterly-results";
 export * from "./eligibility";
 export * from "./audit-logs";
+export * from "./event-review-requests";

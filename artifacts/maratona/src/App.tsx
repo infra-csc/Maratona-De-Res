@@ -20,6 +20,7 @@ import RulesPage from "@/pages/rules";
 import IntegrationPage from "@/pages/integration";
 import AuditPage from "@/pages/audit";
 import MyPerformancePage from "@/pages/my-performance";
+import ReviewRequestsPage from "@/pages/review-requests";
 import NotFound from "@/pages/not-found";
 
 function handleAuthError(error: unknown) {
@@ -107,6 +108,7 @@ function AppRoutes() {
       <Route path="/evaluations" component={() => <ProtectedRoute component={EvaluationsPage} />} />
       <Route path="/calibrations" component={() => <ProtectedRoute component={CalibrationsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} roles={["admin", "rh", "diretoria"]} />} />
+      <Route path="/review-requests" component={() => <ProtectedRoute component={ReviewRequestsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} />} />
       <Route path="/ranking"><Redirect to="/results" /></Route>
       <Route path="/criteria" component={() => <ProtectedRoute component={CriteriaPage} roles={["admin", "rh", "diretoria"]} />} />

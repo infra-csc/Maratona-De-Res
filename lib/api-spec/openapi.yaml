@@ -1188,6 +1188,45 @@ paths:
         "204":
           description: Deleted
 
+  /review-requests:
+    get:
+      operationId: getReviewRequests
+      tags: [review-requests]
+      summary: List event review requests raised by employees
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewRequest"
+
+  /review-requests/{id}/resolve:
+    patch:
+      operationId: resolveReviewRequest
+      tags: [review-requests]
+      summary: Mark a review request as resolved
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequestResolve"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRequest"
+
   /rules:
     get:
       operationId: getRules
@@ -2876,6 +2915,38 @@ components:
           type: integer
         createdAt:
           type: string
+
+    ReviewRequest:
+      type: object
+      required: [id, eventId, employeeId, comment, status, createdAt]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        eventName:
+          type: ["string", "null"]
+        employeeId:
+          type: integer
+        employeeName:
+          type: ["string", "null"]
+        comment:
+          type: string
+        status:
+          type: string
+          enum: [pending, resolved]
+        createdAt:
+          type: string
+        resolvedAt:
+          type: ["string", "null"]
+        resolutionNotes:
+          type: ["string", "null"]
+
+    ReviewRequestResolve:
+      type: object
+      properties:
+        resolutionNotes:
+          type: ["string", "null"]
 
     AbsenceInput:
       type: object

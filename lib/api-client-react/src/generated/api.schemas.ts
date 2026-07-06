@@ -660,6 +660,36 @@ export interface Absence {
   createdAt?: string;
 }
 
+export type ReviewRequestStatus = typeof ReviewRequestStatus[keyof typeof ReviewRequestStatus];
+
+
+export const ReviewRequestStatus = {
+  pending: 'pending',
+  resolved: 'resolved',
+} as const;
+
+export interface ReviewRequest {
+  id: number;
+  eventId: number;
+  /** @nullable */
+  eventName?: string | null;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  comment: string;
+  status: ReviewRequestStatus;
+  createdAt: string;
+  /** @nullable */
+  resolvedAt?: string | null;
+  /** @nullable */
+  resolutionNotes?: string | null;
+}
+
+export interface ReviewRequestResolve {
+  /** @nullable */
+  resolutionNotes?: string | null;
+}
+
 export type AbsenceInputPenaltyType = typeof AbsenceInputPenaltyType[keyof typeof AbsenceInputPenaltyType];
 
 

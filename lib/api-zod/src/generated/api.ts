@@ -1714,6 +1714,49 @@ export const DeleteAbsenceParams = zod.object({
 
 
 /**
+ * @summary List event review requests raised by employees
+ */
+export const GetReviewRequestsResponseItem = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "eventName": zod.string().nullish(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string().nullish(),
+  "comment": zod.string(),
+  "status": zod.enum(['pending', 'resolved']),
+  "createdAt": zod.string(),
+  "resolvedAt": zod.string().nullish(),
+  "resolutionNotes": zod.string().nullish()
+})
+export const GetReviewRequestsResponse = zod.array(GetReviewRequestsResponseItem)
+
+
+/**
+ * @summary Mark a review request as resolved
+ */
+export const ResolveReviewRequestParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ResolveReviewRequestBody = zod.object({
+  "resolutionNotes": zod.string().nullish()
+})
+
+export const ResolveReviewRequestResponse = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "eventName": zod.string().nullish(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string().nullish(),
+  "comment": zod.string(),
+  "status": zod.enum(['pending', 'resolved']),
+  "createdAt": zod.string(),
+  "resolvedAt": zod.string().nullish(),
+  "resolutionNotes": zod.string().nullish()
+})
+
+
+/**
  * @summary Get system rules
  */
 export const GetRulesResponseItem = zod.object({

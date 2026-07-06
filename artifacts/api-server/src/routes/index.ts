@@ -19,6 +19,7 @@ import exportsRouter from "./exports.js";
 import myPerformanceRouter from "./my-performance.js";
 import feedbackRouter from "./feedback.js";
 import eligibilityRouter from "./eligibility.js";
+import reviewRequestsRouter from "./review-requests.js";
 import storageRouter from "./storage.js";
 import cyclesRouter from "./cycles.js";
 
@@ -52,6 +53,7 @@ router.use(rankingRouter);
 router.use(myPerformanceRouter);
 router.use(feedbackRouter);
 router.use(eligibilityRouter);
+router.use(reviewRequestsRouter);
 // exportsRouter mounted early for the same reason as storageRouter/cyclesRouter:
 // it must come BEFORE auditRouter/integrationRouter (blanket requireRole("admin","rh")),
 // otherwise those guards 403 the non-manager-accessible exports

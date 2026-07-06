@@ -6,13 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Trophy, Target, Calendar, TrendingUp, AlertTriangle,
   CheckCircle2, Clock, ChevronDown, ChevronRight,
-  MapPin, DollarSign, Search,
+  MapPin, DollarSign, Search, Flag, Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 
 interface PerformanceData {
@@ -50,6 +51,15 @@ interface Adjustment {
   eventName: string | null;
 }
 
+interface ReviewRequest {
+  id: number;
+  comment: string;
+  status: "pending" | "resolved";
+  createdAt: string;
+  resolvedAt: string | null;
+  resolutionNotes: string | null;
+}
+
 interface EventSummary {
   eventId: number;
   eventName: string;
@@ -68,6 +78,7 @@ interface EventSummary {
   totalCriteria: number;
   criteriaDetails: CriterionDetail[];
   countsForScore: boolean;
+  reviewRequest: ReviewRequest | null;
 }
 
 interface CriterionDetail {
@@ -95,6 +106,107 @@ function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null):
     case "blocked": return "Bloqueado — contate o RH";
     default: return "Resultado final — aguardando aprovação do RH";
   }
+}
+
+function EventReviewRequest({ event }: { event: EventSummary }) {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [comment, setComment] = useState(event.reviewRequest?.comment ?? "");
+
+  const mutation = useMutation({
+    mutationFn: async (text: string) => {
+      const token = localStorage.getItem("maratona_token");
+      const res = await fetch(`${import.meta.env.BASE_URL}api/my-performance/events/${event.eventId}/review-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ comment: text }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Não foi possível enviar a sinalização.");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setShowForm(false);
+      queryClient.invalidateQueries({ queryKey: ["my-performance"] });
+    },
+  });
+
+  if (event.reviewRequest && !showForm) {
+    return (
+      <div className="mt-4 pt-3 border-t-2 border-[#191c1e]/20">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-start gap-2 min-w-0">
+            <Flag size={14} className="mt-0.5 shrink-0 text-[#862200]" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className={cn(
+                  "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
+                  event.reviewRequest.status === "resolved" ? "bg-[#506600] text-white" : "bg-[#fff3cd] text-[#862200]"
+                )}>
+                  {event.reviewRequest.status === "resolved" ? "Revisão resolvida" : "Revisão sinalizada"}
+                </span>
+                <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(event.reviewRequest.createdAt)}</span>
+              </div>
+              <p className="text-xs text-[#444933] italic">"{event.reviewRequest.comment}"</p>
+              {event.reviewRequest.status === "resolved" && event.reviewRequest.resolutionNotes && (
+                <p className="text-xs text-[#506600] font-bold mt-1">Resposta: {event.reviewRequest.resolutionNotes}</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => { setComment(""); setShowForm(true); }}
+            className="text-[10px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e] underline shrink-0"
+          >
+            Sinalizar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 pt-3 border-t-2 border-[#191c1e]/20">
+      {!showForm ? (
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 text-[10px] font-bold uppercase italic px-3 py-2 border-2 border-[#862200] text-[#862200] hover:bg-[#862200]/10 transition-colors"
+        >
+          <Flag size={14} /> Sinalizar Revisão
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[10px] font-black uppercase italic text-[#747a60]">Descreva o motivo da revisão</p>
+          <Textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Ex: acredito que a nota do critério X não reflete minha participação..."
+            className="bg-white text-sm"
+            rows={3}
+          />
+          {mutation.isError && (
+            <p className="text-xs font-bold text-[#862200]">{(mutation.error as Error).message}</p>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => mutation.mutate(comment)}
+              disabled={!comment.trim() || mutation.isPending}
+              className="flex items-center gap-2 text-[10px] font-bold uppercase italic px-3 py-2 bg-[#191c1e] text-[#ccff00] hover:bg-[#191c1e]/90 transition-colors disabled:opacity-50"
+            >
+              <Send size={14} /> {mutation.isPending ? "Enviando..." : "Enviar"}
+            </button>
+            <button
+              onClick={() => { setShowForm(false); setComment(event.reviewRequest?.comment ?? ""); }}
+              className="text-[10px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e]"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function EventCard({ event }: { event: EventSummary }) {
@@ -214,6 +326,8 @@ function EventCard({ event }: { event: EventSummary }) {
               </div>
             ))}
           </div>
+
+          <EventReviewRequest event={event} />
         </div>
       )}
     </div>
@@ -409,58 +523,64 @@ export default function MyPerformancePage() {
           </div>
 
           {/* Penalidades e Méritos */}
-          {(data.adjustments?.length ?? 0) > 0 && (
-            <div className="pt-4">
-              <h2 className="text-xl font-black uppercase tracking-tight text-[#506600] flex items-center gap-2 mb-4">
-                <AlertTriangle size={22} />
-                Penalidades e Méritos
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                {(summary.penaltyPoints ?? 0) > 0 && (
-                  <div className="bg-[#ffdbd1] border-2 border-[#191c1e] p-4 flex items-center justify-between">
-                    <span className="text-xs font-black uppercase italic tracking-wider text-[#862200]">Penalidades</span>
-                    <span className="text-2xl font-black italic text-[#862200]">-{summary.penaltyPoints} pts</span>
-                  </div>
-                )}
-                {(summary.meritPoints ?? 0) > 0 && (
-                  <div className="bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between">
-                    <span className="text-xs font-black uppercase italic tracking-wider text-[#161e00]">Méritos</span>
-                    <span className="text-2xl font-black italic text-[#506600]">+{summary.meritPoints} pts</span>
-                  </div>
-                )}
+          <div className="pt-4">
+            <h2 className="text-xl font-black uppercase tracking-tight text-[#506600] flex items-center gap-2 mb-4">
+              <AlertTriangle size={22} />
+              Penalidades e Méritos
+            </h2>
+            {(data.adjustments?.length ?? 0) === 0 ? (
+              <div className="text-center py-10 bg-white border-2 border-dashed border-[#747a60] text-[#747a60] font-medium">
+                Nenhuma penalidade ou mérito registrado neste ciclo.
               </div>
-              <div className="bg-white border-2 border-[#191c1e] divide-y-2 divide-[#eceef0]">
-                {data.adjustments.map(adj => (
-                  <div key={adj.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className={`text-[10px] font-black uppercase italic px-2 py-0.5 border-2 border-[#191c1e] ${
-                          adj.kind === "merit" ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"
-                        }`}>
-                          {adj.kind === "merit" ? "Mérito" : "Penalidade"}
-                        </span>
-                        <span className="text-xs font-bold italic uppercase text-[#444933]">{adj.penaltyType}</span>
-                        {adj.quantity > 1 && (
-                          <span className="text-[10px] font-bold italic uppercase text-[#747a60] bg-[#eceef0] border border-[#191c1e] px-1.5 py-0.5">x{adj.quantity}</span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold italic text-[#747a60]">
-                        {adj.date && <span>{new Date(`${adj.date}T00:00:00`).toLocaleDateString("pt-BR")}</span>}
-                        {adj.eventName && <span className="flex items-center gap-1"><Calendar size={12} /> {adj.eventName}</span>}
-                      </div>
-                      {adj.reason && <p className="text-xs text-[#444933] italic mt-1">"{adj.reason}"</p>}
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  {(summary.penaltyPoints ?? 0) > 0 && (
+                    <div className="bg-[#ffdbd1] border-2 border-[#191c1e] p-4 flex items-center justify-between">
+                      <span className="text-xs font-black uppercase italic tracking-wider text-[#862200]">Penalidades</span>
+                      <span className="text-2xl font-black italic text-[#862200]">-{summary.penaltyPoints} pts</span>
                     </div>
-                    <span className={`font-black italic text-lg shrink-0 ${adj.kind === "merit" ? "text-[#506600]" : "text-[#862200]"}`}>
-                      {adj.kind === "merit" ? "+" : "-"}{adj.totalPoints} pts
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-2">
-                Méritos somam e penalidades descontam pontos na sua nota final do ciclo (limitada entre 0 e 100).
-              </p>
-            </div>
-          )}
+                  )}
+                  {(summary.meritPoints ?? 0) > 0 && (
+                    <div className="bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between">
+                      <span className="text-xs font-black uppercase italic tracking-wider text-[#161e00]">Méritos</span>
+                      <span className="text-2xl font-black italic text-[#506600]">+{summary.meritPoints} pts</span>
+                    </div>
+                  )}
+                </div>
+                <div className="bg-white border-2 border-[#191c1e] divide-y-2 divide-[#eceef0]">
+                  {data.adjustments.map(adj => (
+                    <div key={adj.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`text-[10px] font-black uppercase italic px-2 py-0.5 border-2 border-[#191c1e] ${
+                            adj.kind === "merit" ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"
+                          }`}>
+                            {adj.kind === "merit" ? "Mérito" : "Penalidade"}
+                          </span>
+                          <span className="text-xs font-bold italic uppercase text-[#444933]">{adj.penaltyType}</span>
+                          {adj.quantity > 1 && (
+                            <span className="text-[10px] font-bold italic uppercase text-[#747a60] bg-[#eceef0] border border-[#191c1e] px-1.5 py-0.5">x{adj.quantity}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs font-bold italic text-[#747a60]">
+                          {adj.date && <span>{new Date(`${adj.date}T00:00:00`).toLocaleDateString("pt-BR")}</span>}
+                          {adj.eventName && <span className="flex items-center gap-1"><Calendar size={12} /> {adj.eventName}</span>}
+                        </div>
+                        {adj.reason && <p className="text-xs text-[#444933] italic mt-1">"{adj.reason}"</p>}
+                      </div>
+                      <span className={`font-black italic text-lg shrink-0 ${adj.kind === "merit" ? "text-[#506600]" : "text-[#862200]"}`}>
+                        {adj.kind === "merit" ? "+" : "-"}{adj.totalPoints} pts
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-2">
+                  Méritos somam e penalidades descontam pontos na sua nota final do ciclo (limitada entre 0 e 100).
+                </p>
+              </>
+            )}
+          </div>
 
           {/* Event breakdown */}
           <div className="pt-4">
