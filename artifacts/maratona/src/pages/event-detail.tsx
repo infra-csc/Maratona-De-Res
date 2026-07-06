@@ -991,7 +991,7 @@ export default function EventDetailPage() {
                         -{result.conformityPenalty} pts conformidade
                       </span>
                     )}
-                    {!concluded && (
+                    {!concluded && !event.isHistorical && (
                       <span className="mt-2 inline-flex items-center gap-1 bg-[#191c1e] text-[#ffb300] text-[9px] font-black italic uppercase tracking-wider px-2 py-1" data-testid="badge-calibration-pending">
                         <AlertCircle size={11} />
                         {calibrated ? "Calibragem parcial" : "Aguardando calibragem"}
