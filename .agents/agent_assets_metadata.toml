@@ -12,3 +12,9 @@ id = "YndYOaQCQNqFol8ydGXvb"
 uri = "file://attached_assets/historico_importar.csv"
 type = "table"
 title = "Resultados Históricos (pronto para importar)"
+
+[[outputs]]
+id = "GdfUwDQcejKSsk04hr-Vl"
+uri = "file://.local/outputs/atualizacao_42k_floripa.csv"
+type = "table"
+title = "Atualização 42K DE FLORIPA - nota corrigida"
