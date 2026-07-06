@@ -39,6 +39,144 @@ function formatDiariaDate(dateStr: string): string {
   return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
 }
 
+function ParticipantDiariaDialog({
+  employeeId, employeeName, candidateDates, scheduledStart, scheduledEnd, scheduledCount,
+  currentDates, isSaving, onSave,
+}: {
+  employeeId: number; employeeName: string; candidateDates: string[];
+  scheduledStart: string | null | undefined; scheduledEnd: string | null | undefined; scheduledCount: number | null | undefined;
+  currentDates: string[]; isSaving: boolean; onSave: (dates: string[], onDone: () => void) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set(currentDates));
+  useEffect(() => { if (open) setSelected(new Set(currentDates)); }, [open, currentDates]);
+
+  const scheduledDates = scheduledStart && scheduledEnd
+    ? candidateDates.filter(d => d >= scheduledStart && d <= scheduledEnd)
+    : [];
+  const scheduledSet = new Set(scheduledDates);
+
+  const toggle = (d: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+  };
+
+  const sortedCurrent = [...currentDates].sort();
+  const sortedSelected = Array.from(selected).sort();
+  const dirty = JSON.stringify(sortedSelected) !== JSON.stringify(sortedCurrent);
+
+  const actionBtn = "flex items-center gap-1.5 px-3 py-2 border-2 border-[#191c1e] font-black italic uppercase text-[11px] tracking-tight transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          data-testid={`button-diaria-dates-${employeeId}`}
+          className="self-center flex items-center gap-1.5 px-2 py-1 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors whitespace-nowrap"
+        >
+          <Calendar size={11} className="text-[#444933] shrink-0" />
+          <span className="text-[10px] font-bold italic uppercase text-[#191c1e]">
+            Realizadas: {currentDates.length}
+          </span>
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogHeader>
+          <DialogTitle className="font-black italic uppercase tracking-tight text-[#191c1e]">
+            Diárias Realizadas — {employeeName}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+            <span className="text-xs font-bold italic uppercase text-[#444933]">
+              Previstas: {scheduledCount ?? "—"}
+              {scheduledStart && scheduledEnd && (
+                <span className="text-[#747a60] normal-case font-semibold not-italic"> ({formatDiariaDate(scheduledStart)} – {formatDiariaDate(scheduledEnd)})</span>
+              )}
+            </span>
+            <span data-testid={`text-diaria-selected-count-${employeeId}`} className="text-sm font-black italic uppercase text-[#506600]">
+              Selecionadas: {selected.size}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid={`button-confirm-previstas-${employeeId}`}
+              onClick={() => setSelected(new Set(scheduledSet))}
+              disabled={scheduledSet.size === 0}
+              className={cn(actionBtn, "bg-[#ccff00] text-[#161e00] enabled:hover:translate-y-[1px]")}
+            >
+              <CheckCircle2 size={14} /> Confirmar Diárias Previstas
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(new Set(candidateDates))}
+              className={cn(actionBtn, "bg-white text-[#191c1e] hover:bg-[#eceef0]")}
+            >
+              Marcar Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              disabled={selected.size === 0}
+              className={cn(actionBtn, "bg-white text-[#191c1e] hover:bg-[#eceef0]")}
+            >
+              Limpar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1">
+            {candidateDates.map(dateStr => {
+              const checked = selected.has(dateStr);
+              const isScheduled = scheduledSet.has(dateStr);
+              return (
+                <button
+                  key={dateStr}
+                  type="button"
+                  data-testid={`checkbox-diaria-${employeeId}-${dateStr}`}
+                  onClick={() => toggle(dateStr)}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-0.5 px-2 py-3 border-2 border-[#191c1e] font-bold italic uppercase text-[11px] transition-colors",
+                    checked ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#444933] hover:bg-[#f2f4f6]"
+                  )}
+                >
+                  <span>{formatDiariaDate(dateStr)}</span>
+                  {isScheduled && (
+                    <span className="text-[8px] normal-case font-semibold text-[#747a60]">prevista</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="px-4 py-2 border-2 border-[#191c1e] bg-white font-black italic uppercase text-xs hover:bg-[#eceef0] transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            data-testid={`button-save-diaria-${employeeId}`}
+            disabled={!dirty || isSaving}
+            onClick={() => onSave(sortedSelected, () => setOpen(false))}
+            className="px-4 py-2 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-xs disabled:opacity-40 disabled:cursor-not-allowed hover:translate-y-[1px] transition-all"
+          >
+            {isSaving ? "Salvando..." : "Salvar"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ParticipantCommentBox({
   participantId, employeeId, initialComment, canManage, reason, onSave, isSaving,
 }: {
@@ -1544,42 +1682,22 @@ export default function EventDetailPage() {
                                   </div>
                                 </div>
                                 {canManage ? (
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <button
-                                        data-testid={`button-diaria-dates-${p.employeeId}`}
-                                        type="button"
-                                        className="self-center flex items-center gap-1.5 px-2 py-1 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors whitespace-nowrap"
-                                      >
-                                        <Calendar size={11} className="text-[#444933] shrink-0" />
-                                        <span className="text-[10px] font-bold italic uppercase text-[#191c1e]">
-                                          Realizadas: {realizadasCount ?? 0}
-                                        </span>
-                                      </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent align="start" className="w-64 p-3 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e]">
-                                      <p className="text-[10px] font-black italic uppercase text-[#444933] mb-2">Dias em que realmente participou</p>
-                                      <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-                                        {candidateDates.map(dateStr => {
-                                          const checked = selectedDates.includes(dateStr);
-                                          return (
-                                            <label key={dateStr} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
-                                              <Checkbox
-                                                data-testid={`checkbox-diaria-${p.employeeId}-${dateStr}`}
-                                                checked={checked}
-                                                onCheckedChange={(checkedVal) => {
-                                                  const next = new Set(selectedDates);
-                                                  if (checkedVal) next.add(dateStr); else next.delete(dateStr);
-                                                  updateParticipant.mutate({ id, participantId: p.id, data: { actualDiariaDates: Array.from(next).sort() } });
-                                                }}
-                                              />
-                                              <span className="font-bold italic uppercase text-[#191c1e]">{formatDiariaDate(dateStr)}</span>
-                                            </label>
-                                          );
-                                        })}
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
+                                  <ParticipantDiariaDialog
+                                    employeeId={p.employeeId}
+                                    employeeName={p.employeeName}
+                                    candidateDates={candidateDates}
+                                    scheduledStart={p.scheduledDiariaStart}
+                                    scheduledEnd={p.scheduledDiariaEnd}
+                                    scheduledCount={p.scheduledDiariaCount}
+                                    currentDates={selectedDates}
+                                    isSaving={updateParticipant.isPending}
+                                    onSave={(dates, onDone) => {
+                                      updateParticipant.mutate(
+                                        { id, participantId: p.id, data: { actualDiariaDates: dates } },
+                                        { onSuccess: onDone },
+                                      );
+                                    }}
+                                  />
                                 ) : realizadasCount != null ? (
                                   <span className="self-center text-[10px] font-bold italic uppercase text-[#747a60] whitespace-nowrap">
                                     Diárias realizadas: {realizadasCount}
