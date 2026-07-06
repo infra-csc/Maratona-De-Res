@@ -63,12 +63,13 @@ export default function EmployeesPage() {
     watch: watchEdit,
   } = useForm<EmployeeInput>();
   const watchedEditEmploymentType = watchEdit("employmentType");
+  const watchedEditFunctionName = watchEdit("functionName");
 
   useEffect(() => {
     if (editingEmployee) {
       resetEdit({
         name: editingEmployee.name,
-        department: editingEmployee.department,
+        document: editingEmployee.document ?? "",
         functionName: editingEmployee.functionName,
         email: editingEmployee.email ?? "",
         phone: editingEmployee.phone ?? "",
@@ -194,15 +195,24 @@ export default function EmployeesPage() {
                 <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
                 <Input data-testid="input-edit-employee-name" {...registerEdit("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-none border-2 border-[#191c1e]" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Departamento</Label>
-                  <Input data-testid="input-edit-employee-dept" {...registerEdit("department")} placeholder="Ex: Cenografia" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função</Label>
-                  <Input data-testid="input-edit-employee-func" {...registerEdit("functionName")} placeholder="Ex: Montador" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                </div>
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">CPF</Label>
+                <Input data-testid="input-edit-employee-document" {...registerEdit("document")} placeholder="000.000.000-00" className="h-11 rounded-none border-2 border-[#191c1e]" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função</Label>
+                <Select
+                  value={watchedEditFunctionName}
+                  onValueChange={v => setValueEdit("functionName", v)}
+                >
+                  <SelectTrigger data-testid="select-edit-employee-func" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
+                    <SelectValue placeholder="Selecione a função..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cenotécnica">Cenotécnica</SelectItem>
+                    <SelectItem value="Sup Ceno">Sup Ceno</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
