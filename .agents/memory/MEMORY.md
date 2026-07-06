@@ -42,6 +42,7 @@
 - [Partial vs final feedback publish](partial-final-publish.md) — 2 independent publish actions (partialPublishedAt repeatable, feedbackReleased terminal); badges must derive 3-state final>partial>none, never 2-state
 - [Merge vs unique indexes](merge-unique-index-ordering.md) — in dedupe merges, copy unique-indexed fields (external_id) only AFTER deleting the duplicate in the same txn
 - [Survey Forms raw import](survey-forms-raw-import.md) — parse MS Forms exports by header text (not fixed column position); -1 sentinel = ignore group; last-row-wins per evaluator+event; skip pairs already in app
+- [resultsConfirmed requires closed](results-confirmed-requires-closed.md) — confirming an open event "succeeds" but silently has zero effect on scores until event.status="closed" too
 - [Diária date-based tracking](diaria-date-tracking.md) — actualDiariaDates (date[]) is source of truth, count is derived; candidate days = event's own start/end, not participant's synced scheduled range; non-scored participants hard-gated server-side
 - [Participation scoring exclusion](participation-scoring-exclusion.md) — freela + "Sup Ceno *" functions participate but never score; negative-match rule, single source `participantCountsForScore()`, live UI join, no PATCH-triggered recompute
 - [Employment type + diária sync](employment-type-diaria-sync.md) — set employmentType only when external payload provides it (never default); "previstas" (scheduledDiaria*) is sync-only/read-only again, never manual; "realizadas" stays RH-manual
