@@ -1179,33 +1179,26 @@ export default function EventDetailPage() {
                                 Participação informativa — sem controle de diárias.
                               </p>
                             ) : (p.scheduledDiariaCount != null || realizadasCount != null || canManage) && (
-                              <div className="flex items-center gap-3 flex-wrap pt-0.5">
-                                {p.scheduledDiariaCount != null ? (
-                                  <span
-                                    data-testid={`text-scheduled-diaria-${p.employeeId}`}
-                                    className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white text-[10px] font-bold italic uppercase text-[#444933]"
-                                    title="Diárias previstas vêm da escalação (logística interna)."
-                                  >
-                                    <Calendar size={11} className="text-[#444933]" />
-                                    Previstas: {p.scheduledDiariaCount}
+                              <div className="flex items-start gap-2 flex-wrap pt-1">
+                                <div
+                                  data-testid={`text-scheduled-diaria-${p.employeeId}`}
+                                  className="flex items-start gap-1.5 px-2 py-1 border-2 border-[#191c1e] bg-white text-[10px] font-bold italic uppercase text-[#444933] leading-tight"
+                                  title="Diárias previstas vêm da escalação (logística interna)."
+                                >
+                                  <Calendar size={11} className="text-[#444933] shrink-0 mt-[1px]" />
+                                  <div>
+                                    <div>Previstas: {p.scheduledDiariaCount ?? "—"}</div>
                                     {p.scheduledDiariaStart && p.scheduledDiariaEnd && (
-                                      <span className="text-[#747a60]"> ({formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)})</span>
+                                      <div className="text-[#747a60] normal-case font-semibold not-italic">
+                                        {formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)}
+                                      </div>
                                     )}
-                                  </span>
-                                ) : (
-                                  <span
-                                    data-testid={`text-scheduled-diaria-${p.employeeId}`}
-                                    className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white text-[10px] font-bold italic uppercase text-[#444933]"
-                                    title="Diárias previstas vêm da escalação (logística interna)."
-                                  >
-                                    <Calendar size={11} className="text-[#444933]" />
-                                    Previstas: —
-                                  </span>
-                                )}
+                                  </div>
+                                </div>
                                 {p.scheduledDiariaCount != null && realizadasCount != null && realizadasCount < p.scheduledDiariaCount && (
                                   <span
                                     data-testid={`badge-diaria-gap-${p.employeeId}`}
-                                    className="px-1.5 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-black text-[10px] italic uppercase"
+                                    className="self-center px-1.5 py-1 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-black text-[10px] italic uppercase whitespace-nowrap"
                                     title="Diárias previstas ainda não cobertas pelas realizadas."
                                   >
                                     Faltam {p.scheduledDiariaCount - realizadasCount}
@@ -1217,9 +1210,9 @@ export default function EventDetailPage() {
                                       <button
                                         data-testid={`button-diaria-dates-${p.employeeId}`}
                                         type="button"
-                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors"
+                                        className="self-center flex items-center gap-1.5 px-2 py-1 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors whitespace-nowrap"
                                       >
-                                        <Calendar size={11} className="text-[#444933]" />
+                                        <Calendar size={11} className="text-[#444933] shrink-0" />
                                         <span className="text-[10px] font-bold italic uppercase text-[#191c1e]">
                                           Realizadas: {realizadasCount ?? 0}
                                         </span>
@@ -1249,7 +1242,7 @@ export default function EventDetailPage() {
                                     </PopoverContent>
                                   </Popover>
                                 ) : realizadasCount != null ? (
-                                  <span className="text-[10px] font-bold italic uppercase text-[#747a60]">
+                                  <span className="self-center text-[10px] font-bold italic uppercase text-[#747a60] whitespace-nowrap">
                                     Diárias realizadas: {realizadasCount}
                                   </span>
                                 ) : null}
