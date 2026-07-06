@@ -412,18 +412,24 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
 
   const platoonRules = await loadPlatoonRules();
 
-  const participants = await db
+  const allParticipants = await db
     .select({
       employeeId: eventParticipantsTable.employeeId,
       employeeName: employeesTable.name,
       functionName: eventParticipantsTable.functionName,
       employeeFunction: employeesTable.functionName,
+      employmentType: employeesTable.employmentType,
       eligibleForBonus: employeesTable.eligibleForBonus,
       eligibilityStatus: employeesTable.eligibilityStatus,
     })
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
     .where(eq(eventParticipantsTable.eventId, eventId));
+  // Freelancers e funções informativas ("Sup Ceno *") participam do evento mas
+  // NUNCA contam para nota (ver lib/participation.ts) — não entram nesta lista
+  // de resultado por participante, senão herdariam a nota do time e um badge
+  // "Elegível" que não correspondem à realidade (não geram employee_event_results).
+  const participants = allParticipants.filter(p => participantCountsForScore(p));
 
   // Evento histórico: não há critérios/avaliações — a nota já vem pronta
   // (calibrada) de fora. Responde direto com importedScore, sem chamar

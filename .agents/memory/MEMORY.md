@@ -51,3 +51,4 @@
 - [Seed test credentials & employee linkage](seed-test-credentials.md) — all seed users share one hardcoded password (see seed.ts); users.employee_id is NULL for all seeds, temp-link+revert to test employee-scoped endpoints
 - [Dialog trigger in clickable header](dialog-trigger-in-clickable-header.md) — nest trigger inside div (not button) accordion header; stopPropagation on BOTH the trigger AND DialogContent (portals bubble via React tree, not DOM)
 - [Scored/syncable function prefix match](scored-function-prefix-match.md) — isScoredFunction must startsWith, not exact-match Set; new external function-name variants (e.g. "cenotecnica sp2") were silently dropped from sync
+- [Event-result informational leak](event-result-informational-leak.md) — GET /events/:id/result must filter by participantCountsForScore too, or Sup Ceno/freela show team score + "Elegível" in event-detail UI despite no real employee_event_results row
