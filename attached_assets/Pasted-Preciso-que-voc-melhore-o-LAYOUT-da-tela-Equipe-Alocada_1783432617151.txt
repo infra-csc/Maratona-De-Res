@@ -1,0 +1,30 @@
+Preciso que você melhore o LAYOUT da tela "Equipe Alocada" sem alterar a paleta de cores atual (fundo preto/lima no cabeçalho, cards brancos, faixa vinho para "NÃO CONTA P/ NOTA", caixa creme para "DIÁRIAS PREVISTAS NÃO CUMPRIDAS").
+
+Problemas atuais que precisam ser corrigidos:
+
+1. ALTURA DOS CARDS INCONSISTENTE
+   - Cards na mesma linha do grid têm alturas diferentes.
+   - Quando um card tem a caixa de "justificativa" aberta, ele fica muito mais alto que os vizinhos, quebrando o alinhamento do grid.
+   - Ajustar para que todos os cards de uma mesma linha tenham a mesma altura (usar align-items: stretch no grid/flex), e se possível manter a caixa de justificativa dentro de um bloco com altura controlada (ex: com scroll interno ou como um accordion/expansível) para não distorcer o grid.
+
+2. ESPAÇO VAZIO EXCESSIVO
+   - Cards sem justificativa (ex: colaboradores com realizadas = previstas) ficam com muito espaço em branco na parte inferior.
+   - Redistribuir o conteúdo verticalmente (justify-content: space-between ou reduzir a altura mínima do card) para eliminar esse vazio, mantendo um espaçamento interno padronizado.
+
+3. ESTRUTURA PADRÃO DO CARD
+   Cada card deve seguir sempre a mesma ordem/posição vertical dos elementos:
+   - Linha 1: avatar (iniciais) + nome + botões de ação (transferir/excluir)
+   - Linha 2: cargo/função (ex: CENOTECNICA SP 2)
+   - Linha 3: tags (CASA, FREELA, NÃO CONTA P/ NOTA)
+   - Linha 4: previstas / realizadas (badges)
+   - Linha 5 (condicional): caixa de justificativa, só aparece quando necessário, sem empurrar o alinhamento do grid inteiro
+
+4. GRID RESPONSIVO
+   - Manter 3 colunas em telas largas, 2 em tablet, 1 em mobile.
+   - Espaçamento (gap) uniforme entre os cards, tanto horizontal quanto vertical.
+
+5. CONSISTÊNCIA VISUAL
+   - Cards "informativos" (FREELA / NÃO CONTA P/ NOTA) devem manter o mesmo padding e alinhamento interno dos demais, só mudando a cor de fundo/borda lateral (mantenha a borda esquerda vinho como está).
+   - Textos "PARTICIPAÇÃO INFORMATIVA — SEM CONTROLE DE DIÁRIAS" devem ficar alinhados no mesmo nível vertical em todos os cards desse tipo.
+
+Não altere as cores, ícones, fontes ou o conteúdo textual — apenas a estrutura de layout (grid, alinhamento, espaçamento e altura dos cards) para deixar a tela mais organizada e uniforme.

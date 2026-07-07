@@ -306,7 +306,7 @@ function ParticipantCommentBox({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Comentário / justificativa..."
-        className="text-xs rounded-none border-2 border-[#191c1e] bg-white min-h-[60px]"
+        className="text-xs rounded-none border-2 border-[#191c1e] bg-white min-h-[56px] max-h-[80px] resize-none"
       />
       <button
         type="button"
@@ -1799,122 +1799,127 @@ export default function EventDetailPage() {
                           key={p.id}
                           data-testid={`chip-participant-${p.employeeId}`}
                           className={cn(
-                            "flex flex-col border-2 border-[#eceef0] h-full transition-colors",
+                            "flex flex-col h-full border-2 border-[#eceef0] transition-colors",
                             isInformational ? "bg-[#862200]/[0.05] border-l-4 border-l-[#862200]" : "hover:border-[#191c1e]",
                             isInactive && "opacity-50"
                           )}
                         >
-                          {/* ── Card header: avatar + nome + botões ── */}
-                          <div className="flex items-start gap-3 p-4 pb-3">
-                            <div className="w-9 h-9 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-xs text-[#191c1e] shrink-0 mt-0.5">
-                              {p.employeeName.split(' ').map((n:string)=>n[0]).slice(0,2).join('').toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="font-black italic uppercase text-sm text-[#191c1e] leading-tight break-words">{p.employeeName}</p>
-                                {canManage && (
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <button
-                                      data-testid={`button-toggle-participant-${p.employeeId}`}
-                                      onClick={() => updateParticipant.mutate({ id, participantId: p.id, data: { confirmed: isInactive } })}
-                                      className={cn(
-                                        "p-1.5 border-2 border-[#191c1e] bg-white transition-colors",
-                                        isInactive ? "text-[#191c1e] hover:bg-[#ccff00]" : "text-[#862200] hover:bg-[#862200] hover:text-white"
-                                      )}
-                                      title={isInactive ? "Reativar colaborador" : "Marcar como inativo (não compareceu)"}
-                                    >
-                                      {isInactive ? <UserCheck size={13} /> : <UserX size={13} />}
-                                    </button>
-                                    <button
-                                      data-testid={`button-remove-participant-${p.employeeId}`}
-                                      onClick={() => setPendingRemoveParticipant(p.id)}
-                                      className="p-1.5 border-2 border-[#191c1e] bg-white text-[#862200] hover:bg-[#862200] hover:text-white transition-colors"
-                                      title="Remover do evento"
-                                    >
-                                      <Trash2 size={13} />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                              <p className="text-[10px] font-bold italic uppercase text-[#747a60] mt-0.5">
-                                {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}
-                              </p>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
-                                  <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
-                                </span>
-                                {isInformational && (
-                                  <span
-                                    data-testid={`badge-no-score-${p.employeeId}`}
-                                    className="px-2 py-0.5 border-2 border-[#862200] bg-[#862200] text-white font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block"
-                                    title="Participação apenas histórica/informativa — não entra na nota nem na elegibilidade."
-                                  >
-                                    <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          {/* Bloco principal — cresce para preencher a célula do grid */}
+                          <div className="flex flex-col flex-1 p-4 gap-2">
 
-                          {/* ── Card body: diárias + aviso ── */}
-                          {(isInformational || p.scheduledDiariaCount != null || realizadasCount != null || canManage || showCommentBox) && (
-                            <div className="px-4 pb-4 border-t-2 border-[#eceef0] pt-3 space-y-2">
-                              {isInformational ? (
-                                <p className="text-[10px] font-bold italic uppercase text-[#862200]/80">
-                                  Participação informativa — sem controle de diárias.
-                                </p>
-                              ) : (p.scheduledDiariaCount != null || realizadasCount != null || canManage) && (
-                                <div className="flex items-start gap-2 flex-wrap">
-                                  <div
-                                    data-testid={`text-scheduled-diaria-${p.employeeId}`}
-                                    className="flex items-start gap-1.5 px-2 py-1 border-2 border-[#191c1e] bg-white text-[10px] font-bold italic uppercase text-[#444933] leading-tight"
-                                    title="Diárias previstas vêm da escalação (logística interna)."
+                            {/* Linha 1: avatar + nome + botões */}
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-xs text-[#191c1e] shrink-0">
+                                {p.employeeName.split(' ').map((n:string)=>n[0]).slice(0,2).join('').toUpperCase()}
+                              </div>
+                              <p className="flex-1 font-black italic uppercase text-sm text-[#191c1e] leading-tight min-w-0 break-words">{p.employeeName}</p>
+                              {canManage && (
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    data-testid={`button-toggle-participant-${p.employeeId}`}
+                                    onClick={() => updateParticipant.mutate({ id, participantId: p.id, data: { confirmed: isInactive } })}
+                                    className={cn(
+                                      "p-1.5 border-2 border-[#191c1e] bg-white transition-colors",
+                                      isInactive ? "text-[#191c1e] hover:bg-[#ccff00]" : "text-[#862200] hover:bg-[#862200] hover:text-white"
+                                    )}
+                                    title={isInactive ? "Reativar colaborador" : "Marcar como inativo (não compareceu)"}
                                   >
-                                    <Calendar size={11} className="text-[#444933] shrink-0 mt-[1px]" />
-                                    <div>
-                                      <div>Previstas: {p.scheduledDiariaCount ?? "—"}</div>
-                                      {p.scheduledDiariaStart && p.scheduledDiariaEnd && (
-                                        <div className="text-[#747a60] normal-case font-semibold not-italic">
-                                          {formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {canManage ? (
-                                    <ParticipantDiariaDialog
-                                      employeeId={p.employeeId}
-                                      employeeName={p.employeeName}
-                                      candidateDates={candidateDates}
-                                      scheduledStart={p.scheduledDiariaStart}
-                                      scheduledEnd={p.scheduledDiariaEnd}
-                                      scheduledCount={p.scheduledDiariaCount}
-                                      currentDates={selectedDates}
-                                      isSaving={updateParticipant.isPending}
-                                      onSave={(dates, onDone) => {
-                                        updateParticipant.mutate(
-                                          { id, participantId: p.id, data: { actualDiariaDates: dates } },
-                                          { onSuccess: onDone },
-                                        );
-                                      }}
-                                    />
-                                  ) : realizadasCount != null ? (
-                                    <span className="self-center text-[10px] font-bold italic uppercase text-[#747a60] whitespace-nowrap">
-                                      Realizadas: {realizadasCount}
-                                    </span>
-                                  ) : null}
+                                    {isInactive ? <UserCheck size={13} /> : <UserX size={13} />}
+                                  </button>
+                                  <button
+                                    data-testid={`button-remove-participant-${p.employeeId}`}
+                                    onClick={() => setPendingRemoveParticipant(p.id)}
+                                    className="p-1.5 border-2 border-[#191c1e] bg-white text-[#862200] hover:bg-[#862200] hover:text-white transition-colors"
+                                    title="Remover do evento"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
                                 </div>
                               )}
-                              {showCommentBox && (
-                                <ParticipantCommentBox
-                                  participantId={p.id}
-                                  employeeId={p.employeeId}
-                                  initialComment={p.comment}
-                                  canManage={canManage}
-                                  reason={commentReason}
-                                  isSaving={updateParticipant.isPending}
-                                  onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
-                                />
+                            </div>
+
+                            {/* Linha 2: cargo/função */}
+                            <p className="text-[10px] font-bold italic uppercase text-[#747a60] leading-tight">
+                              {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}
+                            </p>
+
+                            {/* Linha 3: tags (Casa/Freela + Não conta p/ nota) */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
+                                <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
+                              </span>
+                              {isInformational && (
+                                <span
+                                  data-testid={`badge-no-score-${p.employeeId}`}
+                                  className="px-2 py-0.5 border-2 border-[#862200] bg-[#862200] text-white font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block"
+                                  title="Participação apenas histórica/informativa — não entra na nota nem na elegibilidade."
+                                >
+                                  <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
+                                </span>
                               )}
+                            </div>
+
+                            {/* Linha 4: diárias previstas / realizadas */}
+                            {isInformational ? (
+                              <p className="text-[10px] font-bold italic uppercase text-[#862200]/80">
+                                Participação informativa — sem controle de diárias.
+                              </p>
+                            ) : (p.scheduledDiariaCount != null || realizadasCount != null || canManage) ? (
+                              <div className="flex items-start gap-2 flex-wrap">
+                                <div
+                                  data-testid={`text-scheduled-diaria-${p.employeeId}`}
+                                  className="flex items-start gap-1.5 px-2 py-1 border-2 border-[#191c1e] bg-white text-[10px] font-bold italic uppercase text-[#444933] leading-tight"
+                                  title="Diárias previstas vêm da escalação (logística interna)."
+                                >
+                                  <Calendar size={11} className="text-[#444933] shrink-0 mt-[1px]" />
+                                  <div>
+                                    <div>Previstas: {p.scheduledDiariaCount ?? "—"}</div>
+                                    {p.scheduledDiariaStart && p.scheduledDiariaEnd && (
+                                      <div className="text-[#747a60] normal-case font-semibold not-italic">
+                                        {formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {canManage ? (
+                                  <ParticipantDiariaDialog
+                                    employeeId={p.employeeId}
+                                    employeeName={p.employeeName}
+                                    candidateDates={candidateDates}
+                                    scheduledStart={p.scheduledDiariaStart}
+                                    scheduledEnd={p.scheduledDiariaEnd}
+                                    scheduledCount={p.scheduledDiariaCount}
+                                    currentDates={selectedDates}
+                                    isSaving={updateParticipant.isPending}
+                                    onSave={(dates, onDone) => {
+                                      updateParticipant.mutate(
+                                        { id, participantId: p.id, data: { actualDiariaDates: dates } },
+                                        { onSuccess: onDone },
+                                      );
+                                    }}
+                                  />
+                                ) : realizadasCount != null ? (
+                                  <span className="self-center text-[10px] font-bold italic uppercase text-[#747a60] whitespace-nowrap">
+                                    Realizadas: {realizadasCount}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                          </div>
+
+                          {/* Linha 5 (condicional): caixa de justificativa — altura controlada, não distorce o grid */}
+                          {showCommentBox && (
+                            <div className="border-t-2 border-[#eceef0] px-4 pt-3 pb-4 shrink-0">
+                              <ParticipantCommentBox
+                                participantId={p.id}
+                                employeeId={p.employeeId}
+                                initialComment={p.comment}
+                                canManage={canManage}
+                                reason={commentReason}
+                                isSaving={updateParticipant.isPending}
+                                onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
+                              />
                             </div>
                           )}
                         </div>
