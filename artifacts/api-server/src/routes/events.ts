@@ -1166,4 +1166,38 @@ router.delete("/events/:id/comments/:commentId", async (req, res) => {
   res.status(204).end();
 });
 
+// ---------------------------------------------------------------------------
+// One-time admin: migra calibrações de critérios de nomes longos (errados)
+// para seus equivalentes de nomes curtos (corretos/ativos).
+// Seguro rodar múltiplas vezes (idempotente — só atualiza se o critério
+// de origem ainda existe nas calibrações).
+// ---------------------------------------------------------------------------
+router.post("/events/admin/fix-calibration-criteria", requireRole("admin"), async (req, res) => {
+  const nameMap: Record<string, string> = {
+    "Qualidade e Acabamento da Montagem": "Qualidade da Entrega",
+    "Logística Reversa/Carga da Desmontagem": "Logística Reversa",
+    "Prazo de Entrega/Arena Pronta no Horário": "Prazo de Entrega",
+    "Retorno de Material/Perdas ou Avarias": "Perda de Material/Estrutura",
+  };
+
+  const results: { from: string; to: string; fromId: number; toId: number; updated: number }[] = [];
+  let totalUpdated = 0;
+
+  for (const [fromName, toName] of Object.entries(nameMap)) {
+    const [fromCrit] = await db.select({ id: criteriaTable.id }).from(criteriaTable).where(eq(criteriaTable.name, fromName)).limit(1);
+    const [toCrit] = await db.select({ id: criteriaTable.id }).from(criteriaTable).where(eq(criteriaTable.name, toName)).limit(1);
+    if (!fromCrit || !toCrit) continue;
+
+    const updated = await db.execute(
+      sql`UPDATE calibrations SET criterion_id = ${toCrit.id} WHERE criterion_id = ${fromCrit.id}`
+    );
+    const count = (updated as unknown as { rowCount: number }).rowCount ?? 0;
+    totalUpdated += count;
+    results.push({ from: fromName, to: toName, fromId: fromCrit.id, toId: toCrit.id, updated: count });
+  }
+
+  await audit(req.user!.userId, "fix_calibration_criteria", "calibrations", null, { results, totalUpdated }, null);
+  res.json({ totalUpdated, results });
+});
+
 export default router;

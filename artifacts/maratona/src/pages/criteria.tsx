@@ -239,6 +239,28 @@ export default function CriteriaPage() {
     },
   });
 
+  const [fixCalibRunning, setFixCalibRunning] = useState(false);
+  const [fixCalibResult, setFixCalibResult] = useState<{ totalUpdated: number; results: { from: string; to: string; updated: number }[] } | null>(null);
+  async function runFixCalibrationCriteria() {
+    setFixCalibRunning(true);
+    try {
+      const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
+      const resp = await fetch(`${base}/events/admin/fix-calibration-criteria`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const data = await resp.json();
+      setFixCalibResult(data);
+      toast({ title: `Calibrações corrigidas — ${data.totalUpdated} linha(s) atualizada(s)` });
+    } catch (e: unknown) {
+      toast({ title: "Erro ao corrigir calibrações", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setFixCalibRunning(false);
+    }
+  }
+
   const [resyncSummary, setResyncSummary] = useState<{ processed: number; skipped: number; totalAdded: number; totalDeactivated: number; totalActivated: number; events: { id: number; name: string; added: number; deactivated: number; activated: number }[] } | null>(null);
   const resyncAllMutation = useResyncAllEventsCriteria({
     mutation: {
@@ -301,7 +323,16 @@ export default function CriteriaPage() {
         </section>
 
         {/* Actions */}
-        <section className="flex justify-end gap-3">
+        <section className="flex justify-end gap-3 flex-wrap">
+          <button
+            type="button"
+            disabled={fixCalibRunning || fixCalibResult != null}
+            onClick={runFixCalibrationCriteria}
+            className={`bg-[#fff3cd] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+          >
+            <Zap size={16} className={fixCalibRunning ? "animate-pulse" : ""} />
+            {fixCalibRunning ? "Corrigindo..." : fixCalibResult != null ? `✓ ${fixCalibResult.totalUpdated} corrigidas` : "Corrigir Calibrações (prod)"}
+          </button>
           <button
             type="button"
             data-testid="button-resync-all-events"
