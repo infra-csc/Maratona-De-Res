@@ -652,6 +652,7 @@ export default function EventDetailPage() {
   }, [importedCriteriaScores, result?.criteriaDetails]);
 
   const [config, setConfig] = useState<{ id: number; criterionId: number; active: boolean; weight: number; name: string; eventScoped: boolean }[]>([]);
+  const [showInactiveCriteria, setShowInactiveCriteria] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const [pendingRemoveParticipant, setPendingRemoveParticipant] = useState<number | null>(null);
@@ -1277,7 +1278,7 @@ export default function EventDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y-2 divide-[#eceef0]">
-                    {config.map(item => {
+                    {config.filter(item => item.active || showInactiveCriteria).map(item => {
                       const meta = critMeta.get(item.criterionId);
                       const isEditingName = editingName[item.criterionId] !== undefined;
                       const areaId = meta?.responsibleAreaId ?? null;
@@ -1425,7 +1426,7 @@ export default function EventDetailPage() {
                         </tr>
                       );
                     })}
-                    {config.length === 0 && (
+                    {config.filter(item => item.active || showInactiveCriteria).length === 0 && (
                       <tr>
                         <td colSpan={5} className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhum critério vinculado a este evento.</td>
                       </tr>
@@ -1433,6 +1434,19 @@ export default function EventDetailPage() {
                   </tbody>
                 </table>
               </div>
+
+              {config.some(item => !item.active) && (
+                <button
+                  type="button"
+                  onClick={() => setShowInactiveCriteria(v => !v)}
+                  className="mt-1 flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#747a60] hover:text-[#444933] transition-colors"
+                >
+                  <RotateCcw size={12} />
+                  {showInactiveCriteria
+                    ? "Ocultar critérios inativos"
+                    : `Mostrar critérios inativos (${config.filter(c => !c.active).length})`}
+                </button>
+              )}
 
               {config.some(item => item.active && (critMeta.get(item.criterionId)?.responsibleAreaId != null) && evaluatorsForArea(critMeta.get(item.criterionId)!.responsibleAreaId!).length === 0) && (
                 <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Há áreas sem nenhum avaliador vinculado. Cadastre avaliadores nessas áreas (em Usuários) para poder atribuí-los.</p>
