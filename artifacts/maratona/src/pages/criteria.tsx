@@ -239,7 +239,7 @@ export default function CriteriaPage() {
     },
   });
 
-  const [resyncSummary, setResyncSummary] = useState<{ processed: number; skipped: number; totalAdded: number; totalDeactivated: number; events: { id: number; name: string; added: number; deactivated: number }[] } | null>(null);
+  const [resyncSummary, setResyncSummary] = useState<{ processed: number; skipped: number; totalAdded: number; totalDeactivated: number; totalActivated: number; events: { id: number; name: string; added: number; deactivated: number; activated: number }[] } | null>(null);
   const resyncAllMutation = useResyncAllEventsCriteria({
     mutation: {
       onSuccess: (data) => {
@@ -248,8 +248,10 @@ export default function CriteriaPage() {
           skipped: data.skipped ?? 0,
           totalAdded: data.totalAdded ?? 0,
           totalDeactivated: data.totalDeactivated ?? 0,
+          totalActivated: (data as { totalActivated?: number }).totalActivated ?? 0,
           events: (data.events ?? []).map(ev => ({
             id: ev.id ?? 0, name: ev.name ?? "", added: ev.added ?? 0, deactivated: ev.deactivated ?? 0,
+            activated: (ev as { activated?: number }).activated ?? 0,
           })),
         });
         toast({ title: `Sincronização concluída — ${data.processed ?? 0} evento(s) atualizado(s)` });
@@ -481,7 +483,7 @@ export default function CriteriaPage() {
           </DialogHeader>
           {resyncSummary && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-4 gap-3 text-center">
                 <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
                   <p className="text-2xl font-black italic">{resyncSummary.processed}</p>
                   <p className="text-[10px] font-bold uppercase italic text-[#747a60]">Atualizados</p>
@@ -489,6 +491,10 @@ export default function CriteriaPage() {
                 <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
                   <p className="text-2xl font-black italic">{resyncSummary.totalAdded}</p>
                   <p className="text-[10px] font-bold uppercase italic text-[#747a60]">Adicionados</p>
+                </div>
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic">{resyncSummary.totalActivated}</p>
+                  <p className="text-[10px] font-bold uppercase italic text-[#747a60]">Reativados</p>
                 </div>
                 <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
                   <p className="text-2xl font-black italic">{resyncSummary.totalDeactivated}</p>
@@ -511,7 +517,7 @@ export default function CriteriaPage() {
                     <div key={ev.id} className="px-4 py-2 flex items-center justify-between gap-3">
                       <span className="font-bold italic uppercase text-xs text-[#191c1e] truncate">{ev.name}</span>
                       <span className="text-[10px] font-bold uppercase italic text-[#747a60] whitespace-nowrap">
-                        +{ev.added} / -{ev.deactivated}
+                        +{ev.added} novo(s){ev.activated > 0 ? ` ↺${ev.activated} reativado(s)` : ""}{ev.deactivated > 0 ? ` -${ev.deactivated}` : ""}
                       </span>
                     </div>
                   ))}

@@ -294,7 +294,7 @@ async function resyncEventCriteriaOnce(eventId: number, options: { force?: boole
     }
   });
 
-  return { deactivated: toDeactivate.length, added: toAdd.length };
+  return { deactivated: toDeactivate.length, added: toAdd.length, activated: toActivate.length };
 }
 
 router.get("/events/:id", async (req, res) => {
@@ -1003,9 +1003,9 @@ router.post("/events/:id/criteria/resync", requireRole("admin", "rh"), async (re
   // Explicit force=false opt-out is available for strict mode.
   const force = req.body?.force !== false;
   try {
-    const { deactivated, added } = await resyncEventCriteriaOnce(eventId, { force });
-    await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated, added, force }, null);
-    res.json({ ...(await loadEventDetail(eventId)), removedStale: deactivated, addedNew: added });
+    const { deactivated, added, activated } = await resyncEventCriteriaOnce(eventId, { force });
+    await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated, added, activated, force }, null);
+    res.json({ ...(await loadEventDetail(eventId)), removedStale: deactivated, addedNew: added, reactivated: activated });
   } catch (err) {
     if (err instanceof ResyncBlockedError) {
       const message = err.reason === "confirmed"
@@ -1037,25 +1037,26 @@ router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (re
     .from(eventsTable)
     .where(eq(eventsTable.cycleId, cycle.id));
 
-  let processed = 0, skipped = 0, totalAdded = 0, totalDeactivated = 0;
-  const details: { id: number; name: string; added: number; deactivated: number }[] = [];
+  let processed = 0, skipped = 0, totalAdded = 0, totalDeactivated = 0, totalActivated = 0;
+  const details: { id: number; name: string; added: number; deactivated: number; activated: number }[] = [];
 
   for (const ev of events) {
     try {
-      const { added, deactivated } = await resyncEventCriteriaOnce(ev.id, { force });
-      if (added > 0 || deactivated > 0) {
+      const { added, deactivated, activated } = await resyncEventCriteriaOnce(ev.id, { force });
+      if (added > 0 || deactivated > 0 || activated > 0) {
         processed += 1;
         totalAdded += added;
         totalDeactivated += deactivated;
-        details.push({ id: ev.id, name: ev.name, added, deactivated });
-        await audit(req.user!.userId, "resync_criteria", "events", ev.id, { deactivated, added, bulk: true, force }, null);
+        totalActivated += activated;
+        details.push({ id: ev.id, name: ev.name, added, deactivated, activated });
+        await audit(req.user!.userId, "resync_criteria", "events", ev.id, { deactivated, added, activated, bulk: true, force }, null);
       }
     } catch (err) {
       if (err instanceof ResyncBlockedError) { skipped += 1; continue; }
     }
   }
 
-  res.json({ processed, skipped, totalAdded, totalDeactivated, events: details });
+  res.json({ processed, skipped, totalAdded, totalDeactivated, totalActivated, events: details });
 });
 
 router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (req, res) => {

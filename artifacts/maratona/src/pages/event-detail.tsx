@@ -702,10 +702,15 @@ export default function EventDetailPage() {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
         const removed = data.removedStale ?? 0;
         const added = data.addedNew ?? 0;
-        if (removed === 0 && added === 0) {
+        const reactivated = (data as { reactivated?: number }).reactivated ?? 0;
+        if (removed === 0 && added === 0 && reactivated === 0) {
           toast({ title: "Já está sincronizado", description: "Este evento já usa somente os critérios ativos." });
         } else {
-          toast({ title: "Critérios sincronizados", description: `${added} critério(s) ativo(s) adicionado(s), ${removed} critério(s) desativado(s) (não fazem mais parte do catálogo ativo).` });
+          const parts = [];
+          if (added > 0) parts.push(`${added} adicionado(s)`);
+          if (reactivated > 0) parts.push(`${reactivated} reativado(s)`);
+          if (removed > 0) parts.push(`${removed} desativado(s)`);
+          toast({ title: "Critérios sincronizados", description: parts.join(", ") + "." });
         }
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao sincronizar", description: e.message, variant: "destructive" }),
