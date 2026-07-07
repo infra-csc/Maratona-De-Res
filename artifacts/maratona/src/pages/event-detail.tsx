@@ -63,9 +63,10 @@ function parseImportedCriteriaScores(notes: string): { rawName: string; score: n
     .map(entry => {
       const m = entry.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)\s*(?:-\s*(.*))?$/);
       if (!m) return null;
-      const score = parseFloat(m[2].replace(",", "."));
-      const scale = parseFloat(m[3].replace(",", "."));
-      return { rawName: m[1].trim(), score, scale, excluded: scale === 0, comment: m[4]?.trim() || undefined };
+      // Formato das notas importadas: "<nome> <peso>/<nota>" — m[2]=peso, m[3]=nota
+      const peso = parseFloat(m[2].replace(",", "."));
+      const nota = parseFloat(m[3].replace(",", "."));
+      return { rawName: m[1].trim(), score: nota, scale: 10, excluded: peso === 0, comment: m[4]?.trim() || undefined };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 }
@@ -1160,9 +1161,9 @@ export default function EventDetailPage() {
                             }
                             return (
                               <span className="inline-flex flex-col items-center gap-0.5">
-                                <span className="text-[#862200]">
+                                <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-2 py-0.5 border-2 border-[#191c1e]">
                                   {fmt(imp.score)}
-                                  <span className="text-[10px] font-normal not-italic text-[#9aa088]">/{fmt(imp.scale)}</span>
+                                  <span className="text-[10px] font-normal not-italic text-[#444933]">/10</span>
                                 </span>
                                 <span className="text-[9px] uppercase font-black italic text-[#9aa088]">importado</span>
                               </span>
