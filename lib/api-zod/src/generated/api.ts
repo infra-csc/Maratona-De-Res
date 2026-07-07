@@ -2095,6 +2095,7 @@ export const GetDashboardSummaryResponse = zod.object({
   "pendingEvaluations": zod.number(),
   "submittedEvaluations": zod.number(),
   "eventsInCalibration": zod.number(),
+  "eventsInCycle": zod.number(),
   "quarterAverage": zod.number().nullable(),
   "totalBonusPreview": zod.number(),
   "totalAbsences": zod.number(),

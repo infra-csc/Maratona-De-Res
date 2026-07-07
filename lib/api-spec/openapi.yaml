@@ -3265,7 +3265,7 @@ components:
 
     DashboardSummary:
       type: object
-      required: [totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations, eventsInCalibration, quarterAverage, totalBonusPreview, totalAbsences, eventsWithPendencies, atRiskEmployees]
+      required: [totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations, eventsInCalibration, eventsInCycle, quarterAverage, totalBonusPreview, totalAbsences, eventsWithPendencies, atRiskEmployees]
       properties:
         cycleId:
           type: integer
@@ -3280,6 +3280,8 @@ components:
         submittedEvaluations:
           type: integer
         eventsInCalibration:
+          type: integer
+        eventsInCycle:
           type: integer
         quarterAverage:
           type: ["number", "null"]

@@ -3,6 +3,7 @@ import { db, eventsTable, evaluationsTable, absencesTable, quarterlyResultsTable
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { getCurrentCycle } from "../lib/cycle.js";
+import { calculateTieredBonus } from "../lib/calculations.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -13,14 +14,17 @@ router.get("/dashboard/summary", async (req, res) => {
   if (!cycle) {
     res.json({
       totalEvents: 0, totalEmployeesEvaluated: 0, pendingEvaluations: 0, submittedEvaluations: 0,
-      eventsInCalibration: 0, quarterAverage: null, totalBonusPreview: 0, totalAbsences: 0,
+      eventsInCalibration: 0, eventsInCycle: 0, quarterAverage: null, totalBonusPreview: 0, totalAbsences: 0,
       eventsWithPendencies: [], atRiskEmployees: [],
     });
     return;
   }
 
   const events = await db.select().from(eventsTable).where(eq(eventsTable.cycleId, cycle.id));
-  const totalEvents = events.length;
+  // Fix (1): o KPI de Eventos mostra apenas eventos com resultados confirmados.
+  const confirmedEvts = events.filter(e => e.resultsConfirmed);
+  const totalEvents = confirmedEvts.length;
+  const eventsInCycle = events.length;
 
   const allEvals = await db.select({
     id: evaluationsTable.id,
@@ -29,8 +33,14 @@ router.get("/dashboard/summary", async (req, res) => {
   }).from(evaluationsTable).where(
     sql`${evaluationsTable.eventId} IN (SELECT id FROM events WHERE cycle_id = ${cycle.id})`
   );
-  const pendingEvaluations = allEvals.filter(e => e.status === "draft").length;
-  const submittedEvaluations = allEvals.filter(e => e.status === "submitted").length;
+
+  // Fix (3): Progresso de Avaliações conta EVENTOS com pendências,
+  // não linhas individuais de avaliação. Assim 0 rascunhos existentes
+  // não infla o percentual para 100% enganosamente.
+  const eventsWithDraft = new Set(allEvals.filter(e => e.status === "draft").map(e => e.eventId));
+  const eventsWithAnyEval = new Set(allEvals.map(e => e.eventId));
+  const pendingEvaluations = eventsWithDraft.size;
+  const submittedEvaluations = eventsWithAnyEval.size - eventsWithDraft.size;
 
   const absences = await db.select().from(absencesTable).where(eq(absencesTable.cycleId, cycle.id));
   const totalAbsences = absences.reduce((s, a) => s + a.quantity, 0);
@@ -48,10 +58,33 @@ router.get("/dashboard/summary", async (req, res) => {
     ? scoredQuarterResults.reduce((s, r) => s + parseFloat(r.finalResult), 0) / scoredQuarterResults.length
     : null;
 
-  const totalBonusPreview = isManager
-    ? quarterResults.reduce((s, r) => s + parseFloat(r.bonusValue), 0)
-    : 0;
-  const eventsInCalibration = events.filter(e => e.status === "calibration").length;
+  // Fix (2): Bônus Projetado — usa o valor do snapshot (bonusValue) quando
+  // calculado; para colaboradores ainda inelegíveis (ex.: mínimo de eventos não
+  // atingido), calcula uma projeção ao vivo baseada na finalResult atual, sem
+  // bônus extra de eventos adicionais. Assim o painel mostra uma estimativa
+  // real em vez de R$ 0 durante o ciclo em andamento.
+  let totalBonusPreview = 0;
+  if (isManager) {
+    const platoonRulesRaw = await db.select().from(platoonRulesTable)
+      .where(eq(platoonRulesTable.active, true))
+      .orderBy(platoonRulesTable.displayOrder);
+    const platoonRules = platoonRulesRaw.map(r => ({
+      name: r.name, color: r.color,
+      minScore: parseFloat(r.minScore as unknown as string),
+      maxScore: parseFloat(r.maxScore as unknown as string),
+      minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
+      bonusValue: parseFloat(r.bonusValue as unknown as string),
+      bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
+    }));
+    totalBonusPreview = quarterResults.reduce((s, r) => {
+      const snapshotBonus = parseFloat(r.bonusValue as unknown as string);
+      if (snapshotBonus > 0) return s + snapshotBonus;
+      const fr = parseFloat(r.finalResult as unknown as string);
+      if (fr > 0) return s + calculateTieredBonus(fr, [], platoonRules);
+      return s;
+    }, 0);
+  }
+  const eventsInCalibration = confirmedEvts.length;
 
   const openEvents = events.filter(e => e.status === "open");
   const eventsWithPendencies: { eventId: number; eventName: string; pendingCount: number }[] = [];
@@ -90,7 +123,7 @@ router.get("/dashboard/summary", async (req, res) => {
 
   res.json({
     totalEvents, totalEmployeesEvaluated, pendingEvaluations, submittedEvaluations,
-    eventsInCalibration, quarterAverage, totalBonusPreview, totalAbsences,
+    eventsInCalibration, eventsInCycle, quarterAverage, totalBonusPreview, totalAbsences,
     eventsWithPendencies, atRiskEmployees,
   });
 });

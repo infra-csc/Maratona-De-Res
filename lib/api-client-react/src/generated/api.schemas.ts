@@ -821,6 +821,7 @@ export interface DashboardSummary {
   pendingEvaluations: number;
   submittedEvaluations: number;
   eventsInCalibration: number;
+  eventsInCycle: number;
   /** @nullable */
   quarterAverage: number | null;
   totalBonusPreview: number;

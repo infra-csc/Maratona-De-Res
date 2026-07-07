@@ -22,6 +22,8 @@ export default function DashboardPage() {
 
   const submitted = summary?.submittedEvaluations ?? 0;
   const pending = summary?.pendingEvaluations ?? 0;
+  // submitted + pending = total de eventos com alguma avaliação; o percentual
+  // reflete eventos com todas as avaliações concluídas vs total com avaliações.
   const progress = submitted + pending > 0 ? Math.round((submitted / (submitted + pending)) * 100) : 0;
   const ghostPos = Math.max(0, progress - 7);
 
@@ -58,10 +60,10 @@ export default function DashboardPage() {
           {/* Eventos */}
           <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
             <div className="z-10">
-              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Eventos</p>
+              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Eventos Confirmados</p>
               <h2 data-testid="text-total-events" className="text-[40px] leading-none italic font-black mt-2">{summary?.totalEvents ?? "—"}</h2>
               <p className="text-[11px] font-bold uppercase italic text-[#506600] mt-1 flex items-center gap-1">
-                <CheckCircle2 size={12} /> {summary?.eventsInCalibration ?? 0} Fechados
+                <CheckCircle2 size={12} /> de {summary?.eventsInCycle ?? 0} no ciclo
               </p>
             </div>
             <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
@@ -75,7 +77,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs font-bold uppercase italic tracking-wider text-[#161e00]">Progresso de Avaliações</p>
               <h2 data-testid="text-eval-progress" className="text-[40px] leading-none italic font-black mt-2">{progress}%</h2>
-              <p className="text-[11px] font-bold uppercase italic opacity-60 mt-1">{pending} pendentes</p>
+              <p className="text-[11px] font-bold uppercase italic opacity-60 mt-1">{pending} {pending === 1 ? "evento pendente" : "eventos pendentes"}</p>
             </div>
             <div className="w-full mt-auto border-2 border-[#191c1e] h-3 relative bg-[#e0e3e5]">
               <div className="h-full bg-[#191c1e] transition-[width] duration-700" style={{ width: `${progress}%` }} />
