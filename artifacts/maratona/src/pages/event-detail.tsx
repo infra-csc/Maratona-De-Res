@@ -1148,10 +1148,26 @@ export default function EventDetailPage() {
                         </td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">{fmt(c.weight)}</td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">
+                          {c.averageScore != null ? fmt(c.averageScore) : "—"}
+                        </td>
+                        <td className="px-4 py-4 text-center">
                           {(() => {
-                            if (c.averageScore != null) return fmt(c.averageScore);
+                            if (calibrated) {
+                              return (
+                                <div className="flex flex-col items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 text-xs uppercase font-black italic bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1">
+                                    <Check size={10} /> {fmt(c.calibratedScore as number)}
+                                  </span>
+                                  {c.calibrationReason && (
+                                    <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words text-left max-w-[220px] border-l-2 border-[#191c1e] bg-[#f7f9fb] px-2 py-1">
+                                      {c.calibrationReason}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            }
                             const imp = importedCriteriaMap.get(c.criterionId);
-                            if (!imp) return "—";
+                            if (!imp) return <span className="text-[10px] uppercase font-bold italic text-[#747a60]">Sem calibração</span>;
                             if (imp.excluded) {
                               return (
                                 <span className="text-[10px] uppercase font-bold italic text-[#9aa088]" title={imp.comment}>
@@ -1171,27 +1187,24 @@ export default function EventDetailPage() {
                           })()}
                         </td>
                         <td className="px-4 py-4 text-center">
-                          {calibrated ? (
-                            <div className="flex flex-col items-center gap-1.5">
-                              <span className="inline-flex items-center gap-1 text-xs uppercase font-black italic bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1">
-                                <Check size={10} /> {fmt(c.calibratedScore as number)}
-                              </span>
-                              {c.calibrationReason && (
-                                <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words text-left max-w-[220px] border-l-2 border-[#191c1e] bg-[#f7f9fb] px-2 py-1">
-                                  {c.calibrationReason}
-                                </p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-[10px] uppercase font-bold italic text-[#747a60]">Sem calibração</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          {c.scoreUsed != null ? (
-                            <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-3 py-1 border-2 border-[#191c1e]">
-                              {fmt(c.scoreUsed)}
-                            </span>
-                          ) : "—"}
+                          {(() => {
+                            if (c.scoreUsed != null) {
+                              return (
+                                <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-3 py-1 border-2 border-[#191c1e]">
+                                  {fmt(c.scoreUsed)}
+                                </span>
+                              );
+                            }
+                            const imp = importedCriteriaMap.get(c.criterionId);
+                            if (imp && !imp.excluded) {
+                              return (
+                                <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-3 py-1 border-2 border-[#191c1e]">
+                                  {fmt(imp.score)}
+                                </span>
+                              );
+                            }
+                            return "—";
+                          })()}
                         </td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">
                           {c.criterionTotal != null ? fmt(c.criterionTotal) : "—"}
