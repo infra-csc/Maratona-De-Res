@@ -467,8 +467,9 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
 
     const calMap = new Map(historicalCalibrations.map(c => [c.criterionId, c]));
 
+    const hasAnyCal = calMap.size > 0;
     const historicalCriteriaDetails = historicalCriteriaRows
-      .filter(c => c.active)
+      .filter(c => hasAnyCal ? calMap.has(c.criterionId!) : c.active)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       .map(c => {
         const cal = calMap.get(c.criterionId!);
