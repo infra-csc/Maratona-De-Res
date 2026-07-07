@@ -1960,7 +1960,20 @@ export default function EventDetailPage() {
                                 >
                                   <Calendar size={11} className="text-[#444933] shrink-0 mt-[1px]" />
                                   <div>
-                                    <div>Previstas: {p.scheduledDiariaCount ?? "—"}</div>
+                                    <div>
+                                    Previstas:{" "}
+                                    {p.scheduledDiariaCount != null
+                                      ? p.scheduledDiariaCount
+                                      : (
+                                        <span
+                                          className="normal-case not-italic font-semibold text-[#9aa088]"
+                                          title="Sem diárias previstas cadastradas na Logística Interna"
+                                        >
+                                          Não cadastrado
+                                        </span>
+                                      )
+                                    }
+                                  </div>
                                     {p.scheduledDiariaStart && p.scheduledDiariaEnd && (
                                       <div className="text-[#747a60] normal-case font-semibold not-italic">
                                         {formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)}
