@@ -1727,7 +1727,7 @@ export default function EventDetailPage() {
                     : `Observações importadas indicam ${importedConformityRatio.sim}/${importedConformityRatio.total} itens "Sim" — não é possível identificar qual item pelo texto`}
                 </p>
               )}
-              <div className="p-4 space-y-2">
+              <div className="divide-y-2 divide-[#eceef0]">
                 {conformityItems.map(item => {
                   const value = conformityForm[item.key];
                   const comment = conformityForm[item.commentKey];
@@ -1736,69 +1736,76 @@ export default function EventDetailPage() {
                   const needsComment = (isNonConforming || isPending) && !comment.trim();
                   const isExpanded = expandedComments.has(item.key);
                   return (
-                    <div key={item.key} className={`-mx-4 px-4 py-2 transition-colors ${isNonConforming ? "bg-[#fdece6] border-l-4 border-[#862200]" : isPending ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-bold italic text-[#191c1e]">{item.label}</span>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                    <div key={item.key} className={`px-4 transition-colors ${isNonConforming ? "bg-[#fdece6] border-l-4 border-[#862200]" : isPending ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
+                      <div
+                        className="grid items-center min-h-[56px]"
+                        style={{ gridTemplateColumns: "1fr auto auto" }}
+                      >
+                        <span className="text-sm font-bold italic text-[#191c1e] pr-4 py-3 leading-snug" style={{ maxWidth: 200 }}>{item.label}</span>
+                        <div className="flex items-center gap-1.5 shrink-0 py-2">
                           {isNonConforming && (
-                            <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>
+                            <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap mr-1">-10 pts</span>
                           )}
                           {canManage ? (
-                            <>
-                              <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = { ...conformityForm, [item.key]: true };
-                                    setConformityForm(next);
-                                    setConformity.mutate({ id, data: { [item.key]: true } });
-                                  }}
-                                  className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                                >
-                                  Sim
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = { ...conformityForm, [item.key]: false };
-                                    setConformityForm(next);
-                                    setConformity.mutate({ id, data: { [item.key]: false } });
-                                  }}
-                                  className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                                >
-                                  Não
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = { ...conformityForm, [item.key]: null };
-                                    setConformityForm(next);
-                                    setConformity.mutate({ id, data: { [item.key]: null } });
-                                  }}
-                                  className={`px-2.5 py-1 text-[11px] font-black italic uppercase transition-all ${value === null ? "bg-[#f5e97a] text-[#4a3c00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                                >
-                                  Pendente
-                                </button>
-                              </div>
+                            <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
                               <button
                                 type="button"
-                                title={comment ? "Ver / editar comentário" : "Adicionar comentário"}
-                                onClick={() => setExpandedComments(prev => {
-                                  const next = new Set(prev);
-                                  if (next.has(item.key)) next.delete(item.key); else next.add(item.key);
-                                  return next;
-                                })}
-                                className={`p-1 border-2 transition-all ${needsComment ? "border-[#862200] text-[#862200] bg-[#fdece6] hover:bg-[#fbddd3]" : comment ? "border-[#191c1e] text-[#191c1e] bg-[#ccff00] hover:bg-[#b8e600]" : "border-[#191c1e] text-[#747a60] bg-white hover:bg-[#f0f2e8]"}`}
+                                onClick={() => {
+                                  const next = { ...conformityForm, [item.key]: true };
+                                  setConformityForm(next);
+                                  setConformity.mutate({ id, data: { [item.key]: true } });
+                                }}
+                                className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                               >
-                                <MessageSquare size={13} />
+                                Sim
                               </button>
-                            </>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = { ...conformityForm, [item.key]: false };
+                                  setConformityForm(next);
+                                  setConformity.mutate({ id, data: { [item.key]: false } });
+                                }}
+                                className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >
+                                Não
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = { ...conformityForm, [item.key]: null };
+                                  setConformityForm(next);
+                                  setConformity.mutate({ id, data: { [item.key]: null } });
+                                }}
+                                className={`px-2.5 py-1 text-[11px] font-black italic uppercase transition-all ${value === null ? "bg-[#f5e97a] text-[#4a3c00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >
+                                Pendente
+                              </button>
+                            </div>
                           ) : (
                             <span className={`text-[11px] font-black italic uppercase px-2.5 py-1 border-2 border-[#191c1e] ${value === true ? "bg-[#ccff00] text-[#161e00]" : value === false ? "bg-[#862200] text-white" : "bg-[#f5e97a] text-[#4a3c00]"}`}>
                               {value === true ? "Sim" : value === false ? "Não" : "Pendente"}
                             </span>
                           )}
                         </div>
+                        {canManage ? (
+                          <div className="pl-2 py-2 flex items-center justify-end">
+                            <button
+                              type="button"
+                              title={comment ? "Ver / editar comentário" : "Adicionar comentário"}
+                              onClick={() => setExpandedComments(prev => {
+                                const next = new Set(prev);
+                                if (next.has(item.key)) next.delete(item.key); else next.add(item.key);
+                                return next;
+                              })}
+                              className={`p-1 border-2 transition-all ${needsComment ? "border-[#862200] text-[#862200] bg-[#fdece6] hover:bg-[#fbddd3]" : comment ? "border-[#191c1e] text-[#191c1e] bg-[#ccff00] hover:bg-[#b8e600]" : "border-[#191c1e] text-[#747a60] bg-white hover:bg-[#f0f2e8]"}`}
+                            >
+                              <MessageSquare size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div />
+                        )}
                       </div>
                       {isExpanded && canManage && (
                         <div className="mt-2 p-3 bg-[#fefcf0] border border-[#d4c98a] space-y-2">
