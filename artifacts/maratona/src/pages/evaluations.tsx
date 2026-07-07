@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -14,6 +14,8 @@ import { useAuth } from "@/lib/auth-context";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
+import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions } from "@/lib/routing-api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -182,6 +184,16 @@ export default function EvaluationsPage() {
     query: { enabled: !!selectedEventId && isManager, queryKey: ["event-result-eval", selectedEventId] as unknown[] },
   });
 
+  // Criterion assignments for the selected event (new routing system)
+  const { data: criterionAssignments } = useEventCriterionAssignments(selectedEventId ?? 0);
+  const patchCriterionAssignment = usePatchCriterionAssignment(selectedEventId ?? 0);
+  const [redirectDialogCriterionId, setRedirectDialogCriterionId] = useState<number | null>(null);
+  const [redirectTargetId, setRedirectTargetId] = useState<number | null>(null);
+  const { data: redirectOptionsData } = useRedirectOptions(
+    selectedEventId ?? 0,
+    redirectDialogCriterionId ?? 0,
+  );
+
   const createMutation = useCreateEvaluation({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: evalsQKey }),
@@ -346,7 +358,16 @@ export default function EvaluationsPage() {
       .filter(a => a.evaluatorUserId === user?.id)
       .map(a => a.areaId),
   );
-  const myCriteria = activeCriteria.filter(c => c.responsibleAreaId != null && myAssignedAreaIds.has(c.responsibleAreaId));
+  // Also include criteria directly assigned to this user via the routing system
+  const myDirectCriterionIds = new Set(
+    (criterionAssignments ?? [])
+      .filter(a => a.assignedToId === user?.id && (a.status === "confirmed" || a.status === "suggested"))
+      .map(a => a.criterionId),
+  );
+  const myCriteria = activeCriteria.filter(c =>
+    (c.responsibleAreaId != null && myAssignedAreaIds.has(c.responsibleAreaId)) ||
+    myDirectCriterionIds.has(c.criterionId),
+  );
 
   // Avaliadores atribuídos a cada área (evento → área → avaliador[]); pode haver
   // mais de um por área — a nota final é a média entre eles.
@@ -1119,12 +1140,32 @@ export default function EvaluationsPage() {
                                   />
                                 </div>
 
-                                <div className="flex justify-end pt-3">
+                                <div className="flex items-center justify-between pt-3 gap-3 flex-wrap">
+                                  {/* Redirect button — only for criteria with routing assignments and no submission yet */}
+                                  {(redirectOptionsData?.length ?? 0) > 0 && redirectDialogCriterionId === null && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
+                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                                    >
+                                      <CornerDownRight size={14} /> Redirecionar
+                                    </button>
+                                  )}
+                                  {/* Always-visible redirect button when this criterion has an assignment */}
+                                  {myDirectCriterionIds.has(c.criterionId) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
+                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                                    >
+                                      <CornerDownRight size={14} /> Redirecionar Critério
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
                                     disabled={score === 0 || needsAudio}
                                     data-testid={`button-save-draft-${c.criterionId}`}
-                                    className="bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
+                                    className="ml-auto bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                                   >
                                     <Save size={14} />
                                     {isDraft ? "Atualizar Rascunho" : "Salvar Rascunho"}
@@ -1385,6 +1426,72 @@ export default function EvaluationsPage() {
           </div>
         )}
       </div>
+
+      {/* Redirect dialog — avaliador passes a criterion to another eligible user */}
+      <Dialog open={redirectDialogCriterionId !== null} onOpenChange={(v) => { if (!v) { setRedirectDialogCriterionId(null); setRedirectTargetId(null); } }}>
+        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-xl italic uppercase font-black tracking-tight flex items-center gap-2">
+              <CornerDownRight size={18} /> Redirecionar Critério
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm italic text-[#444933]">
+              Selecione para quem deseja redirecionar esta avaliação. O critério será reatribuído ao usuário escolhido.
+            </p>
+            {(redirectOptionsData?.length ?? 0) === 0 ? (
+              <div className="text-center py-6 border-2 border-dashed border-[#eceef0] italic font-bold text-[#747a60] text-xs uppercase">
+                Nenhuma opção de redirecionamento disponível para este critério.
+              </div>
+            ) : (
+              <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-56 overflow-y-auto">
+                {(redirectOptionsData ?? []).map((opt: { id: number; name: string }) => (
+                  <label key={opt.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#f2f4f6] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="redirect-target"
+                      checked={redirectTargetId === opt.id}
+                      onChange={() => setRedirectTargetId(opt.id)}
+                      className="h-4 w-4 accent-[#191c1e]"
+                    />
+                    <span className="text-sm font-bold italic uppercase">{opt.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 pt-4">
+            <button
+              type="button"
+              onClick={() => { setRedirectDialogCriterionId(null); setRedirectTargetId(null); }}
+              className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={redirectTargetId === null || patchCriterionAssignment.isPending}
+              onClick={() => {
+                if (!redirectDialogCriterionId || !redirectTargetId) return;
+                patchCriterionAssignment.mutate(
+                  { criterionId: redirectDialogCriterionId, assignedToId: redirectTargetId, action: "redirect" },
+                  {
+                    onSuccess: () => {
+                      toast({ title: "Critério redirecionado com sucesso" });
+                      setRedirectDialogCriterionId(null);
+                      setRedirectTargetId(null);
+                    },
+                    onError: (e: Error) => toast({ title: "Erro ao redirecionar", description: e.message, variant: "destructive" }),
+                  },
+                );
+              }}
+              className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
+            >
+              {patchCriterionAssignment.isPending ? "Redirecionando..." : "Confirmar Redirect"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

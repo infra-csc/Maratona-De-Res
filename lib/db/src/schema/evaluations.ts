@@ -52,6 +52,11 @@ export const eventConformitiesTable = pgTable("event_conformities", {
   estaiamentosComment: text("estaiamentos_comment"),
   guardaEquipamentosComment: text("guarda_equipamentos_comment"),
   condutaComment: text("conduta_comment"),
+  // Cenografia — Q6: "Alguém faltou ou atrasou?" (texto livre, exibido na calibração)
+  absencesReport: text("absences_report"),
+  // Cenografia — Q7: "Destaque profissional?" (sim/não + justificativa → Fred/Frederico)
+  standoutResponse: boolean("standout_response"),
+  standoutJustification: text("standout_justification"),
   createdByUserId: integer("created_by_user_id").notNull().references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

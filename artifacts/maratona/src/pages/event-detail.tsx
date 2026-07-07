@@ -1,5 +1,9 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
+import {
+  useEventCriterionAssignments, useGenerateCriterionAssignments,
+  usePatchCriterionAssignment, type CriterionAssignment,
+} from "@/lib/routing-api";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw } from "lucide-react";
@@ -11,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
@@ -821,6 +826,13 @@ export default function EventDetailPage() {
     },
   });
 
+  // ----- Atribuições por Critério (novo roteamento) -----
+  const { data: criterionAssignmentsData, isLoading: criterionAssignmentsLoading } = useEventCriterionAssignments(id);
+  const generateAssignments = useGenerateCriterionAssignments(id);
+  const patchAssignment = usePatchCriterionAssignment(id);
+  const [assignPickerOpen, setAssignPickerOpen] = useState<{ criterionId: number; criterionName: string } | null>(null);
+  const [assignPickerValue, setAssignPickerValue] = useState<number | null>(null);
+
   if (isLoading) {
     return (
       <div className="bg-[#f7f9fb] min-h-full p-6 md:p-10 max-w-6xl mx-auto space-y-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1607,6 +1619,160 @@ export default function EventDetailPage() {
             </div>
           </section>
         )}
+
+        {/* Atribuições por Critério — novo sistema de roteamento */}
+        {canManage && !event.isHistorical && (
+          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
+              <div className="flex items-center gap-2">
+                <UserCheck size={18} />
+                <span className="font-black uppercase tracking-tight">Atribuições por Critério</span>
+              </div>
+              <button
+                type="button"
+                disabled={generateAssignments.isPending}
+                onClick={() => generateAssignments.mutate(undefined, {
+                  onSuccess: (r) => toast({ title: `${r.generated} atribuição(ões) gerada(s)${r.skipped ? `, ${r.skipped} já existiam` : ""}` }),
+                  onError: (e: Error) => toast({ title: "Erro ao gerar atribuições", description: e.message, variant: "destructive" }),
+                })}
+                className="flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1.5 text-[11px] font-black uppercase italic disabled:opacity-50"
+              >
+                <RefreshCw size={12} className={generateAssignments.isPending ? "animate-spin" : ""} />
+                {generateAssignments.isPending ? "Gerando..." : "Gerar Sugestões"}
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm italic text-[#444933]">
+                Define <strong>qual avaliador</strong> preenche cada critério. Use <em>Gerar Sugestões</em> para pré-preencher com os defaults do roteamento e depois confirme ou ajuste individualmente.
+              </p>
+
+              {criterionAssignmentsLoading ? (
+                <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs">Carregando atribuições...</div>
+              ) : !criterionAssignmentsData || criterionAssignmentsData.length === 0 ? (
+                <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs border-2 border-dashed border-[#eceef0]">
+                  Nenhuma atribuição gerada ainda. Clique em &ldquo;Gerar Sugestões&rdquo; para criar automaticamente.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border-2 border-[#191c1e]">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Critério</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Avaliador Atribuído</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-center">Status</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-[#eceef0]">
+                      {criterionAssignmentsData.map((a: CriterionAssignment) => {
+                        const statusColors: Record<string, string> = {
+                          pending: "bg-[#f2f4f6] text-[#747a60]",
+                          suggested: "bg-[#fff4c2] text-[#5c4a00]",
+                          confirmed: "bg-[#d4edda] text-[#155724]",
+                          submitted: "bg-[#506600] text-[#ccff00]",
+                        };
+                        const statusLabels: Record<string, string> = {
+                          pending: "Pendente", suggested: "Sugerido", confirmed: "Confirmado", submitted: "Submetido",
+                        };
+                        return (
+                          <tr key={a.criterionId} className="bg-white hover:bg-[#f7f9fb] transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="font-black italic uppercase text-sm text-[#191c1e]">{a.criterionName ?? `#${a.criterionId}`}</span>
+                              {a.redirectedFromId && (
+                                <p className="text-[10px] font-bold italic text-[#747a60] mt-0.5">Redirecionado</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {a.assignedToName ? (
+                                <span className="text-sm font-bold italic text-[#191c1e]">{a.assignedToName}</span>
+                              ) : (
+                                <span className="text-sm italic text-[#ba1a1a] font-bold">— Sem atribuição</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-1 text-[10px] font-black italic uppercase ${statusColors[a.status] ?? statusColors.pending}`}>
+                                {statusLabels[a.status] ?? a.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {a.status !== "submitted" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAssignPickerOpen({ criterionId: a.criterionId, criterionName: a.criterionName ?? `Critério ${a.criterionId}` });
+                                    setAssignPickerValue(a.assignedToId);
+                                  }}
+                                  className="px-3 py-1.5 border-2 border-[#191c1e] bg-white text-[11px] font-black italic uppercase hover:bg-[#eceef0] transition-colors"
+                                >
+                                  {a.status === "confirmed" ? "Reatribuir" : "Confirmar"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Dialog: Confirmar/Reatribuir avaliador */}
+        <Dialog open={assignPickerOpen !== null} onOpenChange={(v) => { if (!v) setAssignPickerOpen(null); }}>
+          <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+            <DialogHeader>
+              <DialogTitle className="text-xl italic uppercase font-black tracking-tight">
+                Atribuir Avaliador — {assignPickerOpen?.criterionName}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <p className="text-sm italic text-[#444933]">Selecione o avaliador que irá avaliar este critério neste evento.</p>
+              <Select
+                value={assignPickerValue != null ? String(assignPickerValue) : "__none"}
+                onValueChange={(v) => setAssignPickerValue(v === "__none" ? null : parseInt(v))}
+              >
+                <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs">
+                  <SelectValue placeholder="Selecione o avaliador..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">— Sem atribuição</SelectItem>
+                  {evaluators.map(u => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="gap-2 pt-4">
+              <button
+                type="button"
+                onClick={() => setAssignPickerOpen(null)}
+                className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={patchAssignment.isPending}
+                onClick={() => {
+                  if (!assignPickerOpen) return;
+                  patchAssignment.mutate(
+                    { criterionId: assignPickerOpen.criterionId, assignedToId: assignPickerValue, action: "confirm" },
+                    {
+                      onSuccess: () => { toast({ title: "Atribuição confirmada" }); setAssignPickerOpen(null); },
+                      onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+                    },
+                  );
+                }}
+                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
+              >
+                {patchAssignment.isPending ? "Salvando..." : "Confirmar"}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Eventos históricos/importados: sem atribuição de avaliadores — só observações importadas + mural de comentários */}
         {event.isHistorical && (

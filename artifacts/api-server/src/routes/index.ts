@@ -22,6 +22,7 @@ import eligibilityRouter from "./eligibility.js";
 import reviewRequestsRouter from "./review-requests.js";
 import storageRouter from "./storage.js";
 import cyclesRouter from "./cycles.js";
+import routingRouter from "./routing.js";
 
 const router: IRouter = Router();
 
@@ -38,6 +39,7 @@ router.use(storageRouter);
 // otherwise those guards 403 the current-cycle read for non-admin roles
 // (avaliador/colaborador) that need it on my-performance, etc.
 router.use(cyclesRouter);
+router.use(routingRouter);
 router.use(usersRouter);
 router.use(areasRouter);
 router.use(employeesRouter);

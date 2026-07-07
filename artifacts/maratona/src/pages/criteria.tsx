@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetCriteria, useCreateCriterion, useUpdateCriterion, useGetAreas, useResyncAllEventsCriteria, getGetCriteriaQueryKey } from "@workspace/api-client-react";
+import { useGetCriteria, useCreateCriterion, useUpdateCriterion, useGetAreas, useResyncAllEventsCriteria, useGetUsers, getGetCriteriaQueryKey } from "@workspace/api-client-react";
 import type { CriterionInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw } from "lucide-react";
+import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck } from "lucide-react";
+import { useAllCriterionRoutings, useSaveCriterionRouting } from "@/lib/routing-api";
+import type { CriterionRouting } from "@/lib/routing-api";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -68,14 +70,152 @@ function CriterionWeightCell({
   );
 }
 
+function RoutingConfigDialog({
+  criterionId, criterionName, currentRouting, areas, evaluators, onClose,
+}: {
+  criterionId: number;
+  criterionName: string;
+  currentRouting: CriterionRouting | undefined;
+  areas: { id: number; name: string }[];
+  evaluators: { id: number; name: string }[];
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const saveMutation = useSaveCriterionRouting(criterionId);
+
+  const [defaultEvaluatorId, setDefaultEvaluatorId] = useState<number | null>(currentRouting?.defaultEvaluatorId ?? null);
+  const [redirectMode, setRedirectMode] = useState<"none" | "area" | "specific">(currentRouting?.redirectMode ?? "none");
+  const [redirectAreaId, setRedirectAreaId] = useState<number | null>(currentRouting?.redirectAreaId ?? null);
+  const [selectedRedirectUsers, setSelectedRedirectUsers] = useState<Set<number>>(
+    new Set(currentRouting?.redirectUsers?.map(u => u.id) ?? []),
+  );
+
+  const toggleRedirectUser = (userId: number) => {
+    setSelectedRedirectUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    saveMutation.mutate({
+      defaultEvaluatorId,
+      redirectMode,
+      redirectAreaId: redirectMode === "area" ? redirectAreaId : null,
+      redirectUserIds: redirectMode === "specific" ? Array.from(selectedRedirectUsers) : undefined,
+    }, {
+      onSuccess: () => { toast({ title: "Roteamento salvo" }); onClose(); },
+      onError: (e: Error) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="space-y-5 pt-2">
+      <div className="space-y-2">
+        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Avaliador Padrão</Label>
+        <p className="text-[11px] text-[#747a60] italic">Avaliador pré-selecionado quando atribuições forem geradas para este critério.</p>
+        <Select
+          value={defaultEvaluatorId != null ? String(defaultEvaluatorId) : "__none"}
+          onValueChange={v => setDefaultEvaluatorId(v === "__none" ? null : parseInt(v))}
+        >
+          <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+            <SelectValue placeholder="Selecione o avaliador padrão..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none">— Sem padrão</SelectItem>
+            {evaluators.map(u => (
+              <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Modo de Redirecionamento</Label>
+        <p className="text-[11px] text-[#747a60] italic">Quando o avaliador atribuído não pode avaliar, para onde pode redirecionar?</p>
+        <Select value={redirectMode} onValueChange={v => setRedirectMode(v as "none" | "area" | "specific")}>
+          <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sem redirecionamento</SelectItem>
+            <SelectItem value="area">Qualquer usuário da área</SelectItem>
+            <SelectItem value="specific">Usuários específicos</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {redirectMode === "area" && (
+        <div className="space-y-2">
+          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Área de Redirecionamento</Label>
+          <Select
+            value={redirectAreaId != null ? String(redirectAreaId) : "__none"}
+            onValueChange={v => setRedirectAreaId(v === "__none" ? null : parseInt(v))}
+          >
+            <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+              <SelectValue placeholder="Selecione a área..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none">— Selecione</SelectItem>
+              {areas.map(a => (
+                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {redirectMode === "specific" && (
+        <div className="space-y-2">
+          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Usuários Permitidos para Redirect</Label>
+          <div className="border-2 border-[#191c1e] max-h-48 overflow-y-auto divide-y-2 divide-[#eceef0]">
+            {evaluators.map(u => (
+              <label key={u.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#f2f4f6] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedRedirectUsers.has(u.id)}
+                  onChange={() => toggleRedirectUser(u.id)}
+                  className="h-4 w-4 accent-[#191c1e]"
+                />
+                <span className="text-sm font-bold italic uppercase">{u.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+        <button type="button" onClick={onClose} className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          disabled={saveMutation.isPending}
+          onClick={handleSave}
+          className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
+        >
+          {saveMutation.isPending ? "Salvando..." : "Salvar Roteamento"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function CriteriaPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [routingDialogId, setRoutingDialogId] = useState<number | null>(null);
 
   const qKey = getGetCriteriaQueryKey();
   const { data: criteria, isLoading } = useGetCriteria({ query: { queryKey: qKey } });
   const { data: areas } = useGetAreas();
+  const { data: usersList } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
+  const { data: routings } = useAllCriterionRoutings();
+
+  const evaluators = (usersList ?? []).filter(u => u.role === "avaliador" && u.active);
+  const routingMap = new Map((routings ?? []).map(r => [r.criterionId, r]));
 
   const { register, handleSubmit, reset, setValue } = useForm<CriterionInput>({
     defaultValues: { defaultWeight: 3 },
@@ -120,11 +260,8 @@ export default function CriteriaPage() {
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
   const totalWeight = activeCriteria.reduce((s, c) => s + Number(c.defaultWeight), 0);
-  // Não existe uma meta fixa global: cada evento define seu próprio alvo de
-  // soma de pesos a partir dos critérios ativos no momento em que foi criado
-  // (ver event-detail.tsx / targetWeightSum). Esta soma aqui é apenas
-  // informativa — o que valer quando um evento novo for criado vira o alvo
-  // daquele evento.
+
+  const routingCriterion = routingDialogId != null ? (criteria ?? []).find(c => c.id === routingDialogId) : null;
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -138,7 +275,7 @@ export default function CriteriaPage() {
             <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
               Critérios de Avaliação
             </h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2">Configure os quesitos de avaliação e seus respectivos pesos.</p>
+            <p className="text-base md:text-lg text-[#444933] italic mt-2">Configure os quesitos de avaliação, seus respectivos pesos e roteamento de avaliadores.</p>
           </div>
 
           {/* Metric Card: Soma dos Pesos */}
@@ -161,7 +298,7 @@ export default function CriteriaPage() {
           </div>
         </section>
 
-        {/* Create criterion dialog */}
+        {/* Actions */}
         <section className="flex justify-end gap-3">
           <button
             type="button"
@@ -238,52 +375,75 @@ export default function CriteriaPage() {
                 <thead>
                   <tr className="bg-[#191c1e] text-[#ccff00]">
                     <th className="px-6 py-4 text-xs font-bold uppercase italic">Critério & Descrição</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic">Área Responsável</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic">Área</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-center">Peso</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic">Avaliador Padrão</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
-                  {(criteria ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => (
-                    <tr key={c.id} data-testid={`row-criterion-${c.id}`} className={`hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group ${!c.active ? 'opacity-60' : ''}`}>
-                      <td className="px-6 py-4">
-                        <p className="font-bold italic uppercase text-[#191c1e] group-hover:text-[#506600] transition-colors">{c.name}</p>
-                        {c.description && <p className="text-xs text-[#747a60] mt-1 max-w-md leading-relaxed">{c.description}</p>}
-                      </td>
-                      <td className="px-6 py-4">
-                        {c.responsibleAreaName ? (
-                          <span className="bg-[#eceef0] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1.5 skew-x-[8deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[#c4c9ac]">—</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <CriterionWeightCell
-                          criterionId={c.id}
-                          weight={Number(c.defaultWeight)}
-                          isSaving={updateMutation.isPending}
-                          onSave={(value) => updateMutation.mutate({ id: c.id, data: { defaultWeight: value } })}
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          <span className={`text-xs font-bold uppercase italic ${c.active ? 'text-[#506600]' : 'text-[#747a60]'}`}>
-                            {c.active ? 'Ativo' : 'Inativo'}
-                          </span>
-                          <Switch
-                            data-testid={`switch-criterion-${c.id}`}
-                            checked={c.active}
-                            onCheckedChange={v => updateMutation.mutate({ id: c.id, data: { active: v } })}
-                            className="data-[state=checked]:bg-[#506600]"
+                  {(criteria ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => {
+                    const routing = routingMap.get(c.id);
+                    return (
+                      <tr key={c.id} data-testid={`row-criterion-${c.id}`} className={`hover:bg-[#f2f4f6] transition-all group ${!c.active ? 'opacity-60' : ''}`}>
+                        <td className="px-6 py-4">
+                          <p className="font-bold italic uppercase text-[#191c1e] group-hover:text-[#506600] transition-colors">{c.name}</p>
+                          {c.description && <p className="text-xs text-[#747a60] mt-1 max-w-md leading-relaxed">{c.description}</p>}
+                        </td>
+                        <td className="px-6 py-4">
+                          {c.responsibleAreaName ? (
+                            <span className="bg-[#eceef0] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1.5 skew-x-[8deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[#c4c9ac]">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <CriterionWeightCell
+                            criterionId={c.id}
+                            weight={Number(c.defaultWeight)}
+                            isSaving={updateMutation.isPending}
+                            onSave={(value) => updateMutation.mutate({ id: c.id, data: { defaultWeight: value } })}
                           />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            type="button"
+                            onClick={() => setRoutingDialogId(c.id)}
+                            className="flex items-center gap-2 group/routing"
+                            title="Configurar roteamento de avaliador"
+                          >
+                            {routing?.defaultEvaluatorName ? (
+                              <span className="flex items-center gap-1.5 text-sm font-bold italic text-[#191c1e] group-hover/routing:text-[#506600] transition-colors">
+                                <UserCheck size={13} className="text-[#506600]" />
+                                {routing.defaultEvaluatorName}
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#c4c9ac] group-hover/routing:text-[#506600] transition-colors">
+                                <Route size={12} /> Configurar
+                              </span>
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <span className={`text-xs font-bold uppercase italic ${c.active ? 'text-[#506600]' : 'text-[#747a60]'}`}>
+                              {c.active ? 'Ativo' : 'Inativo'}
+                            </span>
+                            <Switch
+                              data-testid={`switch-criterion-${c.id}`}
+                              checked={c.active}
+                              onCheckedChange={v => updateMutation.mutate({ id: c.id, data: { active: v } })}
+                              className="data-[state=checked]:bg-[#506600]"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {(!criteria || criteria.length === 0) && (
-                    <tr><td colSpan={4} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério configurado.</td></tr>
+                    <tr><td colSpan={5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério configurado.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -292,6 +452,28 @@ export default function CriteriaPage() {
         )}
       </div>
 
+      {/* Routing config dialog */}
+      <Dialog open={routingDialogId !== null} onOpenChange={(v) => { if (!v) setRoutingDialogId(null); }}>
+        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-xl italic uppercase font-black tracking-tight flex items-center gap-2">
+              <Route size={18} /> Roteamento — {routingCriterion?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {routingDialogId !== null && routingCriterion && (
+            <RoutingConfigDialog
+              criterionId={routingDialogId}
+              criterionName={routingCriterion.name}
+              currentRouting={routingMap.get(routingDialogId)}
+              areas={areas ?? []}
+              evaluators={evaluators}
+              onClose={() => setRoutingDialogId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Resync summary dialog */}
       <Dialog open={resyncSummary != null} onOpenChange={(v) => { if (!v) setResyncSummary(null); }}>
         <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
           <DialogHeader>

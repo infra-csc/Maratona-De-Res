@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable } from "@workspace/db";
+import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -22,13 +22,26 @@ function isValidAudioPath(value: unknown): value is string {
 }
 
 async function isAssignedForCriterion(eventId: number, criterionId: number, userId: number): Promise<boolean> {
+  // 1. Check direct criterion assignment (novo sistema de roteamento por critério)
+  const [criterionAssignment] = await db
+    .select({ id: eventCriterionAssignmentsTable.id })
+    .from(eventCriterionAssignmentsTable)
+    .where(and(
+      eq(eventCriterionAssignmentsTable.eventId, eventId),
+      eq(eventCriterionAssignmentsTable.criterionId, criterionId),
+      eq(eventCriterionAssignmentsTable.assignedToId, userId),
+    ))
+    .limit(1);
+  if (criterionAssignment) return true;
+
+  // 2. Fallback: check area-level assignment (sistema legado evento→área→avaliador)
   const [crit] = await db
     .select({ areaId: criteriaTable.responsibleAreaId })
     .from(criteriaTable)
     .where(eq(criteriaTable.id, criterionId))
     .limit(1);
   if (!crit || crit.areaId == null) return false;
-  const [assignment] = await db
+  const [areaAssignment] = await db
     .select({ id: eventAreaAssignmentsTable.id })
     .from(eventAreaAssignmentsTable)
     .where(and(
@@ -37,7 +50,7 @@ async function isAssignedForCriterion(eventId: number, criterionId: number, user
       eq(eventAreaAssignmentsTable.evaluatorUserId, userId),
     ))
     .limit(1);
-  return !!assignment;
+  return !!areaAssignment;
 }
 
 /**
