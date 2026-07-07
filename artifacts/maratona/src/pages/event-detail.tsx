@@ -1176,13 +1176,20 @@ export default function EventDetailPage() {
                               );
                             }
                             return (
-                              <span className="inline-flex flex-col items-center gap-0.5">
-                                <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-2 py-0.5 border-2 border-[#191c1e]">
-                                  {fmt(imp.score)}
-                                  <span className="text-[10px] font-normal not-italic text-[#444933]">/10</span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="inline-flex flex-col items-center gap-0.5">
+                                  <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-2 py-0.5 border-2 border-[#191c1e]">
+                                    {fmt(imp.score)}
+                                    <span className="text-[10px] font-normal not-italic text-[#444933]">/10</span>
+                                  </span>
+                                  <span className="text-[9px] uppercase font-black italic text-[#9aa088]">importado</span>
                                 </span>
-                                <span className="text-[9px] uppercase font-black italic text-[#9aa088]">importado</span>
-                              </span>
+                                {imp.comment && (
+                                  <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words text-left max-w-[220px] border-l-2 border-[#191c1e] bg-[#f7f9fb] px-2 py-1 mt-0.5">
+                                    {imp.comment}
+                                  </p>
+                                )}
+                              </div>
                             );
                           })()}
                         </td>
