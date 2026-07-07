@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck } from "lucide-react";
+import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle } from "lucide-react";
 import { useAllCriterionRoutings, useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
 
@@ -89,6 +89,8 @@ function RoutingConfigDialog({
   const [selectedRedirectUsers, setSelectedRedirectUsers] = useState<Set<number>>(
     new Set(currentRouting?.redirectUsers?.map(u => u.id) ?? []),
   );
+  const [redirectSearch, setRedirectSearch] = useState("");
+  const [redirectCollapsed, setRedirectCollapsed] = useState(true);
 
   const toggleRedirectUser = (userId: number) => {
     setSelectedRedirectUsers(prev => {
@@ -97,6 +99,12 @@ function RoutingConfigDialog({
       return next;
     });
   };
+
+  const filteredRedirectEvaluators = evaluators.filter(u =>
+    u.name.toLowerCase().includes(redirectSearch.toLowerCase()),
+  );
+
+  const redirectCount = selectedRedirectUsers.size;
 
   const handleSave = () => {
     saveMutation.mutate({
@@ -112,29 +120,41 @@ function RoutingConfigDialog({
 
   return (
     <div className="space-y-5 pt-2">
+      {/* Avaliador Principal */}
       <div className="space-y-2">
-        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Avaliador Padrão</Label>
-        <p className="text-[11px] text-[#747a60] italic">Avaliador pré-selecionado quando atribuições forem geradas para este critério.</p>
+        <div className="flex items-center gap-2">
+          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Avaliador Principal</Label>
+          <span className="bg-[#ccff00] border border-[#506600] px-1.5 py-0.5 text-[9px] font-black uppercase italic tracking-wider text-[#191c1e]">Obrigatório</span>
+        </div>
+        <p className="text-[11px] text-[#747a60] italic">Responsável padrão por este critério. Pré-selecionado ao gerar atribuições para um evento.</p>
         <Select
           value={defaultEvaluatorId != null ? String(defaultEvaluatorId) : "__none"}
           onValueChange={v => setDefaultEvaluatorId(v === "__none" ? null : parseInt(v))}
         >
-          <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
-            <SelectValue placeholder="Selecione o avaliador padrão..." />
+          <SelectTrigger className={`h-11 rounded-none border-2 font-bold italic uppercase text-xs focus:ring-0 ${defaultEvaluatorId == null ? "border-[#e55050] bg-[#fff5f5]" : "border-[#191c1e]"}`}>
+            <SelectValue placeholder="Selecione o avaliador principal..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__none">— Sem padrão</SelectItem>
+            <SelectItem value="__none">— Sem avaliador principal</SelectItem>
             {evaluators.map(u => (
-              <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+              <SelectItem key={u.id} value={String(u.id)}>
+                <span className="flex items-center gap-2"><UserCheck size={13} className="text-[#506600]" />{u.name}</span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {defaultEvaluatorId == null && (
+          <p className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#e55050]">
+            <AlertCircle size={12} /> Sem avaliador principal definido
+          </p>
+        )}
       </div>
 
-      <div className="space-y-2">
-        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Modo de Redirecionamento</Label>
-        <p className="text-[11px] text-[#747a60] italic">Quando o avaliador atribuído não pode avaliar, para onde pode redirecionar?</p>
-        <Select value={redirectMode} onValueChange={v => setRedirectMode(v as "none" | "area" | "specific")}>
+      {/* Redirecionamento */}
+      <div className="space-y-2 border-t-2 border-[#eceef0] pt-4">
+        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Pode Redirecionar Para</Label>
+        <p className="text-[11px] text-[#747a60] italic">Quando o principal não puder avaliar, para onde pode redirecionar?</p>
+        <Select value={redirectMode} onValueChange={v => { setRedirectMode(v as "none" | "area" | "specific"); setRedirectCollapsed(true); }}>
           <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
             <SelectValue />
           </SelectTrigger>
@@ -168,20 +188,53 @@ function RoutingConfigDialog({
 
       {redirectMode === "specific" && (
         <div className="space-y-2">
-          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Usuários Permitidos para Redirect</Label>
-          <div className="border-2 border-[#191c1e] max-h-48 overflow-y-auto divide-y-2 divide-[#eceef0]">
-            {evaluators.map(u => (
-              <label key={u.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#f2f4f6] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedRedirectUsers.has(u.id)}
-                  onChange={() => toggleRedirectUser(u.id)}
-                  className="h-4 w-4 accent-[#191c1e]"
+          {/* Collapsible header */}
+          <button
+            type="button"
+            onClick={() => setRedirectCollapsed(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-[#f2f4f6] border-2 border-[#191c1e] hover:bg-[#eceef0] transition-colors"
+          >
+            <span className="flex items-center gap-2 font-bold italic uppercase text-xs text-[#444933]">
+              <Users size={13} />
+              {redirectCount === 0
+                ? "Nenhum avaliador de backup selecionado"
+                : `${redirectCount} avaliador${redirectCount > 1 ? "es" : ""} de backup selecionado${redirectCount > 1 ? "s" : ""}`}
+            </span>
+            {redirectCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+
+          {!redirectCollapsed && (
+            <div className="border-2 border-[#191c1e] border-t-0">
+              {/* Search */}
+              <div className="px-3 py-2 border-b-2 border-[#eceef0] bg-white">
+                <Input
+                  placeholder="Buscar avaliador..."
+                  value={redirectSearch}
+                  onChange={e => setRedirectSearch(e.target.value)}
+                  className="h-8 rounded-none border-[#c4c9ac] text-sm focus-visible:ring-0"
                 />
-                <span className="text-sm font-bold italic uppercase">{u.name}</span>
-              </label>
-            ))}
-          </div>
+              </div>
+              {/* List */}
+              <div className="max-h-44 overflow-y-auto divide-y-2 divide-[#eceef0]">
+                {filteredRedirectEvaluators.length === 0 ? (
+                  <p className="px-4 py-3 text-xs italic text-[#747a60]">Nenhum resultado para "{redirectSearch}"</p>
+                ) : filteredRedirectEvaluators.map(u => (
+                  <label key={u.id} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${selectedRedirectUsers.has(u.id) ? "bg-[#f5ffe0]" : "hover:bg-[#f2f4f6]"}`}>
+                    <input
+                      type="checkbox"
+                      checked={selectedRedirectUsers.has(u.id)}
+                      onChange={() => toggleRedirectUser(u.id)}
+                      className="h-4 w-4 accent-[#506600]"
+                    />
+                    <span className="text-sm font-bold italic uppercase">{u.name}</span>
+                    {u.id === defaultEvaluatorId && (
+                      <span className="ml-auto text-[9px] font-black uppercase italic bg-[#ccff00] px-1.5 py-0.5 border border-[#506600] text-[#191c1e]">Principal</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -444,17 +497,30 @@ export default function CriteriaPage() {
                           <button
                             type="button"
                             onClick={() => setRoutingDialogId(c.id)}
-                            className="flex items-center gap-2 group/routing"
+                            className="flex flex-col items-start gap-1 group/routing"
                             title="Configurar roteamento de avaliador"
                           >
                             {routing?.defaultEvaluatorName ? (
-                              <span className="flex items-center gap-1.5 text-sm font-bold italic text-[#191c1e] group-hover/routing:text-[#506600] transition-colors">
-                                <UserCheck size={13} className="text-[#506600]" />
-                                {routing.defaultEvaluatorName}
-                              </span>
+                              <>
+                                <span className="flex items-center gap-1.5 text-sm font-bold italic text-[#191c1e] group-hover/routing:text-[#506600] transition-colors">
+                                  <UserCheck size={13} className="text-[#506600]" />
+                                  {routing.defaultEvaluatorName}
+                                </span>
+                                {routing.redirectMode === "specific" && (routing.redirectUsers?.length ?? 0) > 0 && (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold italic uppercase text-[#747a60] group-hover/routing:text-[#506600] transition-colors">
+                                    <Users size={10} />
+                                    {routing.redirectUsers!.length} backup{routing.redirectUsers!.length > 1 ? "s" : ""}
+                                  </span>
+                                )}
+                                {routing.redirectMode === "area" && routing.redirectAreaName && (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold italic uppercase text-[#747a60] group-hover/routing:text-[#506600] transition-colors">
+                                    <Route size={10} /> {routing.redirectAreaName}
+                                  </span>
+                                )}
+                              </>
                             ) : (
-                              <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#c4c9ac] group-hover/routing:text-[#506600] transition-colors">
-                                <Route size={12} /> Configurar
+                              <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#e55050] group-hover/routing:text-[#c03030] transition-colors">
+                                <AlertCircle size={12} /> Sem avaliador
                               </span>
                             )}
                           </button>
