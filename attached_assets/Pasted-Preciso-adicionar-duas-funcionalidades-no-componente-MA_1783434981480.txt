@@ -1,0 +1,24 @@
+Preciso adicionar duas funcionalidades no componente "MATRIZ DE CONFORMIDADE", mantendo a paleta de cores atual (preto/lima, cards brancos):
+
+1. STATUS COM 3 OPÇÕES (ao invés de só "SIM" fixo)
+   Cada item da matriz (Uso de EPI, Estaiamentos/Aterramentos, Guarda de Equipamentos, Conduta) deve ter um seletor com 3 opções:
+   - SIM (fundo lima, como está hoje)
+   - NÃO (fundo vermelho/vinho, mantendo o padrão de cor já usado em outras telas do sistema para estados negativos)
+   - PENDENTE (fundo amarelo/neutro, ex: cinza claro ou amarelo claro, para indicar "ainda não avaliado")
+   
+   Pode ser implementado como:
+   - um grupo de 3 botões pequenos lado a lado (toggle group), ou
+   - um dropdown/select com as 3 opções
+   Prefira o toggle de 3 botões, pois é mais rápido de usar e mantém o estilo visual de "badge" que já existe.
+
+2. CAMPO DE COMENTÁRIO POR ITEM
+   Ao lado ou abaixo de cada linha da matriz, adicionar um ícone de comentário (💬) que, ao clicar, expande um campo de texto (textarea) para justificativa/observação daquele item específico — seguindo o mesmo padrão visual já usado na tela "Equipe Alocada" (caixa com fundo creme, borda fina, botão "SALVAR COMENTÁRIO" em lima).
+   - O campo de comentário deve ficar oculto por padrão e só aparecer ao clicar no ícone, para não poluir a matriz visualmente.
+   - Se o status for "PENDENTE" ou "NÃO", seria interessante o campo de comentário já vir sugerido/obrigatório (ex: destacar com borda vermelha se estiver vazio), similar ao padrão de "DIÁRIAS PREVISTAS NÃO CUMPRIDAS — JUSTIFIQUE" já usado no sistema.
+
+3. LAYOUT
+   - Cada linha da matriz deve manter o alinhamento atual (nome do item à esquerda, status à direita).
+   - O ícone de comentário pode ficar ao lado do botão de status, ou em uma nova coluna à direita.
+   - Ao expandir o comentário de um item, a linha deve crescer para acomodar o campo, sem quebrar o alinhamento das outras linhas (evitar o mesmo problema que já corrigimos na tela de Equipe Alocada).
+
+Mantenha a fonte, ícones e cores já usados no sistema (preto, lima, vinho, creme).

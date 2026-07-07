@@ -588,12 +588,18 @@ export default function EventDetailPage() {
       onError: () => toast({ title: "Erro ao salvar conformidade", variant: "destructive" }),
     },
   });
-  const [conformityForm, setConformityForm] = useState<{ epi: boolean; estaiamentos: boolean; guardaEquipamentos: boolean; conduta: boolean }>({ epi: true, estaiamentos: true, guardaEquipamentos: true, conduta: true });
-  const conformityItems = [
-    { key: "epi" as const, label: "Uso de EPI" },
-    { key: "estaiamentos" as const, label: "Estaiamentos / Aterramentos" },
-    { key: "guardaEquipamentos" as const, label: "Guarda de Equipamentos" },
-    { key: "conduta" as const, label: "Conduta" },
+  type ConformityKey = "epi" | "estaiamentos" | "guardaEquipamentos" | "conduta";
+  type ConformityCommentKey = "epiComment" | "estaiamentosComment" | "guardaEquipamentosComment" | "condutaComment";
+  const [conformityForm, setConformityForm] = useState<{
+    epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
+    epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
+  }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "" });
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const conformityItems: { key: ConformityKey; label: string; commentKey: ConformityCommentKey }[] = [
+    { key: "epi", label: "Uso de EPI", commentKey: "epiComment" },
+    { key: "estaiamentos", label: "Estaiamentos / Aterramentos", commentKey: "estaiamentosComment" },
+    { key: "guardaEquipamentos", label: "Guarda de Equipamentos", commentKey: "guardaEquipamentosComment" },
+    { key: "conduta", label: "Conduta", commentKey: "condutaComment" },
   ];
   const importedConformityRatio = useMemo(
     () => (event?.isHistorical && event.importedNotes ? parseImportedConformityRatio(event.importedNotes) : null),
@@ -610,18 +616,23 @@ export default function EventDetailPage() {
   useEffect(() => {
     if (conformityData) {
       setConformityForm({
-        epi: conformityData.epi,
-        estaiamentos: conformityData.estaiamentos,
-        guardaEquipamentos: conformityData.guardaEquipamentos,
-        conduta: conformityData.conduta,
+        epi: conformityData.epi ?? null,
+        estaiamentos: conformityData.estaiamentos ?? null,
+        guardaEquipamentos: conformityData.guardaEquipamentos ?? null,
+        conduta: conformityData.conduta ?? null,
+        epiComment: conformityData.epiComment ?? "",
+        estaiamentosComment: conformityData.estaiamentosComment ?? "",
+        guardaEquipamentosComment: conformityData.guardaEquipamentosComment ?? "",
+        condutaComment: conformityData.condutaComment ?? "",
       });
     } else if (importedConformityAllValue !== null) {
-      setConformityForm({
+      setConformityForm(f => ({
+        ...f,
         epi: importedConformityAllValue,
         estaiamentos: importedConformityAllValue,
         guardaEquipamentos: importedConformityAllValue,
         conduta: importedConformityAllValue,
-      });
+      }));
     }
   }, [conformityData?.id, importedConformityAllValue]);
 
@@ -1716,37 +1727,106 @@ export default function EventDetailPage() {
                     : `Observações importadas indicam ${importedConformityRatio.sim}/${importedConformityRatio.total} itens "Sim" — não é possível identificar qual item pelo texto`}
                 </p>
               )}
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-2">
                 {conformityItems.map(item => {
                   const value = conformityForm[item.key];
+                  const comment = conformityForm[item.commentKey];
+                  const isNonConforming = value === false;
+                  const isPending = value === null;
+                  const needsComment = (isNonConforming || isPending) && !comment.trim();
+                  const isExpanded = expandedComments.has(item.key);
                   return (
-                    <div
-                      key={item.key}
-                      className={`flex items-center justify-between gap-3 -mx-4 px-4 py-1.5 ${!value ? "bg-[#fdece6] border-l-4 border-[#862200]" : ""}`}
-                    >
-                      <span className="text-sm font-bold italic text-[#191c1e]">{item.label}</span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {!value && (
-                          <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>
-                        )}
-                        {canManage ? (
+                    <div key={item.key} className={`-mx-4 px-4 py-2 transition-colors ${isNonConforming ? "bg-[#fdece6] border-l-4 border-[#862200]" : isPending ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-bold italic text-[#191c1e]">{item.label}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isNonConforming && (
+                            <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>
+                          )}
+                          {canManage ? (
+                            <>
+                              <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = { ...conformityForm, [item.key]: true };
+                                    setConformityForm(next);
+                                    setConformity.mutate({ id, data: { [item.key]: true } });
+                                  }}
+                                  className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                >
+                                  Sim
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = { ...conformityForm, [item.key]: false };
+                                    setConformityForm(next);
+                                    setConformity.mutate({ id, data: { [item.key]: false } });
+                                  }}
+                                  className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                >
+                                  Não
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = { ...conformityForm, [item.key]: null };
+                                    setConformityForm(next);
+                                    setConformity.mutate({ id, data: { [item.key]: null } });
+                                  }}
+                                  className={`px-2.5 py-1 text-[11px] font-black italic uppercase transition-all ${value === null ? "bg-[#f5e97a] text-[#4a3c00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                >
+                                  Pendente
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                title={comment ? "Ver / editar comentário" : "Adicionar comentário"}
+                                onClick={() => setExpandedComments(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(item.key)) next.delete(item.key); else next.add(item.key);
+                                  return next;
+                                })}
+                                className={`p-1 border-2 transition-all ${needsComment ? "border-[#862200] text-[#862200] bg-[#fdece6] hover:bg-[#fbddd3]" : comment ? "border-[#191c1e] text-[#191c1e] bg-[#ccff00] hover:bg-[#b8e600]" : "border-[#191c1e] text-[#747a60] bg-white hover:bg-[#f0f2e8]"}`}
+                              >
+                                <MessageSquare size={13} />
+                              </button>
+                            </>
+                          ) : (
+                            <span className={`text-[11px] font-black italic uppercase px-2.5 py-1 border-2 border-[#191c1e] ${value === true ? "bg-[#ccff00] text-[#161e00]" : value === false ? "bg-[#862200] text-white" : "bg-[#f5e97a] text-[#4a3c00]"}`}>
+                              {value === true ? "Sim" : value === false ? "Não" : "Pendente"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {isExpanded && canManage && (
+                        <div className="mt-2 p-3 bg-[#fefcf0] border border-[#d4c98a] space-y-2">
+                          <Textarea
+                            value={comment}
+                            onChange={e => setConformityForm(f => ({ ...f, [item.commentKey]: e.target.value }))}
+                            placeholder={value === false ? "Justifique a não conformidade..." : value === null ? "Descreva o status pendente..." : "Observação adicional (opcional)..."}
+                            className={`text-xs rounded-none bg-white resize-none min-h-[60px] ${needsComment ? "border-2 border-[#862200]" : "border border-[#d4c98a]"}`}
+                          />
                           <button
                             type="button"
+                            disabled={setConformity.isPending}
                             onClick={() => {
-                              const next = { ...conformityForm, [item.key]: !value };
+                              const next = { ...conformityForm };
                               setConformityForm(next);
-                              setConformity.mutate({ id, data: { [item.key]: !value } });
+                              setConformity.mutate({ id, data: { [item.commentKey]: comment || null } });
                             }}
-                            className={`text-[11px] font-black italic uppercase px-3 py-1 border-2 border-[#191c1e] transition-all ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}
+                            className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors"
                           >
-                            {value ? "Sim" : "Não"}
+                            {setConformity.isPending ? "Salvando..." : "Salvar Comentário"}
                           </button>
-                        ) : (
-                          <span className={`text-[11px] font-black italic uppercase px-2 py-1 border border-[#191c1e] ${value ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200] text-white"}`}>
-                            {value ? "Sim" : "Não"}
-                          </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
+                      {!isExpanded && comment && (
+                        <p className="mt-1 text-[11px] text-[#444933] italic line-clamp-1 cursor-pointer hover:line-clamp-none" onClick={() => setExpandedComments(prev => { const next = new Set(prev); next.add(item.key); return next; })}>
+                          💬 {comment}
+                        </p>
+                      )}
                     </div>
                   );
                 })}

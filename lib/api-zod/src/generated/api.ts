@@ -863,10 +863,14 @@ export const GetEventResultResponse = zod.object({
   "conformity": zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "epi": zod.boolean(),
-  "estaiamentos": zod.boolean(),
-  "guardaEquipamentos": zod.boolean(),
-  "conduta": zod.boolean(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
   "createdByUserId": zod.number(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
@@ -1070,10 +1074,14 @@ export const GetEventConformityParams = zod.object({
 export const GetEventConformityResponse = zod.union([zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "epi": zod.boolean(),
-  "estaiamentos": zod.boolean(),
-  "guardaEquipamentos": zod.boolean(),
-  "conduta": zod.boolean(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
   "createdByUserId": zod.number(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
@@ -1088,19 +1096,27 @@ export const SetEventConformityParams = zod.object({
 })
 
 export const SetEventConformityBody = zod.object({
-  "epi": zod.boolean().optional(),
-  "estaiamentos": zod.boolean().optional(),
-  "guardaEquipamentos": zod.boolean().optional(),
-  "conduta": zod.boolean().optional()
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish()
 })
 
 export const SetEventConformityResponse = zod.object({
   "id": zod.number(),
   "eventId": zod.number(),
-  "epi": zod.boolean(),
-  "estaiamentos": zod.boolean(),
-  "guardaEquipamentos": zod.boolean(),
-  "conduta": zod.boolean(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
   "createdByUserId": zod.number(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()

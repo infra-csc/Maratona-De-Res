@@ -627,17 +627,23 @@ router.get("/events/:id/conformity", async (req, res) => {
 
 router.post("/events/:id/conformity", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const { epi, estaiamentos, guardaEquipamentos, conduta } = req.body;
+  const { epi, estaiamentos, guardaEquipamentos, conduta, epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment } = req.body;
   const userId = req.user!.userId;
 
+  // null = PENDENTE (sem penalidade); usa !== undefined para distinguir "não
+  // enviado" (undefined → mantém existente) de "enviado como null" (→ PENDENTE).
   const existing = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
   if (existing.length > 0) {
     const [updated] = await db.update(eventConformitiesTable)
       .set({
-        epi: epi ?? existing[0].epi,
-        estaiamentos: estaiamentos ?? existing[0].estaiamentos,
-        guardaEquipamentos: guardaEquipamentos ?? existing[0].guardaEquipamentos,
-        conduta: conduta ?? existing[0].conduta,
+        ...(epi !== undefined && { epi }),
+        ...(estaiamentos !== undefined && { estaiamentos }),
+        ...(guardaEquipamentos !== undefined && { guardaEquipamentos }),
+        ...(conduta !== undefined && { conduta }),
+        ...(epiComment !== undefined && { epiComment: epiComment || null }),
+        ...(estaiamentosComment !== undefined && { estaiamentosComment: estaiamentosComment || null }),
+        ...(guardaEquipamentosComment !== undefined && { guardaEquipamentosComment: guardaEquipamentosComment || null }),
+        ...(condutaComment !== undefined && { condutaComment: condutaComment || null }),
         updatedAt: new Date(),
       })
       .where(eq(eventConformitiesTable.eventId, eventId))
@@ -646,7 +652,18 @@ router.post("/events/:id/conformity", requireRole("admin", "rh"), async (req, re
     res.json(updated);
   } else {
     const [created] = await db.insert(eventConformitiesTable)
-      .values({ eventId, epi: epi ?? true, estaiamentos: estaiamentos ?? true, guardaEquipamentos: guardaEquipamentos ?? true, conduta: conduta ?? true, createdByUserId: userId })
+      .values({
+        eventId,
+        epi: epi !== undefined ? epi : null,
+        estaiamentos: estaiamentos !== undefined ? estaiamentos : null,
+        guardaEquipamentos: guardaEquipamentos !== undefined ? guardaEquipamentos : null,
+        conduta: conduta !== undefined ? conduta : null,
+        epiComment: epiComment || null,
+        estaiamentosComment: estaiamentosComment || null,
+        guardaEquipamentosComment: guardaEquipamentosComment || null,
+        condutaComment: condutaComment || null,
+        createdByUserId: userId,
+      })
       .returning();
     await audit(userId, "create_conformity", "events", eventId, null, created);
     res.status(201).json(created);

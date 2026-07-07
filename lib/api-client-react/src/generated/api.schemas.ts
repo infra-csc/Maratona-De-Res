@@ -519,20 +519,44 @@ export interface EventParticipantUpdate {
 export interface EventConformity {
   id: number;
   eventId: number;
-  epi: boolean;
-  estaiamentos: boolean;
-  guardaEquipamentos: boolean;
-  conduta: boolean;
+  /** @nullable */
+  epi?: boolean | null;
+  /** @nullable */
+  estaiamentos?: boolean | null;
+  /** @nullable */
+  guardaEquipamentos?: boolean | null;
+  /** @nullable */
+  conduta?: boolean | null;
+  /** @nullable */
+  epiComment?: string | null;
+  /** @nullable */
+  estaiamentosComment?: string | null;
+  /** @nullable */
+  guardaEquipamentosComment?: string | null;
+  /** @nullable */
+  condutaComment?: string | null;
   createdByUserId: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface EventConformityInput {
-  epi?: boolean;
-  estaiamentos?: boolean;
-  guardaEquipamentos?: boolean;
-  conduta?: boolean;
+  /** @nullable */
+  epi?: boolean | null;
+  /** @nullable */
+  estaiamentos?: boolean | null;
+  /** @nullable */
+  guardaEquipamentos?: boolean | null;
+  /** @nullable */
+  conduta?: boolean | null;
+  /** @nullable */
+  epiComment?: string | null;
+  /** @nullable */
+  estaiamentosComment?: string | null;
+  /** @nullable */
+  guardaEquipamentosComment?: string | null;
+  /** @nullable */
+  condutaComment?: string | null;
 }
 
 export interface Criterion {

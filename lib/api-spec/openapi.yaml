@@ -2755,20 +2755,28 @@ components:
 
     EventConformity:
       type: object
-      required: [id, eventId, epi, estaiamentos, guardaEquipamentos, conduta, createdByUserId]
+      required: [id, eventId, createdByUserId]
       properties:
         id:
           type: integer
         eventId:
           type: integer
         epi:
-          type: boolean
+          type: ["boolean", "null"]
         estaiamentos:
-          type: boolean
+          type: ["boolean", "null"]
         guardaEquipamentos:
-          type: boolean
+          type: ["boolean", "null"]
         conduta:
-          type: boolean
+          type: ["boolean", "null"]
+        epiComment:
+          type: ["string", "null"]
+        estaiamentosComment:
+          type: ["string", "null"]
+        guardaEquipamentosComment:
+          type: ["string", "null"]
+        condutaComment:
+          type: ["string", "null"]
         createdByUserId:
           type: integer
         createdAt:
@@ -2782,13 +2790,21 @@ components:
       type: object
       properties:
         epi:
-          type: boolean
+          type: ["boolean", "null"]
         estaiamentos:
-          type: boolean
+          type: ["boolean", "null"]
         guardaEquipamentos:
-          type: boolean
+          type: ["boolean", "null"]
         conduta:
-          type: boolean
+          type: ["boolean", "null"]
+        epiComment:
+          type: ["string", "null"]
+        estaiamentosComment:
+          type: ["string", "null"]
+        guardaEquipamentosComment:
+          type: ["string", "null"]
+        condutaComment:
+          type: ["string", "null"]
 
     Criterion:
       type: object

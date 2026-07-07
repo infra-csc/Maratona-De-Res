@@ -41,10 +41,17 @@ export const calibrationsTable = pgTable("calibrations", {
 export const eventConformitiesTable = pgTable("event_conformities", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
-  epi: boolean("epi").notNull().default(true),
-  estaiamentos: boolean("estaiamentos").notNull().default(true),
-  guardaEquipamentos: boolean("guarda_equipamentos").notNull().default(true),
-  conduta: boolean("conduta").notNull().default(true),
+  // null = PENDENTE (ainda não avaliado, sem penalidade)
+  // true  = SIM (conforme)
+  // false = NÃO (não conforme, -10 pts / -10% conformidade)
+  epi: boolean("epi"),
+  estaiamentos: boolean("estaiamentos"),
+  guardaEquipamentos: boolean("guarda_equipamentos"),
+  conduta: boolean("conduta"),
+  epiComment: text("epi_comment"),
+  estaiamentosComment: text("estaiamentos_comment"),
+  guardaEquipamentosComment: text("guarda_equipamentos_comment"),
+  condutaComment: text("conduta_comment"),
   createdByUserId: integer("created_by_user_id").notNull().references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

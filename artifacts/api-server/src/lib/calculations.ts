@@ -115,9 +115,10 @@ export function validateCalculationExample(): boolean {
  * aterramento, Guarda de equipamentos/ferramentas, Conduta e comportamento).
  * Cada item SIM = 25 pontos, NÃO = 0. Subtotal Conformidade vai de 0 a 100.
  * Sem registro de conformidade = conformidade plena (100).
+ * null = PENDENTE: ainda não avaliado — sem penalidade (tratado como SIM).
  */
 export function calculateConformitySubtotal(items: (boolean | null | undefined)[]): number {
-  return items.reduce((sum: number, v) => sum + (v === true ? 25 : 0), 0);
+  return items.reduce((sum: number, v) => sum + (v === false ? 0 : 25), 0);
 }
 
 /**

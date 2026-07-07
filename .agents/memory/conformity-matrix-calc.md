@@ -8,3 +8,5 @@ description: eventScore (raw) vs conformityScore (penalized) distinction in comp
 **Why:** the raw event score reflects only the evaluation criteria, while the conformity score also factors in compliance/conformity penalties tied to the event; using the unpenalized raw score in cycle aggregation would let conformity violations go unpunished in the final ranking/bonus numbers.
 
 **How to apply:** anywhere cycle-level results are computed or displayed (dashboard, results, ranking, exports), read `conformityScore` (or the persisted `finalEventScore`) — never the raw `eventScore` — as the per-event contribution to the cycle total.
+
+**3-state conformity (null = PENDENTE):** the `event_conformities` boolean columns are now nullable. `null` = PENDENTE (not yet evaluated) → no penalty (`calculateConformitySubtotal` treats null as 25 pts, same as `true`). `false` = NÃO → 0 pts (penalty). The external sync still produces only `true`/`false`; null is a manual in-app state. Prod DB migration required on deploy: `ALTER COLUMN DROP NOT NULL + DROP DEFAULT` on the 4 booleans + `ADD COLUMN IF NOT EXISTS *_comment TEXT` ×4.
