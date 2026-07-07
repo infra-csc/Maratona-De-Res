@@ -1252,8 +1252,15 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
         }).returning();
         criterion = created;
       } else if (!criterion.active) {
-        await tx.update(criteriaTable).set({ active: true }).where(eq(criteriaTable.id, criterion.id));
-        criterion = { ...criterion, active: true };
+        const area = areaByName.get(normalizeImportText(tc.areaName))!;
+        await tx.update(criteriaTable).set({
+          active: true,
+          defaultWeight: tc.weight,
+          description: tc.description,
+          responsibleAreaId: area.id,
+          responsibleAreaLabel: tc.areaName,
+        }).where(eq(criteriaTable.id, criterion.id));
+        criterion = { ...criterion, active: true, defaultWeight: tc.weight };
       }
       targetCriteriaByName.set(key, criterion);
     }
@@ -1314,6 +1321,10 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       const existingEvalRows = await tx.select({ criterionId: evaluationsTable.criterionId, evaluatorUserId: evaluationsTable.evaluatorUserId })
         .from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
       const existingEvalPairs = new Set(existingEvalRows.map(e => `${e.criterionId}:${e.evaluatorUserId}`));
+      // Rastreia pares inseridos neste run para evitar duplicatas quando duas
+      // colunas da planilha mapeiam para o mesmo critério (ex.: col 9 e col 11
+      // ambas → "Qualidade e Acabamento da Montagem").
+      const insertedThisRun = new Set<string>();
 
       const areaAssignmentPairs = new Set<string>();
       for (const r of eventRows) {
@@ -1323,7 +1334,8 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
         for (const s of r.scores) {
           const criterion = targetCriteriaByName.get(normalizeImportText(s.criterionName));
           if (!criterion) continue;
-          if (existingEvalPairs.has(`${criterion.id}:${evaluatorUserId}`)) {
+          const pairKey = `${criterion.id}:${evaluatorUserId}`;
+          if (existingEvalPairs.has(pairKey) || insertedThisRun.has(pairKey)) {
             evaluationsSkipped++;
             continue;
           }
@@ -1333,6 +1345,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
             status: "submitted", submittedAt: new Date(),
           });
           evaluationsCreated++;
+          insertedThisRun.add(pairKey);
           if (criterion.responsibleAreaId) areaAssignmentPairs.add(`${criterion.responsibleAreaId}:${evaluatorUserId}`);
         }
       }
@@ -1374,6 +1387,41 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
 
       affectedCycleIds.add(targetEvent.cycleId);
       eventsUpdated++;
+    }
+
+    // Migração global de event_criteria: todos os eventos não-históricos cujos
+    // resultados ainda NÃO foram confirmados devem ter os critérios antigos
+    // removidos e os novos ativados — independente de aparecerem na planilha.
+    // Eventos já processados no loop acima são ignorados (já migrados).
+    // Eventos com results_confirmed=true são preservados intactos.
+    if (retiredCriteriaIds.length > 0 || targetCriteriaByName.size > 0) {
+      const allMigratableEvents = await tx
+        .select({ id: eventsTable.id, cycleId: eventsTable.cycleId })
+        .from(eventsTable)
+        .where(and(eq(eventsTable.isHistorical, false), eq(eventsTable.resultsConfirmed, false)));
+
+      for (const ev of allMigratableEvents) {
+        if (rowsByEventId.has(ev.id)) continue; // já processado no loop principal
+
+        if (retiredCriteriaIds.length > 0) {
+          await tx.delete(eventCriteriaTable).where(
+            and(eq(eventCriteriaTable.eventId, ev.id), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)),
+          );
+        }
+
+        const existingECs = await tx.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, ev.id));
+        const existingByCritId = new Map(existingECs.map(ec => [ec.criterionId, ec]));
+        for (const c of targetCriteriaByName.values()) {
+          const existing = existingByCritId.get(c.id);
+          if (!existing) {
+            await tx.insert(eventCriteriaTable).values({ eventId: ev.id, criterionId: c.id, active: true });
+          } else if (!existing.active) {
+            await tx.update(eventCriteriaTable).set({ active: true }).where(eq(eventCriteriaTable.id, existing.id));
+          }
+        }
+
+        affectedCycleIds.add(ev.cycleId);
+      }
     }
   });
 
