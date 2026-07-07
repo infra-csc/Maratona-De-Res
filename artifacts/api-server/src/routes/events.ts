@@ -661,6 +661,7 @@ router.post("/events/:id/conformity", requireRole("admin", "rh"), async (req, re
   const eventId = parseInt(req.params.id as string);
   const { epi, estaiamentos, guardaEquipamentos, conduta, epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment } = req.body;
   const userId = req.user!.userId;
+  const [evRow] = await db.select({ cycleId: eventsTable.cycleId, status: eventsTable.status }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
 
   // null = PENDENTE (sem penalidade); usa !== undefined para distinguir "não
   // enviado" (undefined → mantém existente) de "enviado como null" (→ PENDENTE).
@@ -681,6 +682,7 @@ router.post("/events/:id/conformity", requireRole("admin", "rh"), async (req, re
       .where(eq(eventConformitiesTable.eventId, eventId))
       .returning();
     await audit(userId, "update_conformity", "events", eventId, existing[0], updated);
+    if (evRow?.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
     res.json(updated);
   } else {
     const [created] = await db.insert(eventConformitiesTable)
@@ -698,6 +700,7 @@ router.post("/events/:id/conformity", requireRole("admin", "rh"), async (req, re
       })
       .returning();
     await audit(userId, "create_conformity", "events", eventId, null, created);
+    if (evRow?.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
     res.status(201).json(created);
   }
 });
@@ -1042,7 +1045,8 @@ router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (re
 
   for (const ev of events) {
     try {
-      const { added, deactivated, activated } = await resyncEventCriteriaOnce(ev.id, { force });
+      const { added, deactivated, activated: activatedRaw } = await resyncEventCriteriaOnce(ev.id, { force });
+      const activated = activatedRaw ?? 0;
       if (added > 0 || deactivated > 0 || activated > 0) {
         processed += 1;
         totalAdded += added;

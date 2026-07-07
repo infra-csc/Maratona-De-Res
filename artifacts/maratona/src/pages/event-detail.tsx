@@ -143,6 +143,28 @@ function ImportedNotesList({ notes }: { notes: string }) {
   );
 }
 
+function ExpandableComment({ comment }: { comment: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const MAX = 120;
+  if (comment.length <= MAX) {
+    return <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words mt-0.5">{comment}</p>;
+  }
+  return (
+    <div className="mt-0.5">
+      <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words">
+        {expanded ? comment : comment.slice(0, MAX) + "…"}
+      </p>
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        className="text-[10px] font-bold italic uppercase text-[#506600] hover:underline mt-0.5"
+      >
+        {expanded ? "Ver menos" : "Ver mais"}
+      </button>
+    </div>
+  );
+}
+
 function ParticipantDiariaDialog({
   employeeId, employeeName, candidateDates, scheduledStart, scheduledEnd, scheduledCount,
   currentDates, isSaving, onSave,
@@ -180,10 +202,15 @@ function ParticipantDiariaDialog({
         <button
           type="button"
           data-testid={`button-diaria-dates-${employeeId}`}
-          className="self-center flex items-center gap-1.5 px-2 py-1 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors whitespace-nowrap"
+          className={cn(
+            "self-center flex items-center gap-1.5 px-2 py-1 border-2 transition-colors whitespace-nowrap",
+            currentDates.length === 0
+              ? "border-[#ff5722] bg-[#fff4e5] hover:bg-[#fce9d6] text-[#7a2e00]"
+              : "border-[#191c1e] bg-white hover:bg-[#f2f4f6]"
+          )}
         >
-          <Calendar size={11} className="text-[#444933] shrink-0" />
-          <span className="text-[10px] font-bold italic uppercase text-[#191c1e]">
+          <Calendar size={11} className="shrink-0" />
+          <span className="text-[10px] font-bold italic uppercase">
             Realizadas: {currentDates.length}
           </span>
         </button>
@@ -867,7 +894,7 @@ export default function EventDetailPage() {
   const critMeta = new Map((event.criteria ?? []).map(c => [c.criterionId, c]));
   const activeSum = config.filter(c => c.active).reduce((s, c) => s + (Number(c.weight) || 0), 0);
   const targetWeightSum = (event.criteria ?? []).reduce((s, c) => s + (Number(c.originalWeight) || 0), 0);
-  const sumValid = Math.abs(activeSum - targetWeightSum) <= 0.01;
+  const sumValid = true;
   const criteriaConfirmed = event.criteriaConfirmed ?? false;
   const hasEvaluations = event.hasEvaluations ?? false;
   // A estrutura do evento (ativar/desativar, duplicar, excluir, renomear
@@ -1153,7 +1180,7 @@ export default function EventDetailPage() {
                                 <div key={i} className="border-l-2 border-[#191c1e] bg-[#f7f9fb] px-2.5 py-1.5">
                                   <p className="text-[10px] font-bold italic uppercase text-[#444933]">{j.name} <span className="text-[#747a60]">— {j.score.toFixed(1)}</span></p>
                                   {j.comment ? (
-                                    <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words mt-0.5">{j.comment}</p>
+                                    <ExpandableComment comment={j.comment} />
                                   ) : (
                                     <p className="text-[10px] italic text-[#9aa088] mt-0.5">Sem justificativa</p>
                                   )}
@@ -1274,7 +1301,7 @@ export default function EventDetailPage() {
 
             <div className="p-6 space-y-4">
               <p className="text-sm italic text-[#444933]">
-                Para cada critério deste evento defina o <strong>peso</strong> e o <strong>avaliador</strong> que dará a nota daquela área. Desative os que não se aplicam — a soma dos pesos ativos deve ser <strong>{fmt(targetWeightSum)}</strong>. As áreas só podem avaliar após a confirmação do RH.
+                Para cada critério deste evento defina o <strong>peso</strong> e o <strong>avaliador</strong> que dará a nota daquela área. Desative os que não se aplicam. As áreas só podem avaliar após a confirmação do RH.
               </p>
 
               {hasEvaluations && (
@@ -1285,8 +1312,8 @@ export default function EventDetailPage() {
 
               <div className="flex items-center justify-between bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
                 <span className="text-xs font-bold italic uppercase text-[#444933]">Soma dos Pesos Ativos</span>
-                <span data-testid="text-criteria-sum" className={`text-2xl font-black italic ${sumValid ? "text-[#506600]" : "text-[#ba1a1a]"}`}>
-                  {Math.round(activeSum * 100) / 100} <span className="text-base text-[#747a60]">/ {fmt(targetWeightSum)}</span>
+                <span data-testid="text-criteria-sum" className="text-2xl font-black italic text-[#506600]">
+                  {Math.round(activeSum * 100) / 100}
                 </span>
               </div>
 
@@ -1476,9 +1503,6 @@ export default function EventDetailPage() {
                 <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Há áreas sem nenhum avaliador vinculado. Cadastre avaliadores nessas áreas (em Usuários) para poder atribuí-los.</p>
               )}
 
-              {!sumValid && !criteriaConfirmed && (
-                <p className="text-xs font-bold italic uppercase text-[#ba1a1a] text-right">Ajuste os pesos para somar exatamente {fmt(targetWeightSum)} antes de salvar ou confirmar.</p>
-              )}
 
               <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
                 <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
@@ -1506,7 +1530,7 @@ export default function EventDetailPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="italic uppercase font-black tracking-tight">Excluir cópia?</AlertDialogTitle>
                     <AlertDialogDescription className="italic text-[#444933]">
-                      Esta cópia será <strong>removida permanentemente</strong> deste evento. Caso ela esteja ativa, lembre-se de redistribuir o peso entre os critérios restantes para que a soma volte a <strong>{fmt(targetWeightSum)}</strong>.
+                      Esta cópia será <strong>removida permanentemente</strong> deste evento.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -1522,31 +1546,6 @@ export default function EventDetailPage() {
                 </AlertDialogContent>
               </AlertDialog>
 
-              <AlertDialog open={pendingRemoveParticipant !== null} onOpenChange={o => { if (!o) setPendingRemoveParticipant(null); }}>
-                <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover participante?</AlertDialogTitle>
-                    <AlertDialogDescription className="italic text-[#444933]">
-                      O colaborador <strong>{event?.participants?.find(p => p.id === pendingRemoveParticipant)?.employeeName ?? ""}</strong> será removido da equipe deste evento. Se ele já possuir avaliações enviadas, as notas serão perdidas.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel data-testid="button-cancel-remove-participant" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      data-testid="button-confirm-remove-participant"
-                      onClick={() => {
-                        if (pendingRemoveParticipant !== null) {
-                          removeParticipant.mutate({ id, participantId: pendingRemoveParticipant });
-                        }
-                        setPendingRemoveParticipant(null);
-                      }}
-                      className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
-                    >
-                      <Trash2 size={16} className="mr-1.5" /> Remover
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
 
               <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
                 {hasEvaluations && (
@@ -2079,12 +2078,11 @@ export default function EventDetailPage() {
                           data-testid={`chip-participant-${p.employeeId}`}
                           className={cn(
                             "flex flex-col h-full border-2 border-[#eceef0] transition-colors",
-                            isInformational ? "bg-[#862200]/[0.05] border-l-4 border-l-[#862200]" : "hover:border-[#191c1e]",
-                            isInactive && "opacity-50"
+                            isInformational ? "bg-[#862200]/[0.05] border-l-4 border-l-[#862200]" : "hover:border-[#191c1e]"
                           )}
                         >
                           {/* Bloco principal — cresce para preencher a célula do grid */}
-                          <div className="flex flex-col flex-1 p-4 gap-2">
+                          <div className={cn("flex flex-col flex-1 p-4 gap-2", isInactive && "opacity-50")}>
 
                             {/* Linha 1: avatar + nome + botões */}
                             <div className="flex items-center gap-3">
@@ -2198,22 +2196,22 @@ export default function EventDetailPage() {
                               </div>
                             ) : null}
 
-                            {/* Linha 5 (condicional): justificativa — mt-auto empurra sempre para o rodapé do card */}
-                            {showCommentBox && (
-                              <div className="mt-auto pt-3 border-t-2 border-[#eceef0] -mx-4 px-4 -mb-4 pb-4">
-                                <ParticipantCommentBox
-                                  participantId={p.id}
-                                  employeeId={p.employeeId}
-                                  initialComment={p.comment}
-                                  canManage={canManage}
-                                  reason={commentReason}
-                                  isSaving={updateParticipant.isPending}
-                                  onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
-                                />
-                              </div>
-                            )}
 
                           </div>
+                          {/* Caixa de justificativa — fora do wrapper com opacity para ficar sempre visível */}
+                          {showCommentBox && (
+                            <div className="pt-3 border-t-2 border-[#eceef0] px-4 pb-4">
+                              <ParticipantCommentBox
+                                participantId={p.id}
+                                employeeId={p.employeeId}
+                                initialComment={p.comment}
+                                canManage={canManage}
+                                reason={commentReason}
+                                isSaving={updateParticipant.isPending}
+                                onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -2221,6 +2219,32 @@ export default function EventDetailPage() {
                 )}
               </div>
             )}
+
+            <AlertDialog open={pendingRemoveParticipant !== null} onOpenChange={o => { if (!o) setPendingRemoveParticipant(null); }}>
+              <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover participante?</AlertDialogTitle>
+                  <AlertDialogDescription className="italic text-[#444933]">
+                    O colaborador <strong>{event?.participants?.find(p => p.id === pendingRemoveParticipant)?.employeeName ?? ""}</strong> será removido da equipe deste evento. Se ele já possuir avaliações enviadas, as notas serão perdidas.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-remove-participant" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    data-testid="button-confirm-remove-participant"
+                    onClick={() => {
+                      if (pendingRemoveParticipant !== null) {
+                        removeParticipant.mutate({ id, participantId: pendingRemoveParticipant });
+                      }
+                      setPendingRemoveParticipant(null);
+                    }}
+                    className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
+                  >
+                    <Trash2 size={16} className="mr-1.5" /> Remover
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             <Dialog open={addParticipantOpen} onOpenChange={(o) => { setAddParticipantOpen(o); if (!o) { setNewParticipantEmployeeId(null); setNewParticipantFunction(""); } }}>
               <DialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
@@ -2258,7 +2282,7 @@ export default function EventDetailPage() {
                                   data-testid={`option-new-participant-${e.id}`}
                                   onSelect={() => {
                                     setNewParticipantEmployeeId(e.id);
-                                    setNewParticipantFunction(e.functionName ?? "");
+                                    setNewParticipantFunction(e.functionName ?? "Logística Interna");
                                     setEmployeePickerOpen(false);
                                   }}
                                   className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2"

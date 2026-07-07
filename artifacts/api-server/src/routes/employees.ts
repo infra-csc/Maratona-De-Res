@@ -3,6 +3,8 @@ import { db, employeesTable, quarterlyResultsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { getCurrentCycle } from "../lib/cycle.js";
+import { recomputeCycleResults } from "./results.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -73,6 +75,10 @@ router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(eligibilityReason !== undefined && { eligibilityReason }),
   }).where(eq(employeesTable.id, id)).returning();
   await audit(req.user!.userId, "update", "employees", id, before, employee);
+  if (active !== undefined || eligibleForBonus !== undefined || eligibilityStatus !== undefined) {
+    const cycle = await getCurrentCycle();
+    if (cycle) await recomputeCycleResults(cycle.id, req.user!.userId);
+  }
   res.json(employee);
 });
 
