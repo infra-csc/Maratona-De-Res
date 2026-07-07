@@ -1,0 +1,122 @@
+Preciso implementar as regras de avaliação abaixo, organizadas por área. Cada critério tem: 
+descrição do que avaliar, se o comentário/justificativa é obrigatório, para quem a 
+avaliação é enviada por padrão, e para quem esse validador pode redirecionar.
+
+═══════════════════════════════════════
+REGRA GERAL — CRITÉRIOS PADRÃO DE TODO EVENTO
+═══════════════════════════════════════
+
+Todos os critérios listados abaixo (EXCETO "Qualidade da Entrega (2)") são PADRÃO em 
+todo evento do sistema.
+
+- Ao criar um evento novo, todos esses critérios devem ser criados automaticamente.
+- Para eventos já existentes / importados que não possuem esses critérios cadastrados, 
+  rodar uma rotina de migração para adicionar todos esses critérios padrão retroativamente.
+- "Qualidade da Entrega (2)" NÃO é criado automaticamente — só existe se o Admin ou RH 
+  duplicar manualmente o critério "Qualidade da Entrega" dentro de um evento específico 
+  (ver detalhes abaixo).
+
+═══════════════════════════════════════
+LOGÍSTICA
+═══════════════════════════════════════
+
+Critério 1: Perda de material/estrutura
+- O que avaliar: Todo material enviado deve retornar à base sem perda de materiais, 
+  mercadorias, nem avarias.
+- Comentário/justificativa: OBRIGATÓRIO
+- Destinatário padrão: Eduardo Meira
+- Redirecionamento: Eduardo pode avaliar OU enviar para Sandro Gomes
+
+Critério 2: Logística Reversa
+- O que avaliar: Se a carga foi feita adequadamente e como o material retornou.
+- Comentário/justificativa: OBRIGATÓRIO
+- Destinatário padrão: Eduardo Meira
+- Redirecionamento: Eduardo pode avaliar OU enviar para Sandro Gomes
+
+(Logística NÃO tem a opção de link para freelancer sem cadastro — ver regra geral no final)
+
+═══════════════════════════════════════
+ATENDIMENTO
+═══════════════════════════════════════
+
+Critério: Qualidade da Entrega
+- O que avaliar: Qualidade do acabamento e estado dos materiais.
+- Comentário/justificativa: OBRIGATÓRIO
+- Destinatário padrão: Agatha
+- Redirecionamento: Agatha pode avaliar OU enviar para qualquer usuário cadastrado na área "Atendimento"
+- Este é o critério PRINCIPAL de "Qualidade da Entrega" — pertence originalmente à área 
+  Atendimento.
+
+(Atendimento NÃO tem a opção de link para freelancer sem cadastro — ver regra geral no final)
+
+═══════════════════════════════════════
+ATIVAÇÃO
+═══════════════════════════════════════
+
+Sobre "Qualidade da Entrega" em Ativação:
+- O critério "Qualidade da Entrega" pertence, por padrão, à área Atendimento (acima).
+- Em CADA evento, deve haver uma opção (para Admin/RH) de definir se a área Ativação 
+  TAMBÉM vai avaliar esse mesmo critério naquele evento específico.
+- Quando essa opção for ativada para o evento, o sistema duplica o critério, criando 
+  "Qualidade da Entrega (2)" dentro da área Ativação, exclusivamente para aquele evento.
+- Ou seja: "Qualidade da Entrega (2)" não é um critério global do sistema, e sim uma 
+  configuração por evento.
+
+Critério: Qualidade da Entrega (2) — [somente quando duplicado no evento]
+- O que avaliar: Qualidade do acabamento e estado dos materiais.
+- Comentário/justificativa: OBRIGATÓRIO
+- Destinatário padrão: Priscila Elias
+- Redirecionamento: Priscila pode avaliar OU enviar para qualquer usuário cadastrado na 
+  área "Ativação"
+
+═══════════════════════════════════════
+PRODUÇÃO
+═══════════════════════════════════════
+
+Critério: Prazo de entrega
+- O que avaliar: Se a entrega foi feita dentro do cronograma, sem atrasos e sem 
+  custos adicionais de mão de obra.
+- Comentário/justificativa: OBRIGATÓRIO
+- Destinatário padrão: Rubem Ismael Vasques
+- Redirecionamento: Rubem pode avaliar OU enviar para qualquer usuário cadastrado na 
+  área "Produção"
+
+═══════════════════════════════════════
+CENOGRAFIA
+═══════════════════════════════════════
+
+Este questionário tem 7 perguntas:
+
+1) "Todos os equipamentos e ferramentas retornaram?" (Sim/Não)
+   - Se "Não": justificativa obrigatória abaixo
+   - Esta resposta ALIMENTA a Matriz de Conformidade
+   - Destinatário padrão: Giovanni Bertoni
+   - Redirecionamento: Giovanni pode avaliar OU enviar para qualquer usuário cadastrado 
+     na área "Cenografia"
+
+2) "Carga na saída do galpão"
+   - O que avaliar: Como foi feita a carga no galpão e a disponibilidade de materiais 
+     na arena.
+   - Formato: Nota + comentário OBRIGATÓRIO
+
+3) "Todos usaram EPI na arena?" (Sim/Não)
+   - Comentário obrigatório SOMENTE se a resposta for "Não"
+   - ALIMENTA a Matriz de Conformidade
+
+4) "Estaiamento e Aterramento foram feitos de maneira correta?" (Sim/Não)
+   - Comentário obrigatório SOMENTE se a resposta for "Não"
+   - ALIMENTA a Matriz de Conformidade
+
+5) "Conduta e comportamento foram adequados?" (Cumprimento de horários, ordens e regras) (Sim/Não)
+   - Comentário obrigatório SOMENTE se a resposta for "Não"
+   - ALIMENTA a Matriz de Conformidade
+
+6) "Alguém faltou ou atrasou por mais de 30 minutos? Especifique."
+   - Campo de texto livre
+   - Esta informação deve aparecer na tela/relatório de "Calibração do Evento"
+
+7) "Algum profissional teve um desempenho fora da curva, se destacando dos demais pela 
+   eficiência ou proatividade?"
+   - Opções: 
+     • "Sim, houve um grande destaque" → abre campo de justificativa na página seguinte
+     • "Não, tudo dentro do
