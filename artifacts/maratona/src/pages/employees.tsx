@@ -33,14 +33,14 @@ export default function EmployeesPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filterActive, setFilterActive] = useState<"all" | "true" | "false">("true");
+  const [filterActive, setFilterActive] = useState<"true" | "false">("true");
   const [filterType, setFilterType] = useState<"all" | EmploymentType>("all");
   const [open, setOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithCycle | null>(null);
 
-  const qKey = getGetEmployeesQueryKey({ active: filterActive === "all" ? undefined : filterActive === "true" });
+  const qKey = getGetEmployeesQueryKey({ active: filterActive === "true" });
   const { data: employeesRaw, isLoading } = useGetEmployees(
-    filterActive === "all" ? {} : { active: filterActive === "true" },
+    { active: filterActive === "true" },
     { query: { queryKey: qKey } }
   );
   const employees = employeesRaw as EmployeeWithCycle[] | undefined;
@@ -315,14 +315,14 @@ export default function EmployeesPage() {
             />
           </div>
           <div className="flex border-2 border-[#191c1e] bg-white">
-            {(["all", "true", "false"] as const).map(v => (
+            {(["true", "false"] as const).map(v => (
               <button
                 key={v}
                 data-testid={`filter-active-${v}`}
                 onClick={() => setFilterActive(v)}
                 className={`px-5 py-2.5 text-xs font-bold italic uppercase tracking-wider transition-all ${filterActive === v ? "bg-[#191c1e] text-[#ccff00]" : "text-[#444933] hover:bg-[#eceef0]"}`}
               >
-                {v === "all" ? "Todos" : v === "true" ? "Ativos" : "Inativos"}
+                {v === "true" ? "Ativos" : "Inativos"}
               </button>
             ))}
           </div>
