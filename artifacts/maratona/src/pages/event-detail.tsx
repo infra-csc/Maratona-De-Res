@@ -1310,12 +1310,6 @@ export default function EventDetailPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-                <span className="text-xs font-bold italic uppercase text-[#444933]">Soma dos Pesos Ativos</span>
-                <span data-testid="text-criteria-sum" className="text-2xl font-black italic text-[#506600]">
-                  {Math.round(activeSum * 100) / 100}
-                </span>
-              </div>
 
               <div className="overflow-x-auto border-2 border-[#191c1e]">
                 <table className="w-full text-left border-collapse">
