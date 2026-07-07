@@ -247,15 +247,19 @@ async function resyncEventCriteriaOnce(eventId: number) {
   const existingCriterionIds = new Set(existing.map(e => e.criterionId));
 
   const toDeactivate = existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
+  const toActivate = existing.filter(e => !e.active && !e.eventScoped && e.criterionActive);
   const toAdd = [...globalActiveIds].filter(cid => !existingCriterionIds.has(cid));
 
-  if (toDeactivate.length === 0 && toAdd.length === 0) {
+  if (toDeactivate.length === 0 && toActivate.length === 0 && toAdd.length === 0) {
     return { deactivated: 0, added: 0 };
   }
 
   await db.transaction(async (tx) => {
     for (const row of toDeactivate) {
       await tx.update(eventCriteriaTable).set({ active: false }).where(eq(eventCriteriaTable.id, row.id));
+    }
+    for (const row of toActivate) {
+      await tx.update(eventCriteriaTable).set({ active: true }).where(eq(eventCriteriaTable.id, row.id));
     }
     if (toAdd.length > 0) {
       await tx.insert(eventCriteriaTable).values(toAdd.map(criterionId => ({ eventId, criterionId, active: true })));
