@@ -1,0 +1,109 @@
+Preciso corrigir os seguintes bugs e implementar os ajustes abaixo, organizados por área/tela.
+
+═══════════════════════════════════════
+1. EQUIPE ALOCADA
+═══════════════════════════════════════
+
+1.1) BUG: Botão "apagar funcionário do evento" não funciona
+   - O botão de excluir/remover funcionário da equipe alocada não está executando a ação. 
+     Verificar o handler do clique e a chamada da API/backend.
+
+1.2) BUG: Comentário fica cinza (esmaecido) após inativar o colaborador
+   - Quando um colaborador é inativado, o texto do comentário dele também fica com 
+     aparência "desabilitada" (cinza), quando deveria continuar legível normalmente.
+   - Aplicar o estilo de "inativo" (cinza/opacidade) apenas no card do colaborador, 
+     mas manter o comentário com o texto normal e legível.
+
+1.3) MELHORIA: Pré-seleção de funções ao adicionar funcionário
+   - Ao adicionar um novo funcionário a um evento, as funções devem vir PRÉ-SELECIONADAS 
+     com base em "Logística Interna" (ou outro padrão a definir), e o usuário só precisa 
+     ajustar/selecionar caso seja diferente do padrão, ao invés de selecionar do zero.
+
+1.4) MELHORIA: Destaque quando "Datas Realizadas" = 0
+   - Quando o campo "Datas Realizadas" estiver zerado, destacar visualmente esse card 
+     (ex: borda ou fundo de alerta), para chamar atenção do gestor.
+
+1.5) MELHORIA: Botão "OK / Confirmar" ao lado das Datas Realizadas
+   - Adicionar um botão de "OK" ou "Confirmar" ao lado do campo de datas realizadas.
+   - Objetivo: o gestor nem sempre precisa comparar a data realizada com a data prevista 
+     — se ele considerar que está tudo certo (mesmo que a data realizada seja diferente 
+     da prevista), ele pode simplesmente clicar em "OK" para confirmar/aprovar sem 
+     necessidade de justificar ou alterar a data.
+
+═══════════════════════════════════════
+2. AVALIAÇÕES / COMENTÁRIOS DOS AVALIADORES
+═══════════════════════════════════════
+
+2.1) MELHORIA: Botão "Ver comentário" nas notas dos avaliadores
+   - Nos comentários de nota deixados pelos avaliadores, adicionar um botão/ícone 
+     "Ver comentário" para exibir o texto completo (útil quando o comentário for 
+     longo ou estiver truncado na listagem).
+
+═══════════════════════════════════════
+3. RANKING
+═══════════════════════════════════════
+
+3.1) BUG: Demora para atualizar o ranking
+   - Usuários inativados ou recém-adicionados demoram muito tempo para refletir no 
+     ranking (a mudança ocorre, mas com atraso significativo).
+   - Investigar se o ranking está sendo recalculado de forma assíncrona/cacheada e 
+     ajustar para atualização mais rápida (idealmente em tempo real ou near real-time 
+     após a ação de ativar/inativar/adicionar).
+
+═══════════════════════════════════════
+4. MATRIZ DE CONFORMIDADE
+═══════════════════════════════════════
+
+4.1) BUG: Mudança na Matriz (Sim/Não) não desconta os 10 pontos do total
+   - Ao alterar uma resposta da Matriz de Conformidade para "Não", o sistema deveria 
+     descontar os 10 pontos correspondentes da nota total, mas isso não está acontecendo. 
+     Corrigir o cálculo/trigger que atualiza a nota final quando a matriz muda.
+
+4.2) MELHORIA: Envio da Matriz para avaliação por área
+   - A Matriz de Conformidade deve ser enviada para avaliação das áreas responsáveis, 
+     seguindo exatamente o fluxo de destinatários/redirecionamento definido no prompt 
+     anterior de "Regras de Avaliação por Área" (Logística → Eduardo Meira/Sandro Gomes, 
+     Atendimento → Agatha, Ativação → Priscila Elias, Produção → Rubem Ismael Vasques, 
+     Cenografia → Giovanni Bertoni/Fred, conforme já detalhado).
+
+═══════════════════════════════════════
+5. PENALIDADES E MÉRITOS
+═══════════════════════════════════════
+
+5.1) MELHORIA: Visualização em múltiplas abas
+   - As penalidades e méritos devem ficar visíveis em 3 lugares:
+     • Aba do Evento
+     • Aba de Ocorrências
+     • Aba de Calibragem
+   - Garantir que os dados fiquem sincronizados e consistentes nas 3 abas (mesma fonte 
+     de dados, sem duplicidade ou divergência de números).
+
+═══════════════════════════════════════
+6. CRITÉRIOS E AVALIADORES — PESOS
+═══════════════════════════════════════
+
+6.1) BUG/AJUSTE: Remover completamente a soma de pesos
+   - Remover a mensagem que soma os pesos dos critérios/avaliadores (hoje aparece 
+     somando "11", mas não existe um valor fechado/obrigatório de soma).
+   - Essa validação/mensagem de soma NÃO deve existir de forma alguma — retirar 
+     completamente do sistema (tanto a exibição quanto qualquer validação de bloqueio 
+     baseada nessa soma).
+
+═══════════════════════════════════════
+PRIORIZAÇÃO SUGERIDA (ajustar conforme necessidade)
+═══════════════════════════════════════
+
+Bugs (corrigir primeiro):
+- 1.1 Botão apagar funcionário não funciona
+- 1.2 Comentário cinza após inativar
+- 3.1 Demora no ranking
+- 4.1 Matriz não desconta pontos
+- 6.1 Remover soma de pesos incorreta
+
+Melhorias (podem vir na sequência):
+- 1.3 Pré-seleção de funções
+- 1.4 Destaque quando datas realizadas = 0
+- 1.5 Botão OK/Confirmar nas datas
+- 2.1 Botão ver comentário
+- 4.2 Envio da matriz por área
+- 5.1 Penalidades/méritos em 3 abas
