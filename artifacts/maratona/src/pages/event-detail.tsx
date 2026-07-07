@@ -1045,7 +1045,7 @@ export default function EventDetailPage() {
               </div>
 
               {result && result.eventScore > 0 && (() => {
-                const concluded = !!event.feedbackReleased;
+                const concluded = !!event.feedbackReleased || event.status === "closed" || !!event.isHistorical;
                 const calibrated = (result.criteriaDetails ?? []).some(c => c.calibratedScore != null);
                 const displayScore = (result.conformityScore != null ? result.conformityScore : result.eventScore) as number;
                 const hasPenalty = (result.conformityPenalty ?? 0) > 0;
