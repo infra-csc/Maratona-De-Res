@@ -1,0 +1,101 @@
+/* Container do grid de cards */
+.equipe-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 colunas em telas largas */
+  gap: 20px;
+  align-items: stretch; /* faz todos os cards da linha terem a mesma altura */
+}
+
+@media (max-width: 1024px) {
+  .equipe-grid {
+    grid-template-columns: repeat(2, 1fr); /* 2 colunas em tablet */
+  }
+}
+
+@media (max-width: 640px) {
+  .equipe-grid {
+    grid-template-columns: 1fr; /* 1 coluna em mobile */
+  }
+}
+
+/* Card individual */
+.equipe-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* ocupa toda a altura da linha (graças ao stretch do grid) */
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* Variante "informativo" (freela / não conta p/ nota) */
+.equipe-card--informativo {
+  border-left: 4px solid #7a1f1f; /* mantém a cor vinho já usada */
+  background: #fdf5f2;
+}
+
+/* Cabeçalho: avatar + nome + botões */
+.equipe-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+/* Cargo/função */
+.equipe-card__cargo {
+  color: #888;
+  font-style: italic;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+/* Tags (CASA, FREELA, NÃO CONTA P/NOTA) */
+.equipe-card__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* Badges de previstas/realizadas */
+.equipe-card__badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* Texto informativo (participação sem controle de diárias) */
+.equipe-card__info-text {
+  color: #7a1f1f;
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* Bloco de justificativa: sempre no rodapé do card, sem quebrar o grid */
+.equipe-card__justificativa {
+  margin-top: auto; /* empurra pro final do card */
+  background: #fdf6d8; /* mantém o creme já usado */
+  border: 1px solid #e0d9a0;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.equipe-card__justificativa textarea {
+  width: 100%;
+  min-height: 60px;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+
+.equipe-card__justificativa button {
+  background: #d4f542; /* mantém o lima já usado */
+  border: none;
+  padding: 8px 16px;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+}

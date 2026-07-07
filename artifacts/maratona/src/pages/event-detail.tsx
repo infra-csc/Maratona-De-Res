@@ -1782,7 +1782,7 @@ export default function EventDetailPage() {
                 {(!event.participants || event.participants.length === 0) ? (
                   <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum colaborador alocado.</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 p-4 items-stretch">
                     {event.participants.map(p => {
                       const isInactive = p.confirmed === false;
                       const isInformational = p.countsForScore === false;
@@ -1906,22 +1906,22 @@ export default function EventDetailPage() {
                               </div>
                             ) : null}
 
-                          </div>
+                            {/* Linha 5 (condicional): justificativa — mt-auto empurra sempre para o rodapé do card */}
+                            {showCommentBox && (
+                              <div className="mt-auto pt-3 border-t-2 border-[#eceef0] -mx-4 px-4 -mb-4 pb-4">
+                                <ParticipantCommentBox
+                                  participantId={p.id}
+                                  employeeId={p.employeeId}
+                                  initialComment={p.comment}
+                                  canManage={canManage}
+                                  reason={commentReason}
+                                  isSaving={updateParticipant.isPending}
+                                  onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
+                                />
+                              </div>
+                            )}
 
-                          {/* Linha 5 (condicional): caixa de justificativa — altura controlada, não distorce o grid */}
-                          {showCommentBox && (
-                            <div className="border-t-2 border-[#eceef0] px-4 pt-3 pb-4 shrink-0">
-                              <ParticipantCommentBox
-                                participantId={p.id}
-                                employeeId={p.employeeId}
-                                initialComment={p.comment}
-                                canManage={canManage}
-                                reason={commentReason}
-                                isSaving={updateParticipant.isPending}
-                                onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
-                              />
-                            </div>
-                          )}
+                          </div>
                         </div>
                       );
                     })}
