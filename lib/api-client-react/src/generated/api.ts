@@ -68,6 +68,7 @@ import type {
   EventTeamResult,
   EventUpdate,
   ExportEventResultsParams,
+  FixCalibrationCriteria200,
   ForceCloseInput,
   GetAbsencesParams,
   GetAuditLogsParams,
@@ -3508,6 +3509,76 @@ export const useResyncAllEventsCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getResyncAllEventsCriteriaMutationOptions(options));
+    }
+
+export const getFixCalibrationCriteriaUrl = () => {
+
+
+
+
+  return `/events/admin/fix-calibration-criteria`
+}
+
+/**
+ * @summary One-time admin migration — remaps calibration criterion_ids from old long-name criteria to current short-name equivalents
+ */
+export const fixCalibrationCriteria = async ( options?: RequestInit): Promise<FixCalibrationCriteria200> => {
+
+  return customFetch<FixCalibrationCriteria200>(getFixCalibrationCriteriaUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getFixCalibrationCriteriaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fixCalibrationCriteria>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof fixCalibrationCriteria>>, TError,void, TContext> => {
+
+const mutationKey = ['fixCalibrationCriteria'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof fixCalibrationCriteria>>, void> = () => {
+
+
+          return  fixCalibrationCriteria(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FixCalibrationCriteriaMutationResult = NonNullable<Awaited<ReturnType<typeof fixCalibrationCriteria>>>
+
+    export type FixCalibrationCriteriaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary One-time admin migration — remaps calibration criterion_ids from old long-name criteria to current short-name equivalents
+ */
+export const useFixCalibrationCriteria = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fixCalibrationCriteria>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof fixCalibrationCriteria>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getFixCalibrationCriteriaMutationOptions(options));
     }
 
 export const getGetEventCommentsUrl = (id: number,) => {

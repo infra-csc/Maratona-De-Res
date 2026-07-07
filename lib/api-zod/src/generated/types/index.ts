@@ -73,6 +73,8 @@ export * from './eventTeamParticipant';
 export * from './eventTeamResult';
 export * from './eventUpdate';
 export * from './exportEventResultsParams';
+export * from './fixCalibrationCriteria200';
+export * from './fixCalibrationCriteria200ResultsItem';
 export * from './forceCloseInput';
 export * from './getAbsencesParams';
 export * from './getAuditLogsParams';

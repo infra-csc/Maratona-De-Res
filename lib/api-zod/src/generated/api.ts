@@ -1526,6 +1526,21 @@ export const ResyncAllEventsCriteriaResponse = zod.object({
 
 
 /**
+ * @summary One-time admin migration — remaps calibration criterion_ids from old long-name criteria to current short-name equivalents
+ */
+export const FixCalibrationCriteriaResponse = zod.object({
+  "totalUpdated": zod.number().optional(),
+  "results": zod.array(zod.object({
+  "from": zod.string().optional(),
+  "to": zod.string().optional(),
+  "fromId": zod.number().optional(),
+  "toId": zod.number().optional(),
+  "updated": zod.number().optional()
+})).optional()
+})
+
+
+/**
  * @summary List an event's general comment thread (visible to all users)
  */
 export const GetEventCommentsParams = zod.object({

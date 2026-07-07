@@ -975,6 +975,37 @@ paths:
                         deactivated:
                           type: integer
 
+  /events/admin/fix-calibration-criteria:
+    post:
+      operationId: fixCalibrationCriteria
+      tags: [events]
+      summary: One-time admin migration — remaps calibration criterion_ids from old long-name criteria to current short-name equivalents
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUpdated:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from:
+                          type: string
+                        to:
+                          type: string
+                        fromId:
+                          type: integer
+                        toId:
+                          type: integer
+                        updated:
+                          type: integer
+
   /events/{id}/comments:
     get:
       operationId: getEventComments

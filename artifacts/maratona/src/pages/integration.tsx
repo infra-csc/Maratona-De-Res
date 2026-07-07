@@ -1,4 +1,4 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, useDedupeEvaluations, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History, ClipboardList, KeyRound, Eraser } from "lucide-react";
+import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History, ClipboardList, KeyRound, Eraser, Wrench } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -175,6 +175,21 @@ export default function IntegrationPage() {
       },
       onError: (e: { message?: string }) => {
         toast({ title: "Falha ao remover duplicatas", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
+
+  const [fixCalResult, setFixCalResult] = useState<FixCalibrationCriteria200 | null>(null);
+  const [fixCalDialogOpen, setFixCalDialogOpen] = useState(false);
+  const fixCalMutation = useFixCalibrationCriteria({
+    mutation: {
+      onSuccess: (data) => {
+        setFixCalResult(data);
+        setFixCalDialogOpen(true);
+        qc.invalidateQueries();
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha na correção de calibrações", description: e.message ?? "Tente novamente.", variant: "destructive" });
       },
     },
   });
@@ -564,6 +579,35 @@ export default function IntegrationPage() {
       )}
 
       {isAdmin && (
+        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-amber-500">
+          <CardHeader className="bg-amber-50 border-b border-amber-100 pb-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-amber-800">
+              <Wrench size={18} /> Corrigir Calibrações (Migração de Quesitos)
+            </CardTitle>
+            <CardDescription className="text-amber-800/80">
+              Recupera calibrações feitas com os quesitos antigos (nomes longos) e remapeia para os equivalentes atuais.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+              Quando o catálogo de quesitos foi migrado (nomes longos → curtos), as calibrações gravadas ficaram referenciando os IDs antigos e deixaram de aparecer na tela.
+              Este botão corrige os IDs de todas as calibrações afetadas de uma vez. <strong>Operação segura e idempotente</strong> — pode ser executada mais de uma vez sem problema.
+            </p>
+            <Button
+              data-testid="button-fix-calibration-criteria"
+              variant="outline"
+              className="w-full bg-white shadow-sm border-dashed border-2 border-amber-400 hover:border-amber-600 hover:bg-amber-50 transition-colors"
+              onClick={() => fixCalMutation.mutate()}
+              disabled={fixCalMutation.isPending}
+            >
+              <Wrench size={16} className="mr-2 text-amber-600" />
+              {fixCalMutation.isPending ? "Corrigindo..." : "Corrigir calibrações agora"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
         <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-red-500">
           <CardHeader className="bg-red-50 border-b border-red-100 pb-4">
             <CardTitle className="text-lg font-bold flex items-center gap-2 text-red-700">
@@ -711,6 +755,49 @@ export default function IntegrationPage() {
             >
               <Trash2 size={16} className="mr-2" />
               {resetMutation.isPending ? "Apagando..." : "Apagar dados"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={fixCalDialogOpen} onOpenChange={(open) => { setFixCalDialogOpen(open); if (!open) setFixCalResult(null); }}>
+        <DialogContent className="sm:max-w-lg" data-testid="dialog-fix-cal-result">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench size={20} className="text-amber-600" />
+              Calibrações corrigidas
+            </DialogTitle>
+            <DialogDescription>
+              {(fixCalResult?.totalUpdated ?? 0) === 0
+                ? "Nenhuma calibração precisou ser atualizada — já estão com os IDs corretos."
+                : `${fixCalResult?.totalUpdated} calibração(ões) atualizadas com sucesso.`}
+            </DialogDescription>
+          </DialogHeader>
+          {fixCalResult && (fixCalResult.results?.length ?? 0) > 0 && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                  <tr>
+                    <th className="text-left p-2">De (quesito antigo)</th>
+                    <th className="text-left p-2">Para (quesito atual)</th>
+                    <th className="text-right p-2">Qtd</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fixCalResult.results?.map((r, i) => (
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className="p-2 text-slate-600">{r.from}</td>
+                      <td className="p-2 font-medium text-slate-800">{r.to}</td>
+                      <td className="p-2 text-right font-bold">{r.updated}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => setFixCalDialogOpen(false)}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

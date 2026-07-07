@@ -1408,6 +1408,19 @@ export type ResyncAllEventsCriteria200 = {
   events?: ResyncAllEventsCriteria200EventsItem[];
 };
 
+export type FixCalibrationCriteria200ResultsItem = {
+  from?: string;
+  to?: string;
+  fromId?: number;
+  toId?: number;
+  updated?: number;
+};
+
+export type FixCalibrationCriteria200 = {
+  totalUpdated?: number;
+  results?: FixCalibrationCriteria200ResultsItem[];
+};
+
 export type GetEvaluationsParams = {
 eventId?: number;
 status?: string;
