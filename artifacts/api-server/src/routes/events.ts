@@ -187,7 +187,14 @@ async function loadEventDetail(id: number) {
 
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
 
-  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null };
+  // Resolve conformity evaluator name if assigned
+  let conformityEvaluatorName: string | null = null;
+  if (ev.conformityEvaluatorUserId) {
+    const [u] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, ev.conformityEvaluatorUserId)).limit(1);
+    conformityEvaluatorName = u?.name ?? null;
+  }
+
+  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null, conformityEvaluatorName };
 }
 
 /**
@@ -651,16 +658,39 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
 });
 
 // Matriz de Conformidade
+// POST /events/:id/conformity-evaluator — atribui (ou remove) o avaliador de conformidade
+router.post("/events/:id/conformity-evaluator", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const { userId } = req.body as { userId: number | null };
+  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!before) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  const [updated] = await db.update(eventsTable)
+    .set({ conformityEvaluatorUserId: userId ?? null })
+    .where(eq(eventsTable.id, id))
+    .returning();
+  await audit(req.user!.userId, "set_conformity_evaluator", "events", id, { conformityEvaluatorUserId: before.conformityEvaluatorUserId }, { conformityEvaluatorUserId: updated.conformityEvaluatorUserId });
+  const detail = await loadEventDetail(id);
+  res.json(detail);
+});
+
 router.get("/events/:id/conformity", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
   res.json(conformity ?? null);
 });
 
-router.post("/events/:id/conformity", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events/:id/conformity", async (req, res) => {
+  // admin/rh podem sempre; o avaliador de conformidade atribuído ao evento também pode
   const eventId = parseInt(req.params.id as string);
-  const { epi, estaiamentos, guardaEquipamentos, conduta, epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment } = req.body;
   const userId = req.user!.userId;
+  const role = req.user!.role;
+  if (!["admin", "rh"].includes(role)) {
+    const [ev] = await db.select({ conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (!ev || ev.conformityEvaluatorUserId !== userId) {
+      res.status(403).json({ error: "Acesso negado" }); return;
+    }
+  }
+  const { epi, estaiamentos, guardaEquipamentos, conduta, epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment } = req.body;
   const [evRow] = await db.select({ cycleId: eventsTable.cycleId, status: eventsTable.status }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
 
   // null = PENDENTE (sem penalidade); usa !== undefined para distinguir "não

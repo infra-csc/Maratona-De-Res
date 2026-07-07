@@ -15,6 +15,7 @@
 - [Criteria weights always editable](criteria-weight-freeze.md) — weights never freeze, always editable incl. after close; saving on closed event recomputes cycle + surfaces warnings; only active-flag/structure locks post-evaluation
 - [Penalties & Merits model](penalties-model.md) — penalties+merits share /absences via `kind` col; points positive, sign from kind; final=clamp(gross-pen+merit,0,100); qty must be int≥1
 - [Orval path+query collision](orval-path-query-collision.md) — never mix a path param + query params on one op (dup `GetXParams` export breaks codegen); make the id a query param
+- [Orval inline body collision](orval-inline-body-collision.md) — inline request body schema → orval generates same name in both api.ts (Zod) and types/ (TS type), causing TS2308 on re-export; always use $ref to a named component schema for body objects
 - [Event detail progress source](event-detail-progress.md) — loadEventDetail returns evaluationMatrix:[] always; use the evaluationProgress field (submitted/total evals) for any "% avaliado", never the matrix
 - [Per-event area assignment](event-area-assignment.md) — eval scoping is event→area→N avaliadores (multi-evaluator per area); PUT replaces only areas listed; completeness needs ALL assigned to submit, then averaged
 - [Event-scoped duplicate criteria](event-scoped-criteria.md) — duplicating a quesito makes its OWN criteria row (eventScoped=true) since scores key by global criterionId; exclude eventScoped from /criteria, sync, AND POST /events seeding

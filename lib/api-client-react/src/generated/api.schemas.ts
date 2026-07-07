@@ -430,6 +430,10 @@ export interface EventDetail {
   evaluationMatrix?: EvaluationMatrixRow[];
   results?: EmployeeEventResult[];
   evaluationProgress?: number;
+  /** @nullable */
+  conformityEvaluatorUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorName?: string | null;
 }
 
 export interface EventInput {
@@ -514,6 +518,11 @@ export interface EventParticipantUpdate {
      * @nullable
      */
   comment?: string | null;
+}
+
+export interface ConformityEvaluatorInput {
+  /** @nullable */
+  userId?: number | null;
 }
 
 export interface EventConformity {

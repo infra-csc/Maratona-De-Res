@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -149,6 +149,9 @@ export default function EvaluationsPage() {
   // Confirmation modal + in-flight state for the one-click "Lançar Avaliação" flow.
   const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [conformityEvalForm, setConformityEvalForm] = useState<{
+    epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
+  }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null });
 
   const { data: events } = useGetEvents({});
 
@@ -173,6 +176,30 @@ export default function EvaluationsPage() {
   const { data: selectedEventDetail } = useGetEvent(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: getGetEventQueryKey(selectedEventId ?? 0) },
   });
+
+  const isConformityEvaluatorForEvent = !!selectedEventId && !!user && selectedEventDetail?.conformityEvaluatorUserId === user.id;
+  const { data: myConformityData } = useGetEventConformity(selectedEventId!, {
+    query: { enabled: isConformityEvaluatorForEvent, queryKey: ["event-conformity-eval", selectedEventId] as unknown[] },
+  });
+  const conformityEvalMutation = useSetEventConformity({
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: ["event-conformity-eval", selectedEventId] }),
+      onError: () => toast({ title: "Erro ao salvar conformidade", variant: "destructive" }),
+    },
+  });
+
+  useEffect(() => {
+    if (myConformityData) {
+      setConformityEvalForm({
+        epi: myConformityData.epi ?? null,
+        estaiamentos: myConformityData.estaiamentos ?? null,
+        guardaEquipamentos: myConformityData.guardaEquipamentos ?? null,
+        conduta: myConformityData.conduta ?? null,
+      });
+    } else {
+      setConformityEvalForm({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null });
+    }
+  }, [myConformityData?.id, selectedEventId]);
 
   const evalsQKey = getGetEvaluationsQueryKey({ eventId: selectedEventId ?? undefined });
   const { data: evaluations } = useGetEvaluations(
@@ -238,9 +265,11 @@ export default function EvaluationsPage() {
             .filter(a => a.evaluatorUserId === user?.id)
             .map(a => a.areaId),
         );
-        return (evaluatorCriteriaQueries[i]?.data ?? []).some(
+        const hasCriteria = (evaluatorCriteriaQueries[i]?.data ?? []).some(
           c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
         );
+        const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
+        return hasCriteria || isConformityEval;
       })
     : [];
 
@@ -274,7 +303,8 @@ export default function EvaluationsPage() {
         const total = myCrit.length;
         // Só conta como concluído para o avaliador depois que os resultados do
         // evento forem confirmados por RH/Admin — enviar tudo não basta.
-        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
+        const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
+        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval };
       }).filter(s => s.relevant)
     : [];
   const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
@@ -1209,6 +1239,71 @@ export default function EvaluationsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Conformity section — only visible when evaluator is assigned */}
+              {isConformityEvaluatorForEvent && (() => {
+                const conformityItems: { key: "epi" | "estaiamentos" | "guardaEquipamentos" | "conduta"; label: string }[] = [
+                  { key: "epi", label: "Uso de EPI" },
+                  { key: "estaiamentos", label: "Estaiamentos / Aterramentos" },
+                  { key: "guardaEquipamentos", label: "Guarda de Equipamentos" },
+                  { key: "conduta", label: "Conduta" },
+                ];
+                const allFilled = conformityItems.every(item => conformityEvalForm[item.key] !== null);
+                return (
+                  <div className="space-y-4">
+                    <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
+                      <ShieldAlert size={22} /> Matriz de Conformidade
+                    </h3>
+                    <p className="text-sm text-[#444933] italic px-1 -mt-1">
+                      Você foi designado para preencher a matriz de conformidade deste evento. Selecione SIM ou NÃO para cada item.
+                    </p>
+                    <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+                      <div className="divide-y-2 divide-[#eceef0]">
+                        {conformityItems.map(item => {
+                          const value = conformityEvalForm[item.key];
+                          const isNonConforming = value === false;
+                          return (
+                            <div key={item.key} className={`px-5 transition-colors ${isNonConforming ? "bg-[#fdece6] border-l-4 border-[#862200]" : value === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
+                              <div className="flex items-center justify-between gap-3 min-h-[56px]">
+                                <span className="text-sm font-bold italic text-[#191c1e] leading-snug">{item.label}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {isNonConforming && (
+                                    <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>
+                                  )}
+                                  <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setConformityEvalForm(f => ({ ...f, [item.key]: true }));
+                                        if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: true } });
+                                      }}
+                                      className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                    >Sim</button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setConformityEvalForm(f => ({ ...f, [item.key]: false }));
+                                        if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: false } });
+                                      }}
+                                      className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${value === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                    >Não</button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {allFilled && (
+                        <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center gap-2">
+                          <CheckCircle size={14} className="text-[#506600]" />
+                          <span className="text-xs font-bold italic uppercase text-[#506600]">Matriz preenchida — {conformityItems.filter(i => conformityEvalForm[i.key] === true).length}/{conformityItems.length} itens conformes</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Right Sticky Panel */}
               <div className="sticky top-6 space-y-6">

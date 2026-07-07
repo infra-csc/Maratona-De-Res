@@ -41,6 +41,9 @@ export const eventsTable = pgTable("events", {
   resultsConfirmed: boolean("results_confirmed").notNull().default(false),
   resultsConfirmedAt: timestamp("results_confirmed_at"),
   resultsConfirmedBy: integer("results_confirmed_by").references(() => usersTable.id),
+  // Usuário responsável por preencher a Matriz de Conformidade via Central de Avaliações.
+  // null = RH/Admin preenche diretamente na página do evento (comportamento legado).
+  conformityEvaluatorUserId: integer("conformity_evaluator_user_id").references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   externalIdUq: uniqueIndex("events_external_id_uq").on(t.externalId),

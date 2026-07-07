@@ -4,9 +4,9 @@ import {
   useEventCriterionAssignments, useGenerateCriterionAssignments,
   usePatchCriterionAssignment, type CriterionAssignment,
 } from "@/lib/routing-api";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
@@ -605,6 +605,19 @@ export default function EventDetailPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const canManage = !!user && ["admin", "rh"].includes(user.role);
+  const canManageConformity = canManage || (!!user && user.id === event?.conformityEvaluatorUserId);
+
+  const [conformityEvaluatorPickerOpen, setConformityEvaluatorPickerOpen] = useState(false);
+  const setConformityEvaluatorMutation = useSetConformityEvaluator({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        setConformityEvaluatorPickerOpen(false);
+        toast({ title: "Avaliador de conformidade atualizado" });
+      },
+      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+    },
+  });
 
   const { data: conformityData } = useGetEventConformity(id, {
     query: { enabled: !!id, queryKey: ["event-conformity", id] as unknown[] },
@@ -1904,6 +1917,51 @@ export default function EventDetailPage() {
               <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
                 <ShieldAlert size={18} />
                 <span className="font-black uppercase tracking-tight">Matriz de Conformidade</span>
+                {canManage ? (
+                  <div className="ml-auto">
+                    <Popover open={conformityEvaluatorPickerOpen} onOpenChange={setConformityEvaluatorPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00]/10 border border-[#ccff00]/40 hover:bg-[#ccff00]/20 px-2 py-1 transition-colors">
+                          <UserCheck size={12} />
+                          {event?.conformityEvaluatorName ?? "Sem avaliador"}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
+                        <Command className="rounded-none">
+                          <CommandInput placeholder="Buscar avaliador..." className="italic" />
+                          <CommandList className="max-h-[280px]">
+                            <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="Sem avaliador"
+                                onSelect={() => { setConformityEvaluatorMutation.mutate({ id, data: { userId: null } }); }}
+                                className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
+                              >
+                                <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorUserId == null ? "opacity-100" : "opacity-0")} />
+                                <span className="text-xs font-bold italic uppercase text-[#747a60]">Sem avaliador</span>
+                              </CommandItem>
+                              {evaluators.map(u => (
+                                <CommandItem
+                                  key={u.id}
+                                  value={u.name}
+                                  onSelect={() => { setConformityEvaluatorMutation.mutate({ id, data: { userId: u.id } }); }}
+                                  className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
+                                >
+                                  <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorUserId === u.id ? "opacity-100" : "opacity-0")} />
+                                  <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                ) : event?.conformityEvaluatorName ? (
+                  <span className="ml-auto text-[11px] font-bold italic flex items-center gap-1 text-[#ccff00]/70">
+                    <User size={11} /> {event.conformityEvaluatorName}
+                  </span>
+                ) : null}
               </div>
               {!conformityData && importedConformityRatio && (
                 <p className="px-4 pt-3 text-[10px] font-bold italic uppercase text-[#9aa088]">
@@ -1931,7 +1989,7 @@ export default function EventDetailPage() {
                           {isNonConforming && (
                             <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap mr-1">-10 pts</span>
                           )}
-                          {canManage ? (
+                          {canManageConformity ? (
                             <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
                               <button
                                 type="button"
@@ -1973,7 +2031,7 @@ export default function EventDetailPage() {
                             </span>
                           )}
                         </div>
-                        {canManage ? (
+                        {canManageConformity ? (
                           <div className="pl-2 py-2 flex items-center justify-end">
                             <button
                               type="button"
@@ -1992,7 +2050,7 @@ export default function EventDetailPage() {
                           <div />
                         )}
                       </div>
-                      {isExpanded && canManage && (
+                      {isExpanded && canManageConformity && (
                         <div className="mt-2 p-3 bg-[#fefcf0] border border-[#d4c98a] space-y-2">
                           <Textarea
                             value={comment}

@@ -31,6 +31,7 @@ import type {
   Calibration,
   CalibrationInput,
   CloseQuarterInput,
+  ConformityEvaluatorInput,
   CreateCycleInput,
   Criterion,
   CriterionInput,
@@ -2927,6 +2928,78 @@ export const useUpdateEventParticipant = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateEventParticipantMutationOptions(options));
+    }
+
+export const getSetConformityEvaluatorUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/conformity-evaluator`
+}
+
+/**
+ * @summary Assign (or unassign) the conformity evaluator for an event
+ */
+export const setConformityEvaluator = async (id: number,
+    conformityEvaluatorInput: ConformityEvaluatorInput, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getSetConformityEvaluatorUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conformityEvaluatorInput,)
+  }
+);}
+
+
+
+
+export const getSetConformityEvaluatorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setConformityEvaluator>>, TError,{id: number;data: BodyType<ConformityEvaluatorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setConformityEvaluator>>, TError,{id: number;data: BodyType<ConformityEvaluatorInput>}, TContext> => {
+
+const mutationKey = ['setConformityEvaluator'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setConformityEvaluator>>, {id: number;data: BodyType<ConformityEvaluatorInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setConformityEvaluator(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetConformityEvaluatorMutationResult = NonNullable<Awaited<ReturnType<typeof setConformityEvaluator>>>
+    export type SetConformityEvaluatorMutationBody = BodyType<ConformityEvaluatorInput>
+    export type SetConformityEvaluatorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Assign (or unassign) the conformity evaluator for an event
+ */
+export const useSetConformityEvaluator = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setConformityEvaluator>>, TError,{id: number;data: BodyType<ConformityEvaluatorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setConformityEvaluator>>,
+        TError,
+        {id: number;data: BodyType<ConformityEvaluatorInput>},
+        TContext
+      > => {
+      return useMutation(getSetConformityEvaluatorMutationOptions(options));
     }
 
 export const getGetEventConformityUrl = (id: number,) => {

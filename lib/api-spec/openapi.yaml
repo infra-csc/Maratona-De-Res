@@ -760,6 +760,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventParticipant"
 
+  /events/{id}/conformity-evaluator:
+    post:
+      operationId: setConformityEvaluator
+      tags: [events]
+      summary: Assign (or unassign) the conformity evaluator for an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConformityEvaluatorInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+
   /events/{id}/conformity:
     get:
       operationId: getEventConformity
@@ -2593,6 +2618,10 @@ components:
             $ref: "#/components/schemas/EmployeeEventResult"
         evaluationProgress:
           type: number
+        conformityEvaluatorUserId:
+          type: ["integer", "null"]
+        conformityEvaluatorName:
+          type: ["string", "null"]
 
     EventInput:
       type: object
@@ -2783,6 +2812,12 @@ components:
           description: >-
             Comentário livre sobre o colaborador nesse evento (ex.:
             justificativa de diárias não cumpridas ou de inatividade).
+
+    ConformityEvaluatorInput:
+      type: object
+      properties:
+        userId:
+          type: ["integer", "null"]
 
     EventConformity:
       type: object

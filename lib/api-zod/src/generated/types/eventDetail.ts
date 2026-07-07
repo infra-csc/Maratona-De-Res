@@ -49,4 +49,8 @@ export interface EventDetail {
   evaluationMatrix?: EvaluationMatrixRow[];
   results?: EmployeeEventResult[];
   evaluationProgress?: number;
+  /** @nullable */
+  conformityEvaluatorUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorName?: string | null;
 }
