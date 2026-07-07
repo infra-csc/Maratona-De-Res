@@ -27,4 +27,6 @@ export interface RankingDetailEvent {
   isHistorical: boolean;
   /** Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e não entra na média/elegibilidade. */
   countsForScore: boolean;
+  /** Se false, o evento ainda não teve os resultados confirmados pelo administrador — não deve aparecer no painel de desempenho. */
+  resultsConfirmed?: boolean;
 }

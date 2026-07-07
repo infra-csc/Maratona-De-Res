@@ -2394,7 +2394,8 @@ export const GetRankingDetailResponse = zod.object({
   "evaluatedCriteria": zod.number(),
   "totalCriteria": zod.number(),
   "isHistorical": zod.boolean(),
-  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e não entra na média\/elegibilidade.')
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e não entra na média\/elegibilidade.'),
+  "resultsConfirmed": zod.boolean().optional().describe('Se false, o evento ainda não teve os resultados confirmados pelo administrador — não deve aparecer no painel de desempenho.')
 })),
   "penalties": zod.array(zod.object({
   "id": zod.number(),

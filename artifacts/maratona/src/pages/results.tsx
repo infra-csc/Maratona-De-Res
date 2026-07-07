@@ -396,11 +396,11 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                   <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2">
                     <Trophy size={16} /> Desempenho nas Provas
                   </h4>
-                  {detail.events.length === 0 ? (
-                    <p className="text-sm italic text-[#747a60] font-medium">Nenhum evento avaliado no ciclo.</p>
+                  {detail.events.filter(ev => ev.resultsConfirmed).length === 0 ? (
+                    <p className="text-sm italic text-[#747a60] font-medium">Nenhum evento confirmado no ciclo.</p>
                   ) : (
                     <div className="space-y-2">
-                      {detail.events.map(ev => (
+                      {detail.events.filter(ev => ev.resultsConfirmed).map(ev => (
                         <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")}>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -581,11 +581,11 @@ function EmployeeDetailSheet({
                 <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2">
                   <Trophy size={16} /> Desempenho nas Provas
                 </h4>
-                {detail.events.length === 0 ? (
-                  <p className="text-sm italic text-[#747a60] font-medium">Nenhum evento avaliado no ciclo.</p>
+                {detail.events.filter(ev => ev.resultsConfirmed).length === 0 ? (
+                  <p className="text-sm italic text-[#747a60] font-medium">Nenhum evento confirmado no ciclo.</p>
                 ) : (
                   <div className="space-y-2">
-                    {detail.events.map(ev => (
+                    {detail.events.filter(ev => ev.resultsConfirmed).map(ev => (
                       <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")}>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
