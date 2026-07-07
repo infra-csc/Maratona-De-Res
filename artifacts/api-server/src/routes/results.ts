@@ -425,7 +425,7 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
       eligibilityStatus: employeesTable.eligibilityStatus,
     })
     .from(eventParticipantsTable)
-    .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
+    .innerJoin(employeesTable, and(eq(eventParticipantsTable.employeeId, employeesTable.id), eq(employeesTable.active, true)))
     .where(eq(eventParticipantsTable.eventId, eventId));
   // Freelancers e funções informativas ("Sup Ceno *") participam do evento mas
   // NUNCA contam para nota (ver lib/participation.ts) — não entram nesta lista
@@ -585,7 +585,7 @@ router.get("/results/quarterly", async (req, res) => {
       paymentNotes: quarterlyResultsTable.paymentNotes,
     })
     .from(quarterlyResultsTable)
-    .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+    .innerJoin(employeesTable, and(eq(quarterlyResultsTable.employeeId, employeesTable.id), eq(employeesTable.active, true)))
     .where(eq(quarterlyResultsTable.cycleId, cycle.id));
 
   const results = await query;
