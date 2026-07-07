@@ -314,6 +314,29 @@ export default function CriteriaPage() {
     }
   }
 
+  const [syncLabelsRunning, setSyncLabelsRunning] = useState(false);
+  const [syncLabelsResult, setSyncLabelsResult] = useState<number | null>(null);
+  async function runSyncAreaLabels() {
+    setSyncLabelsRunning(true);
+    try {
+      const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
+      const resp = await fetch(`${base}/criteria/admin/sync-area-labels`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const data = await resp.json();
+      setSyncLabelsResult(data.updated);
+      toast({ title: `Rótulos de área sincronizados — ${data.updated} critério(s) atualizado(s)` });
+      qc.invalidateQueries({ queryKey: qKey });
+    } catch (e: unknown) {
+      toast({ title: "Erro ao sincronizar rótulos", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSyncLabelsRunning(false);
+    }
+  }
+
   const [resyncSummary, setResyncSummary] = useState<{ processed: number; skipped: number; totalAdded: number; totalDeactivated: number; totalActivated: number; events: { id: number; name: string; added: number; deactivated: number; activated: number }[] } | null>(null);
   const resyncAllMutation = useResyncAllEventsCriteria({
     mutation: {
@@ -377,6 +400,15 @@ export default function CriteriaPage() {
 
         {/* Actions */}
         <section className="flex justify-end gap-3 flex-wrap">
+          <button
+            type="button"
+            disabled={syncLabelsRunning}
+            onClick={runSyncAreaLabels}
+            className={`bg-[#e0f0ff] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+          >
+            <Building2 size={16} className={syncLabelsRunning ? "animate-pulse" : ""} />
+            {syncLabelsRunning ? "Sincronizando..." : syncLabelsResult != null ? `✓ ${syncLabelsResult} área(s) sync` : "Sincronizar Rótulos de Área"}
+          </button>
           <button
             type="button"
             disabled={fixCalibRunning || fixCalibResult != null}

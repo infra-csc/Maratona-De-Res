@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, criteriaTable, areasTable, eventCriteriaTable, eventsTable } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -45,10 +45,23 @@ router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
   const { name, description, responsibleAreaId, defaultWeight, active, displayOrder } = req.body;
   const [before] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+
+  // Quando a área é alterada, sincroniza responsibleAreaLabel automaticamente.
+  let newAreaLabel: string | null | undefined;
+  if (responsibleAreaId !== undefined) {
+    if (responsibleAreaId == null) {
+      newAreaLabel = null;
+    } else {
+      const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, responsibleAreaId)).limit(1);
+      newAreaLabel = area?.name ?? null;
+    }
+  }
+
   const [criterion] = await db.update(criteriaTable).set({
     ...(name !== undefined && { name }),
     ...(description !== undefined && { description }),
     ...(responsibleAreaId !== undefined && { responsibleAreaId }),
+    ...(newAreaLabel !== undefined && { responsibleAreaLabel: newAreaLabel }),
     ...(defaultWeight !== undefined && { defaultWeight: String(defaultWeight) }),
     ...(active !== undefined && { active }),
     ...(displayOrder !== undefined && { displayOrder }),
@@ -76,6 +89,21 @@ router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
 
   await audit(req.user!.userId, "update", "criteria", id, before, criterion);
   res.json(criterion);
+});
+
+// Admin: sincroniza responsibleAreaLabel de todos os critérios com o nome
+// real da área vinculada. Idempotente — só atualiza linhas divergentes.
+router.post("/criteria/admin/sync-area-labels", requireRole("admin"), async (req, res) => {
+  const updated = await db.execute(sql`
+    UPDATE criteria
+    SET    responsible_area_label = areas.name
+    FROM   areas
+    WHERE  criteria.responsible_area_id = areas.id
+      AND  (criteria.responsible_area_label IS DISTINCT FROM areas.name)
+  `);
+  const count = (updated as unknown as { rowCount: number }).rowCount ?? 0;
+  await audit(req.user!.userId, "sync_area_labels", "criteria", null, { updated: count }, null);
+  res.json({ updated: count });
 });
 
 export default router;
