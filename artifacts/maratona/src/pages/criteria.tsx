@@ -495,9 +495,16 @@ export default function CriteriaPage() {
                   <p className="text-[10px] font-bold uppercase italic text-[#747a60]">Desativados</p>
                 </div>
               </div>
-              <p className="text-xs text-[#747a60] italic">
-                {resyncSummary.skipped} evento(s) ficaram de fora (já confirmados ou já com avaliações enviadas).
-              </p>
+              {resyncSummary.skipped > 0 && (
+                <p className="text-xs text-[#747a60] italic">
+                  {resyncSummary.skipped} evento(s) pulado(s) por erro interno.
+                </p>
+              )}
+              {resyncSummary.processed === 0 && resyncSummary.skipped === 0 && (
+                <p className="text-xs text-[#747a60] italic">
+                  Todos os eventos já estavam sincronizados com o catálogo ativo.
+                </p>
+              )}
               {resyncSummary.events.length > 0 && (
                 <div className="max-h-64 overflow-y-auto border-2 border-[#191c1e] divide-y-2 divide-[#eceef0]">
                   {resyncSummary.events.map(ev => (

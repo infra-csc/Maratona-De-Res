@@ -1294,10 +1294,14 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
       }
 
       const existingEventCriteria = await tx.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, eventId));
-      const existingCriterionIds = new Set(existingEventCriteria.map(ec => ec.criterionId));
+      const existingByCriterionId = new Map(existingEventCriteria.map(ec => [ec.criterionId, ec]));
       for (const c of targetCriteriaByName.values()) {
-        if (!existingCriterionIds.has(c.id)) {
+        const existing = existingByCriterionId.get(c.id);
+        if (!existing) {
           await tx.insert(eventCriteriaTable).values({ eventId, criterionId: c.id, active: true });
+        } else if (!existing.active) {
+          // Critério existia mas estava inativo — reativa para que as avaliações importadas sejam visíveis
+          await tx.update(eventCriteriaTable).set({ active: true }).where(eq(eventCriteriaTable.id, existing.id));
         }
       }
       if (retiredCriteriaIds.length > 0) {

@@ -220,11 +220,24 @@ class ResyncBlockedError extends Error {
   constructor(public reason: "confirmed" | "has_evaluations") { super(reason); }
 }
 
-async function resyncEventCriteriaOnce(eventId: number) {
+/**
+ * Sincroniza os critérios de um evento com o catálogo global ativo.
+ *
+ * force=false (padrão): bloqueia se o evento tem avaliações ou critérios confirmados.
+ * force=true (aditivo): nunca remove critérios existentes (seguro para eventos com
+ * avaliações já lançadas ou históricos). Apenas adiciona critérios novos que ainda
+ * não estejam no evento, e reativa critérios inativos que voltaram a ser ativos no
+ * catálogo. Ignora os guards de "has_evaluations" e "criteriaConfirmed".
+ */
+async function resyncEventCriteriaOnce(eventId: number, options: { force?: boolean } = {}) {
+  const { force = false } = options;
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) throw new Error("not_found");
-  if (event.criteriaConfirmed) throw new ResyncBlockedError("confirmed");
-  if (await eventHasEvaluations(eventId)) throw new ResyncBlockedError("has_evaluations");
+
+  if (!force) {
+    if (event.criteriaConfirmed) throw new ResyncBlockedError("confirmed");
+    if (await eventHasEvaluations(eventId)) throw new ResyncBlockedError("has_evaluations");
+  }
 
   const globalActive = await db
     .select({ id: criteriaTable.id })
@@ -246,7 +259,8 @@ async function resyncEventCriteriaOnce(eventId: number) {
 
   const existingCriterionIds = new Set(existing.map(e => e.criterionId));
 
-  const toDeactivate = existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
+  // force=true → nunca desativa (seguro para eventos com avaliações)
+  const toDeactivate = force ? [] : existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
   const toActivate = existing.filter(e => !e.active && !e.eventScoped && e.criterionActive);
   const toAdd = [...globalActiveIds].filter(cid => !existingCriterionIds.has(cid));
 
@@ -971,9 +985,12 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
  */
 router.post("/events/:id/criteria/resync", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
+  // Default force=true: sync is always additive (never removes criteria with evaluations).
+  // Explicit force=false opt-out is available for strict mode.
+  const force = req.body?.force !== false;
   try {
-    const { deactivated, added } = await resyncEventCriteriaOnce(eventId);
-    await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated, added }, null);
+    const { deactivated, added } = await resyncEventCriteriaOnce(eventId, { force });
+    await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated, added, force }, null);
     res.json({ ...(await loadEventDetail(eventId)), removedStale: deactivated, addedNew: added });
   } catch (err) {
     if (err instanceof ResyncBlockedError) {
@@ -996,6 +1013,8 @@ router.post("/events/:id/criteria/resync", requireRole("admin", "rh"), async (re
  * resumo de "processados").
  */
 router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (req, res) => {
+  // Default force=true: additive-only sync works on events with evaluations or confirmed criteria.
+  const force = req.body?.force !== false;
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json({ processed: 0, skipped: 0, totalAdded: 0, totalDeactivated: 0, events: [] }); return; }
 
@@ -1009,13 +1028,13 @@ router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (re
 
   for (const ev of events) {
     try {
-      const { added, deactivated } = await resyncEventCriteriaOnce(ev.id);
+      const { added, deactivated } = await resyncEventCriteriaOnce(ev.id, { force });
       if (added > 0 || deactivated > 0) {
         processed += 1;
         totalAdded += added;
         totalDeactivated += deactivated;
         details.push({ id: ev.id, name: ev.name, added, deactivated });
-        await audit(req.user!.userId, "resync_criteria", "events", ev.id, { deactivated, added, bulk: true }, null);
+        await audit(req.user!.userId, "resync_criteria", "events", ev.id, { deactivated, added, bulk: true, force }, null);
       }
     } catch (err) {
       if (err instanceof ResyncBlockedError) { skipped += 1; continue; }
