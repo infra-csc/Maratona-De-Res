@@ -79,19 +79,45 @@ function normalizeForMatch(s: string): string {
     .trim();
 }
 
+const MATCH_STOP_WORDS = new Set(["de", "da", "do", "das", "dos", "e", "ou", "no", "na", "em", "a", "o", "as", "os"]);
+
+function significantWords(norm: string): string[] {
+  return norm.split(/\s+/).filter(w => w.length >= 3 && !MATCH_STOP_WORDS.has(w));
+}
+
 function matchCriterionByName(rawName: string, criteria: { criterionId: number; criterionName: string }[]): number | null {
   const norm = normalizeForMatch(rawName);
   if (!norm) return null;
-  let best: { id: number; score: number } | null = null;
+
+  // 1. Exact match
+  for (const c of criteria) {
+    if (normalizeForMatch(c.criterionName) === norm) return c.criterionId;
+  }
+
+  // 2. Substring / prefix match
+  let substringBest: { id: number; score: number } | null = null;
   for (const c of criteria) {
     const cn = normalizeForMatch(c.criterionName);
-    if (cn === norm) return c.criterionId;
     if (cn.includes(norm) || norm.includes(cn)) {
       const score = Math.min(cn.length, norm.length);
-      if (!best || score > best.score) best = { id: c.criterionId, score };
+      if (!substringBest || score > substringBest.score) substringBest = { id: c.criterionId, score };
     }
   }
-  return best?.id ?? null;
+  if (substringBest) return substringBest.id;
+
+  // 3. Word-overlap fallback — counts significant shared words
+  const rawWords = significantWords(norm);
+  if (rawWords.length === 0) return null;
+  let overlapBest: { id: number; score: number } | null = null;
+  for (const c of criteria) {
+    const cnWords = significantWords(normalizeForMatch(c.criterionName));
+    const overlap = rawWords.filter(w => cnWords.includes(w)).length;
+    if (overlap > 0) {
+      const score = overlap / Math.max(rawWords.length, cnWords.length);
+      if (!overlapBest || score > overlapBest.score) overlapBest = { id: c.criterionId, score };
+    }
+  }
+  return overlapBest?.id ?? null;
 }
 
 function ImportedNotesList({ notes }: { notes: string }) {

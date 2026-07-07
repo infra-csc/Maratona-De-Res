@@ -433,12 +433,44 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
   // "Elegível" que não correspondem à realidade (não geram employee_event_results).
   const participants = allParticipants.filter(p => participantCountsForScore(p));
 
-  // Evento histórico: não há critérios/avaliações — a nota já vem pronta
-  // (calibrada) de fora. Responde direto com importedScore, sem chamar
-  // computeEventTeamResult (que dependeria de eventCriteria inexistente).
+  // Evento histórico: não há avaliações reais — a nota final já vem pronta
+  // como importedScore. Porém, se o evento tem event_criteria configurados,
+  // retornamos a lista de critérios (com scores nulos) para que o frontend
+  // possa exibir a tabela e popular "Nota Avaliador" a partir do importedNotes.
   if (event.isHistorical) {
     const score = parseFloat(event.importedScore as unknown as string);
     const platoon = getPlatoonByScore(score, platoonRules);
+
+    const historicalCriteriaRows = await db
+      .select({
+        criterionId: eventCriteriaTable.criterionId,
+        criterionName: criteriaTable.name,
+        responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
+        originalWeight: criteriaTable.defaultWeight,
+        weightOverride: eventCriteriaTable.weightOverride,
+        displayOrder: criteriaTable.displayOrder,
+        active: eventCriteriaTable.active,
+      })
+      .from(eventCriteriaTable)
+      .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+      .where(eq(eventCriteriaTable.eventId, eventId));
+
+    const historicalCriteriaDetails = historicalCriteriaRows
+      .filter(c => c.active)
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+      .map(c => ({
+        criterionId: c.criterionId!,
+        criterionName: c.criterionName ?? "",
+        responsibleAreaLabel: c.responsibleAreaLabel ?? null,
+        weight: parseFloat(c.weightOverride ?? c.originalWeight ?? "1"),
+        averageScore: null,
+        calibratedScore: null,
+        calibrationReason: null,
+        scoreUsed: null,
+        criterionTotal: null,
+        status: "avaliado" as const,
+      }));
+
     res.json({
       eventId,
       eventName: event.name,
@@ -452,12 +484,12 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
       projectedPlatoon: platoon?.name ?? null,
       projectedPlatoonColor: platoon?.color ?? null,
       projectedBonus: platoon?.bonusValue ?? 0,
-      totalCriteria: 0,
-      evaluatedCriteria: 0,
+      totalCriteria: historicalCriteriaDetails.length,
+      evaluatedCriteria: historicalCriteriaDetails.length,
       pendingCriteria: 0,
       isComplete: true,
       hasCalibration: true,
-      criteriaDetails: [],
+      criteriaDetails: historicalCriteriaDetails,
       participants: participants.map(p => ({
         employeeId: p.employeeId!,
         employeeName: p.employeeName ?? "",
