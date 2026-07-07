@@ -441,35 +441,53 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
     const score = parseFloat(event.importedScore as unknown as string);
     const platoon = getPlatoonByScore(score, platoonRules);
 
-    const historicalCriteriaRows = await db
-      .select({
-        criterionId: eventCriteriaTable.criterionId,
-        criterionName: criteriaTable.name,
-        responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
-        originalWeight: criteriaTable.defaultWeight,
-        weightOverride: eventCriteriaTable.weightOverride,
-        displayOrder: criteriaTable.displayOrder,
-        active: eventCriteriaTable.active,
-      })
-      .from(eventCriteriaTable)
-      .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-      .where(eq(eventCriteriaTable.eventId, eventId));
+    const [historicalCriteriaRows, historicalCalibrations] = await Promise.all([
+      db
+        .select({
+          criterionId: eventCriteriaTable.criterionId,
+          criterionName: criteriaTable.name,
+          responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
+          originalWeight: criteriaTable.defaultWeight,
+          weightOverride: eventCriteriaTable.weightOverride,
+          displayOrder: criteriaTable.displayOrder,
+          active: eventCriteriaTable.active,
+        })
+        .from(eventCriteriaTable)
+        .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+        .where(eq(eventCriteriaTable.eventId, eventId)),
+      db
+        .select({
+          criterionId: calibrationsTable.criterionId,
+          calibratedScore: calibrationsTable.calibratedScore,
+          calibrationReason: calibrationsTable.calibrationReason,
+        })
+        .from(calibrationsTable)
+        .where(eq(calibrationsTable.eventId, eventId)),
+    ]);
+
+    const calMap = new Map(historicalCalibrations.map(c => [c.criterionId, c]));
 
     const historicalCriteriaDetails = historicalCriteriaRows
       .filter(c => c.active)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-      .map(c => ({
-        criterionId: c.criterionId!,
-        criterionName: c.criterionName ?? "",
-        responsibleAreaLabel: c.responsibleAreaLabel ?? null,
-        weight: parseFloat(c.weightOverride ?? c.originalWeight ?? "1"),
-        averageScore: null,
-        calibratedScore: null,
-        calibrationReason: null,
-        scoreUsed: null,
-        criterionTotal: null,
-        status: "avaliado" as const,
-      }));
+      .map(c => {
+        const cal = calMap.get(c.criterionId!);
+        const calibratedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+        return {
+          criterionId: c.criterionId!,
+          criterionName: c.criterionName ?? "",
+          responsibleAreaLabel: c.responsibleAreaLabel ?? null,
+          weight: parseFloat(c.weightOverride ?? c.originalWeight ?? "1"),
+          averageScore: null,
+          calibratedScore,
+          calibrationReason: cal?.calibrationReason ?? null,
+          scoreUsed: calibratedScore,
+          criterionTotal: calibratedScore != null
+            ? calibratedScore * parseFloat(c.weightOverride ?? c.originalWeight ?? "1")
+            : null,
+          status: "avaliado" as const,
+        };
+      });
 
     res.json({
       eventId,
