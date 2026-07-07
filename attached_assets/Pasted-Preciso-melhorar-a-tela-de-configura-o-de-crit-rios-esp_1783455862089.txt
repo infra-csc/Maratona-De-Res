@@ -1,0 +1,59 @@
+Preciso melhorar a tela de configuração de critérios, especificamente a seção que relaciona 
+avaliadores a cada critério. Hoje ela lista todos os usuários da área como checkboxes soltos, 
+o que fica poluído em listas longas (ex: "Prazo de Entrega" tem 11 pessoas) e não deixa claro 
+qual é o avaliador PRINCIPAL vs. quem pode receber redirecionamento.
+
+═══════════════════════════════════════
+1. SEPARAR "AVALIADOR PRINCIPAL" DE "PODE RECEBER REDIRECIONAMENTO"
+═══════════════════════════════════════
+
+Ao invés de uma lista única de checkboxes, estruturar assim:
+
+- Campo "AVALIADOR PRINCIPAL": um seletor único (dropdown/select ou busca) para escolher 
+  UMA pessoa como responsável padrão por aquele critério (ex: Eduardo Meira para 
+  Logística Reversa).
+  
+- Campo "PODE REDIRECIONAR PARA": lista multi-select (pode manter os checkboxes aqui, 
+  mas com busca) mostrando quem mais pode receber a avaliação quando o principal 
+  redirecionar (ex: Sandro Gomes, Sandro Paiva).
+
+Isso deixa a relação clara: 1 avaliador principal + N avaliadores de redirecionamento, 
+ao invés de uma lista ambígua onde não se sabe quem é o "responsável padrão".
+
+═══════════════════════════════════════
+2. CAMPO DE BUSCA PARA LISTAS LONGAS
+═══════════════════════════════════════
+
+Para critérios com muitos usuários na área (ex: Produção com 11 pessoas), adicionar um 
+campo de busca/filtro no topo da lista de checkboxes, para o usuário digitar o nome e 
+filtrar rapidamente, ao invés de rolar uma lista longa.
+
+═══════════════════════════════════════
+3. CORRIGIR MENSAGEM "SEM AVALIADOR"
+═══════════════════════════════════════
+
+- A mensagem "SEM AVALIADOR" em vermelho deve aparecer SOMENTE quando o campo 
+  "Avaliador Principal" estiver vazio (não selecionado).
+- Se houver um avaliador principal definido, mas nenhum avaliador de redirecionamento, 
+  a mensagem NÃO deve aparecer (redirecionamento é opcional, avaliador principal é 
+  obrigatório).
+
+═══════════════════════════════════════
+4. LAYOUT MAIS COMPACTO
+═══════════════════════════════════════
+
+- Colapsar a lista de "pode redirecionar para" por padrão (ex: mostrar só a contagem 
+  "3 avaliadores de backup selecionados ▾"), expandindo ao clicar, para não ocupar 
+  tanto espaço vertical na tela quando há muitos critérios cadastrados.
+- Manter o peso/nota (ex: "3") e os botões de duplicar/excluir como estão hoje, à direita.
+
+═══════════════════════════════════════
+5. INDICAÇÃO VISUAL DO AVALIADOR PRINCIPAL
+═══════════════════════════════════════
+
+- Destacar visualmente (ex: badge ou ícone de "estrela"/"principal") o avaliador 
+  principal na lista, para diferenciar rapidamente do restante, tanto nesta tela de 
+  configuração quanto em outras telas do sistema que mostrem esse critério.
+
+Manter a paleta de cores atual do sistema (preto/lima, cinza para elementos secundários, 
+vermelho para alertas como "sem avaliador").
