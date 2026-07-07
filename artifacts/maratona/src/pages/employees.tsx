@@ -15,6 +15,12 @@ import { useAuth } from "@/lib/auth-context";
 type EmploymentType = "casa" | "freela";
 const employmentTypeLabel = (t?: string) => (t === "freela" ? "Freela" : "Casa");
 
+// Extra fields injected by GET /employees from quarterly_results for current cycle
+type EmployeeWithCycle = import("@workspace/api-client-react").Employee & {
+  cycleEligible: boolean | null;
+  participatedEventsCount: number | null;
+};
+
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
@@ -30,13 +36,14 @@ export default function EmployeesPage() {
   const [filterActive, setFilterActive] = useState<"all" | "true" | "false">("true");
   const [filterType, setFilterType] = useState<"all" | EmploymentType>("all");
   const [open, setOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeWithCycle | null>(null);
 
   const qKey = getGetEmployeesQueryKey({ active: filterActive === "all" ? undefined : filterActive === "true" });
-  const { data: employees, isLoading } = useGetEmployees(
+  const { data: employeesRaw, isLoading } = useGetEmployees(
     filterActive === "all" ? {} : { active: filterActive === "true" },
     { query: { queryKey: qKey } }
   );
+  const employees = employeesRaw as EmployeeWithCycle[] | undefined;
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<EmployeeInput>({
     defaultValues: { department: "Geral", functionName: "Colaborador", employmentType: "casa" },
@@ -97,10 +104,20 @@ export default function EmployeesPage() {
       e.functionName.toLowerCase().includes(search.toLowerCase()))
   );
 
+  // cycleEligible = computed quarterly eligibility (8-event rule); null = no cycle data yet
+  // Freelas never have quarterly_results entries, so cycleEligible is always null for them
+  const getEligibilityStatus = (e: EmployeeWithCycle): "eligible" | "not_eligible" | "freela" | "pending" => {
+    if (e.employmentType === "freela") return "freela";
+    if (e.cycleEligible === true) return "eligible";
+    if (e.cycleEligible === false) return "not_eligible";
+    // No cycle data yet: fall back to admin flag
+    return e.eligibleForBonus === false ? "not_eligible" : "pending";
+  };
+
   const stats = {
     total: employees?.length ?? 0,
     ativos: employees?.filter(e => e.active).length ?? 0,
-    elegiveis: employees?.filter(e => e.eligibleForBonus !== false).length ?? 0,
+    elegiveis: employees?.filter(e => getEligibilityStatus(e) === "eligible").length ?? 0,
   };
   const pct = (n: number) => (stats.total > 0 ? Math.round((n / stats.total) * 100) : 0);
 
@@ -378,12 +395,33 @@ export default function EmployeesPage() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-1.5 font-bold italic uppercase text-sm">
-                          {emp.eligibleForBonus === false ? (
-                            <span className="flex items-center gap-1.5 text-[#747a60] opacity-70"><XCircle size={16} /> Não Elegível</span>
-                          ) : (
-                            <span className="flex items-center gap-1.5 text-[#506600]"><CheckCircle2 size={16} /> Elegível</span>
-                          )}
+                        <div className="flex flex-col items-center justify-center gap-0.5 font-bold italic uppercase text-sm">
+                          {(() => {
+                            const status = getEligibilityStatus(emp);
+                            if (status === "freela") return (
+                              <span className="flex items-center gap-1.5 text-[#888] opacity-60">— Não pontua</span>
+                            );
+                            if (status === "eligible") return (
+                              <>
+                                <span className="flex items-center gap-1.5 text-[#506600]"><CheckCircle2 size={16} /> Elegível</span>
+                                {emp.participatedEventsCount !== null && (
+                                  <span className="text-[10px] font-normal normal-case opacity-60 not-italic">{emp.participatedEventsCount} eventos</span>
+                                )}
+                              </>
+                            );
+                            if (status === "not_eligible") return (
+                              <>
+                                <span className="flex items-center gap-1.5 text-[#747a60] opacity-70"><XCircle size={16} /> Não Elegível</span>
+                                {emp.participatedEventsCount !== null && (
+                                  <span className="text-[10px] font-normal normal-case opacity-60 not-italic">{emp.participatedEventsCount} eventos</span>
+                                )}
+                              </>
+                            );
+                            // pending: no cycle data yet
+                            return (
+                              <span className="flex items-center gap-1.5 text-[#888] opacity-60">— Sem dados</span>
+                            );
+                          })()}
                         </div>
                       </td>
                       {canEdit && (

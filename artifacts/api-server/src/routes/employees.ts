@@ -11,12 +11,39 @@ router.use(requireAuth);
 
 router.get("/employees", async (req, res) => {
   const activeFilter = req.query.active;
+  const cycle = await getCurrentCycle();
+
+  // Base employee rows
   let query = db.select().from(employeesTable).$dynamic();
   if (activeFilter !== undefined) {
     query = query.where(eq(employeesTable.active, activeFilter === "true"));
   }
   const employees = await query.orderBy(employeesTable.name);
-  res.json(employees);
+
+  // Join quarterly_results for current cycle (if exists) to expose computed eligibility
+  const cycleResults: Record<number, { cycleEligible: boolean; participatedEventsCount: number }> = {};
+  if (cycle) {
+    const rows = await db
+      .select({
+        employeeId: quarterlyResultsTable.employeeId,
+        eligible: quarterlyResultsTable.eligible,
+        participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
+      })
+      .from(quarterlyResultsTable)
+      .where(eq(quarterlyResultsTable.cycleId, cycle.id));
+    for (const r of rows) {
+      cycleResults[r.employeeId] = {
+        cycleEligible: r.eligible,
+        participatedEventsCount: r.participatedEventsCount,
+      };
+    }
+  }
+
+  res.json(employees.map(e => ({
+    ...e,
+    cycleEligible: cycleResults[e.id]?.cycleEligible ?? null,
+    participatedEventsCount: cycleResults[e.id]?.participatedEventsCount ?? null,
+  })));
 });
 
 router.get("/employees/:id", async (req, res) => {
