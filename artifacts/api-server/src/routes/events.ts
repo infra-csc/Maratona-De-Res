@@ -259,8 +259,22 @@ async function resyncEventCriteriaOnce(eventId: number, options: { force?: boole
 
   const existingCriterionIds = new Set(existing.map(e => e.criterionId));
 
-  // force=true → nunca desativa (seguro para eventos com avaliações)
-  const toDeactivate = force ? [] : existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
+  // Candidates for deactivation: active event_criteria whose global criterion is now inactive
+  const deactivateCandidates = existing.filter(e => e.active && !e.eventScoped && !e.criterionActive);
+
+  let toDeactivate = deactivateCandidates;
+  if (force && deactivateCandidates.length > 0) {
+    // In force mode: only protect criteria that have real evaluator submissions.
+    // Criteria with only calibrations (no evaluations) are still deactivated so
+    // the event can be realigned to the current active catalog.
+    const candidateIds = deactivateCandidates.map(e => e.criterionId);
+    const evalsWithData = await db.select({ criterionId: evaluationsTable.criterionId })
+      .from(evaluationsTable)
+      .where(and(eq(evaluationsTable.eventId, eventId), inArray(evaluationsTable.criterionId, candidateIds)));
+    const protectedIds = new Set(evalsWithData.map(e => e.criterionId));
+    toDeactivate = deactivateCandidates.filter(e => !protectedIds.has(e.criterionId));
+  }
+
   const toActivate = existing.filter(e => !e.active && !e.eventScoped && e.criterionActive);
   const toAdd = [...globalActiveIds].filter(cid => !existingCriterionIds.has(cid));
 
