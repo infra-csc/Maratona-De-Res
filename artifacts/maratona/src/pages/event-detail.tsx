@@ -472,24 +472,12 @@ function HistoricalResultPanel({
   });
 
   if (!canManage) {
-    if (!currentNotes) return null;
-    return (
-      <div data-testid="panel-historical-notes-readonly" className="mt-4 p-3 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-2">
-        <MessageSquare size={14} className="text-[#444933] shrink-0 mt-[2px]" />
-        <div className="flex-1"><ImportedNotesList notes={currentNotes} /></div>
-      </div>
-    );
+    return null;
   }
 
   if (!editing) {
     return (
       <div className="mt-4 flex flex-col items-start gap-2">
-        {currentNotes && (
-          <div data-testid="panel-historical-notes-readonly" className="p-3 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-2 w-full">
-            <MessageSquare size={14} className="text-[#444933] shrink-0 mt-[2px]" />
-            <div className="flex-1"><ImportedNotesList notes={currentNotes} /></div>
-          </div>
-        )}
         <button
           type="button"
           data-testid="button-edit-historical-result"
