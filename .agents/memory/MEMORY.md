@@ -1,6 +1,6 @@
 - [Maratona app architecture](maratona-architecture.md) — full-stack PT-BR perf app; api at /api (8080), frontend at / (23916); vite proxies /api → localhost:8080
 - [Seed runner pattern](seed-runner.md) — no tsx in api-server; run seed via scripts' tsx bin; seed wipes in reverse-FK order first
-- [Calculation scale](calculation-scale.md) — score×weight directly (0-100), weights sum to 20, no normalization
+- [Calculation scale](calculation-scale.md) — normalized weighted avg: (Σ nota×peso / Σ peso)×10 → 0–100; weights need NOT sum to 20; divide by actual weight sum
 - [JWT_SECRET env](jwt-secret-env.md) — keep in encrypted Secrets store; auth.ts throws at startup if missing (no fallback)
 - [API client /api prefix](api-client-prefix.md) — generated paths must be BARE; single /api prefix owned by runtime setBaseUrl, else double-prefix → 401
 - [Event duplicate-merge guard](event-merge-duplicate.md) — merge blocks discarding real data on removed duplicate unless force=true; 400 returns requiresConfirmation+details for a UI confirm step
