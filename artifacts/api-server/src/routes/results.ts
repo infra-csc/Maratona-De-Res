@@ -6,7 +6,7 @@ import {
   employeeCycleEligibilityTable, areasTable, cyclesTable, eventConformitiesTable,
   eventAreaAssignmentsTable,
 } from "@workspace/db";
-import { eq, and, inArray, ilike } from "drizzle-orm";
+import { eq, and, inArray, ilike, notExists, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import {
   calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
@@ -590,6 +590,16 @@ router.get("/results/quarterly", async (req, res) => {
       eq(quarterlyResultsTable.cycleId, cycle.id),
       eq(employeesTable.employmentType, "casa"),
       ilike(employeesTable.functionName, "cenotecnic%"),
+      notExists(
+        db.select({ one: sql`1` })
+          .from(eventParticipantsTable)
+          .innerJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
+          .where(and(
+            eq(eventParticipantsTable.employeeId, employeesTable.id),
+            eq(eventsTable.cycleId, cycle.id),
+            ilike(eventParticipantsTable.functionName, "sup ceno%"),
+          )),
+      ),
     ));
 
   const [results, platoonRuleRows] = await Promise.all([
