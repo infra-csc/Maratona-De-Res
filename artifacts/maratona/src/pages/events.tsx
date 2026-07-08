@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check } from "lucide-react";
+import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ArrowUpDown, Info } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -37,6 +37,7 @@ export default function EventsPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [cardFilter, setCardFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState("dateDesc");
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeForEvent, setMergeForEvent] = useState<{ id: number; name: string } | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>("");
@@ -92,14 +93,25 @@ export default function EventsPage() {
   const filtered = (events ?? []).filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchConfig = filterStatus === "all"
-      || (filterStatus === "configured" ? !!ev.criteriaConfirmed : filterStatus === "confirmed" ? !!ev.resultsConfirmed : !ev.resultsConfirmed);
+      || (filterStatus === "configured" && !!ev.criteriaConfirmed)
+      || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
+      || (filterStatus === "unconfirmed" && !ev.resultsConfirmed)
+      || (filterStatus === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
+      || (filterStatus === "fullyEval" && (ev.evaluationProgress ?? 0) >= 1)
+      || (filterStatus === "fullyCalibrated" && !!ev.fullyCalibrated);
     const matchCard = cardFilter === null
       || (cardFilter === "configured" && ev.criteriaConfirmed)
       || (cardFilter === "confirmed" && ev.resultsConfirmed)
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
       || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
-      || (cardFilter === "fullyEval" && ev.evaluationProgress === 1);
+      || (cardFilter === "fullyEval" && (ev.evaluationProgress ?? 0) >= 1);
     return matchSearch && matchConfig && matchCard;
+  }).slice().sort((a, b) => {
+    if (sortBy === "dateAsc") return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    if (sortBy === "scoreDesc") return ((b.teamScore ?? b.averageScore) ?? -1) - ((a.teamScore ?? a.averageScore) ?? -1);
+    if (sortBy === "scoreAsc") return ((a.teamScore ?? a.averageScore) ?? 101) - ((b.teamScore ?? b.averageScore) ?? 101);
+    if (sortBy === "status") return (a.status ?? "").localeCompare(b.status ?? "");
+    return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
   });
 
   const canCreate = user && ["admin", "rh"].includes(user.role);
@@ -187,7 +199,8 @@ export default function EventsPage() {
 
         {/* Summary cards */}
         {events && events.length > 0 && (
-          <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <section className="space-y-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {(() => {
               const all = events ?? [];
               const configured = all.filter(e => e.criteriaConfirmed).length;
@@ -208,6 +221,7 @@ export default function EventsPage() {
                   <button
                     key={c.label}
                     onClick={() => setCardFilter(isActive ? null : c.key)}
+                    title={`Clique para filtrar: ${c.label}`}
                     className={`bg-white border-2 p-4 flex flex-col justify-between h-28 relative overflow-hidden text-left cursor-pointer transition-all hover:translate-y-[-2px] ${isActive ? "border-[#ccff00] shadow-[4px_4px_0px_0px_#ccff00]" : "border-[#191c1e] hover:shadow-[2px_2px_0px_0px_#191c1e]"}`}
                   >
                     <div className="z-10">
@@ -221,6 +235,11 @@ export default function EventsPage() {
                 );
               });
             })()}
+          </div>
+          <p className="flex items-center gap-1.5 text-[11px] italic font-bold text-[#747a60]">
+            <Info size={12} className="shrink-0" />
+            Clique em um card para filtrar a lista. As categorias podem se sobrepor — um evento pode aparecer em mais de um grupo ao mesmo tempo (ex: confirmado e aguardando calibração).
+          </p>
           </section>
         )}
 
@@ -237,8 +256,8 @@ export default function EventsPage() {
             />
           </div>
           <div className="flex flex-wrap gap-2 w-full md:w-auto skew-x-[1deg]">
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger data-testid="select-filter-status" className="w-full md:w-36 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
+            <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setCardFilter(null); }}>
+              <SelectTrigger data-testid="select-filter-status" className="w-full md:w-44 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -246,6 +265,22 @@ export default function EventsPage() {
                 <SelectItem value="configured">Configurados</SelectItem>
                 <SelectItem value="confirmed">Confirmados</SelectItem>
                 <SelectItem value="unconfirmed">Não Confirmados</SelectItem>
+                <SelectItem value="pendingCal">Falta Calibrar</SelectItem>
+                <SelectItem value="fullyCalibrated">Calibragem Concluída</SelectItem>
+                <SelectItem value="fullyEval">Avaliação 100%</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full md:w-44 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
+                <ArrowUpDown size={14} className="mr-1 shrink-0 text-[#747a60]" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dateDesc">Mais Recente</SelectItem>
+                <SelectItem value="dateAsc">Mais Antigo</SelectItem>
+                <SelectItem value="scoreDesc">Maior Score</SelectItem>
+                <SelectItem value="scoreAsc">Menor Score</SelectItem>
+                <SelectItem value="status">Por Status</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -282,7 +317,7 @@ export default function EventsPage() {
                           )}
                           {ev.isHistorical && (
                             <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">Histórico</span>
+                              <span className="inline-block skew-x-[8deg]">Ciclo Anterior</span>
                             </span>
                           )}
                           {ev.forcedClosed && (
@@ -309,13 +344,21 @@ export default function EventsPage() {
                         {ev.clientName && <p className="text-sm font-bold italic uppercase text-[#747a60] mt-1 truncate pr-1.5">{ev.clientName}</p>}
                       </div>
 
-                      {score != null && (
-                        <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[78px] shrink-0 ${concluded ? "bg-[#ccff00]" : "bg-white"}`}>
-                          <span className="block text-[10px] uppercase font-bold italic text-[#161e00] mb-0.5">{concluded ? "Score Final" : "Provisório"}</span>
-                          <span className="text-2xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
-                          <span className={`block text-[8px] uppercase font-bold italic mt-0.5 leading-none ${concluded ? "text-[#506600]" : "text-[#a06a00]"}`}>{concluded ? (calibrated ? "Pós-calibração" : "Evento fechado") : (calibrated ? "Calibração parcial" : "Sem calibração")}</span>
-                        </div>
-                      )}
+                      {score != null && (() => {
+                        const isScoreFinal = concluded && (ev.fullyCalibrated ?? false);
+                        const isScorePartial = concluded && !(ev.fullyCalibrated ?? false);
+                        return (
+                          <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[86px] shrink-0 ${isScoreFinal ? "bg-[#ccff00]" : isScorePartial ? "bg-[#fff8e1]" : "bg-white"}`}>
+                            <span className="block text-[10px] uppercase font-bold italic text-[#161e00] mb-0.5">
+                              {isScoreFinal ? "Score Final" : isScorePartial ? "Score Parcial" : "Provisório"}
+                            </span>
+                            <span className="text-2xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
+                            <span className={`block text-[8px] uppercase font-bold italic mt-0.5 leading-none ${isScoreFinal ? "text-[#506600]" : isScorePartial ? "text-[#a06a00]" : "text-[#747a60]"}`}>
+                              {isScoreFinal ? "Pós-calibração" : isScorePartial ? "Cal. incompleta" : calibrated ? "Cal. parcial" : "Sem calibração"}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t-2 border-dashed border-[#e0e3e5] text-sm font-bold italic text-[#444933]">
@@ -339,19 +382,33 @@ export default function EventsPage() {
                       <div>
                         <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
                           <span className="text-[#444933]">Avaliações dos Avaliadores</span>
-                          <span className={progress === 100 ? "text-[#506600]" : "text-[#191c1e]"}>
-                            {progress}% ({ev.submittedCount ?? 0} / {ev.totalCriteria ?? 0})
-                          </span>
+                          {(ev.totalCriteria ?? 0) === 0 ? (
+                            <span className="text-[#747a60]">—</span>
+                          ) : (
+                            <span className={progress === 100 ? "text-[#506600]" : "text-[#191c1e]"}>
+                              {progress}% ({ev.submittedCount ?? 0} / {ev.totalCriteria})
+                            </span>
+                          )}
                         </div>
                         <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
-                          <div className={progress === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${progress}%` }} />
+                          {(ev.totalCriteria ?? 0) > 0 && (
+                            <div className={progress === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${progress}%` }} />
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs font-bold italic uppercase">
                         <span className="text-[#444933]">Calibragem</span>
                         <span className="flex items-center gap-1.5">
-                          <span className={`inline-block w-2 h-2 border border-[#191c1e] ${concluded ? "bg-[#506600]" : calibrated ? "bg-[#ffb300]" : "bg-[#cfd4d8]"}`} />
-                          <span className={concluded ? "text-[#506600]" : calibrated ? "text-[#a06a00]" : "text-[#747a60]"}>{concluded ? "Concluída" : calibrated ? "Em andamento" : "Pendente"}</span>
+                          {(() => {
+                            const fc = ev.fullyCalibrated ?? false;
+                            const dotColor = fc ? "bg-[#506600]" : calibrated ? "bg-[#ffb300]" : "bg-[#cfd4d8]";
+                            const txtColor = fc ? "text-[#506600]" : calibrated ? "text-[#a06a00]" : "text-[#747a60]";
+                            const label = fc ? "Concluída" : calibrated ? "Em andamento" : "Pendente";
+                            return (<>
+                              <span className={`inline-block w-2 h-2 border border-[#191c1e] ${dotColor}`} />
+                              <span className={txtColor}>{label}</span>
+                            </>);
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -366,6 +423,17 @@ export default function EventsPage() {
                         >
                           <GitMerge size={14} />
                         </button>
+                      )}
+                      {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                        <Link href={`/calibrations?eventId=${ev.id}`}>
+                          <button
+                            data-testid={`button-calibrate-event-${ev.id}`}
+                            title="Ir para calibração deste evento"
+                            className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
+                          >
+                            <SlidersHorizontal size={14} />
+                          </button>
+                        </Link>
                       )}
                       <Link href={`/events/${ev.id}`}>
                         <button data-testid={`button-view-event-${ev.id}`} className="h-8 px-3 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-xs font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all">
