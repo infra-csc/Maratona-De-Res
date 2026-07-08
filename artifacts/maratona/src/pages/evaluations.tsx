@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetEmployees, useAddEventParticipant, useRemoveEventParticipant, useUpdateEventParticipant, useGetAbsences, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -15,9 +15,35 @@ import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+
+// Funções comuns pré-definidas para o seletor de participante (mesma lista de event-detail.tsx).
+const PARTICIPANT_FUNCTIONS = [
+  "Cenotécnica",
+  "Cenotécnica Local",
+  "Cenotécnico",
+  "Sup Ceno",
+  "Sup Ceno Local",
+  "Colaborador",
+] as const;
+const DEFAULT_PARTICIPANT_FUNCTION = "Cenotécnica";
+
+/** Retorna a opção pré-definida que melhor corresponde ao functionName do colaborador. */
+function matchParticipantFunction(fn?: string | null): string {
+  if (!fn) return DEFAULT_PARTICIPANT_FUNCTION;
+  const norm = fn.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const exact = PARTICIPANT_FUNCTIONS.find(
+    o => o.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === norm
+  );
+  if (exact) return exact;
+  const prefix = PARTICIPANT_FUNCTIONS.find(
+    o => norm.startsWith(o.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())
+  );
+  return prefix ?? DEFAULT_PARTICIPANT_FUNCTION;
+}
 
 function ScoreButton({ score, current, onClick, disabled, label }: { score: number, current: number, onClick: () => void, disabled: boolean, label: string }) {
   const isSelected = current === score;
@@ -164,6 +190,13 @@ export default function EvaluationsPage() {
   const [redirectFerramentasOpen, setRedirectFerramentasOpen] = useState(false);
   const [redirectFerramentasTargetId, setRedirectFerramentasTargetId] = useState<number | null>(null);
 
+  // Equipe Alocada — edição do time direto na Central de Avaliações (admin/rh/diretoria).
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
+  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
+  const [newParticipantEmployeeId, setNewParticipantEmployeeId] = useState<number | null>(null);
+  const [newParticipantFunction, setNewParticipantFunction] = useState<string>(DEFAULT_PARTICIPANT_FUNCTION);
+  const [pendingRemoveParticipant, setPendingRemoveParticipant] = useState<number | null>(null);
+
   const { data: events } = useGetEvents({});
 
   // Lista global de avaliadores (independe do evento selecionado) para permitir
@@ -179,6 +212,21 @@ export default function EvaluationsPage() {
   const { data: participants } = useGetEventParticipants(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-participants", selectedEventId] as unknown[] },
   });
+
+  // Colaboradores disponíveis para adicionar à equipe (apenas gestores, ao editar o time deste evento).
+  const { data: allEmployeesForTeam } = useGetEmployees({ active: true }, {
+    query: { enabled: isManager && !!selectedEventId, queryKey: ["employees", "active"] as unknown[] },
+  });
+  const alreadyAllocatedIds = new Set((participants ?? []).map(p => p.employeeId));
+  const availableEmployees = (allEmployeesForTeam ?? []).filter(e => !alreadyAllocatedIds.has(e.id));
+  const selectedNewEmployee = availableEmployees.find(e => e.id === newParticipantEmployeeId);
+
+  // Faltas/atrasos estruturados (tabela `absences`) filtrados pelo evento selecionado —
+  // a API só filtra por employeeId, então filtramos por eventId no cliente.
+  const { data: allAbsencesForEval } = useGetAbsences({}, {
+    query: { enabled: isManager && !!selectedEventId, queryKey: ["absences-central-avaliacoes"] as unknown[] },
+  });
+  const eventAbsences = (allAbsencesForEval ?? []).filter(a => a.eventId === selectedEventId);
 
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-criteria", selectedEventId] as unknown[] },
@@ -293,6 +341,35 @@ export default function EvaluationsPage() {
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: evalsQKey }),
       onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const invalidateTeamQueries = () => {
+    qc.invalidateQueries({ queryKey: ["event-participants", selectedEventId] as unknown[] });
+    qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) });
+  };
+  const addParticipant = useAddEventParticipant({
+    mutation: {
+      onSuccess: () => {
+        invalidateTeamQueries();
+        toast({ title: "Colaborador adicionado à equipe" });
+        setAddParticipantOpen(false);
+        setNewParticipantEmployeeId(null);
+        setNewParticipantFunction(DEFAULT_PARTICIPANT_FUNCTION);
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao adicionar", description: e.message, variant: "destructive" }),
+    },
+  });
+  const removeParticipant = useRemoveEventParticipant({
+    mutation: {
+      onSuccess: () => { invalidateTeamQueries(); toast({ title: "Participante removido" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
+    },
+  });
+  const updateParticipant = useUpdateEventParticipant({
+    mutation: {
+      onSuccess: () => invalidateTeamQueries(),
+      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -1150,6 +1227,66 @@ export default function EvaluationsPage() {
                           <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#b02f00]">Critérios ainda não confirmados — as áreas não podem avaliar até a liberação.</p>
                         </div>
                       )}
+                      {/* Equipe Alocada — quem é o time deste evento, com edição direta para gestores */}
+                      {isManager && (
+                        <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
+                          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
+                            <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight">
+                              <Users size={16} className="shrink-0" /> Equipe Alocada ({participants?.length || 0})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setAddParticipantOpen(true)}
+                              className="flex items-center gap-1.5 px-2.5 py-1 border-2 border-[#ccff00] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[11px] font-black uppercase tracking-tight"
+                            >
+                              <UserPlus size={14} /> Adicionar
+                            </button>
+                          </div>
+                          {(!participants || participants.length === 0) ? (
+                            <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum colaborador alocado.</div>
+                          ) : (
+                            <ul className="divide-y-2 divide-[#eceef0]">
+                              {participants.map(p => {
+                                const isInactive = p.confirmed === false;
+                                return (
+                                  <li key={p.id} className={cn("flex items-center justify-between gap-3 px-5 py-3 flex-wrap", isInactive && "opacity-50 bg-[#fdece6]/40")}>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className="w-8 h-8 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-[10px] text-[#191c1e] shrink-0">
+                                        {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                                      </div>
+                                      <span className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</span>
+                                      <span className="text-[10px] font-bold italic uppercase text-[#747a60] shrink-0">{p.functionName}</span>
+                                      <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
+                                        <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
+                                      </span>
+                                      {isInactive && <span className="text-[10px] font-black italic uppercase text-[#862200] shrink-0">Inativo</span>}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => updateParticipant.mutate({ id: selectedEventId!, participantId: p.id, data: { confirmed: isInactive } })}
+                                        className={cn("p-1.5 border-2 border-[#191c1e] bg-white transition-colors", isInactive ? "text-[#191c1e] hover:bg-[#ccff00]" : "text-[#862200] hover:bg-[#862200] hover:text-white")}
+                                        title={isInactive ? "Reativar colaborador" : "Marcar como inativo (não compareceu)"}
+                                      >
+                                        {isInactive ? <UserCheck size={13} /> : <UserX size={13} />}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPendingRemoveParticipant(p.id)}
+                                        className="p-1.5 border-2 border-[#191c1e] bg-white text-[#862200] hover:bg-[#862200] hover:text-white transition-colors"
+                                        title="Remover do evento"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
                       {/* Outras Respostas do Evento — conformidade, faltas, destaque */}
                       {adminConformityData && typeFilter === "all" && (
                         <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
@@ -1188,11 +1325,27 @@ export default function EvaluationsPage() {
                               <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
                                 <Clock size={12} /> Faltas/Atrasos (+30 min)
                               </p>
+                              {eventAbsences.length > 0 && (
+                                <ul className="space-y-1.5 mb-2">
+                                  {eventAbsences.map(a => (
+                                    <li key={a.id} className="flex items-center justify-between gap-2 border-2 border-[#eceef0] px-3 py-1.5">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <User size={11} className="shrink-0 text-[#747a60]" />
+                                        <span className="font-black italic uppercase text-xs text-[#191c1e] truncate">{a.employeeName ?? "—"}</span>
+                                        <span className="text-[10px] font-bold italic uppercase text-[#747a60] shrink-0">
+                                          {a.penaltyType}{a.quantity && a.quantity > 1 ? ` ×${a.quantity}` : ""}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] font-black italic text-[#b02f00] shrink-0">-{Number(a.points)} pts</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                               {adminConformityData.absencesReport ? (
                                 <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport}</p>
-                              ) : (
+                              ) : eventAbsences.length === 0 ? (
                                 <p className="text-[11px] italic text-[#9aa088]">Nenhuma falta ou atraso registrada.</p>
-                              )}
+                              ) : null}
                             </div>
                             {/* Destaque de Desempenho */}
                             <div className="px-5 py-4">
@@ -2242,6 +2395,114 @@ export default function EvaluationsPage() {
                 {createPublicToken.isPending ? "Gerando..." : "Gerar Link"}
               </button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remover participante — confirmação */}
+      <AlertDialog open={pendingRemoveParticipant !== null} onOpenChange={o => { if (!o) setPendingRemoveParticipant(null); }}>
+        <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover participante?</AlertDialogTitle>
+            <AlertDialogDescription className="italic text-[#444933]">
+              O colaborador <strong>{participants?.find(p => p.id === pendingRemoveParticipant)?.employeeName ?? ""}</strong> será removido da equipe deste evento. Se ele já possuir avaliações enviadas, as notas serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingRemoveParticipant !== null && selectedEventId) {
+                  removeParticipant.mutate({ id: selectedEventId, participantId: pendingRemoveParticipant });
+                }
+                setPendingRemoveParticipant(null);
+              }}
+              className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
+            >
+              <Trash2 size={16} className="mr-1.5" /> Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Adicionar participante à equipe */}
+      <Dialog open={addParticipantOpen} onOpenChange={(o) => { setAddParticipantOpen(o); if (!o) { setNewParticipantEmployeeId(null); setNewParticipantFunction(DEFAULT_PARTICIPANT_FUNCTION); } }}>
+        <DialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="font-black italic uppercase tracking-tight text-[#191c1e]">Adicionar Colaborador</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Colaborador <span className="text-[#ba1a1a]">*</span></Label>
+              <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    role="combobox"
+                    aria-expanded={employeePickerOpen}
+                    className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-none border-2 border-[#191c1e] bg-white text-left"
+                  >
+                    <span className={cn("truncate text-sm", selectedNewEmployee ? "font-black italic uppercase text-[#191c1e]" : "font-bold italic uppercase text-xs tracking-wider text-[#747a60]")}>
+                      {selectedNewEmployee ? selectedNewEmployee.name : "Busque pelo nome..."}
+                    </span>
+                    <ChevronsUpDown size={16} className="text-[#191c1e] opacity-60 shrink-0" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                  <Command className="rounded-none">
+                    <CommandInput placeholder="Buscar pelo nome..." className="italic" />
+                    <CommandList className="max-h-[280px]">
+                      <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum colaborador disponível.</CommandEmpty>
+                      <CommandGroup>
+                        {availableEmployees.map(e => (
+                          <CommandItem
+                            key={e.id}
+                            value={e.name}
+                            onSelect={() => {
+                              setNewParticipantEmployeeId(e.id);
+                              setNewParticipantFunction(matchParticipantFunction(e.functionName));
+                              setEmployeePickerOpen(false);
+                            }}
+                            className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2"
+                          >
+                            <Check size={16} className={cn("shrink-0", newParticipantEmployeeId === e.id ? "opacity-100" : "opacity-0")} />
+                            <span className="font-black italic uppercase text-sm truncate">{e.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função no Evento</Label>
+              <Select value={newParticipantFunction} onValueChange={setNewParticipantFunction}>
+                <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-black italic uppercase text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                  {PARTICIPANT_FUNCTIONS.map(fn => (
+                    <SelectItem key={fn} value={fn} className="rounded-none font-bold italic uppercase text-sm cursor-pointer">
+                      {fn}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              disabled={!newParticipantEmployeeId || addParticipant.isPending || !selectedEventId}
+              onClick={() => {
+                if (!newParticipantEmployeeId || !selectedEventId) return;
+                addParticipant.mutate({ id: selectedEventId, data: { employeeId: newParticipantEmployeeId, functionName: newParticipantFunction || undefined } });
+              }}
+              className="w-full h-11 bg-[#191c1e] text-[#ccff00] font-black italic uppercase tracking-tight disabled:opacity-40 hover:bg-[#ccff00] hover:text-[#191c1e] border-2 border-[#191c1e] transition-colors"
+            >
+              {addParticipant.isPending ? "Adicionando..." : "Adicionar à Equipe"}
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

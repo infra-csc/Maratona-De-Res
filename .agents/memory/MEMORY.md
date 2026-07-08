@@ -62,3 +62,4 @@
 - [Sidebar column blank-space trap](sidebar-blank-space-trap.md) — long per-item lists (e.g. team rosters) confined to a narrow 1/3 sidebar column overflow far taller than their neighbor, wasting the wide column; give long lists their own full-width section with a responsive card grid instead
 - [Drizzle alias not available](drizzle-alias-unavailable.md) — drizzle-orm v0.45.2 does NOT export `alias`; enrich with a second query for same-table double-join cases
 - [Public eval tokens schema](public-eval-tokens-schema.md) — public_eval_tokens has recipient_name (set at creation), submitter_name (set when used); single-use token creates evaluation as createdByUserId
+- [Roster edit pattern reuse](roster-edit-pattern-reuse.md) — event-detail.tsx's add/remove/edit-participant Dialog+Popover+Command block is the canonical pattern; reuse verbatim (PARTICIPANT_FUNCTIONS, matchParticipantFunction) when any other manager screen needs team roster editing
