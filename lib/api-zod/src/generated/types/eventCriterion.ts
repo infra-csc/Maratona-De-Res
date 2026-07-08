@@ -26,4 +26,6 @@ export interface EventCriterion {
   eventScoped?: boolean;
   /** @nullable */
   partialPublishedAt?: string | null;
+  /** @nullable */
+  finalPublishedAt?: string | null;
 }

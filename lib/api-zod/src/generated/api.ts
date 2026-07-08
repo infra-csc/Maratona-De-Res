@@ -508,7 +508,8 @@ export const GetEventResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1006,6 +1007,34 @@ export const PublishCriterionPartialFeedbackResponse = zod.object({
 
 
 /**
+ * @summary Mark a single criterion as "Final" — employee sees it without the partial-draft warning. No edit lock; recalibrations update the score automatically.
+ */
+export const PublishCriterionFinalFeedbackParams = zod.object({
+  "id": zod.coerce.number(),
+  "criterionId": zod.coerce.number()
+})
+
+export const PublishCriterionFinalFeedbackResponse = zod.object({
+  "criterionId": zod.number().optional(),
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Mark ALL active criteria in an event as "Final" at once
+ */
+export const PublishAllCriteriaFinalFeedbackParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PublishAllCriteriaFinalFeedbackResponse = zod.object({
+  "published": zod.number().optional(),
+  "finalPublishedAt": zod.string().optional()
+})
+
+
+/**
  * @summary List event participants
  */
 export const GetEventParticipantsParams = zod.object({
@@ -1161,7 +1190,8 @@ export const SetConformityEvaluatorResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1274,7 +1304,8 @@ export const RedirectConformityEvaluatorResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1387,7 +1418,8 @@ export const SetConformityEvaluatorFerramentasResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1500,7 +1532,8 @@ export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1635,7 +1668,8 @@ export const GetEventCriteriaResponseItem = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })
 export const GetEventCriteriaResponse = zod.array(GetEventCriteriaResponseItem)
 
@@ -1670,7 +1704,8 @@ export const UpdateEventCriteriaResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })),
   "warnings": zod.array(zod.string()).optional()
 })
@@ -1746,7 +1781,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1859,7 +1895,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1968,7 +2005,8 @@ export const ResyncEventCriteriaResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -2193,7 +2231,8 @@ export const DeleteEventCriterionResponse = zod.object({
   "normalizedWeight": zod.number(),
   "weight": zod.number().optional(),
   "eventScoped": zod.boolean().optional(),
-  "partialPublishedAt": zod.string().nullish()
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),

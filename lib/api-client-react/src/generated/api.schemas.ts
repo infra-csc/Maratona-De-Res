@@ -353,6 +353,8 @@ export interface EventCriterion {
   eventScoped?: boolean;
   /** @nullable */
   partialPublishedAt?: string | null;
+  /** @nullable */
+  finalPublishedAt?: string | null;
 }
 
 export interface EventAreaAssignment {
@@ -1435,6 +1437,19 @@ active?: boolean;
 
 export type GetEventsParams = {
 status?: string;
+};
+
+export type PublishCriterionFinalFeedback200 = {
+  criterionId?: number;
+  /** @nullable */
+  finalPublishedAt?: string | null;
+  /** @nullable */
+  partialPublishedAt?: string | null;
+};
+
+export type PublishAllCriteriaFinalFeedback200 = {
+  published?: number;
+  finalPublishedAt?: string;
 };
 
 export type UpdateEventCriteria200 = {

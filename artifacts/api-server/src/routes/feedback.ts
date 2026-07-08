@@ -27,6 +27,7 @@ async function buildEventFeedback(eventId: number) {
       weightOverride: eventCriteriaTable.weightOverride,
       displayOrder: criteriaTable.displayOrder,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
+      finalPublishedAt: eventCriteriaTable.finalPublishedAt,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -51,7 +52,16 @@ async function buildEventFeedback(eventId: number) {
     const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
     const isEvaluated = calibratedScore !== null || completion.isEvaluated;
     const scoreUsed = isEvaluated ? (calibratedScore !== null ? calibratedScore : averageScore) : null;
-    return { criterionId: c.criterionId, name: c.criterionName ?? "", weight, averageScore, calibratedScore, scoreUsed, partialPublishedAt: c.partialPublishedAt };
+    return {
+      criterionId: c.criterionId,
+      name: c.criterionName ?? "",
+      weight,
+      averageScore,
+      calibratedScore,
+      scoreUsed,
+      partialPublishedAt: c.partialPublishedAt,
+      finalPublishedAt: c.finalPublishedAt,
+    };
   });
 
   // Rollup do evento = publicação parcial mais recente entre os critérios
@@ -197,6 +207,61 @@ router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("ad
 
   const feedback = await buildEventFeedback(eventId);
   res.json({ ...feedback, criterionId, criterionPartialPublishedAt: updated.partialPublishedAt });
+});
+
+/**
+ * POST /events/:id/criteria/:criterionId/publish-final
+ * Publica a nota de UM critério como "FINAL" — o colaborador vê sem o aviso
+ * de "projeção parcial". Não trava edição: se a calibração mudar depois, o
+ * colaborador vê automaticamente o valor atualizado (o critério continua
+ * marcado como Final). Pode ser chamado várias vezes (cada chamada atualiza
+ * a data). Disponível mesmo se o evento não estiver fechado.
+ */
+router.post("/events/:id/criteria/:criterionId/publish-final", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const criterionId = parseInt(req.params.criterionId as string);
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+
+  const [link] = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId), eq(eventCriteriaTable.active, true)))
+    .limit(1);
+  if (!link) { res.status(404).json({ error: "Critério não encontrado ou inativo neste evento" }); return; }
+
+  const [updated] = await db.update(eventCriteriaTable).set({
+    finalPublishedAt: new Date(),
+    // Garante que partialPublishedAt também esteja definido (é base para visibilidade)
+    partialPublishedAt: link.partialPublishedAt ?? new Date(),
+  }).where(eq(eventCriteriaTable.id, link.id)).returning();
+  await audit(req.user!.userId, "publish_final_feedback", "event_criteria", updated.id, null, { eventId, criterionId });
+
+  res.json({ criterionId, finalPublishedAt: updated.finalPublishedAt, partialPublishedAt: updated.partialPublishedAt });
+});
+
+/**
+ * POST /events/:id/criteria/publish-final-all
+ * Publica TODOS os critérios ativos do evento como "FINAL" de uma vez.
+ */
+router.post("/events/:id/criteria/publish-final-all", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+
+  const criteriaLinks = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
+
+  const now = new Date();
+  for (const link of criteriaLinks) {
+    await db.update(eventCriteriaTable).set({
+      finalPublishedAt: now,
+      partialPublishedAt: link.partialPublishedAt ?? now,
+    }).where(eq(eventCriteriaTable.id, link.id));
+  }
+  await audit(req.user!.userId, "publish_final_all_feedback", "events", eventId, null, { count: criteriaLinks.length });
+
+  res.json({ published: criteriaLinks.length, finalPublishedAt: now });
 });
 
 export default router;

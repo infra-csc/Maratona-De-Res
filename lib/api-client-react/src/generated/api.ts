@@ -98,6 +98,8 @@ import type {
   PlatoonRule,
   PlatoonRuleInput,
   PlatoonRuleUpdate,
+  PublishAllCriteriaFinalFeedback200,
+  PublishCriterionFinalFeedback200,
   QuarterCloseResult,
   QuarterEligibility,
   QuarterEligibilityInput,
@@ -2714,6 +2716,148 @@ export const usePublishCriterionPartialFeedback = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getPublishCriterionPartialFeedbackMutationOptions(options));
+    }
+
+export const getPublishCriterionFinalFeedbackUrl = (id: number,
+    criterionId: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/${criterionId}/publish-final`
+}
+
+/**
+ * @summary Mark a single criterion as "Final" — employee sees it without the partial-draft warning. No edit lock; recalibrations update the score automatically.
+ */
+export const publishCriterionFinalFeedback = async (id: number,
+    criterionId: number, options?: RequestInit): Promise<PublishCriterionFinalFeedback200> => {
+
+  return customFetch<PublishCriterionFinalFeedback200>(getPublishCriterionFinalFeedbackUrl(id,criterionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPublishCriterionFinalFeedbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishCriterionFinalFeedback>>, TError,{id: number;criterionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishCriterionFinalFeedback>>, TError,{id: number;criterionId: number}, TContext> => {
+
+const mutationKey = ['publishCriterionFinalFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishCriterionFinalFeedback>>, {id: number;criterionId: number}> = (props) => {
+          const {id,criterionId} = props ?? {};
+
+          return  publishCriterionFinalFeedback(id,criterionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishCriterionFinalFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof publishCriterionFinalFeedback>>>
+
+    export type PublishCriterionFinalFeedbackMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark a single criterion as "Final" — employee sees it without the partial-draft warning. No edit lock; recalibrations update the score automatically.
+ */
+export const usePublishCriterionFinalFeedback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishCriterionFinalFeedback>>, TError,{id: number;criterionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof publishCriterionFinalFeedback>>,
+        TError,
+        {id: number;criterionId: number},
+        TContext
+      > => {
+      return useMutation(getPublishCriterionFinalFeedbackMutationOptions(options));
+    }
+
+export const getPublishAllCriteriaFinalFeedbackUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/publish-final-all`
+}
+
+/**
+ * @summary Mark ALL active criteria in an event as "Final" at once
+ */
+export const publishAllCriteriaFinalFeedback = async (id: number, options?: RequestInit): Promise<PublishAllCriteriaFinalFeedback200> => {
+
+  return customFetch<PublishAllCriteriaFinalFeedback200>(getPublishAllCriteriaFinalFeedbackUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPublishAllCriteriaFinalFeedbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAllCriteriaFinalFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishAllCriteriaFinalFeedback>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['publishAllCriteriaFinalFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishAllCriteriaFinalFeedback>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  publishAllCriteriaFinalFeedback(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishAllCriteriaFinalFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof publishAllCriteriaFinalFeedback>>>
+
+    export type PublishAllCriteriaFinalFeedbackMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark ALL active criteria in an event as "Final" at once
+ */
+export const usePublishAllCriteriaFinalFeedback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAllCriteriaFinalFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof publishAllCriteriaFinalFeedback>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPublishAllCriteriaFinalFeedbackMutationOptions(options));
     }
 
 export const getGetEventParticipantsUrl = (id: number,) => {

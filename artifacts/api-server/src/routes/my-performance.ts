@@ -105,6 +105,7 @@ router.get("/my-performance", async (req, res) => {
         weight: eventCriteriaTable.weightOverride,
         defaultWeight: criteriaTable.defaultWeight,
         partialPublishedAt: eventCriteriaTable.partialPublishedAt,
+        finalPublishedAt: eventCriteriaTable.finalPublishedAt,
       })
       .from(eventCriteriaTable)
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -164,6 +165,7 @@ router.get("/my-performance", async (req, res) => {
         evaluated: isEvaluated,
         status: isEvaluated ? "avaliado" : "pendente",
         partialPublishedAt: c.partialPublishedAt ?? null,
+        finalPublishedAt: c.finalPublishedAt ?? null,
       };
     });
 

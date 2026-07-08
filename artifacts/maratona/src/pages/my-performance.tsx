@@ -97,6 +97,7 @@ interface CriterionDetail {
   publicComments: string[];
   evaluated: boolean;
   partialPublishedAt?: string | null;
+  finalPublishedAt?: string | null;
   reviewRequest?: ReviewRequest | null;
 }
 
@@ -389,11 +390,15 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
 
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
+  // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
+  const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
   const publishLabel = event.feedbackReleased
-    ? `Avaliação Final${event.feedbackReleasedAt ? ` · ${formatDateTime(event.feedbackReleasedAt)}` : ""}`
-    : event.partialPublishedAt
-      ? `Avaliação Parcial · ${formatDateTime(event.partialPublishedAt)}`
-      : "Ainda não publicada";
+    ? `Nota Final Confirmada${event.feedbackReleasedAt ? ` · ${formatDateTime(event.feedbackReleasedAt)}` : ""}`
+    : anyCriterionFinal
+      ? "Avaliado — Projeção Parcial"
+      : event.partialPublishedAt
+        ? `Avaliação Parcial · ${formatDateTime(event.partialPublishedAt)}`
+        : "Pendente";
 
   return (
     <div className="bg-white border-2 border-[#191c1e] mb-4">
@@ -413,7 +418,13 @@ function EventCard({ event }: { event: EventSummary }) {
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={cn(
                 "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
-                event.feedbackReleased ? "bg-[#191c1e] text-[#ccff00]" : event.partialPublishedAt ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#d8dadc] text-[#444933]"
+                event.feedbackReleased
+                  ? "bg-[#191c1e] text-[#ccff00]"
+                  : anyCriterionFinal
+                    ? "bg-[#506600] text-[#ccff00]"
+                    : event.partialPublishedAt
+                      ? "bg-[#ccff00] text-[#191c1e]"
+                      : "bg-[#d8dadc] text-[#444933]"
               )}>
                 {publishLabel}
               </span>
@@ -473,21 +484,25 @@ function EventCard({ event }: { event: EventSummary }) {
                           <CheckCircle2 size={12}/> Avaliado
                         </span>
                       )}
-                      {event.feedbackReleased ? (
+                      {event.feedbackReleased || c.finalPublishedAt ? (
                         <span
-                          title={event.feedbackReleasedAt ? `Publicado em ${formatDateTime(event.feedbackReleasedAt)}` : undefined}
-                          className="text-[10px] font-bold uppercase italic text-[#ccff00] bg-[#191c1e] border border-[#191c1e] px-2 py-0.5"
+                          title={c.finalPublishedAt ? `Nota Final publicada em ${formatDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Publicado em ${formatDateTime(event.feedbackReleasedAt)}` : undefined}
+                          className="text-[10px] font-bold uppercase italic text-[#ccff00] bg-[#191c1e] border border-[#191c1e] px-2 py-0.5 flex items-center gap-1"
                         >
-                          Final
+                          ✓ Nota Final Confirmada
                         </span>
                       ) : c.partialPublishedAt ? (
                         <span
                           title={`Publicado em ${formatDateTime(c.partialPublishedAt)}`}
-                          className="text-[10px] font-bold uppercase italic text-[#a15c00] bg-[#fff3cd] border border-[#191c1e] px-2 py-0.5"
+                          className="text-[10px] font-bold uppercase italic text-[#444933] bg-[#ccff00] border border-[#191c1e] px-2 py-0.5"
                         >
-                          Parcial · {formatDateTime(c.partialPublishedAt)}
+                          Avaliado — Projeção Parcial
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase italic text-[#444933] bg-[#d8dadc] border border-[#191c1e] px-2 py-0.5">
+                          Pendente
+                        </span>
+                      )}
                     </div>
                     <p className="font-bold text-sm text-[#191c1e] leading-tight italic">{c.criterionName}</p>
                   </div>

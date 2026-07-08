@@ -30,7 +30,7 @@ router.get("/events", async (req, res) => {
       .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
-    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt })
+    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt, finalPublishedAt: eventCriteriaTable.finalPublishedAt })
       .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id)).where(inArray(eventCriteriaTable.eventId, eventIds)),
     db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
@@ -139,6 +139,7 @@ async function loadEventDetail(id: number) {
       weightOverride: eventCriteriaTable.weightOverride,
       eventScoped: criteriaTable.eventScoped,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
+      finalPublishedAt: eventCriteriaTable.finalPublishedAt,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -867,6 +868,7 @@ router.get("/events/:id/criteria", async (req, res) => {
       weightOverride: eventCriteriaTable.weightOverride,
       eventScoped: criteriaTable.eventScoped,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
+      finalPublishedAt: eventCriteriaTable.finalPublishedAt,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))

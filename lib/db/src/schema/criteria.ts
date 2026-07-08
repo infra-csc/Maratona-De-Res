@@ -29,6 +29,10 @@ export const eventCriteriaTable = pgTable("event_criteria", {
   // liberação final do evento). Pode ser republicado várias vezes
   // (sobrescreve a data); a liberação final continua sendo por evento.
   partialPublishedAt: timestamp("partial_published_at"),
+  // Publicação "Final" por critério — diferente de parcial apenas na exibição
+  // ao colaborador (sem aviso de rascunho). Não trava edição; se a nota mudar
+  // após publicar como Final, o colaborador vê o valor atualizado automaticamente.
+  finalPublishedAt: timestamp("final_published_at"),
 });
 
 export const insertCriterionSchema = createInsertSchema(criteriaTable).omit({ id: true });

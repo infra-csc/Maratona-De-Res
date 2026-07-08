@@ -1160,9 +1160,14 @@ export default function EventDetailPage() {
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="p-6 md:p-10 space-y-8 max-w-6xl mx-auto">
-        <Link href="/events" className="inline-flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] hover:text-[#506600] transition-colors group">
-          <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Voltar para Eventos
-        </Link>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <Link href="/events" className="inline-flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] hover:text-[#506600] transition-colors group">
+            <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Voltar para Eventos
+          </Link>
+          <Link href="/calibrations" className="inline-flex items-center gap-2 text-sm font-black italic uppercase tracking-wider text-white bg-[#191c1e] border-2 border-[#191c1e] px-3 py-1.5 hover:bg-[#506600] hover:border-[#506600] transition-colors">
+            <SlidersHorizontal size={14} /> Ir para Calibração
+          </Link>
+        </div>
 
         {/* Hero */}
         <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>

@@ -689,6 +689,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventFeedback"
 
+  /events/{id}/criteria/{criterionId}/publish-final:
+    post:
+      operationId: publishCriterionFinalFeedback
+      tags: [results]
+      summary: Mark a single criterion as "Final" — employee sees it without the partial-draft warning. No edit lock; recalibrations update the score automatically.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: criterionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  criterionId:
+                    type: integer
+                  finalPublishedAt:
+                    type: ["string", "null"]
+                  partialPublishedAt:
+                    type: ["string", "null"]
+
+  /events/{id}/criteria/publish-final-all:
+    post:
+      operationId: publishAllCriteriaFinalFeedback
+      tags: [results]
+      summary: Mark ALL active criteria in an event as "Final" at once
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  published:
+                    type: integer
+                  finalPublishedAt:
+                    type: string
+
   /events/{id}/participants:
     get:
       operationId: getEventParticipants
@@ -3157,6 +3212,8 @@ components:
         eventScoped:
           type: boolean
         partialPublishedAt:
+          type: ["string", "null"]
+        finalPublishedAt:
           type: ["string", "null"]
 
     EventCriteriaUpdate:

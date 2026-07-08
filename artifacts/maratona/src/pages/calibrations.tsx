@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, useUpdateEventCriteria, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList } from "lucide-react";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -55,6 +56,10 @@ export default function CalibrationsPage() {
   const [weightEdits, setWeightEdits] = useState<Record<number, string>>({});
   const [savingWeightId, setSavingWeightId] = useState<number | null>(null);
   const [collapsedCriteria, setCollapsedCriteria] = useState<Set<number>>(new Set());
+  const [publishingFinalCritId, setPublishingFinalCritId] = useState<number | null>(null);
+  const [publishingAllFinal, setPublishingAllFinal] = useState(false);
+  const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
+  const [contextOpen, setContextOpen] = useState(true);
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
@@ -179,7 +184,17 @@ export default function CalibrationsPage() {
   const releaseMutation = useReleaseEventFeedback();
   const [publishingCritId, setPublishingCritId] = useState<number | null>(null);
   const publishCriterionPartialMutation = usePublishCriterionPartialFeedback();
+  const publishCriterionFinalMutation = usePublishCriterionFinalFeedback();
+  const publishAllFinalMutation = usePublishAllCriteriaFinalFeedback();
   const finalizing = closeMutation.isPending || releaseMutation.isPending;
+
+  // Contexto do evento: conformidade e comentários
+  const { data: conformity } = useGetEventConformity(selectedEventId!, {
+    query: { enabled: !!selectedEventId, queryKey: ["conformity", selectedEventId] as unknown[] },
+  });
+  const { data: eventComments } = useGetEventComments(selectedEventId!, {
+    query: { enabled: !!selectedEventId, queryKey: ["event-comments", selectedEventId] as unknown[] },
+  });
 
   async function handlePublishCriterionPartial(criterionId: number) {
     if (!selectedEventId) return;
@@ -195,6 +210,41 @@ export default function CalibrationsPage() {
       toast({ title: "Não foi possível publicar", description: msg, variant: "destructive" });
     } finally {
       setPublishingCritId(null);
+    }
+  }
+
+  async function handlePublishCriterionFinal(criterionId: number) {
+    if (!selectedEventId) return;
+    setPublishingFinalCritId(criterionId);
+    try {
+      await publishCriterionFinalMutation.mutateAsync({ id: selectedEventId, criterionId });
+      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
+      qc.invalidateQueries({ queryKey: fbQKey });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      toast({ title: "Nota Final publicada", description: "Os funcionários veem esta nota como definitiva para este critério." });
+    } catch (e) {
+      const msg = (e as { message?: string })?.message;
+      toast({ title: "Não foi possível publicar como Final", description: msg, variant: "destructive" });
+    } finally {
+      setPublishingFinalCritId(null);
+    }
+  }
+
+  async function handlePublishAllFinal() {
+    if (!selectedEventId) return;
+    setPublishingAllFinal(true);
+    try {
+      const result = await publishAllFinalMutation.mutateAsync({ id: selectedEventId });
+      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
+      qc.invalidateQueries({ queryKey: fbQKey });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      const count = (result as { published?: number })?.published ?? activeCriteria.length;
+      toast({ title: `${count} critério(s) publicados como Final`, description: "Os funcionários veem todas as notas como definitivas." });
+    } catch (e) {
+      const msg = (e as { message?: string })?.message;
+      toast({ title: "Erro ao publicar todos como Final", description: msg, variant: "destructive" });
+    } finally {
+      setPublishingAllFinal(false);
     }
   }
 
@@ -280,6 +330,16 @@ export default function CalibrationsPage() {
     return score;
   }
   const fillableCount = activeCriteria.filter(c => pendingScore(c.criterionId) != null).length;
+
+  // Quantos critérios já publicados como Final
+  const finalPublishedCount = activeCriteria.filter(c => !!c.finalPublishedAt).length;
+
+  // Critérios filtrados por criterionFilter
+  const filteredActiveCriteria = criterionFilter === "uncalibrated"
+    ? activeCriteria.filter(c => !getCalibration(c.criterionId))
+    : criterionFilter === "calibrated"
+    ? activeCriteria.filter(c => !!getCalibration(c.criterionId))
+    : activeCriteria;
 
   // Pronto para finalizar: todos os critérios com nota da área já foram calibrados.
   const scoredCriteria = activeCriteria.filter(c => getAvgScore(c.criterionId) != null);
@@ -520,7 +580,7 @@ export default function CalibrationsPage() {
                     <p className="text-xs font-bold italic uppercase text-[#747a60] truncate">{pickedEvent.clientName}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
                   {feedback && (
                     <div className="border-2 border-[#191c1e] px-3 py-1.5 flex flex-col items-center justify-center">
                       <span className="text-[9px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota Final da Equipe</span>
@@ -533,7 +593,97 @@ export default function CalibrationsPage() {
                   <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${alreadyReleased ? "bg-[#191c1e] text-[#ccff00]" : partialPublishedAtDate ? "bg-[#ffb5a0] text-[#3b0900]" : "bg-[#d8dadc] text-[#444933]"}`}>
                     <span className="inline-block skew-x-[8deg]">{alreadyReleased ? "Avaliação Final" : partialPublishedAtDate ? "Avaliação Parcial" : "Não Publicada"}</span>
                   </span>
+                  <Link
+                    href={`/events/${selectedEventId}`}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white text-[#444933] border-2 border-[#191c1e] px-3 py-1 hover:bg-[#191c1e] hover:text-white transition-colors shrink-0"
+                  >
+                    <ExternalLink size={12} /> Ver Gerenciamento
+                  </Link>
                 </div>
+              </div>
+            )}
+
+            {/* Painel de Contexto do Evento — conformidade, faltas, destaque, comentários */}
+            {selectedEventId && (conformity || (eventComments && eventComments.length > 0)) && (
+              <div className="border-2 border-[#191c1e] bg-white">
+                <button
+                  type="button"
+                  onClick={() => setContextOpen(o => !o)}
+                  className="w-full flex items-center justify-between gap-3 px-5 py-3 bg-[#f2f4f6] border-b-2 border-[#191c1e] hover:bg-[#e8eaec] transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-[11px] font-black italic uppercase tracking-wider text-[#444933]">
+                    <ClipboardList size={14} /> Contexto do Evento
+                  </span>
+                  {contextOpen ? <ChevronUp size={16} className="text-[#444933] shrink-0" /> : <ChevronDown size={16} className="text-[#444933] shrink-0" />}
+                </button>
+                {contextOpen && (
+                  <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Matriz de Conformidade */}
+                    {conformity && (
+                      <div>
+                        <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
+                          <ShieldCheck size={13} /> Matriz de Conformidade
+                        </p>
+                        <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0]">
+                          {[
+                            { label: "EPI", key: "epi" as const, comment: conformity.epiComment },
+                            { label: "Estaiamentos/Aterramento", key: "estaiamentos" as const, comment: conformity.estaiamentosComment },
+                            { label: "Conduta", key: "conduta" as const, comment: conformity.condutaComment },
+                            { label: "Guarda de Equipamentos", key: "guardaEquipamentos" as const, comment: conformity.guardaEquipamentosComment },
+                          ].map(item => {
+                            const ok = (conformity as unknown as Record<string, boolean | null>)[item.key];
+                            return (
+                              <div key={item.key} className="px-3 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">{item.label}</span>
+                                  <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border border-[#191c1e] shrink-0 ${ok === null ? "bg-[#d8dadc] text-[#444933]" : ok ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"}`}>
+                                    {ok === null ? "—" : ok ? "SIM" : "NÃO"}
+                                  </span>
+                                </div>
+                                {item.comment && ok === false && (
+                                  <p className="text-[11px] italic text-[#444933] mt-1 leading-snug">{item.comment}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Falta / Atraso */}
+                        {conformity.absencesReport && (
+                          <div className="mt-3 border-2 border-[#191c1e] p-3">
+                            <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60] mb-1 flex items-center gap-1"><User size={11} /> Faltas/Atrasos (+30 min)</p>
+                            <p className="text-[11px] italic text-[#191c1e] leading-snug whitespace-pre-wrap">{conformity.absencesReport}</p>
+                          </div>
+                        )}
+                        {/* Destaque */}
+                        {conformity.standoutResponse && conformity.standoutJustification && (
+                          <div className="mt-3 border-2 border-[#506600] bg-[#f7ffe0] p-3">
+                            <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#506600] mb-1 flex items-center gap-1"><Trophy size={11} /> Destaque de Desempenho</p>
+                            <p className="text-[11px] italic text-[#191c1e] leading-snug whitespace-pre-wrap">{conformity.standoutJustification}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Comentários do Evento */}
+                    {eventComments && eventComments.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
+                          <MessageSquare size={13} /> Comentários do Evento <span className="text-[#747a60]">({eventComments.length})</span>
+                        </p>
+                        <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-48 overflow-y-auto">
+                          {eventComments.map((c, i) => (
+                            <div key={i} className="px-3 py-2">
+                              <div className="flex items-center justify-between gap-2 mb-0.5">
+                                <span className="text-[10px] font-bold italic uppercase text-[#747a60]">{(c as { authorName?: string }).authorName ?? "Admin"}</span>
+                                <span className="text-[10px] italic text-[#9aa088] shrink-0">{c.createdAt ? formatDateTime(new Date(c.createdAt)) : ""}</span>
+                              </div>
+                              <p className="text-[11px] italic text-[#191c1e] leading-snug whitespace-pre-wrap">{c.message}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -572,64 +722,107 @@ export default function CalibrationsPage() {
             )}
 
             {activeCriteria.length > 0 && !alreadyReleased && (
-              <div className="sticky top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
-                <div className="flex items-center gap-3 min-w-0">
-                  <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
-                  <div className="min-w-0">
+              <div className="sticky top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
+                {/* Linha 1: info + botões principais */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
+                    <div className="min-w-0">
+                      {readyToFinalize ? (
+                        <>
+                          <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Todas as calibrações salvas</p>
+                          <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
+                            {alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Salvar todas de uma vez</p>
+                          <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
+                            {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 10) abaixo"}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                     {readyToFinalize ? (
-                      <>
-                        <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Todas as calibrações salvas</p>
-                        <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
-                          {alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}
-                        </p>
-                      </>
+                      <button
+                        data-testid="button-open-finalize"
+                        type="button"
+                        onClick={() => setFinalizeOpen(true)}
+                        className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 transition-all hover:bg-white hover:border-white"
+                      >
+                        <Flag size={16} /> {alreadyClosed ? "Liberar Notas" : "Fechar Evento e Liberar Notas"}
+                      </button>
                     ) : (
                       <>
-                        <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Salvar todas de uma vez</p>
-                        <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
-                          {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 10) abaixo"}
-                        </p>
+                        <button
+                          data-testid="button-save-all-cal"
+                          type="button"
+                          disabled={savingAll || fillableCount === 0}
+                          onClick={saveAllCalibrations}
+                          className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
+                        >
+                          <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                        </button>
+                        <button
+                          data-testid="button-send-all-cal"
+                          type="button"
+                          disabled={savingAll || fillableCount === 0}
+                          onClick={sendAllCalibrations}
+                          className="bg-white text-[#191c1e] border-2 border-white px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
+                        >
+                          <Send size={16} /> Enviar
+                        </button>
                       </>
+                    )}
+                    {canFinalize && (
+                      <button
+                        data-testid="button-publish-all-final"
+                        type="button"
+                        disabled={publishingAllFinal}
+                        onClick={handlePublishAllFinal}
+                        className="bg-[#506600] text-[#ccff00] border-2 border-[#506600] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:text-[#161e00] enabled:hover:border-[#ccff00]"
+                      >
+                        <ShieldCheck size={16} /> {publishingAllFinal ? "Publicando..." : "Publicar Todos como Final"}
+                      </button>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                  {readyToFinalize ? (
-                    <button
-                      data-testid="button-open-finalize"
-                      type="button"
-                      onClick={() => setFinalizeOpen(true)}
-                      className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 transition-all hover:bg-white hover:border-white"
-                    >
-                      <Flag size={16} /> {alreadyClosed ? "Liberar Notas" : "Fechar Evento e Liberar Notas"}
-                    </button>
-                  ) : (
-                    <>
+                {/* Linha 2: progresso + filtro */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-white/20">
+                  <span className="text-[11px] font-bold italic uppercase text-white/70 flex items-center gap-1.5">
+                    <ShieldCheck size={12} className="text-[#ccff00]" />
+                    {finalPublishedCount}/{activeCriteria.length} critério(s) publicados como Final
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <Filter size={12} className="text-white/50 shrink-0" />
+                    {([
+                      { value: "all", label: "Todos" },
+                      { value: "uncalibrated", label: "Sem Calibração" },
+                      { value: "calibrated", label: "Calibrados" },
+                    ] as const).map(opt => (
                       <button
-                        data-testid="button-save-all-cal"
+                        key={opt.value}
                         type="button"
-                        disabled={savingAll || fillableCount === 0}
-                        onClick={saveAllCalibrations}
-                        className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
+                        onClick={() => setCriterionFilter(opt.value)}
+                        className={`text-[10px] font-black italic uppercase px-2 py-1 border transition-colors ${criterionFilter === opt.value ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" : "bg-transparent text-white/70 border-white/30 hover:border-white/60"}`}
                       >
-                        <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                        {opt.label}
                       </button>
-                      <button
-                        data-testid="button-send-all-cal"
-                        type="button"
-                        disabled={savingAll || fillableCount === 0}
-                        onClick={sendAllCalibrations}
-                        className="bg-white text-[#191c1e] border-2 border-white px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
-                      >
-                        <Send size={16} /> Enviar
-                      </button>
-                    </>
-                  )}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            {activeCriteria.map(c => {
+            {filteredActiveCriteria.length === 0 && activeCriteria.length > 0 && (
+              <div className="bg-[#d8dadc] border-2 border-[#191c1e] px-5 py-4 text-center">
+                <p className="text-sm italic font-bold uppercase text-[#444933]">Nenhum critério para o filtro selecionado.</p>
+              </div>
+            )}
+            {filteredActiveCriteria.map(c => {
               const areaScores = getAreaScores(c.criterionId);
               const avg = getAvgScore(c.criterionId);
               const cal = getCalibration(c.criterionId);
@@ -639,6 +832,7 @@ export default function CalibrationsPage() {
               const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
               const isSaving = savingCritId === c.criterionId && createMutation.isPending;
               const isCollapsed = collapsedCriteria.has(c.criterionId);
+              const isFinalPublished = !!c.finalPublishedAt;
 
               return (
                 <article key={c.criterionId} data-testid={`row-cal-${c.criterionId}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
@@ -711,7 +905,16 @@ export default function CalibrationsPage() {
                           {avg != null ? "Pendente" : "Sem nota da área"}
                         </span>
                       )}
-                      {!alreadyReleased && c.partialPublishedAt && (
+                      {!alreadyReleased && isFinalPublished && (
+                        <span
+                          data-testid={`badge-criterion-final-${c.criterionId}`}
+                          title={`Final publicado em ${formatDateTime(new Date(c.finalPublishedAt!))}`}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#506600] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1"
+                        >
+                          <ShieldCheck size={12} /> Final · {formatDateTime(new Date(c.finalPublishedAt!))}
+                        </span>
+                      )}
+                      {!alreadyReleased && c.partialPublishedAt && !isFinalPublished && (
                         <span
                           data-testid={`badge-criterion-partial-${c.criterionId}`}
                           title={`Publicado em ${formatDateTime(new Date(c.partialPublishedAt))}`}
@@ -720,7 +923,7 @@ export default function CalibrationsPage() {
                           <Send size={12} /> Parcial · {formatDateTime(new Date(c.partialPublishedAt))}
                         </span>
                       )}
-                      {canFinalize && !alreadyReleased && (
+                      {canFinalize && !alreadyReleased && !isFinalPublished && (
                         <button
                           data-testid={`button-publish-criterion-partial-${c.criterionId}`}
                           type="button"
@@ -729,6 +932,17 @@ export default function CalibrationsPage() {
                           className="inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white text-[#191c1e] border-2 border-[#191c1e] px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#191c1e] enabled:hover:text-white"
                         >
                           <Send size={12} /> {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "Publicando..." : "Publicar Parcial"}
+                        </button>
+                      )}
+                      {canFinalize && !alreadyReleased && (
+                        <button
+                          data-testid={`button-publish-criterion-final-${c.criterionId}`}
+                          type="button"
+                          disabled={publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending}
+                          onClick={() => handlePublishCriterionFinal(c.criterionId)}
+                          className={`inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all ${isFinalPublished ? "bg-[#506600] text-[#ccff00] enabled:hover:bg-[#ccff00] enabled:hover:text-[#161e00]" : "bg-[#191c1e] text-[#ccff00] enabled:hover:bg-[#506600]"}`}
+                        >
+                          <ShieldCheck size={12} /> {publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending ? "Publicando..." : isFinalPublished ? "Republicar Final" : "Publicar Final"}
                         </button>
                       )}
                     </div>
