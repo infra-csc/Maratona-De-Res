@@ -1,0 +1,86 @@
+Preciso importar os dados de um formulário externo (Google Forms/planilha) para o 
+sistema, alimentando as avaliações dos eventos correspondentes. O problema é que 
+parte dessas respostas já pode ter sido lançada manualmente antes por mim, então a 
+importação PRECISA verificar duplicidade antes de gravar, para não duplicar notas 
+nem critérios.
+
+═══════════════════════════════════════
+1. ESTRUTURA DOS DADOS DE ORIGEM (planilha)
+═══════════════════════════════════════
+
+Cada linha da planilha representa UMA resposta de avaliação, com as colunas:
+- Nome do avaliador
+- Nome do evento avaliado (texto livre, ex: "Urban Walk", "C.E. INVERNO - VITÓRIA - 28/06")
+- Área do avaliador (ex: Logística, Atendimento, Produção, Cenografia, Ativação, 
+  Ferramentas e Case (Cenografia))
+- Nota e comentário para cada critério da área (ex: Perda de Material/Estrutura, 
+  Logística Reversa, Qualidade da Entrega, Prazo de Entrega, Todos os equipamentos 
+  retornaram?, Carga na saída do galpão, Todos usaram EPI?, Estaiamento/Aterramento, 
+  Conduta, Faltou/atrasou, Destaque de desempenho)
+
+═══════════════════════════════════════
+2. REGRA DE DEDUPLICAÇÃO (CRÍTICO)
+═══════════════════════════════════════
+
+Antes de gravar cada linha da planilha como uma avaliação no sistema, verificar se já 
+existe uma avaliação equivalente, usando a combinação:
+
+- Mesmo AVALIADOR (nome, ou idealmente vincular por e-mail/ID se disponível)
+- Mesmo EVENTO (nome do evento — ver item 3 sobre correspondência de nomes)
+- Mesmo CRITÉRIO dentro daquele evento
+
+Se já existir um registro com essa combinação (avaliador + evento + critério):
+- NÃO sobrescrever nem duplicar automaticamente.
+- Marcar essa linha como "CONFLITO — já existe avaliação lançada" e colocar em uma 
+  lista separada de revisão manual, mostrando lado a lado: o que já está no sistema 
+  vs. o que está vindo da planilha (nota e comentário), para eu decidir se mantenho 
+  o que já está lá ou substituo pelo da planilha.
+
+Se NÃO existir (nenhuma avaliação com essa combinação):
+- Importar normalmente, criando a avaliação com nota, comentário e vínculo ao evento 
+  e critério corretos.
+
+═══════════════════════════════════════
+3. CORRESPONDÊNCIA DE NOMES DE EVENTOS
+═══════════════════════════════════════
+
+- Os nomes de evento na planilha são texto livre e podem não bater 100% com o nome 
+  cadastrado no sistema (ex: "C.E. INVERNO- MANAUS - 21/06" vs. um evento cadastrado 
+  como "C.E. Inverno Manaus").
+- Implementar uma correspondência "fuzzy" (aproximada) por similaridade de texto 
+  (ignorando acentos, maiúsculas/minúsculas, espaços extras) para tentar casar o nome 
+  da planilha com o evento já cadastrado.
+- Se não encontrar um evento correspondente com confiança razoável, colocar a linha 
+  em uma lista separada de "EVENTO NÃO ENCONTRADO — associar manualmente", ao invés 
+  de criar um evento novo automaticamente ou tentar adivinhar.
+
+═══════════════════════════════════════
+4. RELATÓRIO DE IMPORTAÇÃO (antes de confirmar)
+═══════════════════════════════════════
+
+Antes de gravar qualquer coisa definitivamente, gerar um relatório prévio mostrando:
+- Quantas linhas serão importadas sem conflito
+- Quantas linhas estão em CONFLITO (já existe avaliação com aquele avaliador/evento/critério)
+- Quantas linhas têm EVENTO NÃO ENCONTRADO
+- Permitir revisar esse relatório e confirmar a importação, ao invés de rodar tudo 
+  direto sem revisão.
+
+═══════════════════════════════════════
+5. TRATAMENTO DE CRITÉRIOS ESPECIAIS
+═══════════════════════════════════════
+
+- A coluna "Qualidade da Entrega (2)" deve ser importada especificamente para o 
+  critério duplicado da área Ativação (não confundir com "Qualidade da Entrega" 
+  principal de Atendimento).
+- Perguntas Sim/Não que alimentam a Matriz de Conformidade (Todos os equipamentos 
+  retornaram?, Todos usaram EPI?, Estaiamento/Aterramento, Conduta) devem, ao serem 
+  importadas, também atualizar o status correspondente da Matriz de Conformidade 
+  daquele evento (Sim/Não), aplicando o desconto de pontos já configurado quando 
+  a resposta for "Não".
+- A pergunta "Algum profissional teve desempenho fora da curva" com resposta 
+  "Sim, houve um grande destaque" deve ser registrada como um possível MÉRITO no 
+  sistema (aba de Penalidades e Méritos), vinculado ao profissional citado no 
+  comentário, para revisão manual do RH/gestor.
+
+Me mostrar o relatório de pré-importação (item 4) antes de gravar qualquer dado 
+definitivamente no banco.
