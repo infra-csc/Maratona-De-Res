@@ -40,3 +40,6 @@ EXTERNAL_API_URL = "https://logistica-interna.replit.app"
 
 [nix]
 channel = "stable-25_05"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-4183c397-dcab-4755-baa1-fed83253c4b9"

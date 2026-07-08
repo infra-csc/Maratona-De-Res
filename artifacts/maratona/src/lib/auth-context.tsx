@@ -27,15 +27,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem(TOKEN_KEY);
-    const savedUser = localStorage.getItem(USER_KEY);
-    const savedRealUser = localStorage.getItem(REAL_USER_KEY);
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+    try {
+      const savedToken = localStorage.getItem(TOKEN_KEY);
+      const savedUser = localStorage.getItem(USER_KEY);
+      const savedRealUser = localStorage.getItem(REAL_USER_KEY);
+      if (savedToken && savedUser) {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      }
+      if (savedRealUser) setRealUser(JSON.parse(savedRealUser));
+    } catch {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(REAL_TOKEN_KEY);
+      localStorage.removeItem(REAL_USER_KEY);
+    } finally {
+      setIsLoading(false);
     }
-    if (savedRealUser) setRealUser(JSON.parse(savedRealUser));
-    setIsLoading(false);
   }, []);
 
   const login = useCallback((newToken: string, newUser: User) => {
@@ -82,10 +90,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(REAL_TOKEN_KEY);
     localStorage.removeItem(REAL_USER_KEY);
     if (realToken && real) {
-      setToken(realToken);
-      setUser(JSON.parse(real));
-      localStorage.setItem(TOKEN_KEY, realToken);
-      localStorage.setItem(USER_KEY, real);
+      try {
+        setToken(realToken);
+        setUser(JSON.parse(real));
+        localStorage.setItem(TOKEN_KEY, realToken);
+        localStorage.setItem(USER_KEY, real);
+      } catch {
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      }
     } else {
       // Real session lost/inconsistent — force a full logout instead of
       // silently leaving the admin on the impersonated session.

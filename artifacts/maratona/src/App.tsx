@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
+import { ErrorBoundary } from "@/components/error-boundary";
 import LoginPage from "@/pages/login";
 import ChangePasswordPage from "@/pages/change-password";
 import DashboardPage from "@/pages/dashboard";
@@ -136,16 +137,18 @@ function AppRoutes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") ?? ""}>
-            <AppRoutes />
-          </WouterRouter>
-        </AuthProvider>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") ?? ""}>
+              <AppRoutes />
+            </WouterRouter>
+          </AuthProvider>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
