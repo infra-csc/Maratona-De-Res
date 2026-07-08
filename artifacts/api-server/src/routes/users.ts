@@ -308,6 +308,7 @@ const OFFICE365_EMAIL_MAP: { id: number; email: string }[] = [
   { id: 71, email: "anderson.andreotti@ttkmarketing.com.br" },
   { id: 41, email: "camilla.lopes@nortemkt.com" },
   { id: 36, email: "edney.siqueira@ttkmarketing.com.br" },
+  { id: 37, email: "frederico.coelho@ttkmarketing.com.br" },
   { id: 72, email: "eduardo.meira@cscdoesporte.com.br" },
   { id: 73, email: "fabio.santoniello@ttkmarketing.com.br" },
   { id: 57, email: "fernanda.toussaint@ttkmarketing.com.br" },
