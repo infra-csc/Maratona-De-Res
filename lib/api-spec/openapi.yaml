@@ -1031,6 +1031,31 @@ paths:
                         updated:
                           type: integer
 
+  /integration/migrate-criteria-catalog:
+    post:
+      operationId: migrateCriteriaCatalog
+      tags: [integration]
+      summary: Admin — migrate the global criteria catalog and all event_criteria to the current survey target criteria (idempotent). Works on all events including historical and results_confirmed ones.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed]
+                properties:
+                  success:
+                    type: boolean
+                  catalogDeactivated:
+                    type: integer
+                  catalogActivated:
+                    type: integer
+                  catalogCreated:
+                    type: integer
+                  eventCriteriaFixed:
+                    type: integer
+
   /events/{id}/comments:
     get:
       operationId: getEventComments

@@ -1,4 +1,4 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200 } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -175,6 +175,21 @@ export default function IntegrationPage() {
       },
       onError: (e: { message?: string }) => {
         toast({ title: "Falha ao remover duplicatas", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
+
+  const migrateCriteriaMutation = useMigrateCriteriaCatalog({
+    mutation: {
+      onSuccess: (data) => {
+        toast({
+          title: "Migração concluída",
+          description: `${data.catalogActivated} quesito(s) ativado(s), ${data.catalogDeactivated} desativado(s), ${data.catalogCreated} criado(s). ${data.eventCriteriaFixed} evento(s) atualizados.`,
+        });
+        qc.invalidateQueries();
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha na migração", description: e.message ?? "Tente novamente.", variant: "destructive" });
       },
     },
   });
@@ -602,6 +617,36 @@ export default function IntegrationPage() {
             >
               <Wrench size={16} className="mr-2 text-amber-600" />
               {fixCalMutation.isPending ? "Corrigindo..." : "Corrigir calibrações agora"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-purple-500">
+          <CardHeader className="bg-purple-50 border-b border-purple-100 pb-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-purple-800">
+              <Wrench size={18} /> Migrar Catálogo de Quesitos
+            </CardTitle>
+            <CardDescription className="text-purple-800/80">
+              Ativa os quesitos novos (Matriz de Performance) e desativa os antigos em todos os eventos — incluindo históricos e confirmados.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+              Aplica a migração do catálogo de critérios sem precisar importar uma planilha.
+              Desfaz a vinculação com quesitos antigos e ativa os novos em <strong>todos os eventos</strong>.
+              <strong> Operação idempotente</strong> — segura de executar mais de uma vez.
+            </p>
+            <Button
+              data-testid="button-migrate-criteria-catalog"
+              variant="outline"
+              className="w-full bg-white shadow-sm border-dashed border-2 border-purple-400 hover:border-purple-600 hover:bg-purple-50 transition-colors"
+              onClick={() => migrateCriteriaMutation.mutate()}
+              disabled={migrateCriteriaMutation.isPending}
+            >
+              <Wrench size={16} className="mr-2 text-purple-600" />
+              {migrateCriteriaMutation.isPending ? "Migrando..." : "Executar migração de quesitos"}
             </Button>
           </CardContent>
         </Card>

@@ -101,6 +101,7 @@ export * from './integrationStatus';
 export * from './loginInput';
 export * from './mergeEventInput';
 export * from './mergeEventResult';
+export * from './migrateCriteriaCatalog200';
 export * from './platoonDistribution';
 export * from './platoonRule';
 export * from './platoonRuleInput';

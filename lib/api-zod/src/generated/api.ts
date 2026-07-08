@@ -1658,6 +1658,18 @@ export const FixCalibrationCriteriaResponse = zod.object({
 
 
 /**
+ * @summary Admin — migrate the global criteria catalog and all event_criteria to the current survey target criteria (idempotent). Works on all events including historical and results_confirmed ones.
+ */
+export const MigrateCriteriaCatalogResponse = zod.object({
+  "success": zod.boolean(),
+  "catalogDeactivated": zod.number(),
+  "catalogActivated": zod.number(),
+  "catalogCreated": zod.number(),
+  "eventCriteriaFixed": zod.number()
+})
+
+
+/**
  * @summary List an event's general comment thread (visible to all users)
  */
 export const GetEventCommentsParams = zod.object({

@@ -91,6 +91,7 @@ import type {
   LoginInput,
   MergeEventInput,
   MergeEventResult,
+  MigrateCriteriaCatalog200,
   PlatoonDistribution,
   PlatoonRule,
   PlatoonRuleInput,
@@ -3652,6 +3653,76 @@ export const useFixCalibrationCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getFixCalibrationCriteriaMutationOptions(options));
+    }
+
+export const getMigrateCriteriaCatalogUrl = () => {
+
+
+
+
+  return `/integration/migrate-criteria-catalog`
+}
+
+/**
+ * @summary Admin — migrate the global criteria catalog and all event_criteria to the current survey target criteria (idempotent). Works on all events including historical and results_confirmed ones.
+ */
+export const migrateCriteriaCatalog = async ( options?: RequestInit): Promise<MigrateCriteriaCatalog200> => {
+
+  return customFetch<MigrateCriteriaCatalog200>(getMigrateCriteriaCatalogUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMigrateCriteriaCatalogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof migrateCriteriaCatalog>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof migrateCriteriaCatalog>>, TError,void, TContext> => {
+
+const mutationKey = ['migrateCriteriaCatalog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof migrateCriteriaCatalog>>, void> = () => {
+
+
+          return  migrateCriteriaCatalog(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MigrateCriteriaCatalogMutationResult = NonNullable<Awaited<ReturnType<typeof migrateCriteriaCatalog>>>
+
+    export type MigrateCriteriaCatalogMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin — migrate the global criteria catalog and all event_criteria to the current survey target criteria (idempotent). Works on all events including historical and results_confirmed ones.
+ */
+export const useMigrateCriteriaCatalog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof migrateCriteriaCatalog>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof migrateCriteriaCatalog>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMigrateCriteriaCatalogMutationOptions(options));
     }
 
 export const getGetEventCommentsUrl = (id: number,) => {

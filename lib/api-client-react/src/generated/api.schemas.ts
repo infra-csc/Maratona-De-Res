@@ -1430,6 +1430,14 @@ export type FixCalibrationCriteria200 = {
   results?: FixCalibrationCriteria200ResultsItem[];
 };
 
+export type MigrateCriteriaCatalog200 = {
+  success: boolean;
+  catalogDeactivated: number;
+  catalogActivated: number;
+  catalogCreated: number;
+  eventCriteriaFixed: number;
+};
+
 export type GetEvaluationsParams = {
 eventId?: number;
 status?: string;

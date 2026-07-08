@@ -1441,6 +1441,97 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
   });
 });
 
+// Migração standalone do catálogo de critérios — mesma lógica do commit do
+// survey import, mas sem precisar de uma planilha. Pode ser executada sempre
+// que o catálogo global precisar ser atualizado (idempotente).
+// Também migra event_criteria de TODOS os eventos (incluindo históricos e
+// com results_confirmed=true), ao contrário do resync-all que só toca os
+// não-confirmados.
+router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async (req, res) => {
+  const userId = req.user!.userId;
+
+  const criteriaByName = new Map<string, { id: number; active: boolean }>();
+  const allCriteria = await db.select({ id: criteriaTable.id, name: criteriaTable.name, active: criteriaTable.active }).from(criteriaTable);
+  for (const c of allCriteria) criteriaByName.set(normalizeImportText(c.name), { id: c.id, active: c.active });
+
+  let catalogDeactivated = 0;
+  let catalogActivated = 0;
+  let catalogCreated = 0;
+  let eventCriteriaFixed = 0;
+
+  // Build target criteria map (after upsert)
+  const targetCriteriaByName = new Map<string, { id: number }>();
+
+  await db.transaction(async (tx) => {
+    // 1. Deactivate retired criteria globally
+    for (const name of SURVEY_CRITERIA_RETIRED) {
+      const c = criteriaByName.get(normalizeImportText(name));
+      if (c?.active) {
+        await tx.update(criteriaTable).set({ active: false }).where(eq(criteriaTable.id, c.id));
+        catalogDeactivated++;
+      }
+    }
+
+    // 2. Activate / create target criteria with correct weights
+    for (const tc of SURVEY_TARGET_CRITERIA) {
+      const existing = criteriaByName.get(normalizeImportText(tc.name));
+      const area = await tx.select({ id: areasTable.id }).from(areasTable).where(eq(areasTable.name, tc.areaName)).limit(1);
+      const areaId = area[0]?.id ?? null;
+
+      if (existing) {
+        await tx.update(criteriaTable).set({
+          active: true, defaultWeight: tc.weight, description: tc.description,
+          ...(areaId ? { responsibleAreaId: areaId } : {}),
+        }).where(eq(criteriaTable.id, existing.id));
+        if (!existing.active) catalogActivated++;
+        targetCriteriaByName.set(normalizeImportText(tc.name), { id: existing.id });
+      } else {
+        const [created] = await tx.insert(criteriaTable).values({
+          name: tc.name, description: tc.description, defaultWeight: tc.weight,
+          active: true, responsibleAreaId: areaId,
+        }).returning({ id: criteriaTable.id });
+        catalogCreated++;
+        targetCriteriaByName.set(normalizeImportText(tc.name), { id: created.id });
+      }
+    }
+
+    const retiredCriteriaIds = SURVEY_CRITERIA_RETIRED
+      .map(name => criteriaByName.get(normalizeImportText(name))?.id)
+      .filter((id): id is number => id !== undefined);
+
+    // 3. Migrate event_criteria for ALL events (including historical/confirmed)
+    const allEvents = await tx.select({ id: eventsTable.id }).from(eventsTable);
+    for (const ev of allEvents) {
+      let changed = false;
+      if (retiredCriteriaIds.length > 0) {
+        const del = await tx.delete(eventCriteriaTable).where(
+          and(eq(eventCriteriaTable.eventId, ev.id), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)),
+        );
+        if ((del as unknown as { rowCount: number }).rowCount > 0) changed = true;
+      }
+      const existingECs = await tx.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, ev.id));
+      const existingByCritId = new Map(existingECs.map(ec => [ec.criterionId, ec]));
+      for (const c of targetCriteriaByName.values()) {
+        const existing = existingByCritId.get(c.id);
+        if (!existing) {
+          await tx.insert(eventCriteriaTable).values({ eventId: ev.id, criterionId: c.id, active: true });
+          changed = true;
+        } else if (!existing.active) {
+          await tx.update(eventCriteriaTable).set({ active: true }).where(eq(eventCriteriaTable.id, existing.id));
+          changed = true;
+        }
+      }
+      if (changed) eventCriteriaFixed++;
+    }
+  });
+
+  await audit(userId, "migrate_criteria_catalog", "criteria", undefined, null, {
+    catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed,
+  });
+
+  res.json({ success: true, catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed });
+});
+
 // Remove avaliações duplicadas: cópias EXATAS (mesmo evento, quesito, avaliador,
 // nota e comentário) mantendo a primeira gravada. Duplicatas com conteúdo
 // diferente (ex.: duas perguntas do Forms que mapeiam para o mesmo quesito)
