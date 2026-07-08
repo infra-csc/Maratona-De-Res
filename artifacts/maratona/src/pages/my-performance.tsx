@@ -452,12 +452,6 @@ function EventCard({ event }: { event: EventSummary }) {
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#191c1e]/20">
-          {event.projectedPlatoon && (
-            <span className="text-[10px] font-bold uppercase italic px-2 py-1 border-2 border-[#191c1e]"
-              style={{ backgroundColor: event.projectedPlatoonColor || '#ccff00', color: '#191c1e' }}>
-              {event.projectedPlatoon}
-            </span>
-          )}
 
           {event.eventScore > 0 && (
             <div className="text-right bg-[#ccff00] border-2 border-[#191c1e] px-3 py-1.5">

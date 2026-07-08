@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -140,6 +140,8 @@ export default function EvaluationsPage() {
   const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
   const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "com-nota" | "sem-nota">("all");
+  const [expandedCriteria, setExpandedCriteria] = useState<Set<number>>(new Set());
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   // Per-criterion audio override (objectPath). "" means the user cleared a
@@ -192,6 +194,10 @@ export default function EvaluationsPage() {
   const { data: myConformityData } = useGetEventConformity(selectedEventId!, {
     query: { enabled: isAnyConformityEvaluator, queryKey: ["event-conformity-eval", selectedEventId] as unknown[] },
   });
+  // Admin/consultation view also needs conformity data (read-only) to show responses.
+  const { data: adminConformityData } = useGetEventConformity(selectedEventId!, {
+    query: { enabled: isConsultation && !!selectedEventId, queryKey: ["conformity-admin", selectedEventId] as unknown[] },
+  });
   const conformityEvalMutation = useSetEventConformity({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: ["event-conformity-eval", selectedEventId] }),
@@ -219,6 +225,13 @@ export default function EvaluationsPage() {
       onError: () => toast({ title: "Erro ao redirecionar", variant: "destructive" }),
     },
   });
+
+  // Reset expanded criteria when event changes
+  useEffect(() => {
+    setExpandedCriteria(new Set());
+    setTypeFilter("all");
+    setStatusFilter("all");
+  }, [selectedEventId]);
 
   useEffect(() => {
     if (myConformityData) {
@@ -569,10 +582,32 @@ export default function EvaluationsPage() {
   const statusFilteredCriteria = statusFilter === "all"
     ? avaliadorFilteredCriteria
     : avaliadorFilteredCriteria.filter(c => (statusFilter === "done" ? isCriterionDone(c) : !isCriterionDone(c)));
-  const filteredAreaGroups = groupByArea(statusFilteredCriteria);
+  const typeFilteredCriteria = typeFilter === "all"
+    ? statusFilteredCriteria
+    : typeFilter === "com-nota"
+      ? statusFilteredCriteria.filter(c => getSubmittedEvals(c.criterionId).length > 0)
+      : statusFilteredCriteria.filter(c => getSubmittedEvals(c.criterionId).length === 0);
+  const filteredAreaGroups = groupByArea(typeFilteredCriteria);
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
+  }
+
+  function getSubmittedEvals(criterionId: number) {
+    return (evaluations ?? []).filter(e => e.criterionId === criterionId && e.status === "submitted");
+  }
+
+  function toggleExpand(criterionId: number) {
+    setExpandedCriteria(prev => {
+      const next = new Set(prev);
+      next.has(criterionId) ? next.delete(criterionId) : next.add(criterionId);
+      return next;
+    });
+  }
+
+  function formatEvalDate(v: string | null | undefined) {
+    if (!v) return "";
+    return new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
   function currentScore(criterionId: number) {
@@ -876,6 +911,27 @@ export default function EvaluationsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {isConsultation && (
+                  <div>
+                    <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
+                      <Target size={12} /> Tipo
+                    </p>
+                    <Select
+                      value={typeFilter}
+                      onValueChange={(v) => setTypeFilter(v as "all" | "com-nota" | "sem-nota")}
+                    >
+                      <SelectTrigger className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="com-nota">Com nota</SelectItem>
+                        <SelectItem value="sem-nota">Sem nota (falta)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1094,6 +1150,69 @@ export default function EvaluationsPage() {
                           <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#b02f00]">Critérios ainda não confirmados — as áreas não podem avaliar até a liberação.</p>
                         </div>
                       )}
+                      {/* Outras Respostas do Evento — conformidade, faltas, destaque */}
+                      {adminConformityData && typeFilter === "all" && (
+                        <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
+                          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
+                            <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight">
+                              <ShieldAlert size={16} className="shrink-0" /> Outras Respostas do Evento
+                            </span>
+                          </div>
+                          <div className="divide-y-2 divide-[#eceef0]">
+                            {/* Matriz de Conformidade */}
+                            <div className="px-5 py-4">
+                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-3">Matriz de Conformidade</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {[
+                                  { label: "EPI", val: adminConformityData.epi, comment: adminConformityData.epiComment },
+                                  { label: "Estaiamentos/Aterramento", val: adminConformityData.estaiamentos, comment: adminConformityData.estaiamentosComment },
+                                  { label: "Conduta", val: adminConformityData.conduta, comment: adminConformityData.condutaComment },
+                                  { label: "Guarda de Equipamentos", val: adminConformityData.guardaEquipamentos, comment: adminConformityData.guardaEquipamentosComment },
+                                ].map(item => (
+                                  <div key={item.label} className="border-2 border-[#eceef0] p-3">
+                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                      <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">{item.label}</span>
+                                      <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border shrink-0 ${item.val === null || item.val === undefined ? "bg-[#d8dadc] text-[#444933] border-[#c0c4c8]" : item.val ? "bg-[#ccff00] text-[#161e00] border-[#506600]" : "bg-[#ff5722] text-white border-[#8b1a00]"}`}>
+                                        {item.val === null || item.val === undefined ? "—" : item.val ? "SIM" : "NÃO"}
+                                      </span>
+                                    </div>
+                                    {item.comment && item.val === false && (
+                                      <p className="text-[11px] italic text-[#444933] leading-snug">{item.comment}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Faltas/Atrasos */}
+                            <div className="px-5 py-4">
+                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
+                                <Clock size={12} /> Faltas/Atrasos (+30 min)
+                              </p>
+                              {adminConformityData.absencesReport ? (
+                                <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport}</p>
+                              ) : (
+                                <p className="text-[11px] italic text-[#9aa088]">Nenhuma falta ou atraso registrada.</p>
+                              )}
+                            </div>
+                            {/* Destaque de Desempenho */}
+                            <div className="px-5 py-4">
+                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
+                                <Trophy size={12} /> Destaque de Desempenho
+                              </p>
+                              {adminConformityData.standoutResponse === true && adminConformityData.standoutJustification ? (
+                                <div className="border-2 border-[#506600] bg-[#f7ffe0] p-3">
+                                  <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap">{adminConformityData.standoutJustification}</p>
+                                </div>
+                              ) : adminConformityData.standoutResponse === false ? (
+                                <p className="text-[11px] italic text-[#9aa088]">Nenhum destaque registrado.</p>
+                              ) : (
+                                <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {filteredAreaGroups.map(g => {
                         const submittedInArea = g.criteria.filter(c => isCriterionDone(c)).length;
                         const areaDone = submittedInArea === g.criteria.length;
@@ -1112,23 +1231,87 @@ export default function EvaluationsPage() {
                                 const st = criterionStatus(c.criterionId, c.responsibleAreaId ?? null);
                                 const assignedNames = c.responsibleAreaId != null ? (assignedEvaluatorsByArea.get(c.responsibleAreaId) ?? []).map(a => a.name) : [];
                                 const responsible = assignedNames.length > 0 ? assignedNames.join(", ") : (st.submittedNames[0] ?? null);
+                                const submittedEvals = getSubmittedEvals(c.criterionId);
+                                const isExpanded = expandedCriteria.has(c.criterionId);
+                                const hasContent = submittedEvals.length > 0;
                                 return (
-                                  <li key={c.criterionId} data-testid={`status-crit-${c.criterionId}`} className="flex items-center justify-between gap-3 px-5 py-3 border-t-2 border-[#eceef0] first:border-t-0">
-                                    <span className="font-bold italic text-[#191c1e] min-w-0 truncate pr-1.5">{c.criterionName}</span>
-                                    <span className="shrink-0 flex items-center gap-2">
-                                      <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-nowrap hidden sm:inline-flex items-center gap-1 pr-0.5">
-                                        <User size={11} className="shrink-0" /> {responsible ?? "Sem responsável"}
+                                  <li key={c.criterionId} data-testid={`status-crit-${c.criterionId}`} className="border-t-2 border-[#eceef0] first:border-t-0">
+                                    {/* Status row */}
+                                    <div className="flex items-center justify-between gap-3 px-5 py-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => hasContent && toggleExpand(c.criterionId)}
+                                        className={`flex items-center gap-2 min-w-0 text-left ${hasContent ? "cursor-pointer group" : "cursor-default"}`}
+                                      >
+                                        {hasContent && (
+                                          isExpanded
+                                            ? <ChevronUp size={14} className="shrink-0 text-[#747a60] group-hover:text-[#191c1e]" />
+                                            : <ChevronDown size={14} className="shrink-0 text-[#747a60] group-hover:text-[#191c1e]" />
+                                        )}
+                                        <span className="font-bold italic text-[#191c1e] min-w-0 truncate">{c.criterionName}</span>
+                                        <span className="text-[11px] font-bold italic uppercase text-[#d8dadc] bg-[#f2f4f6] border border-[#d8dadc] px-1.5 py-0.5 shrink-0">
+                                          Peso {c.weightOverride ?? c.originalWeight ?? 0}
+                                        </span>
+                                      </button>
+                                      <span className="shrink-0 flex items-center gap-2">
+                                        <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-nowrap hidden sm:inline-flex items-center gap-1 pr-0.5">
+                                          <User size={11} className="shrink-0" /> {responsible ?? "Sem responsável"}
+                                        </span>
+                                        {st.state === "submitted" ? (
+                                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1"><CheckCircle size={12} /> Preenchido</span>
+                                        ) : st.state === "partial" ? (
+                                          <span data-testid={`status-partial-${c.criterionId}`} title={`Falta: ${st.pendingNames.join(", ")}`} className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#fff4c2] text-[#5c4a00] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> {st.submittedCount}/{st.requiredCount} Parcial</span>
+                                        ) : st.state === "draft" ? (
+                                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffdbd1] text-[#862200] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Rascunho</span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Falta</span>
+                                        )}
+                                        {hasContent && (
+                                          <Link
+                                            href="/calibrations"
+                                            title="Ir para Calibração deste critério"
+                                            className="inline-flex items-center gap-1 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1 hover:bg-[#506600] transition-colors shrink-0"
+                                          >
+                                            <SlidersHorizontal size={11} /> Cal.
+                                          </Link>
+                                        )}
                                       </span>
-                                      {st.state === "submitted" ? (
-                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1"><CheckCircle size={12} /> Preenchido</span>
-                                      ) : st.state === "partial" ? (
-                                        <span data-testid={`status-partial-${c.criterionId}`} title={`Falta: ${st.pendingNames.join(", ")}`} className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#fff4c2] text-[#5c4a00] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> {st.submittedCount}/{st.requiredCount} Parcial</span>
-                                      ) : st.state === "draft" ? (
-                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffdbd1] text-[#862200] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Rascunho</span>
-                                      ) : (
-                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Falta</span>
-                                      )}
-                                    </span>
+                                    </div>
+                                    {/* Expanded: score + comment per evaluator */}
+                                    {isExpanded && hasContent && (
+                                      <div className="bg-[#f7f9fb] border-t-2 border-[#eceef0] px-5 py-4 space-y-3">
+                                        {submittedEvals.map((ev, i) => (
+                                          <div key={i} className="border-2 border-[#e0e3e5] bg-white p-3 space-y-2">
+                                            <div className="flex items-center justify-between gap-3">
+                                              <span className="text-[11px] font-bold italic uppercase text-[#747a60] flex items-center gap-1">
+                                                <User size={11} /> {ev.evaluatorName ?? "Avaliador"}
+                                              </span>
+                                              <div className="flex items-center gap-2">
+                                                {ev.score != null && (
+                                                  <span className="text-xl font-black italic text-[#506600]">
+                                                    {parseFloat(ev.score as unknown as string).toFixed(1)}
+                                                    <span className="text-[11px] text-[#747a60]">/10</span>
+                                                  </span>
+                                                )}
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border border-[#191c1e] px-1.5 py-0.5">
+                                                  <CheckCircle size={10} /> Enviado
+                                                </span>
+                                              </div>
+                                            </div>
+                                            {ev.comments && (
+                                              <p className="text-xs italic text-[#444933] leading-relaxed border-l-2 border-[#ccff00] pl-3 whitespace-pre-wrap">
+                                                {ev.comments}
+                                              </p>
+                                            )}
+                                            {ev.audioUrl && (
+                                              <div className="pt-1">
+                                                <AudioPlayer objectPath={ev.audioUrl} />
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </li>
                                 );
                               })}
@@ -1646,6 +1829,29 @@ export default function EvaluationsPage() {
                             <p className="text-[10px] font-bold italic uppercase tracking-wide text-[#b02f00] leading-tight">
                               Provisória — antes da calibração. O valor final do colaborador sai após a calibração.
                             </p>
+                          )}
+                        </div>
+                      )}
+                      {/* Indicadores rápidos de conformidade */}
+                      {adminConformityData && (
+                        <div className="pt-2 border-t-2 border-[#e0e3e5] space-y-2">
+                          {adminConformityData.standoutResponse === true && (
+                            <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#506600] bg-[#f7ffe0] border border-[#506600] px-3 py-2">
+                              <Trophy size={13} className="shrink-0" />
+                              <span>Destaque de desempenho registrado</span>
+                            </div>
+                          )}
+                          {adminConformityData.absencesReport && (
+                            <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#b02f00] bg-[#fff4e5] border border-[#b02f00] px-3 py-2">
+                              <Clock size={13} className="shrink-0" />
+                              <span>Faltas/atrasos registrados</span>
+                            </div>
+                          )}
+                          {[adminConformityData.epi, adminConformityData.estaiamentos, adminConformityData.conduta, adminConformityData.guardaEquipamentos].some(v => v === false) && (
+                            <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-3 py-2">
+                              <ShieldAlert size={13} className="shrink-0" />
+                              <span>Não-conformidade na matriz</span>
+                            </div>
                           )}
                         </div>
                       )}
