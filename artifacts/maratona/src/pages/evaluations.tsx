@@ -197,6 +197,15 @@ export default function EvaluationsPage() {
   const [newParticipantFunction, setNewParticipantFunction] = useState<string>(DEFAULT_PARTICIPANT_FUNCTION);
   const [pendingRemoveParticipant, setPendingRemoveParticipant] = useState<number | null>(null);
 
+  // Atribuição de avaliadores por área (admin/rh)
+  const [assignAreaPickerOpen, setAssignAreaPickerOpen] = useState<number | null>(null);
+  const [assignAreaUserIds, setAssignAreaUserIds] = useState<number[]>([]);
+  // Atribuição dos avaliadores da matriz de conformidade (admin/rh)
+  const [setConformityPickerOpen, setSetConformityPickerOpen] = useState(false);
+  const [conformityPickerUserId, setConformityPickerUserId] = useState<number | null>(null);
+  const [setFerramentasPickerOpen, setSetFerramentasPickerOpen] = useState(false);
+  const [ferramentasPickerUserId, setFerramentasPickerUserId] = useState<number | null>(null);
+
   const { data: events } = useGetEvents({});
 
   // Lista global de avaliadores (independe do evento selecionado) para permitir
@@ -271,6 +280,24 @@ export default function EvaluationsPage() {
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setRedirectFerramentasOpen(false); toast({ title: "Avaliação redirecionada" }); },
       onError: () => toast({ title: "Erro ao redirecionar", variant: "destructive" }),
+    },
+  });
+  const setConformityEvaluatorMutation = useSetConformityEvaluator({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setSetConformityPickerOpen(false); toast({ title: "Avaliador da Matriz atribuído" }); },
+      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+    },
+  });
+  const setFerramentasEvaluatorMutation = useSetConformityEvaluatorFerramentas({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setSetFerramentasPickerOpen(false); toast({ title: "Avaliador de Ferramentas atribuído" }); },
+      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+    },
+  });
+  const updateAssignmentsMutation = useUpdateEventAssignments({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setAssignAreaPickerOpen(null); toast({ title: "Atribuição salva" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -571,6 +598,15 @@ export default function EvaluationsPage() {
     list.push({ id: a.evaluatorUserId, name: a.evaluatorName ?? "Sem nome" });
     assignedEvaluatorsByArea.set(a.areaId, list);
   }
+
+  // Áreas únicas com critérios ativos neste evento — usadas na UI de atribuição de avaliadores.
+  const eventAreasForAssignment = Array.from(
+    new Map(
+      activeCriteria
+        .filter(c => c.responsibleAreaId != null)
+        .map(c => [c.responsibleAreaId!, { id: c.responsibleAreaId!, name: c.responsibleAreaName ?? "Sem área" }])
+    ).values()
+  ).sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
 
   // Manager-only oversight: per-criterion submission status ("quem preencheu / quem falta").
   // "submitted" só quando TODOS os avaliadores designados para a área enviaram;
@@ -1224,58 +1260,89 @@ export default function EvaluationsPage() {
                           <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#b02f00]">Critérios ainda não confirmados — as áreas não podem avaliar até a liberação.</p>
                         </div>
                       )}
-                      {/* Equipe Alocada — quem é o time deste evento, com edição direta para gestores */}
+                      {/* Atribuição de Avaliadores por Área */}
                       {isManager && (
                         <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
-                          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
+                          <div className="flex items-center gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
                             <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight">
-                              <Users size={16} className="shrink-0" /> Equipe Alocada ({participants?.length || 0})
+                              <Target size={16} className="shrink-0" /> Atribuição de Avaliadores
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setAddParticipantOpen(true)}
-                              className="flex items-center gap-1.5 px-2.5 py-1 border-2 border-[#ccff00] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[11px] font-black uppercase tracking-tight"
-                            >
-                              <UserPlus size={14} /> Adicionar
-                            </button>
                           </div>
-                          {(!participants || participants.length === 0) ? (
-                            <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum colaborador alocado.</div>
+                          {eventAreasForAssignment.length === 0 ? (
+                            <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhuma área com critérios ativos neste evento.</div>
                           ) : (
                             <ul className="divide-y-2 divide-[#eceef0]">
-                              {participants.map(p => {
-                                const isInactive = p.confirmed === false;
+                              {eventAreasForAssignment.map(area => {
+                                const assigned = assignedEvaluatorsByArea.get(area.id) ?? [];
+                                const isEditingThis = assignAreaPickerOpen === area.id;
                                 return (
-                                  <li key={p.id} className={cn("flex items-center justify-between gap-3 px-5 py-3 flex-wrap", isInactive && "opacity-50 bg-[#fdece6]/40")}>
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                      <div className="w-8 h-8 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-[10px] text-[#191c1e] shrink-0">
-                                        {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                                  <li key={area.id} className="px-5 py-3 space-y-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Building2 size={13} className="shrink-0 text-[#747a60]" />
+                                        <span className="font-black italic uppercase text-sm text-[#191c1e] truncate">{area.name}</span>
                                       </div>
-                                      <span className="font-black italic uppercase text-sm text-[#191c1e] truncate">{p.employeeName}</span>
-                                      <span className="text-[10px] font-bold italic uppercase text-[#747a60] shrink-0">{p.functionName}</span>
-                                      <span className={`px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
-                                        <span className="inline-block skew-x-[8deg]">{p.employmentType === "freela" ? "Freela" : "Casa"}</span>
-                                      </span>
-                                      {isInactive && <span className="text-[10px] font-black italic uppercase text-[#862200] shrink-0">Inativo</span>}
+                                      {!isEditingThis && (
+                                        <button
+                                          type="button"
+                                          onClick={() => { setAssignAreaPickerOpen(area.id); setAssignAreaUserIds(assigned.map(a => a.id)); }}
+                                          className="flex items-center gap-1.5 px-2.5 py-1 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors text-[11px] font-black uppercase tracking-tight shrink-0"
+                                        >
+                                          <UserPlus size={13} /> Alterar
+                                        </button>
+                                      )}
                                     </div>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <button
-                                        type="button"
-                                        onClick={() => updateParticipant.mutate({ id: selectedEventId!, participantId: p.id, data: { confirmed: isInactive } })}
-                                        className={cn("p-1.5 border-2 border-[#191c1e] bg-white transition-colors", isInactive ? "text-[#191c1e] hover:bg-[#ccff00]" : "text-[#862200] hover:bg-[#862200] hover:text-white")}
-                                        title={isInactive ? "Reativar colaborador" : "Marcar como inativo (não compareceu)"}
-                                      >
-                                        {isInactive ? <UserCheck size={13} /> : <UserX size={13} />}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setPendingRemoveParticipant(p.id)}
-                                        className="p-1.5 border-2 border-[#191c1e] bg-white text-[#862200] hover:bg-[#862200] hover:text-white transition-colors"
-                                        title="Remover do evento"
-                                      >
-                                        <Trash2 size={13} />
-                                      </button>
-                                    </div>
+                                    {!isEditingThis && (
+                                      <div className="flex flex-wrap gap-1.5 pl-5">
+                                        {assigned.length === 0 ? (
+                                          <span className="text-[11px] italic font-bold uppercase text-[#9aa088]">Sem avaliador atribuído</span>
+                                        ) : assigned.map(a => (
+                                          <span key={a.id} className="inline-flex items-center gap-1 text-[10px] font-black italic uppercase bg-[#f2f4f6] border-2 border-[#191c1e] px-2 py-0.5">
+                                            <User size={10} /> {a.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {isEditingThis && (
+                                      <div className="pl-5 space-y-2">
+                                        <div className="max-h-48 overflow-y-auto space-y-0.5 border-2 border-[#191c1e] p-2 bg-[#f9fafb]">
+                                          {allAvaliadores.length === 0 && (
+                                            <p className="text-[11px] italic text-[#9aa088] px-2 py-1">Nenhum avaliador cadastrado.</p>
+                                          )}
+                                          {allAvaliadores.map(av => {
+                                            const checked = assignAreaUserIds.includes(av.id);
+                                            return (
+                                              <label key={av.id} className="flex items-center gap-2.5 cursor-pointer hover:bg-[#f2f4f6] px-2 py-1.5">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={checked}
+                                                  onChange={() => setAssignAreaUserIds(prev => checked ? prev.filter(id => id !== av.id) : [...prev, av.id])}
+                                                  className="w-3.5 h-3.5 accent-[#506600]"
+                                                />
+                                                <span className="text-[12px] font-bold italic uppercase text-[#191c1e]">{av.name}</span>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            disabled={updateAssignmentsMutation.isPending}
+                                            onClick={() => updateAssignmentsMutation.mutate({ id: selectedEventId!, data: { assignments: [{ areaId: area.id, evaluatorUserIds: assignAreaUserIds }] } })}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#ccff00] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[11px] font-black uppercase tracking-tight disabled:opacity-50"
+                                          >
+                                            <Save size={13} /> Salvar
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setAssignAreaPickerOpen(null)}
+                                            className="px-3 py-1.5 border-2 border-[#191c1e] bg-white text-[#191c1e] hover:bg-[#f2f4f6] transition-colors text-[11px] font-black uppercase tracking-tight"
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </li>
                                 );
                               })}
@@ -1284,24 +1351,117 @@ export default function EvaluationsPage() {
                         </div>
                       )}
 
-                      {/* Outras Respostas do Evento — conformidade, faltas, destaque */}
-                      {adminConformityData && typeFilter === "all" && (
+                      {/* Matriz de Conformidade + Perguntas de Evento */}
+                      {isConsultation && !!selectedEventId && (
                         <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                           <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
                             <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight">
-                              <ShieldAlert size={16} className="shrink-0" /> Outras Respostas do Evento
+                              <ShieldAlert size={16} className="shrink-0" /> Matriz de Conformidade
                             </span>
+                            <span className="text-[10px] font-black italic uppercase text-[#747a60] bg-white border border-[#d8dadc] px-2 py-0.5">4 critérios</span>
                           </div>
                           <div className="divide-y-2 divide-[#eceef0]">
-                            {/* Matriz de Conformidade */}
+
+                            {/* Avaliadores designados — atribuição pelo admin/rh */}
+                            {isManager && (
+                              <div className="px-5 py-4 space-y-4">
+                                <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933]">Avaliadores Designados</p>
+
+                                {/* Cenografia */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">Cenografia</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setSetConformityPickerOpen(v => !v); setSetFerramentasPickerOpen(false); }}
+                                      className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] text-[11px] font-black uppercase shrink-0"
+                                    >
+                                      <UserPlus size={11} /> Atribuir
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-2 pl-0.5">
+                                    <User size={11} className="shrink-0 text-[#747a60]" />
+                                    <span className="text-[11px] italic text-[#444933]">
+                                      {selectedEventDetail?.conformityEvaluatorName ?? <span className="text-[#9aa088]">Sem avaliador atribuído</span>}
+                                    </span>
+                                  </div>
+                                  {setConformityPickerOpen && (
+                                    <div className="border-2 border-[#191c1e] bg-[#f9fafb] max-h-44 overflow-y-auto">
+                                      <button
+                                        type="button"
+                                        onClick={() => setConformityEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: null } })}
+                                        className="w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase text-[#9aa088] hover:bg-[#f2f4f6] border-b border-[#eceef0]"
+                                      >
+                                        — Remover atribuição
+                                      </button>
+                                      {allAvaliadores.map(av => (
+                                        <button
+                                          key={av.id}
+                                          type="button"
+                                          onClick={() => setConformityEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: av.id } })}
+                                          className={cn("w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase hover:bg-[#f2f4f6] border-b border-[#eceef0] last:border-b-0 flex items-center justify-between gap-2", av.id === selectedEventDetail?.conformityEvaluatorUserId ? "text-[#506600] bg-[#f7ffe0]" : "text-[#191c1e]")}
+                                        >
+                                          {av.name}
+                                          {av.id === selectedEventDetail?.conformityEvaluatorUserId && <CheckCircle size={11} className="shrink-0 text-[#506600]" />}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Ferramentas e Case */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">Ferramentas e Case</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setSetFerramentasPickerOpen(v => !v); setSetConformityPickerOpen(false); }}
+                                      className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] text-[11px] font-black uppercase shrink-0"
+                                    >
+                                      <UserPlus size={11} /> Atribuir
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-2 pl-0.5">
+                                    <User size={11} className="shrink-0 text-[#747a60]" />
+                                    <span className="text-[11px] italic text-[#444933]">
+                                      {selectedEventDetail?.conformityEvaluatorFerramentasName ?? <span className="text-[#9aa088]">Sem avaliador atribuído</span>}
+                                    </span>
+                                  </div>
+                                  {setFerramentasPickerOpen && (
+                                    <div className="border-2 border-[#191c1e] bg-[#f9fafb] max-h-44 overflow-y-auto">
+                                      <button
+                                        type="button"
+                                        onClick={() => setFerramentasEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: null } })}
+                                        className="w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase text-[#9aa088] hover:bg-[#f2f4f6] border-b border-[#eceef0]"
+                                      >
+                                        — Remover atribuição
+                                      </button>
+                                      {allAvaliadores.map(av => (
+                                        <button
+                                          key={av.id}
+                                          type="button"
+                                          onClick={() => setFerramentasEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: av.id } })}
+                                          className={cn("w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase hover:bg-[#f2f4f6] border-b border-[#eceef0] last:border-b-0 flex items-center justify-between gap-2", av.id === selectedEventDetail?.conformityEvaluatorFerramentasUserId ? "text-[#506600] bg-[#f7ffe0]" : "text-[#191c1e]")}
+                                        >
+                                          {av.name}
+                                          {av.id === selectedEventDetail?.conformityEvaluatorFerramentasUserId && <CheckCircle size={11} className="shrink-0 text-[#506600]" />}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Respostas dos 4 critérios de matriz */}
                             <div className="px-5 py-4">
-                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-3">Matriz de Conformidade</p>
+                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-3">Respostas da Matriz</p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {[
-                                  { label: "EPI", val: adminConformityData.epi, comment: adminConformityData.epiComment },
-                                  { label: "Estaiamentos/Aterramento", val: adminConformityData.estaiamentos, comment: adminConformityData.estaiamentosComment },
-                                  { label: "Conduta", val: adminConformityData.conduta, comment: adminConformityData.condutaComment },
-                                  { label: "Guarda de Equipamentos", val: adminConformityData.guardaEquipamentos, comment: adminConformityData.guardaEquipamentosComment },
+                                  { label: "EPI", val: adminConformityData?.epi, comment: adminConformityData?.epiComment },
+                                  { label: "Estaiamentos/Aterramento", val: adminConformityData?.estaiamentos, comment: adminConformityData?.estaiamentosComment },
+                                  { label: "Conduta", val: adminConformityData?.conduta, comment: adminConformityData?.condutaComment },
+                                  { label: "Guarda de Equipamentos", val: adminConformityData?.guardaEquipamentos, comment: adminConformityData?.guardaEquipamentosComment },
                                 ].map(item => (
                                   <div key={item.label} className="border-2 border-[#eceef0] p-3">
                                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -1317,6 +1477,7 @@ export default function EvaluationsPage() {
                                 ))}
                               </div>
                             </div>
+
                             {/* Faltas/Atrasos */}
                             <div className="px-5 py-4">
                               <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
@@ -1338,22 +1499,23 @@ export default function EvaluationsPage() {
                                   ))}
                                 </ul>
                               )}
-                              {adminConformityData.absencesReport ? (
+                              {adminConformityData?.absencesReport ? (
                                 <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport}</p>
                               ) : eventAbsences.length === 0 ? (
                                 <p className="text-[11px] italic text-[#9aa088]">Nenhuma falta ou atraso registrada.</p>
                               ) : null}
                             </div>
+
                             {/* Destaque de Desempenho */}
                             <div className="px-5 py-4">
                               <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
                                 <Trophy size={12} /> Destaque de Desempenho
                               </p>
-                              {adminConformityData.standoutResponse === true && adminConformityData.standoutJustification ? (
+                              {adminConformityData?.standoutResponse === true && adminConformityData.standoutJustification ? (
                                 <div className="border-2 border-[#506600] bg-[#f7ffe0] p-3">
                                   <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap">{adminConformityData.standoutJustification}</p>
                                 </div>
-                              ) : adminConformityData.standoutResponse === false ? (
+                              ) : adminConformityData?.standoutResponse === false ? (
                                 <p className="text-[11px] italic text-[#9aa088]">Nenhum destaque registrado.</p>
                               ) : (
                                 <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
