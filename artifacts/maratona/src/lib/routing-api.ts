@@ -5,6 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getAuthToken } from "./custom-fetch";
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -61,17 +62,25 @@ export const criterionRoutingKey = (criterionId: number) => ["criterion-routing"
 export const allCriterionRoutingsKey = () => ["criterion-routing-all"];
 export const eventCriterionAssignmentsKey = (eventId: number) => ["event-criterion-assignments", eventId];
 export const redirectOptionsKey = (eventId: number, criterionId: number) => ["redirect-options", eventId, criterionId];
-export const publicTokensKey = (eventId: number, criterionId: number) => ["public-tokens", eventId, criterionId];
+export const publicTokensKey = (eventId: number) => ["public-tokens", eventId];
+export const publicLinkEligibleCriteriaKey = (eventId: number) => ["public-link-eligible-criteria", eventId];
 
 // ---------------------------------------------------------------------------
 // Fetch helpers
 // ---------------------------------------------------------------------------
 
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
     ...init,
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -169,30 +178,41 @@ export function useRedirectOptions(eventId: number | null, criterionId: number |
   });
 }
 
-/** Cria um token de avaliação pública para freelancer. */
-export function useCreatePublicToken(eventId: number, criterionId: number) {
+/** Critérios do questionário deste avaliador no evento que podem entrar num link público. */
+export function usePublicLinkEligibleCriteria(eventId: number | null) {
+  return useQuery<{ criterionId: number; criterionName: string | null }[]>({
+    queryKey: publicLinkEligibleCriteriaKey(eventId ?? 0),
+    queryFn: () => apiFetch<{ criterionId: number; criterionName: string | null }[]>(
+      `/api/events/${eventId}/public-link-eligible-criteria`,
+    ),
+    enabled: eventId != null,
+  });
+}
+
+/** Cria um token de avaliação pública cobrindo o questionário inteiro do avaliador no evento. */
+export function useCreatePublicToken(eventId: number) {
   const qc = useQueryClient();
   return useMutation<{ tokenId: string }, Error, { recipientName: string }>({
     mutationFn: (body) =>
       apiFetch<{ tokenId: string }>(
-        `/api/events/${eventId}/criterion-assignments/${criterionId}/public-token`,
+        `/api/events/${eventId}/public-token`,
         { method: "POST", body: JSON.stringify(body) },
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: publicTokensKey(eventId, criterionId) });
+      qc.invalidateQueries({ queryKey: publicTokensKey(eventId) });
     },
   });
 }
 
-/** Lista tokens de avaliação pública para um critério/evento. */
-export function usePublicTokens(eventId: number | null, criterionId: number | null) {
+/** Lista tokens de avaliação pública gerados pelo avaliador logado para o evento. */
+export function usePublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
-    queryKey: publicTokensKey(eventId ?? 0, criterionId ?? 0),
+    queryKey: publicTokensKey(eventId ?? 0),
     queryFn: () =>
       apiFetch<PublicToken[]>(
-        `/api/events/${eventId}/criterion-assignments/${criterionId}/public-tokens`,
+        `/api/events/${eventId}/public-tokens`,
       ),
-    enabled: eventId != null && criterionId != null,
+    enabled: eventId != null,
   });
 }
 

@@ -5,6 +5,7 @@ import {
   criterionRoutingTable, criterionRedirectUsersTable,
   eventCriterionAssignmentsTable, criteriaTable, usersTable,
   areasTable, eventsTable, eventCriteriaTable, publicEvalTokensTable,
+  publicEvalTokenCriteriaTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -354,14 +355,47 @@ router.get("/events/:id/criterion-assignments/redirect-options/:criterionId", as
 });
 
 // ---------------------------------------------------------------------------
-// POST /events/:id/criterion-assignments/:criterionId/public-token
-// Gera um link público de avaliação para freelancer (single-use).
-// Só permitido se allowPublicLink=true no criterion_routing.
+// GET /events/:id/public-link-eligible-criteria
+// Retorna os critérios do QUESTIONÁRIO deste avaliador neste evento que
+// podem ser incluídos num link público (allowPublicLink=true no routing
+// global do critério, atribuído a este usuário, e ainda não submetido).
+// Usado pela UI para decidir se mostra o botão "Link Freelancer" e o que
+// o link vai cobrir.
+// ---------------------------------------------------------------------------
+router.get("/events/:id/public-link-eligible-criteria", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const user = req.user!;
+
+  const assignments = await db.select({
+    criterionId: eventCriterionAssignmentsTable.criterionId,
+    criterionName: criteriaTable.name,
+    status: eventCriterionAssignmentsTable.status,
+    allowPublicLink: criterionRoutingTable.allowPublicLink,
+  })
+    .from(eventCriterionAssignmentsTable)
+    .innerJoin(criteriaTable, eq(eventCriterionAssignmentsTable.criterionId, criteriaTable.id))
+    .leftJoin(criterionRoutingTable, eq(criterionRoutingTable.criterionId, eventCriterionAssignmentsTable.criterionId))
+    .where(and(
+      eq(eventCriterionAssignmentsTable.eventId, eventId),
+      eq(eventCriterionAssignmentsTable.assignedToId, user.userId),
+    ));
+
+  const eligible = assignments
+    .filter(a => a.allowPublicLink && a.status !== "submitted")
+    .map(a => ({ criterionId: a.criterionId, criterionName: a.criterionName }));
+
+  res.json(eligible);
+});
+
+// ---------------------------------------------------------------------------
+// POST /events/:id/public-token
+// Gera UM link público único cobrindo TODO o questionário (todos os critérios
+// elegíveis, ver rota acima) que o avaliador logado está respondendo neste
+// evento. Só permitido se houver pelo menos um critério elegível.
 // Body: { recipientName: string }
 // ---------------------------------------------------------------------------
-router.post("/events/:id/criterion-assignments/:criterionId/public-token", async (req, res) => {
+router.post("/events/:id/public-token", async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const criterionId = parseInt(req.params.criterionId as string);
   const user = req.user!;
   const { recipientName } = req.body ?? {};
 
@@ -370,44 +404,54 @@ router.post("/events/:id/criterion-assignments/:criterionId/public-token", async
     return;
   }
 
-  const [routing] = await db.select().from(criterionRoutingTable)
-    .where(eq(criterionRoutingTable.criterionId, criterionId)).limit(1);
-  if (!routing?.allowPublicLink) {
-    res.status(403).json({ error: "Este critério não permite link público" });
-    return;
-  }
-
-  const [assignment] = await db.select().from(eventCriterionAssignmentsTable)
+  const assignments = await db.select({
+    criterionId: eventCriterionAssignmentsTable.criterionId,
+    status: eventCriterionAssignmentsTable.status,
+    allowPublicLink: criterionRoutingTable.allowPublicLink,
+  })
+    .from(eventCriterionAssignmentsTable)
+    .leftJoin(criterionRoutingTable, eq(criterionRoutingTable.criterionId, eventCriterionAssignmentsTable.criterionId))
     .where(and(
       eq(eventCriterionAssignmentsTable.eventId, eventId),
-      eq(eventCriterionAssignmentsTable.criterionId, criterionId),
-    )).limit(1);
+      eq(eventCriterionAssignmentsTable.assignedToId, user.userId),
+    ));
 
-  if (assignment?.status === "submitted") {
-    res.status(400).json({ error: "Avaliação já submetida para este critério" });
+  const eligibleCriterionIds = assignments
+    .filter(a => a.allowPublicLink && a.status !== "submitted")
+    .map(a => a.criterionId);
+
+  if (eligibleCriterionIds.length === 0) {
+    res.status(400).json({ error: "Nenhum critério deste questionário permite link público, ou já foram todos submetidos" });
     return;
   }
 
   const tokenId = randomUUID();
-  await db.insert(publicEvalTokensTable).values({
-    id: tokenId,
-    eventId,
-    criterionId,
-    createdByUserId: user.userId,
-    recipientName: recipientName.trim(),
+  await db.transaction(async (tx) => {
+    await tx.insert(publicEvalTokensTable).values({
+      id: tokenId,
+      eventId,
+      createdByUserId: user.userId,
+      recipientName: recipientName.trim(),
+    });
+    await tx.insert(publicEvalTokenCriteriaTable).values(
+      eligibleCriterionIds.map(criterionId => ({ tokenId, criterionId })),
+    );
   });
 
-  await audit(user.userId, "create", "public_eval_tokens", tokenId, null, { eventId, criterionId, recipientName: recipientName.trim() });
+  await audit(user.userId, "create", "public_eval_tokens", tokenId, null, {
+    eventId, criterionIds: eligibleCriterionIds, recipientName: recipientName.trim(),
+  });
   res.json({ tokenId });
 });
 
 // ---------------------------------------------------------------------------
-// GET /events/:id/criterion-assignments/:criterionId/public-tokens
-// Lista tokens gerados para este critério/evento (histórico).
+// GET /events/:id/public-tokens
+// Lista os links públicos gerados pelo avaliador logado para este evento
+// (histórico exibido na tela de avaliação).
 // ---------------------------------------------------------------------------
-router.get("/events/:id/criterion-assignments/:criterionId/public-tokens", async (req, res) => {
+router.get("/events/:id/public-tokens", async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const criterionId = parseInt(req.params.criterionId as string);
+  const user = req.user!;
 
   const tokens = await db.select({
     id: publicEvalTokensTable.id,
@@ -421,7 +465,7 @@ router.get("/events/:id/criterion-assignments/:criterionId/public-tokens", async
     .leftJoin(usersTable, eq(publicEvalTokensTable.createdByUserId, usersTable.id))
     .where(and(
       eq(publicEvalTokensTable.eventId, eventId),
-      eq(publicEvalTokensTable.criterionId, criterionId),
+      eq(publicEvalTokensTable.createdByUserId, user.userId),
     ))
     .orderBy(publicEvalTokensTable.createdAt);
 

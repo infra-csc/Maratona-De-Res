@@ -69,18 +69,31 @@ export const eventCriterionAssignmentsTable = pgTable("event_criterion_assignmen
 
 /**
  * Tokens de avaliação pública para freelancers (Ativação, Produção, Cenografia).
- * O link é single-use: depois de usado o token expira.
+ * Um token cobre o QUESTIONÁRIO INTEIRO que o avaliador está respondendo em um
+ * evento (todos os critérios atribuídos a ele que permitem link público), não
+ * mais um único critério. O link é single-use: depois de usado o token expira.
+ * A lista de critérios cobertos por cada token fica em public_eval_token_criteria.
  */
 export const publicEvalTokensTable = pgTable("public_eval_tokens", {
   id: text("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
-  criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
   createdByUserId: integer("created_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),
   recipientName: text("recipient_name"),
   submitterName: text("submitter_name"),
   usedAt: timestamp("used_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+/**
+ * Critérios cobertos por um token de avaliação pública (relação N:N —
+ * um token do questionário inteiro cobre vários critérios do evento).
+ */
+export const publicEvalTokenCriteriaTable = pgTable("public_eval_token_criteria", {
+  tokenId: text("token_id").notNull().references(() => publicEvalTokensTable.id, { onDelete: "cascade" }),
+  criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
+}, (t) => ({
+  tokenCriterionUq: uniqueIndex("public_eval_token_criteria_uq").on(t.tokenId, t.criterionId),
+}));
 
 export const insertCriterionRoutingSchema = createInsertSchema(criterionRoutingTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEventCriterionAssignmentSchema = createInsertSchema(eventCriterionAssignmentsTable).omit({ id: true, createdAt: true, updatedAt: true });
@@ -89,5 +102,6 @@ export type CriterionRouting = typeof criterionRoutingTable.$inferSelect;
 export type CriterionRedirectUser = typeof criterionRedirectUsersTable.$inferSelect;
 export type EventCriterionAssignment = typeof eventCriterionAssignmentsTable.$inferSelect;
 export type PublicEvalToken = typeof publicEvalTokensTable.$inferSelect;
+export type PublicEvalTokenCriterion = typeof publicEvalTokenCriteriaTable.$inferSelect;
 export type InsertCriterionRouting = z.infer<typeof insertCriterionRoutingSchema>;
 export type InsertEventCriterionAssignment = z.infer<typeof insertEventCriterionAssignmentSchema>;

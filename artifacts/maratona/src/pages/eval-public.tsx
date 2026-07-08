@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { CheckCircle, ClipboardCheck, AlertTriangle } from "lucide-react";
 
+interface TokenCriterion {
+  criterionId: number;
+  criterionName: string;
+  criterionDescription: string | null;
+}
+
 interface TokenInfo {
   tokenId: string;
   isUsed: boolean;
@@ -9,8 +15,12 @@ interface TokenInfo {
   submitterName: string | null;
   eventName: string | null;
   eventStatus: string | null;
-  criterionName: string | null;
-  criterionDescription: string | null;
+  criteria: TokenCriterion[];
+}
+
+interface CriterionAnswer {
+  score: number;
+  comments: string;
 }
 
 const scoreLabels: Record<number, string> = {
@@ -26,8 +36,7 @@ export default function PublicEvalPage() {
   const [info, setInfo] = useState<TokenInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitterName, setSubmitterName] = useState("");
-  const [score, setScore] = useState<number>(0);
-  const [comments, setComments] = useState("");
+  const [answers, setAnswers] = useState<Record<number, CriterionAnswer>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -45,19 +54,42 @@ export default function PublicEvalPage() {
       .then((data) => {
         setInfo(data);
         setSubmitterName(data.recipientName ?? "");
+        setAnswers(
+          Object.fromEntries(
+            (data.criteria ?? []).map((c) => [c.criterionId, { score: 0, comments: "" }]),
+          ),
+        );
       })
       .catch((e: Error) => setLoadError(e.message));
   }, [token]);
 
+  const criteria = info?.criteria ?? [];
+  const allScored = criteria.length > 0 && criteria.every((c) => (answers[c.criterionId]?.score ?? 0) > 0);
+
+  function setScore(criterionId: number, score: number) {
+    setAnswers((prev) => ({ ...prev, [criterionId]: { score, comments: prev[criterionId]?.comments ?? "" } }));
+  }
+
+  function setComments(criterionId: number, comments: string) {
+    setAnswers((prev) => ({ ...prev, [criterionId]: { score: prev[criterionId]?.score ?? 0, comments } }));
+  }
+
   async function handleSubmit() {
-    if (!token || score === 0 || !submitterName.trim()) return;
+    if (!token || !submitterName.trim() || !allScored) return;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
       const r = await fetch(`/api/public-eval/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submitterName: submitterName.trim(), score, comments }),
+        body: JSON.stringify({
+          submitterName: submitterName.trim(),
+          evaluations: criteria.map((c) => ({
+            criterionId: c.criterionId,
+            score: answers[c.criterionId]?.score ?? 0,
+            comments: answers[c.criterionId]?.comments ?? "",
+          })),
+        }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
@@ -132,16 +164,6 @@ export default function PublicEvalPage() {
         </div>
 
         <div className="bg-white border-2 border-[#191c1e] shadow-[8px_8px_0px_0px_#191c1e] p-6 md:p-8 space-y-6">
-          <div className="border-2 border-[#ccff00] bg-[#f9ffe0] p-4">
-            <p className="text-xs font-black italic uppercase text-[#506600] mb-1">Critério a avaliar</p>
-            <h2 className="text-xl italic uppercase font-black tracking-tight text-[#191c1e]">
-              {info.criterionName}
-            </h2>
-            {info.criterionDescription && (
-              <p className="text-sm italic text-[#444933] mt-2 leading-relaxed">{info.criterionDescription}</p>
-            )}
-          </div>
-
           <div>
             <label className="block text-xs font-black italic uppercase mb-2">
               Seu nome <span className="text-[#ba1a1a] text-[10px] ml-1 bg-[#ffdad6] px-2 py-0.5 border border-[#191c1e]">Obrigatório</span>
@@ -155,48 +177,69 @@ export default function PublicEvalPage() {
             />
           </div>
 
-          <div>
-            <p className="text-xs font-black italic uppercase mb-3">
-              Nota <span className="text-[#ba1a1a] text-[10px] ml-1 bg-[#ffdad6] px-2 py-0.5 border border-[#191c1e]">Obrigatório</span>
-            </p>
-            <div className="grid grid-cols-5 gap-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setScore(val)}
-                  className={`border-2 border-[#191c1e] py-3 font-black text-lg italic transition-all ${
-                    score === val
-                      ? "bg-[#ccff00] text-[#161e00] shadow-[3px_3px_0px_0px_#161e00]"
-                      : "bg-white hover:bg-[#f2f4f6]"
-                  }`}
-                >
-                  {val}
-                </button>
-              ))}
-            </div>
-            {score > 0 && (
-              <p className="mt-2 text-xs font-bold italic text-[#747a60] text-center">
-                {score} — {scoreLabels[score]}
-              </p>
-            )}
-          </div>
+          <div className="space-y-6">
+            {criteria.map((c, idx) => {
+              const answer = answers[c.criterionId] ?? { score: 0, comments: "" };
+              return (
+                <div key={c.criterionId} className="border-2 border-[#191c1e] p-5 space-y-4">
+                  <div className="border-2 border-[#ccff00] bg-[#f9ffe0] p-4">
+                    <p className="text-xs font-black italic uppercase text-[#506600] mb-1">
+                      Critério {idx + 1} de {criteria.length}
+                    </p>
+                    <h2 className="text-xl italic uppercase font-black tracking-tight text-[#191c1e]">
+                      {c.criterionName}
+                    </h2>
+                    {c.criterionDescription && (
+                      <p className="text-sm italic text-[#444933] mt-2 leading-relaxed">{c.criterionDescription}</p>
+                    )}
+                  </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-black italic uppercase">
-                Comentário <span className="text-[10px] text-[#747a60] bg-[#e6e8ea] border border-[#191c1e] px-2 py-0.5 ml-1 font-bold italic uppercase">Opcional</span>
-              </label>
-              <span className="text-[10px] font-bold italic text-[#747a60] tabular-nums">{comments.length}/300</span>
-            </div>
-            <textarea
-              value={comments}
-              onChange={e => setComments(e.target.value)}
-              maxLength={300}
-              rows={4}
-              placeholder="Observações sobre o desempenho da equipe neste critério..."
-              className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 text-sm italic resize-y focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
-            />
+                  <div>
+                    <p className="text-xs font-black italic uppercase mb-3">
+                      Nota <span className="text-[#ba1a1a] text-[10px] ml-1 bg-[#ffdad6] px-2 py-0.5 border border-[#191c1e]">Obrigatório</span>
+                    </p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setScore(c.criterionId, val)}
+                          className={`border-2 border-[#191c1e] py-3 font-black text-lg italic transition-all ${
+                            answer.score === val
+                              ? "bg-[#ccff00] text-[#161e00] shadow-[3px_3px_0px_0px_#161e00]"
+                              : "bg-white hover:bg-[#f2f4f6]"
+                          }`}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
+                    {answer.score > 0 && (
+                      <p className="mt-2 text-xs font-bold italic text-[#747a60] text-center">
+                        {answer.score} — {scoreLabels[answer.score]}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-black italic uppercase">
+                        Comentário <span className="text-[10px] text-[#747a60] bg-[#e6e8ea] border border-[#191c1e] px-2 py-0.5 ml-1 font-bold italic uppercase">Opcional</span>
+                      </label>
+                      <span className="text-[10px] font-bold italic text-[#747a60] tabular-nums">{answer.comments.length}/300</span>
+                    </div>
+                    <textarea
+                      value={answer.comments}
+                      onChange={e => setComments(c.criterionId, e.target.value)}
+                      maxLength={300}
+                      rows={3}
+                      placeholder="Observações sobre o desempenho da equipe neste critério..."
+                      className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 text-sm italic resize-y focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {submitError && (
@@ -208,7 +251,7 @@ export default function PublicEvalPage() {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={score === 0 || !submitterName.trim() || isSubmitting}
+            disabled={!allScored || !submitterName.trim() || isSubmitting}
             className="w-full bg-[#ccff00] border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] px-6 py-4 font-black italic uppercase text-base tracking-wide disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px] transition-all"
           >
             {isSubmitting ? "Enviando..." : "Enviar Avaliação"}

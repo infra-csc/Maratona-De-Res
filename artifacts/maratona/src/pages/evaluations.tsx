@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens } from "@/lib/routing-api";
+import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -320,7 +320,7 @@ export default function EvaluationsPage() {
   const patchCriterionAssignment = usePatchCriterionAssignment(selectedEventId ?? 0);
   const [redirectDialogCriterionId, setRedirectDialogCriterionId] = useState<number | null>(null);
   const [redirectTargetId, setRedirectTargetId] = useState<number | null>(null);
-  const [publicLinkDialogCriterionId, setPublicLinkDialogCriterionId] = useState<number | null>(null);
+  const [publicLinkDialogOpen, setPublicLinkDialogOpen] = useState(false);
   const [publicLinkRecipientName, setPublicLinkRecipientName] = useState("");
   const [generatedPublicUrl, setGeneratedPublicUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -328,13 +328,10 @@ export default function EvaluationsPage() {
     selectedEventId ?? 0,
     redirectDialogCriterionId ?? 0,
   );
-  const createPublicToken = useCreatePublicToken(
-    selectedEventId ?? 0,
-    publicLinkDialogCriterionId ?? 0,
-  );
+  const { data: publicLinkEligibleCriteria } = usePublicLinkEligibleCriteria(selectedEventId ?? null);
+  const createPublicToken = useCreatePublicToken(selectedEventId ?? 0);
   const { data: publicTokenHistory, refetch: refetchTokenHistory } = usePublicTokens(
-    publicLinkDialogCriterionId != null ? (selectedEventId ?? null) : null,
-    publicLinkDialogCriterionId,
+    publicLinkDialogOpen ? (selectedEventId ?? null) : null,
   );
 
   const createMutation = useCreateEvaluation({
@@ -1620,21 +1617,6 @@ export default function EvaluationsPage() {
                                     >
                                       <CornerDownRight size={14} /> Redirecionar
                                     </button>
-                                    {/* Gerar link público para freelancer */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setPublicLinkDialogCriterionId(c.criterionId);
-                                        setPublicLinkRecipientName("");
-                                        setGeneratedPublicUrl(null);
-                                        setLinkCopied(false);
-                                        refetchTokenHistory();
-                                      }}
-                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
-                                      title="Gerar link de avaliação para freelancer"
-                                    >
-                                      <Link2 size={14} /> Link Freelancer
-                                    </button>
                                   </div>
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
@@ -2049,6 +2031,26 @@ export default function EvaluationsPage() {
                     </div>
                   )}
 
+                  {/* Link Freelancer — um único link para o questionário inteiro do evento */}
+                  {isEvaluator && myCriteria.length > 0 && (publicLinkEligibleCriteria ?? []).length > 0 && (
+                    <div className="p-5 border-b-2 border-[#eceef0]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPublicLinkDialogOpen(true);
+                          setPublicLinkRecipientName("");
+                          setGeneratedPublicUrl(null);
+                          setLinkCopied(false);
+                          refetchTokenHistory();
+                        }}
+                        className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                        title="Gerar link único para um freelancer responder todo o questionário deste evento"
+                      >
+                        <Link2 size={14} /> Link Freelancer
+                      </button>
+                    </div>
+                  )}
+
                   {/* Submission — evaluators only */}
                   {isEvaluator && myCriteria.length > 0 && (
                     <div className="p-5">
@@ -2259,10 +2261,10 @@ export default function EvaluationsPage() {
 
       {/* Public link dialog — generate single-use evaluation link for freelancers */}
       <Dialog
-        open={publicLinkDialogCriterionId !== null}
+        open={publicLinkDialogOpen}
         onOpenChange={(v) => {
+          setPublicLinkDialogOpen(v);
           if (!v) {
-            setPublicLinkDialogCriterionId(null);
             setPublicLinkRecipientName("");
             setGeneratedPublicUrl(null);
             setLinkCopied(false);
@@ -2276,20 +2278,23 @@ export default function EvaluationsPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            {publicLinkDialogCriterionId != null && (() => {
-              const crit = myCriteria.find(x => x.criterionId === publicLinkDialogCriterionId);
-              return crit ? (
-                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-0.5">Critério</p>
-                  <p className="text-sm font-black italic uppercase">{crit.criterionName}</p>
-                </div>
-              ) : null;
-            })()}
+            {(publicLinkEligibleCriteria ?? []).length > 0 && (
+              <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+                <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-1">
+                  Critérios inclusos no questionário ({(publicLinkEligibleCriteria ?? []).length})
+                </p>
+                <ul className="space-y-0.5">
+                  {(publicLinkEligibleCriteria ?? []).map(c => (
+                    <li key={c.criterionId} className="text-sm font-black italic uppercase">{c.criterionName}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {!generatedPublicUrl ? (
               <>
                 <p className="text-sm italic text-[#444933]">
-                  Gere um link de uso único para que um freelancer avalie este critério. O link expira após o primeiro uso.
+                  Gere um link único para que um freelancer responda o questionário inteiro acima. O link expira após o primeiro uso.
                 </p>
                 <div>
                   <label className="block text-xs font-black italic uppercase mb-2">
@@ -2363,7 +2368,7 @@ export default function EvaluationsPage() {
             <button
               type="button"
               onClick={() => {
-                setPublicLinkDialogCriterionId(null);
+                setPublicLinkDialogOpen(false);
                 setPublicLinkRecipientName("");
                 setGeneratedPublicUrl(null);
                 setLinkCopied(false);
@@ -2377,7 +2382,7 @@ export default function EvaluationsPage() {
                 type="button"
                 disabled={!publicLinkRecipientName.trim() || createPublicToken.isPending}
                 onClick={() => {
-                  if (!publicLinkDialogCriterionId || !publicLinkRecipientName.trim()) return;
+                  if (!publicLinkRecipientName.trim()) return;
                   createPublicToken.mutate(
                     { recipientName: publicLinkRecipientName.trim() },
                     {
