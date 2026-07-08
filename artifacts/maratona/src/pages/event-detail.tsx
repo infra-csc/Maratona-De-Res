@@ -2427,16 +2427,17 @@ export default function EventDetailPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 p-4 items-stretch">
                     {event.participants.map(p => {
                       const isInactive = p.confirmed === false;
+                      const isConfirmed = p.confirmed === true;
                       const isInformational = p.countsForScore === false;
                       const selectedDates = p.actualDiariaDates ?? [];
                       const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
                       const candidateDates = eventDateRange(event.startDate, event.endDate);
                       const isQuickConfirmed = p.diariaQuickConfirmed === true;
-                      const daysMismatch = !isInformational && !isQuickConfirmed && p.scheduledDiariaCount != null && realizadasCount != null && realizadasCount < p.scheduledDiariaCount;
-                      const showCommentBox = isInactive || daysMismatch;
+                      const hasZeroDiarias = !isConfirmed && (realizadasCount == null || realizadasCount === 0);
+                      const showCommentBox = isInactive || hasZeroDiarias;
                       const commentReason = isInactive
                         ? "Colaborador inativo — justifique"
-                        : "Diárias previstas não cumpridas — justifique";
+                        : "Nenhuma diária realizada — justifique";
                       return (
                         <div
                           key={p.id}
