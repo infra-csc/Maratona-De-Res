@@ -124,6 +124,7 @@ export * from './platoonRule';
 export * from './platoonRuleInput';
 export * from './platoonRuleUpdate';
 export * from './publishAllCriteriaFinalFeedback200';
+export * from './publishAllCriteriaPartialFeedback200';
 export * from './publishCriterionFinalFeedback200';
 export * from './quarterCloseResult';
 export * from './quarterEligibility';

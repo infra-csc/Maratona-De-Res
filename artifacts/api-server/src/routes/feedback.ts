@@ -240,6 +240,36 @@ router.post("/events/:id/criteria/:criterionId/publish-final", requireRole("admi
 });
 
 /**
+ * POST /events/:id/criteria/publish-partial-all
+ * Publica um retrato PARCIAL de TODOS os critérios ativos do evento de uma
+ * vez (sem exigir conclusão das avaliações nem fechar o evento). Bloqueado
+ * depois que a avaliação final do evento já foi publicada.
+ */
+router.post("/events/:id/criteria/publish-partial-all", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  if (event.feedbackReleased) {
+    res.status(400).json({ error: "A avaliação final já foi publicada para este evento e não pode voltar a ser parcial" });
+    return;
+  }
+
+  const criteriaLinks = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
+
+  const now = new Date();
+  for (const link of criteriaLinks) {
+    await db.update(eventCriteriaTable).set({
+      partialPublishedAt: now,
+    }).where(eq(eventCriteriaTable.id, link.id));
+  }
+  await audit(req.user!.userId, "publish_partial_all_feedback", "events", eventId, null, { count: criteriaLinks.length });
+
+  res.json({ published: criteriaLinks.length, partialPublishedAt: now });
+});
+
+/**
  * POST /events/:id/criteria/publish-final-all
  * Publica TODOS os critérios ativos do evento como "FINAL" de uma vez.
  */

@@ -1555,6 +1555,11 @@ export type PublishCriterionFinalFeedback200 = {
   partialPublishedAt?: string | null;
 };
 
+export type PublishAllCriteriaPartialFeedback200 = {
+  published?: number;
+  partialPublishedAt?: string;
+};
+
 export type PublishAllCriteriaFinalFeedback200 = {
   published?: number;
   finalPublishedAt?: string;

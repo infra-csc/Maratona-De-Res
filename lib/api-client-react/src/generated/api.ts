@@ -107,6 +107,7 @@ import type {
   PlatoonRuleInput,
   PlatoonRuleUpdate,
   PublishAllCriteriaFinalFeedback200,
+  PublishAllCriteriaPartialFeedback200,
   PublishCriterionFinalFeedback200,
   QuarterCloseResult,
   QuarterEligibility,
@@ -3015,6 +3016,76 @@ export const usePublishCriterionFinalFeedback = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getPublishCriterionFinalFeedbackMutationOptions(options));
+    }
+
+export const getPublishAllCriteriaPartialFeedbackUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/publish-partial-all`
+}
+
+/**
+ * @summary Mark ALL active criteria in an event as "Partial" at once
+ */
+export const publishAllCriteriaPartialFeedback = async (id: number, options?: RequestInit): Promise<PublishAllCriteriaPartialFeedback200> => {
+
+  return customFetch<PublishAllCriteriaPartialFeedback200>(getPublishAllCriteriaPartialFeedbackUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPublishAllCriteriaPartialFeedbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAllCriteriaPartialFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishAllCriteriaPartialFeedback>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['publishAllCriteriaPartialFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishAllCriteriaPartialFeedback>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  publishAllCriteriaPartialFeedback(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishAllCriteriaPartialFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof publishAllCriteriaPartialFeedback>>>
+
+    export type PublishAllCriteriaPartialFeedbackMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark ALL active criteria in an event as "Partial" at once
+ */
+export const usePublishAllCriteriaPartialFeedback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAllCriteriaPartialFeedback>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof publishAllCriteriaPartialFeedback>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPublishAllCriteriaPartialFeedbackMutationOptions(options));
     }
 
 export const getPublishAllCriteriaFinalFeedbackUrl = (id: number,) => {

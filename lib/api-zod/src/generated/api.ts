@@ -1103,6 +1103,19 @@ export const PublishCriterionFinalFeedbackResponse = zod.object({
 
 
 /**
+ * @summary Mark ALL active criteria in an event as "Partial" at once
+ */
+export const PublishAllCriteriaPartialFeedbackParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PublishAllCriteriaPartialFeedbackResponse = zod.object({
+  "published": zod.number().optional(),
+  "partialPublishedAt": zod.string().optional()
+})
+
+
+/**
  * @summary Mark ALL active criteria in an event as "Final" at once
  */
 export const PublishAllCriteriaFinalFeedbackParams = zod.object({

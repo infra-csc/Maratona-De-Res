@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,7 @@ export default function CalibrationsPage() {
   const [collapsedCriteria, setCollapsedCriteria] = useState<Set<number>>(new Set());
   const [publishingFinalCritId, setPublishingFinalCritId] = useState<number | null>(null);
   const [publishingAllFinal, setPublishingAllFinal] = useState(false);
+  const [publishingAllPartial, setPublishingAllPartial] = useState(false);
   const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
   const [contextOpen, setContextOpen] = useState(true);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
@@ -210,6 +211,7 @@ export default function CalibrationsPage() {
   const publishCriterionPartialMutation = usePublishCriterionPartialFeedback();
   const publishCriterionFinalMutation = usePublishCriterionFinalFeedback();
   const publishAllFinalMutation = usePublishAllCriteriaFinalFeedback();
+  const publishAllPartialMutation = usePublishAllCriteriaPartialFeedback();
   const finalizing = closeMutation.isPending || releaseMutation.isPending;
 
   // Contexto do evento: conformidade e comentários
@@ -269,6 +271,24 @@ export default function CalibrationsPage() {
       toast({ title: "Erro ao publicar todos como Final", description: msg, variant: "destructive" });
     } finally {
       setPublishingAllFinal(false);
+    }
+  }
+
+  async function handlePublishAllPartial() {
+    if (!selectedEventId) return;
+    setPublishingAllPartial(true);
+    try {
+      const result = await publishAllPartialMutation.mutateAsync({ id: selectedEventId });
+      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
+      qc.invalidateQueries({ queryKey: fbQKey });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      const count = (result as { published?: number })?.published ?? activeCriteria.length;
+      toast({ title: `${count} critério(s) publicados como Parcial`, description: "Os funcionários veem uma prévia de todas as notas." });
+    } catch (e) {
+      const msg = (e as { message?: string })?.message;
+      toast({ title: "Erro ao publicar todos como Parcial", description: msg, variant: "destructive" });
+    } finally {
+      setPublishingAllPartial(false);
     }
   }
 
@@ -808,7 +828,7 @@ export default function CalibrationsPage() {
                         <>
                           <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Todas as calibrações salvas</p>
                           <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
-                            {alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}
+                            Publique as notas (parcial ou final) para os funcionários quando estiver pronto.
                           </p>
                         </>
                       ) : (
@@ -822,16 +842,7 @@ export default function CalibrationsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                    {readyToFinalize ? (
-                      <button
-                        data-testid="button-open-finalize"
-                        type="button"
-                        onClick={() => setFinalizeOpen(true)}
-                        className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 transition-all hover:bg-white hover:border-white"
-                      >
-                        <Flag size={16} /> {alreadyClosed ? "Liberar Notas" : "Fechar Evento e Liberar Notas"}
-                      </button>
-                    ) : (
+                    {!readyToFinalize && (
                       <>
                         <button
                           data-testid="button-save-all-cal"
@@ -855,6 +866,17 @@ export default function CalibrationsPage() {
                     )}
                     {canFinalize && (
                       <button
+                        data-testid="button-publish-all-partial"
+                        type="button"
+                        disabled={publishingAllPartial}
+                        onClick={handlePublishAllPartial}
+                        className="bg-[#ffb5a0] text-[#3b0900] border-2 border-[#ffb5a0] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
+                      >
+                        <Flag size={16} /> {publishingAllPartial ? "Publicando..." : "Publicar Todos Parcial"}
+                      </button>
+                    )}
+                    {canFinalize && (
+                      <button
                         data-testid="button-publish-all-final"
                         type="button"
                         disabled={publishingAllFinal}
@@ -868,10 +890,22 @@ export default function CalibrationsPage() {
                 </div>
                 {/* Linha 2: progresso + filtro */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-white/20">
-                  <span className="text-[11px] font-bold italic uppercase text-white/70 flex items-center gap-1.5">
-                    <ShieldCheck size={12} className="text-[#ccff00]" />
-                    {finalPublishedCount}/{activeCriteria.length} critério(s) publicados como Final
-                  </span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-[11px] font-bold italic uppercase text-white/70 flex items-center gap-1.5">
+                      <ShieldCheck size={12} className="text-[#ccff00]" />
+                      {finalPublishedCount}/{activeCriteria.length} critério(s) publicados como Final
+                    </span>
+                    {readyToFinalize && canFinalize && (
+                      <button
+                        data-testid="button-open-finalize"
+                        type="button"
+                        onClick={() => setFinalizeOpen(true)}
+                        className="text-[10px] font-black italic uppercase text-white/50 underline decoration-dotted underline-offset-2 hover:text-[#ccff00] transition-colors"
+                      >
+                        {alreadyClosed ? "Liberar Notas (fechamento formal)" : "Fechar Evento e Liberar Notas (fechamento formal)"}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <Filter size={12} className="text-white/50 shrink-0" />
                     {([
@@ -1162,8 +1196,8 @@ export default function CalibrationsPage() {
                 <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-5 flex items-center gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
                   <CheckCircle size={26} className="text-[#ccff00] shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-base font-black italic uppercase tracking-tight leading-tight">{alreadyClosed ? "Avaliação Parcial — falta liberar as notas" : "Todas as calibrações salvas"}</p>
-                    <p className="text-xs font-bold italic uppercase text-white/60 leading-tight">{alreadyClosed ? "Falta liberar as notas para os funcionários." : "O evento está pronto para ser fechado e ter as notas liberadas."}</p>
+                    <p className="text-base font-black italic uppercase tracking-tight leading-tight">Todas as calibrações salvas</p>
+                    <p className="text-xs font-bold italic uppercase text-white/60 leading-tight">Publique as notas (parcial ou final) para os funcionários quando estiver pronto.</p>
                   </div>
                 </div>
               ) : allCalibrated && !evaluationsComplete ? (

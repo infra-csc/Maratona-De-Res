@@ -771,6 +771,30 @@ paths:
                   partialPublishedAt:
                     type: ["string", "null"]
 
+  /events/{id}/criteria/publish-partial-all:
+    post:
+      operationId: publishAllCriteriaPartialFeedback
+      tags: [results]
+      summary: Mark ALL active criteria in an event as "Partial" at once
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  published:
+                    type: integer
+                  partialPublishedAt:
+                    type: string
+
   /events/{id}/criteria/publish-final-all:
     post:
       operationId: publishAllCriteriaFinalFeedback
