@@ -1,0 +1,57 @@
+No modal "Diárias Realizadas" (ex: Erick Ramos da Silva), hoje o gestor só pode marcar 
+manualmente quais dias específicos foram cumpridos (Ter, Qua, Qui, Sex, Sáb, Dom), 
+comparando com as datas previstas.
+
+Preciso adicionar uma opção adicional: o gestor poder simplesmente CONFIRMAR que está 
+tudo certo, MESMO que as diárias realizadas não coincidam exatamente com as datas 
+previstas — sem precisar justificar ou remarcar dia a dia.
+
+═══════════════════════════════════════
+1. NOVO BOTÃO/OPÇÃO: "CONFIRMAR SEM COMPARAR DATAS"
+═══════════════════════════════════════
+
+- Adicionar uma opção no modal, algo como um botão ou toggle: 
+  "CONFIRMAR (não precisa bater com a data prevista)" ou "MARCAR COMO OK"
+- Ao usar essa opção, o sistema deve registrar que o gestor validou/aprovou aquele 
+  colaborador para a contagem de diárias, independente de quais dias específicos 
+  ele marcou como realizados.
+- Isso serve para casos em que o colaborador cumpriu a diária em um dia diferente do 
+  previsto (ou fez de forma diferente), mas o gestor considera que está tudo certo 
+  e não precisa de burocracia extra pra registrar isso.
+
+═══════════════════════════════════════
+2. DIFERENCIAR OS DOIS FLUXOS NO MODAL
+═══════════════════════════════════════
+
+Deixar claro visualmente que existem 2 formas de resolver a "diária realizada":
+
+a) MODO DETALHADO (o que já existe hoje): marcar manualmente quais dias específicos 
+   da semana foram cumpridos, comparando com as datas previstas.
+
+b) MODO RÁPIDO (novo): confirmar direto com "OK", sem precisar detalhar quais dias 
+   específicos — útil quando o gestor confia que está tudo certo e não quer perder 
+   tempo comparando data por data.
+
+Sugestão de layout: manter os botões atuais (Confirmar Diárias Previstas / Marcar 
+Todos / Limpar) e adicionar, ao lado ou abaixo, um novo botão destacado, tipo:
+"✓ TUDO CERTO — CONFIRMAR SEM DETALHAR DATAS"
+
+═══════════════════════════════════════
+3. IMPACTO NA CONTAGEM/NOTA
+═══════════════════════════════════════
+
+- Quando o gestor usar o "Modo Rápido" (confirmar sem comparar datas), o sistema deve 
+  considerar as diárias como CUMPRIDAS INTEGRALMENTE para fins de contagem/nota 
+  (equivalente a "Realizadas = Previstas"), mesmo que os dias marcados sejam diferentes.
+- Isso evita que o colaborador seja penalizado por uma divergência de datas que o 
+  gestor já validou manualmente como aceitável.
+
+═══════════════════════════════════════
+4. REGISTRO/AUDITORIA
+═══════════════════════════════════════
+
+- Registrar no sistema (mesmo que não visível para o colaborador) QUAL modo foi usado 
+  pelo gestor (detalhado ou confirmação rápida) e quando, para fins de auditoria/histórico, 
+  caso seja necessário revisar depois.
+
+Manter a paleta de cores atual (preto/lima para os botões de ação, branco para o modal).

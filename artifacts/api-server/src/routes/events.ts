@@ -187,14 +187,19 @@ async function loadEventDetail(id: number) {
 
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
 
-  // Resolve conformity evaluator name if assigned
+  // Resolve conformity evaluator names if assigned
   let conformityEvaluatorName: string | null = null;
   if (ev.conformityEvaluatorUserId) {
     const [u] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, ev.conformityEvaluatorUserId)).limit(1);
     conformityEvaluatorName = u?.name ?? null;
   }
+  let conformityEvaluatorFerramentasName: string | null = null;
+  if (ev.conformityEvaluatorFerramentasUserId) {
+    const [u2] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, ev.conformityEvaluatorFerramentasUserId)).limit(1);
+    conformityEvaluatorFerramentasName = u2?.name ?? null;
+  }
 
-  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null, conformityEvaluatorName };
+  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null, conformityEvaluatorName, conformityEvaluatorFerramentasName };
 }
 
 /**
@@ -673,6 +678,60 @@ router.post("/events/:id/conformity-evaluator", requireRole("admin", "rh"), asyn
   res.json(detail);
 });
 
+// Grupo 1 (Ferramentas e Case): assign/unassign the equipment evaluator (admin/RH only)
+router.post("/events/:id/conformity-evaluator-ferramentas", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const { userId } = req.body as { userId: number | null };
+  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!before) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  const [updated] = await db.update(eventsTable)
+    .set({ conformityEvaluatorFerramentasUserId: userId ?? null })
+    .where(eq(eventsTable.id, id))
+    .returning();
+  await audit(req.user!.userId, "set_conformity_evaluator_ferramentas", "events", id, { conformityEvaluatorFerramentasUserId: before.conformityEvaluatorFerramentasUserId }, { conformityEvaluatorFerramentasUserId: updated.conformityEvaluatorFerramentasUserId });
+  res.json(await loadEventDetail(id));
+});
+
+// Redirect: Grupo 2 (Cenografia) evaluator can delegate to another user in area 13
+// Admin/RH can also use this to reassign
+router.patch("/events/:id/conformity-evaluator", async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const requesterId = req.user!.userId;
+  const role = req.user!.role;
+  const { userId: newUserId } = req.body as { userId: number };
+  const [ev] = await db.select({ conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId }).from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!ev) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  const isAdminRh = ["admin", "rh"].includes(role);
+  if (!isAdminRh) {
+    if (ev.conformityEvaluatorUserId !== requesterId) { res.status(403).json({ error: "Acesso negado" }); return; }
+    const [areaUser] = await db.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.id, newUserId), eq(usersTable.areaId, 13), eq(usersTable.active, true)));
+    if (!areaUser) { res.status(400).json({ error: "Avaliador deve ser da área Cenografia" }); return; }
+  }
+  await db.update(eventsTable).set({ conformityEvaluatorUserId: newUserId }).where(eq(eventsTable.id, id));
+  await audit(requesterId, "redirect_conformity_evaluator", "events", id, { from: ev.conformityEvaluatorUserId }, { to: newUserId });
+  res.json(await loadEventDetail(id));
+});
+
+// Redirect: Grupo 1 (Ferramentas e Case) evaluator can delegate to another user in area 16
+// Admin/RH can also use this to reassign
+router.patch("/events/:id/conformity-evaluator-ferramentas", async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const requesterId = req.user!.userId;
+  const role = req.user!.role;
+  const { userId: newUserId } = req.body as { userId: number };
+  const [ev] = await db.select({ conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId }).from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+  if (!ev) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  const isAdminRh = ["admin", "rh"].includes(role);
+  if (!isAdminRh) {
+    if (ev.conformityEvaluatorFerramentasUserId !== requesterId) { res.status(403).json({ error: "Acesso negado" }); return; }
+    const [areaUser] = await db.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.id, newUserId), eq(usersTable.areaId, 16), eq(usersTable.active, true)));
+    if (!areaUser) { res.status(400).json({ error: "Avaliador deve ser da área Ferramentas e Case" }); return; }
+  }
+  await db.update(eventsTable).set({ conformityEvaluatorFerramentasUserId: newUserId }).where(eq(eventsTable.id, id));
+  await audit(requesterId, "redirect_conformity_evaluator_ferramentas", "events", id, { from: ev.conformityEvaluatorFerramentasUserId }, { to: newUserId });
+  res.json(await loadEventDetail(id));
+});
+
 router.get("/events/:id/conformity", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
@@ -680,57 +739,88 @@ router.get("/events/:id/conformity", async (req, res) => {
 });
 
 router.post("/events/:id/conformity", async (req, res) => {
-  // admin/rh podem sempre; o avaliador de conformidade atribuído ao evento também pode
+  // Controle de acesso por grupo:
+  // - Admin/RH: pode atualizar todos os campos
+  // - Grupo 2 (conformityEvaluatorUserId / Cenografia): epi, estaiamentos, conduta + comentários + absences + standout
+  // - Grupo 1 (conformityEvaluatorFerramentasUserId / Ferramentas e Case): apenas guardaEquipamentos + comentário
   const eventId = parseInt(req.params.id as string);
   const userId = req.user!.userId;
   const role = req.user!.role;
-  if (!["admin", "rh"].includes(role)) {
-    const [ev] = await db.select({ conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
-    if (!ev || ev.conformityEvaluatorUserId !== userId) {
-      res.status(403).json({ error: "Acesso negado" }); return;
-    }
+
+  const [evRow] = await db.select({
+    cycleId: eventsTable.cycleId,
+    status: eventsTable.status,
+    conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId,
+    conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId,
+  }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!evRow) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+
+  const isAdminRh = ["admin", "rh"].includes(role);
+  const isCenografiaEval = evRow.conformityEvaluatorUserId === userId;
+  const isFerramentasEval = evRow.conformityEvaluatorFerramentasUserId === userId;
+
+  if (!isAdminRh && !isCenografiaEval && !isFerramentasEval) {
+    res.status(403).json({ error: "Acesso negado" }); return;
   }
-  const { epi, estaiamentos, guardaEquipamentos, conduta, epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment } = req.body;
-  const [evRow] = await db.select({ cycleId: eventsTable.cycleId, status: eventsTable.status }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+
+  const {
+    epi, estaiamentos, guardaEquipamentos, conduta,
+    epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment,
+    absencesReport, standoutResponse, standoutJustification,
+  } = req.body;
+
+  // Campos permitidos por grupo
+  const canCenografia = isAdminRh || isCenografiaEval;
+  const canFerramentas = isAdminRh || isFerramentasEval;
 
   // null = PENDENTE (sem penalidade); usa !== undefined para distinguir "não
   // enviado" (undefined → mantém existente) de "enviado como null" (→ PENDENTE).
   const existing = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
   if (existing.length > 0) {
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (canCenografia) {
+      if (epi !== undefined) patch.epi = epi;
+      if (estaiamentos !== undefined) patch.estaiamentos = estaiamentos;
+      if (conduta !== undefined) patch.conduta = conduta;
+      if (epiComment !== undefined) patch.epiComment = epiComment || null;
+      if (estaiamentosComment !== undefined) patch.estaiamentosComment = estaiamentosComment || null;
+      if (condutaComment !== undefined) patch.condutaComment = condutaComment || null;
+      if (absencesReport !== undefined) patch.absencesReport = absencesReport || null;
+      if (standoutResponse !== undefined) patch.standoutResponse = standoutResponse;
+      if (standoutJustification !== undefined) patch.standoutJustification = standoutJustification || null;
+    }
+    if (canFerramentas) {
+      if (guardaEquipamentos !== undefined) patch.guardaEquipamentos = guardaEquipamentos;
+      if (guardaEquipamentosComment !== undefined) patch.guardaEquipamentosComment = guardaEquipamentosComment || null;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [updated] = await db.update(eventConformitiesTable)
-      .set({
-        ...(epi !== undefined && { epi }),
-        ...(estaiamentos !== undefined && { estaiamentos }),
-        ...(guardaEquipamentos !== undefined && { guardaEquipamentos }),
-        ...(conduta !== undefined && { conduta }),
-        ...(epiComment !== undefined && { epiComment: epiComment || null }),
-        ...(estaiamentosComment !== undefined && { estaiamentosComment: estaiamentosComment || null }),
-        ...(guardaEquipamentosComment !== undefined && { guardaEquipamentosComment: guardaEquipamentosComment || null }),
-        ...(condutaComment !== undefined && { condutaComment: condutaComment || null }),
-        updatedAt: new Date(),
-      })
+      .set(patch as any)
       .where(eq(eventConformitiesTable.eventId, eventId))
       .returning();
     await audit(userId, "update_conformity", "events", eventId, existing[0], updated);
-    if (evRow?.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
+    if (evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
     res.json(updated);
   } else {
     const [created] = await db.insert(eventConformitiesTable)
       .values({
         eventId,
-        epi: epi !== undefined ? epi : null,
-        estaiamentos: estaiamentos !== undefined ? estaiamentos : null,
-        guardaEquipamentos: guardaEquipamentos !== undefined ? guardaEquipamentos : null,
-        conduta: conduta !== undefined ? conduta : null,
-        epiComment: epiComment || null,
-        estaiamentosComment: estaiamentosComment || null,
-        guardaEquipamentosComment: guardaEquipamentosComment || null,
-        condutaComment: condutaComment || null,
+        epi: canCenografia && epi !== undefined ? epi : null,
+        estaiamentos: canCenografia && estaiamentos !== undefined ? estaiamentos : null,
+        guardaEquipamentos: canFerramentas && guardaEquipamentos !== undefined ? guardaEquipamentos : null,
+        conduta: canCenografia && conduta !== undefined ? conduta : null,
+        epiComment: canCenografia ? (epiComment || null) : null,
+        estaiamentosComment: canCenografia ? (estaiamentosComment || null) : null,
+        guardaEquipamentosComment: canFerramentas ? (guardaEquipamentosComment || null) : null,
+        condutaComment: canCenografia ? (condutaComment || null) : null,
+        absencesReport: canCenografia ? (absencesReport || null) : null,
+        standoutResponse: canCenografia && standoutResponse !== undefined ? standoutResponse : null,
+        standoutJustification: canCenografia ? (standoutJustification || null) : null,
         createdByUserId: userId,
       })
       .returning();
     await audit(userId, "create_conformity", "events", eventId, null, created);
-    if (evRow?.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
+    if (evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
     res.status(201).json(created);
   }
 });

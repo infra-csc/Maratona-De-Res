@@ -53,4 +53,8 @@ export interface EventDetail {
   conformityEvaluatorUserId?: number | null;
   /** @nullable */
   conformityEvaluatorName?: string | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasName?: string | null;
 }

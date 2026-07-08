@@ -1,0 +1,89 @@
+Dentro da área CENOGRAFIA, existem 2 grupos distintos de avaliadores, cada um responsável 
+por perguntas diferentes. Preciso implementar essa separação corretamente.
+
+═══════════════════════════════════════
+GRUPO 1: "FERRAMENTAS E CASE (CENOGRAFIA)"
+═══════════════════════════════════════
+
+Responsável por avaliar APENAS o primeiro item da matriz:
+
+Pergunta: "Todos os equipamentos e ferramentas retornaram?"
+- Opções de resposta: SIM / NÃO / PENDENTE (estado inicial, antes de ser respondido)
+- Comentário/justificativa: OBRIGATÓRIO somente se a resposta for "NÃO"
+- Esta resposta ALIMENTA a Matriz de Conformidade (item "Equipamentos e Ferramentas")
+- Avaliador padrão: Giovanni Bertoni
+- Redirecionamento: Giovanni pode avaliar OU enviar para qualquer usuário cadastrado 
+  no grupo "Ferramentas e Case (Cenografia)"
+
+═══════════════════════════════════════
+GRUPO 2: "CENOGRAFIA"
+═══════════════════════════════════════
+
+Responsável por avaliar as demais perguntas do questionário (tudo, exceto a pergunta 
+do Grupo 1 acima):
+
+1) "Carga na saída do galpão"
+   - O que avaliar: Como foi feita a carga no galpão e a disponibilidade de materiais 
+     na arena.
+   - Formato: Nota de 1 a 10
+   - Comentário/justificativa: OBRIGATÓRIO
+
+2) "Todos usaram EPI na arena?"
+   - Opções: SIM / NÃO
+   - Comentário/justificativa: OBRIGATÓRIO somente se a resposta for "NÃO"
+   - ALIMENTA a Matriz de Conformidade (item "Uso de EPI")
+
+3) "Estaiamento e Aterramento foram feitos de maneira correta?"
+   - Opções: SIM / NÃO
+   - Comentário/justificativa: OBRIGATÓRIO somente se a resposta for "NÃO"
+   - ALIMENTA a Matriz de Conformidade (item "Estaiamento/Aterramento")
+
+4) "Conduta e comportamento foram adequados?" (Cumprimento de horários, ordens e regras)
+   - Opções: SIM / NÃO
+   - Comentário/justificativa: OBRIGATÓRIO somente se a resposta for "NÃO"
+   - ALIMENTA a Matriz de Conformidade (item "Conduta")
+
+5) "Alguém faltou ou atrasou por mais de 30 minutos? Especifique."
+   - Formato: Campo de texto livre (resposta descritiva)
+   - Não alimenta a matriz — esta informação deve aparecer na tela/relatório de 
+     "Calibração do Evento"
+
+6) "Algum profissional teve um desempenho fora da curva, se destacando dos demais pela 
+   eficiência ou proatividade?"
+   - Opções:
+     • "Não, tudo dentro do padrão esperado." → sem campo adicional
+     • "Sim, houve um grande destaque" → abre campo de comentário/justificativa 
+       OBRIGATÓRIO para detalhar o destaque
+   - Não alimenta a matriz
+
+Avaliador padrão do Grupo 2: Fred
+Redirecionamento: Fred pode avaliar OU enviar para qualquer usuário cadastrado no 
+grupo "Cenografia"
+
+═══════════════════════════════════════
+REGRAS GERAIS DESTA IMPLEMENTAÇÃO
+═══════════════════════════════════════
+
+1. Os grupos "Ferramentas e Case (Cenografia)" e "Cenografia" são LISTAS DE USUÁRIOS 
+   SEPARADAS/INDEPENDENTES — um avaliador de um grupo não aparece automaticamente como 
+   opção de redirecionamento do outro grupo.
+
+2. Os itens que alimentam a Matriz de Conformidade (perguntas 1, 2, 3, 4 do Grupo 2 
+   + a pergunta do Grupo 1) devem seguir o comportamento já especificado anteriormente:
+   - Cada item da matriz vale 10 pontos
+   - "NÃO" desconta 10 pontos da nota final automaticamente, em tempo real
+   - "PENDENTE" (antes de ser respondido) não desconta pontos ainda, apenas indica 
+     que está aguardando resposta
+
+3. Enquanto a pergunta correspondente não for respondida, o item da matriz deve exibir 
+   "PENDENTE" como status.
+
+4. Todas as perguntas com comentário condicional ("obrigatório somente se NÃO") devem 
+   bloquear o salvamento/envio da avaliação se a resposta for "NÃO" e o comentário 
+   estiver vazio.
+
+5. Manter a paleta de cores já usada no sistema (lima para SIM, vermelho/vinho para 
+   NÃO, cinza/amarelo para PENDENTE).
+
+Testar o fluxo completo separadamente para os 2 grupos: cada grupo deve receber e 
+responder apenas as perguntas de sua responsabilidade, sem misturar os questionários.

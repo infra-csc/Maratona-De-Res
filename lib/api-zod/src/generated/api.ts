@@ -114,6 +114,21 @@ export const CreateUserBody = zod.object({
 
 
 /**
+ * @summary List active users in a given area (for redirect dropdowns)
+ */
+export const GetUsersByAreaParams = zod.object({
+  "areaId": zod.coerce.number()
+})
+
+export const GetUsersByAreaResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.string()
+})
+export const GetUsersByAreaResponse = zod.array(GetUsersByAreaResponseItem)
+
+
+/**
  * @summary Get user
  */
 export const GetUserParams = zod.object({
@@ -531,7 +546,9 @@ export const GetEventResponse = zod.object({
 })).optional(),
   "evaluationProgress": zod.number().optional(),
   "conformityEvaluatorUserId": zod.number().nullish(),
-  "conformityEvaluatorName": zod.string().nullish()
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
 })
 
 
@@ -873,6 +890,9 @@ export const GetEventResultResponse = zod.object({
   "estaiamentosComment": zod.string().nullish(),
   "guardaEquipamentosComment": zod.string().nullish(),
   "condutaComment": zod.string().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.number(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
@@ -1067,7 +1087,7 @@ export const UpdateEventParticipantResponse = zod.object({
 
 
 /**
- * @summary Assign (or unassign) the conformity evaluator for an event
+ * @summary Assign (or unassign) the conformity evaluator for an event (Grupo 2 - Cenografia)
  */
 export const SetConformityEvaluatorParams = zod.object({
   "id": zod.coerce.number()
@@ -1171,7 +1191,342 @@ export const SetConformityEvaluatorResponse = zod.object({
 })).optional(),
   "evaluationProgress": zod.number().optional(),
   "conformityEvaluatorUserId": zod.number().nullish(),
-  "conformityEvaluatorName": zod.string().nullish()
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
+})
+
+
+/**
+ * @summary Redirect (delegate) the Cenografia conformity evaluator to another user in area 13
+ */
+export const RedirectConformityEvaluatorParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RedirectConformityEvaluatorBody = zod.object({
+  "userId": zod.number()
+})
+
+export const RedirectConformityEvaluatorResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
+  "resultsConfirmed": zod.boolean().optional(),
+  "resultsConfirmedAt": zod.string().nullish(),
+  "resultsConfirmedBy": zod.number().nullish(),
+  "participants": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
+  "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaId": zod.number().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.number(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "eventId": zod.number(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional(),
+  "conformityEvaluatorUserId": zod.number().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
+})
+
+
+/**
+ * @summary Assign (or unassign) the equipment evaluator for an event (Grupo 1 - Ferramentas e Case)
+ */
+export const SetConformityEvaluatorFerramentasParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetConformityEvaluatorFerramentasBody = zod.object({
+  "userId": zod.number().nullish()
+})
+
+export const SetConformityEvaluatorFerramentasResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
+  "resultsConfirmed": zod.boolean().optional(),
+  "resultsConfirmedAt": zod.string().nullish(),
+  "resultsConfirmedBy": zod.number().nullish(),
+  "participants": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
+  "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaId": zod.number().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.number(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "eventId": zod.number(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional(),
+  "conformityEvaluatorUserId": zod.number().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
+})
+
+
+/**
+ * @summary Redirect (delegate) the Ferramentas e Case evaluator to another user in area 16
+ */
+export const RedirectConformityEvaluatorFerramentasParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RedirectConformityEvaluatorFerramentasBody = zod.object({
+  "userId": zod.number()
+})
+
+export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.number(),
+  "cycleName": zod.string().optional(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
+  "resultsConfirmed": zod.boolean().optional(),
+  "resultsConfirmedAt": zod.string().nullish(),
+  "resultsConfirmedBy": zod.number().nullish(),
+  "participants": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.number().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
+  "actualDiariaCount": zod.number().nullish(),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaId": zod.number().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional(),
+  "partialPublishedAt": zod.string().nullish()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.number(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "eventId": zod.number(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.number(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional(),
+  "conformityEvaluatorUserId": zod.number().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
 })
 
 
@@ -1193,6 +1548,9 @@ export const GetEventConformityResponse = zod.union([zod.object({
   "estaiamentosComment": zod.string().nullish(),
   "guardaEquipamentosComment": zod.string().nullish(),
   "condutaComment": zod.string().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.number(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
@@ -1214,7 +1572,10 @@ export const SetEventConformityBody = zod.object({
   "epiComment": zod.string().nullish(),
   "estaiamentosComment": zod.string().nullish(),
   "guardaEquipamentosComment": zod.string().nullish(),
-  "condutaComment": zod.string().nullish()
+  "condutaComment": zod.string().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish()
 })
 
 export const SetEventConformityResponse = zod.object({
@@ -1228,6 +1589,9 @@ export const SetEventConformityResponse = zod.object({
   "estaiamentosComment": zod.string().nullish(),
   "guardaEquipamentosComment": zod.string().nullish(),
   "condutaComment": zod.string().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.number(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
@@ -1404,7 +1768,9 @@ export const UpdateEventAssignmentsResponse = zod.object({
 })).optional(),
   "evaluationProgress": zod.number().optional(),
   "conformityEvaluatorUserId": zod.number().nullish(),
-  "conformityEvaluatorName": zod.string().nullish()
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
 })
 
 
@@ -1513,7 +1879,9 @@ export const ConfirmEventCriteriaResponse = zod.object({
 })).optional(),
   "evaluationProgress": zod.number().optional(),
   "conformityEvaluatorUserId": zod.number().nullish(),
-  "conformityEvaluatorName": zod.string().nullish()
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
 })
 
 
@@ -1618,7 +1986,9 @@ export const ResyncEventCriteriaResponse = zod.object({
 })).optional(),
   "evaluationProgress": zod.number().optional(),
   "conformityEvaluatorUserId": zod.number().nullish(),
-  "conformityEvaluatorName": zod.string().nullish()
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
 }).and(zod.object({
   "removedStale": zod.number().optional(),
   "addedNew": zod.number().optional()
@@ -1824,7 +2194,9 @@ export const DeleteEventCriterionResponse = zod.object({
 })).optional(),
   "evaluationProgress": zod.number().optional(),
   "conformityEvaluatorUserId": zod.number().nullish(),
-  "conformityEvaluatorName": zod.string().nullish()
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish()
 })
 
 

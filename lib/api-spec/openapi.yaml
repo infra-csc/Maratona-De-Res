@@ -130,6 +130,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
 
+  /users/by-area/{areaId}:
+    get:
+      operationId: getUsersByArea
+      tags: [users]
+      summary: List active users in a given area (for redirect dropdowns)
+      parameters:
+        - name: areaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+
   /users/{id}:
     get:
       operationId: getUser
@@ -764,7 +785,7 @@ paths:
     post:
       operationId: setConformityEvaluator
       tags: [events]
-      summary: Assign (or unassign) the conformity evaluator for an event
+      summary: Assign (or unassign) the conformity evaluator for an event (Grupo 2 - Cenografia)
       parameters:
         - name: id
           in: path
@@ -777,6 +798,77 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ConformityEvaluatorInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+    patch:
+      operationId: redirectConformityEvaluator
+      tags: [events]
+      summary: Redirect (delegate) the Cenografia conformity evaluator to another user in area 13
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConformityEvaluatorRedirectInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+
+  /events/{id}/conformity-evaluator-ferramentas:
+    post:
+      operationId: setConformityEvaluatorFerramentas
+      tags: [events]
+      summary: Assign (or unassign) the equipment evaluator for an event (Grupo 1 - Ferramentas e Case)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConformityEvaluatorInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+    patch:
+      operationId: redirectConformityEvaluatorFerramentas
+      tags: [events]
+      summary: Redirect (delegate) the Ferramentas e Case evaluator to another user in area 16
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConformityEvaluatorRedirectInput"
       responses:
         "200":
           description: OK
@@ -2269,6 +2361,17 @@ components:
         user:
           $ref: "#/components/schemas/User"
 
+    UserSummary:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+
     User:
       type: object
       required: [id, name, email, role, active]
@@ -2647,6 +2750,10 @@ components:
           type: ["integer", "null"]
         conformityEvaluatorName:
           type: ["string", "null"]
+        conformityEvaluatorFerramentasUserId:
+          type: ["integer", "null"]
+        conformityEvaluatorFerramentasName:
+          type: ["string", "null"]
 
     EventInput:
       type: object
@@ -2844,6 +2951,13 @@ components:
         userId:
           type: ["integer", "null"]
 
+    ConformityEvaluatorRedirectInput:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: integer
+
     EventConformity:
       type: object
       required: [id, eventId, createdByUserId]
@@ -2867,6 +2981,12 @@ components:
         guardaEquipamentosComment:
           type: ["string", "null"]
         condutaComment:
+          type: ["string", "null"]
+        absencesReport:
+          type: ["string", "null"]
+        standoutResponse:
+          type: ["boolean", "null"]
+        standoutJustification:
           type: ["string", "null"]
         createdByUserId:
           type: integer
@@ -2895,6 +3015,12 @@ components:
         guardaEquipamentosComment:
           type: ["string", "null"]
         condutaComment:
+          type: ["string", "null"]
+        absencesReport:
+          type: ["string", "null"]
+        standoutResponse:
+          type: ["boolean", "null"]
+        standoutJustification:
           type: ["string", "null"]
 
     Criterion:

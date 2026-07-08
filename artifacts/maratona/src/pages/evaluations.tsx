@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -151,7 +151,17 @@ export default function EvaluationsPage() {
   const [launching, setLaunching] = useState(false);
   const [conformityEvalForm, setConformityEvalForm] = useState<{
     epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
-  }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null });
+    epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
+    absencesReport: string; standoutResponse: boolean | null; standoutJustification: string;
+  }>({
+    epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null,
+    epiComment: '', estaiamentosComment: '', guardaEquipamentosComment: '', condutaComment: '',
+    absencesReport: '', standoutResponse: null, standoutJustification: '',
+  });
+  const [redirectConformityOpen, setRedirectConformityOpen] = useState(false);
+  const [redirectConformityTargetId, setRedirectConformityTargetId] = useState<number | null>(null);
+  const [redirectFerramentasOpen, setRedirectFerramentasOpen] = useState(false);
+  const [redirectFerramentasTargetId, setRedirectFerramentasTargetId] = useState<number | null>(null);
 
   const { data: events } = useGetEvents({});
 
@@ -178,13 +188,36 @@ export default function EvaluationsPage() {
   });
 
   const isConformityEvaluatorForEvent = !!selectedEventId && !!user && selectedEventDetail?.conformityEvaluatorUserId === user.id;
+  const isFerramentasEvaluatorForEvent = !!selectedEventId && !!user && selectedEventDetail?.conformityEvaluatorFerramentasUserId === user.id;
+  const isAnyConformityEvaluator = isConformityEvaluatorForEvent || isFerramentasEvaluatorForEvent;
   const { data: myConformityData } = useGetEventConformity(selectedEventId!, {
-    query: { enabled: isConformityEvaluatorForEvent, queryKey: ["event-conformity-eval", selectedEventId] as unknown[] },
+    query: { enabled: isAnyConformityEvaluator, queryKey: ["event-conformity-eval", selectedEventId] as unknown[] },
   });
   const conformityEvalMutation = useSetEventConformity({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: ["event-conformity-eval", selectedEventId] }),
       onError: () => toast({ title: "Erro ao salvar conformidade", variant: "destructive" }),
+    },
+  });
+  // Users for redirect popups (loaded lazily)
+  const CENOGRAFIA_AREA_ID = 13;
+  const FERRAMENTAS_AREA_ID = 16;
+  const { data: cenografiaUsers } = useGetUsersByArea(CENOGRAFIA_AREA_ID, {
+    query: { enabled: isConformityEvaluatorForEvent, queryKey: ["users-by-area", CENOGRAFIA_AREA_ID] as unknown[] },
+  });
+  const { data: ferramentasUsers } = useGetUsersByArea(FERRAMENTAS_AREA_ID, {
+    query: { enabled: isFerramentasEvaluatorForEvent, queryKey: ["users-by-area", FERRAMENTAS_AREA_ID] as unknown[] },
+  });
+  const redirectConformityMutation = useRedirectConformityEvaluator({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setRedirectConformityOpen(false); toast({ title: "Avaliação redirecionada" }); },
+      onError: () => toast({ title: "Erro ao redirecionar", variant: "destructive" }),
+    },
+  });
+  const redirectFerramentasMutation = useRedirectConformityEvaluatorFerramentas({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setRedirectFerramentasOpen(false); toast({ title: "Avaliação redirecionada" }); },
+      onError: () => toast({ title: "Erro ao redirecionar", variant: "destructive" }),
     },
   });
 
@@ -195,9 +228,20 @@ export default function EvaluationsPage() {
         estaiamentos: myConformityData.estaiamentos ?? null,
         guardaEquipamentos: myConformityData.guardaEquipamentos ?? null,
         conduta: myConformityData.conduta ?? null,
+        epiComment: myConformityData.epiComment ?? '',
+        estaiamentosComment: myConformityData.estaiamentosComment ?? '',
+        guardaEquipamentosComment: myConformityData.guardaEquipamentosComment ?? '',
+        condutaComment: myConformityData.condutaComment ?? '',
+        absencesReport: myConformityData.absencesReport ?? '',
+        standoutResponse: myConformityData.standoutResponse ?? null,
+        standoutJustification: myConformityData.standoutJustification ?? '',
       });
     } else {
-      setConformityEvalForm({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null });
+      setConformityEvalForm({
+        epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null,
+        epiComment: '', estaiamentosComment: '', guardaEquipamentosComment: '', condutaComment: '',
+        absencesReport: '', standoutResponse: null, standoutJustification: '',
+      });
     }
   }, [myConformityData?.id, selectedEventId]);
 
@@ -269,7 +313,8 @@ export default function EvaluationsPage() {
           c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
         );
         const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
-        return hasCriteria || isConformityEval;
+        const isFerramentasEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
+        return hasCriteria || isConformityEval || isFerramentasEval;
       })
     : [];
 
@@ -304,7 +349,8 @@ export default function EvaluationsPage() {
         // Só conta como concluído para o avaliador depois que os resultados do
         // evento forem confirmados por RH/Admin — enviar tudo não basta.
         const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
-        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval };
+        const isFerramentasEval2 = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
+        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval || isFerramentasEval2 };
       }).filter(s => s.relevant)
     : [];
   const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
@@ -1240,66 +1286,259 @@ export default function EvaluationsPage() {
                 )}
               </div>
 
-              {/* Conformity section — only visible when evaluator is assigned */}
-              {isConformityEvaluatorForEvent && (() => {
-                const conformityItems: { key: "epi" | "estaiamentos" | "guardaEquipamentos" | "conduta"; label: string }[] = [
-                  { key: "epi", label: "Uso de EPI" },
-                  { key: "estaiamentos", label: "Estaiamentos / Aterramentos" },
-                  { key: "guardaEquipamentos", label: "Guarda de Equipamentos" },
-                  { key: "conduta", label: "Conduta" },
-                ];
-                const allFilled = conformityItems.every(item => conformityEvalForm[item.key] !== null);
+              {/* ─── GRUPO 1: Ferramentas e Case (Cenografia) ─── */}
+              {isFerramentasEvaluatorForEvent && (() => {
+                const val = conformityEvalForm.guardaEquipamentos;
+                const isNao = val === false;
+                const commentMissing = isNao && !conformityEvalForm.guardaEquipamentosComment.trim();
+                const canSave = !commentMissing;
                 return (
                   <div className="space-y-4">
                     <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
-                      <ShieldAlert size={22} /> Matriz de Conformidade
+                      <ShieldAlert size={22} /> Ferramentas e Case (Cenografia)
                     </h3>
                     <p className="text-sm text-[#444933] italic px-1 -mt-1">
-                      Você foi designado para preencher a matriz de conformidade deste evento. Selecione SIM ou NÃO para cada item.
+                      Você foi designado para avaliar o retorno de equipamentos e ferramentas.
                     </p>
                     <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+                      <div className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
+                        <div className="flex items-center justify-between gap-3 min-h-[56px]">
+                          <span className="text-sm font-bold italic text-[#191c1e] leading-snug">Todos os equipamentos e ferramentas retornaram?</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isNao && <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>}
+                            <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
+                              <button type="button"
+                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: null })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: null } }); }}
+                                className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === null ? "bg-[#d4a800] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >Pendente</button>
+                              <button type="button"
+                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: true } }); }}
+                                className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >Sim</button>
+                              <button type="button"
+                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: false } }); }}
+                                className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${val === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >Não</button>
+                            </div>
+                          </div>
+                        </div>
+                        {isNao && (
+                          <div className="pb-3 space-y-1">
+                            <label className="text-[10px] font-black italic uppercase text-[#862200]">Justificativa <span className="text-[#862200]">*</span> obrigatória quando NÃO</label>
+                            <Textarea
+                              placeholder="Descreva o que aconteceu com os equipamentos/ferramentas..."
+                              value={conformityEvalForm.guardaEquipamentosComment}
+                              onChange={e => setConformityEvalForm(f => ({ ...f, guardaEquipamentosComment: e.target.value }))}
+                              className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
+                            />
+                            {commentMissing && <p className="text-[10px] font-bold italic text-[#862200]">Preencha a justificativa antes de salvar.</p>}
+                          </div>
+                        )}
+                      </div>
+                      {/* Save comment */}
+                      {isNao && (
+                        <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Salvar justificativa</span>
+                          <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
+                            onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
+                          ><Save size={12} /> Salvar</button>
+                        </div>
+                      )}
+                      {/* Redirect */}
+                      <div className="px-5 py-3 border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
+                        <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Redirecionar para outro membro do grupo</span>
+                        <Popover open={redirectFerramentasOpen} onOpenChange={setRedirectFerramentasOpen}>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
+                              <ArrowRight size={12} /> Redirecionar
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
+                            <Command className="rounded-none">
+                              <CommandInput placeholder="Buscar avaliador..." className="italic" />
+                              <CommandList className="max-h-[240px]">
+                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                  {(ferramentasUsers ?? []).map(u => (
+                                    <CommandItem key={u.id} value={u.name}
+                                      onSelect={() => { setRedirectFerramentasTargetId(u.id); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
+                                      className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
+                                    >
+                                      <Check size={14} className={cn("shrink-0", redirectFerramentasTargetId === u.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ─── GRUPO 2: Cenografia ─── */}
+              {isConformityEvaluatorForEvent && (() => {
+                type CKey = "epi" | "estaiamentos" | "conduta";
+                type CCommentKey = "epiComment" | "estaiamentosComment" | "condutaComment";
+                const cenografiaItems: { key: CKey; commentKey: CCommentKey; label: string; question: string }[] = [
+                  { key: "epi", commentKey: "epiComment", label: "Uso de EPI", question: "Todos usaram EPI na arena?" },
+                  { key: "estaiamentos", commentKey: "estaiamentosComment", label: "Estaiamentos / Aterramentos", question: "Estaiamento e Aterramento foram feitos de maneira correta?" },
+                  { key: "conduta", commentKey: "condutaComment", label: "Conduta", question: "Conduta e comportamento foram adequados? (horários, ordens e regras)" },
+                ];
+                const anyCommentMissing = cenografiaItems.some(item => conformityEvalForm[item.key] === false && !conformityEvalForm[item.commentKey].trim());
+                const standoutNeedsJustification = conformityEvalForm.standoutResponse === true && !conformityEvalForm.standoutJustification.trim();
+                const canSaveTexts = !anyCommentMissing && !standoutNeedsJustification;
+                const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
+                return (
+                  <div className="space-y-4">
+                    <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
+                      <ShieldAlert size={22} /> Cenografia
+                    </h3>
+                    <p className="text-sm text-[#444933] italic px-1 -mt-1">
+                      Você foi designado para avaliar a conformidade da equipe de Cenografia neste evento.
+                    </p>
+
+                    {/* 3 conformity items */}
+                    <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
                       <div className="divide-y-2 divide-[#eceef0]">
-                        {conformityItems.map(item => {
-                          const value = conformityEvalForm[item.key];
-                          const isNonConforming = value === false;
+                        {cenografiaItems.map(item => {
+                          const val = conformityEvalForm[item.key];
+                          const isNao = val === false;
+                          const commentMissing = isNao && !conformityEvalForm[item.commentKey].trim();
                           return (
-                            <div key={item.key} className={`px-5 transition-colors ${isNonConforming ? "bg-[#fdece6] border-l-4 border-[#862200]" : value === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
+                            <div key={item.key} className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
                               <div className="flex items-center justify-between gap-3 min-h-[56px]">
-                                <span className="text-sm font-bold italic text-[#191c1e] leading-snug">{item.label}</span>
+                                <span className="text-sm font-bold italic text-[#191c1e] leading-snug">{item.question}</span>
                                 <div className="flex items-center gap-2 shrink-0">
-                                  {isNonConforming && (
-                                    <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>
-                                  )}
+                                  {isNao && <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>}
                                   <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setConformityEvalForm(f => ({ ...f, [item.key]: true }));
-                                        if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: true } });
-                                      }}
-                                      className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                    <button type="button"
+                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: true } }); }}
+                                      className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >Sim</button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setConformityEvalForm(f => ({ ...f, [item.key]: false }));
-                                        if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: false } });
-                                      }}
-                                      className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${value === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                    <button type="button"
+                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: false } }); }}
+                                      className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${val === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >Não</button>
                                   </div>
                                 </div>
                               </div>
+                              {isNao && (
+                                <div className="pb-3 space-y-1">
+                                  <label className="text-[10px] font-black italic uppercase text-[#862200]">Justificativa <span>*</span> obrigatória quando NÃO</label>
+                                  <Textarea
+                                    placeholder={`Justifique por que ${item.label.toLowerCase()} não foi atendido...`}
+                                    value={conformityEvalForm[item.commentKey]}
+                                    onChange={e => setConformityEvalForm(f => ({ ...f, [item.commentKey]: e.target.value }))}
+                                    className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[64px]"
+                                  />
+                                  {commentMissing && <p className="text-[10px] font-bold italic text-[#862200]">Preencha a justificativa antes de salvar.</p>}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
                       </div>
-                      {allFilled && (
+                      {filledCount === cenografiaItems.length && (
                         <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center gap-2">
                           <CheckCircle size={14} className="text-[#506600]" />
-                          <span className="text-xs font-bold italic uppercase text-[#506600]">Matriz preenchida — {conformityItems.filter(i => conformityEvalForm[i.key] === true).length}/{conformityItems.length} itens conformes</span>
+                          <span className="text-xs font-bold italic uppercase text-[#506600]">Itens preenchidos — {cenografiaItems.filter(i => conformityEvalForm[i.key] === true).length}/{cenografiaItems.length} conformes</span>
                         </div>
                       )}
+                    </div>
+
+                    {/* Absences text field */}
+                    <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+                      <div className="px-5 py-4 space-y-2">
+                        <label className="block text-sm font-black italic uppercase text-[#191c1e]">Alguém faltou ou atrasou por mais de 30 minutos?</label>
+                        <p className="text-[11px] text-[#747a60] italic">Especifique nomes e motivo. Se ninguém faltou, deixe em branco.</p>
+                        <Textarea
+                          placeholder="Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso por trânsito."
+                          value={conformityEvalForm.absencesReport}
+                          onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
+                          className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Standout question */}
+                    <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+                      <div className="px-5 py-4 space-y-3">
+                        <label className="block text-sm font-black italic uppercase text-[#191c1e]">Algum profissional teve um desempenho fora da curva?</label>
+                        <div className="flex gap-2">
+                          <button type="button"
+                            onClick={() => { setConformityEvalForm(f => ({ ...f, standoutResponse: false, standoutJustification: '' })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { standoutResponse: false, standoutJustification: null } }); }}
+                            className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${conformityEvalForm.standoutResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                          >Não, dentro do padrão esperado</button>
+                          <button type="button"
+                            onClick={() => setConformityEvalForm(f => ({ ...f, standoutResponse: true }))}
+                            className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${conformityEvalForm.standoutResponse === true ? "bg-[#506600] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                          >Sim, houve um grande destaque</button>
+                        </div>
+                        {conformityEvalForm.standoutResponse === true && (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black italic uppercase text-[#506600]">Detalhe o destaque <span>*</span> obrigatório</label>
+                            <Textarea
+                              placeholder="Nome do profissional e por que se destacou..."
+                              value={conformityEvalForm.standoutJustification}
+                              onChange={e => setConformityEvalForm(f => ({ ...f, standoutJustification: e.target.value }))}
+                              className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
+                            />
+                            {standoutNeedsJustification && <p className="text-[10px] font-bold italic text-[#862200]">Descreva o destaque antes de salvar.</p>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Save text fields button */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-[#747a60] italic">Salva justificativas, ausências e destaque.</span>
+                      <button type="button" disabled={!canSaveTexts || conformityEvalMutation.isPending}
+                        onClick={() => {
+                          if (!selectedEventId || !canSaveTexts) return;
+                          const payload: Record<string, unknown> = { absencesReport: conformityEvalForm.absencesReport || null, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
+                          cenografiaItems.forEach(item => { if (conformityEvalForm[item.key] === false) payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
+                          conformityEvalMutation.mutate({ id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] });
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
+                      ><Save size={14} /> Salvar observações</button>
+                    </div>
+
+                    {/* Redirect */}
+                    <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+                      <div className="px-5 py-3 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-bold italic uppercase text-[#747a60]">Redirecionar para outro membro do grupo</span>
+                        <Popover open={redirectConformityOpen} onOpenChange={setRedirectConformityOpen}>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
+                              <ArrowRight size={12} /> Redirecionar
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
+                            <Command className="rounded-none">
+                              <CommandInput placeholder="Buscar avaliador..." className="italic" />
+                              <CommandList className="max-h-[240px]">
+                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                  {(cenografiaUsers ?? []).map(u => (
+                                    <CommandItem key={u.id} value={u.name}
+                                      onSelect={() => { setRedirectConformityTargetId(u.id); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
+                                      className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
+                                    >
+                                      <Check size={14} className={cn("shrink-0", redirectConformityTargetId === u.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </div>
                   </div>
                 );

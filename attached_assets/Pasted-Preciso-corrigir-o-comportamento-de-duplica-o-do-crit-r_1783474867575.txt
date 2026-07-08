@@ -1,0 +1,65 @@
+Preciso corrigir o comportamento de duplicação do critério "Qualidade da Entrega" e 
+melhorar a forma como os avaliadores são selecionados/relacionados a cada critério.
+
+═══════════════════════════════════════
+1. CORRIGIR NOME DO CRITÉRIO DUPLICADO
+═══════════════════════════════════════
+
+- Hoje, ao duplicar "Qualidade da Entrega", o novo critério aparece como 
+  "Qualidade da Entrega (CÓPIA)" com uma tag preta "CÓPIA".
+- O nome correto deve ser "Qualidade da Entrega (2)" — sem a tag "CÓPIA", seguindo 
+  o padrão de nomenclatura já usado no sistema (nome original + número sequencial 
+  entre parênteses).
+- Se duplicar novamente, deve virar "Qualidade da Entrega (3)", e assim por diante.
+
+═══════════════════════════════════════
+2. CORRIGIR ÁREA E LISTA DE AVALIADORES AO DUPLICAR
+═══════════════════════════════════════
+
+- Hoje, ao duplicar "Qualidade da Entrega" (que pertence à área Atendimento), o 
+  critério duplicado continua aparecendo vinculado à área "ATENDIMENTO" e mostrando 
+  a lista de usuários de Atendimento (Mirella Milani, Aline Soares, etc).
+- O correto é: ao duplicar ESTE critério específico, o novo critério "Qualidade da 
+  Entrega (2)" deve automaticamente:
+  a) Ser vinculado à área ATIVAÇÃO (não Atendimento)
+  b) Mostrar a lista de usuários cadastrados na área Ativação para seleção de 
+     avaliador (não a lista de Atendimento)
+  c) Ter como avaliador padrão sugerido: Priscila Elias
+
+═══════════════════════════════════════
+3. MELHORAR A SELEÇÃO/RELAÇÃO DE AVALIADORES (TODOS OS CRITÉRIOS)
+═══════════════════════════════════════
+
+A lista atual de checkboxes soltos (ex: "Carga na Saída do Galpão" com 14 nomes) está 
+poluída e sem hierarquia. Melhorar assim:
+
+a) CAMPO "AVALIADOR PRINCIPAL" (obrigatório, seleção única)
+   - Dropdown ou campo de busca para escolher 1 pessoa como avaliador padrão do critério.
+   - Exibir esse nome já preenchido/sugerido quando aplicável (ex: Priscila Elias para 
+     Qualidade da Entrega (2), Fred para Carga na Saída do Galpão).
+
+b) CAMPO "PODE REDIRECIONAR PARA" (opcional, multi-seleção)
+   - Lista dos demais usuários da mesma área, com CAMPO DE BUSCA no topo para filtrar 
+     por nome (essencial para listas longas, como a de Produção/Cenografia com 10+ pessoas).
+   - Manter como checkboxes, mas com busca ativa.
+   - Colapsar por padrão (ex: "4 avaliadores de backup selecionados ▾"), expandindo 
+     ao clicar, para não ocupar tanto espaço vertical.
+
+c) MENSAGEM "SEM AVALIADOR"
+   - Deve aparecer em vermelho SOMENTE se o campo "Avaliador Principal" estiver vazio.
+   - Não deve aparecer só porque não há avaliadores de redirecionamento marcados 
+     (isso é opcional).
+
+═══════════════════════════════════════
+4. RESULTADO ESPERADO
+═══════════════════════════════════════
+
+Ao clicar em "duplicar" no critério "Qualidade da Entrega" (Atendimento):
+1. Cria "Qualidade da Entrega (2)" 
+2. Já vinculado à área "ATIVAÇÃO"
+3. Já mostrando a lista de usuários de Ativação (não mais Atendimento)
+4. Com Priscila Elias sugerida como avaliador principal
+5. Layout de seleção de avaliadores com busca e hierarquia (principal + backups), 
+   ao invés de lista solta de checkboxes
+
+Manter a paleta de cores atual (preto/lima, cinza para secundário, vermelho para alertas).

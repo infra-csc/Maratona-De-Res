@@ -1,0 +1,69 @@
+Preciso corrigir um bug crítico e melhorar a experiência geral da página de avaliação 
+(tela "Critérios de Avaliação" / evaluations).
+
+═══════════════════════════════════════
+1. BUG: OPÇÃO DE REDIRECIONAR NÃO APARECE PARA AGATHA
+═══════════════════════════════════════
+
+- Agatha é a avaliadora PRINCIPAL do critério "Qualidade da Entrega" (área Atendimento), 
+  e ela deveria ter a opção de REDIRECIONAR essa avaliação para qualquer outro usuário 
+  cadastrado na área Atendimento (conforme já definido: avaliador principal pode avaliar 
+  OU redirecionar).
+- Hoje, na tela de avaliação (ex: "Night Run – Campo Grande – MS"), essa opção de 
+  redirecionar não aparece em lugar nenhum para ela.
+- Corrigir: todo avaliador principal deve ver, ao lado ou próximo de cada critério que 
+  ele é responsável, um botão/ação "Redirecionar para outro avaliador", que abre a lista 
+  (com busca) dos demais usuários da mesma área, permitindo transferir a responsabilidade 
+  daquela avaliação específica.
+- Validar se esse botão está sendo renderizado condicionalmente com base em alguma 
+  checagem de permissão que pode estar bloqueando indevidamente para avaliadores 
+  principais de área (não só admin).
+
+═══════════════════════════════════════
+2. MELHORIAS GERAIS NA PÁGINA DE AVALIAÇÃO (deixar "10/10")
+═══════════════════════════════════════
+
+a) HIERARQUIA VISUAL DA NOTA
+   - As 10 opções de nota (1 a 10) com seus rótulos (Crítico, Muito Abaixo, etc) estão 
+     ok, mas hoje nenhuma parece "selecionada" mesmo antes de escolher — adicionar um 
+     estado de hover mais claro e uma transição visual (ex: preenchimento em lima) 
+     quando o avaliador clicar/selecionar uma nota, para dar feedback imediato de que 
+     a escolha foi registrada.
+
+b) INDICADOR DE PROGRESSO MAIS CLARO
+   - O card "RESUMO DA AVALIAÇÃO" já mostra "0%" e "1 critério pendente" — melhorar 
+     para que, assim que uma nota for selecionada (mesmo sem salvar/submeter), o 
+     progresso e o resumo das notas à direita atualizem em tempo real (ex: 
+     "Qualidade da Entrega: 8" ao invés de "—"), dando feedback visual instantâneo.
+
+c) BOTÃO DE SALVAR/SUBMETER MAIS EVIDENTE
+   - Hoje o botão "1 CRITÉRIO PENDENTE" está desabilitado (cinza) até preencher tudo — 
+     isso está correto, mas ele deveria mudar de cor/estado (ex: ficar lima e com texto 
+     "SUBMETER AVALIAÇÃO") assim que todos os critérios estiverem preenchidos, deixando 
+     claro que a ação está disponível.
+
+d) CAMPO DE JUSTIFICATIVA
+   - Manter opcional como está, mas adicionar um contador de caracteres ou indicação 
+     sutil de que comentários ajudam o colaborador a entender a nota recebida (mesmo 
+     sendo anônimo), incentivando o preenchimento sem tornar obrigatório.
+
+e) NAVEGAÇÃO ENTRE CRITÉRIOS
+   - Se o evento tiver múltiplos critérios, adicionar navegação clara entre eles 
+     (ex: "Critério 1 de 4" com setas ou abas), ao invés de exigir scroll longo pela 
+     página — isso ajuda avaliadores com muitos critérios por evento a não se perderem.
+
+f) ESTADO "REDIRECIONADO"
+   - Quando um critério for redirecionado para outro avaliador, ele deve sair da lista 
+     "A FAZER" do avaliador original e aparecer como "REDIRECIONADO PARA [NOME]" em uma 
+     aba ou seção separada (ex: dentro de "Minhas Avaliações"), para rastreabilidade — 
+     sem sumir completamente do histórico do avaliador original.
+
+g) CONSISTÊNCIA DE CORES
+   - O badge da área do critério (ex: "ATENDIMENTO" em laranja/vermelho na imagem) 
+     parece destoar da paleta preto/lima usada no resto do sistema — avaliar se faz 
+     sentido padronizar essa cor com o restante (ex: usar tons neutros/cinza escuro 
+     para o badge de área, reservando cores fortes só para status como Pendente/Concluído).
+
+Manter a estrutura geral e a paleta de cores principal do sistema (preto/lima), 
+ajustando apenas o que for necessário para dar mais clareza e feedback visual ao 
+avaliador durante o processo de avaliação.

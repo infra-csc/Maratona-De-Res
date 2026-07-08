@@ -4,7 +4,7 @@ import {
   useEventCriterionAssignments, useGenerateCriterionAssignments,
   usePatchCriterionAssignment, type CriterionAssignment,
 } from "@/lib/routing-api";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -613,7 +613,19 @@ export default function EventDetailPage() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
         setConformityEvaluatorPickerOpen(false);
-        toast({ title: "Avaliador de conformidade atualizado" });
+        toast({ title: "Avaliador de Cenografia atualizado" });
+      },
+      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
+    },
+  });
+
+  const [conformityEvaluatorFerramentasPickerOpen, setConformityEvaluatorFerramentasPickerOpen] = useState(false);
+  const setConformityEvaluatorFerramentasMutation = useSetConformityEvaluatorFerramentas({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        setConformityEvaluatorFerramentasPickerOpen(false);
+        toast({ title: "Avaliador de Ferramentas e Case atualizado" });
       },
       onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
     },
@@ -1917,13 +1929,50 @@ export default function EventDetailPage() {
               <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
                 <ShieldAlert size={18} />
                 <span className="font-black uppercase tracking-tight">Matriz de Conformidade</span>
-                {canManage ? (
-                  <div className="ml-auto">
+              </div>
+              {/* Avaliadores por grupo — visível apenas para admin/RH */}
+              {canManage ? (
+                <div className="flex divide-x-2 divide-[#eceef0] border-b-2 border-[#eceef0]">
+                  {/* Grupo 1: Ferramentas e Case */}
+                  <div className="flex-1 px-4 py-2 flex items-center gap-2 min-w-0">
+                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">Ferramentas:</span>
+                    <Popover open={conformityEvaluatorFerramentasPickerOpen} onOpenChange={setConformityEvaluatorFerramentasPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors truncate max-w-[160px]">
+                          <UserCheck size={10} className="shrink-0" />
+                          <span className="truncate">{event?.conformityEvaluatorFerramentasName ?? "Sem avaliador"}</span>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
+                        <Command className="rounded-none">
+                          <CommandInput placeholder="Buscar avaliador..." className="italic" />
+                          <CommandList className="max-h-[280px]">
+                            <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem value="Sem avaliador" onSelect={() => setConformityEvaluatorFerramentasMutation.mutate({ id, data: { userId: null } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
+                                <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorFerramentasUserId == null ? "opacity-100" : "opacity-0")} />
+                                <span className="text-xs font-bold italic uppercase text-[#747a60]">Sem avaliador</span>
+                              </CommandItem>
+                              {evaluators.map(u => (
+                                <CommandItem key={u.id} value={u.name} onSelect={() => setConformityEvaluatorFerramentasMutation.mutate({ id, data: { userId: u.id } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
+                                  <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorFerramentasUserId === u.id ? "opacity-100" : "opacity-0")} />
+                                  <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  {/* Grupo 2: Cenografia */}
+                  <div className="flex-1 px-4 py-2 flex items-center gap-2 min-w-0">
+                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">Cenografia:</span>
                     <Popover open={conformityEvaluatorPickerOpen} onOpenChange={setConformityEvaluatorPickerOpen}>
                       <PopoverTrigger asChild>
-                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00]/10 border border-[#ccff00]/40 hover:bg-[#ccff00]/20 px-2 py-1 transition-colors">
-                          <UserCheck size={12} />
-                          {event?.conformityEvaluatorName ?? "Sem avaliador"}
+                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors truncate max-w-[160px]">
+                          <UserCheck size={10} className="shrink-0" />
+                          <span className="truncate">{event?.conformityEvaluatorName ?? "Sem avaliador"}</span>
                         </button>
                       </PopoverTrigger>
                       <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
@@ -1932,21 +1981,12 @@ export default function EventDetailPage() {
                           <CommandList className="max-h-[280px]">
                             <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
                             <CommandGroup>
-                              <CommandItem
-                                value="Sem avaliador"
-                                onSelect={() => { setConformityEvaluatorMutation.mutate({ id, data: { userId: null } }); }}
-                                className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
-                              >
+                              <CommandItem value="Sem avaliador" onSelect={() => setConformityEvaluatorMutation.mutate({ id, data: { userId: null } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
                                 <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorUserId == null ? "opacity-100" : "opacity-0")} />
                                 <span className="text-xs font-bold italic uppercase text-[#747a60]">Sem avaliador</span>
                               </CommandItem>
                               {evaluators.map(u => (
-                                <CommandItem
-                                  key={u.id}
-                                  value={u.name}
-                                  onSelect={() => { setConformityEvaluatorMutation.mutate({ id, data: { userId: u.id } }); }}
-                                  className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
-                                >
+                                <CommandItem key={u.id} value={u.name} onSelect={() => setConformityEvaluatorMutation.mutate({ id, data: { userId: u.id } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
                                   <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorUserId === u.id ? "opacity-100" : "opacity-0")} />
                                   <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
                                 </CommandItem>
@@ -1957,12 +1997,13 @@ export default function EventDetailPage() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                ) : event?.conformityEvaluatorName ? (
-                  <span className="ml-auto text-[11px] font-bold italic flex items-center gap-1 text-[#ccff00]/70">
-                    <User size={11} /> {event.conformityEvaluatorName}
-                  </span>
-                ) : null}
-              </div>
+                </div>
+              ) : (event?.conformityEvaluatorName || event?.conformityEvaluatorFerramentasName) ? (
+                <div className="flex divide-x-2 divide-[#eceef0] border-b-2 border-[#eceef0] text-[10px] font-bold italic text-[#747a60]">
+                  <div className="flex-1 px-4 py-2 flex items-center gap-1.5"><span className="uppercase">Ferramentas:</span><span className="text-[#191c1e]">{event.conformityEvaluatorFerramentasName ?? "—"}</span></div>
+                  <div className="flex-1 px-4 py-2 flex items-center gap-1.5"><span className="uppercase">Cenografia:</span><span className="text-[#191c1e]">{event.conformityEvaluatorName ?? "—"}</span></div>
+                </div>
+              ) : null}
               {!conformityData && importedConformityRatio && (
                 <p className="px-4 pt-3 text-[10px] font-bold italic uppercase text-[#9aa088]">
                   {importedConformityAllValue !== null

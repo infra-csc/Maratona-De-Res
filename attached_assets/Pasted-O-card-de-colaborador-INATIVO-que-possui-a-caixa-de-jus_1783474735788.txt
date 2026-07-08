@@ -1,0 +1,41 @@
+O card de colaborador INATIVO que possui a caixa de "justificativa" aberta (ex: quando o 
+sistema pede para justificar por que o colaborador está inativo) está com um visual 
+estranho e inconsistente. Preciso corrigir:
+
+1. REMOVER A BORDA PRETA GROSSA AO REDOR DO CARD INTEIRO
+   - Hoje, quando o card tem a caixa de comentário/justificativa aberta, ele ganha uma 
+     borda preta grossa envolvendo todo o card, dando a impressão de estar "em foco" ou 
+     "selecionado", como se fosse um erro.
+   - Remover essa borda grossa. O card deve manter a mesma borda fina/sutil que os 
+     demais cards de colaboradores inativos (ex: fundo rosado claro + borda lateral 
+     esquerda vinho, como já usado em outros cards do tipo "NÃO CONTA P/ NOTA").
+
+2. PADRONIZAR O ESTILO DE "INATIVO" COM OS DEMAIS CARDS
+   - Usar o MESMO padrão visual já aplicado a outros colaboradores inativos na tela 
+     (fundo levemente rosado, borda esquerda vinho, textos em cinza), ao invés de um 
+     estilo diferente só para quando há comentário aberto.
+
+3. SUAVIZAR O CONTRASTE DA CAIXA DE COMENTÁRIO
+   - A caixa "COLABORADOR INATIVO — JUSTIFIQUE" está com cores muito fortes 
+     (fundo creme vibrante + borda azul de foco no textarea) em comparação ao resto 
+     do card, que fica todo acinzentado/desbotado por estar inativo.
+   - Ajustar a caixa de comentário para ter uma cor mais neutra/suave quando o 
+     colaborador estiver inativo (ex: manter o creme mas mais claro, e trocar a borda 
+     azul de foco do textarea por um tom mais neutro, como cinza escuro ou o próprio 
+     vinho do sistema), mantendo consistência com o restante do card que já está 
+     em tom "desativado".
+
+4. MANTER LEGIBILIDADE
+   - Mesmo com o card em tom "inativo" (acinzentado), o texto dentro da caixa de 
+     comentário/justificativa deve continuar 100% legível (texto escuro, sem 
+     opacidade reduzida), já que essa é uma informação importante que o gestor 
+     precisa ler e preencher.
+
+5. RESULTADO ESPERADO
+   O card do colaborador inativo com comentário aberto deve parecer uma VARIAÇÃO 
+   discreta do card inativo padrão (mesmo fundo rosado, mesma borda lateral vinho), 
+   apenas com a caixa de justificativa aparecendo embaixo — sem bordas pretas grossas, 
+   sem contraste chapado entre "cinza" e "colorido vibrante".
+
+Manter a paleta de cores já usada no sistema (preto/lima no header geral, vinho para 
+elementos "inativo/não conta", creme suave para caixas de comentário).

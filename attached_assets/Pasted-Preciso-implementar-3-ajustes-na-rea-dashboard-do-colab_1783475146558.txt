@@ -1,0 +1,59 @@
+Preciso implementar 3 ajustes na área/dashboard do colaborador (visão "Meu Desempenho").
+
+═══════════════════════════════════════
+1. PÁGINA DE REGRAS DO APP PARA O COLABORADOR
+═══════════════════════════════════════
+
+- Criar uma página/seção acessível ao colaborador (ex: item no menu lateral, tipo 
+  "Como funciona" ou "Regras da Maratona") explicando de forma simples:
+  - Como funciona o ciclo de avaliação
+  - Como a nota média é calculada
+  - Quantos eventos são necessários para ser elegível ao bônus (ex: 8 eventos confirmados)
+  - O que é o "Bônus Caju" e como ele é calculado
+  - O que significam os status (Pendente, Confirmado, Em Avaliação, etc)
+  - Como funciona a sinalização de revisão de nota
+- Objetivo: o colaborador não precisar perguntar para o RH/gestor como o sistema 
+  funciona, tendo essa referência sempre disponível dentro do próprio app.
+
+═══════════════════════════════════════
+2. AJUSTAR CARDS DO DASHBOARD DO COLABORADOR
+═══════════════════════════════════════
+
+REMOVER:
+- Card "SEU PELOTÃO" (ex: "Pelotão Verde") — essa mecânica de pelotão não existe 
+  mais no sistema, remover completamente esse card do dashboard.
+
+AJUSTAR o card de participação/eventos:
+- Ao invés de só mostrar "11 eventos no ciclo / 9 em avaliação", o card deve mostrar 
+  claramente:
+  a) Quantos eventos já estão CONFIRMADOS (ou seja, o colaborador participou e o 
+     evento já foi validado/fechado)
+  b) Quantos eventos AINDA FALTAM para ele atingir a elegibilidade ao bônus 
+     (ex: "Faltam 3 eventos para você ser elegível ao bônus" — considerando que a 
+     meta é 8 eventos confirmados)
+- Manter visível a meta de elegibilidade (8 eventos) como referência, para o 
+  colaborador entender o "quanto falta".
+
+Exemplo de como o card poderia comunicar isso:
+"EVENTOS CONFIRMADOS: 5 de 8 necessários para o bônus"
+"FALTAM 3 EVENTOS para você se tornar elegível ao bônus"
+
+Manter os demais cards (Média do Ciclo, Bônus Caju) como estão.
+
+═══════════════════════════════════════
+3. SINALIZAR REVISÃO — POR NOTA OU POR EVENTO
+═══════════════════════════════════════
+
+- Hoje o colaborador só consegue "Sinalizar Revisão" no nível do EVENTO inteiro.
+- Adicionar também a opção de sinalizar revisão em uma NOTA/CRITÉRIO específico 
+  dentro do detalhamento do evento (ex: sinalizar revisão só da nota de 
+  "Qualidade da Entrega", sem precisar sinalizar o evento inteiro).
+- Regra importante: o botão "Sinalizar Revisão" (tanto no nível do evento quanto no 
+  nível da nota/critério individual) só deve ficar disponível/habilitado quando 
+  aquele evento ou critério JÁ TIVER UMA NOTA LANÇADA.
+  - Se o critério/evento ainda estiver "PENDENTE" (sem nota), o botão de sinalizar 
+    revisão deve ficar desabilitado ou oculto, já que não há nota para contestar ainda.
+  - Assim que a nota for lançada (status deixar de ser "Pendente"), o botão de 
+    sinalizar revisão passa a ficar disponível para aquele item específico.
+
+Manter a paleta de cores já usada no sistema (preto/lima).

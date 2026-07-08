@@ -32,6 +32,7 @@ import type {
   CalibrationInput,
   CloseQuarterInput,
   ConformityEvaluatorInput,
+  ConformityEvaluatorRedirectInput,
   CreateCycleInput,
   Criterion,
   CriterionInput,
@@ -119,6 +120,7 @@ import type {
   UploadUrlResponse,
   User,
   UserInput,
+  UserSummary,
   UserUpdate
 } from './api.schemas';
 
@@ -647,6 +649,83 @@ export const useCreateUser = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateUserMutationOptions(options));
     }
+
+export const getGetUsersByAreaUrl = (areaId: number,) => {
+
+
+
+
+  return `/users/by-area/${areaId}`
+}
+
+/**
+ * @summary List active users in a given area (for redirect dropdowns)
+ */
+export const getUsersByArea = async (areaId: number, options?: RequestInit): Promise<UserSummary[]> => {
+
+  return customFetch<UserSummary[]>(getGetUsersByAreaUrl(areaId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUsersByAreaQueryKey = (areaId: number,) => {
+    return [
+    `/users/by-area/${areaId}`
+    ] as const;
+    }
+
+
+export const getGetUsersByAreaQueryOptions = <TData = Awaited<ReturnType<typeof getUsersByArea>>, TError = ErrorType<unknown>>(areaId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUsersByArea>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUsersByAreaQueryKey(areaId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUsersByArea>>> = ({ signal }) => getUsersByArea(areaId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(areaId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUsersByArea>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUsersByAreaQueryResult = NonNullable<Awaited<ReturnType<typeof getUsersByArea>>>
+export type GetUsersByAreaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active users in a given area (for redirect dropdowns)
+ */
+
+export function useGetUsersByArea<TData = Awaited<ReturnType<typeof getUsersByArea>>, TError = ErrorType<unknown>>(
+ areaId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUsersByArea>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUsersByAreaQueryOptions(areaId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetUserUrl = (id: number,) => {
 
@@ -2940,7 +3019,7 @@ export const getSetConformityEvaluatorUrl = (id: number,) => {
 }
 
 /**
- * @summary Assign (or unassign) the conformity evaluator for an event
+ * @summary Assign (or unassign) the conformity evaluator for an event (Grupo 2 - Cenografia)
  */
 export const setConformityEvaluator = async (id: number,
     conformityEvaluatorInput: ConformityEvaluatorInput, options?: RequestInit): Promise<EventDetail> => {
@@ -2990,7 +3069,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SetConformityEvaluatorMutationError = ErrorType<unknown>
 
     /**
- * @summary Assign (or unassign) the conformity evaluator for an event
+ * @summary Assign (or unassign) the conformity evaluator for an event (Grupo 2 - Cenografia)
  */
 export const useSetConformityEvaluator = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setConformityEvaluator>>, TError,{id: number;data: BodyType<ConformityEvaluatorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3001,6 +3080,222 @@ export const useSetConformityEvaluator = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSetConformityEvaluatorMutationOptions(options));
+    }
+
+export const getRedirectConformityEvaluatorUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/conformity-evaluator`
+}
+
+/**
+ * @summary Redirect (delegate) the Cenografia conformity evaluator to another user in area 13
+ */
+export const redirectConformityEvaluator = async (id: number,
+    conformityEvaluatorRedirectInput: ConformityEvaluatorRedirectInput, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getRedirectConformityEvaluatorUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conformityEvaluatorRedirectInput,)
+  }
+);}
+
+
+
+
+export const getRedirectConformityEvaluatorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof redirectConformityEvaluator>>, TError,{id: number;data: BodyType<ConformityEvaluatorRedirectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof redirectConformityEvaluator>>, TError,{id: number;data: BodyType<ConformityEvaluatorRedirectInput>}, TContext> => {
+
+const mutationKey = ['redirectConformityEvaluator'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof redirectConformityEvaluator>>, {id: number;data: BodyType<ConformityEvaluatorRedirectInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  redirectConformityEvaluator(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RedirectConformityEvaluatorMutationResult = NonNullable<Awaited<ReturnType<typeof redirectConformityEvaluator>>>
+    export type RedirectConformityEvaluatorMutationBody = BodyType<ConformityEvaluatorRedirectInput>
+    export type RedirectConformityEvaluatorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Redirect (delegate) the Cenografia conformity evaluator to another user in area 13
+ */
+export const useRedirectConformityEvaluator = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof redirectConformityEvaluator>>, TError,{id: number;data: BodyType<ConformityEvaluatorRedirectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof redirectConformityEvaluator>>,
+        TError,
+        {id: number;data: BodyType<ConformityEvaluatorRedirectInput>},
+        TContext
+      > => {
+      return useMutation(getRedirectConformityEvaluatorMutationOptions(options));
+    }
+
+export const getSetConformityEvaluatorFerramentasUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/conformity-evaluator-ferramentas`
+}
+
+/**
+ * @summary Assign (or unassign) the equipment evaluator for an event (Grupo 1 - Ferramentas e Case)
+ */
+export const setConformityEvaluatorFerramentas = async (id: number,
+    conformityEvaluatorInput: ConformityEvaluatorInput, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getSetConformityEvaluatorFerramentasUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conformityEvaluatorInput,)
+  }
+);}
+
+
+
+
+export const getSetConformityEvaluatorFerramentasMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setConformityEvaluatorFerramentas>>, TError,{id: number;data: BodyType<ConformityEvaluatorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setConformityEvaluatorFerramentas>>, TError,{id: number;data: BodyType<ConformityEvaluatorInput>}, TContext> => {
+
+const mutationKey = ['setConformityEvaluatorFerramentas'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setConformityEvaluatorFerramentas>>, {id: number;data: BodyType<ConformityEvaluatorInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setConformityEvaluatorFerramentas(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetConformityEvaluatorFerramentasMutationResult = NonNullable<Awaited<ReturnType<typeof setConformityEvaluatorFerramentas>>>
+    export type SetConformityEvaluatorFerramentasMutationBody = BodyType<ConformityEvaluatorInput>
+    export type SetConformityEvaluatorFerramentasMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Assign (or unassign) the equipment evaluator for an event (Grupo 1 - Ferramentas e Case)
+ */
+export const useSetConformityEvaluatorFerramentas = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setConformityEvaluatorFerramentas>>, TError,{id: number;data: BodyType<ConformityEvaluatorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setConformityEvaluatorFerramentas>>,
+        TError,
+        {id: number;data: BodyType<ConformityEvaluatorInput>},
+        TContext
+      > => {
+      return useMutation(getSetConformityEvaluatorFerramentasMutationOptions(options));
+    }
+
+export const getRedirectConformityEvaluatorFerramentasUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/conformity-evaluator-ferramentas`
+}
+
+/**
+ * @summary Redirect (delegate) the Ferramentas e Case evaluator to another user in area 16
+ */
+export const redirectConformityEvaluatorFerramentas = async (id: number,
+    conformityEvaluatorRedirectInput: ConformityEvaluatorRedirectInput, options?: RequestInit): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getRedirectConformityEvaluatorFerramentasUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conformityEvaluatorRedirectInput,)
+  }
+);}
+
+
+
+
+export const getRedirectConformityEvaluatorFerramentasMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof redirectConformityEvaluatorFerramentas>>, TError,{id: number;data: BodyType<ConformityEvaluatorRedirectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof redirectConformityEvaluatorFerramentas>>, TError,{id: number;data: BodyType<ConformityEvaluatorRedirectInput>}, TContext> => {
+
+const mutationKey = ['redirectConformityEvaluatorFerramentas'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof redirectConformityEvaluatorFerramentas>>, {id: number;data: BodyType<ConformityEvaluatorRedirectInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  redirectConformityEvaluatorFerramentas(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RedirectConformityEvaluatorFerramentasMutationResult = NonNullable<Awaited<ReturnType<typeof redirectConformityEvaluatorFerramentas>>>
+    export type RedirectConformityEvaluatorFerramentasMutationBody = BodyType<ConformityEvaluatorRedirectInput>
+    export type RedirectConformityEvaluatorFerramentasMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Redirect (delegate) the Ferramentas e Case evaluator to another user in area 16
+ */
+export const useRedirectConformityEvaluatorFerramentas = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof redirectConformityEvaluatorFerramentas>>, TError,{id: number;data: BodyType<ConformityEvaluatorRedirectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof redirectConformityEvaluatorFerramentas>>,
+        TError,
+        {id: number;data: BodyType<ConformityEvaluatorRedirectInput>},
+        TContext
+      > => {
+      return useMutation(getRedirectConformityEvaluatorFerramentasMutationOptions(options));
     }
 
 export const getGetEventConformityUrl = (id: number,) => {

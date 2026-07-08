@@ -70,6 +70,12 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface UserSummary {
+  id: number;
+  name: string;
+  role: string;
+}
+
 export interface UserInput {
   name: string;
   email: string;
@@ -434,6 +440,10 @@ export interface EventDetail {
   conformityEvaluatorUserId?: number | null;
   /** @nullable */
   conformityEvaluatorName?: string | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasName?: string | null;
 }
 
 export interface EventInput {
@@ -525,6 +535,10 @@ export interface ConformityEvaluatorInput {
   userId?: number | null;
 }
 
+export interface ConformityEvaluatorRedirectInput {
+  userId: number;
+}
+
 export interface EventConformity {
   id: number;
   eventId: number;
@@ -544,6 +558,12 @@ export interface EventConformity {
   guardaEquipamentosComment?: string | null;
   /** @nullable */
   condutaComment?: string | null;
+  /** @nullable */
+  absencesReport?: string | null;
+  /** @nullable */
+  standoutResponse?: boolean | null;
+  /** @nullable */
+  standoutJustification?: string | null;
   createdByUserId: number;
   createdAt?: string;
   updatedAt?: string;
@@ -566,6 +586,12 @@ export interface EventConformityInput {
   guardaEquipamentosComment?: string | null;
   /** @nullable */
   condutaComment?: string | null;
+  /** @nullable */
+  absencesReport?: string | null;
+  /** @nullable */
+  standoutResponse?: boolean | null;
+  /** @nullable */
+  standoutJustification?: string | null;
 }
 
 export interface Criterion {

@@ -23,4 +23,10 @@ export interface EventConformityInput {
   guardaEquipamentosComment?: string | null;
   /** @nullable */
   condutaComment?: string | null;
+  /** @nullable */
+  absencesReport?: string | null;
+  /** @nullable */
+  standoutResponse?: boolean | null;
+  /** @nullable */
+  standoutJustification?: string | null;
 }
