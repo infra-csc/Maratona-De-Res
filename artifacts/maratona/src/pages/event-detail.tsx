@@ -714,6 +714,8 @@ export default function EventDetailPage() {
         qc.invalidateQueries({ queryKey: ["event-conformity", id] });
         qc.invalidateQueries({ queryKey: ["event-result", id] });
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         toast({ title: "Matriz de conformidade atualizada", variant: "default" });
       },
       onError: () => toast({ title: "Erro ao salvar conformidade", variant: "destructive" }),
@@ -849,6 +851,8 @@ export default function EventDetailPage() {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
         qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
         qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         if (data.warnings && data.warnings.length > 0) {
           toast({ title: "Resultados confirmados", description: data.warnings.join(" "), variant: "destructive" });
         } else {
@@ -864,6 +868,8 @@ export default function EventDetailPage() {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
         qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
         qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         toast({ title: "Confirmação revertida", description: "O evento deixou de contar na elegibilidade e na nota dos colaboradores." });
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao reverter confirmação", description: e.message, variant: "destructive" }),
@@ -901,6 +907,10 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: (_data, vars) => {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
+        qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         if (vars.data.confirmed !== undefined) {
           toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
         } else if (vars.data.actualDiariaDates !== undefined) {
