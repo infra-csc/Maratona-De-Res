@@ -851,10 +851,37 @@ export default function EventDetailPage() {
     },
   });
 
+  // Funções comuns pré-definidas para o seletor de participante.
+  const PARTICIPANT_FUNCTIONS = [
+    "Cenotécnica",
+    "Cenotécnica Local",
+    "Cenotécnico",
+    "Sup Ceno",
+    "Sup Ceno Local",
+    "Colaborador",
+  ] as const;
+  const DEFAULT_FUNCTION = "Cenotécnica";
+
+  /** Retorna a opção pré-definida que melhor corresponde ao functionName do colaborador. */
+  function matchParticipantFunction(fn?: string | null): string {
+    if (!fn) return DEFAULT_FUNCTION;
+    const norm = fn.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    // Busca match exato normalizado primeiro
+    const exact = PARTICIPANT_FUNCTIONS.find(
+      o => o.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === norm
+    );
+    if (exact) return exact;
+    // Busca por prefixo (ex.: "cenotecnica sp" → "Cenotécnica")
+    const prefix = PARTICIPANT_FUNCTIONS.find(
+      o => norm.startsWith(o.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())
+    );
+    return prefix ?? DEFAULT_FUNCTION;
+  }
+
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
   const [newParticipantEmployeeId, setNewParticipantEmployeeId] = useState<number | null>(null);
-  const [newParticipantFunction, setNewParticipantFunction] = useState("");
+  const [newParticipantFunction, setNewParticipantFunction] = useState<string>(DEFAULT_FUNCTION);
   const { data: allEmployees } = useGetEmployees({ active: true }, { query: { enabled: canManage, queryKey: ["employees", "active"] as unknown[] } });
   const alreadyAllocatedIds = new Set((event?.participants ?? []).map(p => p.employeeId));
   const availableEmployees = (allEmployees ?? []).filter(e => !alreadyAllocatedIds.has(e.id));
@@ -2514,7 +2541,7 @@ export default function EventDetailPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <Dialog open={addParticipantOpen} onOpenChange={(o) => { setAddParticipantOpen(o); if (!o) { setNewParticipantEmployeeId(null); setNewParticipantFunction(""); } }}>
+            <Dialog open={addParticipantOpen} onOpenChange={(o) => { setAddParticipantOpen(o); if (!o) { setNewParticipantEmployeeId(null); setNewParticipantFunction(DEFAULT_FUNCTION); } }}>
               <DialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
                 <DialogHeader>
                   <DialogTitle className="font-black italic uppercase tracking-tight text-[#191c1e]">Adicionar Colaborador</DialogTitle>
@@ -2550,7 +2577,7 @@ export default function EventDetailPage() {
                                   data-testid={`option-new-participant-${e.id}`}
                                   onSelect={() => {
                                     setNewParticipantEmployeeId(e.id);
-                                    setNewParticipantFunction(e.functionName ?? "Logística Interna");
+                                    setNewParticipantFunction(matchParticipantFunction(e.functionName));
                                     setEmployeePickerOpen(false);
                                   }}
                                   className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2"
@@ -2567,13 +2594,18 @@ export default function EventDetailPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função no Evento</Label>
-                    <Input
-                      data-testid="input-new-participant-function"
-                      value={newParticipantFunction}
-                      onChange={(e) => setNewParticipantFunction(e.target.value)}
-                      placeholder="Ex: Operador, Auxiliar..."
-                      className="h-11 rounded-none border-2 border-[#191c1e]"
-                    />
+                    <Select value={newParticipantFunction} onValueChange={setNewParticipantFunction}>
+                      <SelectTrigger data-testid="select-new-participant-function" className="h-11 rounded-none border-2 border-[#191c1e] font-black italic uppercase text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                        {PARTICIPANT_FUNCTIONS.map(fn => (
+                          <SelectItem key={fn} value={fn} className="rounded-none font-bold italic uppercase text-sm cursor-pointer">
+                            {fn}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <DialogFooter>
