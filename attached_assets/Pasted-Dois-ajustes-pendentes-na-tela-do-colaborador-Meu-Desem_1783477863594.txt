@@ -1,0 +1,42 @@
+Dois ajustes pendentes na tela do colaborador ("Meu Desempenho"):
+
+═══════════════════════════════════════
+1. FALTA A PÁGINA/LINK DE REGRAS DO APP
+═══════════════════════════════════════
+
+- Já foi solicitado anteriormente criar uma página explicando as regras do sistema 
+  para o colaborador (como funciona o ciclo, cálculo da nota, elegibilidade ao bônus, 
+  faixas de premiação, sinalização de revisão etc), mas isso ainda não aparece em 
+  lugar nenhum da tela.
+- Adicionar um item de menu visível para o colaborador (ex: no menu lateral, abaixo 
+  de "AVALIAÇÕES", ou um ícone de "?"/"Ajuda" no topo da página "Meu Desempenho"), 
+  levando a essa página de regras.
+- Conteúdo da página deve incluir, no mínimo:
+  - Como funciona o ciclo de avaliação (datas, o que conta, o que não conta)
+  - Como a nota média é calculada
+  - Quantos eventos são necessários para elegibilidade ao bônus (8 eventos)
+  - Nova tabela de faixas de bônus (Nota Média × Prêmio Base × Bônus por Evento 
+    Adicional), já implementada na área de configuração do Admin
+  - Como funciona a sinalização de revisão (por evento ou por critério/nota)
+
+═══════════════════════════════════════
+2. FINALIZAR REMOÇÃO DE "PELOTÃO" (ainda aparece em 2 lugares)
+═══════════════════════════════════════
+
+Mesmo após a remoção do sistema de Pelotões e da nova tabela de bônus, ainda restam 
+referências antigas que precisam ser removidas:
+
+a) Aviso amarelo no topo ("CICLO EM ANDAMENTO — NOTA, PELOTÃO E BÔNUS SÃO PROJEÇÕES 
+   PARCIAIS...") — remover a palavra "PELOTÃO" desse texto, deixando algo como:
+   "CICLO EM ANDAMENTO — NOTA E BÔNUS SÃO PROJEÇÕES PARCIAIS E PODEM MUDAR ATÉ O 
+   FECHAMENTO OFICIAL"
+
+b) Badge "PELOTÃO VERDE" que ainda aparece no card de detalhamento de um evento 
+   avaliado (ex: card "CIRCUITO VALE - VITÓRIA - ES - 2026", ao lado da nota "77.5") 
+   — remover esse badge completamente. Deve sobrar apenas o badge de nota (ex: "NOTA 77.5").
+
+Fazer uma varredura completa no código/telas por qualquer ocorrência residual da 
+palavra "pelotão" (incluindo variações de case e nos textos de componentes/templates), 
+já que na primeira remoção alguns lugares específicos passaram despercebidos.
+
+Manter a paleta de cores atual (preto/lima).
