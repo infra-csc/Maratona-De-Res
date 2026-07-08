@@ -38,7 +38,7 @@ router.post("/penalty-types/seed-defaults", requireRole("admin"), async (req, re
     return;
   }
   const inserted = await db.insert(penaltyTypesTable).values(toInsert).returning();
-  await audit(req.user!.userId, "seed_defaults", "penalty_types", null, null, { inserted: inserted.map(r => r.slug) });
+  await audit(req.user!.userId, "seed_defaults", "penalty_types", undefined, undefined, { inserted: inserted.map(r => r.slug) });
   res.json({ inserted: inserted.length, types: inserted });
 });
 

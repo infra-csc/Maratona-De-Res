@@ -76,7 +76,22 @@ export default function PenaltyTypesPage() {
     },
   });
 
+  const seedMutation = useSeedDefaultPenaltyTypes({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: qKey });
+        if (data.inserted === 0) {
+          toast({ title: "Tipos padrão já existem", description: "Nenhum tipo novo foi inserido." });
+        } else {
+          toast({ title: `${data.inserted} tipo(s) padrão restaurado(s) com sucesso` });
+        }
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao restaurar padrões", description: e.message, variant: "destructive" }),
+    },
+  });
+
   const canEdit = user && ["admin", "rh"].includes(user.role);
+  const isAdmin = user?.role === "admin";
 
   function openCreate() {
     setEditingType(null);
@@ -135,14 +150,26 @@ export default function PenaltyTypesPage() {
               <p className="text-base text-[#444933] italic mt-2">Configure os tipos de penalidade e mérito e seus valores em pontos.</p>
             </div>
           </div>
-          {canEdit && (
-            <button
-              onClick={openCreate}
-              className={`bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-            >
-              <Plus size={16} /> Novo Tipo
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <button
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+                title="Insere os 6 tipos padrão (falta, atraso, conformidade, rei do galpão, estrela, colega top) que ainda não existem"
+                className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+              >
+                <RefreshCw size={14} className={seedMutation.isPending ? "animate-spin" : ""} /> Restaurar Padrões
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={openCreate}
+                className={`bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+              >
+                <Plus size={16} /> Novo Tipo
+              </button>
+            )}
+          </div>
         </section>
 
         {isLoading ? (
