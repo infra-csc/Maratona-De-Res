@@ -445,6 +445,7 @@ export const MergeEmployeeResponse = zod.object({
   "movedAbsences": zod.number().optional(),
   "movedEvals": zod.number().optional(),
   "movedReviews": zod.number().optional(),
+  "movedEvaluatorEvals": zod.number().optional(),
   "removedUsers": zod.number().optional()
 })
 

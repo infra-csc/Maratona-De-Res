@@ -3216,6 +3216,8 @@ components:
           type: integer
         movedReviews:
           type: integer
+        movedEvaluatorEvals:
+          type: integer
         removedUsers:
           type: integer
 

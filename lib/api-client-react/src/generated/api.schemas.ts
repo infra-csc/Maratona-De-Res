@@ -569,6 +569,7 @@ export interface MergeEmployeeResult {
   movedAbsences?: number;
   movedEvals?: number;
   movedReviews?: number;
+  movedEvaluatorEvals?: number;
   removedUsers?: number;
 }
 

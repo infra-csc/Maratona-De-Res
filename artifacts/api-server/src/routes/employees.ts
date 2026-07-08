@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable } from "@workspace/db";
+import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
 import { eq, and, inArray, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -148,7 +148,7 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
   const dupIds = duplicateIds.filter(id => id !== canonicalId);
   if (dupIds.length === 0) { res.status(400).json({ error: "Nenhum duplicado válido" }); return; }
 
-  let movedParticipations = 0, movedAbsences = 0, movedEvals = 0, movedReviews = 0, removedUsers = 0;
+  let movedParticipations = 0, movedAbsences = 0, movedEvals = 0, movedReviews = 0, removedUsers = 0, movedEvaluatorEvals = 0;
 
   await db.transaction(async (tx) => {
     // event_participants: move if canonical doesn't already have that event
@@ -205,25 +205,33 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
       }
     }
 
-    // users: if duplicate has a user account and canonical doesn't, re-link it
-    const canonicalUser = await tx.select({ id: usersTable.id })
+    // users: if duplicate has a user account and canonical doesn't, re-link it;
+    // otherwise transfer evaluations made BY the duplicate user, then deactivate it
+    const [canonicalUser] = await tx.select({ id: usersTable.id })
       .from(usersTable).where(eq(usersTable.employeeId, canonicalId)).limit(1);
-    if (!canonicalUser.length) {
-      for (const dupId of dupIds) {
-        const dupUser = await tx.select().from(usersTable)
-          .where(eq(usersTable.employeeId, dupId)).limit(1);
-        if (dupUser.length) {
-          await tx.update(usersTable)
-            .set({ employeeId: canonicalId })
-            .where(eq(usersTable.id, dupUser[0].id));
-          break;
-        }
+
+    for (const dupId of dupIds) {
+      const [dupUser] = await tx.select({ id: usersTable.id })
+        .from(usersTable).where(eq(usersTable.employeeId, dupId)).limit(1);
+      if (!dupUser) continue;
+
+      if (!canonicalUser) {
+        // Canônico sem usuário — reutiliza o do duplicado
+        await tx.update(usersTable)
+          .set({ employeeId: canonicalId })
+          .where(eq(usersTable.id, dupUser.id));
+      } else {
+        // Canônico já tem usuário — transfere avaliações feitas como avaliador e desativa o duplicado
+        const evRes = await tx.update(evaluationsTable)
+          .set({ evaluatorUserId: canonicalUser.id })
+          .where(eq(evaluationsTable.evaluatorUserId, dupUser.id));
+        movedEvaluatorEvals += (evRes as unknown as { rowCount?: number }).rowCount ?? 0;
+        // Desvincula e desativa a conta do duplicado
+        await tx.update(usersTable)
+          .set({ employeeId: null, active: false })
+          .where(eq(usersTable.id, dupUser.id));
+        removedUsers++;
       }
-    } else {
-      // Detach (nullify) users linked to duplicates so they can be deleted
-      await tx.update(usersTable).set({ employeeId: null })
-        .where(and(inArray(usersTable.employeeId, dupIds), ne(usersTable.employeeId, canonicalId)));
-      removedUsers++;
     }
 
     // quarterly_results: move if no conflict
@@ -247,8 +255,8 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
     await tx.delete(employeesTable).where(inArray(employeesTable.id, dupIds));
   });
 
-  await audit(req.user!.userId, "merge", "employees", canonicalId, { duplicateIds: dupIds }, { movedParticipations, movedAbsences, movedEvals, movedReviews });
-  res.json({ canonicalId, merged: dupIds, movedParticipations, movedAbsences, movedEvals, movedReviews, removedUsers });
+  await audit(req.user!.userId, "merge", "employees", canonicalId, { duplicateIds: dupIds }, { movedParticipations, movedAbsences, movedEvals, movedReviews, movedEvaluatorEvals });
+  res.json({ canonicalId, merged: dupIds, movedParticipations, movedAbsences, movedEvals, movedReviews, movedEvaluatorEvals, removedUsers });
 });
 
 router.get("/employees/:id/history", async (req, res) => {

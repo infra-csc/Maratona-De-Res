@@ -685,6 +685,8 @@ export default function EmployeesPage() {
               <p><span className="font-black">{mergeResult?.merged.length ?? 0}</span> duplicata(s) removida(s)</p>
               <p><span className="font-black">{mergeResult?.movedParticipations ?? 0}</span> participações transferidas</p>
               {(mergeResult?.movedAbsences ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedAbsences}</span> penalidades/méritos transferidos</p>}
+              {(mergeResult?.movedEvaluatorEvals ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedEvaluatorEvals}</span> avaliações de avaliador transferidas</p>}
+              {(mergeResult?.removedUsers ?? 0) > 0 && <p className="text-[#cc3300]"><span className="font-black">{mergeResult?.removedUsers}</span> conta(s) de usuário desativada(s)</p>}
             </div>
             <p className="text-xs text-[#747a60] italic">Agora você pode usar "Gerar Acessos em Massa" para criar as credenciais dos colaboradores mesclados.</p>
             <div className="flex justify-end pt-2 border-t-2 border-[#e0e3e5]">
