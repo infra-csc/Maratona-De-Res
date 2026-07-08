@@ -1,0 +1,97 @@
+A tela "Resultados do Ciclo" (rota /results, com as abas Ranking, Consolidação e 
+Bônus & Pagamentos) ainda tem MUITAS referências ao sistema antigo de "Pelotão" que 
+precisam ser removidas, além de outros ajustes para ficar completa.
+
+═══════════════════════════════════════
+1. REMOVER "PELOTÃO" DE TODA A TELA (CRÍTICO)
+═══════════════════════════════════════
+
+Encontrado em pelo menos estes pontos — remover todos:
+
+a) Filtro dropdown "Todos os pelotões" — presente nas 3 abas (Ranking, Consolidação, 
+   Bônus & Pagamentos). Remover esse filtro completamente.
+
+b) Badge "Pelotão Azul" — aparece:
+   - Ao lado de cada colaborador na lista de "Classificação Geral" (aba Ranking)
+   - No pódio da maratona (#1, #2, #3)
+   - Como coluna "PELOTÃO" na "Planilha de Consolidação" (aba Consolidação)
+   - Como coluna "PELOTÃO OFICIAL" na tabela de "Bônus & Pagamentos"
+   - No painel lateral de detalhe do colaborador (badge "PELOTÃO AZUL" no topo, ao 
+     lado de "COLABORADOR" e "CICLO 2026")
+   Remover TODAS essas ocorrências.
+
+c) Fazer uma varredura final e completa em todo o sistema (todas as telas, incluindo 
+   as já verificadas antes) por qualquer resíduo de "pelotão" — front-end (textos, 
+   componentes, badges) e back-end (colunas de banco não usadas podem ficar, mas sem 
+   nenhuma exibição ativa).
+
+═══════════════════════════════════════
+2. SUBSTITUIR PELOTÃO PELA FAIXA DE BÔNUS NOS LUGARES EQUIVALENTES
+═══════════════════════════════════════
+
+Onde antes aparecia o "Pelotão" como classificação visual do colaborador, substituir 
+pela FAIXA DE BÔNUS correspondente à nota dele (conforme a tabela já configurada: 
+70-74,99 / 75-79,99 / 80-84,99 / 85-89,99 / 90-94,99 / 95-100):
+
+- No lugar do badge "Pelotão Azul", mostrar algo como "Faixa 80-84,99" ou o nome que 
+  o Admin tiver dado à faixa (se decidirmos nomear as faixas, ver item 3).
+- Isso vale para: lista de ranking, pódio, coluna na consolidação, coluna em bônus 
+  e painel de detalhe do colaborador.
+
+═══════════════════════════════════════
+3. CONSIDERAR NOMEAR AS FAIXAS DE BÔNUS (opcional, mas recomendado)
+═══════════════════════════════════════
+
+- Já que o "Pelotão" tinha nomes (Quênia, Azul, Verde, Branco) que ajudavam a 
+  identificar rapidamente o nível, sugerir ao Admin (na tela de configuração das 
+  faixas de bônus) um campo opcional "Nome da Faixa" (ex: "Elite", "Avançado", 
+  "Intermediário", "Iniciante"), para manter esse reconhecimento visual rápido sem 
+  reintroduzir o conceito de pelotão.
+- Se o Admin não nomear, exibir só o intervalo de nota (ex: "80-84,99").
+
+═══════════════════════════════════════
+4. CORRIGIR LÓGICA DE ELEGIBILIDADE NA ABA "BÔNUS & PAGAMENTOS"
+═══════════════════════════════════════
+
+- Hoje aparece "ELEGIBILIDADE: 0%" e todos os colaboradores como "NÃO ELEGÍVEL", 
+  mesmo com nota 80.0 — verificar se a trava está usando corretamente a regra de 
+  "mínimo 8 eventos confirmados" (conforme já definido). Os exemplos mostrados 
+  (Vinicius com 1 evento, Erick com 2 eventos) estão corretamente não elegíveis por 
+  não terem 8 eventos ainda — mas confirmar se o sistema calcularia certo para quem 
+  JÁ tem 8+ eventos.
+- Coluna "BÔNUS" e "BÔNUS EXTRA" devem ser calculadas com base na nova tabela de 
+  faixas (Prêmio Base + Bônus por Evento Adicional), e não mais zeradas/fixas.
+
+═══════════════════════════════════════
+5. OUTRAS MELHORIAS PARA DEIXAR 10/10
+═══════════════════════════════════════
+
+a) COLUNA "EVENTOS C/ NOTA" vs "EVENTOS PARTICIPADOS" (aba Consolidação) — os números 
+   estão iguais em todos os exemplos mostrados; confirmar se há diferença real entre 
+   "participou" e "teve nota lançada" (pode haver evento em que ele participou mas 
+   ainda está pendente de nota) — se sim, deixar mais claro visualmente quando esses 
+   números divergirem (ex: destacar em laranja se "participados" > "c/ nota").
+
+b) COLUNA "PENALIDADES/MÉRITOS" (aba Consolidação) mostrando "—" para todos — 
+   confirmar que essa coluna realmente puxa os dados da aba "Penalidades e Méritos" 
+   já implementada em outras telas (Evento, Ocorrências, Calibragem), garantindo 
+   consistência entre todas as visualizações.
+
+c) BOTÃO "FECHAR CICLO" (aba Bônus & Pagamentos) — adicionar uma confirmação clara 
+   antes de executar (modal: "Isso irá travar as notas finais e os bônus deste ciclo. 
+   Deseja continuar?"), já que parece ser uma ação irreversível/crítica.
+
+d) PAINEL LATERAL DO COLABORADOR (Image 4) — o "DESEMPENHO NAS PROVAS" mostra só 1 
+   evento com "NOTA TIME: 80.0"; se o colaborador tiver mais eventos no ciclo, listar 
+   todos aqui (não só 1), para dar visão completa do histórico dentro do próprio 
+   painel de resultados.
+
+e) BUSCA "Buscar colaborador..." — confirmar que funciona também por departamento/
+   função (já implementado em outras telas de busca do sistema, como "Colaboradores"), 
+   para manter consistência de UX entre as telas.
+
+f) EXPORTAR — verificar se os arquivos exportados (Ranking, Consolidação, Bônus) 
+   também estão sem a coluna "Pelotão" e já trazem a nova faixa de bônus.
+
+Manter a paleta de cores atual do sistema (preto/lima), garantindo que a nova "faixa 
+de bônus" substitua visualmente o pelotão sem perder a identidade visual do sistema.

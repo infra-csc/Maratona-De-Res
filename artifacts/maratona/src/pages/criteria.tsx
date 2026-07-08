@@ -260,6 +260,7 @@ export default function CriteriaPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [routingDialogId, setRoutingDialogId] = useState<number | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const qKey = getGetCriteriaQueryKey();
   const { data: criteria, isLoading } = useGetCriteria({ query: { queryKey: qKey } });
@@ -359,7 +360,9 @@ export default function CriteriaPage() {
   });
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
+  const inactiveCriteria = (criteria ?? []).filter(c => !c.active);
   const totalWeight = activeCriteria.reduce((s, c) => s + Number(c.defaultWeight), 0);
+  const displayedCriteria = showInactive ? (criteria ?? []) : activeCriteria;
 
   const routingCriterion = routingDialogId != null ? (criteria ?? []).find(c => c.id === routingDialogId) : null;
 
@@ -488,6 +491,25 @@ export default function CriteriaPage() {
           <div className="text-center py-20 italic uppercase font-bold text-[#747a60]">Carregando critérios...</div>
         ) : (
           <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
+            {/* Filter bar */}
+            <div className="flex items-center justify-between px-6 py-3 border-b-2 border-[#eceef0] bg-[#f9fafb]">
+              <span className="text-xs font-bold italic uppercase text-[#747a60]">
+                Exibindo {displayedCriteria.length} de {(criteria ?? []).length} critério{(criteria ?? []).length !== 1 ? "s" : ""}
+              </span>
+              {inactiveCriteria.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowInactive(v => !v)}
+                  className={`flex items-center gap-2 px-3 py-1.5 border-2 text-[11px] font-bold italic uppercase transition-colors ${
+                    showInactive
+                      ? "border-[#191c1e] bg-[#191c1e] text-white"
+                      : "border-[#191c1e] bg-white text-[#747a60] hover:bg-[#f2f4f6]"
+                  }`}
+                >
+                  {showInactive ? "Ocultar Inativos" : `Mostrar Inativos (${inactiveCriteria.length})`}
+                </button>
+              )}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -500,7 +522,7 @@ export default function CriteriaPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
-                  {(criteria ?? []).slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => {
+                  {displayedCriteria.slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => {
                     const routing = routingMap.get(c.id);
                     return (
                       <tr key={c.id} data-testid={`row-criterion-${c.id}`} className={`hover:bg-[#f2f4f6] transition-all group ${!c.active ? 'opacity-60' : ''}`}>
