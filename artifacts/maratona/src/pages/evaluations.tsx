@@ -1252,6 +1252,11 @@ export default function EvaluationsPage() {
                                         <span className="text-[11px] font-bold italic uppercase text-[#d8dadc] bg-[#f2f4f6] border border-[#d8dadc] px-1.5 py-0.5 shrink-0">
                                           Peso {c.weightOverride ?? c.originalWeight ?? 0}
                                         </span>
+                                        {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && (
+                                          <span className="text-[9px] font-black italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-1.5 py-0.5 shrink-0">
+                                            Não conta na média
+                                          </span>
+                                        )}
                                       </button>
                                       <span className="shrink-0 flex items-center gap-2">
                                         <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-nowrap hidden sm:inline-flex items-center gap-1 pr-0.5">
@@ -1357,6 +1362,9 @@ export default function EvaluationsPage() {
                               <div>
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="bg-[#e6e8ea] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-black italic uppercase">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
+                                  {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && (
+                                    <span className="bg-[#ffdbd1] border-2 border-[#862200] text-[#862200] px-2 py-0.5 text-[11px] font-black italic uppercase">Peso 0 — não conta na média</span>
+                                  )}
                                   {c.responsibleAreaName && (
                                     <span className="bg-[#e6e8ea] text-[#191c1e] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1">
                                       <Building2 size={11} /> {c.responsibleAreaName}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, getGetCalibrationsQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar } from "lucide-react";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -47,7 +47,9 @@ export default function CalibrationsPage() {
   const { user } = useAuth();
   const canFinalize = ["admin", "rh", "diretoria"].includes(user?.role ?? "");
   const qc = useQueryClient();
+  const search = useSearch();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [eventIdFromUrlApplied, setEventIdFromUrlApplied] = useState(false);
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [eventStatusFilter, setEventStatusFilter] = useState<"all" | "open" | "closed">("all");
   const [calScores, setCalScores] = useState<Record<number, string>>({});
@@ -60,6 +62,7 @@ export default function CalibrationsPage() {
   const [publishingAllFinal, setPublishingAllFinal] = useState(false);
   const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
   const [contextOpen, setContextOpen] = useState(true);
+  const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
@@ -85,6 +88,9 @@ export default function CalibrationsPage() {
     { eventId: selectedEventId ?? undefined },
     { query: { enabled: !!selectedEventId, queryKey: calQKey } }
   );
+  const { data: fullEvent } = useGetEvent(selectedEventId ?? 0, {
+    query: { enabled: !!selectedEventId, queryKey: getGetEventQueryKey(selectedEventId ?? 0) },
+  });
 
   // Todos os eventos do ciclo aparecem — a calibração pode começar a qualquer
   // momento, inclusive antes de todas as avaliações serem enviadas.
@@ -103,6 +109,24 @@ export default function CalibrationsPage() {
       setWeightEdits({});
     }
   }, [selectedEventId, calibratableEvents, events]);
+
+  // Deep-link: se veio de "Ir para Calibração" no evento (?eventId=), seleciona
+  // esse evento automaticamente assim que a lista de eventos carregar.
+  useEffect(() => {
+    if (eventIdFromUrlApplied) return;
+    if (!events || events.length === 0) return;
+    const params = new URLSearchParams(search);
+    const raw = params.get("eventId");
+    if (!raw) {
+      setEventIdFromUrlApplied(true);
+      return;
+    }
+    const id = Number(raw);
+    if (!isNaN(id) && events.some(e => e.id === id)) {
+      setSelectedEventId(id);
+    }
+    setEventIdFromUrlApplied(true);
+  }, [events, search, eventIdFromUrlApplied]);
 
   const createMutation = useCreateCalibration({
     mutation: {
@@ -158,8 +182,8 @@ export default function CalibrationsPage() {
   function saveWeight(critId: number, active: boolean) {
     const raw = (weightEdits[critId] ?? "").replace(",", ".").trim();
     const w = Number(raw);
-    if (!raw || isNaN(w) || w <= 0) {
-      toast({ title: "Peso inválido", description: "Informe um peso maior que zero.", variant: "destructive" });
+    if (!raw || isNaN(w) || w < 0) {
+      toast({ title: "Peso inválido", description: "Informe um peso maior ou igual a zero.", variant: "destructive" });
       return;
     }
     setSavingWeightId(critId);
@@ -297,8 +321,8 @@ export default function CalibrationsPage() {
     const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
     const reason = (calReasons[critId] ?? existing?.calibrationReason ?? "").trim();
     const score = Number(raw);
-    if (!raw || isNaN(score) || score < 1 || score > 10) {
-      toast({ title: "Nota inválida", description: "Informe uma nota calibrada de 1 a 10.", variant: "destructive" });
+    if (!raw || isNaN(score) || score < 0 || score > 10) {
+      toast({ title: "Nota inválida", description: "Informe uma nota calibrada de 0 a 10.", variant: "destructive" });
       return;
     }
     setSavingCritId(critId);
@@ -326,7 +350,7 @@ export default function CalibrationsPage() {
     const existing = getCalibration(critId);
     const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
     const score = Number(raw);
-    if (!raw || isNaN(score) || score < 1 || score > 10) return null;
+    if (!raw || isNaN(score) || score < 0 || score > 10) return null;
     return score;
   }
   const fillableCount = activeCriteria.filter(c => pendingScore(c.criterionId) != null).length;
@@ -603,6 +627,58 @@ export default function CalibrationsPage() {
               </div>
             )}
 
+            {/* Equipe Alocada — referência rápida de quem participou do evento sem
+                precisar sair para "Ver Gerenciamento" */}
+            {selectedEventId && fullEvent?.participants && fullEvent.participants.length > 0 && (() => {
+              const relevantParticipants = fullEvent.participants!.filter(p => p.confirmed !== false && p.countsForScore !== false);
+              return (
+                <div className="border-2 border-[#191c1e] bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setTeamPanelOpen(o => !o)}
+                    className="w-full flex items-center justify-between gap-3 px-5 py-3 bg-[#f2f4f6] border-b-2 border-[#191c1e] hover:bg-[#e8eaec] transition-colors"
+                  >
+                    <span className="flex items-center gap-2 text-[11px] font-black italic uppercase tracking-wider text-[#444933]">
+                      <Users size={14} /> Equipe Alocada <span className="text-[#747a60]">({relevantParticipants.length})</span>
+                    </span>
+                    {teamPanelOpen ? <ChevronUp size={16} className="text-[#444933] shrink-0" /> : <ChevronDown size={16} className="text-[#444933] shrink-0" />}
+                  </button>
+                  {teamPanelOpen && (
+                    relevantParticipants.length === 0 ? (
+                      <div className="py-6 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum colaborador ativo alocado neste evento.</div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                        {relevantParticipants.map(p => {
+                          const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
+                          return (
+                            <div key={p.id} className="border-2 border-[#eceef0] p-3 flex items-center gap-3">
+                              <div className="w-8 h-8 bg-[#eceef0] border-2 border-[#191c1e] flex items-center justify-center font-black italic text-[10px] text-[#191c1e] shrink-0">
+                                {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-black italic uppercase text-xs text-[#191c1e] leading-tight truncate">{p.employeeName}</p>
+                                <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">{p.functionName}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <span className={`px-1.5 py-0.5 border border-[#191c1e] font-bold text-[9px] italic uppercase ${p.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
+                                  {p.employmentType === "freela" ? "Freela" : "Casa"}
+                                </span>
+                                {realizadasCount != null && (
+                                  <span className="flex items-center gap-1 text-[9px] font-bold italic uppercase text-[#747a60]">
+                                    <Calendar size={9} /> {realizadasCount} diária{realizadasCount === 1 ? "" : "s"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Painel de Contexto do Evento — conformidade, faltas, destaque, comentários */}
             {selectedEventId && (conformity || (eventComments && eventComments.length > 0)) && (
               <div className="border-2 border-[#191c1e] bg-white">
@@ -875,9 +951,17 @@ export default function CalibrationsPage() {
                               {savingWeightId === c.criterionId && updateWeightMutation.isPending ? "..." : "Salvar peso"}
                             </button>
                           )}
+                          {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && (
+                            <span className="text-[9px] font-black italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-1.5 py-0.5">Não conta na média</span>
+                          )}
                         </div>
                       ) : (
-                        <div className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[11px] font-bold italic uppercase text-[#747a60]">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
+                          {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && (
+                            <span className="text-[9px] font-black italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-1.5 py-0.5">Não conta na média</span>
+                          )}
+                        </div>
                       )}
                       </div>
                       {isCollapsed && (
@@ -1155,6 +1239,9 @@ export default function CalibrationsPage() {
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="text-xs font-black italic uppercase text-[#191c1e] truncate">{c.criterionName}</span>
                             <span className="text-[9px] font-bold italic uppercase text-[#747a60] border border-[#c4c9ac] px-1 shrink-0">Peso {peso}</span>
+                            {Number(peso) === 0 && (
+                              <span className="text-[9px] font-black italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-1 shrink-0">Não conta</span>
+                            )}
                             {c.responsibleAreaName && (
                               <span className="inline-flex items-center gap-1 text-[9px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#191c1e] px-1 shrink-0"><Building2 size={10} /> {c.responsibleAreaName}</span>
                             )}

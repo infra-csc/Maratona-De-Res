@@ -54,8 +54,8 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
   }
   const reason = typeof calibrationReason === "string" && calibrationReason.trim() ? calibrationReason.trim() : null;
   const numScore = parseFloat(calibratedScore);
-  if (isNaN(numScore) || numScore < 1 || numScore > 10) {
-    res.status(400).json({ error: "A nota calibrada deve estar entre 1 e 10" });
+  if (isNaN(numScore) || numScore < 0 || numScore > 10) {
+    res.status(400).json({ error: "A nota calibrada deve estar entre 0 e 10" });
     return;
   }
 

@@ -1,0 +1,88 @@
+Preciso corrigir os seguintes bugs/ajustes pendentes no sistema.
+
+═══════════════════════════════════════
+1. SINALIZAR REVISÃO — SÓ PARA EVENTOS/CRITÉRIOS COM NOTA LANÇADA
+═══════════════════════════════════════
+
+- Reforçando uma regra já definida: o botão "Sinalizar Revisão" (tanto por evento 
+  quanto por critério individual) só pode aparecer/ficar habilitado quando aquele 
+  evento ou critério JÁ TIVER NOTA LANÇADA.
+- Hoje isso ainda não está sendo respeitado em algum lugar — verificar e corrigir 
+  para que, se o evento/critério estiver "PENDENTE" (sem nota), o botão de 
+  sinalizar revisão fique oculto ou desabilitado.
+
+═══════════════════════════════════════
+2. MODAL "DIÁRIAS REALIZADAS" — BOTÃO DE CONFIRMAÇÃO RÁPIDA SEM COMENTÁRIO + FEEDBACK VISUAL
+═══════════════════════════════════════
+
+- O botão "Confirmar/OK" (modo rápido, que confirma a diária como cumprida mesmo 
+  sem bater exatamente com a data prevista) NÃO deve exigir comentário/justificativa 
+  — deve ser uma ação de 1 clique, sem abrir formulário adicional.
+- Ao clicar em "Confirmar/OK" na Equipe Alocada, o sistema deve mostrar um FEEDBACK 
+  VISUAL imediato de que a ação foi registrada (ex: check verde, mudança de cor do 
+  card, ou uma pequena mensagem "Confirmado ✓"), SEM precisar abrir o modal completo 
+  de "Diárias Realizadas".
+- Fluxo esperado: o gestor vê o botão "Confirmar/OK" diretamente no card do 
+  colaborador na Equipe Alocada → clica → aparece confirmação visual na hora, ali 
+  mesmo na tela → só se ele quiser detalhar dia a dia é que abre o modal completo.
+
+═══════════════════════════════════════
+3. "MEU DESEMPENHO" — HISTÓRICO DE NOTAS MOSTRANDO TUDO, DEVERIA MOSTRAR SÓ CONFIRMADAS
+═══════════════════════════════════════
+
+- Na tela "Meu Desempenho" do colaborador, a seção de notas/histórico está exibindo 
+  TODOS os eventos (incluindo pendentes, em avaliação, etc), mas deveria mostrar 
+  apenas os eventos com NOTA CONFIRMADA (nota final já publicada/validada).
+- Corrigir o filtro dessa listagem para exibir somente os eventos cuja nota já foi 
+  confirmada, e não o histórico completo misturado com pendências.
+- (A aba "Histórico de Eventos" com os filtros "Todos / Avaliados / Em Avaliação" 
+  pode continuar mostrando tudo, já que ali o filtro é explícito — o problema é 
+  especificamente na área de "notas"/resumo do desempenho, que deveria ser só 
+  confirmadas por padrão.)
+
+═══════════════════════════════════════
+4. TELA DE CALIBRAÇÃO — FALTA EXIBIR OS COLABORADORES DA EQUIPE ALOCADA
+═══════════════════════════════════════
+
+- Reforçando um pedido anterior que ainda não foi implementado: a tela de Calibração 
+  Técnica de cada evento deve mostrar a lista de colaboradores alocados naquele 
+  evento (filtrados por: ativos, tipo CASA, cargo CENOTÉCNICA no evento, com ao 
+  menos 1 diária realizada).
+- Hoje essa lista de colaboradores não aparece em lugar nenhum dentro da tela de 
+  Calibração — adicionar essa seção/painel.
+
+═══════════════════════════════════════
+5. ATALHO "IR PARA CALIBRAÇÃO" NÃO LEVA PARA O EVENTO ESPECÍFICO
+═══════════════════════════════════════
+
+- O atalho "Ir para Calibração" (adicionado na tela de Gerenciamento de Evento) está 
+  levando apenas para a tela GERAL de Calibrações Técnicas (/calibrations), sem 
+  filtrar/abrir diretamente o evento de origem.
+- Corrigir para que o atalho leve DIRETO para a calibração DAQUELE evento específico 
+  (já com o evento selecionado no dropdown "Selecionar Evento" e a seção expandida), 
+  sem exigir que o Admin busque manualmente o evento na lista geral depois de clicar.
+
+═══════════════════════════════════════
+6. PERMITIR PESO 0 E NOTA 0 EM UM CRITÉRIO (GERENCIAMENTO DE EVENTO E CALIBRAÇÃO)
+═══════════════════════════════════════
+
+- Tanto na tela de Gerenciamento de Evento (configuração dos critérios daquele 
+  evento) quanto na tela de Calibração, deve ser possível definir:
+  - PESO = 0 para um critério específico (ex: quando aquele critério não deve 
+    influenciar em nada a nota final daquele evento em particular, mas ainda deve 
+    aparecer registrado/visível).
+  - NOTA = 0 para um critério específico (ex: quando o Admin/calibrador precisa 
+    zerar a nota daquele critério manualmente, por alguma penalidade grave ou 
+    situação excepcional).
+- Hoje, verificar se os campos de Peso e Nota aceitam o valor 0 sem bloquear o 
+  salvamento (ex: validação de formulário rejeitando "0" como se fosse campo vazio) 
+  — corrigir se estiver havendo esse tipo de bloqueio.
+- Ao definir PESO = 0, o critério não deve contar na média ponderada final do 
+  evento, mas deve continuar sendo exibido normalmente nas telas (Calibração, 
+  Central de Avaliações, Meu Desempenho), com uma indicação visual clara de que 
+  aquele critério tem peso zero (ex: badge "PESO 0 — NÃO CONTA NA MÉDIA").
+- Ao definir NOTA = 0, o cálculo da nota final do evento deve considerar 
+  corretamente esse zero na média ponderada (0 é um valor válido, diferente de 
+  "sem nota"/pendente).
+
+Manter a paleta de cores atual do sistema (preto/lima).

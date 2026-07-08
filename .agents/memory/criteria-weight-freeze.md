@@ -33,3 +33,13 @@ point, including after close, and have it retroactively reflected in results/bon
 - Frontend (event-detail.tsx): weight `<Input>` is only disabled by `!item.active`,
   never by the confirmed/hasEvaluations lock. A "Salvar Pesos" action stays visible
   whenever weights are dirty, independent of the structural lock state.
+
+## Weight 0 and score 0 are valid, not "unset"
+A criterion can have `weightOverride = 0` (deliberately excluded from the average)
+and a calibrated/raw score of `0` (a real evaluation, not "no score yet"). Only the
+per-event SUM of active weights must stay `> 0` (validated server-side in the
+criteria-weight PUT route); individual criteria may sit at 0. Any weight/score input
+validation must use `< 0` (reject negatives only), never `<= 0` or `< 1`, or it wrongly
+blocks legitimate zero values. Frontend surfaces a "Peso 0 — não conta na média" badge
+wherever weight is displayed (evaluations, calibrations, my-performance) since a
+weight-0 criterion silently drops out of the weighted average.

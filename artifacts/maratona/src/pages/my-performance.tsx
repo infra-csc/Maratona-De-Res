@@ -83,6 +83,7 @@ interface EventSummary {
   totalCriteria: number;
   criteriaDetails: CriterionDetail[];
   countsForScore: boolean;
+  resultsConfirmed: boolean;
   reviewRequest: ReviewRequest | null;
 }
 
@@ -438,7 +439,7 @@ function EventCard({ event }: { event: EventSummary }) {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-bold text-base text-[#191c1e]">{event.eventName}</p>
-              <EventReviewRequest event={event} />
+              {event.eventScore > 0 && <EventReviewRequest event={event} />}
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold italic text-[#747a60]">
               {(event.city || event.location) && (
@@ -453,9 +454,20 @@ function EventCard({ event }: { event: EventSummary }) {
         <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#191c1e]/20">
 
           {event.eventScore > 0 && (
-            <div className="text-right bg-[#ccff00] border-2 border-[#191c1e] px-3 py-1.5">
+            <div className={cn(
+              "text-right border-2 border-[#191c1e] px-3 py-1.5",
+              event.countsForScore && !event.resultsConfirmed ? "bg-[#f2f4f6]" : "bg-[#ccff00]"
+            )}>
               <span className="block text-[10px] uppercase font-bold text-[#191c1e] mb-0.5 italic">Nota</span>
-              <span className="font-black text-xl text-[#506600]">{event.eventScore.toFixed(1)}</span>
+              <span className={cn(
+                "font-black text-xl",
+                event.countsForScore && !event.resultsConfirmed ? "text-[#747a60]" : "text-[#506600]"
+              )}>{event.eventScore.toFixed(1)}</span>
+              {event.countsForScore && !event.resultsConfirmed && (
+                <span className="block text-[8px] uppercase font-bold text-[#a15c00] italic mt-0.5 whitespace-nowrap">
+                  Não confirmada
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -472,6 +484,9 @@ function EventCard({ event }: { event: EventSummary }) {
                   <div>
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-[10px] font-bold uppercase italic text-[#747a60] bg-[#f2f4f6] border border-[#191c1e] px-2 py-0.5">Peso {c.weight}</span>
+                      {Number(c.weight) === 0 && (
+                        <span className="text-[10px] font-black uppercase italic text-[#862200] bg-[#ffdbd1] border border-[#862200] px-2 py-0.5">Não conta na média</span>
+                      )}
                       {c.evaluated && (
                         <span className="text-[10px] font-bold uppercase italic text-[#506600] flex items-center gap-1">
                           <CheckCircle2 size={12}/> Avaliado

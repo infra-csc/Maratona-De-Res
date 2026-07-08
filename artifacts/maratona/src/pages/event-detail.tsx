@@ -1164,7 +1164,7 @@ export default function EventDetailPage() {
           <Link href="/events" className="inline-flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] hover:text-[#506600] transition-colors group">
             <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Voltar para Eventos
           </Link>
-          <Link href="/calibrations" className="inline-flex items-center gap-2 text-sm font-black italic uppercase tracking-wider text-white bg-[#191c1e] border-2 border-[#191c1e] px-3 py-1.5 hover:bg-[#506600] hover:border-[#506600] transition-colors">
+          <Link href={`/calibrations?eventId=${event.id}`} className="inline-flex items-center gap-2 text-sm font-black italic uppercase tracking-wider text-white bg-[#191c1e] border-2 border-[#191c1e] px-3 py-1.5 hover:bg-[#506600] hover:border-[#506600] transition-colors">
             <SlidersHorizontal size={14} /> Ir para Calibração
           </Link>
         </div>
@@ -2549,29 +2549,49 @@ export default function EventDetailPage() {
                                   </div>
                                 </div>
                                 {canManage ? (
-                                  <ParticipantDiariaDialog
-                                    employeeId={p.employeeId}
-                                    employeeName={p.employeeName}
-                                    candidateDates={candidateDates}
-                                    scheduledStart={p.scheduledDiariaStart}
-                                    scheduledEnd={p.scheduledDiariaEnd}
-                                    scheduledCount={p.scheduledDiariaCount}
-                                    currentDates={selectedDates}
-                                    quickConfirmed={isQuickConfirmed}
-                                    isSaving={updateParticipant.isPending}
-                                    onSave={(dates, onDone) => {
-                                      updateParticipant.mutate(
-                                        { id, participantId: p.id, data: { actualDiariaDates: dates } },
-                                        { onSuccess: onDone },
-                                      );
-                                    }}
-                                    onQuickConfirm={(onDone) => {
-                                      updateParticipant.mutate(
-                                        { id, participantId: p.id, data: { diariaQuickConfirmed: !isQuickConfirmed } },
-                                        { onSuccess: onDone },
-                                      );
-                                    }}
-                                  />
+                                  <>
+                                    {!isQuickConfirmed && (
+                                      <button
+                                        type="button"
+                                        data-testid={`button-quick-ok-${p.employeeId}`}
+                                        disabled={updateParticipant.isPending}
+                                        onClick={() => {
+                                          updateParticipant.mutate(
+                                            { id, participantId: p.id, data: { diariaQuickConfirmed: true } },
+                                            { onSuccess: () => toast({ title: `Confirmado ✓ — ${p.employeeName}`, description: "Diária tratada como cumprida." }) },
+                                          );
+                                        }}
+                                        title="Confirmar diárias como cumpridas sem abrir o calendário detalhado"
+                                        className="self-center flex items-center gap-1.5 px-2 py-1 border-2 border-[#506600] bg-white text-[#506600] hover:bg-[#ccff00] hover:text-[#161e00] transition-colors whitespace-nowrap disabled:opacity-40"
+                                      >
+                                        <CheckCircle2 size={11} className="shrink-0" />
+                                        <span className="text-[10px] font-bold italic uppercase">Confirmar/OK</span>
+                                      </button>
+                                    )}
+                                    <ParticipantDiariaDialog
+                                      employeeId={p.employeeId}
+                                      employeeName={p.employeeName}
+                                      candidateDates={candidateDates}
+                                      scheduledStart={p.scheduledDiariaStart}
+                                      scheduledEnd={p.scheduledDiariaEnd}
+                                      scheduledCount={p.scheduledDiariaCount}
+                                      currentDates={selectedDates}
+                                      quickConfirmed={isQuickConfirmed}
+                                      isSaving={updateParticipant.isPending}
+                                      onSave={(dates, onDone) => {
+                                        updateParticipant.mutate(
+                                          { id, participantId: p.id, data: { actualDiariaDates: dates } },
+                                          { onSuccess: onDone },
+                                        );
+                                      }}
+                                      onQuickConfirm={(onDone) => {
+                                        updateParticipant.mutate(
+                                          { id, participantId: p.id, data: { diariaQuickConfirmed: !isQuickConfirmed } },
+                                          { onSuccess: onDone },
+                                        );
+                                      }}
+                                    />
+                                  </>
                                 ) : realizadasCount != null ? (
                                   <span className="self-center text-[10px] font-bold italic uppercase text-[#747a60] whitespace-nowrap">
                                     Realizadas: {realizadasCount}
