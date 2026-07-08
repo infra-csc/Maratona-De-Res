@@ -9,7 +9,7 @@ import { getPlatoonByScore } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { computeEventTeamResult } from "./results.js";
-import { participantCountsForScore } from "../lib/participation.js";
+import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -134,6 +134,10 @@ router.get("/ranking-detail", async (req, res) => {
     // histórico do colaborador mas não conta para nota — mesma regra do
     // fechamento (recomputeCycleResults, ver lib/participation.ts).
     const countsForScore = participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName });
+    const noScoreReason: string | null = countsForScore ? null
+      : isInformationalFunction(p.functionName) ? "sup_ceno"
+      : employee.employmentType === "freela" ? "freela"
+      : "outro";
 
     // Evento histórico: nota já vem pronta (importedScore) de fora, sem
     // critérios/avaliações — não passar pelo cálculo por quesitos.
@@ -154,6 +158,8 @@ router.get("/ranking-detail", async (req, res) => {
         totalCriteria: 0,
         isHistorical: true,
         countsForScore,
+        noScoreReason,
+        participationFunction: p.functionName ?? null,
         resultsConfirmed: p.resultsConfirmed ?? false,
       });
       continue;
@@ -182,6 +188,8 @@ router.get("/ranking-detail", async (req, res) => {
       totalCriteria: teamResult.totalCriteria,
       isHistorical: false,
       countsForScore,
+      noScoreReason,
+      participationFunction: p.functionName ?? null,
       resultsConfirmed: p.resultsConfirmed ?? false,
     });
   }

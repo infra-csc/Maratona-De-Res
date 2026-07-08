@@ -410,9 +410,15 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                                 <span
                                   data-testid={`detail-event-no-score-${ev.eventId}`}
                                   className="px-1.5 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
-                                  title="Participação apenas histórica/informativa — não entra na nota."
+                                  title={(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : (ev as { noScoreReason?: string }).noScoreReason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}
                                 >
-                                  <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
+                                  <span className="inline-block skew-x-[8deg]">
+                                    {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
+                                      ? `Sup Ceno — não conta p/ nota`
+                                      : (ev as { noScoreReason?: string }).noScoreReason === "freela"
+                                      ? "Freela — não conta p/ nota"
+                                      : "Não conta p/ nota"}
+                                  </span>
                                 </span>
                               )}
                             </div>
@@ -594,9 +600,15 @@ function EmployeeDetailSheet({
                               <span
                                 data-testid={`detail-event-no-score-${ev.eventId}`}
                                 className="px-1.5 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
-                                title="Participação apenas histórica/informativa — não entra na nota."
+                                title={(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : (ev as { noScoreReason?: string }).noScoreReason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}
                               >
-                                <span className="inline-block skew-x-[8deg]">Não conta p/ nota</span>
+                                <span className="inline-block skew-x-[8deg]">
+                                  {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
+                                    ? `Sup Ceno — não conta p/ nota`
+                                    : (ev as { noScoreReason?: string }).noScoreReason === "freela"
+                                    ? "Freela — não conta p/ nota"
+                                    : "Não conta p/ nota"}
+                                </span>
                               </span>
                             )}
                           </div>
