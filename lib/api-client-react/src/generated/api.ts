@@ -102,6 +102,8 @@ import type {
   MergeEmployeeResult,
   MergeEventInput,
   MergeEventResult,
+  MergeUserInput,
+  MergeUserResult,
   MigrateCriteriaCatalog200,
   PenaltyType,
   PenaltyTypeInput,
@@ -1185,6 +1187,78 @@ export const useBulkGenerateCollaboratorAccess = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getBulkGenerateCollaboratorAccessMutationOptions(options));
+    }
+
+export const getMergeUserUrl = (id: number,) => {
+
+
+
+
+  return `/users/${id}/merge`
+}
+
+/**
+ * @summary Merge duplicate evaluator user accounts into a canonical one
+ */
+export const mergeUser = async (id: number,
+    mergeUserInput: MergeUserInput, options?: RequestInit): Promise<MergeUserResult> => {
+
+  return customFetch<MergeUserResult>(getMergeUserUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mergeUserInput,)
+  }
+);}
+
+
+
+
+export const getMergeUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeUser>>, TError,{id: number;data: BodyType<MergeUserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mergeUser>>, TError,{id: number;data: BodyType<MergeUserInput>}, TContext> => {
+
+const mutationKey = ['mergeUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mergeUser>>, {id: number;data: BodyType<MergeUserInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  mergeUser(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MergeUserMutationResult = NonNullable<Awaited<ReturnType<typeof mergeUser>>>
+    export type MergeUserMutationBody = BodyType<MergeUserInput>
+    export type MergeUserMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Merge duplicate evaluator user accounts into a canonical one
+ */
+export const useMergeUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeUser>>, TError,{id: number;data: BodyType<MergeUserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mergeUser>>,
+        TError,
+        {id: number;data: BodyType<MergeUserInput>},
+        TContext
+      > => {
+      return useMutation(getMergeUserMutationOptions(options));
     }
 
 export const getResetUserPasswordUrl = (id: number,) => {

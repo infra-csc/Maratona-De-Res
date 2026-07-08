@@ -272,6 +272,27 @@ export const BulkGenerateCollaboratorAccessResponse = zod.object({
 
 
 /**
+ * @summary Merge duplicate evaluator user accounts into a canonical one
+ */
+export const MergeUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MergeUserBody = zod.object({
+  "duplicateIds": zod.array(zod.number())
+})
+
+export const MergeUserResponse = zod.object({
+  "canonicalId": zod.number(),
+  "merged": zod.array(zod.number()),
+  "movedEvaluations": zod.number().optional(),
+  "movedCalibrations": zod.number().optional(),
+  "movedConformities": zod.number().optional(),
+  "movedAssignments": zod.number().optional()
+})
+
+
+/**
  * @summary Reset user password
  */
 export const ResetUserPasswordParams = zod.object({

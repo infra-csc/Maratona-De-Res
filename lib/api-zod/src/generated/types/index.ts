@@ -119,6 +119,8 @@ export * from './mergeEmployeeInput';
 export * from './mergeEmployeeResult';
 export * from './mergeEventInput';
 export * from './mergeEventResult';
+export * from './mergeUserInput';
+export * from './mergeUserResult';
 export * from './migrateCriteriaCatalog200';
 export * from './penaltyType';
 export * from './penaltyTypeInput';

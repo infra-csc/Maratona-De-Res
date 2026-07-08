@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, getGetUsersQueryKey } from "@workspace/api-client-react";
-import type { UserInput, User } from "@workspace/api-client-react";
+import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, useMergeUser, getGetUsersQueryKey } from "@workspace/api-client-react";
+import type { UserInput, User, MergeUserResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye, Pencil, LineChart } from "lucide-react";
+import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye, Pencil, LineChart, GitMerge, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -39,6 +39,11 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = useState("");
   const [editUser, setEditUser] = useState<User | null>(null);
   const [impersonateTarget, setImpersonateTarget] = useState<string>("/");
+
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [canonicalId, setCanonicalId] = useState<number | null>(null);
+  const [mergeResult, setMergeResult] = useState<MergeUserResult | null>(null);
 
   const qKey = getGetUsersQueryKey();
   const { data: users, isLoading } = useGetUsers({ query: { queryKey: qKey } });
@@ -94,6 +99,19 @@ export default function UsersPage() {
     },
   });
 
+  const mergeMutation = useMergeUser({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: qKey });
+        setMergeResult(data);
+        setMergeMode(false);
+        setSelectedIds(new Set());
+        setCanonicalId(null);
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao mesclar", description: e.message, variant: "destructive" }),
+    },
+  });
+
   const resetPwMutation = useResetUserPassword({
     mutation: {
       onSuccess: () => {
@@ -131,6 +149,16 @@ export default function UsersPage() {
             <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-xl">Controle quem pode acessar a plataforma e o que podem fazer.</p>
           </div>
 
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <button
+                data-testid="button-merge-mode"
+                onClick={() => { setMergeMode(v => !v); setSelectedIds(new Set()); setCanonicalId(null); }}
+                className={`border-2 border-[#191c1e] px-5 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 whitespace-nowrap ${HARD_SHADOW} ${HARD_SHADOW_HOVER} ${mergeMode ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#191c1e]"}`}
+              >
+                <GitMerge size={18} /> {mergeMode ? "Cancelar Mescla" : "Mesclar Avaliadores"}
+              </button>
+            )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <button
@@ -223,6 +251,7 @@ export default function UsersPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </section>
 
         {/* Stats bar */}
@@ -263,12 +292,22 @@ export default function UsersPage() {
           <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
             <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex justify-between items-center italic">
               <h3 className="text-xs font-bold uppercase tracking-widest">Grade de Acessos</h3>
-              <Filter size={18} />
+              {mergeMode ? (
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#ccff00] animate-pulse">
+                  Modo Mescla — selecione avaliadores duplicados
+                </span>
+              ) : <Filter size={18} />}
             </div>
+            {mergeMode && (
+              <div className="bg-[#fffde7] border-b-2 border-[#191c1e] px-6 py-3 text-xs font-bold italic text-[#444933]">
+                Selecione todos os usuários duplicados e o <strong>canônico</strong> (conta que será mantida). Avaliações e calibrações serão transferidas para o canônico e os duplicados serão desativados.
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                    {mergeMode && <th className="px-4 py-4 w-10" />}
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Usuário</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Perfil</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Área</th>
@@ -279,10 +318,53 @@ export default function UsersPage() {
                 <tbody className="divide-y-2 divide-[#eceef0]">
                   {sortedUsers.map(u => {
                     const roleInfo = getRoleInfo(u.role);
+                    const isAvaliador = u.role === "avaliador";
+                    const isSelected = selectedIds.has(u.id);
+                    const isCanonical = canonicalId === u.id;
                     return (
-                      <tr key={u.id} data-testid={`row-user-${u.id}`} className="hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group">
+                      <tr
+                        key={u.id}
+                        data-testid={`row-user-${u.id}`}
+                        className={`transition-all group ${mergeMode && isAvaliador ? "cursor-pointer" : ""} ${isCanonical ? "bg-[#f0ffe0] hover:bg-[#e8ffcc]" : isSelected ? "bg-[#fffde7] hover:bg-[#fff9c4]" : "hover:bg-[#f2f4f6] hover:translate-x-1"}`}
+                        onClick={mergeMode && isAvaliador ? () => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(u.id)) {
+                              next.delete(u.id);
+                              if (canonicalId === u.id) setCanonicalId(null);
+                            } else {
+                              next.add(u.id);
+                            }
+                            return next;
+                          });
+                        } : undefined}
+                      >
+                        {mergeMode && (
+                          <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                            {isAvaliador ? (
+                              <input
+                                type="checkbox"
+                                className="w-4 h-4 border-2 border-[#191c1e] cursor-pointer accent-[#ccff00]"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setSelectedIds(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(u.id)) {
+                                      next.delete(u.id);
+                                      if (canonicalId === u.id) setCanonicalId(null);
+                                    } else {
+                                      next.add(u.id);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                              />
+                            ) : <span className="text-[#c4c9ac]">—</span>}
+                          </td>
+                        )}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-4">
+                            {isCanonical && <span className="text-[10px] bg-[#ccff00] border border-[#191c1e] px-2 py-0.5 font-black italic uppercase shrink-0">Canônico</span>}
                             <div className="w-11 h-11 border-2 border-[#191c1e] skew-x-[-4deg] bg-[#e0e3e5] flex items-center justify-center shrink-0">
                               <span className="skew-x-[4deg] text-sm font-black italic">{initials(u.name)}</span>
                             </div>
@@ -328,7 +410,16 @@ export default function UsersPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {isAdmin && u.employeeId != null && u.active && (
+                            {mergeMode && isAvaliador && isSelected && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setCanonicalId(u.id); }}
+                                title={isCanonical ? "Conta canônica selecionada" : "Definir como conta canônica (mantida)"}
+                                className={`px-3 py-1.5 border-2 border-[#191c1e] text-[11px] font-bold italic uppercase transition-all ${isCanonical ? "bg-[#ccff00] text-[#191c1e]" : "bg-white hover:bg-[#ccff00]"}`}
+                              >
+                                {isCanonical ? "✓ Canônico" : "Definir Canônico"}
+                              </button>
+                            )}
+                            {!mergeMode && isAdmin && u.employeeId != null && u.active && (
                               <button
                                 data-testid={`button-view-performance-${u.id}`}
                                 onClick={() => {
@@ -342,7 +433,7 @@ export default function UsersPage() {
                                 <LineChart size={14} />
                               </button>
                             )}
-                            {isAdmin && u.id !== currentUser?.id && u.active && (
+                            {!mergeMode && isAdmin && u.id !== currentUser?.id && u.active && (
                               <button
                                 data-testid={`button-impersonate-${u.id}`}
                                 onClick={() => {
@@ -356,23 +447,23 @@ export default function UsersPage() {
                                 <Eye size={14} />
                               </button>
                             )}
-                            <button
+                            {!mergeMode && <button
                               data-testid={`button-edit-user-${u.id}`}
                               onClick={() => setEditUser(u)}
                               title="Editar usuário"
                               className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#eceef0] transition-all"
                             >
                               <Pencil size={14} />
-                            </button>
-                            <button
+                            </button>}
+                            {!mergeMode && <button
                               data-testid={`button-reset-pw-${u.id}`}
                               onClick={() => setResetOpen(u.id)}
                               title="Redefinir senha"
                               className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ff5722] hover:text-white transition-all"
                             >
                               <KeyRound size={14} />
-                            </button>
-                            {u.id !== currentUser?.id && (
+                            </button>}
+                            {!mergeMode && u.id !== currentUser?.id && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <button
@@ -408,7 +499,7 @@ export default function UsersPage() {
                     );
                   })}
                   {(users ?? []).length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum usuário cadastrado.</td></tr>
+                    <tr><td colSpan={mergeMode ? 6 : 5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum usuário cadastrado.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -419,6 +510,107 @@ export default function UsersPage() {
           </section>
         )}
       </div>
+
+      {/* Merge action bar */}
+      {mergeMode && selectedIds.size >= 2 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#191c1e] text-white border-2 border-[#ccff00] shadow-[6px_6px_0px_0px_#ccff00] px-6 py-4 flex items-center gap-6 min-w-[500px]">
+          <div className="flex-1">
+            <p className="text-xs font-bold italic uppercase tracking-wider text-[#ccff00]">Mescla de Avaliadores</p>
+            <p className="text-sm font-bold mt-0.5">
+              {selectedIds.size} selecionados
+              {canonicalId ? ` — canônico: ${sortedUsers.find(u => u.id === canonicalId)?.name ?? canonicalId}` : " — defina o canônico nas ações"}
+            </p>
+          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                disabled={!canonicalId || mergeMutation.isPending}
+                className="bg-[#ccff00] text-[#191c1e] border-2 border-[#ccff00] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-40"
+              >
+                <GitMerge size={16} /> Mesclar Agora
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl italic uppercase font-black tracking-tight">Confirmar Mescla?</AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2">
+                  <span className="block">O usuário canônico <strong>{sortedUsers.find(u => u.id === canonicalId)?.name}</strong> receberá todas as avaliações e calibrações dos {selectedIds.size - 1} usuário(s) duplicado(s):</span>
+                  <ul className="list-disc pl-4 text-xs">
+                    {[...selectedIds].filter(id => id !== canonicalId).map(id => (
+                      <li key={id}>{sortedUsers.find(u => u.id === id)?.name ?? id}</li>
+                    ))}
+                  </ul>
+                  <span className="block text-[#ba1a1a] font-bold">Os duplicados serão desativados. Esta ação não pode ser desfeita.</span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="rounded-none border-2 border-[#191c1e] bg-[#506600] text-white hover:bg-[#506600]/90 italic uppercase font-bold"
+                  onClick={() => {
+                    if (!canonicalId) return;
+                    const dups = [...selectedIds].filter(id => id !== canonicalId);
+                    mergeMutation.mutate({ id: canonicalId, data: { duplicateIds: dups } });
+                  }}
+                >
+                  <GitMerge size={14} className="mr-2" /> Confirmar Mescla
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <button
+            onClick={() => { setMergeMode(false); setSelectedIds(new Set()); setCanonicalId(null); }}
+            className="p-2 hover:bg-white/10 transition-all"
+            title="Cancelar"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Merge result dialog */}
+      <Dialog open={mergeResult !== null} onOpenChange={v => !v && setMergeResult(null)}>
+        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
+              <GitMerge size={22} className="text-[#506600]" /> Mescla Concluída
+            </DialogTitle>
+          </DialogHeader>
+          {mergeResult && (
+            <div className="pt-4 space-y-4">
+              <div className="bg-[#f0ffe0] border-2 border-[#506600] p-4 space-y-1">
+                <p className="text-sm font-bold italic text-[#191c1e]">
+                  {mergeResult.merged.length} usuário(s) mesclado(s) no canônico
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedEvaluations ?? 0}</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Avaliações transferidas</p>
+                </div>
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedCalibrations ?? 0}</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Calibrações transferidas</p>
+                </div>
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedAssignments ?? 0}</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Atribuições transferidas</p>
+                </div>
+                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
+                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedConformities ?? 0}</p>
+                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Conformidades transferidas</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMergeResult(null)}
+                className="w-full bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider"
+              >
+                Fechar
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={resetOpen !== null} onOpenChange={v => !v && setResetOpen(null)}>
         <DialogContent className="max-w-sm rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">

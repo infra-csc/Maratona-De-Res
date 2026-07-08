@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, areasTable, employeesTable } from "@workspace/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { db, usersTable, areasTable, employeesTable, evaluationsTable, calibrationsTable, eventConformitiesTable, eventsTable, eventAreaAssignmentsTable } from "@workspace/db";
+import { eq, and, isNull, inArray, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
@@ -213,6 +213,90 @@ router.delete("/users/:id", requireRole("admin"), async (req, res) => {
   }
   await audit(req.user!.userId, "delete", "users", id);
   res.status(204).end();
+});
+
+// POST /users/:id/merge — mescla avaliadores duplicados no canônico
+router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => {
+  const canonicalId = parseInt(req.params.id as string);
+  const { duplicateIds } = req.body as { duplicateIds: number[] };
+  if (!Array.isArray(duplicateIds) || duplicateIds.length === 0) {
+    res.status(400).json({ error: "duplicateIds obrigatório" }); return;
+  }
+  const [canonical] = await db.select().from(usersTable).where(eq(usersTable.id, canonicalId)).limit(1);
+  if (!canonical) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
+
+  const dupIds = duplicateIds.filter(id => id !== canonicalId);
+  if (dupIds.length === 0) { res.status(400).json({ error: "Nenhum duplicado válido" }); return; }
+
+  let movedEvaluations = 0, movedCalibrations = 0, movedConformities = 0, movedAssignments = 0;
+
+  await db.transaction(async (tx) => {
+    // evaluations.evaluator_user_id
+    const evRes = await tx.update(evaluationsTable)
+      .set({ evaluatorUserId: canonicalId })
+      .where(inArray(evaluationsTable.evaluatorUserId, dupIds));
+    movedEvaluations = (evRes as unknown as { rowCount?: number }).rowCount ?? 0;
+
+    // calibrations.calibrated_by_user_id
+    const calRes = await tx.update(calibrationsTable)
+      .set({ calibratedByUserId: canonicalId })
+      .where(inArray(calibrationsTable.calibratedByUserId, dupIds));
+    movedCalibrations = (calRes as unknown as { rowCount?: number }).rowCount ?? 0;
+
+    // event_conformities.created_by_user_id
+    const confRes = await tx.update(eventConformitiesTable)
+      .set({ createdByUserId: canonicalId })
+      .where(inArray(eventConformitiesTable.createdByUserId, dupIds));
+    movedConformities = (confRes as unknown as { rowCount?: number }).rowCount ?? 0;
+
+    // events.conformity_evaluator_user_id / conformity_evaluator_ferramentas_user_id
+    for (const dupId of dupIds) {
+      await tx.update(eventsTable)
+        .set({ conformityEvaluatorUserId: canonicalId })
+        .where(eq(eventsTable.conformityEvaluatorUserId, dupId));
+      await tx.update(eventsTable)
+        .set({ conformityEvaluatorFerramentasUserId: canonicalId })
+        .where(eq(eventsTable.conformityEvaluatorFerramentasUserId, dupId));
+    }
+
+    // event_area_assignments.evaluator_user_id (unique: event+area+evaluator — skip conflicts)
+    const canonicalAssign = await tx.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId })
+      .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.evaluatorUserId, canonicalId));
+    const canonicalKeys = new Set(canonicalAssign.map(a => `${a.eventId}-${a.areaId}`));
+    for (const dupId of dupIds) {
+      const dupAssign = await tx.select().from(eventAreaAssignmentsTable)
+        .where(eq(eventAreaAssignmentsTable.evaluatorUserId, dupId));
+      for (const a of dupAssign) {
+        const key = `${a.eventId}-${a.areaId}`;
+        if (!canonicalKeys.has(key)) {
+          await tx.update(eventAreaAssignmentsTable)
+            .set({ evaluatorUserId: canonicalId })
+            .where(eq(eventAreaAssignmentsTable.id, a.id));
+          canonicalKeys.add(key);
+          movedAssignments++;
+        }
+      }
+    }
+
+    // Se canônico não tem área mas duplicado tem, herda a área
+    if (!canonical.areaId) {
+      for (const dupId of dupIds) {
+        const [dup] = await tx.select({ areaId: usersTable.areaId }).from(usersTable).where(eq(usersTable.id, dupId)).limit(1);
+        if (dup?.areaId) {
+          await tx.update(usersTable).set({ areaId: dup.areaId }).where(eq(usersTable.id, canonicalId));
+          break;
+        }
+      }
+    }
+
+    // Desativa os duplicados
+    await tx.update(usersTable)
+      .set({ active: false })
+      .where(inArray(usersTable.id, dupIds));
+  });
+
+  await audit(req.user!.userId, "merge", "users", canonicalId, { duplicateIds: dupIds }, { movedEvaluations, movedCalibrations, movedConformities, movedAssignments });
+  res.json({ canonicalId, merged: dupIds, movedEvaluations, movedCalibrations, movedConformities, movedAssignments });
 });
 
 router.post("/users/:id/reset-password", requireRole("admin", "rh"), async (req, res) => {

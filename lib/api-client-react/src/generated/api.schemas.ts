@@ -582,6 +582,19 @@ export interface MergeEmployeeResult {
   removedUsers?: number;
 }
 
+export interface MergeUserInput {
+  duplicateIds: number[];
+}
+
+export interface MergeUserResult {
+  canonicalId: number;
+  merged: number[];
+  movedEvaluations?: number;
+  movedCalibrations?: number;
+  movedConformities?: number;
+  movedAssignments?: number;
+}
+
 export interface MergeEventInput {
   /** Id of the duplicate event to absorb into and delete. */
   mergeEventId: number;

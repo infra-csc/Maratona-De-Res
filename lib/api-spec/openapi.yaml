@@ -264,6 +264,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkGenerateAccessResult"
 
+  /users/{id}/merge:
+    post:
+      operationId: mergeUser
+      tags: [users]
+      summary: Merge duplicate evaluator user accounts into a canonical one
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MergeUserInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MergeUserResult"
+
   /users/{id}/reset-password:
     post:
       operationId: resetUserPassword
@@ -3229,6 +3254,34 @@ components:
         movedEvaluatorEvals:
           type: integer
         removedUsers:
+          type: integer
+
+    MergeUserInput:
+      type: object
+      required: [duplicateIds]
+      properties:
+        duplicateIds:
+          type: array
+          items:
+            type: integer
+
+    MergeUserResult:
+      type: object
+      required: [canonicalId, merged]
+      properties:
+        canonicalId:
+          type: integer
+        merged:
+          type: array
+          items:
+            type: integer
+        movedEvaluations:
+          type: integer
+        movedCalibrations:
+          type: integer
+        movedConformities:
+          type: integer
+        movedAssignments:
           type: integer
 
     MergeEventInput:
