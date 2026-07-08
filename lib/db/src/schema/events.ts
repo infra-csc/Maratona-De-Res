@@ -72,6 +72,12 @@ export const eventParticipantsTable = pgTable("event_participants", {
   // participações informativas (countsForScore === false).
   actualDiariaDates: date("actual_diaria_dates").array(),
   actualDiariaCount: integer("actual_diaria_count"),
+  // Confirmação rápida de diárias pelo gestor — indica que ele validou a
+  // presença do colaborador sem comparar data a data com a escalação prevista.
+  // Equivale a "Realizadas = Previstas" para fins de nota/elegibilidade.
+  // diariaQuickConfirmedAt registra quando ocorreu (auditoria).
+  diariaQuickConfirmed: boolean("diaria_quick_confirmed").default(false),
+  diariaQuickConfirmedAt: timestamp("diaria_quick_confirmed_at"),
   // Comentário livre sobre o colaborador nesse evento (ex.: justificativa de
   // diárias não cumpridas ou de marcação como inativo). Preenchido manualmente
   // por admin/RH; exibido na UI apenas quando há descumprimento de diárias

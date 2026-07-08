@@ -32,6 +32,16 @@ export interface EventParticipant {
   /** @nullable */
   actualDiariaCount?: number | null;
   /**
+     * true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a "Realizadas = Previstas" para fins de nota. null/false = modo detalhado (padrão).
+     * @nullable
+     */
+  diariaQuickConfirmed?: boolean | null;
+  /**
+     * Timestamp (ISO 8601) da confirmação rápida, para auditoria.
+     * @nullable
+     */
+  diariaQuickConfirmedAt?: string | null;
+  /**
      * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).
      * @nullable
      */

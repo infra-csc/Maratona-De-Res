@@ -1,0 +1,81 @@
+Preciso melhorar a tela de avaliação (Central de Avaliações / Critérios de Avaliação) 
+em 3 frentes: clareza do redirecionamento, link público para freelancers sem cadastro, 
+e histórico/auditoria dessas ações.
+
+═══════════════════════════════════════
+1. TORNAR O REDIRECIONAMENTO MAIS INTUITIVO
+═══════════════════════════════════════
+
+- Hoje o botão "REDIRECIONAR" existe e abre uma busca de avaliador (Image 3), mas não 
+  fica claro visualmente que essa ação vai TRANSFERIR a responsabilidade daquele 
+  critério específico para outra pessoa.
+- Melhorias sugeridas:
+  a) Renomear/complementar o botão para algo mais explícito, ex: "Enviar para outra 
+     pessoa avaliar" ou manter "Redirecionar" mas com um ícone de "transferência" 
+     mais claro (uma seta dupla ou ícone de "handoff").
+  b) Ao clicar em "Redirecionar" e escolher o nome, mostrar uma confirmação clara 
+     antes de efetivar, tipo: "Você está transferindo a avaliação de '[critério]' 
+     para [Nome]. Ele(a) poderá avaliar ou redirecionar novamente. Confirmar?"
+  c) Depois de redirecionado, o critério deve sumir da lista "A FAZER" do avaliador 
+     original e uma indicação visual clara deve aparecer (ver item 3, histórico).
+
+═══════════════════════════════════════
+2. LINK PÚBLICO PARA FREELANCER SEM CADASTRO (FALTANDO)
+═══════════════════════════════════════
+
+- Essa funcionalidade ainda não foi implementada. Preciso adicionar, ao lado da opção 
+  "Redirecionar", uma segunda opção: "Gerar link para freelancer sem cadastro".
+- REGRA DE ÁREA: essa opção de link público só deve aparecer para critérios de áreas 
+  DIFERENTES de Logística e Atendimento (ou seja: Ativação, Produção, Cenografia, 
+  Ferramentas e Case (Cenografia), e demais áreas futuras).
+  - Para critérios de Logística e Atendimento, mostrar SOMENTE a opção "Redirecionar 
+    para outro membro do grupo", sem a opção de link público.
+- Fluxo ao gerar o link:
+  a) Antes de gerar o link, exigir que o avaliador preencha o CAMPO "Nome de quem vai 
+     receber o link" (texto livre) — esse nome fica registrado, para saber pra quem 
+     o link foi enviado, mesmo que a pessoa ainda não tenha cadastro no sistema.
+  b) Após preencher o nome e confirmar, o sistema gera o link público (uso único, 
+     vinculado àquele evento + critério específico).
+  c) O link deve levar a uma tela simples onde o freelancer confirma/digita o próprio 
+     nome (para registro de quem efetivamente respondeu) e preenche a avaliação 
+     daquele critério.
+  d) Após o freelancer responder, o link expira e não pode ser reutilizado.
+
+═══════════════════════════════════════
+3. HISTÓRICO DE REDIRECIONAMENTO / ENVIO DE LINK
+═══════════════════════════════════════
+
+- Sempre que um avaliador REDIRECIONAR para outro membro do grupo, OU ENVIAR UM LINK 
+  PÚBLICO para um freelancer, isso deve ficar registrado no histórico daquele critério/
+  avaliação, visível para quem tem permissão (Admin e o próprio avaliador original).
+- O histórico deve mostrar, no mínimo:
+  - Quem redirecionou/enviou (nome do avaliador original)
+  - Para quem foi redirecionado ou o nome informado do freelancer (link público)
+  - Data e hora da ação
+  - Se foi "redirecionamento interno" (outro usuário cadastrado) ou "link público" 
+    (freelancer sem cadastro)
+- Essa informação pode aparecer, por exemplo, como uma pequena tag/nota abaixo do 
+  critério: "Redirecionado para Giovanni Bertoni em 07/07/2026" ou "Link enviado para 
+  'João Freela' em 07/07/2026 — respondido em 08/07/2026".
+
+═══════════════════════════════════════
+4. OUTRAS MELHORIAS DE CLAREZA NA TELA (bônus)
+═══════════════════════════════════════
+
+a) Quando aparecer "NENHUM CRITÉRIO ATRIBUÍDO À SUA ÁREA NESTE EVENTO" (Image 2), 
+   deixar mais claro que isso é normal (não é erro) — ex: complementar com um texto 
+   explicativo: "Isso significa que nenhum critério de Logística foi configurado 
+   para este evento específico."
+
+b) O card "FERRAMENTAS E CASE (CENOGRAFIA)" aparecendo na tela de um avaliador de 
+   LOGÍSTICA (Sandro Gomes) — confirmar se isso é intencional (ele acumula 2 papéis) 
+   ou se é um bug de atribuição cruzada de área. Se for intencional, deixar mais claro 
+   visualmente que são 2 "chapéus"/funções diferentes que ele exerce (ex: separar em 
+   abas "Minhas funções: Logística | Ferramentas e Case").
+
+c) Botão "SALVAR OBSERVAÇÕES" aparece cinza/desabilitado até preencher algo — 
+   confirmar que ele habilita corretamente assim que o campo obrigatório 
+   ("DETALHE O DESTAQUE") for preenchido.
+
+Manter a paleta de cores atual do sistema (preto/lima, com destaque em amarelo/creme 
+para itens pendentes de resposta).

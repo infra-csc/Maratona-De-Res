@@ -489,6 +489,8 @@ export const GetEventResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1024,6 +1026,8 @@ export const GetEventParticipantsResponseItem = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
@@ -1064,6 +1068,7 @@ export const UpdateEventParticipantParams = zod.object({
 export const UpdateEventParticipantBody = zod.object({
   "confirmed": zod.boolean().optional(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Diárias realizadas (preenchidas manualmente pelo RH com base na presença real). As diárias previstas (scheduledDiaria\*) não são editáveis por aqui — vêm apenas da sincronização com a logística interna.'),
+  "diariaQuickConfirmed": zod.boolean().optional().describe('true = modo rápido: gestor confirmou presença sem comparar datas. Equivale a \"Realizadas = Previstas\". Registra timestamp de auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).')
 })
 
@@ -1081,6 +1086,8 @@ export const UpdateEventParticipantResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })
@@ -1134,6 +1141,8 @@ export const SetConformityEvaluatorResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1245,6 +1254,8 @@ export const RedirectConformityEvaluatorResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1356,6 +1367,8 @@ export const SetConformityEvaluatorFerramentasResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1467,6 +1480,8 @@ export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1711,6 +1726,8 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1822,6 +1839,8 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -1929,6 +1948,8 @@ export const ResyncEventCriteriaResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),
@@ -2139,6 +2160,8 @@ export const DeleteEventCriterionResponse = zod.object({
   "scheduledDiariaEnd": zod.string().nullish(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.'),
   "actualDiariaCount": zod.number().nullish(),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a \"Realizadas = Previstas\" para fins de nota. null\/false = modo detalhado (padrão).'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('Timestamp (ISO 8601) da confirmação rápida, para auditoria.'),
   "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).'),
   "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica\/informativa (freela ou função \"Sup Ceno \*\") e nunca entra na nota nem na elegibilidade.')
 })).optional(),

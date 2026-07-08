@@ -6,7 +6,7 @@ import {
 } from "@/lib/routing-api";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useGetAreas, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search, Zap } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
@@ -167,11 +167,13 @@ function ExpandableComment({ comment }: { comment: string }) {
 
 function ParticipantDiariaDialog({
   employeeId, employeeName, candidateDates, scheduledStart, scheduledEnd, scheduledCount,
-  currentDates, isSaving, onSave,
+  currentDates, quickConfirmed, isSaving, onSave, onQuickConfirm,
 }: {
   employeeId: number; employeeName: string; candidateDates: string[];
   scheduledStart: string | null | undefined; scheduledEnd: string | null | undefined; scheduledCount: number | null | undefined;
-  currentDates: string[]; isSaving: boolean; onSave: (dates: string[], onDone: () => void) => void;
+  currentDates: string[]; quickConfirmed: boolean; isSaving: boolean;
+  onSave: (dates: string[], onDone: () => void) => void;
+  onQuickConfirm: (onDone: () => void) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set(currentDates));
@@ -204,14 +206,16 @@ function ParticipantDiariaDialog({
           data-testid={`button-diaria-dates-${employeeId}`}
           className={cn(
             "self-center flex items-center gap-1.5 px-2 py-1 border-2 transition-colors whitespace-nowrap",
-            currentDates.length === 0
-              ? "border-[#ff5722] bg-[#fff4e5] hover:bg-[#fce9d6] text-[#7a2e00]"
-              : "border-[#191c1e] bg-white hover:bg-[#f2f4f6]"
+            quickConfirmed
+              ? "border-[#506600] bg-[#ccff00] text-[#161e00] hover:bg-[#b8e600]"
+              : currentDates.length === 0
+                ? "border-[#ff5722] bg-[#fff4e5] hover:bg-[#fce9d6] text-[#7a2e00]"
+                : "border-[#191c1e] bg-white hover:bg-[#f2f4f6]"
           )}
         >
-          <Calendar size={11} className="shrink-0" />
+          {quickConfirmed ? <Zap size={11} className="shrink-0" /> : <Calendar size={11} className="shrink-0" />}
           <span className="text-[10px] font-bold italic uppercase">
-            Realizadas: {currentDates.length}
+            {quickConfirmed ? "Modo Rápido" : `Realizadas: ${currentDates.length}`}
           </span>
         </button>
       </DialogTrigger>
@@ -222,67 +226,124 @@ function ParticipantDiariaDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-            <span className="text-xs font-bold italic uppercase text-[#444933]">
-              Previstas: {scheduledCount ?? "—"}
-              {scheduledStart && scheduledEnd && (
-                <span className="text-[#747a60] normal-case font-semibold not-italic"> ({formatDiariaDate(scheduledStart)} – {formatDiariaDate(scheduledEnd)})</span>
-              )}
-            </span>
-            <span data-testid={`text-diaria-selected-count-${employeeId}`} className="text-sm font-black italic uppercase text-[#506600]">
-              Selecionadas: {selected.size}
-            </span>
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              data-testid={`button-confirm-previstas-${employeeId}`}
-              onClick={() => setSelected(new Set(scheduledSet))}
-              disabled={scheduledSet.size === 0}
-              className={cn(actionBtn, "bg-[#ccff00] text-[#161e00] enabled:hover:translate-y-[1px]")}
-            >
-              <CheckCircle2 size={14} /> Confirmar Diárias Previstas
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelected(new Set(candidateDates))}
-              className={cn(actionBtn, "bg-white text-[#191c1e] hover:bg-[#eceef0]")}
-            >
-              Marcar Todos
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelected(new Set())}
-              disabled={selected.size === 0}
-              className={cn(actionBtn, "bg-white text-[#191c1e] hover:bg-[#eceef0]")}
-            >
-              Limpar
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1">
-            {candidateDates.map(dateStr => {
-              const checked = selected.has(dateStr);
-              const isScheduled = scheduledSet.has(dateStr);
-              return (
+          {/* ── MODO RÁPIDO ─────────────────────────────────────────────── */}
+          <div className={cn(
+            "border-2 p-4 space-y-3",
+            quickConfirmed ? "border-[#506600] bg-[#f5ffe0]" : "border-[#191c1e] bg-[#f9fafb]"
+          )}>
+            <div className="flex items-center gap-2">
+              <Zap size={14} className={quickConfirmed ? "text-[#506600]" : "text-[#444933]"} />
+              <span className="text-xs font-black italic uppercase tracking-tight text-[#191c1e]">
+                Modo Rápido — Confirmar Sem Comparar Datas
+              </span>
+            </div>
+            <p className="text-[11px] text-[#5a6040] leading-relaxed">
+              Use quando a presença foi confirmada verbalmente ou via documento externo.
+              O sistema trata como <strong>Realizadas = Previstas</strong> para fins de nota e elegibilidade.
+            </p>
+            {quickConfirmed ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#506600]">
+                  <CheckCircle2 size={13} /> Presença confirmada em modo rápido
+                </span>
                 <button
-                  key={dateStr}
                   type="button"
-                  data-testid={`checkbox-diaria-${employeeId}-${dateStr}`}
-                  onClick={() => toggle(dateStr)}
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-0.5 px-2 py-3 border-2 border-[#191c1e] font-bold italic uppercase text-[11px] transition-colors",
-                    checked ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#444933] hover:bg-[#f2f4f6]"
-                  )}
+                  disabled={isSaving}
+                  onClick={() => onQuickConfirm(() => setOpen(false))}
+                  className="text-[10px] font-bold italic uppercase text-[#747a60] underline underline-offset-2 hover:text-[#191c1e] disabled:opacity-40"
                 >
-                  <span>{formatDiariaDate(dateStr)}</span>
-                  {isScheduled && (
-                    <span className="text-[8px] normal-case font-semibold text-[#747a60]">prevista</span>
-                  )}
+                  Desfazer
                 </button>
-              );
-            })}
+              </div>
+            ) : (
+              <button
+                type="button"
+                data-testid={`button-quick-confirm-${employeeId}`}
+                disabled={isSaving}
+                onClick={() => onQuickConfirm(() => setOpen(false))}
+                className={cn(actionBtn, "bg-[#ccff00] text-[#161e00] enabled:hover:translate-y-[1px]")}
+              >
+                <Zap size={14} /> Confirmar Sem Comparar Datas
+              </button>
+            )}
+          </div>
+
+          {/* ── MODO DETALHADO ───────────────────────────────────────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Calendar size={13} className="text-[#444933]" />
+              <span className="text-xs font-black italic uppercase tracking-tight text-[#191c1e]">
+                Modo Detalhado — Selecione data a data
+              </span>
+            </div>
+            {quickConfirmed && (
+              <p className="text-[11px] text-[#8a6c00] italic">
+                Salvar datas específicas abaixo cancela o modo rápido automaticamente.
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+              <span className="text-xs font-bold italic uppercase text-[#444933]">
+                Previstas: {scheduledCount ?? "—"}
+                {scheduledStart && scheduledEnd && (
+                  <span className="text-[#747a60] normal-case font-semibold not-italic"> ({formatDiariaDate(scheduledStart)} – {formatDiariaDate(scheduledEnd)})</span>
+                )}
+              </span>
+              <span data-testid={`text-diaria-selected-count-${employeeId}`} className="text-sm font-black italic uppercase text-[#506600]">
+                Selecionadas: {selected.size}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                data-testid={`button-confirm-previstas-${employeeId}`}
+                onClick={() => setSelected(new Set(scheduledSet))}
+                disabled={scheduledSet.size === 0}
+                className={cn(actionBtn, "bg-white text-[#191c1e] enabled:hover:bg-[#eceef0]")}
+              >
+                <CheckCircle2 size={14} /> Marcar Previstas
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set(candidateDates))}
+                className={cn(actionBtn, "bg-white text-[#191c1e] hover:bg-[#eceef0]")}
+              >
+                Marcar Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                disabled={selected.size === 0}
+                className={cn(actionBtn, "bg-white text-[#191c1e] hover:bg-[#eceef0]")}
+              >
+                Limpar
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+              {candidateDates.map(dateStr => {
+                const checked = selected.has(dateStr);
+                const isScheduled = scheduledSet.has(dateStr);
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    data-testid={`checkbox-diaria-${employeeId}-${dateStr}`}
+                    onClick={() => toggle(dateStr)}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-0.5 px-2 py-3 border-2 border-[#191c1e] font-bold italic uppercase text-[11px] transition-colors",
+                      checked ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#444933] hover:bg-[#f2f4f6]"
+                    )}
+                  >
+                    <span>{formatDiariaDate(dateStr)}</span>
+                    {isScheduled && (
+                      <span className="text-[8px] normal-case font-semibold text-[#747a60]">prevista</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -300,7 +361,7 @@ function ParticipantDiariaDialog({
             onClick={() => onSave(sortedSelected, () => setOpen(false))}
             className="px-4 py-2 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-xs disabled:opacity-40 disabled:cursor-not-allowed hover:translate-y-[1px] transition-all"
           >
-            {isSaving ? "Salvando..." : "Salvar"}
+            {isSaving ? "Salvando..." : "Salvar Datas"}
           </button>
         </DialogFooter>
       </DialogContent>
@@ -2359,7 +2420,8 @@ export default function EventDetailPage() {
                       const selectedDates = p.actualDiariaDates ?? [];
                       const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
                       const candidateDates = eventDateRange(event.startDate, event.endDate);
-                      const daysMismatch = !isInformational && p.scheduledDiariaCount != null && realizadasCount != null && realizadasCount < p.scheduledDiariaCount;
+                      const isQuickConfirmed = p.diariaQuickConfirmed === true;
+                      const daysMismatch = !isInformational && !isQuickConfirmed && p.scheduledDiariaCount != null && realizadasCount != null && realizadasCount < p.scheduledDiariaCount;
                       const showCommentBox = isInactive || daysMismatch;
                       const commentReason = isInactive
                         ? "Colaborador inativo — justifique"
@@ -2474,10 +2536,17 @@ export default function EventDetailPage() {
                                     scheduledEnd={p.scheduledDiariaEnd}
                                     scheduledCount={p.scheduledDiariaCount}
                                     currentDates={selectedDates}
+                                    quickConfirmed={isQuickConfirmed}
                                     isSaving={updateParticipant.isPending}
                                     onSave={(dates, onDone) => {
                                       updateParticipant.mutate(
                                         { id, participantId: p.id, data: { actualDiariaDates: dates } },
+                                        { onSuccess: onDone },
+                                      );
+                                    }}
+                                    onQuickConfirm={(onDone) => {
+                                      updateParticipant.mutate(
+                                        { id, participantId: p.id, data: { diariaQuickConfirmed: !isQuickConfirmed } },
                                         { onSuccess: onDone },
                                       );
                                     }}

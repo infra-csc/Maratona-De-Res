@@ -602,12 +602,13 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
-  const { confirmed, actualDiariaDates, comment } = req.body;
-  if (confirmed === undefined && actualDiariaDates === undefined && comment === undefined) {
-    res.status(400).json({ error: "informe confirmed, actualDiariaDates e/ou comment" });
+  const { confirmed, actualDiariaDates, comment, diariaQuickConfirmed } = req.body;
+  if (confirmed === undefined && actualDiariaDates === undefined && comment === undefined && diariaQuickConfirmed === undefined) {
+    res.status(400).json({ error: "informe confirmed, actualDiariaDates, diariaQuickConfirmed e/ou comment" });
     return;
   }
   if (confirmed !== undefined && typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed deve ser boolean" }); return; }
+  if (diariaQuickConfirmed !== undefined && typeof diariaQuickConfirmed !== "boolean") { res.status(400).json({ error: "diariaQuickConfirmed deve ser boolean" }); return; }
   if (comment !== undefined && comment !== null && typeof comment !== "string") { res.status(400).json({ error: "comment deve ser string ou null" }); return; }
 
   let normalizedDates: string[] | null | undefined = undefined;
@@ -650,8 +651,16 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
       ...(normalizedDates !== undefined && {
         actualDiariaDates: normalizedDates,
         actualDiariaCount: normalizedDates ? normalizedDates.length : null,
+        // Salvar datas específicas cancela o modo rápido — o gestor está sendo
+        // detalhado agora; reset garante que os dois modos não coexistam.
+        diariaQuickConfirmed: false,
+        diariaQuickConfirmedAt: null,
       }),
       ...(comment !== undefined && { comment: comment === null ? null : comment.trim() || null }),
+      ...(diariaQuickConfirmed !== undefined && {
+        diariaQuickConfirmed,
+        diariaQuickConfirmedAt: diariaQuickConfirmed ? new Date() : null,
+      }),
     })
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();

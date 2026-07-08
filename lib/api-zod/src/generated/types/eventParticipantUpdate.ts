@@ -13,6 +13,8 @@ export interface EventParticipantUpdate {
      * @nullable
      */
   actualDiariaDates?: string[] | null;
+  /** true = modo rápido: gestor confirmou presença sem comparar datas. Equivale a "Realizadas = Previstas". Registra timestamp de auditoria. */
+  diariaQuickConfirmed?: boolean;
   /**
      * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).
      * @nullable

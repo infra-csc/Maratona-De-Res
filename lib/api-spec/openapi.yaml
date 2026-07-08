@@ -2877,6 +2877,15 @@ components:
             do tamanho desta lista.
         actualDiariaCount:
           type: ["integer", "null"]
+        diariaQuickConfirmed:
+          type: ["boolean", "null"]
+          description: >-
+            true quando o gestor confirmou as diárias no modo rápido (sem
+            comparar data a data). Equivale a "Realizadas = Previstas" para
+            fins de nota. null/false = modo detalhado (padrão).
+        diariaQuickConfirmedAt:
+          type: ["string", "null"]
+          description: Timestamp (ISO 8601) da confirmação rápida, para auditoria.
         comment:
           type: ["string", "null"]
           description: >-
@@ -2939,6 +2948,11 @@ components:
             presença real). As diárias previstas (scheduledDiaria*) não são
             editáveis por aqui — vêm apenas da sincronização com a logística
             interna.
+        diariaQuickConfirmed:
+          type: boolean
+          description: >-
+            true = modo rápido: gestor confirmou presença sem comparar datas.
+            Equivale a "Realizadas = Previstas". Registra timestamp de auditoria.
         comment:
           type: ["string", "null"]
           description: >-
