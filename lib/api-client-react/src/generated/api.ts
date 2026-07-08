@@ -82,6 +82,7 @@ import type {
   GetAbsencesParams,
   GetAuditLogsParams,
   GetCalibrationsParams,
+  GetCollaboratorsWithoutAccessParams,
   GetCycleEligibilityParams,
   GetEmployeesParams,
   GetEvaluationsParams,
@@ -1031,20 +1032,27 @@ export const useDeleteUser = <TError = ErrorType<unknown>,
       return useMutation(getDeleteUserMutationOptions(options));
     }
 
-export const getGetCollaboratorsWithoutAccessUrl = () => {
+export const getGetCollaboratorsWithoutAccessUrl = (params?: GetCollaboratorsWithoutAccessParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/users/collaborators-without-access`
+  return stringifiedParams.length > 0 ? `/users/collaborators-without-access?${stringifiedParams}` : `/users/collaborators-without-access`
 }
 
 /**
  * @summary Preview of active colaboradores that still have no login (used before bulk-generating access)
  */
-export const getCollaboratorsWithoutAccess = async ( options?: RequestInit): Promise<CollaboratorsWithoutAccessPreview> => {
+export const getCollaboratorsWithoutAccess = async (params?: GetCollaboratorsWithoutAccessParams, options?: RequestInit): Promise<CollaboratorsWithoutAccessPreview> => {
 
-  return customFetch<CollaboratorsWithoutAccessPreview>(getGetCollaboratorsWithoutAccessUrl(),
+  return customFetch<CollaboratorsWithoutAccessPreview>(getGetCollaboratorsWithoutAccessUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1057,23 +1065,23 @@ export const getCollaboratorsWithoutAccess = async ( options?: RequestInit): Pro
 
 
 
-export const getGetCollaboratorsWithoutAccessQueryKey = () => {
+export const getGetCollaboratorsWithoutAccessQueryKey = (params?: GetCollaboratorsWithoutAccessParams,) => {
     return [
-    `/users/collaborators-without-access`
+    `/users/collaborators-without-access`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetCollaboratorsWithoutAccessQueryOptions = <TData = Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCollaboratorsWithoutAccessQueryOptions = <TData = Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError = ErrorType<unknown>>(params?: GetCollaboratorsWithoutAccessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCollaboratorsWithoutAccessQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetCollaboratorsWithoutAccessQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>> = ({ signal }) => getCollaboratorsWithoutAccess({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>> = ({ signal }) => getCollaboratorsWithoutAccess(params, { signal, ...requestOptions });
 
 
 
@@ -1091,11 +1099,11 @@ export type GetCollaboratorsWithoutAccessQueryError = ErrorType<unknown>
  */
 
 export function useGetCollaboratorsWithoutAccess<TData = Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetCollaboratorsWithoutAccessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetCollaboratorsWithoutAccessQueryOptions(options)
+  const queryOptions = getGetCollaboratorsWithoutAccessQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

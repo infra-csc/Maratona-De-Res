@@ -63,6 +63,7 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithCycle | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkResult, setBulkResult] = useState<BulkGenerateAccessResult | null>(null);
+  const [bulkTypeFilter, setBulkTypeFilter] = useState<"casa" | "freela" | "all">("casa");
   const [newAccess, setNewAccess] = useState<{ cpfLogin: string; password: string } | null>(null);
 
   const [mergeMode, setMergeMode] = useState(false);
@@ -101,7 +102,10 @@ export default function EmployeesPage() {
     data: bulkPreview,
     isLoading: isBulkPreviewLoading,
     refetch: refetchBulkPreview,
-  } = useGetCollaboratorsWithoutAccess({ query: { enabled: bulkOpen, queryKey: getGetCollaboratorsWithoutAccessQueryKey() } });
+  } = useGetCollaboratorsWithoutAccess(
+    bulkTypeFilter !== "all" ? { employmentType: bulkTypeFilter } : {},
+    { query: { enabled: bulkOpen, queryKey: [...getGetCollaboratorsWithoutAccessQueryKey(), bulkTypeFilter] } }
+  );
 
   const mergeMutation = useMergeEmployee({
     mutation: {
@@ -605,8 +609,19 @@ export default function EmployeesPage() {
               <p className="text-sm italic text-[#747a60]">Carregando prévia...</p>
             ) : !bulkResult ? (
               <>
+                <div className="flex gap-2">
+                  {(["casa", "freela", "all"] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setBulkTypeFilter(t)}
+                      className={`px-4 py-2 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all ${bulkTypeFilter === t ? "bg-[#191c1e] text-[#ccff00]" : "bg-white hover:bg-[#eceef0]"}`}
+                    >
+                      {t === "all" ? "Todos" : t.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
                 <p className="text-sm text-[#444933] italic">
-                  Serão criados logins por CPF para colaboradores ativos sem acesso à plataforma. A senha inicial será gerada automaticamente e exibida apenas uma vez, junto com o arquivo CSV para download.
+                  Serão criados logins por CPF para colaboradores {bulkTypeFilter === "all" ? "ativos" : `tipo ${bulkTypeFilter.toUpperCase()}`} sem acesso à plataforma. A senha inicial será gerada automaticamente e exibida apenas uma vez, junto com o arquivo CSV para download.
                 </p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 text-center">
@@ -635,7 +650,7 @@ export default function EmployeesPage() {
                   <button
                     data-testid="button-confirm-bulk-generate"
                     disabled={!bulkPreview || bulkPreview.eligibleCount === 0 || bulkGenerateMutation.isPending}
-                    onClick={() => bulkGenerateMutation.mutate({ data: { dryRun: false } })}
+                    onClick={() => bulkGenerateMutation.mutate({ data: { dryRun: false, ...(bulkTypeFilter !== "all" ? { employmentType: bulkTypeFilter } : {}) } })}
                     className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
                   >
                     {bulkGenerateMutation.isPending ? "Gerando..." : `Gerar ${bulkPreview?.eligibleCount ?? 0} Acessos`}

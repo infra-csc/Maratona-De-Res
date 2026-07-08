@@ -229,6 +229,10 @@ export const DeleteUserParams = zod.object({
 /**
  * @summary Preview of active colaboradores that still have no login (used before bulk-generating access)
  */
+export const GetCollaboratorsWithoutAccessQueryParams = zod.object({
+  "employmentType": zod.enum(['casa', 'freela']).optional()
+})
+
 export const GetCollaboratorsWithoutAccessResponse = zod.object({
   "eligibleCount": zod.number(),
   "missingCpfCount": zod.number(),
@@ -243,6 +247,7 @@ export const GetCollaboratorsWithoutAccessResponse = zod.object({
  * @summary Bulk-generate CPF-based login credentials for active colaboradores without an account
  */
 export const BulkGenerateCollaboratorAccessBody = zod.object({
+  "employmentType": zod.enum(['casa', 'freela']).optional(),
   "dryRun": zod.boolean().optional()
 })
 

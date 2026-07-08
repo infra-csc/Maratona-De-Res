@@ -119,7 +119,16 @@ export interface CollaboratorsWithoutAccessPreview {
   missingCpf: CollaboratorsWithoutAccessPreviewMissingCpfItem[];
 }
 
+export type BulkGenerateAccessInputEmploymentType = typeof BulkGenerateAccessInputEmploymentType[keyof typeof BulkGenerateAccessInputEmploymentType];
+
+
+export const BulkGenerateAccessInputEmploymentType = {
+  casa: 'casa',
+  freela: 'freela',
+} as const;
+
 export interface BulkGenerateAccessInput {
+  employmentType?: BulkGenerateAccessInputEmploymentType;
   dryRun?: boolean;
 }
 
@@ -1554,6 +1563,18 @@ export interface CsvExport {
   filename: string;
   data: string;
 }
+
+export type GetCollaboratorsWithoutAccessParams = {
+employmentType?: GetCollaboratorsWithoutAccessEmploymentType;
+};
+
+export type GetCollaboratorsWithoutAccessEmploymentType = typeof GetCollaboratorsWithoutAccessEmploymentType[keyof typeof GetCollaboratorsWithoutAccessEmploymentType];
+
+
+export const GetCollaboratorsWithoutAccessEmploymentType = {
+  casa: 'casa',
+  freela: 'freela',
+} as const;
 
 export type GetEmployeesParams = {
 active?: boolean;

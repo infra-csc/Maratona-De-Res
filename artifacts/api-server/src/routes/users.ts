@@ -32,7 +32,9 @@ router.get("/users", requireRole("admin", "rh", "diretoria"), async (_req, res) 
   res.json(users);
 });
 
-router.get("/users/collaborators-without-access", requireRole("admin", "rh"), async (_req, res) => {
+router.get("/users/collaborators-without-access", requireRole("admin", "rh"), async (req, res) => {
+  const { employmentType } = req.query as { employmentType?: string };
+  const typeFilter = employmentType === "casa" || employmentType === "freela" ? eq(employeesTable.employmentType, employmentType) : undefined;
   const employees = await db
     .select({
       id: employeesTable.id,
@@ -41,7 +43,7 @@ router.get("/users/collaborators-without-access", requireRole("admin", "rh"), as
     })
     .from(employeesTable)
     .leftJoin(usersTable, eq(usersTable.employeeId, employeesTable.id))
-    .where(and(eq(employeesTable.active, true), isNull(usersTable.id)));
+    .where(and(eq(employeesTable.active, true), isNull(usersTable.id), typeFilter));
 
   const eligible: { id: number; name: string; cpfDigits: string }[] = [];
   const missingCpf: { id: number; name: string }[] = [];
@@ -58,6 +60,8 @@ router.get("/users/collaborators-without-access", requireRole("admin", "rh"), as
 
 router.post("/users/bulk-generate-collaborator-access", requireRole("admin", "rh"), async (req, res) => {
   const dryRun = req.body?.dryRun === true;
+  const { employmentType } = req.body as { employmentType?: string };
+  const typeFilter = employmentType === "casa" || employmentType === "freela" ? eq(employeesTable.employmentType, employmentType) : undefined;
 
   const employees = await db
     .select({
@@ -67,7 +71,7 @@ router.post("/users/bulk-generate-collaborator-access", requireRole("admin", "rh
     })
     .from(employeesTable)
     .leftJoin(usersTable, eq(usersTable.employeeId, employeesTable.id))
-    .where(and(eq(employeesTable.active, true), isNull(usersTable.id)));
+    .where(and(eq(employeesTable.active, true), isNull(usersTable.id), typeFilter));
 
   const created: { employeeId: number; name: string; cpfLogin: string; password: string }[] = [];
   const missingCpf: { employeeId: number; name: string }[] = [];

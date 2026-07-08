@@ -230,6 +230,13 @@ paths:
       operationId: getCollaboratorsWithoutAccess
       tags: [users]
       summary: Preview of active colaboradores that still have no login (used before bulk-generating access)
+      parameters:
+        - name: employmentType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [casa, freela]
       responses:
         "200":
           description: OK
@@ -2743,6 +2750,9 @@ components:
     BulkGenerateAccessInput:
       type: object
       properties:
+        employmentType:
+          type: string
+          enum: [casa, freela]
         dryRun:
           type: boolean
 

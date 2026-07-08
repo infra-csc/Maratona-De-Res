@@ -5,7 +5,9 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { BulkGenerateAccessInputEmploymentType } from './bulkGenerateAccessInputEmploymentType';
 
 export interface BulkGenerateAccessInput {
+  employmentType?: BulkGenerateAccessInputEmploymentType;
   dryRun?: boolean;
 }
