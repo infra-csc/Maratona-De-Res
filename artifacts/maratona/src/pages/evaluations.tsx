@@ -345,9 +345,10 @@ export default function EvaluationsPage() {
   // Criterion assignments for the selected event (new routing system)
   const { data: criterionAssignments } = useEventCriterionAssignments(selectedEventId ?? 0);
   const patchCriterionAssignment = usePatchCriterionAssignment(selectedEventId ?? 0);
-  const [redirectDialogCriterionId, setRedirectDialogCriterionId] = useState<number | null>(null);
+  const [redirectDialogArea, setRedirectDialogArea] = useState<{ areaId: number; areaName: string; criteriaIds: number[]; firstCriterionId: number } | null>(null);
   const [redirectTargetId, setRedirectTargetId] = useState<number | null>(null);
-  const [publicLinkDialogOpen, setPublicLinkDialogOpen] = useState(false);
+  const [publicLinkDialogCriteriaIds, setPublicLinkDialogCriteriaIds] = useState<number[] | null>(null);
+  const [publicLinkDialogAreaName, setPublicLinkDialogAreaName] = useState<string | null>(null);
   const [publicLinkRecipientName, setPublicLinkRecipientName] = useState("");
   const [generatedPublicUrl, setGeneratedPublicUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -358,14 +359,14 @@ export default function EvaluationsPage() {
   const [conformityLinkCopied, setConformityLinkCopied] = useState(false);
   const { data: redirectOptionsData } = useRedirectOptions(
     selectedEventId ?? 0,
-    redirectDialogCriterionId ?? 0,
+    redirectDialogArea?.firstCriterionId ?? 0,
   );
   const { data: publicLinkEligibleCriteria } = usePublicLinkEligibleCriteria(selectedEventId ?? null);
   const createPublicToken = useCreatePublicToken(selectedEventId ?? 0);
   const createConformityPublicToken = useCreateConformityPublicToken(selectedEventId ?? 0);
   const createFerramentasPublicToken = useCreateFerramentasPublicToken(selectedEventId ?? 0);
   const { data: publicTokenHistory, refetch: refetchTokenHistory } = usePublicTokens(
-    publicLinkDialogOpen ? (selectedEventId ?? null) : null,
+    publicLinkDialogCriteriaIds !== null ? (selectedEventId ?? null) : null,
   );
   const { data: conformityPublicTokenHistory, refetch: refetchConformityTokenHistory } = useConformityPublicTokens(
     conformityPublicLinkType === "cenografia" ? (selectedEventId ?? null) : null,
@@ -585,12 +586,10 @@ export default function EvaluationsPage() {
 
   // For primary-area evaluators: fallback redirect options from the criterion's responsible area.
   // Placed after myCriteria because it references myCriteria.find() to look up the area.
-  const redirectCriterionAreaId = redirectDialogCriterionId != null
-    ? (myCriteria.find(c => c.criterionId === redirectDialogCriterionId)?.responsibleAreaId ?? null)
-    : null;
+  const redirectCriterionAreaId = redirectDialogArea?.areaId ?? null;
   const { data: redirectAreaUsersRaw } = useGetUsersByArea(redirectCriterionAreaId!, {
     query: {
-      enabled: redirectCriterionAreaId != null && redirectDialogCriterionId != null,
+      enabled: redirectCriterionAreaId != null,
       queryKey: ["users-by-area-redirect", redirectCriterionAreaId] as unknown[],
     },
   });
@@ -666,6 +665,23 @@ export default function EvaluationsPage() {
     );
   }
   const areaGroups = groupByArea(activeCriteria);
+
+  // Agrupa os critérios do avaliador logado por área — inclui areaId para
+  // suportar botões de redirecionar/link-público por formulário (grupo de área).
+  const myAreaGroups = (() => {
+    const map = new Map<number, { areaId: number; areaName: string; criteria: typeof myCriteria }>();
+    for (const c of myCriteria) {
+      const key = c.responsibleAreaId ?? -1;
+      const existing = map.get(key);
+      if (existing) {
+        existing.criteria.push(c);
+      } else {
+        map.set(key, { areaId: key, areaName: c.responsibleAreaName ?? "Sem área definida", criteria: [c] });
+      }
+    }
+    return Array.from(map.values());
+  })();
+
   const teamSubmittedCount = activeCriteria.filter(c => criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted").length;
   const teamProgressPct = activeCriteria.length ? (teamSubmittedCount / activeCriteria.length) * 100 : 0;
 
@@ -1666,8 +1682,41 @@ export default function EvaluationsPage() {
                   </div>
                 ) : (
                   <div className={`bg-white border-2 border-[#191c1e] p-6 md:p-8 ${HARD_SHADOW}`}>
-                    <div className="space-y-10">
-                      {myCriteria.map((c, index) => {
+                    <div className="space-y-12">
+                      {myAreaGroups.map(g => {
+                        const eligibleIds = new Set((publicLinkEligibleCriteria ?? []).map(ec => ec.criterionId));
+                        const areaEligible = g.criteria.filter(c => eligibleIds.has(c.criterionId)).map(c => c.criterionId);
+                        const allGroupDone = g.criteria.every(c => getEval(c.criterionId)?.status === "submitted");
+                        return (
+                          <div key={g.areaId} className="space-y-10">
+                            {/* Header do formulário com botões de redirecionar e link público por grupo/área */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-l-4 border-[#ccff00] pl-4">
+                              <div>
+                                <p className="text-[10px] font-bold italic uppercase text-[#747a60] tracking-wider">Formulário</p>
+                                <h3 className="text-lg italic uppercase font-black tracking-tight">{g.areaName}</h3>
+                              </div>
+                              {!allGroupDone && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => { setRedirectDialogArea({ areaId: g.areaId, areaName: g.areaName, criteriaIds: g.criteria.map(c => c.criterionId), firstCriterionId: g.criteria[0]?.criterionId ?? 0 }); setRedirectTargetId(null); }}
+                                    className="border-2 border-[#191c1e] bg-white px-3 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                                  >
+                                    <CornerDownRight size={13} /> Redirecionar Formulário
+                                  </button>
+                                  {areaEligible.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); refetchTokenHistory(); }}
+                                      className="border-2 border-[#191c1e] bg-white px-3 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                                    >
+                                      <Link2 size={13} /> Link Freelancer
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            {g.criteria.map((c, index) => {
                         const ev = getEval(c.criterionId);
                         const submitted = ev?.status === "submitted";
                         const isDraft = ev?.status === "draft";
@@ -1783,22 +1832,12 @@ export default function EvaluationsPage() {
                                   />
                                 </div>
 
-                                <div className="flex items-center justify-between pt-3 gap-3 flex-wrap">
-                                  <div className="flex items-center gap-2">
-                                    {/* Redirect — available to every evaluator for all their criteria */}
-                                    <button
-                                      type="button"
-                                      onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
-                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
-                                    >
-                                      <CornerDownRight size={14} /> Redirecionar
-                                    </button>
-                                  </div>
+                                <div className="flex items-center justify-end pt-3 gap-3 flex-wrap">
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
                                     disabled={score == null || !comment.trim() || needsAudio}
                                     data-testid={`button-save-draft-${c.criterionId}`}
-                                    className="ml-auto bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
+                                    className="bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                                   >
                                     <Save size={14} />
                                     {isDraft ? "Atualizar Rascunho" : "Salvar Rascunho"}
@@ -1820,6 +1859,9 @@ export default function EvaluationsPage() {
                                 <AudioPlayer objectPath={audio} />
                               </div>
                             )}
+                          </div>
+                        );
+                      })}
                           </div>
                         );
                       })}
@@ -2214,25 +2256,7 @@ export default function EvaluationsPage() {
                     </div>
                   )}
 
-                  {/* Link Freelancer — um único link para o questionário inteiro do evento */}
-                  {isEvaluator && myCriteria.length > 0 && (publicLinkEligibleCriteria ?? []).length > 0 && (
-                    <div className="p-5 border-b-2 border-[#eceef0]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPublicLinkDialogOpen(true);
-                          setPublicLinkRecipientName("");
-                          setGeneratedPublicUrl(null);
-                          setLinkCopied(false);
-                          refetchTokenHistory();
-                        }}
-                        className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#f2f4f6] transition-all"
-                        title="Gerar link único para um freelancer responder todo o questionário deste evento"
-                      >
-                        <Link2 size={14} /> Link Freelancer
-                      </button>
-                    </div>
-                  )}
+                  {/* Link Freelancer — movido para o cabeçalho de cada formulário/área */}
 
                   {/* Submission — evaluators only */}
                   {isEvaluator && myCriteria.length > 0 && (
@@ -2362,26 +2386,28 @@ export default function EvaluationsPage() {
         )}
       </div>
 
-      {/* Redirect dialog — avaliador passes a criterion to another eligible user */}
-      <Dialog open={redirectDialogCriterionId !== null} onOpenChange={(v) => { if (!v) { setRedirectDialogCriterionId(null); setRedirectTargetId(null); } }}>
+      {/* Redirect dialog — avaliador redireciona o formulário inteiro (todos os critérios da área) */}
+      <Dialog open={redirectDialogArea !== null} onOpenChange={(v) => { if (!v) { setRedirectDialogArea(null); setRedirectTargetId(null); } }}>
         <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
           <DialogHeader>
             <DialogTitle className="text-xl italic uppercase font-black tracking-tight flex items-center gap-2">
-              <CornerDownRight size={18} /> Redirecionar Critério
+              <CornerDownRight size={18} /> Redirecionar Formulário
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            {redirectDialogCriterionId != null && (() => {
-              const crit = myCriteria.find(x => x.criterionId === redirectDialogCriterionId);
-              return crit ? (
-                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-0.5">Critério</p>
-                  <p className="text-sm font-black italic uppercase">{crit.criterionName}</p>
-                </div>
-              ) : null;
-            })()}
+            {redirectDialogArea != null && (
+              <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+                <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-0.5">Formulário</p>
+                <p className="text-sm font-black italic uppercase">{redirectDialogArea.areaName}</p>
+                {redirectDialogArea.criteriaIds.length > 1 && (
+                  <p className="text-[10px] italic text-[#747a60] mt-1">
+                    {redirectDialogArea.criteriaIds.length} critérios serão transferidos juntos.
+                  </p>
+                )}
+              </div>
+            )}
             <p className="text-sm italic text-[#444933]">
-              Selecione quem assumirá a responsabilidade por esta avaliação. Após a confirmação, o critério sai da sua lista e passa para o usuário escolhido.
+              Selecione quem assumirá a responsabilidade por este formulário. Após a confirmação, todos os critérios saem da sua lista e passam para o usuário escolhido.
             </p>
             {effectiveRedirectOptions.length === 0 ? (
               <div className="text-center py-6 border-2 border-dashed border-[#eceef0] italic font-bold text-[#747a60] text-xs uppercase">
@@ -2412,7 +2438,7 @@ export default function EvaluationsPage() {
           <DialogFooter className="gap-2 pt-4">
             <button
               type="button"
-              onClick={() => { setRedirectDialogCriterionId(null); setRedirectTargetId(null); }}
+              onClick={() => { setRedirectDialogArea(null); setRedirectTargetId(null); }}
               className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
             >
               Cancelar
@@ -2420,19 +2446,18 @@ export default function EvaluationsPage() {
             <button
               type="button"
               disabled={redirectTargetId === null || patchCriterionAssignment.isPending}
-              onClick={() => {
-                if (!redirectDialogCriterionId || !redirectTargetId) return;
-                patchCriterionAssignment.mutate(
-                  { criterionId: redirectDialogCriterionId, assignedToId: redirectTargetId, action: "redirect" },
-                  {
-                    onSuccess: () => {
-                      toast({ title: "Critério redirecionado com sucesso" });
-                      setRedirectDialogCriterionId(null);
-                      setRedirectTargetId(null);
-                    },
-                    onError: (e: Error) => toast({ title: "Erro ao redirecionar", description: e.message, variant: "destructive" }),
-                  },
-                );
+              onClick={async () => {
+                if (!redirectDialogArea || !redirectTargetId) return;
+                try {
+                  for (const criterionId of redirectDialogArea.criteriaIds) {
+                    await patchCriterionAssignment.mutateAsync({ criterionId, assignedToId: redirectTargetId, action: "redirect" });
+                  }
+                  toast({ title: "Formulário redirecionado com sucesso" });
+                  setRedirectDialogArea(null);
+                  setRedirectTargetId(null);
+                } catch (e) {
+                  toast({ title: "Erro ao redirecionar", description: (e as Error).message, variant: "destructive" });
+                }
               }}
               className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
             >
@@ -2442,12 +2467,13 @@ export default function EvaluationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Public link dialog — generate single-use evaluation link for freelancers */}
+      {/* Public link dialog — link único por formulário/área para freelancers */}
       <Dialog
-        open={publicLinkDialogOpen}
+        open={publicLinkDialogCriteriaIds !== null}
         onOpenChange={(v) => {
-          setPublicLinkDialogOpen(v);
           if (!v) {
+            setPublicLinkDialogCriteriaIds(null);
+            setPublicLinkDialogAreaName(null);
             setPublicLinkRecipientName("");
             setGeneratedPublicUrl(null);
             setLinkCopied(false);
@@ -2461,23 +2487,34 @@ export default function EvaluationsPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            {(publicLinkEligibleCriteria ?? []).length > 0 && (
-              <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-                <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-1">
-                  Critérios inclusos no questionário ({(publicLinkEligibleCriteria ?? []).length})
-                </p>
-                <ul className="space-y-0.5">
-                  {(publicLinkEligibleCriteria ?? []).map(c => (
-                    <li key={c.criterionId} className="text-sm font-black italic uppercase">{c.criterionName}</li>
-                  ))}
-                </ul>
+            {publicLinkDialogAreaName && (
+              <div className="border-l-4 border-[#ccff00] pl-3">
+                <p className="text-[10px] font-bold italic uppercase text-[#747a60]">Formulário</p>
+                <p className="text-sm font-black italic uppercase">{publicLinkDialogAreaName}</p>
               </div>
             )}
+            {(() => {
+              const dialogEligible = (publicLinkEligibleCriteria ?? []).filter(c =>
+                (publicLinkDialogCriteriaIds ?? []).includes(c.criterionId)
+              );
+              return dialogEligible.length > 0 ? (
+                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-1">
+                    Critérios inclusos ({dialogEligible.length})
+                  </p>
+                  <ul className="space-y-0.5">
+                    {dialogEligible.map(c => (
+                      <li key={c.criterionId} className="text-sm font-black italic uppercase">{c.criterionName}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null;
+            })()}
 
             {!generatedPublicUrl ? (
               <>
                 <p className="text-sm italic text-[#444933]">
-                  Gere um link único para que um freelancer responda o questionário inteiro acima. O link expira após o primeiro uso.
+                  Gere um link único para que um freelancer responda este formulário. O link expira após o primeiro uso.
                 </p>
                 <div>
                   <label className="block text-xs font-black italic uppercase mb-2">
@@ -2551,7 +2588,8 @@ export default function EvaluationsPage() {
             <button
               type="button"
               onClick={() => {
-                setPublicLinkDialogOpen(false);
+                setPublicLinkDialogCriteriaIds(null);
+                setPublicLinkDialogAreaName(null);
                 setPublicLinkRecipientName("");
                 setGeneratedPublicUrl(null);
                 setLinkCopied(false);
@@ -2567,7 +2605,7 @@ export default function EvaluationsPage() {
                 onClick={() => {
                   if (!publicLinkRecipientName.trim()) return;
                   createPublicToken.mutate(
-                    { recipientName: publicLinkRecipientName.trim() },
+                    { recipientName: publicLinkRecipientName.trim(), criterionIds: publicLinkDialogCriteriaIds ?? undefined },
                     {
                       onSuccess: ({ tokenId }) => {
                         const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");

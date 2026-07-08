@@ -402,7 +402,7 @@ router.get("/events/:id/public-link-eligible-criteria", async (req, res) => {
 router.post("/events/:id/public-token", async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const user = req.user!;
-  const { recipientName } = req.body ?? {};
+  const { recipientName, criterionIds: requestedCriterionIds } = req.body ?? {};
 
   if (!recipientName || typeof recipientName !== "string" || !recipientName.trim()) {
     res.status(400).json({ error: "Nome do destinatário é obrigatório" });
@@ -421,12 +421,19 @@ router.post("/events/:id/public-token", async (req, res) => {
       eq(eventCriterionAssignmentsTable.assignedToId, user.userId),
     ));
 
-  const eligibleCriterionIds = assignments
+  let eligibleCriterionIds = assignments
     .filter(a => a.allowPublicLink && a.status !== "submitted")
     .map(a => a.criterionId);
 
+  // Se o front passou uma lista de critérios (token de área/formulário), filtra
+  // para a interseção — o token só cobre os critérios elegíveis daquela área.
+  if (Array.isArray(requestedCriterionIds) && requestedCriterionIds.length > 0) {
+    const requested = new Set(requestedCriterionIds as number[]);
+    eligibleCriterionIds = eligibleCriterionIds.filter(id => requested.has(id));
+  }
+
   if (eligibleCriterionIds.length === 0) {
-    res.status(400).json({ error: "Nenhum critério deste questionário permite link público, ou já foram todos submetidos" });
+    res.status(400).json({ error: "Nenhum critério deste formulário permite link público, ou já foram todos submetidos" });
     return;
   }
 

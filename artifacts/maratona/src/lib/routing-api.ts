@@ -191,10 +191,12 @@ export function usePublicLinkEligibleCriteria(eventId: number | null) {
   });
 }
 
-/** Cria um token de avaliação pública cobrindo o questionário inteiro do avaliador no evento. */
+/** Cria um token de avaliação pública cobrindo um formulário/área do avaliador no evento.
+ *  Se criterionIds for fornecido, o token cobre apenas esses critérios (intersecção com elegíveis).
+ *  Sem criterionIds, cobre todos os critérios elegíveis do avaliador no evento. */
 export function useCreatePublicToken(eventId: number) {
   const qc = useQueryClient();
-  return useMutation<{ tokenId: string }, Error, { recipientName: string }>({
+  return useMutation<{ tokenId: string }, Error, { recipientName: string; criterionIds?: number[] }>({
     mutationFn: (body) =>
       apiFetch<{ tokenId: string }>(
         `/api/events/${eventId}/public-token`,
