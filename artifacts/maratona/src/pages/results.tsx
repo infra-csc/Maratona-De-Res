@@ -66,6 +66,24 @@ const fmtScore = (v: number) => v.toFixed(1);
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtBRLShort = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+function FaixaBadge({ minScore, maxScore, color }: { minScore?: number | null; maxScore?: number | null; color?: string | null }) {
+  if (minScore == null && maxScore == null) return <span className="text-[#c4c9ac] font-bold italic">—</span>;
+  const bg = color ?? "#eceef0";
+  const isDark = bg === "#191c1e" || bg.toLowerCase() === "#000000";
+  const fgClass = isDark ? "text-[#ccff00]" : "text-[#191c1e]";
+  const label = minScore != null && maxScore != null
+    ? `${minScore}–${maxScore}`
+    : minScore != null ? `≥ ${minScore}` : `≤ ${maxScore}`;
+  return (
+    <span
+      className={`inline-block text-[10px] font-black italic uppercase px-2 py-0.5 border-2 border-[#191c1e] skew-x-[-6deg] ${fgClass}`}
+      style={{ backgroundColor: bg }}
+    >
+      <span className="inline-block skew-x-[6deg]">{label}</span>
+    </span>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* RANKING TAB                                                         */
 /* ------------------------------------------------------------------ */
@@ -273,6 +291,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                               <span className="inline-block skew-x-[8deg]">{entry.absences} penalidades</span>
                             </span>
                           )}
+                          <FaixaBadge minScore={entry.platoonMinScore} maxScore={entry.platoonMaxScore} color={entry.platoonColor} />
                         </div>
                       </div>
                       <div className="hidden md:flex items-center gap-3 w-40 shrink-0">
@@ -799,7 +818,14 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                         <span className="text-[11px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-0.5">{r.eventsCount ?? 0}</span>
                       </td>
                       <td className="px-5 py-4 text-center">
-                        <span className="text-[11px] font-bold italic uppercase text-[#161e00] bg-[#ccff00] border-2 border-[#191c1e] px-2 py-0.5">{r.participatedEventsCount ?? 0}</span>
+                        <span className={cn(
+                          "text-[11px] font-bold italic uppercase border-2 border-[#191c1e] px-2 py-0.5",
+                          (r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0)
+                            ? "text-white bg-[#ff8c00]"
+                            : "text-[#161e00] bg-[#ccff00]"
+                        )} title={(r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? "Participou em mais eventos do que os que entraram na nota" : undefined}>
+                          {r.participatedEventsCount ?? 0}
+                        </span>
                       </td>
                       <td className="px-5 py-4 text-center">
                         {net < 0 ? (
@@ -817,7 +843,7 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-center">
-                        <span className="text-xs font-bold italic text-[#444933]">{r.platoon ?? "—"}</span>
+                        <FaixaBadge minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
                       </td>
                     </tr>
                   );
@@ -1142,7 +1168,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="text-xs font-bold italic text-[#444933]">{r.platoon ?? "—"}</span>
+                        <FaixaBadge minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
                       </td>
                       <td className="px-6 py-4 text-center">
                         {r.eligible === false ? (

@@ -20,23 +20,31 @@ router.get("/ranking", async (req, res) => {
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json([]); return; }
 
-  const results = await db
-    .select({
-      employeeId: quarterlyResultsTable.employeeId,
-      employeeName: employeesTable.name,
-      finalResult: quarterlyResultsTable.finalResult,
-      platoon: quarterlyResultsTable.platoon,
-      platoonColor: quarterlyResultsTable.platoonColor,
-      bonusValue: quarterlyResultsTable.bonusValue,
-      eligible: quarterlyResultsTable.eligible,
-      eventsCount: quarterlyResultsTable.eventsCount,
-      participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
-      totalAbsences: quarterlyResultsTable.totalAbsences,
-    })
-    .from(quarterlyResultsTable)
-    .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-    .where(eq(quarterlyResultsTable.cycleId, cycle.id))
-    .orderBy(sql`${quarterlyResultsTable.finalResult} DESC`);
+  const [results, platoonRuleRows] = await Promise.all([
+    db
+      .select({
+        employeeId: quarterlyResultsTable.employeeId,
+        employeeName: employeesTable.name,
+        finalResult: quarterlyResultsTable.finalResult,
+        platoon: quarterlyResultsTable.platoon,
+        platoonColor: quarterlyResultsTable.platoonColor,
+        bonusValue: quarterlyResultsTable.bonusValue,
+        eligible: quarterlyResultsTable.eligible,
+        eventsCount: quarterlyResultsTable.eventsCount,
+        participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
+        totalAbsences: quarterlyResultsTable.totalAbsences,
+      })
+      .from(quarterlyResultsTable)
+      .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+      .where(eq(quarterlyResultsTable.cycleId, cycle.id))
+      .orderBy(sql`${quarterlyResultsTable.finalResult} DESC`),
+    db.select().from(platoonRulesTable),
+  ]);
+
+  const platoonByName = new Map(platoonRuleRows.map(p => [p.name, {
+    minScore: parseFloat(p.minScore as unknown as string),
+    maxScore: parseFloat(p.maxScore as unknown as string),
+  }]));
 
   let filtered = results;
   if (search) {
@@ -44,19 +52,24 @@ router.get("/ranking", async (req, res) => {
     filtered = results.filter(r => (r.employeeName ?? "").toLowerCase().includes(s));
   }
 
-  res.json(filtered.map((r, i) => ({
-    position: i + 1,
-    employeeId: r.employeeId,
-    employeeName: r.employeeName ?? "",
-    finalResult: parseFloat(r.finalResult),
-    platoon: r.platoon,
-    platoonColor: r.platoonColor,
-    bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
-    eligible: r.eligible,
-    eventsCount: r.eventsCount,
-    participatedEventsCount: r.participatedEventsCount,
-    absences: r.totalAbsences,
-  })));
+  res.json(filtered.map((r, i) => {
+    const pRule = r.platoon ? platoonByName.get(r.platoon) : undefined;
+    return {
+      position: i + 1,
+      employeeId: r.employeeId,
+      employeeName: r.employeeName ?? "",
+      finalResult: parseFloat(r.finalResult),
+      platoon: r.platoon,
+      platoonColor: r.platoonColor,
+      platoonMinScore: pRule?.minScore ?? null,
+      platoonMaxScore: pRule?.maxScore ?? null,
+      bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
+      eligible: r.eligible,
+      eventsCount: r.eventsCount,
+      participatedEventsCount: r.participatedEventsCount,
+      absences: r.totalAbsences,
+    };
+  }));
 });
 
 /**

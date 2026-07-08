@@ -946,6 +946,10 @@ export interface QuarterlyResult {
   platoon: string | null;
   /** @nullable */
   platoonColor?: string | null;
+  /** @nullable */
+  platoonMinScore?: number | null;
+  /** @nullable */
+  platoonMaxScore?: number | null;
   bonusValue: number;
   extraBonusValue?: number;
   eligible?: boolean;
@@ -1106,6 +1110,10 @@ export interface RankingEntry {
   platoon: string | null;
   /** @nullable */
   platoonColor?: string | null;
+  /** @nullable */
+  platoonMinScore?: number | null;
+  /** @nullable */
+  platoonMaxScore?: number | null;
   bonusValue: number;
   eventsCount: number;
   participatedEventsCount?: number;

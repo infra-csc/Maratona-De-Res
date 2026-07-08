@@ -102,7 +102,7 @@ async function buildEventFeedback(eventId: number) {
   if (event.city || event.state) lines.push(`📍 ${[event.city, event.state].filter(Boolean).join("/")}`);
   lines.push("");
   lines.push(`🏆 Nota do time no evento: ${eventScore.toFixed(0)}/100`);
-  if (platoon) lines.push(`🎖️ Pelotão projetado: ${platoon.name}`);
+  if (platoon) lines.push(`🎖️ Faixa de bônus projetada: ${platoon.minScore}–${platoon.maxScore}`);
   lines.push(`✅ Critérios avaliados: ${criteria.length - pending.length} de ${criteria.length}`);
   lines.push("");
   if (highlights.length > 0) {

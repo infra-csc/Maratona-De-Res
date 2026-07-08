@@ -588,27 +588,41 @@ router.get("/results/quarterly", async (req, res) => {
     .innerJoin(employeesTable, and(eq(quarterlyResultsTable.employeeId, employeesTable.id), eq(employeesTable.active, true)))
     .where(eq(quarterlyResultsTable.cycleId, cycle.id));
 
-  const results = await query;
+  const [results, platoonRuleRows] = await Promise.all([
+    query,
+    db.select().from(platoonRulesTable),
+  ]);
+
+  const platoonByName = new Map(platoonRuleRows.map(p => [p.name, {
+    minScore: parseFloat(p.minScore as unknown as string),
+    maxScore: parseFloat(p.maxScore as unknown as string),
+  }]));
+
   const filtered = results
     .filter(r => !employeeId || r.employeeId === parseInt(employeeId as string))
     .filter(r => !platoon || r.platoon === platoon);
 
-  res.json(filtered.map(r => ({
-    ...r,
-    scoreSum: parseFloat(r.scoreSum),
-    grossAverage: parseFloat(r.grossAverage),
-    absencePenalty: parseFloat(r.absencePenalty),
-    meritPoints: parseFloat(r.meritPoints),
-    finalResult: parseFloat(r.finalResult),
-    bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
-    extraBonusValue: isManager ? parseFloat(r.extraBonusValue) : 0,
-    bonusStatus: isManager ? r.bonusStatus : null,
-    paymentMethod: isManager ? r.paymentMethod : null,
-    paymentDueDate: isManager ? r.paymentDueDate : null,
-    paidAt: isManager ? r.paidAt : null,
-    paymentNotes: isManager ? r.paymentNotes : null,
-    eventBreakdown: [],
-  })));
+  res.json(filtered.map(r => {
+    const pRule = r.platoon ? platoonByName.get(r.platoon) : undefined;
+    return {
+      ...r,
+      scoreSum: parseFloat(r.scoreSum),
+      grossAverage: parseFloat(r.grossAverage),
+      absencePenalty: parseFloat(r.absencePenalty),
+      meritPoints: parseFloat(r.meritPoints),
+      finalResult: parseFloat(r.finalResult),
+      platoonMinScore: pRule?.minScore ?? null,
+      platoonMaxScore: pRule?.maxScore ?? null,
+      bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
+      extraBonusValue: isManager ? parseFloat(r.extraBonusValue) : 0,
+      bonusStatus: isManager ? r.bonusStatus : null,
+      paymentMethod: isManager ? r.paymentMethod : null,
+      paymentDueDate: isManager ? r.paymentDueDate : null,
+      paidAt: isManager ? r.paidAt : null,
+      paymentNotes: isManager ? r.paymentNotes : null,
+      eventBreakdown: [],
+    };
+  }));
 });
 
 router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"), async (req, res) => {
