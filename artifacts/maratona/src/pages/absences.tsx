@@ -194,7 +194,10 @@ export default function AbsencesPage() {
   const filteredAbsences = (absences ?? []).filter(a => {
     if (search && !(a.employeeName ?? "").toLowerCase().includes(search.toLowerCase())) return false;
     if (filterKind !== "all" && a.kind !== filterKind) return false;
-    if (filterEventId !== "__all" && String(a.eventId ?? "") !== filterEventId) return false;
+    if (filterEventId !== "__all") {
+      if (filterEventId === "__none" && a.eventId != null) return false;
+      if (filterEventId !== "__none" && String(a.eventId) !== filterEventId) return false;
+    }
     if (filterDateFrom && a.date < filterDateFrom) return false;
     if (filterDateTo && a.date > filterDateTo) return false;
     return true;
@@ -278,7 +281,7 @@ export default function AbsencesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all">Todos os eventos</SelectItem>
-                <SelectItem value="">Sem evento (ciclo)</SelectItem>
+                <SelectItem value="__none">Sem evento (ciclo)</SelectItem>
                 {(events ?? []).map(e => (
                   <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
                 ))}
