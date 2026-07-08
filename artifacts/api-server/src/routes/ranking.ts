@@ -3,7 +3,7 @@ import {
   db, quarterlyResultsTable, employeesTable, absencesTable, eventsTable,
   eventParticipantsTable, platoonRulesTable,
 } from "@workspace/db";
-import { eq, and, sql, ilike, notExists } from "drizzle-orm";
+import { eq, and, sql, ilike, exists } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -39,15 +39,14 @@ router.get("/ranking", async (req, res) => {
       .where(and(
         eq(quarterlyResultsTable.cycleId, cycle.id),
         eq(employeesTable.employmentType, "casa"),
-        ilike(employeesTable.functionName, "cenotecnic%"),
-        notExists(
+        exists(
           db.select({ one: sql`1` })
             .from(eventParticipantsTable)
             .innerJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
             .where(and(
               eq(eventParticipantsTable.employeeId, employeesTable.id),
               eq(eventsTable.cycleId, cycle.id),
-              ilike(eventParticipantsTable.functionName, "sup ceno%"),
+              ilike(eventParticipantsTable.functionName, "cenotecnic%"),
             )),
         ),
       ))
