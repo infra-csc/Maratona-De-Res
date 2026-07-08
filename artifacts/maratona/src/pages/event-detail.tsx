@@ -309,28 +309,32 @@ function ParticipantDiariaDialog({
 }
 
 function ParticipantCommentBox({
-  participantId, employeeId, initialComment, canManage, reason, onSave, isSaving,
+  participantId, employeeId, initialComment, canManage, reason, onSave, isSaving, isInactive,
 }: {
   participantId: number; employeeId: number; initialComment: string | null | undefined;
-  canManage: boolean; reason: string; onSave: (value: string) => void; isSaving: boolean;
+  canManage: boolean; reason: string; onSave: (value: string) => void; isSaving: boolean; isInactive?: boolean;
 }) {
   const [value, setValue] = useState(initialComment ?? "");
   useEffect(() => { setValue(initialComment ?? ""); }, [initialComment, participantId]);
   const dirty = value.trim() !== (initialComment ?? "").trim();
 
+  const boxCls = isInactive
+    ? "border border-[#c9b5b5] bg-[#fdf7f7]"
+    : "border-2 border-[#191c1e] bg-[#fff8e1]";
+
   if (!canManage) {
     if (!initialComment) return null;
     return (
-      <div className="mt-1 p-2 border-2 border-[#191c1e] bg-[#fff8e1] flex items-start gap-1.5">
-        <MessageSquare size={12} className="text-[#444933] shrink-0 mt-[2px]" />
+      <div className={cn("mt-1 p-2 flex items-start gap-1.5", boxCls)}>
+        <MessageSquare size={12} className="text-[#862200]/60 shrink-0 mt-[2px]" />
         <p className="text-[11px] font-semibold italic text-[#191c1e] whitespace-pre-wrap">{initialComment}</p>
       </div>
     );
   }
 
   return (
-    <div className="mt-1 p-2 border-2 border-[#191c1e] bg-[#fff8e1] space-y-1.5">
-      <p className="text-[10px] font-black italic uppercase text-[#862200] flex items-center gap-1.5">
+    <div className={cn("mt-1 p-2 space-y-1.5", boxCls)}>
+      <p className={cn("text-[10px] font-black italic uppercase flex items-center gap-1.5", isInactive ? "text-[#862200]/70" : "text-[#862200]")}>
         <MessageSquare size={12} /> {reason}
       </p>
       <Textarea
@@ -338,14 +342,24 @@ function ParticipantCommentBox({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Comentário / justificativa..."
-        className="text-xs rounded-none border-2 border-[#191c1e] bg-white min-h-[56px] max-h-[80px] resize-none"
+        className={cn(
+          "text-xs rounded-none bg-white min-h-[56px] max-h-[80px] resize-none",
+          isInactive
+            ? "border border-[#c9b5b5] focus-visible:ring-1 focus-visible:ring-[#862200]/40 focus-visible:ring-offset-0 focus-visible:border-[#862200]/50"
+            : "border-2 border-[#191c1e]"
+        )}
       />
       <button
         type="button"
         data-testid={`button-save-participant-comment-${employeeId}`}
         disabled={isSaving || !dirty}
         onClick={() => onSave(value.trim())}
-        className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b3e600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className={cn(
+          "px-3 py-1 font-black italic uppercase text-[10px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+          isInactive
+            ? "border border-[#862200]/50 bg-[#862200]/10 text-[#862200] hover:bg-[#862200]/20"
+            : "border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] hover:bg-[#b3e600]"
+        )}
       >
         {isSaving ? "Salvando..." : "Salvar comentário"}
       </button>
@@ -2171,7 +2185,9 @@ export default function EventDetailPage() {
                           data-testid={`chip-participant-${p.employeeId}`}
                           className={cn(
                             "flex flex-col h-full border-2 border-[#eceef0] transition-colors",
-                            isInformational ? "bg-[#862200]/[0.05] border-l-4 border-l-[#862200]" : "hover:border-[#191c1e]"
+                            isInactive ? "bg-[#fdece6]/40 border-l-4 border-l-[#862200]" :
+                            isInformational ? "bg-[#862200]/[0.05] border-l-4 border-l-[#862200]" :
+                            "hover:border-[#191c1e]"
                           )}
                         >
                           {/* Bloco principal — cresce para preencher a célula do grid */}
@@ -2293,13 +2309,14 @@ export default function EventDetailPage() {
                           </div>
                           {/* Caixa de justificativa — fora do wrapper com opacity para ficar sempre visível */}
                           {showCommentBox && (
-                            <div className="pt-3 border-t-2 border-[#eceef0] px-4 pb-4">
+                            <div className={cn("px-4 pb-4 pt-3", isInactive ? "border-t border-[#c9b5b5]" : "border-t-2 border-[#eceef0]")}>
                               <ParticipantCommentBox
                                 participantId={p.id}
                                 employeeId={p.employeeId}
                                 initialComment={p.comment}
                                 canManage={canManage}
                                 reason={commentReason}
+                                isInactive={isInactive}
                                 isSaving={updateParticipant.isPending}
                                 onSave={(value) => updateParticipant.mutate({ id, participantId: p.id, data: { comment: value || null } })}
                               />
