@@ -83,6 +83,8 @@ export const publicEvalTokensTable = pgTable("public_eval_tokens", {
   submitterName: text("submitter_name"),
   usedAt: timestamp("used_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  /** 'criteria' | 'conformity_cenografia' | 'conformity_ferramentas' */
+  tokenType: text("token_type").notNull().default("criteria"),
 });
 
 /**

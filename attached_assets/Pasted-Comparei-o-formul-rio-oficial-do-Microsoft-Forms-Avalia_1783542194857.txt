@@ -1,0 +1,85 @@
+Comparei o formulário oficial do Microsoft Forms ("Avaliação - Time de CENOGRAFIA no 
+evento") com o que está implementado no app e encontrei 2 divergências que precisam 
+ser corrigidas para o app refletir fielmente a regra real de avaliação.
+
+═══════════════════════════════════════
+1. CORRIGIR ESCALA DE NOTA: 0-10 (11 opções), NÃO 1-10
+═══════════════════════════════════════
+
+- O app hoje usa uma escala de 1 a 10 (10 opções), com um rótulo textual diferente 
+  para CADA número (1-Crítico, 2-Muito Abaixo, 3-Abaixo do Esperado, 4-Insuficiente, 
+  5-Atendeu Minimamente, 6-Atendeu, 7-Atendeu Bem, 8-Muito Bom, 9-Ótimo, 10-Excelência).
+- O formulário OFICIAL usa escala de 0 a 10 (11 opções: 0,1,2,3,4,5,6,7,8,9,10), com 
+  apenas 2 rótulos textuais, um em cada ponta:
+  - 0 = "Crítico, não atendeu ao básico"
+  - 10 = "Perfeição, atendeu completamente e sem erros"
+  (Os números do meio não têm rótulo textual individual.)
+- Corrigir o app para usar essa escala oficial: 0 a 10, com rótulo apenas nas 
+  extremidades (0 e 10), removendo os rótulos individuais dos números intermediários.
+- ATENÇÃO: isso muda a base de cálculo (11 valores possíveis em vez de 10, e agora 
+  incluindo o 0 como nota válida, não como "sem nota"). Revisar se isso impacta o 
+  cálculo de médias/pesos já configurado, e ajustar a lógica de "Nota Máxima por 
+  Critério" nas Regras do Sistema de "10" para refletir que 0 também é uma nota 
+  válida dentro da escala (não uma ausência de nota).
+
+═══════════════════════════════════════
+2. CORRIGIR REGRA DE OBRIGATORIEDADE DO COMENTÁRIO
+═══════════════════════════════════════
+
+No formulário oficial, a regra de comentário obrigatório é:
+
+a) CRITÉRIOS COM NOTA (0-10) — comentário SEMPRE obrigatório, independente do valor 
+   da nota. Vale para: Qualidade da Entrega, Qualidade da Entrega (2), Prazo de 
+   Entrega, Perda de Material/Estrutura, Logística Reversa, Carga na Saída do Galpão.
+
+b) PERGUNTAS SIM/NÃO DA MATRIZ DE CONFORMIDADE — comentário SEMPRE OPCIONAL, mesmo 
+   quando a resposta for "Não". Vale para: Todos os equipamentos e ferramentas 
+   retornaram?, Todos usaram EPI na arena?, Estaiamento e Aterramento foram feitos 
+   corretamente?, Conduta e comportamento foram adequados?
+
+- Isso é DIFERENTE da regra que havia sido definida anteriormente no app 
+  ("comentário obrigatório somente se resposta for Não"). Ajustar o app para seguir 
+  a regra REAL do formulário oficial: comentário sempre opcional nessas 4 perguntas 
+  Sim/Não, independente da resposta.
+
+═══════════════════════════════════════
+3. CONFIRMAR ESTRUTURA DE PERGUNTAS DA CENOGRAFIA (JÁ CORRETA, SÓ VALIDAR ORDEM)
+═══════════════════════════════════════
+
+Confirmando que a ordem e obrigatoriedade do formulário de Cenografia deve ser:
+
+1. Carga na Saída do Galpão — nota 0-10 (obrigatório) + Comentário (obrigatório)
+2. Todos os equipamentos e ferramentas retornaram? — Sim/Não (obrigatório) + 
+   Comentário (opcional) [Grupo: Ferramentas e Case]
+3. Todos usaram EPI na arena? — Sim/Não (obrigatório) + Comentário (opcional)
+4. Estaiamento e Aterramento foram feitos de maneira correta? — Sim/Não 
+   (obrigatório) + Comentário (opcional)
+5. Conduta e comportamento foram adequados? — Sim/Não (obrigatório) + Comentário 
+   (opcional)
+6. Alguém faltou ou atrasou por mais de 30 minutos? Especifique. — Texto livre 
+   (obrigatório, mesmo se resposta for "não houve" — precisa preencher algo, ex: 
+   "Não" ou "Ninguém")
+7. Algum profissional teve desempenho fora da curva? — Escolha (obrigatório): 
+   "Não, tudo dentro do padrão esperado" / "Sim, houve um grande destaque" 
+   — se "Sim", abre campo de justificativa obrigatório na sequência.
+
+- Confirmar que o item "Todos os equipamentos e ferramentas retornaram?" continua 
+  sendo avaliado pelo grupo separado "Ferramentas e Case (Cenografia)" (Giovanni 
+  Bertoni), enquanto os demais itens (2-7 restantes) são do grupo "Cenografia" 
+  (Fred), conforme já definido.
+
+═══════════════════════════════════════
+4. VALIDAR SE ESSA MESMA ESTRUTURA/ESCALA SE APLICA A TODAS AS OUTRAS ÁREAS
+═══════════════════════════════════════
+
+- Confirmar que a escala 0-10 (com rótulo só nas pontas) e a regra de comentário 
+  sempre obrigatório para critérios de nota se aplicam igualmente a: Ativação 
+  (Qualidade da Entrega (2)), Atendimento (Qualidade da Entrega), Produção (Prazo 
+  de Entrega), Logística (Perda de Material/Estrutura, Logística Reversa).
+- Ou seja, TODOS os critérios do tipo "nota" no sistema devem usar a escala 0-10 
+  com rótulo só nas pontas, e comentário sempre obrigatório — não é uma regra 
+  exclusiva de Cenografia.
+
+Testar o formulário completo do avaliador (para cada área) após o ajuste, 
+comparando visualmente com o formulário oficial do Microsoft Forms para garantir 
+que ficou idêntico em texto, ordem, obrigatoriedade e escala de notas.

@@ -1,0 +1,87 @@
+Preciso corrigir um erro conceitual que se repetiu em várias partes do sistema: o 
+redirecionamento de avaliação (e a geração de link público para freelancer) NÃO deve 
+ser feito por CRITÉRIO individual — deve ser feito por FORMULÁRIO INTEIRO da 
+área/grupo, exatamente como funciona no Microsoft Forms hoje (um único formulário 
+com várias perguntas, todas respondidas de uma vez pela mesma pessoa).
+
+═══════════════════════════════════════
+1. MODELO CORRETO: 1 FORMULÁRIO = TODAS AS PERGUNTAS DAQUELE GRUPO
+═══════════════════════════════════════
+
+Cada "formulário" agrupa TODAS as perguntas de um mesmo grupo/área dentro de um 
+evento, exatamente como no Forms oficial. Por exemplo, no formulário de Cenografia:
+- Carga na Saída do Galpão (nota + comentário obrigatório)
+- Todos usaram EPI na arena? (Sim/Não + comentário opcional)
+- Estaiamento e Aterramento foram feitos corretamente? (Sim/Não + comentário opcional)
+- Conduta e comportamento foram adequados? (Sim/Não + comentário opcional)
+- Alguém faltou ou atrasou? (texto livre)
+- Desempenho fora da curva? (escolha + justificativa condicional)
+
+Todas essas perguntas pertencem ao MESMO formulário, respondido de uma vez só pela 
+MESMA pessoa (ex: Fred). O único item que sai desse formulário é "Todos os 
+equipamentos e ferramentas retornaram?", que pertence a um formulário SEPARADO, do 
+grupo "Ferramentas e Case" (Giovanni Bertoni).
+
+═══════════════════════════════════════
+2. REDIRECIONAMENTO — POR FORMULÁRIO, NÃO POR CRITÉRIO
+═══════════════════════════════════════
+
+- O botão "Redirecionar para outro membro do grupo" deve aparecer UMA VEZ por 
+  FORMULÁRIO (ex: um botão para o formulário inteiro de "Cenografia", outro botão 
+  separado para o formulário de "Ferramentas e Case"), e não um botão por pergunta/
+  critério individual dentro do formulário.
+- Ao redirecionar, TODO o formulário (todas as perguntas daquele grupo) é 
+  transferido de uma vez para a nova pessoa — ela recebe o formulário completo para 
+  responder, exatamente como a pessoa original teria recebido.
+- Isso corrige o modelo anterior (que sugeria redirecionamento por critério 
+  isolado) em TODAS as telas onde isso foi implementado ou sugerido: tela do 
+  avaliador (Sandro Gomes, Fred, Agatha), tela de Central de Avaliações, tela de 
+  Atribuição de Avaliadores do evento.
+
+═══════════════════════════════════════
+3. LINK PÚBLICO PARA FREELANCER — TAMBÉM POR FORMULÁRIO
+═══════════════════════════════════════
+
+- Da mesma forma, a opção "Gerar link para freelancer sem cadastro" deve gerar um 
+  link para o FORMULÁRIO INTEIRO daquele grupo/área (todas as perguntas de uma vez), 
+  não um link por pergunta/critério isolado.
+- O freelancer recebe um único link, abre, preenche o nome dele, e responde TODAS 
+  as perguntas daquele formulário de uma vez (igual ao fluxo do Forms), antes de 
+  enviar. O link expira após esse envio único.
+
+═══════════════════════════════════════
+4. ATRIBUIÇÃO DE AVALIADOR — TAMBÉM É POR FORMULÁRIO/GRUPO, NÃO POR CRITÉRIO
+═══════════════════════════════════════
+
+- Reforçando o que já era a intenção original: na tela de "Atribuição de 
+  Avaliadores" do evento, cada ÁREA/GRUPO (Atendimento, Cenografia, Logística, 
+  Produção, Ferramentas e Case) recebe UM avaliador responsável pelo FORMULÁRIO 
+  INTEIRO daquele grupo — não é possível (nem necessário) dividir avaliadores 
+  diferentes para perguntas diferentes dentro do MESMO formulário/grupo.
+- Isso simplifica a tela de "Critérios de Avaliação" (/criteria): o "avaliador 
+  padrão" e o "redirecionamento" devem ser configurados no nível do FORMULÁRIO/GRUPO 
+  (ex: um avaliador padrão para "Cenografia" inteiro), e não em cada linha de 
+  critério individual como estava sendo tratado antes.
+- Ajustar a interface dessa tela para deixar isso claro: agrupar visualmente os 
+  critérios por FORMULÁRIO/GRUPO (com um único campo de "Avaliador Padrão" e 
+  "Redirecionamento" no topo de cada grupo), em vez de repetir esse campo em cada 
+  linha de critério isolado.
+
+═══════════════════════════════════════
+5. EXCEÇÃO: MATRIZ DE CONFORMIDADE COM 2 GRUPOS DENTRO DE CENOGRAFIA
+═══════════════════════════════════════
+
+- Reforçando a estrutura já definida: dentro de "Cenografia" como CATEGORIA, existem 
+  2 formulários/grupos distintos e independentes:
+  a) "Ferramentas e Case (Cenografia)" — formulário próprio, com 1 pergunta (Todos 
+     os equipamentos e ferramentas retornaram?), avaliador padrão Giovanni Bertoni.
+  b) "Cenografia" — formulário próprio, com as demais 6 perguntas, avaliador padrão 
+     Fred.
+- Cada um desses 2 formulários tem seu PRÓPRIO redirecionamento e PRÓPRIO link 
+  público independentes um do outro — redirecionar ou gerar link em um não afeta o 
+  outro.
+
+Revisar TODAS as telas já implementadas (Central de Avaliações, tela individual do 
+avaliador, Atribuição de Avaliadores do Evento, tela de Critérios) para garantir que 
+a lógica de redirecionamento/link público esteja no nível de FORMULÁRIO/GRUPO, e 
+corrigir qualquer lugar onde isso ainda esteja implementado por critério individual.

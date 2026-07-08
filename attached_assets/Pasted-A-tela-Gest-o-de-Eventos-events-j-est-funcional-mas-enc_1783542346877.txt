@@ -1,0 +1,80 @@
+A tela "Gestão de Eventos" (/events) já está funcional, mas encontrei alguns pontos 
+de clareza e um possível bug que precisam de ajuste.
+
+═══════════════════════════════════════
+1. BUG: "AVALIAÇÕES DOS AVALIADORES 100% (0/0)"
+═══════════════════════════════════════
+
+- Em eventos concluídos (ex: "S Run - Sorocaba", "Girl Power - Belo Horizonte", "42K 
+  - Florianópolis", "Eco Run - São Paulo"), aparece "AVALIAÇÕES DOS AVALIADORES 100% 
+  (0/0)" — isso é uma divisão por zero (0 de 0), que tecnicamente não deveria ser 
+  "100%", é uma indefinição.
+- Corrigir a lógica: se o total de avaliações esperadas for 0 (ex: nenhum critério 
+  configurado, ou dados históricos sem essa contagem), mostrar algo como "—" ou 
+  "Dados não disponíveis" ao invés de "100% (0/0)", que passa uma informação falsa.
+
+═══════════════════════════════════════
+2. CLAREZA NOS CARDS DO TOPO (NÚMEROS QUE NÃO SOMAM)
+═══════════════════════════════════════
+
+- Os 5 cards no topo (Configurados: 4, Confirmados: 14, Não Confirmados: 62, Falta 
+  Calibrar: 11, Avaliação 100%: 23) somam mais que "76 eventos" no total, sugerindo 
+  que as categorias se sobrepõem (ex: um evento pode estar "Confirmado" E "Falta 
+  Calibrar" ao mesmo tempo).
+- Deixar isso explícito com um texto de ajuda (tooltip ou legenda), ex: "Estas 
+  categorias podem se sobrepor — um evento pode estar em mais de um status ao mesmo 
+  tempo (ex: confirmado e aguardando calibração)."
+- Alternativa mais clara: tornar cada card CLICÁVEL, filtrando automaticamente a 
+  lista de eventos abaixo por aquele status ao clicar (ex: clicar em "Falta 
+  Calibrar: 11" filtra a lista para mostrar só esses 11 eventos).
+
+═══════════════════════════════════════
+3. BADGES DUPLICADOS/REDUNDANTES NOS CARDS DE EVENTO
+═══════════════════════════════════════
+
+- Em eventos concluídos aparecem 2 badges parecidos: "HISTÓRICO" e "EVENTO 
+  CONCLUÍDO" — ambos parecem comunicar a mesma coisa (evento já terminou).
+- Consolidar em um único badge mais claro, ex: apenas "EVENTO CONCLUÍDO" (remover 
+  "HISTÓRICO", que é redundante), a menos que "Histórico" tenha um significado 
+  técnico diferente (ex: eventos de ciclos anteriores) — se for esse o caso, deixar 
+  isso mais explícito com um texto diferente, tipo "Ciclo Anterior" em vez de 
+  "Histórico".
+
+═══════════════════════════════════════
+4. ATALHO ENTRE CARD E CALIBRAÇÃO (JÁ EXISTE ÍCONE, CONFIRMAR FUNCIONAMENTO)
+═══════════════════════════════════════
+
+- Cada card tem um pequeno ícone (parece ser de "atalho"/navegação) ao lado do 
+  botão "GERENCIAR" — confirmar que esse ícone é o atalho direto para a Calibração 
+  daquele evento específico (já solicitado anteriormente) e que ele está 
+  funcionando corretamente, levando para a calibração JÁ daquele evento selecionado, 
+  não para a tela geral de calibrações.
+
+═══════════════════════════════════════
+5. FILTRO "TODOS STATUS" — GARANTIR QUE COBRE TODOS OS BADGES
+═══════════════════════════════════════
+
+- Confirmar que o dropdown "TODOS STATUS" permite filtrar por: Aguardando RH, 
+  Histórico/Evento Concluído, Falta Calibrar, Calibragem Concluída, Calibragem 
+  Pendente — cobrindo todos os status visíveis nos cards.
+
+═══════════════════════════════════════
+6. INDICADOR DE SCORE FINAL — DIFERENCIAR "PARCIAL" DE "FINAL"
+═══════════════════════════════════════
+
+- O badge "SCORE FINAL" com "PÓS-CALIBRAÇÃO" (ex: 72.5, 80.0, 67.5, 65.0) é uma boa 
+  indicação, mas considerando o botão "PUBLICAR FINAL" (já implementado na tela de 
+  Calibração), garantir que esse "Score Final" só apareça com essa etiqueta quando 
+  TODOS os critérios daquele evento já tiverem sido publicados como final — caso 
+  contrário, mostrar algo como "Score Parcial (calibração em andamento)".
+
+═══════════════════════════════════════
+7. ORDENAÇÃO DA LISTA DE EVENTOS
+═══════════════════════════════════════
+
+- Adicionar opção de ordenação (ex: por data mais recente, por status, por score) 
+  no topo da lista, já que com 76 eventos a navegação pode ficar difícil só com 
+  busca e filtro de status.
+
+Manter a paleta de cores atual do sistema (preto/lima, laranja para pendências, 
+vermelho para "não confirmados").

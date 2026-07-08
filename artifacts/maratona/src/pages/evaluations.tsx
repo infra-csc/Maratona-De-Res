@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria } from "@/lib/routing-api";
+import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -351,14 +351,27 @@ export default function EvaluationsPage() {
   const [publicLinkRecipientName, setPublicLinkRecipientName] = useState("");
   const [generatedPublicUrl, setGeneratedPublicUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Conformity public link dialog state (shared for cenografia + ferramentas)
+  const [conformityPublicLinkType, setConformityPublicLinkType] = useState<"cenografia" | "ferramentas" | null>(null);
+  const [conformityPublicRecipientName, setConformityPublicRecipientName] = useState("");
+  const [generatedConformityUrl, setGeneratedConformityUrl] = useState<string | null>(null);
+  const [conformityLinkCopied, setConformityLinkCopied] = useState(false);
   const { data: redirectOptionsData } = useRedirectOptions(
     selectedEventId ?? 0,
     redirectDialogCriterionId ?? 0,
   );
   const { data: publicLinkEligibleCriteria } = usePublicLinkEligibleCriteria(selectedEventId ?? null);
   const createPublicToken = useCreatePublicToken(selectedEventId ?? 0);
+  const createConformityPublicToken = useCreateConformityPublicToken(selectedEventId ?? 0);
+  const createFerramentasPublicToken = useCreateFerramentasPublicToken(selectedEventId ?? 0);
   const { data: publicTokenHistory, refetch: refetchTokenHistory } = usePublicTokens(
     publicLinkDialogOpen ? (selectedEventId ?? null) : null,
+  );
+  const { data: conformityPublicTokenHistory, refetch: refetchConformityTokenHistory } = useConformityPublicTokens(
+    conformityPublicLinkType === "cenografia" ? (selectedEventId ?? null) : null,
+  );
+  const { data: ferramentasPublicTokenHistory, refetch: refetchFerramentasTokenHistory } = useFerramentasPublicTokens(
+    conformityPublicLinkType === "ferramentas" ? (selectedEventId ?? null) : null,
   );
 
   const createMutation = useCreateEvaluation({
@@ -1837,9 +1850,46 @@ export default function EvaluationsPage() {
                 const canSave = !commentMissing;
                 return (
                   <div className="space-y-4">
-                    <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
-                      <ShieldAlert size={22} /> Ferramentas e Case (Cenografia)
-                    </h3>
+                    <div className="flex items-start justify-between gap-3 px-1">
+                      <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
+                        <ShieldAlert size={22} /> Ferramentas e Case (Cenografia)
+                      </h3>
+                      <div className="flex items-center gap-2 shrink-0 pt-1">
+                        <Popover open={redirectFerramentasOpen} onOpenChange={setRedirectFerramentasOpen}>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
+                              <ArrowRight size={12} /> Redirecionar
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
+                            <Command className="rounded-none">
+                              <CommandInput placeholder="Buscar avaliador..." className="italic" />
+                              <CommandList className="max-h-[240px]">
+                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                  {(ferramentasUsers ?? []).map(u => (
+                                    <CommandItem key={u.id} value={u.name}
+                                      onSelect={() => { setRedirectFerramentasTargetId(u.id); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
+                                      className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
+                                    >
+                                      <Check size={14} className={cn("shrink-0", redirectFerramentasTargetId === u.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <button type="button"
+                          onClick={() => { setConformityPublicLinkType("ferramentas"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchFerramentasTokenHistory(); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors"
+                          title="Gerar link único para um freelancer responder o formulário de Ferramentas"
+                        >
+                          <Link2 size={12} /> Link Freelancer
+                        </button>
+                      </div>
+                    </div>
                     <p className="text-sm text-[#444933] italic px-1 -mt-1">
                       Você foi designado para avaliar o retorno de equipamentos e ferramentas.
                     </p>
@@ -1888,36 +1938,6 @@ export default function EvaluationsPage() {
                           ><Save size={12} /> Salvar</button>
                         </div>
                       )}
-                      {/* Redirect */}
-                      <div className="px-5 py-3 border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
-                        <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Redirecionar para outro membro do grupo</span>
-                        <Popover open={redirectFerramentasOpen} onOpenChange={setRedirectFerramentasOpen}>
-                          <PopoverTrigger asChild>
-                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
-                              <ArrowRight size={12} /> Redirecionar
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
-                            <Command className="rounded-none">
-                              <CommandInput placeholder="Buscar avaliador..." className="italic" />
-                              <CommandList className="max-h-[240px]">
-                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                  {(ferramentasUsers ?? []).map(u => (
-                                    <CommandItem key={u.id} value={u.name}
-                                      onSelect={() => { setRedirectFerramentasTargetId(u.id); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
-                                      className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
-                                    >
-                                      <Check size={14} className={cn("shrink-0", redirectFerramentasTargetId === u.id ? "opacity-100" : "opacity-0")} />
-                                      <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
                     </div>
                   </div>
                 );
@@ -1938,9 +1958,46 @@ export default function EvaluationsPage() {
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
                 return (
                   <div className="space-y-4">
-                    <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
-                      <ShieldAlert size={22} /> Cenografia
-                    </h3>
+                    <div className="flex items-start justify-between gap-3 px-1">
+                      <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
+                        <ShieldAlert size={22} /> Cenografia
+                      </h3>
+                      <div className="flex items-center gap-2 shrink-0 pt-1">
+                        <Popover open={redirectConformityOpen} onOpenChange={setRedirectConformityOpen}>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
+                              <ArrowRight size={12} /> Redirecionar
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
+                            <Command className="rounded-none">
+                              <CommandInput placeholder="Buscar avaliador..." className="italic" />
+                              <CommandList className="max-h-[240px]">
+                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                  {(cenografiaUsers ?? []).map(u => (
+                                    <CommandItem key={u.id} value={u.name}
+                                      onSelect={() => { setRedirectConformityTargetId(u.id); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
+                                      className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
+                                    >
+                                      <Check size={14} className={cn("shrink-0", redirectConformityTargetId === u.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <button type="button"
+                          onClick={() => { setConformityPublicLinkType("cenografia"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchConformityTokenHistory(); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors"
+                          title="Gerar link único para um freelancer responder o formulário de Cenografia"
+                        >
+                          <Link2 size={12} /> Link Freelancer
+                        </button>
+                      </div>
+                    </div>
                     <p className="text-sm text-[#444933] italic px-1 -mt-1">
                       Você foi designado para avaliar a conformidade da equipe de Cenografia neste evento.
                     </p>
@@ -2051,38 +2108,6 @@ export default function EvaluationsPage() {
                       ><Save size={14} /> Salvar observações</button>
                     </div>
 
-                    {/* Redirect */}
-                    <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-                      <div className="px-5 py-3 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-bold italic uppercase text-[#747a60]">Redirecionar para outro membro do grupo</span>
-                        <Popover open={redirectConformityOpen} onOpenChange={setRedirectConformityOpen}>
-                          <PopoverTrigger asChild>
-                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
-                              <ArrowRight size={12} /> Redirecionar
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="end" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
-                            <Command className="rounded-none">
-                              <CommandInput placeholder="Buscar avaliador..." className="italic" />
-                              <CommandList className="max-h-[240px]">
-                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                  {(cenografiaUsers ?? []).map(u => (
-                                    <CommandItem key={u.id} value={u.name}
-                                      onSelect={() => { setRedirectConformityTargetId(u.id); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
-                                      className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3"
-                                    >
-                                      <Check size={14} className={cn("shrink-0", redirectConformityTargetId === u.id ? "opacity-100" : "opacity-0")} />
-                                      <span className="text-xs font-bold italic uppercase truncate">{u.name}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
                   </div>
                 );
               })()}
@@ -2560,6 +2585,125 @@ export default function EvaluationsPage() {
                 className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
               >
                 {createPublicToken.isPending ? "Gerando..." : "Gerar Link"}
+              </button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: Link Público de Conformidade (Cenografia / Ferramentas) ── */}
+      <Dialog open={conformityPublicLinkType !== null} onOpenChange={o => { if (!o) { setConformityPublicLinkType(null); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); } }}>
+        <DialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="italic uppercase font-black tracking-tight flex items-center gap-2">
+              <Link2 size={18} />
+              {conformityPublicLinkType === "cenografia" ? "Link Freelancer — Cenografia" : "Link Freelancer — Ferramentas"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <p className="text-sm italic text-[#444933]">
+              {conformityPublicLinkType === "cenografia"
+                ? "Gere um link único de uso único para um freelancer preencher o formulário de conformidade de Cenografia (EPI, Estaiamentos, Conduta, Ausências e Destaque)."
+                : "Gere um link único de uso único para um freelancer preencher o formulário de Guarda de Equipamentos."}
+            </p>
+
+            {!generatedConformityUrl ? (
+              <div className="space-y-2">
+                <Label className="text-xs font-black italic uppercase">Nome do destinatário</Label>
+                <input
+                  type="text"
+                  value={conformityPublicRecipientName}
+                  onChange={e => setConformityPublicRecipientName(e.target.value)}
+                  placeholder="Ex.: Fred Ribeiro"
+                  className="w-full border-2 border-[#191c1e] px-4 py-2.5 text-sm italic font-bold focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="border-2 border-[#506600] bg-[#f0fff0] p-3 flex items-start gap-2">
+                  <CheckCircle size={16} className="text-[#506600] shrink-0 mt-0.5" />
+                  <p className="text-xs font-bold italic text-[#506600]">Link gerado com sucesso! Copie e envie ao freelancer.</p>
+                </div>
+                <div className="border-2 border-[#191c1e] bg-[#f2f4f6] px-3 py-2 flex items-center gap-2 min-w-0">
+                  <span className="text-xs italic font-bold text-[#444933] truncate flex-1">{generatedConformityUrl}</span>
+                  <button type="button"
+                    onClick={() => { navigator.clipboard.writeText(generatedConformityUrl); setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2500); }}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#ccff00] border-2 border-[#191c1e] hover:bg-[#b8e600] transition-colors"
+                  >
+                    <Copy size={12} />{conformityLinkCopied ? "Copiado!" : "Copiar"}
+                  </button>
+                </div>
+                <p className="text-[11px] italic text-[#747a60]">
+                  Este link é de uso único e expira após o freelancer submeter o formulário.
+                </p>
+              </>
+            )}
+
+            {/* Histórico de tokens */}
+            {(() => {
+              const hist = conformityPublicLinkType === "cenografia"
+                ? (conformityPublicTokenHistory ?? [])
+                : (ferramentasPublicTokenHistory ?? []);
+              if (hist.length === 0) return null;
+              return (
+                <div>
+                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-2">Histórico de links enviados</p>
+                  <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-40 overflow-y-auto">
+                    {hist.map(t => (
+                      <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
+                          <p className="text-[10px] italic text-[#747a60]">
+                            Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                        {t.usedAt ? (
+                          <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
+                            <CheckCircle size={10} /> Respondido
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
+                            Pendente
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          <DialogFooter className="gap-2 pt-4">
+            <button type="button"
+              onClick={() => { setConformityPublicLinkType(null); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); }}
+              className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
+            >
+              {generatedConformityUrl ? "Fechar" : "Cancelar"}
+            </button>
+            {!generatedConformityUrl && (
+              <button type="button"
+                disabled={!conformityPublicRecipientName.trim() || createConformityPublicToken.isPending || createFerramentasPublicToken.isPending}
+                onClick={() => {
+                  if (!conformityPublicRecipientName.trim()) return;
+                  const mutation = conformityPublicLinkType === "cenografia" ? createConformityPublicToken : createFerramentasPublicToken;
+                  mutation.mutate(
+                    { recipientName: conformityPublicRecipientName.trim() },
+                    {
+                      onSuccess: ({ tokenId }) => {
+                        const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+                        setGeneratedConformityUrl(`${base}/eval/${tokenId}`);
+                        if (conformityPublicLinkType === "cenografia") refetchConformityTokenHistory();
+                        else refetchFerramentasTokenHistory();
+                      },
+                      onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+                    },
+                  );
+                }}
+                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
+              >
+                {(createConformityPublicToken.isPending || createFerramentasPublicToken.isPending) ? "Gerando..." : "Gerar Link"}
               </button>
             )}
           </DialogFooter>

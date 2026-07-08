@@ -471,6 +471,152 @@ router.get("/events/:id/public-tokens", async (req, res) => {
     .where(and(
       eq(publicEvalTokensTable.eventId, eventId),
       eq(publicEvalTokensTable.createdByUserId, user.userId),
+      eq(publicEvalTokensTable.tokenType, "criteria"),
+    ))
+    .orderBy(publicEvalTokensTable.createdAt);
+
+  res.json(tokens);
+});
+
+// ---------------------------------------------------------------------------
+// POST /events/:id/public-token/conformity
+// Gera um link público single-use para o avaliador de conformidade Cenografia
+// delegar o formulário (EPI / Estaiamentos / Conduta / Ausências / Destaque)
+// a um freelancer sem cadastro.
+// Body: { recipientName: string }
+// ---------------------------------------------------------------------------
+router.post("/events/:id/public-token/conformity", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const user = req.user!;
+  const { recipientName } = req.body ?? {};
+
+  if (!recipientName || typeof recipientName !== "string" || !recipientName.trim()) {
+    res.status(400).json({ error: "Nome do destinatário é obrigatório" });
+    return;
+  }
+
+  const [ev] = await db.select({
+    status: eventsTable.status,
+    conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId,
+  }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+
+  if (!ev) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  if (ev.status !== "open" && ev.status !== "closed") {
+    res.status(400).json({ error: "Evento não está aberto para avaliações" }); return;
+  }
+
+  const isAdminRh = ["admin", "rh"].includes(user.role);
+  if (!isAdminRh && ev.conformityEvaluatorUserId !== user.userId) {
+    res.status(403).json({ error: "Você não é o avaliador de conformidade Cenografia deste evento" }); return;
+  }
+
+  const tokenId = randomUUID();
+  await db.insert(publicEvalTokensTable).values({
+    id: tokenId,
+    eventId,
+    createdByUserId: user.userId,
+    recipientName: recipientName.trim(),
+    tokenType: "conformity_cenografia",
+  });
+
+  await audit(user.userId, "create", "public_eval_tokens", tokenId, null, {
+    eventId, recipientName: recipientName.trim(), tokenType: "conformity_cenografia",
+  });
+  res.json({ tokenId });
+});
+
+// ---------------------------------------------------------------------------
+// POST /events/:id/public-token/conformity-ferramentas
+// Gera um link público single-use para o avaliador de conformidade Ferramentas
+// delegar o formulário (Guarda de Equipamentos) a um freelancer sem cadastro.
+// Body: { recipientName: string }
+// ---------------------------------------------------------------------------
+router.post("/events/:id/public-token/conformity-ferramentas", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const user = req.user!;
+  const { recipientName } = req.body ?? {};
+
+  if (!recipientName || typeof recipientName !== "string" || !recipientName.trim()) {
+    res.status(400).json({ error: "Nome do destinatário é obrigatório" });
+    return;
+  }
+
+  const [ev] = await db.select({
+    status: eventsTable.status,
+    conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId,
+  }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+
+  if (!ev) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  if (ev.status !== "open" && ev.status !== "closed") {
+    res.status(400).json({ error: "Evento não está aberto para avaliações" }); return;
+  }
+
+  const isAdminRh = ["admin", "rh"].includes(user.role);
+  if (!isAdminRh && ev.conformityEvaluatorFerramentasUserId !== user.userId) {
+    res.status(403).json({ error: "Você não é o avaliador de conformidade Ferramentas deste evento" }); return;
+  }
+
+  const tokenId = randomUUID();
+  await db.insert(publicEvalTokensTable).values({
+    id: tokenId,
+    eventId,
+    createdByUserId: user.userId,
+    recipientName: recipientName.trim(),
+    tokenType: "conformity_ferramentas",
+  });
+
+  await audit(user.userId, "create", "public_eval_tokens", tokenId, null, {
+    eventId, recipientName: recipientName.trim(), tokenType: "conformity_ferramentas",
+  });
+  res.json({ tokenId });
+});
+
+// ---------------------------------------------------------------------------
+// GET /events/:id/public-tokens/conformity
+// Lista tokens de conformidade Cenografia gerados pelo avaliador logado.
+// ---------------------------------------------------------------------------
+router.get("/events/:id/public-tokens/conformity", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const user = req.user!;
+
+  const tokens = await db.select({
+    id: publicEvalTokensTable.id,
+    recipientName: publicEvalTokensTable.recipientName,
+    submitterName: publicEvalTokensTable.submitterName,
+    usedAt: publicEvalTokensTable.usedAt,
+    createdAt: publicEvalTokensTable.createdAt,
+  })
+    .from(publicEvalTokensTable)
+    .where(and(
+      eq(publicEvalTokensTable.eventId, eventId),
+      eq(publicEvalTokensTable.createdByUserId, user.userId),
+      eq(publicEvalTokensTable.tokenType, "conformity_cenografia"),
+    ))
+    .orderBy(publicEvalTokensTable.createdAt);
+
+  res.json(tokens);
+});
+
+// ---------------------------------------------------------------------------
+// GET /events/:id/public-tokens/conformity-ferramentas
+// Lista tokens de conformidade Ferramentas gerados pelo avaliador logado.
+// ---------------------------------------------------------------------------
+router.get("/events/:id/public-tokens/conformity-ferramentas", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const user = req.user!;
+
+  const tokens = await db.select({
+    id: publicEvalTokensTable.id,
+    recipientName: publicEvalTokensTable.recipientName,
+    submitterName: publicEvalTokensTable.submitterName,
+    usedAt: publicEvalTokensTable.usedAt,
+    createdAt: publicEvalTokensTable.createdAt,
+  })
+    .from(publicEvalTokensTable)
+    .where(and(
+      eq(publicEvalTokensTable.eventId, eventId),
+      eq(publicEvalTokensTable.createdByUserId, user.userId),
+      eq(publicEvalTokensTable.tokenType, "conformity_ferramentas"),
     ))
     .orderBy(publicEvalTokensTable.createdAt);
 

@@ -206,7 +206,7 @@ export function useCreatePublicToken(eventId: number) {
   });
 }
 
-/** Lista tokens de avaliação pública gerados pelo avaliador logado para o evento. */
+/** Lista tokens de avaliação pública (critérios) gerados pelo avaliador logado para o evento. */
 export function usePublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
     queryKey: publicTokensKey(eventId ?? 0),
@@ -214,6 +214,56 @@ export function usePublicTokens(eventId: number | null) {
       apiFetch<PublicToken[]>(
         `/api/events/${eventId}/public-tokens`,
       ),
+    enabled: eventId != null,
+  });
+}
+
+/** Cria um token de avaliação pública para o formulário de conformidade Cenografia. */
+export function useCreateConformityPublicToken(eventId: number) {
+  const qc = useQueryClient();
+  return useMutation<{ tokenId: string }, Error, { recipientName: string }>({
+    mutationFn: (body) =>
+      apiFetch<{ tokenId: string }>(
+        `/api/events/${eventId}/public-token/conformity`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conformity-public-tokens", eventId] });
+    },
+  });
+}
+
+/** Cria um token de avaliação pública para o formulário de conformidade Ferramentas. */
+export function useCreateFerramentasPublicToken(eventId: number) {
+  const qc = useQueryClient();
+  return useMutation<{ tokenId: string }, Error, { recipientName: string }>({
+    mutationFn: (body) =>
+      apiFetch<{ tokenId: string }>(
+        `/api/events/${eventId}/public-token/conformity-ferramentas`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conformity-ferramentas-public-tokens", eventId] });
+    },
+  });
+}
+
+/** Lista tokens de conformidade Cenografia gerados pelo avaliador logado. */
+export function useConformityPublicTokens(eventId: number | null) {
+  return useQuery<PublicToken[]>({
+    queryKey: ["conformity-public-tokens", eventId ?? 0],
+    queryFn: () =>
+      apiFetch<PublicToken[]>(`/api/events/${eventId}/public-tokens/conformity`),
+    enabled: eventId != null,
+  });
+}
+
+/** Lista tokens de conformidade Ferramentas gerados pelo avaliador logado. */
+export function useFerramentasPublicTokens(eventId: number | null) {
+  return useQuery<PublicToken[]>({
+    queryKey: ["conformity-ferramentas-public-tokens", eventId ?? 0],
+    queryFn: () =>
+      apiFetch<PublicToken[]>(`/api/events/${eventId}/public-tokens/conformity-ferramentas`),
     enabled: eventId != null,
   });
 }
