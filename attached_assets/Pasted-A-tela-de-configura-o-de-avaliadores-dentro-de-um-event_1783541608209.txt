@@ -1,0 +1,122 @@
+A tela de configuração de avaliadores dentro de um evento específico (dentro de 
+"Central de Avaliações") tem vários problemas de clareza, redundância e falta de 
+funcionalidades essenciais. Preciso resolver os pontos abaixo.
+
+═══════════════════════════════════════
+1. FALTA BOTÃO/AÇÃO PARA "LIBERAR" AS AVALIAÇÕES
+═══════════════════════════════════════
+
+- Aparece o aviso "🔒 CRITÉRIOS AINDA NÃO CONFIRMADOS — AS ÁREAS NÃO PODEM AVALIAR 
+  ATÉ A LIBERAÇÃO", mas não existe nenhum botão visível de "Liberar Avaliações" ou 
+  "Confirmar Critérios" na tela.
+- Adicionar um botão claro (ex: "🔓 LIBERAR AVALIAÇÕES DO EVENTO"), que só fica 
+  habilitado depois que TODOS os avaliadores (por área) tiverem sido atribuídos. 
+  Enquanto houver "SEM AVALIADOR ATRIBUÍDO" em qualquer área, o botão deve ficar 
+  desabilitado com uma dica explicando o motivo (ex: "Atribua um avaliador para 
+  todas as áreas antes de liberar").
+
+═══════════════════════════════════════
+2. CONFUSÃO ENTRE "ATRIBUIÇÃO POR ÁREA" E "LISTA DE CRITÉRIOS INDIVIDUAIS"
+═══════════════════════════════════════
+
+- A tela mostra duas seções que parecem redundantes/conflitantes:
+  a) "ATRIBUIÇÃO DE AVALIADORES" — atribui 1 avaliador por ÁREA (Atendimento, 
+     Cenografia, Logística, Produção) com botão "ALTERAR".
+  b) Mais abaixo, uma lista de CRITÉRIOS INDIVIDUAIS (ex: "Carga na Saída do 
+     Galpão", "Perda de Material/Estrutura", "Logística Reversa", "Qualidade da 
+     Entrega", "Prazo de Entrega"), cada um com "SEM RESPONSÁVEL" e badge "FALTA".
+- Isso não fica claro: a atribuição é por ÁREA (uma pessoa avalia todos os critérios 
+  daquela área) ou é por CRITÉRIO individual (pode ter pessoas diferentes para cada 
+  critério da mesma área)? 
+- CORRIGIR a lógica e a interface para УМ dos dois modelos, com clareza total:
+  - Se for por ÁREA: remover a lista de critérios individuais com "SEM RESPONSÁVEL" 
+    (ela deve só mostrar o nome do critério e seu peso, sem exigir atribuição 
+    própria, já que herda o avaliador da área).
+  - Se for por CRITÉRIO (mais flexível, permite ex: uma pessoa de Logística cuidar 
+    só de "Perda de Material" e outra de "Logística Reversa"): então a seção 
+    "Atribuição de Avaliadores" por área deve ser removida ou se tornar apenas um 
+    atalho de "atribuir a mesma pessoa para todos os critérios daquela área de uma 
+    vez", mas a lista individual de critérios deve ser a fonte de verdade.
+- Recomendação: manter o modelo por CRITÉRIO (mais flexível e alinhado com o que já 
+  foi construído no restante do sistema, ex: Sandro Gomes/Sandro Paiva podem 
+  dividir critérios diferentes de Logística), com um atalho "Atribuir a mesma 
+  pessoa para toda a área" para agilizar quando não houver necessidade de dividir.
+
+═══════════════════════════════════════
+3. PADRONIZAR OS BOTÕES DE AÇÃO ("ALTERAR" vs "ATRIBUIR" vs "FALTA")
+═══════════════════════════════════════
+
+- Hoje existem 3 rótulos diferentes fazendo praticamente a mesma coisa (definir 
+  quem avalia): "ALTERAR" (nas áreas), "ATRIBUIR" (na Matriz de Conformidade), e o 
+  badge "FALTA" clicável(?) nos critérios individuais.
+- Padronizar para um único padrão visual e textual em todo o sistema: 
+  - Quando NÃO há avaliador: botão "ATRIBUIR AVALIADOR"
+  - Quando JÁ há avaliador: botão "ALTERAR AVALIADOR" (mostrando o nome atual ao lado)
+
+═══════════════════════════════════════
+4. MATRIZ DE CONFORMIDADE — CLAREZA DE QUEM AVALIA O QUÊ
+═══════════════════════════════════════
+
+- A seção "Matriz de Conformidade" mostra 2 avaliadores possíveis: "CENOGRAFIA" e 
+  "FERRAMENTAS E CASE", ambos "Sem avaliador atribuído" — isso está correto conforme 
+  a regra definida anteriormente (Ferramentas e Case avalia só o item de 
+  equipamentos/ferramentas; Cenografia avalia os demais itens da matriz).
+- Porém, não fica claro visualmente QUAL avaliador é responsável por QUAL item 
+  específico da matriz (EPI, Estaiamento/Aterramento, Conduta, Guarda de 
+  Equipamentos). Adicionar uma pequena legenda ao lado de cada item da matriz 
+  indicando a qual grupo ele pertence (ex: "Guarda de Equipamentos → Avaliado por: 
+  Ferramentas e Case" / "EPI, Estaiamento, Conduta → Avaliado por: Cenografia").
+
+═══════════════════════════════════════
+5. AÇÃO EM MASSA PARA EVENTOS COM MUITOS CRITÉRIOS/ÁREAS
+═══════════════════════════════════════
+
+- Hoje o Admin precisa clicar em "Alterar"/"Atribuir" individualmente para cada 
+  área e cada item da matriz — isso é tedioso.
+- Adicionar uma ação em massa "ATRIBUIR AVALIADOR PADRÃO PARA TODAS AS ÁREAS SEM 
+  RESPONSÁVEL", que usa automaticamente o avaliador PRINCIPAL já configurado para 
+  cada critério (definido na tela de Critérios), preenchendo tudo de uma vez — o 
+  Admin só precisaria alterar manualmente as exceções.
+
+═══════════════════════════════════════
+6. INDICADORES DE PROGRESSO POR ÁREA (NÃO SÓ GLOBAL)
+═══════════════════════════════════════
+
+- Hoje só existe um indicador global no painel "STATUS DO TIME" (Progresso 0%, 
+  Critérios Pendentes: 5).
+- Adicionar também um indicador de progresso por ÁREA (ex: badge "0/2 PENDENTE" já 
+  existe em alguns lugares — padronizar para aparecer em TODAS as áreas e na Matriz 
+  de Conformidade também).
+
+═══════════════════════════════════════
+7. FALTA CONTEXTO SOBRE OS 10 PARTICIPANTES
+═══════════════════════════════════════
+
+- O cabeçalho mostra "10 participantes", mas não há nenhum link/atalho direto para 
+  ver quem são (ex: ir para a "Equipe Alocada" daquele evento) a partir desta tela.
+- Adicionar um atalho "Ver Equipe Alocada (10)" próximo ao cabeçalho, permitindo 
+  navegação rápida sem sair do contexto do evento.
+
+═══════════════════════════════════════
+8. LINK PÚBLICO PARA FREELANCER — VERIFICAR SE APARECE AQUI
+═══════════════════════════════════════
+
+- Conforme já definido anteriormente, para áreas diferentes de Logística/Atendimento, 
+  deve existir a opção de gerar link público para freelancer avaliar. Confirmar se 
+  essa opção está disponível nesta tela de configuração de avaliadores do evento 
+  (ou se só aparece depois, na tela do próprio avaliador já designado) — se só 
+  aparecer depois, tudo bem, mas indicar isso com um texto de ajuda aqui (ex: "Após 
+  atribuir um avaliador, ele poderá gerar link para freelancers sem cadastro, quando 
+  aplicável").
+
+═══════════════════════════════════════
+9. TEXTO EXPLICATIVO SOBRE O QUE ACONTECE APÓS ATRIBUIR
+═══════════════════════════════════════
+
+- Adicionar uma breve explicação no topo da tela (ex: caixa informativa) descrevendo 
+  o fluxo geral: "Atribua um avaliador para cada área e para a Matriz de 
+  Conformidade. Após atribuir todos, libere o evento para que as áreas possam 
+  começar a avaliar."
+
+Manter a paleta de cores atual do sistema (preto/lima, laranja para pendências, 
+vermelho para "sem responsável"/alertas).

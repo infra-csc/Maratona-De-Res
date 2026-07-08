@@ -1,0 +1,101 @@
+A tela "Critérios de Avaliação" (/criteria) trata tudo como se fosse um "critério com 
+peso e nota", mas o sistema já tem perguntas de outros tipos (Matriz de Conformidade, 
+Faltas/Atrasos, Destaque de Desempenho) que não são geridas aqui. Além disso, há um 
+bug no seletor de avaliador padrão. Preciso resolver os pontos abaixo.
+
+═══════════════════════════════════════
+1. BUG: SELEÇÃO DE "AVALIADOR PADRÃO" NÃO FUNCIONA
+═══════════════════════════════════════
+
+- Todas as linhas mostram "SEM AVALIADOR" em vermelho, mesmo em critérios que já 
+  deveriam ter avaliador padrão definido (ex: "Carga na Saída do Galpão" deveria ter 
+  Giovanni Bertoni/Fred; "Qualidade da Entrega" deveria ter Agatha, etc — conforme já 
+  configuramos anteriormente).
+- Investigar se o clique no ícone/link "SEM AVALIADOR" está realmente abrindo a busca 
+  de avaliador e SALVANDO a seleção, ou se há um bug no salvamento (ex: o valor não 
+  persiste no banco, ou a tela não reflete o valor salvo).
+- Corrigir para que, ao definir um avaliador padrão para um critério, esse nome 
+  apareça corretamente na coluna e persista após recarregar a página.
+
+═══════════════════════════════════════
+2. ADICIONAR EDIÇÃO DAS PERGUNTAS QUE NÃO SÃO "CRITÉRIO COM NOTA/PESO"
+═══════════════════════════════════════
+
+Hoje esta tela só lista critérios do tipo "nota + peso" (ex: Carga na Saída do 
+Galpão, Logística Reversa, Prazo de Entrega). Mas o sistema também tem outros tipos 
+de pergunta que fazem parte do MESMO formulário de uma área (ex: Cenografia) e que 
+não aparecem aqui para gestão:
+
+a) PERGUNTAS SIM/NÃO DA MATRIZ DE CONFORMIDADE (Uso de EPI, Estaiamento/Aterramento, 
+   Conduta, Equipamentos/Ferramentas retornaram)
+b) PERGUNTA DE TEXTO LIVRE "Alguém faltou ou atrasou por mais de 30 minutos?"
+c) PERGUNTA DE ESCOLHA "Algum profissional teve desempenho fora da curva?"
+
+Adicionar uma nova seção nesta tela (ou uma aba separada, ex: "Critérios com Nota" 
+vs. "Perguntas de Formulário/Matriz"), permitindo ao Admin:
+- Ver e editar o texto de cada pergunta
+- Definir/alterar o tipo de resposta (Sim/Não, Texto Livre, Escolha com opções)
+- Definir se aquela pergunta ALIMENTA a Matriz de Conformidade (toggle Sim/Não)
+- Definir o avaliador padrão daquele formulário/área (pode reaproveitar a mesma 
+  lógica de avaliador principal + redirecionamento já usada nos critérios com nota)
+
+═══════════════════════════════════════
+3. REMOVER COLUNA "AV. CONFORMIDADE" DE CRITÉRIOS QUE NÃO SE APLICAM
+═══════════════════════════════════════
+
+- A coluna "AV. CONFORMIDADE" aparece em TODAS as linhas da tabela (ex: "Logística 
+  Reversa", "Prazo de Entrega", "Qualidade da Entrega"), mas isso só faz sentido 
+  para os itens que de fato alimentam a Matriz de Conformidade.
+- Corrigir para que essa coluna só apareça preenchida (com avaliador ou "sem 
+  avaliador") nas linhas que realmente representam perguntas ligadas à Matriz — 
+  para os demais critérios, deixar essa célula em branco ou com um traço "—", sem 
+  o ícone de alerta vermelho.
+- Melhor ainda: já que a Matriz de Conformidade não é "por critério individual" mas 
+  sim um conjunto de perguntas dentro do formulário de Cenografia, considerar mover 
+  essa informação para a nova seção "Perguntas de Formulário/Matriz" (item 2), 
+  removendo a coluna "AV. CONFORMIDADE" desta tabela principal de critérios com 
+  nota/peso.
+
+═══════════════════════════════════════
+4. CLAREZA NOS BOTÕES DO TOPO
+═══════════════════════════════════════
+
+Os botões "SINCRONIZAR RÓTULOS DE ÁREA", "CORRIGIR CALIBRAÇÕES (PROD)" e 
+"SINCRONIZAR TODOS OS EVENTOS" não têm nenhuma explicação do que fazem:
+- Adicionar um tooltip ou pequena descrição abaixo de cada botão explicando a ação 
+  (ex: "Sincronizar Rótulos de Área: atualiza o nome exibido da área em todos os 
+  critérios vinculados"; "Corrigir Calibrações (PROD): recalcula calibrações que 
+  ficaram com erro no ambiente de produção"; "Sincronizar Todos os Eventos: aplica 
+  os critérios atuais retroativamente a eventos já criados").
+- Se "CORRIGIR CALIBRAÇÕES (PROD)" for uma ação de manutenção/debug perigosa, 
+  considerar movê-la para uma área separada de "Ferramentas de Manutenção" 
+  (visível só para Admin avançado), com confirmação extra antes de executar.
+
+═══════════════════════════════════════
+5. FILTROS E ORGANIZAÇÃO DA LISTA
+═══════════════════════════════════════
+
+- Hoje mostra "Exibindo 5 de 12 critérios" com botão "MOSTRAR INATIVOS (7)" — 
+  adicionar também filtro por ÁREA (dropdown: Todas / Logística / Atendimento / 
+  Produção / Cenografia / Ativação / Ferramentas e Case), já que com 12+ critérios 
+  a lista pode crescer e ficar difícil de navegar.
+- Adicionar busca por nome do critério/pergunta.
+
+═══════════════════════════════════════
+6. COLUNA "ÁREA" — PERMITIR MAIS DE UMA ÁREA POR CRITÉRIO?
+═══════════════════════════════════════
+
+- Confirmar se um critério pode pertencer a mais de uma área (ex: "Qualidade da 
+  Entrega" que é duplicado entre Atendimento e Ativação) — se sim, deixar claro 
+  visualmente que "Qualidade da Entrega (2)" é o duplicado de Ativação, talvez com 
+  uma indicação "(cópia de: Qualidade da Entrega)" na descrição.
+
+═══════════════════════════════════════
+7. INDICADOR DE STATUS MAIS CLARO
+═══════════════════════════════════════
+
+- O toggle verde "ATIVO" já existe — considerar adicionar, ao lado, uma contagem de 
+  "usado em X eventos" para o Admin entender o impacto antes de desativar um critério.
+
+Manter a paleta de cores atual do sistema (preto/lima, vermelho para "sem 
+avaliador").

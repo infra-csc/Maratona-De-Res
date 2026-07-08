@@ -1,0 +1,49 @@
+Na tela de avaliação do Fred (Avaliador · Cenografia), o formulário de critérios 
+(Matriz de Conformidade, Faltas/Atrasos, Destaque de Desempenho) está completo, mas 
+faltam duas ações essenciais que já foram implementadas em outras áreas (ex: 
+Sandro Gomes, Logística) e não estão aparecendo aqui:
+
+═══════════════════════════════════════
+1. FALTA OPÇÃO "REDIRECIONAR PARA OUTRO MEMBRO DO GRUPO"
+═══════════════════════════════════════
+
+- Já implementamos essa função para outros avaliadores (ex: Sandro Gomes via 
+  Logística, que tinha o botão "REDIRECIONAR" ao lado de cada critério).
+- Na tela do Fred (Cenografia), essa opção não aparece em NENHUM lugar do 
+  formulário — nem nos critérios individuais, nem na seção de perguntas gerais 
+  (Faltas/Atrasos, Destaque de Desempenho).
+- Adicionar o botão "Redirecionar para outro membro do grupo" em TODOS os pontos 
+  aplicáveis desta tela, seguindo o mesmo padrão já usado em Logística:
+  - Ao lado de cada pergunta Sim/Não da Matriz (EPI, Estaiamento/Aterramento, 
+    Conduta)
+  - Na seção "Alguém Faltou ou Atrasou" e "Algum Profissional teve Desempenho Fora 
+    da Curva" (ou pelo menos um botão de redirecionamento geral para todo o 
+    questionário de Cenografia, já que essas perguntas não são "por critério" 
+    isolado, mas sim parte do mesmo formulário do avaliador)
+
+═══════════════════════════════════════
+2. FALTA OPÇÃO "GERAR LINK PARA FREELANCER SEM CADASTRO"
+═══════════════════════════════════════
+
+- Conforme já definido: para áreas diferentes de Logística e Atendimento (Cenografia 
+  incluída), deve existir a opção de gerar um link público para um freelancer sem 
+  cadastro responder aquele questionário.
+- Essa opção também está ausente nesta tela — verificar se foi implementada em 
+  algum lugar do sistema ou se ficou pendente apenas para esta área específica.
+- Adicionar essa opção junto ao botão de "Redirecionar", como uma segunda escolha: 
+  "Gerar link para freelancer sem cadastro" (com o fluxo já definido: preencher 
+  nome de quem vai receber → gerar link de uso único vinculado ao evento e 
+  critério/formulário → freelancer confirma nome ao abrir e responde).
+
+═══════════════════════════════════════
+3. VERIFICAR CONSISTÊNCIA ENTRE TODAS AS ÁREAS
+═══════════════════════════════════════
+
+- Fazer uma varredura em TODAS as áreas (Logística, Atendimento, Produção, 
+  Cenografia, Ativação, Ferramentas e Case) para confirmar que:
+  - Logística e Atendimento têm APENAS a opção de "Redirecionar" (sem link público)
+  - Todas as outras áreas têm AMBAS as opções ("Redirecionar" E "Link público")
+- Hoje parece que essa implementação ficou inconsistente entre as áreas — algumas 
+  telas têm essas opções, outras (como a do Fred) não têm nenhuma das duas.
+
+Manter a paleta de cores atual do sistema (preto/lima).

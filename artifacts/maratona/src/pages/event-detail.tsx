@@ -6,7 +6,7 @@ import {
 } from "@/lib/routing-api";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useGetAreas, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search, Zap } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search, Zap, Info } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
@@ -728,11 +728,11 @@ export default function EventDetailPage() {
     epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
   }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "" });
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
-  const conformityItems: { key: ConformityKey; label: string; commentKey: ConformityCommentKey }[] = [
-    { key: "epi", label: "Uso de EPI", commentKey: "epiComment" },
-    { key: "estaiamentos", label: "Estaiamentos / Aterramentos", commentKey: "estaiamentosComment" },
-    { key: "guardaEquipamentos", label: "Guarda de Equipamentos", commentKey: "guardaEquipamentosComment" },
-    { key: "conduta", label: "Conduta", commentKey: "condutaComment" },
+  const conformityItems: { key: ConformityKey; label: string; commentKey: ConformityCommentKey; group: "cenografia" | "ferramentas" }[] = [
+    { key: "epi", label: "Uso de EPI", commentKey: "epiComment", group: "cenografia" },
+    { key: "estaiamentos", label: "Estaiamentos / Aterramentos", commentKey: "estaiamentosComment", group: "cenografia" },
+    { key: "guardaEquipamentos", label: "Guarda de Equipamentos", commentKey: "guardaEquipamentosComment", group: "ferramentas" },
+    { key: "conduta", label: "Conduta", commentKey: "condutaComment", group: "cenografia" },
   ];
   const importedConformityRatio = useMemo(
     () => (event?.isHistorical && event.importedNotes ? parseImportedConformityRatio(event.importedNotes) : null),
@@ -1459,34 +1459,79 @@ export default function EventDetailPage() {
             <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal size={18} />
-                <span className="font-black uppercase tracking-tight">Critérios e Avaliadores (RH)</span>
+                <span className="font-black uppercase tracking-tight">Critérios, Pesos e Avaliadores (RH)</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {allAssigned ? (
-                  <span data-testid="badge-assignments-complete" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
-                    <UserCheck size={12} /> Avaliadores Atribuídos
-                  </span>
-                ) : (
-                  <span data-testid="badge-assignments-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
-                    <AlertCircle size={12} /> Atribuição Pendente
-                  </span>
-                )}
+                {assignAreas.map(a => {
+                  const assigned = primaryEvaluator[a.areaId] != null;
+                  return (
+                    <span key={a.areaId} className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black uppercase ${assigned ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"}`}>
+                      {assigned ? <UserCheck size={10} /> : <AlertCircle size={10} />} {a.areaName}
+                    </span>
+                  );
+                })}
                 {criteriaConfirmed ? (
                   <span data-testid="badge-criteria-confirmed" className="inline-flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1 text-[11px] font-black uppercase">
-                    <Lock size={12} /> Critérios Confirmados
+                    <Lock size={12} /> Liberado
                   </span>
                 ) : (
                   <span data-testid="badge-criteria-pending" className="inline-flex items-center gap-1.5 bg-[#ff5722] text-white border-2 border-[#ff5722] px-3 py-1 text-[11px] font-black uppercase">
-                    <AlertCircle size={12} /> Aguardando Confirmação
+                    <AlertCircle size={12} /> Não Liberado
                   </span>
                 )}
+                <a
+                  href="#equipe-alocada"
+                  onClick={e => { e.preventDefault(); document.getElementById("equipe-alocada")?.scrollIntoView({ behavior: "smooth" }); }}
+                  className="inline-flex items-center gap-1 bg-transparent border border-[#ccff00]/40 px-2 py-0.5 text-[10px] font-black uppercase text-[#ccff00] hover:bg-[#ccff00]/10 transition-colors"
+                >
+                  <Users size={10} /> Ver Equipe ({event.participants?.length ?? 0})
+                </a>
               </div>
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-sm italic text-[#444933]">
-                Para cada critério deste evento defina o <strong>peso</strong> e o <strong>avaliador</strong> que dará a nota daquela área. Desative os que não se aplicam. As áreas só podem avaliar após a confirmação do RH.
-              </p>
+              <div className="flex items-start gap-3 bg-[#f7f9fb] border-2 border-[#eceef0] px-4 py-3">
+                <Info size={16} className="text-[#506600] shrink-0 mt-0.5" />
+                <p className="text-xs italic text-[#444933]">
+                  <strong>Fluxo:</strong> Defina o peso de cada critério e atribua um avaliador principal para cada área. Depois clique em <strong>Liberar Avaliações</strong> para que as áreas comecem a avaliar. Após liberado, os pesos continuam editáveis mas a estrutura fica bloqueada.
+                </p>
+              </div>
+
+              {/* Banner de liberação — destaque visual quando não confirmado */}
+              {!criteriaConfirmed && (
+                <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 border-2 px-5 py-4 ${allAssigned && sumValid ? "border-[#506600] bg-[#f0fff0]" : "border-[#ff5722] bg-[#fff8f5]"}`}>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    {allAssigned && sumValid
+                      ? <Unlock size={18} className="text-[#506600] shrink-0 mt-0.5" />
+                      : <Lock size={18} className="text-[#ff5722] shrink-0 mt-0.5" />}
+                    <div>
+                      <p className="text-xs font-black italic uppercase text-[#191c1e]">
+                        {allAssigned && sumValid ? "Tudo pronto — libere para as áreas avaliarem" : "Avaliações ainda não liberadas"}
+                      </p>
+                      <p className="text-[11px] italic text-[#747a60] mt-0.5">
+                        {!sumValid
+                          ? `Pesos ativos precisam somar ${fmt(targetWeightSum)}.`
+                          : !allAssigned
+                          ? `Atribua avaliador para: ${assignAreas.filter(a => primaryEvaluator[a.areaId] == null).map(a => a.areaName).join(", ")}.`
+                          : "Clique em Liberar Avaliações para que as áreas possam começar a avaliar."}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    data-testid="button-confirm-criteria-top"
+                    onClick={handleConfirmAndRelease}
+                    disabled={!sumValid || !allAssigned || confirmBusy}
+                    className={`shrink-0 flex items-center gap-2 px-5 py-2.5 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider transition-all ${
+                      sumValid && allAssigned
+                        ? `bg-[#ccff00] text-[#161e00] ${HARD_SHADOW} hover:translate-y-[1px]`
+                        : "bg-[#eceef0] text-[#9aa088] cursor-not-allowed opacity-60"
+                    }`}
+                  >
+                    {confirmBusy ? <RefreshCw size={14} className="animate-spin" /> : <Unlock size={14} />}
+                    {confirmBusy ? "Liberando..." : "Liberar Avaliações"}
+                  </button>
+                </div>
+              )}
 
               {hasEvaluations && (
                 <div data-testid="notice-criteria-locked" className="flex items-center gap-2 bg-[#fff4e5] border-2 border-[#ff5722] text-[#7a2e00] px-4 py-3 text-xs font-bold italic uppercase">
@@ -1945,13 +1990,14 @@ export default function EventDetailPage() {
           </section>
         )}
 
-        {/* Atribuições por Critério — novo sistema de roteamento */}
+        {/* Atribuições por Critério — roteamento fino (avançado) */}
         {canManage && !event.isHistorical && (
           <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
             <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
               <div className="flex items-center gap-2">
                 <UserCheck size={18} />
-                <span className="font-black uppercase tracking-tight">Atribuições por Critério</span>
+                <span className="font-black uppercase tracking-tight">Roteamento por Critério</span>
+                <span className="text-[10px] font-bold uppercase text-[#ccff00]/60 border border-[#ccff00]/30 px-1.5 py-0.5">Avançado</span>
               </div>
               <button
                 type="button"
@@ -1968,9 +2014,20 @@ export default function EventDetailPage() {
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-sm italic text-[#444933]">
-                Define <strong>qual avaliador</strong> preenche cada critério. Use <em>Gerar Sugestões</em> para pré-preencher com os defaults do roteamento e depois confirme ou ajuste individualmente.
-              </p>
+              <div className="flex items-start gap-3 bg-[#f7f9fb] border-2 border-[#eceef0] px-4 py-3">
+                <Info size={16} className="text-[#506600] shrink-0 mt-0.5" />
+                <div className="text-xs italic text-[#444933] space-y-1">
+                  <p>
+                    <strong>Para que serve:</strong> Quando dois avaliadores de uma mesma área precisam dividir critérios diferentes (ex.: Sandro Gomes avalia Logística e Sandro Paiva avalia Abastecimento), use esta seção para rotear cada critério individualmente.
+                  </p>
+                  <p>
+                    Clique em <strong>Gerar Sugestões</strong> para pré-preencher a partir das atribuições de área e depois <strong>Atribuir Avaliador</strong> em cada linha para confirmar ou ajustar.
+                  </p>
+                  <p className="text-[#506600]">
+                    <strong>Freelancers / link externo:</strong> Avaliadores convidados (sem conta no sistema) recebem um link individual gerado no painel de cada critério após a atribuição.
+                  </p>
+                </div>
+              </div>
 
               {criterionAssignmentsLoading ? (
                 <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs">Carregando atribuições...</div>
@@ -2028,9 +2085,9 @@ export default function EventDetailPage() {
                                     setAssignPickerOpen({ criterionId: a.criterionId, criterionName: a.criterionName ?? `Critério ${a.criterionId}` });
                                     setAssignPickerValue(a.assignedToId);
                                   }}
-                                  className="px-3 py-1.5 border-2 border-[#191c1e] bg-white text-[11px] font-black italic uppercase hover:bg-[#eceef0] transition-colors"
+                                  className={`px-3 py-1.5 border-2 border-[#191c1e] text-[11px] font-black italic uppercase transition-colors ${a.assignedToId != null ? "bg-[#eceef0] hover:bg-[#dde0e3]" : "bg-[#ccff00] text-[#161e00] hover:bg-[#b8e600]"}`}
                                 >
-                                  {a.status === "confirmed" ? "Reatribuir" : "Confirmar"}
+                                  {a.assignedToId != null ? "Alterar Avaliador" : "Atribuir Avaliador"}
                                 </button>
                               )}
                             </td>
@@ -2327,7 +2384,12 @@ export default function EventDetailPage() {
                         className="grid items-center min-h-[56px]"
                         style={{ gridTemplateColumns: "1fr auto auto" }}
                       >
-                        <span className="text-sm font-bold italic text-[#191c1e] pr-4 py-3 leading-snug" style={{ maxWidth: 200 }}>{item.label}</span>
+                        <div className="pr-4 py-3 leading-snug" style={{ maxWidth: 220 }}>
+                          <span className="text-sm font-bold italic text-[#191c1e]">{item.label}</span>
+                          <p className="text-[9px] font-black italic uppercase text-[#9aa088] mt-0.5">
+                            {item.group === "ferramentas" ? "Avaliado por: Ferramentas e Case" : "Avaliado por: Cenografia"}
+                          </p>
+                        </div>
                         <div className="flex items-center gap-1.5 shrink-0 py-2">
                           {isNonConforming && (
                             <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap mr-1">-10 pts</span>
@@ -2436,7 +2498,7 @@ export default function EventDetailPage() {
         </div>
 
         {((event.participants && event.participants.length > 0) || canManage) && (
-              <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+              <div id="equipe-alocada" className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
                 <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center justify-between gap-2 italic">
                   <div className="flex items-center gap-2">
                     <Users size={18} />
