@@ -45,6 +45,10 @@ export default function UsersPage() {
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeUserResult | null>(null);
 
+  const [emailMigOpen, setEmailMigOpen] = useState(false);
+  const [emailMigPreview, setEmailMigPreview] = useState<{ id: number; name?: string; emailFrom?: string | null; emailTo?: string; email?: string; status: string }[] | null>(null);
+  const [emailMigLoading, setEmailMigLoading] = useState(false);
+
   const qKey = getGetUsersQueryKey();
   const { data: users, isLoading } = useGetUsers({ query: { queryKey: qKey } });
   const { data: areas } = useGetAreas();
@@ -127,6 +131,33 @@ export default function UsersPage() {
     return ROLES.find(r => r.value === role) ?? { label: role, chip: "bg-[#f2f4f6] text-[#444933]" };
   }
 
+  async function runEmailMigration(dryRun: boolean) {
+    setEmailMigLoading(true);
+    try {
+      const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`${base}/api/users/bulk-update-emails`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ dryRun }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao migrar emails");
+      if (!dryRun) {
+        toast({ title: `${data.updated} email(s) atualizados com sucesso` });
+        qc.invalidateQueries({ queryKey: qKey });
+        setEmailMigOpen(false);
+        setEmailMigPreview(null);
+      } else {
+        setEmailMigPreview(data.preview);
+      }
+    } catch (e: unknown) {
+      toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setEmailMigLoading(false);
+    }
+  }
+
   const sortedUsers = [...(users ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   const stats = {
@@ -150,6 +181,75 @@ export default function UsersPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => { setEmailMigOpen(true); setEmailMigPreview(null); }}
+                  className={`border-2 border-[#191c1e] px-5 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 whitespace-nowrap bg-white text-[#191c1e] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                >
+                  <Mail size={18} /> Migrar Emails
+                </button>
+                <Dialog open={emailMigOpen} onOpenChange={o => { setEmailMigOpen(o); if (!o) setEmailMigPreview(null); }}>
+                  <DialogContent className="max-w-2xl rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Migrar Emails Office 365</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <p className="text-sm text-[#444933]">Atualiza os emails de <strong>34 avaliadores</strong> identificados no Office 365. Clique em <em>Prévia</em> para ver o que será alterado antes de confirmar.</p>
+                      {!emailMigPreview && (
+                        <button
+                          onClick={() => runEmailMigration(true)}
+                          disabled={emailMigLoading}
+                          className={`border-2 border-[#191c1e] px-6 py-3 font-bold text-sm italic uppercase tracking-wider bg-white ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                        >
+                          {emailMigLoading ? "Carregando..." : "Ver Prévia"}
+                        </button>
+                      )}
+                      {emailMigPreview && (
+                        <div className="space-y-3">
+                          <div className="flex gap-4 text-xs font-bold uppercase tracking-wider">
+                            <span className="text-green-700">{emailMigPreview.filter(p => p.status === "will_update").length} para atualizar</span>
+                            <span className="text-[#444933]">{emailMigPreview.filter(p => p.status === "no_change").length} sem mudança</span>
+                            {emailMigPreview.filter(p => p.status === "not_found").length > 0 && (
+                              <span className="text-red-600">{emailMigPreview.filter(p => p.status === "not_found").length} não encontrado</span>
+                            )}
+                          </div>
+                          <div className="max-h-72 overflow-y-auto border-2 border-[#191c1e] divide-y divide-[#e0e3e5]">
+                            {emailMigPreview.filter(p => p.status === "will_update").map(p => (
+                              <div key={p.id} className="px-3 py-2 bg-green-50 text-xs">
+                                <span className="font-bold">{p.name}</span>
+                                <div className="text-[#747a60] line-through">{p.emailFrom ?? <em>sem email</em>}</div>
+                                <div className="text-green-700 font-mono">{p.emailTo}</div>
+                              </div>
+                            ))}
+                            {emailMigPreview.filter(p => p.status === "no_change").map(p => (
+                              <div key={p.id} className="px-3 py-2 text-xs text-[#747a60]">
+                                <span className="font-bold">{p.name}</span> — já atualizado
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 pt-2">
+                            <button
+                              onClick={() => runEmailMigration(false)}
+                              disabled={emailMigLoading || emailMigPreview.filter(p => p.status === "will_update").length === 0}
+                              className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-3 font-bold text-sm italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                            >
+                              {emailMigLoading ? "Aplicando..." : "Confirmar e Aplicar"}
+                            </button>
+                            <button
+                              onClick={() => { setEmailMigOpen(false); setEmailMigPreview(null); }}
+                              className="border-2 border-[#191c1e] px-6 py-3 font-bold text-sm italic uppercase tracking-wider bg-white"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
             {isAdmin && (
               <button
                 data-testid="button-merge-mode"

@@ -299,6 +299,76 @@ router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => 
   res.json({ canonicalId, merged: dupIds, movedEvaluations, movedCalibrations, movedConformities, movedAssignments });
 });
 
+// ─── Bulk Office 365 email migration ────────────────────────────────────────
+const OFFICE365_EMAIL_MAP: { id: number; email: string }[] = [
+  { id: 59, email: "aline.candido@ttkmarketing.com.br" },
+  { id: 34, email: "agatha.nadolsky@nortemkt.com" },
+  { id: 67, email: "aline.soares@nortemkt.com" },
+  { id: 61, email: "ana.motta@nortemkt.com" },
+  { id: 71, email: "anderson.andreotti@ttkmarketing.com.br" },
+  { id: 41, email: "camilla.lopes@nortemkt.com" },
+  { id: 36, email: "edney.siqueira@ttkmarketing.com.br" },
+  { id: 72, email: "eduardo.meira@cscdoesporte.com.br" },
+  { id: 73, email: "fabio.santoniello@ttkmarketing.com.br" },
+  { id: 57, email: "fernanda.toussaint@ttkmarketing.com.br" },
+  { id: 64, email: "geuderson.silva@ttkmarketing.com.br" },
+  { id: 32, email: "giovanni.bertoni@ttkmarketing.com.br" },
+  { id: 42, email: "guilherme.flauzino@ttkmarketing.com.br" },
+  { id: 70, email: "igor.santos@ttkmarketing.com.br" },
+  { id: 74, email: "jaqueline.oshiro@ttkmarketing.com.br" },
+  { id: 35, email: "leonardo.almeida@ttkmarketing.com.br" },
+  { id: 33, email: "lucas.vicenzo@ttkmarketing.com.br" },
+  { id: 40, email: "luciano.nascimento@ttkmarketing.com.br" },
+  { id: 60, email: "manoel.alves@ttkmarketing.com.br" },
+  { id: 77, email: "marcelo.toscano@ttkmarketing.com.br" },
+  { id: 78, email: "mirella.milani@nortemkt.com" },
+  { id: 48, email: "natasha.barbosa@ttkmarketing.com.br" },
+  { id: 79, email: "oscar.cardoso@cscdoesporte.onmicrosoft.com" },
+  { id: 39, email: "paulo.roberto@ttkmarketing.com.br" },
+  { id: 69, email: "priscila.elias@ttkmarketing.com.br" },
+  { id: 58, email: "rubem.vasques@ttkmarketing.com.br" },
+  { id: 51, email: "rafael.silva@ttkmarketing.com.br" },
+  { id: 44, email: "reinaldo.sousa@nortemkt.com" },
+  { id: 43, email: "renan.mota@ttkmarketing.com.br" },
+  { id: 82, email: "sandro.paiva@cscdoesporte.com.br" },
+  { id: 83, email: "tarcisio.ferreira@ttkmarketing.com.br" },
+  { id: 63, email: "ulisses.souza@cscdoesporte.com.br" },
+  { id: 66, email: "vinicius.alexandre@ttkmarketing.com.br" },
+  { id: 38, email: "gabriel.bernardineli@ttkmarketing.com.br" },
+];
+
+router.post("/users/bulk-update-emails", requireRole("admin"), async (req, res) => {
+  const dryRun = req.body?.dryRun === true;
+
+  const ids = OFFICE365_EMAIL_MAP.map(r => r.id);
+  const existing = await db
+    .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+    .from(usersTable)
+    .where(inArray(usersTable.id, ids));
+
+  const existingMap = new Map(existing.map(u => [u.id, u]));
+
+  const preview = OFFICE365_EMAIL_MAP.map(({ id, email }) => {
+    const u = existingMap.get(id);
+    if (!u) return { id, email, status: "not_found" as const };
+    const changed = u.email !== email;
+    return { id, name: u.name, emailFrom: u.email ?? null, emailTo: email, status: changed ? "will_update" as const : "no_change" as const };
+  });
+
+  if (dryRun) {
+    res.json({ dryRun: true, preview });
+    return;
+  }
+
+  const toUpdate = preview.filter(p => p.status === "will_update");
+  for (const row of toUpdate) {
+    await db.update(usersTable).set({ email: row.emailTo }).where(eq(usersTable.id, row.id));
+    await audit(req.user!.userId, "bulk_update_email", "users", row.id, undefined, { emailTo: row.emailTo });
+  }
+
+  res.json({ dryRun: false, updated: toUpdate.length, preview });
+});
+
 router.post("/users/:id/reset-password", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { newPassword } = req.body;
