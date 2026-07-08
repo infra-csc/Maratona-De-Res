@@ -184,7 +184,7 @@ export default function IntegrationPage() {
       onSuccess: (data) => {
         toast({
           title: "Migração concluída",
-          description: `${data.catalogActivated} quesito(s) ativado(s), ${data.catalogDeactivated} desativado(s), ${data.catalogCreated} criado(s). ${data.eventCriteriaFixed} evento(s) atualizados.`,
+          description: `${data.catalogActivated} quesito(s) ativado(s), ${data.catalogDeactivated} desativado(s), ${data.catalogCreated} criado(s). ${data.eventCriteriaFixed} evento(s) atualizados. ${(data as { evaluationsRemapped?: number }).evaluationsRemapped ?? 0} avaliação(ões) remapeadas para o catálogo novo.`,
         });
         qc.invalidateQueries();
       },
@@ -644,7 +644,7 @@ export default function IntegrationPage() {
               <Wrench size={18} /> Migrar Catálogo de Quesitos
             </CardTitle>
             <CardDescription className="text-purple-800/80">
-              Ativa os quesitos novos (Matriz de Performance) e desativa os antigos em todos os eventos — incluindo históricos e confirmados.
+              Relaciona os 5 quesitos ativos da Matriz de Performance com todos os eventos e remapeia avaliações que ainda referenciam quesitos antigos — incluindo históricos e confirmados.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">

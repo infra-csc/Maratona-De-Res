@@ -864,30 +864,41 @@ const SURVEY_COL = {
   NIVEL_DESEMPENHO: 28,
 } as const;
 
-// Critérios antigos (catálogo pré-Matriz de Performance) — todos são
-// retirados nesta importação, substituídos pelos 5 novos abaixo.
+// Critérios antigos (catálogo pré-Matriz de Performance) — devem ser
+// desativados e substituídos pelos 5 novos da Matriz de Performance.
 const SURVEY_CRITERIA_RETIRED = [
-  "Perda de Material/Estrutura", "Logística Reversa", "Qualidade da Entrega", "Prazo de Entrega",
+  "Qualidade e Acabamento da Montagem",
+  "Logística Reversa/Carga da Desmontagem",
+  "Prazo de Entrega/Arena Pronta no Horário",
+  "Retorno de Material/Perdas ou Avarias",
   "Ferramentas & Case", "Obrigações Estruturais", "Conduta e Comportamento",
 ];
 
-// Catálogo novo (Matriz de Performance) — mesmos nomes/pesos/áreas já
-// estabelecidos no ambiente de dev por outra frente de trabalho, replicados
-// aqui em produção para manter os dois ambientes consistentes.
+// Catálogo novo (Matriz de Performance) — os 5 quesitos ativos que devem
+// estar em TODOS os eventos. Nomes, pesos e áreas conforme o cadastro atual.
 const SURVEY_TARGET_CRITERIA: { name: string; description: string; areaName: string; weight: string }[] = [
-  { name: "Qualidade e Acabamento da Montagem", description: "Avalia acabamento, materiais em bom estado e qualidade visual da montagem entregue.", areaName: "Cenografia", weight: "3" },
-  { name: "Logística Reversa/Carga da Desmontagem", description: "Avalia se a carga de retorno da desmontagem foi feita adequadamente e conforme o alinhamento combinado.", areaName: "Logística", weight: "2" },
-  { name: "Prazo de Entrega/Arena Pronta no Horário", description: "Avalia se a arena ficou pronta dentro do prazo/horário combinado, sem atrasos.", areaName: "Produção", weight: "2" },
-  { name: "Carga na Saída do Galpão", description: "Avalia a conferência e organização da carga na saída do galpão antes do evento.", areaName: "Logística", weight: "2" },
-  { name: "Retorno de Material/Perdas ou Avarias", description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.", areaName: "Ferramentas e case", weight: "2" },
+  { name: "Perda de Material/Estrutura", description: "Todo material enviado deve retornar à base sem perda de mercadorias, materiais ou avarias.", areaName: "Logística", weight: "3" },
+  { name: "Logística Reversa", description: "Avalia se a carga de retorno foi feita adequadamente e conforme o alinhamento combinado.", areaName: "Logística", weight: "3" },
+  { name: "Qualidade da Entrega", description: "Avalia acabamento, materiais em bom estado, qualidade visual e satisfação na ativação/atendimento.", areaName: "Atendimento", weight: "3" },
+  { name: "Prazo de Entrega", description: "Avalia se as entregas ocorreram dentro do cronograma, sem atrasos e sem custos adicionais de mão de obra.", areaName: "Produção", weight: "3" },
+  { name: "Carga na Saída do Galpão", description: "Avalia a conferência, organização e integridade da carga no momento da saída do galpão, antes do embarque para o evento.", areaName: "Cenografia", weight: "3" },
+];
+
+// Mapeamento de critérios antigos → novos equivalentes para remapeamento
+// de avaliações já submetidas com o catálogo antigo.
+const SURVEY_CRITERIA_REMAP: { oldName: string; newName: string }[] = [
+  { oldName: "Qualidade e Acabamento da Montagem", newName: "Qualidade da Entrega" },
+  { oldName: "Logística Reversa/Carga da Desmontagem", newName: "Logística Reversa" },
+  { oldName: "Prazo de Entrega/Arena Pronta no Horário", newName: "Prazo de Entrega" },
+  { oldName: "Retorno de Material/Perdas ou Avarias", newName: "Perda de Material/Estrutura" },
 ];
 
 const SURVEY_SCORE_COLUMNS: { col: number; commentCol: number; criterionName: string }[] = [
-  { col: SURVEY_COL.PERDA_MATERIAL, commentCol: SURVEY_COL.PERDA_MATERIAL_COMMENT, criterionName: "Retorno de Material/Perdas ou Avarias" },
-  { col: SURVEY_COL.LOGISTICA_REVERSA, commentCol: SURVEY_COL.LOGISTICA_REVERSA_COMMENT, criterionName: "Logística Reversa/Carga da Desmontagem" },
-  { col: SURVEY_COL.QUALIDADE_ATENDIMENTO, commentCol: SURVEY_COL.QUALIDADE_ATENDIMENTO_COMMENT, criterionName: "Qualidade e Acabamento da Montagem" },
-  { col: SURVEY_COL.QUALIDADE_ATIVACAO, commentCol: SURVEY_COL.QUALIDADE_ATIVACAO_COMMENT, criterionName: "Qualidade e Acabamento da Montagem" },
-  { col: SURVEY_COL.PRAZO_ENTREGA, commentCol: SURVEY_COL.PRAZO_ENTREGA_COMMENT, criterionName: "Prazo de Entrega/Arena Pronta no Horário" },
+  { col: SURVEY_COL.PERDA_MATERIAL, commentCol: SURVEY_COL.PERDA_MATERIAL_COMMENT, criterionName: "Perda de Material/Estrutura" },
+  { col: SURVEY_COL.LOGISTICA_REVERSA, commentCol: SURVEY_COL.LOGISTICA_REVERSA_COMMENT, criterionName: "Logística Reversa" },
+  { col: SURVEY_COL.QUALIDADE_ATENDIMENTO, commentCol: SURVEY_COL.QUALIDADE_ATENDIMENTO_COMMENT, criterionName: "Qualidade da Entrega" },
+  { col: SURVEY_COL.QUALIDADE_ATIVACAO, commentCol: SURVEY_COL.QUALIDADE_ATIVACAO_COMMENT, criterionName: "Qualidade da Entrega" },
+  { col: SURVEY_COL.PRAZO_ENTREGA, commentCol: SURVEY_COL.PRAZO_ENTREGA_COMMENT, criterionName: "Prazo de Entrega" },
   { col: SURVEY_COL.CARGA_GALPAO, commentCol: SURVEY_COL.CARGA_GALPAO_COMMENT, criterionName: "Carga na Saída do Galpão" },
 ];
 
@@ -1458,6 +1469,7 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
   let catalogActivated = 0;
   let catalogCreated = 0;
   let eventCriteriaFixed = 0;
+  let evaluationsRemapped = 0;
 
   // Build target criteria map (after upsert)
   const targetCriteriaByName = new Map<string, { id: number }>();
@@ -1503,12 +1515,15 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
     const allEvents = await tx.select({ id: eventsTable.id }).from(eventsTable);
     for (const ev of allEvents) {
       let changed = false;
+      // 3a. Deactivate old retired criteria in event_criteria (mark inactive, don't delete,
+      //     so we preserve history but they stop counting for scoring)
       if (retiredCriteriaIds.length > 0) {
-        const del = await tx.delete(eventCriteriaTable).where(
-          and(eq(eventCriteriaTable.eventId, ev.id), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)),
-        );
-        if ((del as unknown as { rowCount: number }).rowCount > 0) changed = true;
+        const deactivated = await tx.update(eventCriteriaTable)
+          .set({ active: false })
+          .where(and(eq(eventCriteriaTable.eventId, ev.id), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds), eq(eventCriteriaTable.active, true)));
+        if ((deactivated as unknown as { rowCount: number }).rowCount > 0) changed = true;
       }
+      // 3b. Add or reactivate new target criteria
       const existingECs = await tx.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, ev.id));
       const existingByCritId = new Map(existingECs.map(ec => [ec.criterionId, ec]));
       for (const c of targetCriteriaByName.values()) {
@@ -1523,13 +1538,25 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
       }
       if (changed) eventCriteriaFixed++;
     }
+
+    // 4. Remap evaluations that still reference old criteria → new equivalents
+    //    (happens when survey was imported before the catalog was corrected)
+    for (const { oldName, newName } of SURVEY_CRITERIA_REMAP) {
+      const oldCrit = criteriaByName.get(normalizeImportText(oldName));
+      const newCrit = targetCriteriaByName.get(normalizeImportText(newName));
+      if (!oldCrit || !newCrit) continue;
+      const result = await tx.update(evaluationsTable)
+        .set({ criterionId: newCrit.id })
+        .where(eq(evaluationsTable.criterionId, oldCrit.id));
+      evaluationsRemapped += (result as unknown as { rowCount: number }).rowCount ?? 0;
+    }
   });
 
   await audit(userId, "migrate_criteria_catalog", "criteria", undefined, null, {
     catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed,
   });
 
-  res.json({ success: true, catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed });
+  res.json({ success: true, catalogDeactivated, catalogActivated, catalogCreated, eventCriteriaFixed, evaluationsRemapped });
 });
 
 // Remove avaliações duplicadas: cópias EXATAS (mesmo evento, quesito, avaliador,
