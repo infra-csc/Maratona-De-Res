@@ -207,9 +207,9 @@ export function calculateBonusByScore(score: number, rules: PlatoonRuleData[]): 
 }
 
 /**
- * Bônus total = Prêmio Base da faixa da nota média + (quantidade de eventos
- * extras × Bônus por Evento Extra da mesma faixa). Ambas as parcelas usam
- * a faixa definida pela nota geral do colaborador — sem lookup por evento.
+ * Bônus total = Prêmio Base da faixa da nota média + soma de bônus por
+ * evento extra, onde cada evento extra usa a faixa da SUA PRÓPRIA nota
+ * (não a nota geral do colaborador).
  */
 export function calculateTieredBonus(
   score: number,
@@ -218,21 +218,28 @@ export function calculateTieredBonus(
 ): number {
   const platoon = getPlatoonByScore(score, rules);
   if (!platoon) return 0;
-  const extraBonus = extraEventScores.length * (platoon.bonusPerExtraEvent ?? 0);
+  const extraBonus = extraEventScores.reduce((sum, evScore) => {
+    const evPlatoon = getPlatoonByScore(evScore, rules);
+    return sum + (evPlatoon?.bonusPerExtraEvent ?? 0);
+  }, 0);
   return Math.round((platoon.bonusValue + extraBonus) * 100) / 100;
 }
 
 /**
- * Parcela de bônus extra isolada — quantidade de eventos extras × bonusPerExtraEvent
- * da faixa da nota geral (baseScore). Não inclui o prêmio base.
+ * Parcela de bônus extra isolada — soma de bonusPerExtraEvent por evento
+ * extra, usando a faixa da nota de CADA evento extra individualmente.
+ * Não inclui o prêmio base.
  */
 export function calculateExtraBonusValue(
-  baseScore: number,
+  _baseScore: number,
   extraEventScores: number[],
   rules: PlatoonRuleData[],
 ): number {
-  const platoon = getPlatoonByScore(baseScore, rules);
-  return Math.round(extraEventScores.length * (platoon?.bonusPerExtraEvent ?? 0) * 100) / 100;
+  const extraBonus = extraEventScores.reduce((sum, evScore) => {
+    const evPlatoon = getPlatoonByScore(evScore, rules);
+    return sum + (evPlatoon?.bonusPerExtraEvent ?? 0);
+  }, 0);
+  return Math.round(extraBonus * 100) / 100;
 }
 
 /**
