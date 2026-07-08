@@ -1,0 +1,67 @@
+O modal "Registrar Lançamento" já está completo (Tipo de Lançamento, Evento, 
+Colaborador, Data, Quantidade, Motivo/Observação). Preciso apenas dos ajustes abaixo 
+para deixar a tela 10/10.
+
+═══════════════════════════════════════
+1. CAMPO "EVENTO" — CLAREZA SOBRE OBRIGATORIEDADE CONDICIONAL
+═══════════════════════════════════════
+
+- O campo Evento diz "(opcional p/ mérito galpão e falta no ciclo)" — deixar esse 
+  comportamento mais claro na prática:
+  - Para tipos vinculados ao CICLO todo (ex: "Rei do Galpão", "Ausência Não 
+    Comunicada"), manter o campo Evento opcional.
+  - Para tipos vinculados a um EVENTO específico (ex: "Atraso > 30 Minutos", 
+    "Inconformidade de Ponto", "Estrela do Evento", "Colega Top"), tornar o campo 
+    Evento OBRIGATÓRIO, com validação e mensagem de erro clara se tentar confirmar 
+    sem selecionar.
+
+═══════════════════════════════════════
+2. VALIDAR CÁLCULO DE PONTOS COM QUANTIDADE
+═══════════════════════════════════════
+
+- Confirmar que ao mudar o campo "Quantidade" (ex: de 1 para 2), o total de pontos 
+  aplicado é multiplicado corretamente (QTD × pontos do tipo selecionado).
+- Exemplo: "Atraso > 30 Minutos (-10 pts)" com Quantidade = 2 deve resultar em -20 
+  pontos totais lançados para aquele colaborador.
+- Mostrar essa conta de forma visível no próprio modal antes de confirmar (ex: 
+  "Total: -20 pts"), para o Admin conferir antes de salvar.
+
+═══════════════════════════════════════
+3. TABELA "REGISTROS DE PENALIDADES E MÉRITOS" — MELHORIAS
+═══════════════════════════════════════
+
+a) COLUNA "AÇÃO" — confirmar que permite EDITAR e EXCLUIR cada lançamento (com 
+   confirmação antes de excluir).
+
+b) FILTROS ADICIONAIS — hoje só tem busca por colaborador; adicionar filtros por:
+   - Tipo (Penalidade / Mérito / Todos)
+   - Evento específico
+   - Período (além do "Ciclo 2026" já fixo, permitir refinar por data específica)
+
+c) VISUAL DIFERENCIADO POR TIPO — diferenciar visualmente penalidades de méritos nas 
+   linhas da tabela (ex: ícone/cor vermelha para penalidade, verde/lima para mérito), 
+   facilitando leitura rápida.
+
+═══════════════════════════════════════
+4. INTEGRAÇÃO COM OUTRAS TELAS (JÁ SOLICITADO ANTERIORMENTE)
+═══════════════════════════════════════
+
+- Confirmar que os lançamentos feitos aqui aparecem corretamente:
+  - Na coluna "PENALIDADES/MÉRITOS" da tela de Consolidação (Resultados do Ciclo)
+  - No painel lateral de detalhe do colaborador (seção "PENALIDADES" e "MÉRITOS")
+  - Na aba do Evento, na aba de Ocorrências e na aba de Calibragem
+- O cálculo da NOTA FINAL do colaborador deve refletir corretamente a soma/desconto 
+  desses lançamentos.
+
+═══════════════════════════════════════
+5. TIPOS PRÉ-CADASTRADOS — PERMITIR EDIÇÃO PELO ADMIN
+═══════════════════════════════════════
+
+- Se ainda não existir, criar uma tela de configuração (em Cadastros) para o Admin 
+  poder criar, editar ou remover os tipos de penalidade/mérito e seus valores em 
+  pontos (hoje fixos: Ausência Não Comunicada -50, Atraso > 30 Minutos -10, 
+  Inconformidade de Ponto -10, Rei do Galpão +50, Estrela do Evento +25, Colega Top 
+  +10), sem precisar de alteração de código a cada mudança de regra.
+
+Manter a paleta de cores atual (laranja para penalidades, lima para méritos, preto 
+para cabeçalhos).
