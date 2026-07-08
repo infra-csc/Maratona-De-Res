@@ -1,0 +1,76 @@
+A tela "Central de Avaliações" / "Status das Avaliações" (visão do Admin, rota 
+/evaluations) hoje só mostra o STATUS de cada critério (Pendente/Falta), mas não 
+mostra o CONTEÚDO das respostas já enviadas pelos avaliadores. Preciso completar 
+essa tela.
+
+═══════════════════════════════════════
+1. EXIBIR AS RESPOSTAS JÁ ENVIADAS (NÃO SÓ O STATUS)
+═══════════════════════════════════════
+
+Para cada critério que já tiver sido respondido pela área (status diferente de 
+"FALTA"/"PENDENTE"), exibir, expansível ou já visível na linha do critério:
+- A NOTA dada pelo avaliador
+- O COMENTÁRIO/JUSTIFICATIVA daquele critério
+
+Além disso, para os itens que hoje não têm lugar nenhuma nesta tela, adicionar:
+
+a) RESPOSTAS DA MATRIZ DE CONFORMIDADE (Sim/Não) — mostrar os itens que alimentam a 
+   matriz (Equipamentos/Ferramentas retornaram?, EPI, Estaiamento/Aterramento, 
+   Conduta) com a resposta dada e o comentário (quando "Não").
+
+b) PERGUNTA DE ATRASO/FALTA — "Alguém faltou ou atrasou por mais de 30 minutos?" 
+   com a resposta em texto livre.
+
+c) DESTAQUE DE DESEMPENHO — "Algum profissional teve desempenho fora da curva?" 
+   com a resposta (Sim/Não) e, se "Sim", o nome e justificativa do destaque.
+
+d) OBSERVAÇÕES GERAIS DO EVENTO — qualquer comentário geral registrado que não seja 
+   ligado a um critério específico.
+
+Sugestão de layout: dentro de cada card de área (ex: "CENOGRAFIA", "ATENDIMENTO"), 
+ao lado dos critérios normais, adicionar uma seção "OUTRAS RESPOSTAS DO EVENTO" (ou 
+similar) reunindo os itens acima (b, c, d), já que eles não são "critérios com peso/
+nota" no mesmo sentido, mas fazem parte da resposta enviada por aquele avaliador/área.
+
+═══════════════════════════════════════
+2. REMOVER RESÍDUO DE "PELOTÃO" (ainda aparece)
+═══════════════════════════════════════
+
+- No painel lateral "STATUS DO TIME", ainda aparece o campo "PELOTÃO PROJETADO: 
+  Pelotão Branco" — remover completamente esse campo, já que o sistema de pelotões 
+  foi substituído pela nova tabela de faixas de bônus.
+- Fazer nova varredura completa por "pelotão" nesta tela e em outras que ainda não 
+  tenham sido verificadas.
+
+═══════════════════════════════════════
+3. OUTRAS MELHORIAS PARA DEIXAR A TELA 10/10
+═══════════════════════════════════════
+
+a) FILTRO POR TIPO DE PENDÊNCIA
+   - Adicionar no bloco "FILTROS" (que já tem Evento, Avaliador, Status) uma opção 
+     extra para filtrar por TIPO de item: "Critérios com nota", "Matriz de 
+     Conformidade", "Atraso/Falta", "Destaque de Desempenho" — útil para o Admin 
+     focar em revisar só uma categoria de cada vez.
+
+b) INDICADOR DE "TEM DESTAQUE" NO RESUMO GERAL
+   - No painel "STATUS DO TIME", adicionar um indicador rápido tipo "1 destaque de 
+     desempenho registrado neste evento" ou "2 ausências/atrasos registrados", para 
+     o Admin identificar rapidamente, sem precisar abrir cada área, se há algo 
+     relevante para revisar manualmente (ex: possíveis méritos/penalidades).
+
+c) LINK DIRETO PARA CALIBRAÇÃO
+   - Ao lado de cada critério já respondido (não mais "Falta"), adicionar um atalho 
+     "Ir para Calibração" (levando direto para aquele critério específico na tela de 
+     Calibrações Técnicas), evitando que o Admin precise navegar manualmente até achar 
+     o critério certo lá.
+
+d) BOTÃO "EXPORTAR PENDENTES" (já existe) — verificar se também é possível ter um 
+   "EXPORTAR RESPOSTAS COMPLETAS" (Excel/CSV com notas, comentários, matriz, atrasos, 
+   destaques), útil para relatórios e auditoria externa.
+
+e) EVENTO SEM PARTICIPANTES (ex: "TESTE" com "0 participantes", Image 2 e 3) — 
+   considerar ocultar da lista principal, ou mostrar um aviso claro "Este evento não 
+   possui colaboradores alocados ainda", já que aparece de forma um pouco confusa 
+   junto de eventos reais.
+
+Manter a paleta de cores atual do sistema (preto/lima, laranja/creme para pendências).

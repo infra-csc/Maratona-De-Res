@@ -1,0 +1,110 @@
+Preciso evoluir a tela de "Calibrações Técnicas" com os ajustes abaixo.
+
+═══════════════════════════════════════
+1. BOTÃO "PUBLICAR FINAL" (além do "Publicar Parcial")
+═══════════════════════════════════════
+
+- Hoje cada critério só tem a opção "PUBLICAR PARCIAL".
+- Adicionar um botão "PUBLICAR FINAL" (por critério e também um botão geral no topo, 
+  ao lado de "SALVAR TODAS" e "ENVIAR").
+- Diferença entre os dois é APENAS de exibição para o colaborador, não de bloqueio 
+  de edição:
+  - PARCIAL: nota fica visível para o colaborador como "projeção/rascunho" (mesmo 
+    aviso amarelo já usado: "projeções parciais e podem mudar até o fechamento oficial").
+  - FINAL: nota fica visível para o colaborador como "Nota Final" (sem aviso de 
+    "parcial"), passando a impressão de que o ciclo daquele critério está encerrado.
+- IMPORTANTE: o Admin/gestor SEMPRE pode voltar e recalibrar a nota depois, mesmo 
+  após publicar como "Final" — não deve haver nenhum bloqueio técnico de edição, nem 
+  confirmação para recalibrar. A diferença "Parcial vs. Final" é só uma informação 
+  mostrada ao colaborador, não uma trava do sistema.
+- Se o Admin recalibrar uma nota que já estava publicada como "Final", o colaborador 
+  deve ver a nota atualizada automaticamente (sem precisar de nova ação de "publicar" 
+  — ela já está marcada como final, só o valor muda).
+
+═══════════════════════════════════════
+2. STATUS DA NOTA VISÍVEL PARA O COLABORADOR
+═══════════════════════════════════════
+
+- O colaborador, na tela "Meu Desempenho" / histórico de eventos, deve ver claramente 
+  o status de cada critério/evento:
+  - "PENDENTE" (área ainda não avaliou)
+  - "AVALIADO — PROJEÇÃO PARCIAL" (área avaliou, mas calibração ainda não publicou final)
+  - "NOTA FINAL CONFIRMADA" (calibração publicou como final)
+- Isso já existe parcialmente (badges "PENDENTE"/"AVALIADO" na tela do colaborador), 
+  mas precisa refletir também o status de calibração (parcial vs. final), não só se 
+  a área respondeu.
+
+═══════════════════════════════════════
+3. EXIBIR CONTEXTO COMPLETO NA TELA DE CALIBRAÇÃO
+═══════════════════════════════════════
+
+Ao lado (ou acima) de cada critério em calibração, mostrar também:
+
+a) COMENTÁRIOS DO EVENTO — observações gerais registradas sobre o evento (se houver 
+   um campo de comentário geral do evento, distinto dos critérios).
+
+b) COMENTÁRIOS DE ATRASO/FALTA — resposta da pergunta "Alguém faltou ou atrasou por 
+   mais de 30 minutos?" daquele evento.
+
+c) DESTAQUE DE DESEMPENHO — resposta da pergunta "Algum profissional teve desempenho 
+   fora da curva?", incluindo o nome e justificativa de quem foi destacado (para o 
+   Admin já visualizar isso no momento de calibrar, sem precisar abrir outra tela).
+
+d) RESPOSTAS DA MATRIZ DE CONFORMIDADE — mostrar os itens da matriz (Sim/Não) daquele 
+   evento (Equipamentos/Ferramentas, EPI, Estaiamento/Aterramento, Conduta) com seus 
+   respectivos status e comentários, já que eles impactam diretamente no desconto de 
+   pontos da nota final.
+
+Sugestão de layout: um painel lateral ou seção expansível "CONTEXTO DO EVENTO" no 
+topo da tela de calibração, antes da lista de critérios, resumindo esses 4 pontos.
+
+═══════════════════════════════════════
+4. ATALHO PARA GERENCIAMENTO DE EVENTO (E VICE-VERSA)
+═══════════════════════════════════════
+
+- Na tela de Calibração, adicionar um botão/link "Ver Gerenciamento do Evento" 
+  (leva para a tela de configuração/detalhes daquele evento específico).
+- Na tela de Gerenciamento do Evento, adicionar um botão/link "Ir para Calibração" 
+  (leva de volta para a calibração daquele mesmo evento).
+- Isso cria uma navegação de mão dupla entre as duas telas, facilitando o trabalho 
+  do Admin sem precisar navegar pelo menu lateral toda vez.
+
+═══════════════════════════════════════
+5. FILTRAR COLABORADORES DA EQUIPE ALOCADA
+═══════════════════════════════════════
+
+Na visualização de equipe alocada dentro do contexto de calibração/evento, mostrar 
+APENAS colaboradores que atendam a TODOS os critérios abaixo:
+- Tiveram AO MENOS 1 diária realizada registrada
+- Estão ATIVOS (não inativos)
+- São do tipo "CASA" (não freela/informativo)
+- Cargo "CENOTÉCNICA" no evento (conforme a regra de cargo por evento já definida 
+  anteriormente — cargos que não contam nota, como Sup Ceno, ficam de fora)
+
+Isso evita poluir a tela de calibração com colaboradores que são apenas informativos 
+ou que não participaram efetivamente daquele evento.
+
+═══════════════════════════════════════
+6. OUTRAS SUGESTÕES PARA DEIXAR A TELA 10/10
+═══════════════════════════════════════
+
+a) HISTÓRICO DE CALIBRAÇÃO: mostrar não só "Calibração atual: 7.00 · por Admin 
+   Sistema", mas um histórico expansível se houve mais de uma alteração (quem alterou, 
+   de qual nota para qual nota, quando).
+
+b) BUSCA/FILTRO DE CRITÉRIOS: para eventos com muitos critérios, adicionar um filtro 
+   rápido (ex: "Mostrar só os SEM NOTA DA ÁREA" ou "Mostrar só os já CALIBRADOS"), 
+   facilitando o Admin focar no que falta.
+
+c) INDICADOR GERAL DE PROGRESSO DO EVENTO: no topo da tela (perto de "SALVAR TODAS" 
+   e "ENVIAR"), mostrar um resumo tipo "3 de 5 critérios calibrados e publicados como 
+   final" para visão rápida do progresso de fechamento daquele evento.
+
+d) CAMPO "SEM NOTA DA ÁREA" (badge vermelho visto na tela, critério "Carga na 
+   Saída do Galpão") — permitir que o Admin, mesmo sem nota da área, ainda calibre 
+   manualmente uma nota (já parece ser possível, já que o campo de calibração aparece 
+   mesmo assim) — só confirmar que esse fluxo está funcionando e deixar mais claro 
+   visualmente que "SEM NOTA DA ÁREA" não bloqueia a calibração manual.
+
+Manter a paleta de cores atual do sistema (preto/lima, com vermelho para alertas e 
+laranja/creme para status "sem nota"/pendente).
