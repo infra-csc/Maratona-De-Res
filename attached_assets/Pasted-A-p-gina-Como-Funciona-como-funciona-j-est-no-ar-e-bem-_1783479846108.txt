@@ -1,0 +1,67 @@
+A página "Como Funciona" (/como-funciona) já está no ar e bem estruturada, mas 
+precisa de ajustes e complementos.
+
+═══════════════════════════════════════
+1. REMOVER RESÍDUOS DE "PELOTÃO" (ainda aparecem no texto)
+═══════════════════════════════════════
+
+Encontrado em pelo menos 2 lugares:
+
+a) Seção "ELEGIBILIDADE AO BÔNUS", linha "EVENTOS EXTRAS":
+   "Eventos acima de 8 podem gerar bônus adicional. Cada evento extra dentro da sua 
+   faixa de pelotão soma um valor extra ao bônus."
+   → Trocar "faixa de pelotão" por "faixa de nota"
+
+b) Seção "O BÔNUS CAJU", linha "BÔNUS BASE":
+   "É o valor fixo correspondente à sua faixa de nota (pelotão)."
+   → Remover "(pelotão)" completamente, deixando só "É o valor fixo correspondente 
+   à sua faixa de nota."
+
+Fazer uma nova varredura nesta página específica por "pelotão" (incluindo variações 
+de maiúscula/minúscula), já que passou despercebido nas remoções anteriores.
+
+═══════════════════════════════════════
+2. ADICIONAR SEÇÃO QUE AINDA FALTA NO GUIA
+═══════════════════════════════════════
+
+A página cobre bem: ciclo de avaliação, cálculo de nota, elegibilidade ao bônus, 
+bônus Caju, status de cada evento, sinalização de revisão, e dúvidas frequentes. 
+Falta apenas:
+
+a) NOVA SEÇÃO: "MATRIZ DE CONFORMIDADE"
+   - Explicar o que é (itens como Uso de EPI, Estaiamento/Aterramento, Equipamentos, 
+     Conduta), que cada item vale 10 pontos, e que uma resposta "Não" desconta 10 
+     pontos da nota do evento correspondente.
+
+b) NOVA SEÇÃO: "PENALIDADES E MÉRITOS" (complementar à explicação já dada em 
+   "COMO SUA NOTA É CALCULADA")
+   - Detalhar os tipos mais comuns (ex: Ausência Não Comunicada, Atraso > 30 Minutos, 
+     Rei do Galpão, Estrela do Evento, Colega Top) e seus valores em pontos, para o 
+     colaborador entender exemplos concretos, não só a fórmula genérica.
+
+═══════════════════════════════════════
+3. MELHORIAS DE NAVEGAÇÃO/USABILIDADE
+═══════════════════════════════════════
+
+a) ÍNDICE/SUMÁRIO NO TOPO
+   - Como a página está ficando longa (Ciclo, Nota, Elegibilidade, Bônus, Status, 
+     Sinalizar Revisão, Dúvidas Frequentes + as novas seções sugeridas), adicionar um 
+     sumário clicável no topo da página (âncoras para cada seção), para o colaborador 
+     não precisar rolar tudo procurando o que precisa.
+
+b) BUSCA RÁPIDA
+   - Adicionar um campo de busca no topo da página (ex: "Buscar nesta página...") 
+     que filtra/destaca as seções relevantes, útil para colaboradores impacientes 
+     que só querem uma resposta rápida.
+
+═══════════════════════════════════════
+4. CONSISTÊNCIA DE TERMINOLOGIA
+═══════════════════════════════════════
+
+- Revisar se todos os termos usados na página ("faixa de nota", "faixa de pontuação") 
+  são exatamente os mesmos usados nas outras telas do sistema (Simulador de Bônus, 
+  Dashboard do Colaborador, Bônus & Pagamentos), para não gerar confusão de 
+  nomenclatura entre telas diferentes.
+
+Manter a paleta de cores e estrutura visual atual (blocos lima com título preto, 
+tabelas com linha de destaque, caixa de exemplo com borda lateral).
