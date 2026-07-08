@@ -4,9 +4,9 @@ import {
   useEventCriterionAssignments, useGenerateCriterionAssignments,
   usePatchCriterionAssignment, type CriterionAssignment,
 } from "@/lib/routing-api";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useGetAreas, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
@@ -874,21 +874,38 @@ export default function EventDetailPage() {
   });
 
   const { data: usersList } = useGetUsers({ query: { enabled: canManage, queryKey: ["users"] as unknown[] } });
+  const { data: areasList } = useGetAreas({ query: { enabled: canManage, queryKey: ["areas"] as unknown[] } });
   const evaluators = (usersList ?? []).filter(u => u.role === "avaliador" && u.active);
   // Apenas avaliadores RELACIONADOS à área aparecem no seletor daquela área.
   const evaluatorsForArea = (areaId: number) => evaluators.filter(u => u.areaId === areaId);
 
   const [assignments, setAssignments] = useState<Record<number, number[]>>({});
+  const [primaryEvaluator, setPrimaryEvaluator] = useState<Record<number, number | null>>({});
+  const [redirectExpanded, setRedirectExpanded] = useState<Record<number, boolean>>({});
+  const [redirectSearch, setRedirectSearch] = useState<Record<number, string>>({});
+
   useEffect(() => {
     if (event?.areaAssignments) {
       const map: Record<number, number[]> = {};
+      const primMap: Record<number, number | null> = {};
       for (const a of event.areaAssignments) {
-        if (!map[a.areaId]) map[a.areaId] = [];
+        if (!map[a.areaId]) { map[a.areaId] = []; primMap[a.areaId] = null; }
         map[a.areaId].push(a.evaluatorUserId);
       }
+      // First user per area = principal
+      for (const [areaId, ids] of Object.entries(map)) {
+        primMap[Number(areaId)] = ids[0] ?? null;
+        map[Number(areaId)] = ids.slice(1); // rest are backups
+      }
       setAssignments(map);
+      setPrimaryEvaluator(primMap);
     }
   }, [event?.areaAssignments]);
+
+  // Duplicate dialog state
+  const [duplicateDialog, setDuplicateDialog] = useState<{ criterionId: number; baseName: string } | null>(null);
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicateAreaId, setDuplicateAreaId] = useState<string>("");
 
   const updateAssignments = useUpdateEventAssignments({
     mutation: {
@@ -954,8 +971,35 @@ export default function EventDetailPage() {
   const handleSaveCriteria = () =>
     updateCriteria.mutate({ id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
   const handleConfirmCriteria = (value: boolean) => confirmCriteria.mutate({ id, data: { confirmed: value } });
-  const handleDuplicate = (criterionId: number, baseName: string) =>
-    duplicateCriterion.mutate({ id, data: { sourceCriterionId: criterionId, name: `${baseName} (cópia)` } });
+  const computeSequentialName = (baseName: string): string => {
+    // Strip trailing " (N)" if already present to get the root name
+    const root = baseName.replace(/\s*\(\d+\)$/, "");
+    const existing = (event.criteria ?? []).map(c => c.criterionName ?? "");
+    const nums = existing.map(n => {
+      const m = n.match(new RegExp(`^${root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\((\\d+)\\)$`));
+      return m ? parseInt(m[1]) : null;
+    }).filter((n): n is number => n !== null);
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 2;
+    return `${root} (${next})`;
+  };
+  const handleDuplicate = (criterionId: number, baseName: string) => {
+    const suggested = computeSequentialName(baseName);
+    setDuplicateName(suggested);
+    setDuplicateAreaId("");
+    setDuplicateDialog({ criterionId, baseName });
+  };
+  const handleConfirmDuplicate = () => {
+    if (!duplicateDialog) return;
+    const selectedArea = areasList?.find(a => a.id.toString() === duplicateAreaId);
+    duplicateCriterion.mutate({
+      id,
+      data: {
+        sourceCriterionId: duplicateDialog.criterionId,
+        name: duplicateName.trim() || computeSequentialName(duplicateDialog.baseName),
+        ...(selectedArea ? { responsibleAreaId: selectedArea.id, responsibleAreaLabel: selectedArea.name } : {}),
+      },
+    }, { onSuccess: () => setDuplicateDialog(null) });
+  };
   const handleRename = (criterionId: number) => {
     const name = (editingName[criterionId] ?? "").trim();
     if (!name) return;
@@ -973,23 +1017,25 @@ export default function EventDetailPage() {
         .map(c => [c.responsibleAreaId as number, c.responsibleAreaName ?? `Área ${c.responsibleAreaId}`] as [number, string])
     ).entries()
   ).map(([areaId, areaName]) => ({ areaId, areaName }));
-  const allAssigned = assignAreas.every(a => (assignments[a.areaId] ?? []).length > 0);
-  const sameEvaluatorSet = (a: number[], b: number[]) => {
-    const sa = [...a].sort((x, y) => x - y);
-    const sb = [...b].sort((x, y) => x - y);
-    return sa.length === sb.length && sa.every((v, i) => v === sb[i]);
+  const buildOrderedEvaluatorIds = (areaId: number): number[] => {
+    const primary = primaryEvaluator[areaId];
+    const backups = (assignments[areaId] ?? []).filter(id => id !== primary);
+    return primary != null ? [primary, ...backups] : backups;
   };
+  const allAssigned = assignAreas.every(a => primaryEvaluator[a.areaId] != null);
+  const areOrderedEqual = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
   const assignmentsDirty = assignAreas.some(a => {
+    const ordered = buildOrderedEvaluatorIds(a.areaId);
     const current = (event.areaAssignments ?? []).filter(x => x.areaId === a.areaId).map(x => x.evaluatorUserId);
-    return !sameEvaluatorSet(assignments[a.areaId] ?? [], current);
+    return !areOrderedEqual(ordered, current);
   });
-  const toggleAreaEvaluator = (areaId: number, userId: number, checked: boolean) =>
+  const toggleBackupEvaluator = (areaId: number, userId: number, checked: boolean) =>
     setAssignments(prev => {
-      const current = prev[areaId] ?? [];
+      const current = (prev[areaId] ?? []).filter(id => id !== primaryEvaluator[areaId]);
       const next = checked ? [...current, userId] : current.filter(v => v !== userId);
       return { ...prev, [areaId]: next };
     });
-  const buildAssignmentsPayload = () => assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserIds: assignments[a.areaId] ?? [] }));
+  const buildAssignmentsPayload = () => assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserIds: buildOrderedEvaluatorIds(a.areaId) }));
   const handleSaveAssignments = () =>
     updateAssignments.mutate({ id, data: { assignments: buildAssignmentsPayload() } });
   const handleSaveAll = () => {
@@ -1394,7 +1440,7 @@ export default function EventDetailPage() {
                               <div className="flex items-center gap-2">
                                 <span className="font-black italic uppercase text-sm text-[#191c1e]">{meta?.criterionName ?? item.name}</span>
                                 {item.eventScoped && (
-                                  <span className="bg-[#191c1e] text-[#ccff00] px-1.5 py-0.5 text-[9px] font-black italic uppercase">Cópia</span>
+                                  <span className="bg-[#506600] text-white px-1.5 py-0.5 text-[9px] font-black italic uppercase">Duplicado</span>
                                 )}
                               </div>
                             )}
@@ -1414,40 +1460,96 @@ export default function EventDetailPage() {
                               className="w-20 h-10 rounded-none border-2 border-[#191c1e] text-center font-black italic disabled:opacity-50 inline-block"
                             />
                           </td>
-                          <td className="px-4 py-3 min-w-[200px]">
+                          <td className="px-4 py-3 min-w-[220px]">
                             {!item.active || areaId == null ? (
                               <span className="text-[11px] font-bold italic uppercase text-[#747a60]">—</span>
-                            ) : (
-                              <>
-                                {areaEvaluators.length === 0 ? (
-                                  <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
-                                ) : (
-                                  <div data-testid={`select-assignment-${item.criterionId}`} className="flex flex-col gap-1 max-w-[220px]">
-                                    {areaEvaluators.map(u => {
-                                      const checked = (assignments[areaId] ?? []).includes(u.id);
-                                      return (
-                                        <label key={u.id} className="flex items-center gap-2 text-xs font-bold italic uppercase text-[#191c1e] cursor-pointer">
-                                          <input
-                                            type="checkbox"
-                                            data-testid={`checkbox-evaluator-${item.criterionId}-${u.id}`}
-                                            checked={checked}
-                                            disabled={hasEvaluations}
-                                            onChange={e => toggleAreaEvaluator(areaId, u.id, e.target.checked)}
-                                            className="h-4 w-4 accent-[#191c1e] disabled:opacity-50"
-                                          />
-                                          {u.name}
-                                        </label>
-                                      );
-                                    })}
+                            ) : areaEvaluators.length === 0 ? (
+                              <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
+                            ) : (() => {
+                              const primary = primaryEvaluator[areaId] ?? null;
+                              const backups = (assignments[areaId] ?? []).filter(id => id !== primary);
+                              const backupEvaluators = areaEvaluators.filter(u => u.id !== primary);
+                              const search = redirectSearch[areaId] ?? "";
+                              const filteredBackups = backupEvaluators.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
+                              const expanded = redirectExpanded[areaId] ?? false;
+                              const selectedBackupCount = backupEvaluators.filter(u => backups.includes(u.id)).length;
+                              return (
+                                <div className="space-y-2" data-testid={`select-assignment-${item.criterionId}`}>
+                                  {/* Avaliador Principal */}
+                                  <div>
+                                    <p className="text-[9px] font-black italic uppercase text-[#747a60] mb-1">Avaliador Principal *</p>
+                                    <Select
+                                      disabled={hasEvaluations}
+                                      value={primary?.toString() ?? ""}
+                                      onValueChange={val => setPrimaryEvaluator(prev => ({ ...prev, [areaId]: val ? Number(val) : null }))}
+                                    >
+                                      <SelectTrigger data-testid={`select-primary-evaluator-${item.criterionId}`} className="h-8 rounded-none border-2 border-[#191c1e] text-xs font-bold italic disabled:opacity-50 w-full">
+                                        <SelectValue placeholder="Selecionar..." />
+                                      </SelectTrigger>
+                                      <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                                        {areaEvaluators.map(u => (
+                                          <SelectItem key={u.id} value={u.id.toString()} className="text-xs font-bold italic">{u.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    {!primary && (
+                                      <p className="mt-0.5 text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador principal</p>
+                                    )}
                                   </div>
-                                )}
-                                {areaEvaluators.length > 0 && (assignments[areaId] ?? []).length === 0 ? (
-                                  <p className="mt-1 text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador</p>
-                                ) : (assignments[areaId] ?? []).length > 1 ? (
-                                  <p className="mt-1 text-[10px] font-bold italic uppercase text-[#506600]">{(assignments[areaId] ?? []).length} avaliadores — nota final é a média</p>
-                                ) : null}
-                              </>
-                            )}
+                                  {/* Pode Redirecionar Para — colapsível */}
+                                  {backupEvaluators.length > 0 && (
+                                    <div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setRedirectExpanded(prev => ({ ...prev, [areaId]: !expanded }))}
+                                        className="flex items-center gap-1 text-[9px] font-black italic uppercase text-[#747a60] hover:text-[#444933] transition-colors"
+                                      >
+                                        {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                                        Pode redirecionar para
+                                        {selectedBackupCount > 0 && (
+                                          <span className="bg-[#191c1e] text-[#ccff00] px-1 py-px text-[8px] font-black">{selectedBackupCount}</span>
+                                        )}
+                                      </button>
+                                      {expanded && (
+                                        <div className="mt-1.5 border border-[#eceef0] p-2 space-y-1.5">
+                                          {backupEvaluators.length > 4 && (
+                                            <div className="flex items-center gap-1 border border-[#eceef0] px-2 py-1">
+                                              <Search size={10} className="text-[#747a60] shrink-0" />
+                                              <input
+                                                type="text"
+                                                value={search}
+                                                onChange={e => setRedirectSearch(prev => ({ ...prev, [areaId]: e.target.value }))}
+                                                placeholder="Buscar..."
+                                                className="flex-1 text-[11px] italic font-bold outline-none bg-transparent text-[#191c1e] placeholder:text-[#9aa088]"
+                                              />
+                                            </div>
+                                          )}
+                                          {filteredBackups.map(u => {
+                                            const checked = backups.includes(u.id);
+                                            return (
+                                              <label key={u.id} className="flex items-center gap-2 text-[11px] font-bold italic text-[#191c1e] cursor-pointer">
+                                                <input
+                                                  type="checkbox"
+                                                  data-testid={`checkbox-evaluator-${item.criterionId}-${u.id}`}
+                                                  checked={checked}
+                                                  disabled={hasEvaluations}
+                                                  onChange={e => toggleBackupEvaluator(areaId, u.id, e.target.checked)}
+                                                  className="h-3.5 w-3.5 accent-[#191c1e] disabled:opacity-50 shrink-0"
+                                                />
+                                                {u.name}
+                                              </label>
+                                            );
+                                          })}
+                                          {filteredBackups.length === 0 && (
+                                            <p className="text-[10px] italic text-[#9aa088]">Nenhum resultado.</p>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2 justify-end">
@@ -1536,6 +1638,62 @@ export default function EventDetailPage() {
                 <p className="text-xs font-bold italic uppercase text-[#ba1a1a]">Há áreas sem nenhum avaliador vinculado. Cadastre avaliadores nessas áreas (em Usuários) para poder atribuí-los.</p>
               )}
 
+
+              {/* ─── Dialog: Duplicar Quesito ─── */}
+              <Dialog open={duplicateDialog !== null} onOpenChange={o => { if (!o) setDuplicateDialog(null); }}>
+                <DialogContent className="rounded-none border-2 border-[#191c1e] max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="italic uppercase font-black tracking-tight text-lg">Duplicar Quesito</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black italic uppercase text-[#747a60]">Nome do novo quesito</label>
+                      <Input
+                        value={duplicateName}
+                        onChange={e => setDuplicateName(e.target.value)}
+                        className="rounded-none border-2 border-[#191c1e] font-black italic text-sm h-10"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black italic uppercase text-[#747a60]">
+                        Área responsável <span className="font-normal normal-case not-italic text-[#9aa088]">(opcional — padrão: mesma área de origem)</span>
+                      </label>
+                      <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
+                        <SelectTrigger className="rounded-none border-2 border-[#191c1e] font-bold italic text-sm h-10">
+                          <SelectValue placeholder="Manter área original..." />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-none border-2 border-[#191c1e]">
+                          {(areasList ?? []).map(a => (
+                            <SelectItem key={a.id} value={a.id.toString()} className="font-bold italic">{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {duplicateAreaId && (
+                      <p className="text-[10px] italic text-[#506600] font-bold">
+                        O novo quesito será vinculado à área selecionada. Os avaliadores da nova área aparecerão para atribuição.
+                      </p>
+                    )}
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDuplicateDialog(null)}
+                      className="px-4 py-2 border-2 border-[#191c1e] font-bold italic uppercase text-xs bg-white hover:bg-[#f5f5f5] transition-colors"
+                    >Cancelar</button>
+                    <button
+                      type="button"
+                      disabled={duplicateCriterion.isPending || !duplicateName.trim()}
+                      onClick={handleConfirmDuplicate}
+                      className="px-4 py-2 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-xs hover:bg-[#b8e600] transition-colors disabled:opacity-40"
+                    >
+                      <Copy size={13} className="inline mr-1.5" />
+                      {duplicateCriterion.isPending ? "Duplicando..." : "Duplicar"}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
                 <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">

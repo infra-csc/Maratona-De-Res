@@ -9,4 +9,6 @@
 export interface EventCriterionDuplicate {
   sourceCriterionId: number;
   name?: string;
+  responsibleAreaId?: number | null;
+  responsibleAreaLabel?: string | null;
 }

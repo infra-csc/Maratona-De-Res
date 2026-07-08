@@ -2088,7 +2088,9 @@ export const DuplicateEventCriterionParams = zod.object({
 
 export const DuplicateEventCriterionBody = zod.object({
   "sourceCriterionId": zod.number(),
-  "name": zod.string().optional()
+  "name": zod.string().optional(),
+  "responsibleAreaId": zod.number().nullish(),
+  "responsibleAreaLabel": zod.string().nullish()
 })
 
 

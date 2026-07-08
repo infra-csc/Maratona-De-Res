@@ -984,6 +984,8 @@ router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async 
 
   const sourceCriterionId = Number(req.body?.sourceCriterionId);
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const areaIdOverride = req.body?.responsibleAreaId != null ? Number(req.body.responsibleAreaId) : null;
+  const areaLabelOverride = typeof req.body?.responsibleAreaLabel === "string" ? req.body.responsibleAreaLabel.trim() : null;
   if (!sourceCriterionId) { res.status(400).json({ error: "Informe o critério de origem (sourceCriterionId)" }); return; }
 
   const [link] = await db.select().from(eventCriteriaTable)
@@ -995,10 +997,10 @@ router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async 
   if (!source) { res.status(404).json({ error: "Critério de origem não encontrado" }); return; }
 
   const [copy] = await db.insert(criteriaTable).values({
-    name: name || `${source.name} (cópia)`,
+    name: name || `${source.name} (2)`,
     description: source.description,
-    responsibleAreaId: source.responsibleAreaId,
-    responsibleAreaLabel: source.responsibleAreaLabel,
+    responsibleAreaId: areaIdOverride ?? source.responsibleAreaId,
+    responsibleAreaLabel: areaLabelOverride ?? source.responsibleAreaLabel,
     defaultWeight: source.defaultWeight,
     active: true,
     displayOrder: source.displayOrder,

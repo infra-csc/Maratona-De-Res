@@ -3140,6 +3140,12 @@ components:
           type: integer
         name:
           type: string
+        responsibleAreaId:
+          type: integer
+          nullable: true
+        responsibleAreaLabel:
+          type: string
+          nullable: true
 
     EventAreaAssignment:
       type: object

@@ -643,6 +643,8 @@ export interface EventCriteriaConfirm {
 export interface EventCriterionDuplicate {
   sourceCriterionId: number;
   name?: string;
+  responsibleAreaId?: number | null;
+  responsibleAreaLabel?: string | null;
 }
 
 export type EventAssignmentsUpdateAssignmentsItem = {
