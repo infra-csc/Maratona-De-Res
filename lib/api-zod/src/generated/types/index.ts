@@ -112,6 +112,8 @@ export * from './impersonateInput';
 export * from './importResult';
 export * from './integrationStatus';
 export * from './loginInput';
+export * from './mergeEmployeeInput';
+export * from './mergeEmployeeResult';
 export * from './mergeEventInput';
 export * from './mergeEventResult';
 export * from './migrateCriteriaCatalog200';

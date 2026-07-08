@@ -414,6 +414,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/Employee"
 
+  /employees/{id}/merge:
+    post:
+      operationId: mergeEmployee
+      tags: [employees]
+      summary: Merge duplicate employees into a canonical record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MergeEmployeeInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MergeEmployeeResult"
+
   /employees/{id}/history:
     get:
       operationId: getEmployeeHistory
@@ -3163,6 +3188,36 @@ components:
         importedNotes:
           type: ["string", "null"]
           description: Free-text notes/comments for the historical event (conformity + performance breakdown).
+
+    MergeEmployeeInput:
+      type: object
+      required: [duplicateIds]
+      properties:
+        duplicateIds:
+          type: array
+          items:
+            type: integer
+
+    MergeEmployeeResult:
+      type: object
+      required: [canonicalId, merged]
+      properties:
+        canonicalId:
+          type: integer
+        merged:
+          type: array
+          items:
+            type: integer
+        movedParticipations:
+          type: integer
+        movedAbsences:
+          type: integer
+        movedEvals:
+          type: integer
+        movedReviews:
+          type: integer
+        removedUsers:
+          type: integer
 
     MergeEventInput:
       type: object

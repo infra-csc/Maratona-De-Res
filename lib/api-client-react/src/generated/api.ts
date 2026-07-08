@@ -97,6 +97,8 @@ import type {
   ImportResult,
   IntegrationStatus,
   LoginInput,
+  MergeEmployeeInput,
+  MergeEmployeeResult,
   MergeEventInput,
   MergeEventResult,
   MigrateCriteriaCatalog200,
@@ -1771,6 +1773,78 @@ export const useUpdateEmployee = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateEmployeeMutationOptions(options));
+    }
+
+export const getMergeEmployeeUrl = (id: number,) => {
+
+
+
+
+  return `/employees/${id}/merge`
+}
+
+/**
+ * @summary Merge duplicate employees into a canonical record
+ */
+export const mergeEmployee = async (id: number,
+    mergeEmployeeInput: MergeEmployeeInput, options?: RequestInit): Promise<MergeEmployeeResult> => {
+
+  return customFetch<MergeEmployeeResult>(getMergeEmployeeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mergeEmployeeInput,)
+  }
+);}
+
+
+
+
+export const getMergeEmployeeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeEmployee>>, TError,{id: number;data: BodyType<MergeEmployeeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mergeEmployee>>, TError,{id: number;data: BodyType<MergeEmployeeInput>}, TContext> => {
+
+const mutationKey = ['mergeEmployee'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mergeEmployee>>, {id: number;data: BodyType<MergeEmployeeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  mergeEmployee(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MergeEmployeeMutationResult = NonNullable<Awaited<ReturnType<typeof mergeEmployee>>>
+    export type MergeEmployeeMutationBody = BodyType<MergeEmployeeInput>
+    export type MergeEmployeeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Merge duplicate employees into a canonical record
+ */
+export const useMergeEmployee = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeEmployee>>, TError,{id: number;data: BodyType<MergeEmployeeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mergeEmployee>>,
+        TError,
+        {id: number;data: BodyType<MergeEmployeeInput>},
+        TContext
+      > => {
+      return useMutation(getMergeEmployeeMutationOptions(options));
     }
 
 export const getGetEmployeeHistoryUrl = (id: number,) => {

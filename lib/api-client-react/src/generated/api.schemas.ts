@@ -558,6 +558,20 @@ export interface HistoricalResultUpdate {
   importedNotes?: string | null;
 }
 
+export interface MergeEmployeeInput {
+  duplicateIds: number[];
+}
+
+export interface MergeEmployeeResult {
+  canonicalId: number;
+  merged: number[];
+  movedParticipations?: number;
+  movedAbsences?: number;
+  movedEvals?: number;
+  movedReviews?: number;
+  removedUsers?: number;
+}
+
 export interface MergeEventInput {
   /** Id of the duplicate event to absorb into and delete. */
   mergeEventId: number;

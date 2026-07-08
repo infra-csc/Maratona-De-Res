@@ -428,6 +428,28 @@ export const UpdateEmployeeResponse = zod.object({
 
 
 /**
+ * @summary Merge duplicate employees into a canonical record
+ */
+export const MergeEmployeeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MergeEmployeeBody = zod.object({
+  "duplicateIds": zod.array(zod.number())
+})
+
+export const MergeEmployeeResponse = zod.object({
+  "canonicalId": zod.number(),
+  "merged": zod.array(zod.number()),
+  "movedParticipations": zod.number().optional(),
+  "movedAbsences": zod.number().optional(),
+  "movedEvals": zod.number().optional(),
+  "movedReviews": zod.number().optional(),
+  "removedUsers": zod.number().optional()
+})
+
+
+/**
  * @summary Get employee quarterly history
  */
 export const GetEmployeeHistoryParams = zod.object({

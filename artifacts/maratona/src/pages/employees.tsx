@@ -3,12 +3,13 @@ import {
   useGetEmployees,
   useCreateEmployee,
   useUpdateEmployee,
+  useMergeEmployee,
   useGetCollaboratorsWithoutAccess,
   useBulkGenerateCollaboratorAccess,
   getGetEmployeesQueryKey,
   getGetCollaboratorsWithoutAccessQueryKey,
 } from "@workspace/api-client-react";
-import type { EmployeeInput, Employee, GeneratedCredential, BulkGenerateAccessResult } from "@workspace/api-client-react";
+import type { EmployeeInput, Employee, GeneratedCredential, BulkGenerateAccessResult, MergeEmployeeResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 function downloadCredentialsCsv(created: GeneratedCredential[]) {
@@ -64,6 +65,11 @@ export default function EmployeesPage() {
   const [bulkResult, setBulkResult] = useState<BulkGenerateAccessResult | null>(null);
   const [newAccess, setNewAccess] = useState<{ cpfLogin: string; password: string } | null>(null);
 
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [canonicalId, setCanonicalId] = useState<number | null>(null);
+  const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
+
   const qKey = getGetEmployeesQueryKey({ active: filterActive === "true" });
   const { data: employeesRaw, isLoading } = useGetEmployees(
     { active: filterActive === "true" },
@@ -96,6 +102,20 @@ export default function EmployeesPage() {
     isLoading: isBulkPreviewLoading,
     refetch: refetchBulkPreview,
   } = useGetCollaboratorsWithoutAccess({ query: { enabled: bulkOpen, queryKey: getGetCollaboratorsWithoutAccessQueryKey() } });
+
+  const mergeMutation = useMergeEmployee({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey({ active: true }) });
+        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey({ active: false }) });
+        setMergeResult(data);
+        setMergeMode(false);
+        setSelectedIds(new Set());
+        setCanonicalId(null);
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao mesclar", description: e.message, variant: "destructive" }),
+    },
+  });
 
   const bulkGenerateMutation = useBulkGenerateCollaboratorAccess({
     mutation: {
@@ -179,6 +199,12 @@ export default function EmployeesPage() {
           </div>
           {canEdit && (
             <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => { setMergeMode(v => !v); setSelectedIds(new Set()); setCanonicalId(null); }}
+                className={`border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 transition-all ${mergeMode ? "bg-[#ff5722] text-white" : "bg-white hover:bg-[#eceef0]"}`}
+              >
+                {mergeMode ? <><X size={18} /> Cancelar Mesclagem</> : <><GitMerge size={18} /> Mesclar Duplicatas</>}
+              </button>
               <button
                 data-testid="button-bulk-generate-access"
                 onClick={() => { setBulkOpen(true); setBulkResult(null); }}
@@ -409,25 +435,49 @@ export default function EmployeesPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                    {mergeMode && <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center w-10">✓</th>}
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Atleta / Colaborador</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Departamento</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Cargo</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Tipo</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Status</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Elegibilidade</th>
-                    {canEdit && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Ações</th>}
+                    {canEdit && !mergeMode && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Ações</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
-                  {filtered.map(emp => (
-                    <tr key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-[#f2f4f6] transition-all hover:translate-x-1 group">
+                  {filtered.map(emp => {
+                    const isSelected = selectedIds.has(emp.id);
+                    const isCanonical = canonicalId === emp.id;
+                    return (
+                    <tr
+                      key={emp.id}
+                      data-testid={`row-employee-${emp.id}`}
+                      onClick={mergeMode ? () => {
+                        setSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(emp.id)) { next.delete(emp.id); if (canonicalId === emp.id) setCanonicalId(null); }
+                          else next.add(emp.id);
+                          return next;
+                        });
+                      } : undefined}
+                      className={`transition-all ${mergeMode ? "cursor-pointer " + (isSelected ? "bg-[#eeffc0]" : "hover:bg-[#f2f4f6]") : "hover:bg-[#f2f4f6] hover:translate-x-1"} group`}
+                    >
+                      {mergeMode && (
+                        <td className="px-4 py-4 text-center">
+                          <div className={`w-5 h-5 border-2 border-[#191c1e] inline-flex items-center justify-center ${isSelected ? "bg-[#506600]" : "bg-white"}`}>
+                            {isSelected && <span className="text-white text-[10px] font-black">✓</span>}
+                          </div>
+                        </td>
+                      )}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 border-2 border-[#191c1e] skew-x-[-4deg] bg-[#e0e3e5] flex items-center justify-center shrink-0">
+                          <div className={`w-11 h-11 border-2 border-[#191c1e] skew-x-[-4deg] flex items-center justify-center shrink-0 ${isCanonical ? "bg-[#ccff00]" : "bg-[#e0e3e5]"}`}>
                             <span className="skew-x-[4deg] text-sm font-black italic">{initials(emp.name)}</span>
                           </div>
                           <div>
                             <p className="font-bold italic text-[#191c1e]">{emp.name}</p>
+                            {isCanonical && <span className="text-[10px] font-black italic uppercase text-[#506600] bg-[#ccff00] px-1">CANÔNICO</span>}
                             {emp.email && <p className="text-xs text-[#747a60] mt-0.5">{emp.email}</p>}
                           </div>
                         </div>
@@ -480,7 +530,7 @@ export default function EmployeesPage() {
                           })()}
                         </div>
                       </td>
-                      {canEdit && (
+                      {canEdit && !mergeMode && (
                         <td className="px-6 py-4 text-center">
                           <button
                             data-testid={`button-edit-employee-${emp.id}`}
@@ -492,9 +542,10 @@ export default function EmployeesPage() {
                         </td>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={canEdit ? 6 : 5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
+                    <tr><td colSpan={(canEdit && !mergeMode) ? 7 : mergeMode ? 7 : 6} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -502,6 +553,43 @@ export default function EmployeesPage() {
             <div className="px-6 py-4 border-t-2 border-[#eceef0] flex justify-between items-center">
               <span className="text-xs font-bold italic uppercase text-[#747a60]">Mostrando {filtered.length} de {stats.total} colaboradores</span>
             </div>
+          </section>
+        )}
+
+        {/* Merge action bar */}
+        {mergeMode && selectedIds.size >= 2 && (
+          <section className="sticky bottom-4 bg-[#191c1e] border-2 border-[#ccff00] p-4 flex flex-col md:flex-row items-start md:items-center gap-4 shadow-[6px_6px_0px_0px_#ccff00]">
+            <div className="flex-1">
+              <p className="text-[#ccff00] font-black italic uppercase text-sm">{selectedIds.size} colaboradores selecionados</p>
+              <p className="text-[#747a60] text-xs italic mt-0.5">Selecione qual é o CANÔNICO (o que permanece):</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {Array.from(selectedIds).map(id => {
+                  const emp = (employees ?? []).find(e => e.id === id);
+                  if (!emp) return null;
+                  return (
+                    <button
+                      key={id}
+                      onClick={e => { e.stopPropagation(); setCanonicalId(id); }}
+                      className={`px-3 py-1.5 border-2 font-bold text-[11px] italic uppercase transition-all ${canonicalId === id ? "border-[#ccff00] bg-[#ccff00] text-[#161e00]" : "border-[#747a60] text-white hover:border-[#ccff00]"}`}
+                    >
+                      {emp.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <button
+              disabled={!canonicalId || mergeMutation.isPending}
+              onClick={() => {
+                if (!canonicalId) return;
+                const dupIds = Array.from(selectedIds).filter(id => id !== canonicalId);
+                mergeMutation.mutate({ id: canonicalId, data: { duplicateIds: dupIds } });
+              }}
+              className="bg-[#ccff00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase text-[#161e00] flex items-center gap-2 disabled:opacity-40 shrink-0"
+            >
+              <GitMerge size={16} />
+              {mergeMutation.isPending ? "Mesclando..." : `Mesclar → Manter "${(employees ?? []).find(e => e.id === canonicalId)?.name ?? "?"}"`}
+            </button>
           </section>
         )}
       </div>
@@ -582,6 +670,26 @@ export default function EmployeesPage() {
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Merge result dialog */}
+      <Dialog open={!!mergeResult} onOpenChange={v => { if (!v) setMergeResult(null); }}>
+        <DialogContent className="max-w-sm rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2"><GitMerge size={20} /> Mesclagem Concluída</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 space-y-2 text-sm italic">
+              <p><span className="font-black">{mergeResult?.merged.length ?? 0}</span> duplicata(s) removida(s)</p>
+              <p><span className="font-black">{mergeResult?.movedParticipations ?? 0}</span> participações transferidas</p>
+              {(mergeResult?.movedAbsences ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedAbsences}</span> penalidades/méritos transferidos</p>}
+            </div>
+            <p className="text-xs text-[#747a60] italic">Agora você pode usar "Gerar Acessos em Massa" para criar as credenciais dos colaboradores mesclados.</p>
+            <div className="flex justify-end pt-2 border-t-2 border-[#e0e3e5]">
+              <button onClick={() => setMergeResult(null)} className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase">Fechar</button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
