@@ -170,6 +170,106 @@ function EvaluatorPickerCell({
   );
 }
 
+function ConformityEvaluatorPickerCell({
+  criterionId, currentRouting, evaluators, onSaved,
+}: {
+  criterionId: number;
+  currentRouting: CriterionRouting | undefined;
+  evaluators: { id: number; name: string }[];
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const saveMutation = useSaveCriterionRouting(criterionId);
+
+  const handleSelect = (userId: number | null) => {
+    saveMutation.mutate({
+      conformityEvaluatorId: userId,
+      defaultEvaluatorId: currentRouting?.defaultEvaluatorId ?? null,
+      commentRequired: currentRouting?.commentRequired ?? true,
+      redirectMode: currentRouting?.redirectMode ?? "none",
+      redirectAreaId: currentRouting?.redirectAreaId ?? null,
+      redirectUserIds: currentRouting?.redirectUsers?.map(u => u.id) ?? [],
+    }, {
+      onSuccess: () => { setOpen(false); setSearch(""); onSaved(); },
+    });
+  };
+
+  const filtered = evaluators.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
+  const current = currentRouting?.conformityEvaluatorName ?? null;
+
+  return (
+    <Popover open={open} onOpenChange={v => { setOpen(v); if (!v) setSearch(""); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 group/ev text-left"
+          title="Clique para definir o avaliador da Matriz de Conformidade"
+        >
+          {current ? (
+            <span className="flex items-center gap-1.5 text-sm font-bold italic text-[#191c1e] group-hover/ev:text-[#506600] transition-colors">
+              <UserCheck size={13} className="text-[#506600] shrink-0" />
+              {current}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#9aa088] group-hover/ev:text-[#747a60] transition-colors">
+              <AlertCircle size={12} /> Sem avaliador
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-64 p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e]"
+        align="start"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-2 border-b-2 border-[#191c1e] bg-[#f0f5e0]">
+          <p className="text-[10px] font-black uppercase italic tracking-wider text-[#506600] mb-1.5">Av. Matriz de Conformidade</p>
+          <Input
+            placeholder="Buscar avaliador..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-7 text-xs rounded-none border-2 border-[#191c1e] focus-visible:ring-0"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-52 overflow-y-auto">
+          {current && (
+            <button
+              type="button"
+              onClick={() => handleSelect(null)}
+              disabled={saveMutation.isPending}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold italic text-[#e55050] hover:bg-[#fff0f0] border-b border-[#eceef0] transition-colors"
+            >
+              <X size={11} /> Remover avaliador
+            </button>
+          )}
+          {filtered.length === 0 && (
+            <p className="text-center text-xs text-[#747a60] italic py-4">Nenhum encontrado</p>
+          )}
+          {filtered.map(u => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => handleSelect(u.id)}
+              disabled={saveMutation.isPending}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold italic text-left hover:bg-[#f0f5e0] transition-colors border-b border-[#eceef0] last:border-b-0 ${u.id === currentRouting?.conformityEvaluatorId ? "bg-[#f0f5e0] text-[#506600]" : "text-[#191c1e]"}`}
+            >
+              {u.id === currentRouting?.conformityEvaluatorId && <Check size={11} className="shrink-0 text-[#506600]" />}
+              <span>{u.name}</span>
+            </button>
+          ))}
+        </div>
+        {saveMutation.isPending && (
+          <div className="p-2 border-t-2 border-[#191c1e] bg-[#f7f9fb] text-center text-[10px] font-bold italic text-[#747a60]">
+            Salvando...
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function RoutingConfigDialog({
   criterionId, criterionName, currentRouting, areas, evaluators, onClose,
 }: {
@@ -600,12 +700,16 @@ export default function CriteriaPage() {
                     <th className="px-6 py-4 text-xs font-bold uppercase italic">Área</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-center">Peso</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic">Avaliador Padrão</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase italic">Av. Conformidade</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase italic text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
                   {displayedCriteria.slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => {
                     const routing = routingMap.get(c.id);
+                    const areaEvaluators = c.responsibleAreaId != null
+                      ? evaluators.filter(u => (u as { areaId?: number | null }).areaId === c.responsibleAreaId).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+                      : evaluators.slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
                     return (
                       <tr key={c.id} data-testid={`row-criterion-${c.id}`} className={`hover:bg-[#f2f4f6] transition-all group ${!c.active ? 'opacity-60' : ''}`}>
                         <td className="px-6 py-4">
@@ -634,7 +738,7 @@ export default function CriteriaPage() {
                             <EvaluatorPickerCell
                               criterionId={c.id}
                               currentRouting={routing}
-                              evaluators={evaluators}
+                              evaluators={areaEvaluators}
                               onSaved={() => qc.invalidateQueries()}
                             />
                             <button
@@ -646,6 +750,14 @@ export default function CriteriaPage() {
                               <Settings2 size={13} />
                             </button>
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <ConformityEvaluatorPickerCell
+                            criterionId={c.id}
+                            currentRouting={routing}
+                            evaluators={areaEvaluators}
+                            onSaved={() => qc.invalidateQueries()}
+                          />
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-3">
@@ -664,7 +776,7 @@ export default function CriteriaPage() {
                     );
                   })}
                   {(!criteria || criteria.length === 0) && (
-                    <tr><td colSpan={5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério configurado.</td></tr>
+                    <tr><td colSpan={6} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum critério configurado.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -687,7 +799,9 @@ export default function CriteriaPage() {
               criterionName={routingCriterion.name}
               currentRouting={routingMap.get(routingDialogId)}
               areas={areas ?? []}
-              evaluators={evaluators}
+              evaluators={routingCriterion.responsibleAreaId != null
+                ? evaluators.filter(u => (u as { areaId?: number | null }).areaId === routingCriterion.responsibleAreaId).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+                : evaluators.slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))}
               onClose={() => setRoutingDialogId(null)}
             />
           )}

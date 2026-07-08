@@ -7,7 +7,7 @@ import {
   areasTable, eventsTable, eventCriteriaTable, publicEvalTokensTable,
   publicEvalTokenCriteriaTable,
 } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, alias } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -19,10 +19,13 @@ router.use(requireAuth);
 // Retorna o roteamento de todos os critérios (admin/rh).
 // ---------------------------------------------------------------------------
 router.get("/criterion-routing", requireRole("admin", "rh"), async (_req, res) => {
+  const conformityUser = alias(usersTable, "conformity_user");
   const routings = await db.select({
     criterionId: criterionRoutingTable.criterionId,
     defaultEvaluatorId: criterionRoutingTable.defaultEvaluatorId,
     defaultEvaluatorName: usersTable.name,
+    conformityEvaluatorId: criterionRoutingTable.conformityEvaluatorId,
+    conformityEvaluatorName: conformityUser.name,
     commentRequired: criterionRoutingTable.commentRequired,
     redirectMode: criterionRoutingTable.redirectMode,
     redirectAreaId: criterionRoutingTable.redirectAreaId,
@@ -31,6 +34,7 @@ router.get("/criterion-routing", requireRole("admin", "rh"), async (_req, res) =
   })
     .from(criterionRoutingTable)
     .leftJoin(usersTable, eq(criterionRoutingTable.defaultEvaluatorId, usersTable.id))
+    .leftJoin(conformityUser, eq(criterionRoutingTable.conformityEvaluatorId, conformityUser.id))
     .leftJoin(areasTable, eq(criterionRoutingTable.redirectAreaId, areasTable.id));
 
   res.json(routings);
@@ -43,11 +47,14 @@ router.get("/criterion-routing", requireRole("admin", "rh"), async (_req, res) =
 router.get("/criteria/:id/routing", requireRole("admin", "rh"), async (req, res) => {
   const criterionId = parseInt(req.params.id as string);
 
+  const conformityUser = alias(usersTable, "conformity_user");
   const [routing] = await db.select({
     id: criterionRoutingTable.id,
     criterionId: criterionRoutingTable.criterionId,
     defaultEvaluatorId: criterionRoutingTable.defaultEvaluatorId,
     defaultEvaluatorName: usersTable.name,
+    conformityEvaluatorId: criterionRoutingTable.conformityEvaluatorId,
+    conformityEvaluatorName: conformityUser.name,
     commentRequired: criterionRoutingTable.commentRequired,
     redirectMode: criterionRoutingTable.redirectMode,
     redirectAreaId: criterionRoutingTable.redirectAreaId,
@@ -56,6 +63,7 @@ router.get("/criteria/:id/routing", requireRole("admin", "rh"), async (req, res)
   })
     .from(criterionRoutingTable)
     .leftJoin(usersTable, eq(criterionRoutingTable.defaultEvaluatorId, usersTable.id))
+    .leftJoin(conformityUser, eq(criterionRoutingTable.conformityEvaluatorId, conformityUser.id))
     .leftJoin(areasTable, eq(criterionRoutingTable.redirectAreaId, areasTable.id))
     .where(eq(criterionRoutingTable.criterionId, criterionId))
     .limit(1);
@@ -82,13 +90,14 @@ router.get("/criteria/:id/routing", requireRole("admin", "rh"), async (req, res)
 // ---------------------------------------------------------------------------
 router.put("/criteria/:id/routing", requireRole("admin", "rh"), async (req, res) => {
   const criterionId = parseInt(req.params.id as string);
-  const { defaultEvaluatorId, commentRequired, redirectMode, redirectAreaId, allowPublicLink, redirectUserIds } = req.body;
+  const { defaultEvaluatorId, conformityEvaluatorId, commentRequired, redirectMode, redirectAreaId, allowPublicLink, redirectUserIds } = req.body;
 
   const [existing] = await db.select().from(criterionRoutingTable)
     .where(eq(criterionRoutingTable.criterionId, criterionId)).limit(1);
 
   const values = {
     defaultEvaluatorId: defaultEvaluatorId ?? null,
+    conformityEvaluatorId: conformityEvaluatorId ?? null,
     commentRequired: commentRequired !== false,
     redirectMode: redirectMode ?? "area",
     redirectAreaId: redirectAreaId ?? null,

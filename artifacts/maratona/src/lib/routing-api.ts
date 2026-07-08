@@ -16,6 +16,8 @@ export interface CriterionRouting {
   criterionId: number;
   defaultEvaluatorId: number | null;
   defaultEvaluatorName: string | null;
+  conformityEvaluatorId: number | null;
+  conformityEvaluatorName: string | null;
   commentRequired: boolean;
   redirectMode: "none" | "area" | "specific";
   redirectAreaId: number | null;

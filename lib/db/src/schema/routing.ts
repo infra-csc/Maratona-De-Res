@@ -20,6 +20,7 @@ export const criterionRoutingTable = pgTable("criterion_routing", {
   id: serial("id").primaryKey(),
   criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id, { onDelete: "cascade" }),
   defaultEvaluatorId: integer("default_evaluator_id").references(() => usersTable.id, { onDelete: "set null" }),
+  conformityEvaluatorId: integer("conformity_evaluator_id").references(() => usersTable.id, { onDelete: "set null" }),
   commentRequired: boolean("comment_required").notNull().default(true),
   redirectMode: text("redirect_mode").notNull().default("area"),
   redirectAreaId: integer("redirect_area_id").references(() => areasTable.id, { onDelete: "set null" }),
