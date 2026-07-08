@@ -4,10 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Calculator, CircleDollarSign, Plus } from "lucide-react";
-import { PlatoonBadge } from "@/components/ui/platoon-badge";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+
+const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 export default function RulesPage() {
   const { toast } = useToast();
@@ -20,7 +21,7 @@ export default function RulesPage() {
   const { data: platoonRules } = useGetPlatoonRules({ query: { queryKey: platoonQKey } });
 
   const [ruleValues, setRuleValues] = useState<Record<string, string>>({});
-  const [platoonValues, setPlatoonValues] = useState<Record<number, Partial<{ minScore: number; maxScore: number; bonusValue: number }>>>({});
+  const [platoonValues, setPlatoonValues] = useState<Record<number, Partial<{ minScore: number; maxScore: number; bonusValue: number; bonusPerExtraEvent: number }>>>({});
 
   const updateRuleMutation = useUpdateRule({
     mutation: {
@@ -36,36 +37,39 @@ export default function RulesPage() {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: platoonQKey });
-        toast({ title: "Configuração do pelotão atualizada" });
+        toast({ title: "Faixa atualizada com sucesso" });
       },
     },
   });
 
-  const [newPlatoon, setNewPlatoon] = useState({ name: "", color: "#94a3b8", minScore: "", maxScore: "", bonusValue: "" });
+  const [newPlatoon, setNewPlatoon] = useState({ minScore: "", maxScore: "", bonusValue: "", bonusPerExtraEvent: "" });
 
   const createPlatoonMutation = useCreatePlatoonRule({
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: platoonQKey });
-        toast({ title: "Pelotão adicionado com sucesso" });
-        setNewPlatoon({ name: "", color: "#94a3b8", minScore: "", maxScore: "", bonusValue: "" });
+        toast({ title: "Faixa adicionada com sucesso" });
+        setNewPlatoon({ minScore: "", maxScore: "", bonusValue: "", bonusPerExtraEvent: "" });
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao adicionar pelotão", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Erro ao adicionar faixa", description: e.message, variant: "destructive" }),
     },
   });
 
   function handleCreatePlatoon() {
-    if (!newPlatoon.name.trim() || newPlatoon.minScore === "" || newPlatoon.maxScore === "") {
-      toast({ title: "Preencha nome, mínimo e máximo", variant: "destructive" });
+    if (newPlatoon.minScore === "" || newPlatoon.maxScore === "") {
+      toast({ title: "Preencha nota mínima e máxima", variant: "destructive" });
       return;
     }
+    const min = parseFloat(newPlatoon.minScore);
+    const max = parseFloat(newPlatoon.maxScore);
     createPlatoonMutation.mutate({
       data: {
-        name: newPlatoon.name.trim(),
-        color: newPlatoon.color,
-        minScore: parseFloat(newPlatoon.minScore),
-        maxScore: parseFloat(newPlatoon.maxScore),
+        name: `${min}-${max}`,
+        color: "#94a3b8",
+        minScore: min,
+        maxScore: max,
         bonusValue: parseFloat(newPlatoon.bonusValue || "0"),
+        bonusPerExtraEvent: parseFloat(newPlatoon.bonusPerExtraEvent || "0"),
       },
     });
   }
@@ -83,7 +87,7 @@ export default function RulesPage() {
             Regras do Sistema
           </h1>
           <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-2xl">
-            Defina os limites de performance e as bonificações financeiras dos pelotões. A agressividade das regras dita o ritmo da corrida.
+            Defina os parâmetros de cálculo e as faixas de bônus financeiro do ciclo.
           </p>
         </section>
 
@@ -122,42 +126,46 @@ export default function RulesPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-6 p-4 bg-[#f2f4f6] border-l-4 border-[#506600] italic font-medium text-[15px] text-[#444933]">
-              "O bônus é calculado sobre o atingimento individual somado à performance coletiva do pelotão."
-            </div>
           </div>
         </section>
 
-        {/* Pelotões & Premiação */}
+        {/* Faixas de Bônus & Premiação */}
         <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
           <div className="bg-[#191c1e] text-[#ccff00] px-6 py-4 flex items-center gap-3 italic">
             <CircleDollarSign size={20} />
             <div>
-              <h3 className="text-base font-black uppercase tracking-wider">Pelotões &amp; Premiação</h3>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#ccff00]/70 not-italic">Defina as faixas de notas e o bônus financeiro Caju correspondente</p>
+              <h3 className="text-base font-black uppercase tracking-wider">Faixas de Bônus &amp; Premiação</h3>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#ccff00]/70 not-italic">Defina as faixas de nota e os valores de bônus Caju correspondentes</p>
             </div>
           </div>
+
+          {/* Fórmula explicativa */}
+          <div className="px-6 py-4 bg-[#f7f9fb] border-b-2 border-[#191c1e] text-sm italic text-[#444933]">
+            <span className="font-black text-[#191c1e]">Bônus Total</span> = Prêmio Base da faixa + (Eventos Extras × Bônus por Evento Extra da faixa)
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Pelotão Oficial</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Intervalo de Pontos (0-100)</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Bônus Caju (R$)</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Faixa de Nota</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Prêmio Base (R$)</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Bônus p/ Evento Extra (R$)</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Total (Base + 3 Extra)</th>
                   <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-[#eceef0]">
                 {(platoonRules ?? []).map(p => {
                   const isDirty = platoonValues[p.id] !== undefined;
+                  const currentBonus = platoonValues[p.id]?.bonusValue ?? p.bonusValue;
+                  const currentExtra = platoonValues[p.id]?.bonusPerExtraEvent ?? (p.bonusPerExtraEvent ?? 0);
+                  const total3 = currentBonus + 3 * currentExtra;
 
                   return (
                     <tr key={p.id} data-testid={`row-platoon-${p.id}`} className="hover:bg-[#f2f4f6] transition-colors">
                       <td className="px-6 py-4">
-                        <PlatoonBadge platoon={p.name} colorHex={p.color} className="text-sm px-3 py-1" />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center gap-2">
                           <Input
                             data-testid={`input-platoon-min-${p.id}`}
                             type="number" min="0" max="100" step="1"
@@ -165,7 +173,7 @@ export default function RulesPage() {
                             value={platoonValues[p.id]?.minScore ?? p.minScore}
                             onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))}
                           />
-                          <span className="text-[#747a60] font-bold italic uppercase text-xs px-1">até</span>
+                          <span className="text-[#747a60] font-bold italic uppercase text-xs">–</span>
                           <Input
                             data-testid={`input-platoon-max-${p.id}`}
                             type="number" min="0" max="100" step="1"
@@ -182,10 +190,25 @@ export default function RulesPage() {
                             data-testid={`input-platoon-bonus-${p.id}`}
                             type="number" min="0" step="10"
                             className="w-full text-right h-11 font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                            value={platoonValues[p.id]?.bonusValue ?? p.bonusValue}
+                            value={currentBonus}
                             onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusValue: parseFloat(e.target.value) } }))}
                           />
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="relative max-w-[130px] mx-auto">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#506600] font-black italic text-xs z-10">R$</span>
+                          <Input
+                            data-testid={`input-platoon-extra-${p.id}`}
+                            type="number" min="0" step="10"
+                            className="w-full text-right h-11 font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                            value={currentExtra}
+                            onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusPerExtraEvent: parseFloat(e.target.value) } }))}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-sm font-black italic text-[#191c1e]">{fmtBRL(total3)}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button
@@ -204,60 +227,54 @@ export default function RulesPage() {
             </table>
           </div>
 
-          {/* Adicionar novo pelotão */}
+          {/* Adicionar nova faixa */}
           <div className="border-t-2 border-[#191c1e] p-6 bg-[#f7f9fb]">
             <h4 className="text-sm font-black uppercase italic tracking-tight mb-4 flex items-center gap-2">
-              <Plus size={16} /> Adicionar Pelotão
+              <Plus size={16} /> Adicionar Faixa
             </h4>
             <div className="flex flex-wrap items-end gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Nome</label>
-                <Input
-                  data-testid="input-new-platoon-name"
-                  value={newPlatoon.name}
-                  onChange={e => setNewPlatoon(v => ({ ...v, name: e.target.value }))}
-                  className="h-11 w-44 rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                  placeholder="Ex.: Elite"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Cor</label>
-                <input
-                  data-testid="input-new-platoon-color"
-                  type="color"
-                  value={newPlatoon.color}
-                  onChange={e => setNewPlatoon(v => ({ ...v, color: e.target.value }))}
-                  className="h-11 w-14 border-2 border-[#191c1e] bg-white p-1 cursor-pointer"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Mínimo</label>
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Nota Mínima</label>
                 <Input
                   data-testid="input-new-platoon-min"
                   type="number" min="0" max="100" step="1"
                   value={newPlatoon.minScore}
                   onChange={e => setNewPlatoon(v => ({ ...v, minScore: e.target.value }))}
                   className="h-11 w-24 text-center font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                  placeholder="0"
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Máximo</label>
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Nota Máxima</label>
                 <Input
                   data-testid="input-new-platoon-max"
                   type="number" min="0" max="100" step="1"
                   value={newPlatoon.maxScore}
                   onChange={e => setNewPlatoon(v => ({ ...v, maxScore: e.target.value }))}
                   className="h-11 w-24 text-center font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                  placeholder="100"
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Bônus (R$)</label>
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Prêmio Base (R$)</label>
                 <Input
                   data-testid="input-new-platoon-bonus"
                   type="number" min="0" step="10"
                   value={newPlatoon.bonusValue}
                   onChange={e => setNewPlatoon(v => ({ ...v, bonusValue: e.target.value }))}
-                  className="h-11 w-28 text-right font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                  className="h-11 w-32 text-right font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                  placeholder="0"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Bônus Extra (R$/evento)</label>
+                <Input
+                  data-testid="input-new-platoon-extra"
+                  type="number" min="0" step="10"
+                  value={newPlatoon.bonusPerExtraEvent}
+                  onChange={e => setNewPlatoon(v => ({ ...v, bonusPerExtraEvent: e.target.value }))}
+                  className="h-11 w-36 text-right font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
+                  placeholder="0"
                 />
               </div>
               <button
@@ -270,7 +287,7 @@ export default function RulesPage() {
               </button>
             </div>
             <p className="text-[11px] text-[#747a60] italic mt-3 max-w-2xl">
-              As faixas devem cobrir de 0 a 100 sem lacunas ou sobreposições. Ajuste os limites dos pelotões existentes antes de adicionar um novo.
+              As faixas devem cobrir de 0 a 100 sem lacunas ou sobreposições. Ajuste os limites das faixas existentes antes de adicionar uma nova.
             </p>
           </div>
         </section>

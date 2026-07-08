@@ -922,14 +922,6 @@ export default function CalibrationsPage() {
                   {feedback ? feedback.eventScore.toFixed(1) : "—"}<span className="text-sm text-[#747a60]">/100</span>
                 </span>
               </div>
-              {feedback?.projectedPlatoon && (
-                <div className="flex-1 border-2 border-[#191c1e] bg-[#f2f4f6] p-4 flex flex-col justify-center">
-                  <span className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Pelotão</span>
-                  <span className="text-lg font-black italic uppercase text-[#191c1e] leading-tight mt-1 flex items-center gap-1.5">
-                    <Trophy size={16} className="text-[#506600]" /> {feedback.projectedPlatoon}
-                  </span>
-                </div>
-              )}
             </div>
 
             {scoredCriteria.length > 0 && (

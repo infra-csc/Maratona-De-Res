@@ -70,10 +70,11 @@ function validatePlatoonRanges(ranges: RangeRow[]): string | null {
 
 router.post("/platoon-rules", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, bonusPerExtraEvent, description, displayOrder } = req.body;
-  if (!name || minScore === undefined || maxScore === undefined) {
-    res.status(400).json({ error: "Campos obrigatórios: name, minScore, maxScore" });
+  if (minScore === undefined || maxScore === undefined) {
+    res.status(400).json({ error: "Campos obrigatórios: minScore, maxScore" });
     return;
   }
+  const resolvedName = (name as string | undefined)?.trim() || `${parseFloat(minScore)}-${parseFloat(maxScore)}`;
   if (parseFloat(minScore) >= parseFloat(maxScore)) {
     res.status(400).json({ error: "minScore deve ser menor que maxScore" });
     return;
@@ -94,7 +95,7 @@ router.post("/platoon-rules", requireRole("admin", "rh", "diretoria"), async (re
   if (err) { res.status(400).json({ error: err }); return; }
 
   const [rule] = await db.insert(platoonRulesTable).values({
-    name, color: color ?? "#94a3b8",
+    name: resolvedName, color: color ?? "#94a3b8",
     minScore: String(minScore), maxScore: String(maxScore),
     minInclusive: minInclusive ?? true, maxInclusive: maxInclusive ?? false,
     bonusValue: String(bonusValue ?? 0),

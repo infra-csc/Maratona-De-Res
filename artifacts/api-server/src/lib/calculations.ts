@@ -207,12 +207,9 @@ export function calculateBonusByScore(score: number, rules: PlatoonRuleData[]): 
 }
 
 /**
- * Bônus do Simulador: valor base da faixa da nota geral (para o mínimo de
- * eventos exigido) somado ao bônus de CADA evento adicional (além do mínimo).
- * Os eventos adicionais são sempre os últimos cronologicamente (a partir do
- * evento de nº mínimo+1); cada um usa a NOTA DAQUELE evento específico para
- * definir sua própria faixa e o valor de "bônus por evento adicional" dela —
- * não a faixa da nota geral. Sem teto — soma linear por evento extra.
+ * Bônus total = Prêmio Base da faixa da nota média + (quantidade de eventos
+ * extras × Bônus por Evento Extra da mesma faixa). Ambas as parcelas usam
+ * a faixa definida pela nota geral do colaborador — sem lookup por evento.
  */
 export function calculateTieredBonus(
   score: number,
@@ -221,25 +218,21 @@ export function calculateTieredBonus(
 ): number {
   const platoon = getPlatoonByScore(score, rules);
   if (!platoon) return 0;
-  const extraBonus = calculateExtraBonusValue(extraEventScores, rules);
+  const extraBonus = extraEventScores.length * (platoon.bonusPerExtraEvent ?? 0);
   return Math.round((platoon.bonusValue + extraBonus) * 100) / 100;
 }
 
 /**
- * Soma apenas a parcela de "bônus extra" — o valor de `bonusPerExtraEvent`
- * de cada evento participado além do mínimo de elegibilidade. Não inclui o
- * bônus base da faixa da nota geral (ver `calculateTieredBonus`).
+ * Parcela de bônus extra isolada — quantidade de eventos extras × bonusPerExtraEvent
+ * da faixa da nota geral (baseScore). Não inclui o prêmio base.
  */
 export function calculateExtraBonusValue(
+  baseScore: number,
   extraEventScores: number[],
   rules: PlatoonRuleData[],
 ): number {
-  let extraBonus = 0;
-  for (const extraScore of extraEventScores) {
-    const extraPlatoon = getPlatoonByScore(extraScore, rules);
-    extraBonus += extraPlatoon?.bonusPerExtraEvent ?? 0;
-  }
-  return Math.round(extraBonus * 100) / 100;
+  const platoon = getPlatoonByScore(baseScore, rules);
+  return Math.round(extraEventScores.length * (platoon?.bonusPerExtraEvent ?? 0) * 100) / 100;
 }
 
 /**

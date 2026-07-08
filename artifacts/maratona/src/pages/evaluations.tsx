@@ -11,7 +11,6 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
-import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions } from "@/lib/routing-api";
@@ -1608,12 +1607,6 @@ export default function EvaluationsPage() {
                               Provisória — antes da calibração. O valor final do colaborador sai após a calibração.
                             </p>
                           )}
-                        </div>
-                      )}
-                      {eventResult?.projectedPlatoon && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold italic uppercase text-[#444933]">Pelotão Projetado</span>
-                          <PlatoonBadge platoon={eventResult.projectedPlatoon} colorHex={eventResult.projectedPlatoonColor} />
                         </div>
                       )}
                     </div>

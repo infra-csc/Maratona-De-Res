@@ -665,7 +665,7 @@ export default function IntegrationPage() {
           <CardContent className="p-6">
             <p className="text-sm text-slate-600 leading-relaxed mb-4">
               Apaga <strong>eventos, avaliações/notas, colaboradores e usuários</strong> (exceto o seu próprio login).
-              Áreas, quesitos, ciclo atual e regras de bonificação/pelotão <strong>são preservados</strong>.
+              Áreas, quesitos, ciclo atual e faixas de bônus <strong>são preservados</strong>.
               Use para reiniciar o cadastro de produção do zero.
             </p>
             <Button

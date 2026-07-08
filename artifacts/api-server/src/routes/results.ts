@@ -327,7 +327,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
 
     const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEvents) : [];
     const bonusValue = eligible ? calculateTieredBonus(finalResult, extraEventScores, platoonRules) : 0;
-    const extraBonusValue = eligible ? calculateExtraBonusValue(extraEventScores, platoonRules) : 0;
+    const extraBonusValue = eligible ? calculateExtraBonusValue(finalResult, extraEventScores, platoonRules) : 0;
     const autoStatus = eligible ? "projected" : "not_eligible";
 
     // Preserva decisões de pagamento já acionadas manualmente.

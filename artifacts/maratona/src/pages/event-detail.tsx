@@ -8,7 +8,6 @@ import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriter
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search, Zap } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1242,11 +1241,6 @@ export default function EventDetailPage() {
                         <AlertCircle size={11} />
                         {calibrated ? "Calibragem parcial" : "Aguardando calibragem"}
                       </span>
-                    )}
-                    {result.projectedPlatoon && (
-                      <div className="mt-3">
-                        <PlatoonBadge platoon={result.projectedPlatoon} colorHex={result.projectedPlatoonColor} />
-                      </div>
                     )}
                   </div>
                 </div>

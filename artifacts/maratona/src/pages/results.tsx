@@ -24,7 +24,6 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { cn } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -108,7 +107,6 @@ function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: numb
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="text-sm italic uppercase font-black tracking-tight break-words" data-testid={`text-podium-name-${entry.employeeId}`}>{entry.employeeName}</h3>
-        <div className="mt-1"><PlatoonBadge platoon={entry.platoon} colorHex={entry.platoonColor} /></div>
       </div>
       <div className="text-right shrink-0">
         <span className="block text-[9px] uppercase font-bold italic text-[#747a60] leading-none mb-1">{theme.label}</span>
@@ -123,7 +121,6 @@ function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: numb
 function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [filterPlatoon, setFilterPlatoon] = useState<string>("__all");
   const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
@@ -149,10 +146,8 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   }
 
   const allResults = ranking ?? [];
-  const platoons = Array.from(new Set(allResults.map(r => r.platoon).filter(Boolean))).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
 
   const filteredRanking = allResults.filter(r => {
-    if (filterPlatoon !== "__all" && r.platoon !== filterPlatoon) return false;
     if (filterEligible === "eligible" && r.eligible === false) return false;
     if (filterEligible === "ineligible" && r.eligible !== false) return false;
     return true;
@@ -224,17 +219,6 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                 />
               </div>
               <div className="flex gap-3">
-                <div className="w-40">
-                  <Select value={filterPlatoon} onValueChange={setFilterPlatoon}>
-                    <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
-                      <SelectValue placeholder="Pelotão" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                      <SelectItem value="__all">Todos os pelotões</SelectItem>
-                      {platoons.map(p => <SelectItem key={p} value={p!}>{p}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="w-48">
                   <Select value={filterEligible} onValueChange={(v) => setFilterEligible(v as any)}>
                     <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
@@ -281,7 +265,6 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                       <div className="flex-1 min-w-0">
                         <p className="font-black italic uppercase text-base md:text-lg break-words" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                          <PlatoonBadge platoon={entry.platoon} colorHex={entry.platoonColor} />
                           <span className="text-[11px] font-bold uppercase italic text-[#444933] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">
                             <span className="inline-block skew-x-[8deg]">{entry.eventsCount} eventos</span>
                           </span>
@@ -348,7 +331,6 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                   {detail.employee.name}
                 </SheetTitle>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase italic">
-                  {detail.summary.platoon && <PlatoonBadge platoon={detail.summary.platoon} colorHex={detail.summary.platoonColor ?? undefined} />}
                   {detail.employee.functionName && (
                     <span className="border-2 border-[#ccff00] text-[#ccff00] px-2 py-0.5">{detail.employee.functionName}</span>
                   )}
@@ -533,7 +515,6 @@ function EmployeeDetailSheet({
                 {detail.employee.name}
               </SheetTitle>
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase italic">
-                {detail.summary.platoon && <PlatoonBadge platoon={detail.summary.platoon} colorHex={detail.summary.platoonColor ?? undefined} />}
                 {detail.employee.functionName && (
                   <span className="border-2 border-[#ccff00] text-[#ccff00] px-2 py-0.5">{detail.employee.functionName}</span>
                 )}
@@ -696,17 +677,13 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
   });
   const rows = results ?? [];
   const [search, setSearch] = useState("");
-  const [filterPlatoon, setFilterPlatoon] = useState<string>("__all");
   const [sortKey, setSortKey] = useState<keyof QuarterlyResult | null>("finalResult");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const platoons = Array.from(new Set(rows.map(r => r.platoon).filter(Boolean))).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
-
   const filteredRows = rows.filter(r => {
     const matchSearch = !search || (r.employeeName ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchPlatoon = filterPlatoon === "__all" || r.platoon === filterPlatoon;
-    return matchSearch && matchPlatoon;
+    return matchSearch;
   });
 
   function handleSort(key: keyof QuarterlyResult) {
@@ -782,17 +759,6 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                 placeholder="Buscar colaborador..."
               />
             </div>
-            <div className="w-40">
-              <Select value={filterPlatoon} onValueChange={setFilterPlatoon}>
-                <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
-                  <SelectValue placeholder="Pelotão" />
-                </SelectTrigger>
-                <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                  <SelectItem value="__all">Todos os pelotões</SelectItem>
-                  {platoons.map(p => <SelectItem key={p} value={p!}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
@@ -810,7 +776,6 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                   {headerCell("Eventos Participados", "participatedEventsCount")}
                   {headerCell("Penalidades / Méritos", "absencePenalty")}
                   {headerCell("Média (Nota Final)", "finalResult")}
-                  {headerCell("Pelotão", "platoon")}
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-[#eceef0]">
@@ -850,9 +815,6 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                           <span className="text-[10px] font-bold italic text-[#747a60] uppercase">/100</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-center">
-                        {r.platoon ? <PlatoonBadge platoon={r.platoon} colorHex={r.platoonColor} /> : <span className="text-[#c4c9ac]">—</span>}
-                      </td>
                     </tr>
                   );
                 })}
@@ -880,7 +842,6 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
   const [forceClose, setForceClose] = useState(false);
   const [forceReason, setForceReason] = useState("");
   const [search, setSearch] = useState("");
-  const [filterPlatoon, setFilterPlatoon] = useState<string>("__all");
   const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
   const [sortKey, setSortKey] = useState<keyof QuarterlyResult | null>("finalResult");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -967,14 +928,11 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
   }
 
   const rows = results ?? [];
-  const platoons = Array.from(new Set(rows.map(r => r.platoon).filter(Boolean))).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
-
   const filteredRows = rows.filter(r => {
     const matchSearch = !search || (r.employeeName ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchPlatoon = filterPlatoon === "__all" || r.platoon === filterPlatoon;
     if (filterEligible === "eligible" && r.eligible === false) return false;
     if (filterEligible === "ineligible" && r.eligible !== false) return false;
-    return matchSearch && matchPlatoon;
+    return matchSearch;
   });
 
   const totalBonus = filteredRows.reduce((acc, r) => acc + (r.bonusValue ?? 0), 0);
@@ -1025,7 +983,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                 </div>
                 <AlertDialogTitle className="text-2xl italic uppercase font-black tracking-tight">Consolidar Resultados do Ciclo?</AlertDialogTitle>
                 <AlertDialogDescription className="text-sm leading-relaxed text-[#444933] italic">
-                  O fechamento irá congelar as notas, classificar os pelotões oficiais e gerar a projeção de bônus baseada nos eventos já finalizados.
+                  O fechamento irá congelar as notas, calcular as faixas de bônus e gerar a projeção de premiação baseada nos eventos já finalizados.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="space-y-4 py-4 bg-[#f7f9fb] p-4 border-2 border-[#191c1e] mt-2">
@@ -1119,17 +1077,6 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                 placeholder="Buscar colaborador..."
               />
             </div>
-            <div className="w-40">
-              <Select value={filterPlatoon} onValueChange={setFilterPlatoon}>
-                <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
-                  <SelectValue placeholder="Pelotão" />
-                </SelectTrigger>
-                <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                  <SelectItem value="__all">Todos os pelotões</SelectItem>
-                  {platoons.map(p => <SelectItem key={p} value={p!}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="w-48">
               <Select value={filterEligible} onValueChange={(v) => setFilterEligible(v as any)}>
                 <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
@@ -1156,7 +1103,6 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                   {payHeaderCell("Colaborador", "employeeName", "left")}
                   {payHeaderCell("Atividade", "eventsCount")}
                   {payHeaderCell("Nota Final", "finalResult")}
-                  {payHeaderCell("Pelotão Oficial", "platoon")}
                   {payHeaderCell("Elegibilidade", "eligible")}
                   {payHeaderCell("Bônus", "bonusValue")}
                   {payHeaderCell("Bônus Extra", "extraBonusValue")}
@@ -1189,9 +1135,6 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                           <span className="font-black italic text-2xl text-[#191c1e] leading-none">{fmtScore(r.finalResult)}</span>
                           <span className="text-[10px] font-bold italic text-[#747a60] uppercase">/100</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {r.platoon ? <PlatoonBadge platoon={r.platoon} colorHex={r.platoonColor} /> : <span className="text-[#c4c9ac]">—</span>}
                       </td>
                       <td className="px-6 py-4 text-center">
                         {r.eligible === false ? (

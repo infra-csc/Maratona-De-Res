@@ -1,7 +1,6 @@
-import { useGetDashboardSummary, useGetDashboardPlatoonDistribution, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, getGetDashboardSummaryQueryKey, getGetDashboardPlatoonDistributionQueryKey } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { CheckCircle2, Users, Trophy, DollarSign, History, AlertTriangle, Clock, ChevronRight } from "lucide-react";
-import { PlatoonBadge } from "@/components/ui/platoon-badge";
 import { CycleBadge } from "@/components/cycle-badge";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -10,9 +9,6 @@ const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e]
 export default function DashboardPage() {
   const { data: summary } = useGetDashboardSummary({
     query: { queryKey: getGetDashboardSummaryQueryKey() },
-  });
-  const { data: distribution } = useGetDashboardPlatoonDistribution({
-    query: { queryKey: getGetDashboardPlatoonDistributionQueryKey() },
   });
   const { data: topEmployees } = useGetDashboardTopEmployees();
   const { data: evolution } = useGetDashboardQuarterlyEvolution();
@@ -26,8 +22,6 @@ export default function DashboardPage() {
   // reflete eventos com todas as avaliações concluídas vs total com avaliações.
   const progress = submitted + pending > 0 ? Math.round((submitted / (submitted + pending)) * 100) : 0;
   const ghostPos = Math.max(0, progress - 7);
-
-  const platoonRanking = [...(distribution ?? [])].sort((a, b) => b.count - a.count).slice(0, 3);
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -131,68 +125,36 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* 3. Bottom grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Top Pelotões */}
-          <section className="lg:col-span-1 bg-white border-2 border-[#191c1e] p-6 flex flex-col">
-            <h3 className="text-xl italic uppercase font-black mb-6 border-b-4 border-[#506600] pb-2">Top Pelotões</h3>
-            <div className="space-y-4">
-              {platoonRanking.length === 0 && (
-                <p className="text-sm italic uppercase font-bold text-[#747a60]">Sem dados de pelotão.</p>
-              )}
-              {platoonRanking.map((p, i) => (
-                <div
-                  key={p.platoonName}
-                  className={`flex items-center gap-4 border-2 border-[#191c1e] p-4 skew-x-[-3deg] ${i === 0 ? `bg-[#ccff00] ${HARD_SHADOW}` : ""}`}
-                >
-                  <span className={`text-2xl italic font-black ${i === 0 ? "text-[#191c1e]" : "text-[#747a60] opacity-50"}`}>
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div className="flex-1 skew-x-[3deg]">
-                    <p className="text-sm font-black uppercase italic">{p.platoonName}</p>
-                    <p className="text-[11px] font-bold opacity-60 italic uppercase">{p.count} colaboradores · {p.percentage.toFixed(1)}%</p>
-                  </div>
-                  {i === 0
-                    ? <Trophy size={22} className="text-[#191c1e] skew-x-[3deg]" />
-                    : <span className="w-7 h-7 border-2 border-[#191c1e] skew-x-[3deg]" style={{ backgroundColor: p.color }} />}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Top Performance */}
-          <section className="lg:col-span-2 bg-white border-2 border-[#191c1e] overflow-hidden flex flex-col">
-            <div className="p-6 border-b-2 border-[#191c1e] flex justify-between items-center bg-[#f2f4f6]">
-              <h3 className="text-xl italic uppercase font-black">Top Performance</h3>
-              <History size={20} className="text-[#444933]" />
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#e6e8ea]">
-                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Pos</th>
-                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Colaborador</th>
-                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Pelotão</th>
-                    <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e] text-right">Nota</th>
+        {/* 3. Top Performance */}
+        <section className="bg-white border-2 border-[#191c1e] overflow-hidden flex flex-col">
+          <div className="p-6 border-b-2 border-[#191c1e] flex justify-between items-center bg-[#f2f4f6]">
+            <h3 className="text-xl italic uppercase font-black">Top Performance</h3>
+            <History size={20} className="text-[#444933]" />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#e6e8ea]">
+                  <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Pos</th>
+                  <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e]">Colaborador</th>
+                  <th className="p-4 text-xs font-bold italic uppercase border-b-2 border-[#191c1e] text-right">Nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(!topEmployees || topEmployees.length === 0) && (
+                  <tr><td colSpan={3} className="p-6 text-sm italic uppercase font-bold text-[#747a60] text-center">Nenhum resultado consolidado.</td></tr>
+                )}
+                {topEmployees?.slice(0, 6).map((emp, i) => (
+                  <tr key={emp.employeeId} className="border-b border-[#c4c9ac] hover:bg-[#f2f4f6] transition-colors">
+                    <td className="p-4 text-lg italic font-black w-12">{String(i + 1).padStart(2, "0")}</td>
+                    <td className="p-4 text-base italic font-bold uppercase">{emp.employeeName}</td>
+                    <td className="p-4 text-right text-lg italic font-black text-[#506600]">{fmt(emp.finalResult)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {(!topEmployees || topEmployees.length === 0) && (
-                    <tr><td colSpan={4} className="p-6 text-sm italic uppercase font-bold text-[#747a60] text-center">Nenhum resultado consolidado.</td></tr>
-                  )}
-                  {topEmployees?.slice(0, 6).map((emp, i) => (
-                    <tr key={emp.employeeId} className="border-b border-[#c4c9ac] hover:bg-[#f2f4f6] transition-colors">
-                      <td className="p-4 text-lg italic font-black w-12">{String(i + 1).padStart(2, "0")}</td>
-                      <td className="p-4 text-base italic font-bold uppercase">{emp.employeeName}</td>
-                      <td className="p-4"><PlatoonBadge platoon={emp.platoon} colorHex={emp.platoonColor} /></td>
-                      <td className="p-4 text-right text-lg italic font-black text-[#506600]">{fmt(emp.finalResult)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {/* 4. Alerts */}
         {((summary?.atRiskEmployees && summary.atRiskEmployees.length > 0) || (summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0)) && (

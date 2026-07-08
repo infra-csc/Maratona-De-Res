@@ -602,7 +602,7 @@ export default function MyPerformancePage() {
           {summary.isQuarterClosed ? <CheckCircle2 size={16} /> : <Clock size={16} />}
           {summary.isQuarterClosed
             ? "Ciclo fechado — resultado oficial"
-            : "Ciclo em andamento — nota, pelotão e bônus são projeções parciais e podem mudar até o fechamento oficial"}
+            : "Ciclo em andamento — nota e bônus são projeções parciais e podem mudar até o fechamento oficial"}
         </div>
       )}
 
