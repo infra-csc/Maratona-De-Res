@@ -76,6 +76,7 @@ export const publicEvalTokensTable = pgTable("public_eval_tokens", {
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
   criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id),
   createdByUserId: integer("created_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),
+  recipientName: text("recipient_name"),
   submitterName: text("submitter_name"),
   usedAt: timestamp("used_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

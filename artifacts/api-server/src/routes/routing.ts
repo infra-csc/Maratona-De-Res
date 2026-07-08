@@ -1,9 +1,10 @@
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import {
   db,
   criterionRoutingTable, criterionRedirectUsersTable,
   eventCriterionAssignmentsTable, criteriaTable, usersTable,
-  areasTable, eventsTable, eventCriteriaTable,
+  areasTable, eventsTable, eventCriteriaTable, publicEvalTokensTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -135,6 +136,7 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
     status: eventCriterionAssignmentsTable.status,
     redirectedFromId: eventCriterionAssignmentsTable.redirectedFromId,
     confirmedAt: eventCriterionAssignmentsTable.confirmedAt,
+    updatedAt: eventCriterionAssignmentsTable.updatedAt,
     createdAt: eventCriterionAssignmentsTable.createdAt,
   })
     .from(eventCriterionAssignmentsTable)
@@ -143,12 +145,24 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
     .where(eq(eventCriterionAssignmentsTable.eventId, eventId))
     .orderBy(criteriaTable.name);
 
+  // Enrich with redirectedFromName via a second look-up (alias not available in this drizzle version)
+  const redirectFromIds = [...new Set(allAssigned.map(a => a.redirectedFromId).filter((id): id is number => id != null))];
+  const redirectFromUsers = redirectFromIds.length > 0
+    ? await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable).where(inArray(usersTable.id, redirectFromIds))
+    : [];
+  const redirectFromMap = new Map(redirectFromUsers.map(u => [u.id, u.name]));
+
+  const enriched = allAssigned.map(a => ({
+    ...a,
+    redirectedFromName: a.redirectedFromId != null ? (redirectFromMap.get(a.redirectedFromId) ?? null) : null,
+  }));
+
   if (user.role === "avaliador") {
-    res.json(allAssigned.filter(a => a.assignedToId === user.userId));
+    res.json(enriched.filter(a => a.assignedToId === user.userId));
     return;
   }
 
-  res.json(allAssigned);
+  res.json(enriched);
 });
 
 // ---------------------------------------------------------------------------
@@ -337,6 +351,81 @@ router.get("/events/:id/criterion-assignments/redirect-options/:criterionId", as
   }
 
   res.json([]);
+});
+
+// ---------------------------------------------------------------------------
+// POST /events/:id/criterion-assignments/:criterionId/public-token
+// Gera um link público de avaliação para freelancer (single-use).
+// Só permitido se allowPublicLink=true no criterion_routing.
+// Body: { recipientName: string }
+// ---------------------------------------------------------------------------
+router.post("/events/:id/criterion-assignments/:criterionId/public-token", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const criterionId = parseInt(req.params.criterionId as string);
+  const user = req.user!;
+  const { recipientName } = req.body ?? {};
+
+  if (!recipientName || typeof recipientName !== "string" || !recipientName.trim()) {
+    res.status(400).json({ error: "Nome do destinatário é obrigatório" });
+    return;
+  }
+
+  const [routing] = await db.select().from(criterionRoutingTable)
+    .where(eq(criterionRoutingTable.criterionId, criterionId)).limit(1);
+  if (!routing?.allowPublicLink) {
+    res.status(403).json({ error: "Este critério não permite link público" });
+    return;
+  }
+
+  const [assignment] = await db.select().from(eventCriterionAssignmentsTable)
+    .where(and(
+      eq(eventCriterionAssignmentsTable.eventId, eventId),
+      eq(eventCriterionAssignmentsTable.criterionId, criterionId),
+    )).limit(1);
+
+  if (assignment?.status === "submitted") {
+    res.status(400).json({ error: "Avaliação já submetida para este critério" });
+    return;
+  }
+
+  const tokenId = randomUUID();
+  await db.insert(publicEvalTokensTable).values({
+    id: tokenId,
+    eventId,
+    criterionId,
+    createdByUserId: user.userId,
+    recipientName: recipientName.trim(),
+  });
+
+  await audit(user.userId, "create", "public_eval_tokens", tokenId, null, { eventId, criterionId, recipientName: recipientName.trim() });
+  res.json({ tokenId });
+});
+
+// ---------------------------------------------------------------------------
+// GET /events/:id/criterion-assignments/:criterionId/public-tokens
+// Lista tokens gerados para este critério/evento (histórico).
+// ---------------------------------------------------------------------------
+router.get("/events/:id/criterion-assignments/:criterionId/public-tokens", async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const criterionId = parseInt(req.params.criterionId as string);
+
+  const tokens = await db.select({
+    id: publicEvalTokensTable.id,
+    recipientName: publicEvalTokensTable.recipientName,
+    submitterName: publicEvalTokensTable.submitterName,
+    usedAt: publicEvalTokensTable.usedAt,
+    createdAt: publicEvalTokensTable.createdAt,
+    createdByName: usersTable.name,
+  })
+    .from(publicEvalTokensTable)
+    .leftJoin(usersTable, eq(publicEvalTokensTable.createdByUserId, usersTable.id))
+    .where(and(
+      eq(publicEvalTokensTable.eventId, eventId),
+      eq(publicEvalTokensTable.criterionId, criterionId),
+    ))
+    .orderBy(publicEvalTokensTable.createdAt);
+
+  res.json(tokens);
 });
 
 export default router;

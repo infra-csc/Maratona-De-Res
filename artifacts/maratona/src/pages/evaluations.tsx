@@ -6,14 +6,14 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions } from "@/lib/routing-api";
+import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -259,9 +259,21 @@ export default function EvaluationsPage() {
   const patchCriterionAssignment = usePatchCriterionAssignment(selectedEventId ?? 0);
   const [redirectDialogCriterionId, setRedirectDialogCriterionId] = useState<number | null>(null);
   const [redirectTargetId, setRedirectTargetId] = useState<number | null>(null);
+  const [publicLinkDialogCriterionId, setPublicLinkDialogCriterionId] = useState<number | null>(null);
+  const [publicLinkRecipientName, setPublicLinkRecipientName] = useState("");
+  const [generatedPublicUrl, setGeneratedPublicUrl] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const { data: redirectOptionsData } = useRedirectOptions(
     selectedEventId ?? 0,
     redirectDialogCriterionId ?? 0,
+  );
+  const createPublicToken = useCreatePublicToken(
+    selectedEventId ?? 0,
+    publicLinkDialogCriterionId ?? 0,
+  );
+  const { data: publicTokenHistory, refetch: refetchTokenHistory } = usePublicTokens(
+    publicLinkDialogCriterionId != null ? (selectedEventId ?? null) : null,
+    publicLinkDialogCriterionId,
   );
 
   const createMutation = useCreateEvaluation({
@@ -1177,11 +1189,22 @@ export default function EvaluationsPage() {
                                       <Clock size={12} /> Rascunho
                                     </span>
                                   )}
-                                  {criterionAssignments?.some(a => a.criterionId === c.criterionId && a.redirectedFromId === user?.id) && (
-                                    <span className="bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1">
-                                      <CornerDownRight size={11} /> Redirecionado
-                                    </span>
-                                  )}
+                                  {(() => {
+                                    const a = criterionAssignments?.find(x => x.criterionId === c.criterionId);
+                                    if (!a?.redirectedFromId) return null;
+                                    const date = a.updatedAt
+                                      ? new Date(a.updatedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                                      : null;
+                                    const fromFirst = a.redirectedFromName?.split(" ")[0] ?? "?";
+                                    return (
+                                      <span
+                                        title={`Redirecionado de ${a.redirectedFromName ?? "?"}${date ? ` em ${date}` : ""}`}
+                                        className="bg-[#e8f0fe] text-[#3451b2] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1"
+                                      >
+                                        <CornerDownRight size={11} /> De {fromFirst}{date ? <span className="opacity-70">· {date}</span> : null}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                                 <h4 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">{index + 1}. {c.criterionName}</h4>
                                 <p className="text-sm text-[#444933] italic mt-1 leading-relaxed">
@@ -1244,14 +1267,31 @@ export default function EvaluationsPage() {
                                 </div>
 
                                 <div className="flex items-center justify-between pt-3 gap-3 flex-wrap">
-                                  {/* Redirect — available to every evaluator for all their criteria (area-primary or routing-assigned) */}
-                                  <button
-                                    type="button"
-                                    onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
-                                    className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
-                                  >
-                                    <CornerDownRight size={14} /> Redirecionar
-                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    {/* Redirect — available to every evaluator for all their criteria */}
+                                    <button
+                                      type="button"
+                                      onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
+                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                                    >
+                                      <CornerDownRight size={14} /> Redirecionar
+                                    </button>
+                                    {/* Gerar link público para freelancer */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPublicLinkDialogCriterionId(c.criterionId);
+                                        setPublicLinkRecipientName("");
+                                        setGeneratedPublicUrl(null);
+                                        setLinkCopied(false);
+                                        refetchTokenHistory();
+                                      }}
+                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                                      title="Gerar link de avaliação para freelancer"
+                                    >
+                                      <Link2 size={14} /> Link Freelancer
+                                    </button>
+                                  </div>
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
                                     disabled={score === 0 || needsAudio}
@@ -1779,8 +1819,17 @@ export default function EvaluationsPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            {redirectDialogCriterionId != null && (() => {
+              const crit = myCriteria.find(x => x.criterionId === redirectDialogCriterionId);
+              return crit ? (
+                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-0.5">Critério</p>
+                  <p className="text-sm font-black italic uppercase">{crit.criterionName}</p>
+                </div>
+              ) : null;
+            })()}
             <p className="text-sm italic text-[#444933]">
-              Selecione para quem deseja redirecionar esta avaliação. O critério será reatribuído ao usuário escolhido.
+              Selecione quem assumirá a responsabilidade por esta avaliação. Após a confirmação, o critério sai da sua lista e passa para o usuário escolhido.
             </p>
             {effectiveRedirectOptions.length === 0 ? (
               <div className="text-center py-6 border-2 border-dashed border-[#eceef0] italic font-bold text-[#747a60] text-xs uppercase">
@@ -1803,6 +1852,11 @@ export default function EvaluationsPage() {
               </div>
             )}
           </div>
+          {redirectTargetId != null && (
+            <div className="bg-[#f9ffe0] border-2 border-[#ccff00] px-4 py-3 text-xs font-bold italic text-[#506600]">
+              ↳ Confirmar: transferir para <strong>{effectiveRedirectOptions.find(o => o.id === redirectTargetId)?.name ?? "?"}</strong>. Esta ação é imediata.
+            </div>
+          )}
           <DialogFooter className="gap-2 pt-4">
             <button
               type="button"
@@ -1830,8 +1884,150 @@ export default function EvaluationsPage() {
               }}
               className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
             >
-              {patchCriterionAssignment.isPending ? "Redirecionando..." : "Confirmar Redirect"}
+              {patchCriterionAssignment.isPending ? "Redirecionando..." : "Confirmar Transferência"}
             </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Public link dialog — generate single-use evaluation link for freelancers */}
+      <Dialog
+        open={publicLinkDialogCriterionId !== null}
+        onOpenChange={(v) => {
+          if (!v) {
+            setPublicLinkDialogCriterionId(null);
+            setPublicLinkRecipientName("");
+            setGeneratedPublicUrl(null);
+            setLinkCopied(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-xl italic uppercase font-black tracking-tight flex items-center gap-2">
+              <Link2 size={18} /> Link para Freelancer
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {publicLinkDialogCriterionId != null && (() => {
+              const crit = myCriteria.find(x => x.criterionId === publicLinkDialogCriterionId);
+              return crit ? (
+                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
+                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-0.5">Critério</p>
+                  <p className="text-sm font-black italic uppercase">{crit.criterionName}</p>
+                </div>
+              ) : null;
+            })()}
+
+            {!generatedPublicUrl ? (
+              <>
+                <p className="text-sm italic text-[#444933]">
+                  Gere um link de uso único para que um freelancer avalie este critério. O link expira após o primeiro uso.
+                </p>
+                <div>
+                  <label className="block text-xs font-black italic uppercase mb-2">
+                    Nome de quem vai receber o link
+                    <span className="text-[#ba1a1a] text-[10px] ml-2 bg-[#ffdad6] px-2 py-0.5 border border-[#191c1e]">Obrigatório</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={publicLinkRecipientName}
+                    onChange={e => setPublicLinkRecipientName(e.target.value)}
+                    placeholder="Ex: João Freelancer"
+                    className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 text-sm italic font-bold focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm italic text-[#506600] font-bold">
+                  Link gerado! Copie e envie para <strong>{publicLinkRecipientName}</strong>.
+                </p>
+                <div className="border-2 border-[#191c1e] bg-[#f2f4f6] p-3 flex items-center gap-2">
+                  <span className="text-xs font-bold italic break-all flex-1 select-all">{generatedPublicUrl}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedPublicUrl ?? "");
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 2500);
+                    }}
+                    className="shrink-0 bg-[#ccff00] border-2 border-[#191c1e] px-3 py-2 flex items-center gap-1.5 font-bold text-xs italic uppercase hover:bg-[#b8e800] transition-colors"
+                  >
+                    {linkCopied ? <><CheckCheck size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
+                  </button>
+                </div>
+                <p className="text-[11px] italic text-[#747a60]">
+                  Este link é de uso único e expira após o freelancer submeter a avaliação.
+                </p>
+              </>
+            )}
+
+            {/* Token history */}
+            {(publicTokenHistory ?? []).length > 0 && (
+              <div>
+                <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-2">Histórico de links enviados</p>
+                <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-40 overflow-y-auto">
+                  {(publicTokenHistory ?? []).map(t => (
+                    <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
+                        <p className="text-[10px] italic text-[#747a60]">
+                          Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      {t.usedAt ? (
+                        <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
+                          <CheckCircle size={10} /> Respondido
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
+                          Pendente
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setPublicLinkDialogCriterionId(null);
+                setPublicLinkRecipientName("");
+                setGeneratedPublicUrl(null);
+                setLinkCopied(false);
+              }}
+              className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
+            >
+              {generatedPublicUrl ? "Fechar" : "Cancelar"}
+            </button>
+            {!generatedPublicUrl && (
+              <button
+                type="button"
+                disabled={!publicLinkRecipientName.trim() || createPublicToken.isPending}
+                onClick={() => {
+                  if (!publicLinkDialogCriterionId || !publicLinkRecipientName.trim()) return;
+                  createPublicToken.mutate(
+                    { recipientName: publicLinkRecipientName.trim() },
+                    {
+                      onSuccess: ({ tokenId }) => {
+                        const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+                        setGeneratedPublicUrl(`${base}/eval/${tokenId}`);
+                        refetchTokenHistory();
+                      },
+                      onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+                    },
+                  );
+                }}
+                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
+              >
+                {createPublicToken.isPending ? "Gerando..." : "Gerar Link"}
+              </button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

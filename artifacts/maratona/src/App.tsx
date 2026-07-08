@@ -22,6 +22,7 @@ import AuditPage from "@/pages/audit";
 import MyPerformancePage from "@/pages/my-performance";
 import ComoFuncionaPage from "@/pages/como-funciona";
 import ReviewRequestsPage from "@/pages/review-requests";
+import PublicEvalPage from "@/pages/eval-public";
 import NotFound from "@/pages/not-found";
 
 function handleAuthError(error: unknown) {
@@ -98,6 +99,7 @@ function AppRoutes() {
   }
   return (
     <Switch>
+      <Route path="/eval/:token" component={PublicEvalPage} />
       <Route path="/login">
         {user ? <Redirect to="/" /> : <LoginPage />}
       </Route>

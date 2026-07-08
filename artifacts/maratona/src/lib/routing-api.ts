@@ -32,8 +32,19 @@ export interface CriterionAssignment {
   assignedToName: string | null;
   status: "pending" | "suggested" | "confirmed" | "submitted";
   redirectedFromId: number | null;
+  redirectedFromName: string | null;
   confirmedAt: string | null;
+  updatedAt: string | null;
   createdAt: string | null;
+}
+
+export interface PublicToken {
+  id: string;
+  recipientName: string | null;
+  submitterName: string | null;
+  usedAt: string | null;
+  createdAt: string | null;
+  createdByName: string | null;
 }
 
 export interface RouteUser {
@@ -50,6 +61,7 @@ export const criterionRoutingKey = (criterionId: number) => ["criterion-routing"
 export const allCriterionRoutingsKey = () => ["criterion-routing-all"];
 export const eventCriterionAssignmentsKey = (eventId: number) => ["event-criterion-assignments", eventId];
 export const redirectOptionsKey = (eventId: number, criterionId: number) => ["redirect-options", eventId, criterionId];
+export const publicTokensKey = (eventId: number, criterionId: number) => ["public-tokens", eventId, criterionId];
 
 // ---------------------------------------------------------------------------
 // Fetch helpers
@@ -153,6 +165,33 @@ export function useRedirectOptions(eventId: number | null, criterionId: number |
     queryFn: () => apiFetch<RouteUser[]>(
       `/api/events/${eventId}/criterion-assignments/redirect-options/${criterionId}`,
     ),
+    enabled: eventId != null && criterionId != null,
+  });
+}
+
+/** Cria um token de avaliação pública para freelancer. */
+export function useCreatePublicToken(eventId: number, criterionId: number) {
+  const qc = useQueryClient();
+  return useMutation<{ tokenId: string }, Error, { recipientName: string }>({
+    mutationFn: (body) =>
+      apiFetch<{ tokenId: string }>(
+        `/api/events/${eventId}/criterion-assignments/${criterionId}/public-token`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: publicTokensKey(eventId, criterionId) });
+    },
+  });
+}
+
+/** Lista tokens de avaliação pública para um critério/evento. */
+export function usePublicTokens(eventId: number | null, criterionId: number | null) {
+  return useQuery<PublicToken[]>({
+    queryKey: publicTokensKey(eventId ?? 0, criterionId ?? 0),
+    queryFn: () =>
+      apiFetch<PublicToken[]>(
+        `/api/events/${eventId}/criterion-assignments/${criterionId}/public-tokens`,
+      ),
     enabled: eventId != null && criterionId != null,
   });
 }

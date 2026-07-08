@@ -23,6 +23,7 @@ import reviewRequestsRouter from "./review-requests.js";
 import storageRouter from "./storage.js";
 import cyclesRouter from "./cycles.js";
 import routingRouter from "./routing.js";
+import publicEvalRouter from "./public-eval.js";
 
 const router: IRouter = Router();
 
@@ -34,6 +35,7 @@ router.use(authRouter);
 // uploads/playback used by avaliadores. Storage has its own guards: requireAuth
 // on the upload-URL endpoint, public GET for <audio> playback.
 router.use(storageRouter);
+router.use(publicEvalRouter);
 // cyclesRouter mounted early for the same reason as storageRouter: it must come
 // BEFORE auditRouter/integrationRouter (blanket requireRole("admin","rh")),
 // otherwise those guards 403 the current-cycle read for non-admin roles
