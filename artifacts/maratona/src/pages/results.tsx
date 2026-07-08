@@ -776,6 +776,7 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                   {headerCell("Eventos Participados", "participatedEventsCount")}
                   {headerCell("Penalidades / Méritos", "absencePenalty")}
                   {headerCell("Média (Nota Final)", "finalResult")}
+                  {headerCell("Faixa", "platoon")}
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-[#eceef0]">
@@ -814,6 +815,9 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                           <span className="font-black italic text-2xl text-[#191c1e] leading-none">{fmtScore(r.finalResult)}</span>
                           <span className="text-[10px] font-bold italic text-[#747a60] uppercase">/100</span>
                         </div>
+                      </td>
+                      <td className="px-5 py-4 text-center">
+                        <span className="text-xs font-bold italic text-[#444933]">{r.platoon ?? "—"}</span>
                       </td>
                     </tr>
                   );
@@ -1103,6 +1107,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                   {payHeaderCell("Colaborador", "employeeName", "left")}
                   {payHeaderCell("Atividade", "eventsCount")}
                   {payHeaderCell("Nota Final", "finalResult")}
+                  {payHeaderCell("Faixa", "platoon")}
                   {payHeaderCell("Elegibilidade", "eligible")}
                   {payHeaderCell("Bônus", "bonusValue")}
                   {payHeaderCell("Bônus Extra", "extraBonusValue")}
@@ -1135,6 +1140,9 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                           <span className="font-black italic text-2xl text-[#191c1e] leading-none">{fmtScore(r.finalResult)}</span>
                           <span className="text-[10px] font-bold italic text-[#747a60] uppercase">/100</span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-xs font-bold italic text-[#444933]">{r.platoon ?? "—"}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         {r.eligible === false ? (
