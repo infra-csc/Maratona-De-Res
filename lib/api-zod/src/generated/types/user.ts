@@ -9,7 +9,10 @@
 export interface User {
   id: number;
   name: string;
-  email: string;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  cpfLogin?: string | null;
   role: string;
   /** @nullable */
   areaId?: number | null;
@@ -20,5 +23,6 @@ export interface User {
   /** @nullable */
   employeeName?: string | null;
   active: boolean;
+  mustChangePassword?: boolean;
   createdAt?: string;
 }

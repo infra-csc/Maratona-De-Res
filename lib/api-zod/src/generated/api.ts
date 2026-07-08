@@ -20,7 +20,7 @@ export const HealthCheckResponse = zod.object({
  * @summary Login
  */
 export const LoginBody = zod.object({
-  "email": zod.string(),
+  "identifier": zod.string().describe('E-mail corporativo (admin\/rh\/diretoria\/avaliador) or CPF (colaboradores)'),
   "password": zod.string()
 })
 
@@ -29,13 +29,15 @@ export const LoginResponse = zod.object({
   "user": zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 })
@@ -47,14 +49,43 @@ export const LoginResponse = zod.object({
 export const GetMeResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Change own password (used for forced first-login password change)
+ */
+export const ChangePasswordBody = zod.object({
+  "newPassword": zod.string(),
+  "confirmPassword": zod.string().optional()
+})
+
+export const ChangePasswordResponse = zod.object({
+  "token": zod.string(),
+  "user": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
+  "role": zod.string(),
+  "areaId": zod.number().nullish(),
+  "areaName": zod.string().nullish(),
+  "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
+  "createdAt": zod.string().optional()
+})
 })
 
 
@@ -70,13 +101,15 @@ export const ImpersonateResponse = zod.object({
   "user": zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 })
@@ -88,13 +121,15 @@ export const ImpersonateResponse = zod.object({
 export const GetUsersResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 export const GetUsersResponse = zod.array(GetUsersResponseItem)
@@ -138,13 +173,15 @@ export const GetUserParams = zod.object({
 export const GetUserResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -168,13 +205,15 @@ export const UpdateUserBody = zod.object({
 export const UpdateUserResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
   "role": zod.string(),
   "areaId": zod.number().nullish(),
   "areaName": zod.string().nullish(),
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 
@@ -184,6 +223,46 @@ export const UpdateUserResponse = zod.object({
  */
 export const DeleteUserParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Preview of active colaboradores that still have no login (used before bulk-generating access)
+ */
+export const GetCollaboratorsWithoutAccessResponse = zod.object({
+  "eligibleCount": zod.number(),
+  "missingCpfCount": zod.number(),
+  "missingCpf": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+}))
+})
+
+
+/**
+ * @summary Bulk-generate CPF-based login credentials for active colaboradores without an account
+ */
+export const BulkGenerateCollaboratorAccessBody = zod.object({
+  "dryRun": zod.boolean().optional()
+})
+
+export const BulkGenerateCollaboratorAccessResponse = zod.object({
+  "dryRun": zod.boolean(),
+  "createdCount": zod.number(),
+  "created": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "name": zod.string(),
+  "cpfLogin": zod.string(),
+  "password": zod.string()
+})),
+  "missingCpf": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "name": zod.string()
+})),
+  "conflicts": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "name": zod.string()
+}))
 })
 
 

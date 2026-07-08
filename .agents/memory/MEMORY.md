@@ -63,3 +63,4 @@
 - [Drizzle alias not available](drizzle-alias-unavailable.md) — drizzle-orm v0.45.2 does NOT export `alias`; enrich with a second query for same-table double-join cases
 - [Public eval tokens schema](public-eval-tokens-schema.md) — public_eval_tokens has recipient_name (set at creation), submitter_name (set when used); single-use token creates evaluation as createdByUserId
 - [Roster edit pattern reuse](roster-edit-pattern-reuse.md) — event-detail.tsx's add/remove/edit-participant Dialog+Popover+Command block is the canonical pattern; reuse verbatim (PARTICIPANT_FUNCTIONS, matchParticipantFunction) when any other manager screen needs team roster editing
+- [Nullable email/User schema ripple](nullable-email-ripple.md) — making users.email optional (CPF-login feature) breaks all callers assuming non-null email; must fix every consumer, not just schema

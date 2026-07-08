@@ -7,11 +7,17 @@ const _JWT_SECRET: string = JWT_SECRET;
 
 export interface JwtPayload {
   userId: number;
-  email: string;
+  email: string | null;
   role: string;
   areaId?: number | null;
   employeeId?: number | null;
+  mustChangePassword?: boolean;
 }
+
+// Paths reachable even while a login is pending a forced password change.
+// Checked against req.path (mounted under /api by app.ts, so req.path here
+// is relative to the mount, e.g. "/auth/change-password").
+const PASSWORD_CHANGE_ALLOWLIST = ["/auth/me", "/auth/logout", "/auth/change-password"];
 
 export function signToken(payload: JwtPayload): string {
   return jwt.sign(payload, _JWT_SECRET, { expiresIn: "24h" });
@@ -36,7 +42,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
   try {
-    req.user = verifyToken(auth.slice(7));
+    const payload = verifyToken(auth.slice(7));
+    if (payload.mustChangePassword && !PASSWORD_CHANGE_ALLOWLIST.includes(req.path)) {
+      res.status(403).json({ error: "Troca de senha obrigatória", code: "PASSWORD_CHANGE_REQUIRED" });
+      return;
+    }
+    req.user = payload;
     next();
   } catch {
     res.status(401).json({ error: "Token inválido ou expirado" });

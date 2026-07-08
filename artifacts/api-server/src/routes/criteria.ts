@@ -102,7 +102,7 @@ router.post("/criteria/admin/sync-area-labels", requireRole("admin"), async (req
       AND  (criteria.responsible_area_label IS DISTINCT FROM areas.name)
   `);
   const count = (updated as unknown as { rowCount: number }).rowCount ?? 0;
-  await audit(req.user!.userId, "sync_area_labels", "criteria", null, { updated: count }, null);
+  await audit(req.user!.userId, "sync_area_labels", "criteria", undefined, { updated: count }, undefined);
   res.json({ updated: count });
 });
 

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import LoginPage from "@/pages/login";
+import ChangePasswordPage from "@/pages/change-password";
 import DashboardPage from "@/pages/dashboard";
 import EventsPage from "@/pages/events";
 import EventDetailPage from "@/pages/event-detail";
@@ -61,6 +62,7 @@ function ProtectedRoute({ component: Component, roles }: { component: React.Comp
     );
   }
   if (!user) return <Redirect to="/login" />;
+  if (user.mustChangePassword) return <Redirect to="/trocar-senha" />;
   if (roles && !roles.includes(user.role)) {
     return (
       <AppLayout>
@@ -102,7 +104,10 @@ function AppRoutes() {
     <Switch>
       <Route path="/eval/:token" component={PublicEvalPage} />
       <Route path="/login">
-        {user ? <Redirect to="/" /> : <LoginPage />}
+        {user ? (user.mustChangePassword ? <Redirect to="/trocar-senha" /> : <Redirect to="/" />) : <LoginPage />}
+      </Route>
+      <Route path="/trocar-senha">
+        {!user ? <Redirect to="/login" /> : <ChangePasswordPage />}
       </Route>
       <Route path="/" component={HomeRoute} />
       <Route path="/dashboard"><Redirect to="/meu-desempenho" /></Route>

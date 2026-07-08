@@ -288,7 +288,10 @@ export default function UsersPage() {
                             </div>
                             <div>
                               <p className="font-bold italic text-[#191c1e]">{u.name}</p>
-                              <p className="text-xs text-[#747a60] mt-0.5">{u.email}</p>
+                              {u.email && <p className="text-xs text-[#747a60] mt-0.5">{u.email}</p>}
+                              {u.cpfLogin && (
+                                <p className="text-xs text-[#747a60] mt-0.5">CPF: {u.cpfLogin}</p>
+                              )}
                               {u.employeeName && (
                                 <p className="text-[11px] text-[#506600] font-bold italic uppercase mt-0.5">↳ {u.employeeName}</p>
                               )}
@@ -308,15 +311,20 @@ export default function UsersPage() {
                           ) : <span className="text-[#c4c9ac]">—</span>}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {u.active ? (
-                            <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">Ativo</span>
-                            </span>
-                          ) : (
-                            <span className="bg-[#d8dadc] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block opacity-70">
-                              <span className="inline-block skew-x-[8deg]">Inativo</span>
-                            </span>
-                          )}
+                          <div className="flex flex-col items-center gap-1">
+                            {u.active ? (
+                              <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
+                                <span className="inline-block skew-x-[8deg]">Ativo</span>
+                              </span>
+                            ) : (
+                              <span className="bg-[#d8dadc] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block opacity-70">
+                                <span className="inline-block skew-x-[8deg]">Inativo</span>
+                              </span>
+                            )}
+                            {u.mustChangePassword && (
+                              <span className="text-[10px] text-[#ba1a1a] font-bold italic uppercase">Troca de senha pendente</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -496,7 +504,7 @@ function EditUserForm({
   const { register, handleSubmit, setValue, watch } = useForm<EditUserFormValues>({
     defaultValues: {
       name: user.name,
-      email: user.email,
+      email: user.email ?? "",
       role: user.role,
       areaId: user.areaId ?? null,
       employeeId: user.employeeId ?? null,

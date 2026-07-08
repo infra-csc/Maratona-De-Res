@@ -6,8 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LoginInput {
-  /** E-mail corporativo (admin/rh/diretoria/avaliador) or CPF (colaboradores) */
-  identifier: string;
+export interface GeneratedCredential {
+  employeeId: number;
+  name: string;
+  cpfLogin: string;
   password: string;
 }

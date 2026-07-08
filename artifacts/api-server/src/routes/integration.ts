@@ -1094,7 +1094,7 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
     if (!usersByName.has(key)) usersByName.set(key, []);
     usersByName.get(key)!.push(u);
   }
-  const usedEmails = new Set(allUsers.map(u => u.email.toLowerCase()));
+  const usedEmails = new Set(allUsers.filter(u => u.email).map(u => u.email!.toLowerCase()));
 
   const ignoredGroupKeys = new Set(groupPlans.filter(gp => gp.ignored).map(gp => gp.groupKey));
 

@@ -29,9 +29,13 @@ import type {
   AuditLogPage,
   AuthResponse,
   BonusPaymentInput,
+  BulkGenerateAccessInput,
+  BulkGenerateAccessResult,
   Calibration,
   CalibrationInput,
+  ChangePasswordInput,
   CloseQuarterInput,
+  CollaboratorsWithoutAccessPreview,
   ConformityEvaluatorInput,
   ConformityEvaluatorRedirectInput,
   CreateCycleInput,
@@ -45,6 +49,7 @@ import type {
   DedupeEvaluationsInput,
   DedupeEvaluationsResult,
   Employee,
+  EmployeeCreateResponse,
   EmployeeInput,
   EmployeeUpdate,
   ErrorEnvelope,
@@ -435,6 +440,77 @@ export const useLogout = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getLogoutMutationOptions(options));
+    }
+
+export const getChangePasswordUrl = () => {
+
+
+
+
+  return `/auth/change-password`
+}
+
+/**
+ * @summary Change own password (used for forced first-login password change)
+ */
+export const changePassword = async (changePasswordInput: ChangePasswordInput, options?: RequestInit): Promise<AuthResponse> => {
+
+  return customFetch<AuthResponse>(getChangePasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      changePasswordInput,)
+  }
+);}
+
+
+
+
+export const getChangePasswordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext> => {
+
+const mutationKey = ['changePassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, {data: BodyType<ChangePasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  changePassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
+    export type ChangePasswordMutationBody = BodyType<ChangePasswordInput>
+    export type ChangePasswordMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Change own password (used for forced first-login password change)
+ */
+export const useChangePassword = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof changePassword>>,
+        TError,
+        {data: BodyType<ChangePasswordInput>},
+        TContext
+      > => {
+      return useMutation(getChangePasswordMutationOptions(options));
     }
 
 export const getImpersonateUrl = () => {
@@ -952,6 +1028,154 @@ export const useDeleteUser = <TError = ErrorType<unknown>,
       return useMutation(getDeleteUserMutationOptions(options));
     }
 
+export const getGetCollaboratorsWithoutAccessUrl = () => {
+
+
+
+
+  return `/users/collaborators-without-access`
+}
+
+/**
+ * @summary Preview of active colaboradores that still have no login (used before bulk-generating access)
+ */
+export const getCollaboratorsWithoutAccess = async ( options?: RequestInit): Promise<CollaboratorsWithoutAccessPreview> => {
+
+  return customFetch<CollaboratorsWithoutAccessPreview>(getGetCollaboratorsWithoutAccessUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCollaboratorsWithoutAccessQueryKey = () => {
+    return [
+    `/users/collaborators-without-access`
+    ] as const;
+    }
+
+
+export const getGetCollaboratorsWithoutAccessQueryOptions = <TData = Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCollaboratorsWithoutAccessQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>> = ({ signal }) => getCollaboratorsWithoutAccess({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCollaboratorsWithoutAccessQueryResult = NonNullable<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>>
+export type GetCollaboratorsWithoutAccessQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Preview of active colaboradores that still have no login (used before bulk-generating access)
+ */
+
+export function useGetCollaboratorsWithoutAccess<TData = Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaboratorsWithoutAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCollaboratorsWithoutAccessQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getBulkGenerateCollaboratorAccessUrl = () => {
+
+
+
+
+  return `/users/bulk-generate-collaborator-access`
+}
+
+/**
+ * @summary Bulk-generate CPF-based login credentials for active colaboradores without an account
+ */
+export const bulkGenerateCollaboratorAccess = async (bulkGenerateAccessInput?: BulkGenerateAccessInput, options?: RequestInit): Promise<BulkGenerateAccessResult> => {
+
+  return customFetch<BulkGenerateAccessResult>(getBulkGenerateCollaboratorAccessUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bulkGenerateAccessInput,)
+  }
+);}
+
+
+
+
+export const getBulkGenerateCollaboratorAccessMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCollaboratorAccess>>, TError,{data?: BodyType<BulkGenerateAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCollaboratorAccess>>, TError,{data?: BodyType<BulkGenerateAccessInput>}, TContext> => {
+
+const mutationKey = ['bulkGenerateCollaboratorAccess'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkGenerateCollaboratorAccess>>, {data?: BodyType<BulkGenerateAccessInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkGenerateCollaboratorAccess(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkGenerateCollaboratorAccessMutationResult = NonNullable<Awaited<ReturnType<typeof bulkGenerateCollaboratorAccess>>>
+    export type BulkGenerateCollaboratorAccessMutationBody = BodyType<BulkGenerateAccessInput> | undefined
+    export type BulkGenerateCollaboratorAccessMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Bulk-generate CPF-based login credentials for active colaboradores without an account
+ */
+export const useBulkGenerateCollaboratorAccess = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCollaboratorAccess>>, TError,{data?: BodyType<BulkGenerateAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkGenerateCollaboratorAccess>>,
+        TError,
+        {data?: BodyType<BulkGenerateAccessInput>},
+        TContext
+      > => {
+      return useMutation(getBulkGenerateCollaboratorAccessMutationOptions(options));
+    }
+
 export const getResetUserPasswordUrl = (id: number,) => {
 
 
@@ -1339,9 +1563,9 @@ export const getCreateEmployeeUrl = () => {
 /**
  * @summary Create employee
  */
-export const createEmployee = async (employeeInput: EmployeeInput, options?: RequestInit): Promise<Employee> => {
+export const createEmployee = async (employeeInput: EmployeeInput, options?: RequestInit): Promise<EmployeeCreateResponse> => {
 
-  return customFetch<Employee>(getCreateEmployeeUrl(),
+  return customFetch<EmployeeCreateResponse>(getCreateEmployeeUrl(),
   {
     ...options,
     method: 'POST',

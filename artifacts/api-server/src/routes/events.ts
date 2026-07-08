@@ -1346,7 +1346,7 @@ router.post("/events/admin/fix-calibration-criteria", requireRole("admin"), asyn
     results.push({ from: fromName, to: toName, fromId: fromCrit.id, toId: toCrit.id, updated: count });
   }
 
-  await audit(req.user!.userId, "fix_calibration_criteria", "calibrations", null, { results, totalUpdated }, null);
+  await audit(req.user!.userId, "fix_calibration_criteria", "calibrations", undefined, { results, totalUpdated }, undefined);
   res.json({ totalUpdated, results });
 });
 

@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { db, employeesTable, quarterlyResultsTable } from "@workspace/db";
+import bcrypt from "bcryptjs";
+import { db, employeesTable, quarterlyResultsTable, usersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
+import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -72,7 +74,32 @@ router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
     employmentType: employmentType ?? "casa",
   }).returning();
   await audit(req.user!.userId, "create", "employees", employee.id, null, employee);
-  res.status(201).json(employee);
+
+  // Auto-provision a CPF-based login for the new colaborador when a valid CPF
+  // was provided, mirroring the bulk-generation rule (see lib/credentials.ts).
+  let generatedAccess: { cpfLogin: string; password: string } | null = null;
+  const digits = employee.document ? normalizeCpf(employee.document) : "";
+  if (employee.active && isValidCpfLength(digits)) {
+    const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.cpfLogin, digits)).limit(1);
+    if (!existing) {
+      const password = defaultPasswordForCpf(digits);
+      const passwordHash = await bcrypt.hash(password, 12);
+      await db.insert(usersTable).values({
+        name: employee.name,
+        email: null,
+        cpfLogin: digits,
+        passwordHash,
+        role: "visualizador",
+        employeeId: employee.id,
+        active: true,
+        mustChangePassword: true,
+      });
+      generatedAccess = { cpfLogin: digits, password };
+      await audit(req.user!.userId, "auto_provision_access", "users", employee.id, null, { cpfLogin: digits });
+    }
+  }
+
+  res.status(201).json({ ...employee, generatedAccess });
 });
 
 router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {

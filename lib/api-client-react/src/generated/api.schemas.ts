@@ -40,8 +40,14 @@ export interface HealthStatus {
 }
 
 export interface LoginInput {
-  email: string;
+  /** E-mail corporativo (admin/rh/diretoria/avaliador) or CPF (colaboradores) */
+  identifier: string;
   password: string;
+}
+
+export interface ChangePasswordInput {
+  newPassword: string;
+  confirmPassword?: string;
 }
 
 export interface ImpersonateInput {
@@ -51,7 +57,10 @@ export interface ImpersonateInput {
 export interface User {
   id: number;
   name: string;
-  email: string;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  cpfLogin?: string | null;
   role: string;
   /** @nullable */
   areaId?: number | null;
@@ -62,6 +71,7 @@ export interface User {
   /** @nullable */
   employeeName?: string | null;
   active: boolean;
+  mustChangePassword?: boolean;
   createdAt?: string;
 }
 
@@ -96,6 +106,46 @@ export interface UserUpdate {
   /** @nullable */
   employeeId?: number | null;
   active?: boolean;
+}
+
+export type CollaboratorsWithoutAccessPreviewMissingCpfItem = {
+  id: number;
+  name: string;
+};
+
+export interface CollaboratorsWithoutAccessPreview {
+  eligibleCount: number;
+  missingCpfCount: number;
+  missingCpf: CollaboratorsWithoutAccessPreviewMissingCpfItem[];
+}
+
+export interface BulkGenerateAccessInput {
+  dryRun?: boolean;
+}
+
+export interface GeneratedCredential {
+  employeeId: number;
+  name: string;
+  cpfLogin: string;
+  password: string;
+}
+
+export type BulkGenerateAccessResultMissingCpfItem = {
+  employeeId: number;
+  name: string;
+};
+
+export type BulkGenerateAccessResultConflictsItem = {
+  employeeId: number;
+  name: string;
+};
+
+export interface BulkGenerateAccessResult {
+  dryRun: boolean;
+  createdCount: number;
+  created: GeneratedCredential[];
+  missingCpf: BulkGenerateAccessResultMissingCpfItem[];
+  conflicts: BulkGenerateAccessResultConflictsItem[];
 }
 
 export interface ResetPasswordInput {
@@ -152,6 +202,19 @@ export interface Employee {
   sourceType?: string;
   createdAt?: string;
 }
+
+/**
+ * @nullable
+ */
+export type EmployeeCreateResponseGeneratedAccess = {
+  cpfLogin?: string;
+  password?: string;
+} | null;
+
+export type EmployeeCreateResponse = Employee & {
+  /** @nullable */
+  generatedAccess?: EmployeeCreateResponseGeneratedAccess;
+};
 
 export type EmployeeInputEmploymentType = typeof EmployeeInputEmploymentType[keyof typeof EmployeeInputEmploymentType];
 

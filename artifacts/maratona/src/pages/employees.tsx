@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
-import { useGetEmployees, useCreateEmployee, useUpdateEmployee, getGetEmployeesQueryKey } from "@workspace/api-client-react";
-import type { EmployeeInput, Employee } from "@workspace/api-client-react";
+import {
+  useGetEmployees,
+  useCreateEmployee,
+  useUpdateEmployee,
+  useGetCollaboratorsWithoutAccess,
+  useBulkGenerateCollaboratorAccess,
+  getGetEmployeesQueryKey,
+  getGetCollaboratorsWithoutAccessQueryKey,
+} from "@workspace/api-client-react";
+import type { EmployeeInput, Employee, GeneratedCredential, BulkGenerateAccessResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +17,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+
+function downloadCredentialsCsv(created: GeneratedCredential[]) {
+  const header = "Nome,CPF (login),Senha";
+  const rows = created.map(c => `"${c.name.replace(/"/g, '""')}",${c.cpfLogin},${c.password}`);
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `credenciais-colaboradores-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 type EmploymentType = "casa" | "freela";
 const employmentTypeLabel = (t?: string) => (t === "freela" ? "Freela" : "Casa");
@@ -37,6 +60,9 @@ export default function EmployeesPage() {
   const [filterType, setFilterType] = useState<"all" | EmploymentType>("all");
   const [open, setOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithCycle | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkGenerateAccessResult | null>(null);
+  const [newAccess, setNewAccess] = useState<{ cpfLogin: string; password: string } | null>(null);
 
   const qKey = getGetEmployeesQueryKey({ active: filterActive === "true" });
   const { data: employeesRaw, isLoading } = useGetEmployees(
@@ -52,13 +78,34 @@ export default function EmployeesPage() {
 
   const createMutation = useCreateEmployee({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: qKey });
         toast({ title: "Colaborador criado" });
         setOpen(false);
         reset();
+        if (data.generatedAccess?.cpfLogin && data.generatedAccess?.password) {
+          setNewAccess({ cpfLogin: data.generatedAccess.cpfLogin, password: data.generatedAccess.password });
+        }
       },
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const {
+    data: bulkPreview,
+    isLoading: isBulkPreviewLoading,
+    refetch: refetchBulkPreview,
+  } = useGetCollaboratorsWithoutAccess({ query: { enabled: bulkOpen, queryKey: getGetCollaboratorsWithoutAccessQueryKey() } });
+
+  const bulkGenerateMutation = useBulkGenerateCollaboratorAccess({
+    mutation: {
+      onSuccess: (data) => {
+        setBulkResult(data);
+        if (!data.dryRun) {
+          qc.invalidateQueries({ queryKey: qKey });
+        }
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao gerar acessos", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -131,15 +178,23 @@ export default function EmployeesPage() {
             <p className="text-base md:text-lg text-[#444933] italic mt-2">Gestão do time e elegibilidade da Maratona</p>
           </div>
           {canEdit && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <button
-                  data-testid="button-create-employee"
-                  className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-                >
-                  <Plus size={18} /> Novo Colaborador
-                </button>
-              </DialogTrigger>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                data-testid="button-bulk-generate-access"
+                onClick={() => { setBulkOpen(true); setBulkResult(null); }}
+                className="bg-white border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#eceef0] transition-all"
+              >
+                <KeyRound size={18} /> Gerar Acessos em Massa
+              </button>
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <button
+                    data-testid="button-create-employee"
+                    className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                  >
+                    <Plus size={18} /> Novo Colaborador
+                  </button>
+                </DialogTrigger>
               <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
                 <DialogHeader>
                   <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Colaborador</DialogTitle>
@@ -191,7 +246,8 @@ export default function EmployeesPage() {
                   </div>
                 </form>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           )}
         </section>
 
@@ -449,6 +505,117 @@ export default function EmployeesPage() {
           </section>
         )}
       </div>
+
+      {/* Bulk generate access dialog */}
+      <Dialog open={bulkOpen} onOpenChange={v => { setBulkOpen(v); if (!v) setBulkResult(null); }}>
+        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Gerar Acessos em Massa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 pt-2">
+            {isBulkPreviewLoading ? (
+              <p className="text-sm italic text-[#747a60]">Carregando prévia...</p>
+            ) : !bulkResult ? (
+              <>
+                <p className="text-sm text-[#444933] italic">
+                  Serão criados logins por CPF para colaboradores ativos sem acesso à plataforma. A senha inicial será gerada automaticamente e exibida apenas uma vez, junto com o arquivo CSV para download.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 text-center">
+                    <p className="text-3xl italic font-black">{bulkPreview?.eligibleCount ?? 0}</p>
+                    <p className="text-[11px] font-bold italic uppercase text-[#444933]">Prontos para gerar acesso</p>
+                  </div>
+                  <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 text-center">
+                    <p className="text-3xl italic font-black text-[#ba1a1a]">{bulkPreview?.missingCpfCount ?? 0}</p>
+                    <p className="text-[11px] font-bold italic uppercase text-[#444933]">Sem CPF cadastrado</p>
+                  </div>
+                </div>
+                {bulkPreview && bulkPreview.missingCpf.length > 0 && (
+                  <div className="border-2 border-[#191c1e] max-h-40 overflow-y-auto">
+                    <div className="bg-[#ba1a1a] text-white px-3 py-1.5 flex items-center gap-2 text-[11px] font-bold italic uppercase">
+                      <AlertTriangle size={14} /> Precisam de CPF cadastrado
+                    </div>
+                    <ul className="divide-y-2 divide-[#eceef0]">
+                      {bulkPreview.missingCpf.map(m => (
+                        <li key={m.id} className="px-3 py-2 text-sm italic">{m.name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+                  <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+                  <button
+                    data-testid="button-confirm-bulk-generate"
+                    disabled={!bulkPreview || bulkPreview.eligibleCount === 0 || bulkGenerateMutation.isPending}
+                    onClick={() => bulkGenerateMutation.mutate({ data: { dryRun: false } })}
+                    className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                  >
+                    {bulkGenerateMutation.isPending ? "Gerando..." : `Gerar ${bulkPreview?.eligibleCount ?? 0} Acessos`}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-[#444933] italic">
+                  <strong>{bulkResult.createdCount}</strong> acesso(s) gerado(s) com sucesso. Baixe o arquivo CSV agora — as senhas não poderão ser visualizadas novamente.
+                </p>
+                {bulkResult.conflicts.length > 0 && (
+                  <p className="text-xs text-[#ba1a1a] italic">{bulkResult.conflicts.length} colaborador(es) já possuíam acesso e foram ignorados.</p>
+                )}
+                <button
+                  data-testid="button-download-credentials-csv"
+                  onClick={() => downloadCredentialsCsv(bulkResult.created)}
+                  disabled={bulkResult.created.length === 0}
+                  className="w-full h-12 bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] font-black italic uppercase text-[13px] tracking-tight flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Download size={16} /> Baixar CSV com Credenciais
+                </button>
+                <div className="flex justify-end pt-4 border-t-2 border-[#e0e3e5]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold"
+                    onClick={() => { setBulkOpen(false); setBulkResult(null); refetchBulkPreview(); }}
+                  >
+                    Fechar
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Newly generated single-employee access */}
+      <Dialog open={!!newAccess} onOpenChange={v => { if (!v) setNewAccess(null); }}>
+        <DialogContent className="max-w-sm rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Acesso Gerado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-[#444933] italic">Anote ou compartilhe estas credenciais agora — a senha não será exibida novamente.</p>
+            <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 space-y-2">
+              <div>
+                <p className="text-[11px] font-bold italic uppercase text-[#747a60]">Login (CPF)</p>
+                <p className="text-lg font-black italic" data-testid="text-new-access-cpf">{newAccess?.cpfLogin}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold italic uppercase text-[#747a60]">Senha Inicial</p>
+                <p className="text-lg font-black italic" data-testid="text-new-access-password">{newAccess?.password}</p>
+              </div>
+            </div>
+            <div className="flex justify-end pt-4 border-t-2 border-[#e0e3e5]">
+              <button
+                data-testid="button-close-new-access"
+                onClick={() => setNewAccess(null)}
+                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

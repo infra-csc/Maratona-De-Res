@@ -1,9 +1,10 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable, areasTable, employeesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
 
 const router = Router();
 
@@ -15,18 +16,113 @@ router.get("/users", requireRole("admin", "rh", "diretoria"), async (_req, res) 
       id: usersTable.id,
       name: usersTable.name,
       email: usersTable.email,
+      cpfLogin: usersTable.cpfLogin,
       role: usersTable.role,
       areaId: usersTable.areaId,
       areaName: areasTable.name,
       employeeId: usersTable.employeeId,
       employeeName: employeesTable.name,
       active: usersTable.active,
+      mustChangePassword: usersTable.mustChangePassword,
       createdAt: usersTable.createdAt,
     })
     .from(usersTable)
     .leftJoin(areasTable, eq(usersTable.areaId, areasTable.id))
     .leftJoin(employeesTable, eq(usersTable.employeeId, employeesTable.id));
   res.json(users);
+});
+
+router.get("/users/collaborators-without-access", requireRole("admin", "rh"), async (_req, res) => {
+  const employees = await db
+    .select({
+      id: employeesTable.id,
+      name: employeesTable.name,
+      document: employeesTable.document,
+    })
+    .from(employeesTable)
+    .leftJoin(usersTable, eq(usersTable.employeeId, employeesTable.id))
+    .where(and(eq(employeesTable.active, true), isNull(usersTable.id)));
+
+  const eligible: { id: number; name: string; cpfDigits: string }[] = [];
+  const missingCpf: { id: number; name: string }[] = [];
+  for (const e of employees) {
+    const digits = e.document ? normalizeCpf(e.document) : "";
+    if (isValidCpfLength(digits)) {
+      eligible.push({ id: e.id, name: e.name, cpfDigits: digits });
+    } else {
+      missingCpf.push({ id: e.id, name: e.name });
+    }
+  }
+  res.json({ eligibleCount: eligible.length, missingCpfCount: missingCpf.length, missingCpf });
+});
+
+router.post("/users/bulk-generate-collaborator-access", requireRole("admin", "rh"), async (req, res) => {
+  const dryRun = req.body?.dryRun === true;
+
+  const employees = await db
+    .select({
+      id: employeesTable.id,
+      name: employeesTable.name,
+      document: employeesTable.document,
+    })
+    .from(employeesTable)
+    .leftJoin(usersTable, eq(usersTable.employeeId, employeesTable.id))
+    .where(and(eq(employeesTable.active, true), isNull(usersTable.id)));
+
+  const created: { employeeId: number; name: string; cpfLogin: string; password: string }[] = [];
+  const missingCpf: { employeeId: number; name: string }[] = [];
+  const conflicts: { employeeId: number; name: string }[] = [];
+  const seenCpf = new Set<string>();
+
+  for (const e of employees) {
+    const digits = e.document ? normalizeCpf(e.document) : "";
+    if (!isValidCpfLength(digits)) {
+      missingCpf.push({ employeeId: e.id, name: e.name });
+      continue;
+    }
+    if (seenCpf.has(digits)) {
+      conflicts.push({ employeeId: e.id, name: e.name });
+      continue;
+    }
+    if (!dryRun) {
+      const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.cpfLogin, digits)).limit(1);
+      if (existing) {
+        conflicts.push({ employeeId: e.id, name: e.name });
+        continue;
+      }
+    }
+    seenCpf.add(digits);
+    const password = defaultPasswordForCpf(digits);
+    if (!dryRun) {
+      const passwordHash = await bcrypt.hash(password, 12);
+      await db.insert(usersTable).values({
+        name: e.name,
+        email: null,
+        cpfLogin: digits,
+        passwordHash,
+        role: "visualizador",
+        employeeId: e.id,
+        active: true,
+        mustChangePassword: true,
+      });
+    }
+    created.push({ employeeId: e.id, name: e.name, cpfLogin: digits, password });
+  }
+
+  if (!dryRun && created.length > 0) {
+    await audit(req.user!.userId, "bulk_generate_access", "users", undefined, undefined, {
+      count: created.length,
+      employeeIds: created.map(c => c.employeeId),
+    });
+  }
+
+  res.json({
+    dryRun,
+    createdCount: created.length,
+    created: dryRun ? [] : created,
+    missingCpf,
+    conflicts,
+  });
 });
 
 router.get("/users/:id", requireRole("admin", "rh"), async (req, res) => {
@@ -36,10 +132,12 @@ router.get("/users/:id", requireRole("admin", "rh"), async (req, res) => {
       id: usersTable.id,
       name: usersTable.name,
       email: usersTable.email,
+      cpfLogin: usersTable.cpfLogin,
       role: usersTable.role,
       areaId: usersTable.areaId,
       areaName: areasTable.name,
       active: usersTable.active,
+      mustChangePassword: usersTable.mustChangePassword,
       createdAt: usersTable.createdAt,
     })
     .from(usersTable)
@@ -118,7 +216,7 @@ router.post("/users/:id/reset-password", requireRole("admin", "rh"), async (req,
   const { newPassword } = req.body;
   if (!newPassword) { res.status(400).json({ error: "newPassword obrigatório" }); return; }
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, id));
+  await db.update(usersTable).set({ passwordHash, mustChangePassword: true }).where(eq(usersTable.id, id));
   await audit(req.user!.userId, "reset_password", "users", id);
   res.json({ message: "Senha redefinida com sucesso" });
 });

@@ -79,6 +79,25 @@ paths:
         "200":
           description: OK
 
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change own password (used for forced first-login password change)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed, fresh session issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
   /auth/impersonate:
     post:
       operationId: impersonate
@@ -206,6 +225,38 @@ paths:
         "204":
           description: Deleted
 
+  /users/collaborators-without-access:
+    get:
+      operationId: getCollaboratorsWithoutAccess
+      tags: [users]
+      summary: Preview of active colaboradores that still have no login (used before bulk-generating access)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaboratorsWithoutAccessPreview"
+
+  /users/bulk-generate-collaborator-access:
+    post:
+      operationId: bulkGenerateCollaboratorAccess
+      tags: [users]
+      summary: Bulk-generate CPF-based login credentials for active colaboradores without an account
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkGenerateAccessInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkGenerateAccessResult"
+
   /users/{id}/reset-password:
     post:
       operationId: resetUserPassword
@@ -319,7 +370,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Employee"
+                $ref: "#/components/schemas/EmployeeCreateResponse"
 
   /employees/{id}:
     get:
@@ -2515,11 +2566,21 @@ components:
 
     LoginInput:
       type: object
-      required: [email, password]
+      required: [identifier, password]
       properties:
-        email:
+        identifier:
           type: string
+          description: E-mail corporativo (admin/rh/diretoria/avaliador) or CPF (colaboradores)
         password:
+          type: string
+
+    ChangePasswordInput:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+        confirmPassword:
           type: string
 
     ImpersonateInput:
@@ -2551,14 +2612,16 @@ components:
 
     User:
       type: object
-      required: [id, name, email, role, active]
+      required: [id, name, role, active]
       properties:
         id:
           type: integer
         name:
           type: string
         email:
-          type: string
+          type: ["string", "null"]
+        cpfLogin:
+          type: ["string", "null"]
         role:
           type: string
         areaId:
@@ -2570,6 +2633,8 @@ components:
         employeeName:
           type: ["string", "null"]
         active:
+          type: boolean
+        mustChangePassword:
           type: boolean
         createdAt:
           type: string
@@ -2606,6 +2671,77 @@ components:
           type: ["integer", "null"]
         active:
           type: boolean
+
+    CollaboratorsWithoutAccessPreview:
+      type: object
+      required: [eligibleCount, missingCpfCount, missingCpf]
+      properties:
+        eligibleCount:
+          type: integer
+        missingCpfCount:
+          type: integer
+        missingCpf:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+
+    BulkGenerateAccessInput:
+      type: object
+      properties:
+        dryRun:
+          type: boolean
+
+    GeneratedCredential:
+      type: object
+      required: [employeeId, name, cpfLogin, password]
+      properties:
+        employeeId:
+          type: integer
+        name:
+          type: string
+        cpfLogin:
+          type: string
+        password:
+          type: string
+
+    BulkGenerateAccessResult:
+      type: object
+      required: [dryRun, createdCount, created, missingCpf, conflicts]
+      properties:
+        dryRun:
+          type: boolean
+        createdCount:
+          type: integer
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedCredential"
+        missingCpf:
+          type: array
+          items:
+            type: object
+            required: [employeeId, name]
+            properties:
+              employeeId:
+                type: integer
+              name:
+                type: string
+        conflicts:
+          type: array
+          items:
+            type: object
+            required: [employeeId, name]
+            properties:
+              employeeId:
+                type: integer
+              name:
+                type: string
 
     ResetPasswordInput:
       type: object
@@ -2681,6 +2817,19 @@ components:
           type: string
         createdAt:
           type: string
+
+    EmployeeCreateResponse:
+      allOf:
+        - $ref: "#/components/schemas/Employee"
+        - type: object
+          properties:
+            generatedAccess:
+              type: ["object", "null"]
+              properties:
+                cpfLogin:
+                  type: string
+                password:
+                  type: string
 
     EmployeeInput:
       type: object
