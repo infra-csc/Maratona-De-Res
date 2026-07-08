@@ -52,7 +52,7 @@ router.get("/events", async (req, res) => {
     // critérios/avaliações para calcular — usa importedScore diretamente.
     if (ev.isHistorical) {
       const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
-      return { ...ev, participantCount, evaluationProgress: 1, totalCriteria: 0, submittedCount: 0, averageScore: score, teamScore: score, hasCalibration: true, partialPublishedAt: null };
+      return { ...ev, participantCount, evaluationProgress: 1, totalCriteria: 0, submittedCount: 0, averageScore: score, teamScore: score, hasCalibration: true, fullyCalibrated: true, partialPublishedAt: null };
     }
 
     const evEvals = evals.filter(e => e.eventId === ev.id);
@@ -87,6 +87,10 @@ router.get("/events", async (req, res) => {
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
     const progress = activeCriteria.length > 0 ? evaluatedCriteria / activeCriteria.length : 0;
 
+    // Totalmente calibrado = todo critério ativo já teve a calibração
+    // publicada como final (não basta ter calibração parcial/rascunho).
+    const fullyCalibrated = activeCriteria.length > 0 && activeCriteria.every(c => c.finalPublishedAt != null);
+
     // Rollup do evento = mais recente publicação parcial entre os critérios
     // ativos (a granularidade real agora é por critério, ver /events/:id/criteria).
     const partialTimestamps = activeCriteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
@@ -94,7 +98,7 @@ router.get("/events", async (req, res) => {
       ? new Date(Math.max(...partialTimestamps.map(d => d.getTime())))
       : null;
 
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration, partialPublishedAt };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt };
   });
   res.json(enriched);
 });

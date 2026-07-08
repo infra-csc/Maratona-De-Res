@@ -285,6 +285,7 @@ export interface Event {
   /** @nullable */
   teamScore?: number | null;
   hasCalibration?: boolean;
+  fullyCalibrated?: boolean;
   criteriaConfirmed?: boolean;
   feedbackReleased?: boolean;
   /** @nullable */

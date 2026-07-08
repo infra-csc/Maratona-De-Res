@@ -97,7 +97,7 @@ export default function EventsPage() {
       || (cardFilter === "configured" && ev.criteriaConfirmed)
       || (cardFilter === "confirmed" && ev.resultsConfirmed)
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
-      || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.hasCalibration)
+      || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
       || (cardFilter === "fullyEval" && ev.evaluationProgress === 1);
     return matchSearch && matchConfig && matchCard;
   });
@@ -193,7 +193,7 @@ export default function EventsPage() {
               const configured = all.filter(e => e.criteriaConfirmed).length;
               const confirmed = all.filter(e => e.resultsConfirmed).length;
               const unconfirmed = all.filter(e => !e.resultsConfirmed).length;
-              const pendingCal = all.filter(e => e.status === "closed" && !e.hasCalibration).length;
+              const pendingCal = all.filter(e => e.status === "closed" && !e.fullyCalibrated).length;
               const fullyEval = all.filter(e => e.evaluationProgress === 1).length;
               const cards = [
                 { key: "configured", label: "Configurados", value: configured, color: "#506600" },
@@ -270,13 +270,16 @@ export default function EventsPage() {
               const score = ev.teamScore ?? ev.averageScore ?? null;
               const calibrated = ev.hasCalibration ?? false;
               const concluded = ev.status === "closed";
+              const fullyResolved = progress === 100 && (ev.fullyCalibrated ?? false);
               return (
                 <div key={ev.id} data-testid={`card-event-${ev.id}`} className={`bg-white border-2 border-[#191c1e] flex flex-col ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}>
                   <div className="p-5 flex-1">
                     <div className="flex justify-between items-start gap-4 mb-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
+                          {!(fullyResolved && !ev.criteriaConfirmed) && (
+                            <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
+                          )}
                           {ev.isHistorical && (
                             <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
                               <span className="inline-block skew-x-[8deg]">Histórico</span>

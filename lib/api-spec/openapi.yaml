@@ -2948,6 +2948,8 @@ components:
           type: ["number", "null"]
         hasCalibration:
           type: boolean
+        fullyCalibrated:
+          type: boolean
         criteriaConfirmed:
           type: boolean
         feedbackReleased:
