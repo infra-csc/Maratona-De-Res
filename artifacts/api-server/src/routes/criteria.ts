@@ -18,12 +18,13 @@ router.get("/criteria", async (_req, res) => {
       defaultWeight: criteriaTable.defaultWeight,
       active: criteriaTable.active,
       displayOrder: criteriaTable.displayOrder,
+      eventCount: sql<number>`(SELECT COUNT(DISTINCT ec.event_id) FROM event_criteria ec WHERE ec.criterion_id = ${criteriaTable.id} AND ec.active = true)`,
     })
     .from(criteriaTable)
     .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
     .where(eq(criteriaTable.eventScoped, false))
     .orderBy(criteriaTable.displayOrder, criteriaTable.name);
-  res.json(criteria.map(c => ({ ...c, defaultWeight: parseFloat(c.defaultWeight as unknown as string) })));
+  res.json(criteria.map(c => ({ ...c, defaultWeight: parseFloat(c.defaultWeight as unknown as string), eventCount: Number(c.eventCount) })));
 });
 
 router.post("/criteria", requireRole("admin", "rh"), async (req, res) => {
