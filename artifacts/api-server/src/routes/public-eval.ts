@@ -119,8 +119,8 @@ router.post("/public-eval/:token/submit", async (req, res) => {
   for (const item of evaluations) {
     const criterionId = parseInt(item?.criterionId);
     const score = typeof item?.score === "number" ? item.score : parseFloat(item?.score);
-    if (isNaN(criterionId) || isNaN(score) || score < 1 || score > 10) {
-      res.status(400).json({ error: "Cada critério precisa de uma nota entre 1 e 10" });
+    if (isNaN(criterionId) || isNaN(score) || score < 0 || score > 10) {
+      res.status(400).json({ error: "Cada critério precisa de uma nota entre 0 e 10" });
       return;
     }
     parsedEvaluations.push({

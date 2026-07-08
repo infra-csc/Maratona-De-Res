@@ -45,7 +45,7 @@ function matchParticipantFunction(fn?: string | null): string {
   return prefix ?? DEFAULT_PARTICIPANT_FUNCTION;
 }
 
-function ScoreButton({ score, current, onClick, disabled, label }: { score: number, current: number, onClick: () => void, disabled: boolean, label: string }) {
+function ScoreButton({ score, current, onClick, disabled, label }: { score: number, current: number | null, onClick: () => void, disabled: boolean, label?: string }) {
   const isSelected = current === score;
   return (
     <button
@@ -53,15 +53,15 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "border-2 border-[#191c1e] p-3 md:p-4 flex flex-col items-center gap-1.5 transition-all w-full",
+        "border-2 border-[#191c1e] p-2 md:p-3 flex flex-col items-center gap-0.5 transition-all w-full",
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:-translate-y-1 active:translate-y-0",
         isSelected
           ? "bg-[#ccff00] text-[#161e00]"
           : "bg-white text-[#191c1e]"
       )}
     >
-      <span className="text-2xl italic font-black">{score}</span>
-      <span className="text-[10px] leading-tight text-center font-bold uppercase italic">{label}</span>
+      <span className="text-xl italic font-black">{score}</span>
+      {label && <span className="text-[9px] leading-tight text-center font-bold uppercase italic">{label}</span>}
     </button>
   );
 }
@@ -733,10 +733,10 @@ export default function EvaluationsPage() {
     return new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
-  function currentScore(criterionId: number) {
+  function currentScore(criterionId: number): number | null {
     if (scores[criterionId] != null) return scores[criterionId];
     const ev = getEval(criterionId);
-    return ev ? parseFloat(ev.score as unknown as string) : 0;
+    return ev ? parseFloat(ev.score as unknown as string) : null;
   }
 
   function currentAudio(criterionId: number): string | null {
@@ -748,15 +748,19 @@ export default function EvaluationsPage() {
   function handleSaveDraft(criterionId: number) {
     if (!selectedEventId) return;
     const score = currentScore(criterionId);
-    if (score === 0) return;
+    if (score == null) return;
 
     const comment = comments[criterionId] ?? getEval(criterionId)?.comments ?? "";
+    if (!comment.trim()) {
+      toast({ title: "Comentário obrigatório", description: "Preencha o comentário antes de salvar.", variant: "destructive" });
+      return;
+    }
     const audioUrl = currentAudio(criterionId);
     if (!audioUrl) {
       toast({ title: "Áudio obrigatório", description: "Grave um áudio explicando a avaliação antes de salvar.", variant: "destructive" });
       return;
     }
-    createMutation.mutate({ data: { eventId: selectedEventId, criterionId, score, comments: comment || undefined, audioUrl } });
+    createMutation.mutate({ data: { eventId: selectedEventId, criterionId, score, comments: comment, audioUrl } });
   }
 
   function handleScoreClick(criterionId: number, score: number) {
@@ -764,13 +768,14 @@ export default function EvaluationsPage() {
   }
 
   // A criterion is "ready to launch" if it's already submitted, OR fully filled
-  // in-screen (score chosen and áudio gravado) — justificativa is opcional —
-  // even if it was never explicitly saved as rascunho.
+  // in-screen: score escolhido, comentário preenchido e áudio gravado.
   function criterionReady(criterionId: number): boolean {
     const ev = getEval(criterionId);
     if (ev?.status === "submitted") return true;
     const score = currentScore(criterionId);
-    if (score === 0) return false;
+    if (score == null) return false;
+    const comment = comments[criterionId] ?? ev?.comments ?? "";
+    if (!comment.trim()) return false;
     if (!currentAudio(criterionId)) return false;
     return true;
   }
@@ -786,6 +791,7 @@ export default function EvaluationsPage() {
         const ev = getEval(c.criterionId);
         if (ev?.status === "submitted") continue;
         const score = currentScore(c.criterionId);
+        if (score == null) continue;
         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
         const audioUrl = currentAudio(c.criterionId);
         const created = await createEvaluation({
@@ -897,17 +903,9 @@ export default function EvaluationsPage() {
     </Popover>
   );
 
-  const labels = {
-    1: "Crítico",
-    2: "Muito abaixo",
-    3: "Abaixo do esperado",
-    4: "Insuficiente",
-    5: "Atendeu minimamente",
-    6: "Atendeu",
-    7: "Atendeu bem",
-    8: "Muito bom",
-    9: "Ótimo",
-    10: "Excelência"
+  const labels: Record<number, string> = {
+    0: "Crítico, não atendeu ao básico",
+    10: "Perfeição, atendeu completamente e sem erros",
   };
 
   return (
@@ -1677,12 +1675,11 @@ export default function EvaluationsPage() {
                         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
                         const audio = currentAudio(c.criterionId);
 
-                        // Áudio é obrigatório para salvar/submeter qualquer avaliação.
-                        // Justificativa é sempre opcional.
+                        // Comentário e áudio são obrigatórios para salvar/submeter.
                         const needsAudio = !audio;
 
                         return (
-                          <div key={c.criterionId} className={cn("criterion-row border-l-4 pl-6 py-2", submitted ? "border-[#506600]" : isDraft ? "border-[#ff5722]" : score > 0 ? "border-[#ccff00]" : "border-[#191c1e]/20")}>
+                          <div key={c.criterionId} className={cn("criterion-row border-l-4 pl-6 py-2", submitted ? "border-[#506600]" : isDraft ? "border-[#ff5722]" : score != null ? "border-[#ccff00]" : "border-[#191c1e]/20")}>
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
                               <div>
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -1732,22 +1729,26 @@ export default function EvaluationsPage() {
 
                               <div className="shrink-0 text-right">
                                 <p className="text-[11px] font-bold italic uppercase text-[#747a60]">Ritmo Atual</p>
-                                <p className="text-[40px] leading-none italic font-black">{score > 0 ? score : "-"}</p>
+                                <p className="text-[40px] leading-none italic font-black">{score != null ? score : "-"}</p>
                               </div>
                             </div>
 
                             <div className="mb-4">
-                              <div className="grid grid-cols-5 gap-2 md:gap-3">
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
+                              <div className="grid grid-cols-11 gap-1">
+                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
                                   <ScoreButton
                                     key={val}
                                     score={val}
                                     current={score}
-                                    label={labels[val as keyof typeof labels]}
+                                    label={labels[val]}
                                     onClick={() => handleScoreClick(c.criterionId, val)}
                                     disabled={submitted}
                                   />
                                 ))}
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span className="text-[10px] italic text-[#747a60] font-bold max-w-[130px] leading-tight">{labels[0]}</span>
+                                <span className="text-[10px] italic text-[#747a60] font-bold max-w-[130px] text-right leading-tight">{labels[10]}</span>
                               </div>
                             </div>
 
@@ -1756,12 +1757,12 @@ export default function EvaluationsPage() {
                                 <div className="flex items-center justify-between gap-2 mb-2">
                                   <label className="text-xs font-black italic uppercase flex items-center gap-2">
                                     Justificativa / Feedback
-                                    <span className="text-[10px] text-[#444933] bg-[#e6e8ea] border border-[#191c1e] px-2 py-0.5 font-bold italic uppercase">Opcional</span>
+                                    <span className="text-[10px] text-white bg-[#ba1a1a] px-2 py-0.5 font-bold italic uppercase">Obrigatório</span>
                                   </label>
                                   <span className="text-[10px] font-bold italic text-[#747a60] tabular-nums shrink-0">{comment.length}/300</span>
                                 </div>
                                 <Textarea
-                                  placeholder="Comentários opcionais para a equipe (serão vistos anonimamente)..."
+                                  placeholder="Descreva o desempenho da equipe para este critério (será compartilhado anonimamente)..."
                                   value={comment}
                                   maxLength={300}
                                   onChange={e => setComments(s => ({ ...s, [c.criterionId]: e.target.value }))}
@@ -1795,7 +1796,7 @@ export default function EvaluationsPage() {
                                   </div>
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
-                                    disabled={score === 0 || needsAudio}
+                                    disabled={score == null || !comment.trim() || needsAudio}
                                     data-testid={`button-save-draft-${c.criterionId}`}
                                     className="ml-auto bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                                   >
@@ -1846,8 +1847,7 @@ export default function EvaluationsPage() {
               {isFerramentasEvaluatorForEvent && (() => {
                 const val = conformityEvalForm.guardaEquipamentos;
                 const isNao = val === false;
-                const commentMissing = isNao && !conformityEvalForm.guardaEquipamentosComment.trim();
-                const canSave = !commentMissing;
+                const canSave = true;
                 return (
                   <div className="space-y-4">
                     <div className="flex items-start justify-between gap-3 px-1">
@@ -1915,23 +1915,22 @@ export default function EvaluationsPage() {
                             </div>
                           </div>
                         </div>
-                        {isNao && (
+                        {val !== null && (
                           <div className="pb-3 space-y-1">
-                            <label className="text-[10px] font-black italic uppercase text-[#862200]">Justificativa <span className="text-[#862200]">*</span> obrigatória quando NÃO</label>
+                            <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
                             <Textarea
-                              placeholder="Descreva o que aconteceu com os equipamentos/ferramentas..."
+                              placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
                               value={conformityEvalForm.guardaEquipamentosComment}
                               onChange={e => setConformityEvalForm(f => ({ ...f, guardaEquipamentosComment: e.target.value }))}
                               className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
                             />
-                            {commentMissing && <p className="text-[10px] font-bold italic text-[#862200]">Preencha a justificativa antes de salvar.</p>}
                           </div>
                         )}
                       </div>
                       {/* Save comment */}
-                      {isNao && (
+                      {val !== null && (
                         <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
-                          <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Salvar justificativa</span>
+                          <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Salvar observação</span>
                           <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
                             onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }); }}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
@@ -1952,9 +1951,8 @@ export default function EvaluationsPage() {
                   { key: "estaiamentos", commentKey: "estaiamentosComment", label: "Estaiamentos / Aterramentos", question: "Estaiamento e Aterramento foram feitos de maneira correta?" },
                   { key: "conduta", commentKey: "condutaComment", label: "Conduta", question: "Conduta e comportamento foram adequados? (horários, ordens e regras)" },
                 ];
-                const anyCommentMissing = cenografiaItems.some(item => conformityEvalForm[item.key] === false && !conformityEvalForm[item.commentKey].trim());
                 const standoutNeedsJustification = conformityEvalForm.standoutResponse === true && !conformityEvalForm.standoutJustification.trim();
-                const canSaveTexts = !anyCommentMissing && !standoutNeedsJustification;
+                const canSaveTexts = !standoutNeedsJustification;
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
                 return (
                   <div className="space-y-4">
@@ -2008,7 +2006,6 @@ export default function EvaluationsPage() {
                         {cenografiaItems.map(item => {
                           const val = conformityEvalForm[item.key];
                           const isNao = val === false;
-                          const commentMissing = isNao && !conformityEvalForm[item.commentKey].trim();
                           return (
                             <div key={item.key} className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
                               <div className="flex items-center justify-between gap-3 min-h-[56px]">
@@ -2027,16 +2024,15 @@ export default function EvaluationsPage() {
                                   </div>
                                 </div>
                               </div>
-                              {isNao && (
+                              {val !== null && (
                                 <div className="pb-3 space-y-1">
-                                  <label className="text-[10px] font-black italic uppercase text-[#862200]">Justificativa <span>*</span> obrigatória quando NÃO</label>
+                                  <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
                                   <Textarea
-                                    placeholder={`Justifique por que ${item.label.toLowerCase()} não foi atendido...`}
+                                    placeholder={isNao ? `Descreva o que aconteceu com ${item.label.toLowerCase()}...` : "Alguma observação? (opcional)"}
                                     value={conformityEvalForm[item.commentKey]}
                                     onChange={e => setConformityEvalForm(f => ({ ...f, [item.commentKey]: e.target.value }))}
                                     className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[64px]"
                                   />
-                                  {commentMissing && <p className="text-[10px] font-bold italic text-[#862200]">Preencha a justificativa antes de salvar.</p>}
                                 </div>
                               )}
                             </div>
@@ -2101,7 +2097,7 @@ export default function EvaluationsPage() {
                         onClick={() => {
                           if (!selectedEventId || !canSaveTexts) return;
                           const payload: Record<string, unknown> = { absencesReport: conformityEvalForm.absencesReport || null, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
-                          cenografiaItems.forEach(item => { if (conformityEvalForm[item.key] === false) payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
+                          cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
                           conformityEvalMutation.mutate({ id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] });
                         }}
                         className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
@@ -2196,7 +2192,7 @@ export default function EvaluationsPage() {
                         {myCriteria.map(c => {
                           const ev = getEval(c.criterionId);
                           const score = currentScore(c.criterionId);
-                          const hasScore = score > 0;
+                          const hasScore = score != null;
                           const isSubmitted = ev?.status === "submitted";
                           const isDraft = ev?.status === "draft";
                           return (
@@ -2264,7 +2260,7 @@ export default function EvaluationsPage() {
                         <p className="text-[11px] text-center text-[#747a60] italic mt-3 leading-relaxed">
                           {allReady
                             ? <>Ao lançar, suas notas são <strong>submetidas e bloqueadas</strong>. Salvar rascunho é opcional.</>
-                            : <>Dê nota e grave o áudio de cada critério (a justificativa é opcional). <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
+                            : <>Dê nota, preencha o comentário e grave o áudio de cada critério. <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
                         </p>
                       )}
 
@@ -2287,7 +2283,7 @@ export default function EvaluationsPage() {
                                 {myCriteria.map(c => {
                                   const ev = getEval(c.criterionId);
                                   const score = currentScore(c.criterionId);
-                                  const hasScore = score > 0;
+                                  const hasScore = score != null;
                                   const isSubmitted = ev?.status === "submitted";
                                   const isDraft = ev?.status === "draft";
                                   return (

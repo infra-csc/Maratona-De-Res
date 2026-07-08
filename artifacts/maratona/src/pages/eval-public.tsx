@@ -21,8 +21,9 @@ interface TokenInfo {
   criteria: TokenCriterion[];
 }
 
+// score: null = ainda não selecionado; number = selecionado (inclusive 0)
 interface CriterionAnswer {
-  score: number;
+  score: number | null;
   comments: string;
 }
 
@@ -39,10 +40,10 @@ interface ConformityAnswers {
   standoutJustification: string;
 }
 
+// Rótulo apenas nas extremidades (0 e 10), conforme formulário oficial
 const scoreLabels: Record<number, string> = {
-  1: "Muito fraco", 2: "Fraco", 3: "Abaixo do esperado",
-  4: "Razoável", 5: "Médio", 6: "Acima da média",
-  7: "Bom", 8: "Muito bom", 9: "Excelente", 10: "Excepcional",
+  0: "Crítico, não atendeu ao básico",
+  10: "Perfeição, atendeu completamente e sem erros",
 };
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -58,7 +59,7 @@ export default function PublicEvalPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  // Criteria form state
+  // Criteria form state — score null = ainda não escolhido
   const [answers, setAnswers] = useState<Record<number, CriterionAnswer>>({});
 
   // Cenografia conformity state
@@ -78,16 +79,17 @@ export default function PublicEvalPage() {
       .then(async (r) => {
         if (!r.ok) {
           const j = await r.json().catch(() => ({}));
-          throw new Error((j as { error?: string }).error ?? "Link inválido");
+          throw new Error((j as { error?: string }).error ?? `Erro ${r.status}`);
         }
-        return r.json() as Promise<TokenInfo>;
+        return r.json();
       })
       .then((data) => {
         setInfo(data);
         setSubmitterName(data.recipientName ?? "");
         setAnswers(
           Object.fromEntries(
-            (data.criteria ?? []).map((c) => [c.criterionId, { score: 0, comments: "" }]),
+            // score: null = ainda não selecionado (0 é nota válida)
+            (data.criteria ?? []).map((c: TokenCriterion) => [c.criterionId, { score: null, comments: "" }]),
           ),
         );
       })
@@ -96,24 +98,28 @@ export default function PublicEvalPage() {
 
   const tokenType = info?.tokenType ?? "criteria";
   const criteria = info?.criteria ?? [];
-  const allCriteriaScored = criteria.length > 0 && criteria.every((c) => (answers[c.criterionId]?.score ?? 0) > 0);
 
-  // Cenografia validation
+  // critério pronto = score selecionado (inclui 0) E comentário preenchido
+  const allCriteriaScored = criteria.length > 0 && criteria.every((c) => {
+    const ans = answers[c.criterionId];
+    return ans?.score !== null && ans?.score !== undefined && ans?.comments?.trim().length > 0;
+  });
+
+  // Cenografia: comentários são SEMPRE opcionais (mesmo quando Não)
   const cenoItems = ["epi", "estaiamentos", "conduta"] as const;
   const cenoAllAnswered = cenoItems.every(k => cenoAnswers[k] !== null);
-  const cenoAnyCommentMissing = cenoItems.some(k => cenoAnswers[k] === false && !cenoAnswers[`${k}Comment` as keyof ConformityAnswers]?.toString().trim());
   const cenoStandoutMissing = cenoAnswers.standoutResponse === true && !cenoAnswers.standoutJustification.trim();
-  const cenoCanSubmit = cenoAllAnswered && !cenoAnyCommentMissing && !cenoStandoutMissing;
+  const cenoCanSubmit = cenoAllAnswered && !cenoStandoutMissing;
 
-  // Ferramentas validation
-  const ferramentasCanSubmit = ferramentasAnswer !== null && (ferramentasAnswer === true || ferramentasComment.trim().length > 0);
+  // Ferramentas: comentário SEMPRE opcional
+  const ferramentasCanSubmit = ferramentasAnswer !== null;
 
   function setScore(criterionId: number, score: number) {
     setAnswers((prev) => ({ ...prev, [criterionId]: { score, comments: prev[criterionId]?.comments ?? "" } }));
   }
 
   function setComments(criterionId: number, comments: string) {
-    setAnswers((prev) => ({ ...prev, [criterionId]: { score: prev[criterionId]?.score ?? 0, comments } }));
+    setAnswers((prev) => ({ ...prev, [criterionId]: { score: prev[criterionId]?.score ?? null, comments } }));
   }
 
   async function handleSubmitCriteria() {
@@ -128,7 +134,7 @@ export default function PublicEvalPage() {
           submitterName: submitterName.trim(),
           evaluations: criteria.map((c) => ({
             criterionId: c.criterionId,
-            score: answers[c.criterionId]?.score,
+            score: answers[c.criterionId]?.score ?? 0,
             comments: answers[c.criterionId]?.comments || undefined,
           })),
         }),
@@ -271,59 +277,76 @@ export default function PublicEvalPage() {
           />
         </div>
 
-        {/* ── Criteria form ───────────────────────────────────────────────── */}
-        {!isConformity && criteria.map((c) => (
-          <div key={c.criterionId} className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-            <div className="bg-[#f2f4f6] border-b-2 border-[#191c1e] px-5 py-3">
-              <p className="text-xs font-black italic uppercase text-[#747a60] mb-0.5">Critério</p>
-              <p className="text-base font-black italic uppercase text-[#191c1e]">{c.criterionName}</p>
-              {c.criterionDescription && (
-                <p className="text-xs italic text-[#747a60] mt-1">{c.criterionDescription}</p>
-              )}
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <p className="text-xs font-black italic uppercase text-[#444933] mb-3">
-                  Nota <span className="text-[#ba1a1a]">*</span>
-                  {answers[c.criterionId]?.score > 0 && (
-                    <span className="ml-2 text-[#506600]">— {scoreLabels[answers[c.criterionId].score]}</span>
+        {/* ── Criteria form (escala 0-10, comentário obrigatório) ───────────── */}
+        {!isConformity && criteria.map((c) => {
+          const ans = answers[c.criterionId];
+          const selectedScore = ans?.score ?? null;
+          const comment = ans?.comments ?? "";
+          const commentMissing = selectedScore !== null && comment.trim().length === 0;
+          return (
+            <div key={c.criterionId} className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+              <div className="bg-[#f2f4f6] border-b-2 border-[#191c1e] px-5 py-3">
+                <p className="text-xs font-black italic uppercase text-[#747a60] mb-0.5">Critério</p>
+                <p className="text-base font-black italic uppercase text-[#191c1e]">{c.criterionName}</p>
+                {c.criterionDescription && (
+                  <p className="text-xs italic text-[#747a60] mt-1">{c.criterionDescription}</p>
+                )}
+              </div>
+              <div className="p-5 space-y-4">
+                {/* Score picker: 0-10, rótulo só nas pontas */}
+                <div>
+                  <p className="text-xs font-black italic uppercase text-[#444933] mb-3">
+                    Nota <span className="text-[#ba1a1a]">*</span>
+                    {selectedScore !== null && scoreLabels[selectedScore] && (
+                      <span className="ml-2 text-[#506600] normal-case font-bold">— {scoreLabels[selectedScore]}</span>
+                    )}
+                  </p>
+                  <div className="flex gap-1">
+                    {[0,1,2,3,4,5,6,7,8,9,10].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setScore(c.criterionId, s)}
+                        className={`flex-1 border-2 border-[#191c1e] py-2.5 text-sm font-black italic transition-all ${selectedScore === s ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] italic text-[#747a60] font-bold max-w-[120px] leading-tight">{scoreLabels[0]}</span>
+                    <span className="text-[10px] italic text-[#747a60] font-bold max-w-[120px] text-right leading-tight">{scoreLabels[10]}</span>
+                  </div>
+                </div>
+
+                {/* Comentário SEMPRE obrigatório */}
+                <div>
+                  <label className="block text-xs font-black italic uppercase mb-1.5 text-[#444933]">
+                    Comentário <span className="text-[#ba1a1a]">*</span>
+                    <span className="ml-1 text-[10px] font-bold normal-case text-[#747a60]">(obrigatório)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={comment}
+                    onChange={e => setComments(c.criterionId, e.target.value)}
+                    placeholder="Descreva o desempenho observado..."
+                    className={`w-full border-2 px-4 py-2.5 text-sm italic resize-none focus:outline-none focus:ring-2 focus:ring-[#ccff00] ${commentMissing ? "border-[#ba1a1a] bg-[#fff5f5]" : "border-[#191c1e]"}`}
+                  />
+                  {commentMissing && (
+                    <p className="text-[10px] font-bold italic text-[#ba1a1a] mt-1">Preencha o comentário antes de enviar.</p>
                   )}
-                </p>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {[1,2,3,4,5,6,7,8,9,10].map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setScore(c.criterionId, s)}
-                      className={`border-2 border-[#191c1e] py-2.5 text-sm font-black italic transition-all ${answers[c.criterionId]?.score === s ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-black italic uppercase mb-1.5 text-[#444933]">
-                  Comentário <span className="text-[11px] font-bold normal-case text-[#747a60]">(opcional)</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={answers[c.criterionId]?.comments ?? ""}
-                  onChange={e => setComments(c.criterionId, e.target.value)}
-                  placeholder="Descreva o desempenho observado..."
-                  className="w-full border-2 border-[#191c1e] px-4 py-2.5 text-sm italic resize-none focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
-                />
-              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* ── Cenografia conformity form ───────────────────────────────────── */}
         {isConformityCenografia && (() => {
-          const items: { key: "epi" | "estaiamentos" | "conduta"; label: string; question: string }[] = [
-            { key: "epi", label: "Uso de EPI", question: "Todos usaram EPI na arena?" },
-            { key: "estaiamentos", label: "Estaiamentos / Aterramentos", question: "Estaiamento e Aterramento foram feitos de maneira correta?" },
-            { key: "conduta", label: "Conduta", question: "Conduta e comportamento foram adequados?" },
+          const items: { key: "epi" | "estaiamentos" | "conduta"; commentKey: "epiComment" | "estaiamentosComment" | "condutaComment"; label: string; question: string }[] = [
+            { key: "epi", commentKey: "epiComment", label: "Uso de EPI", question: "Todos usaram EPI na arena?" },
+            { key: "estaiamentos", commentKey: "estaiamentosComment", label: "Estaiamentos / Aterramentos", question: "Estaiamento e Aterramento foram feitos de maneira correta?" },
+            { key: "conduta", commentKey: "condutaComment", label: "Conduta", question: "Conduta e comportamento foram adequados?" },
           ];
           return (
             <div className="space-y-4">
@@ -335,8 +358,6 @@ export default function PublicEvalPage() {
                   {items.map(item => {
                     const val = cenoAnswers[item.key];
                     const isNao = val === false;
-                    const commentKey = `${item.key}Comment` as keyof ConformityAnswers;
-                    const commentMissing = isNao && !cenoAnswers[commentKey]?.toString().trim();
                     return (
                       <div key={item.key} className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
                         <div className="flex items-center justify-between gap-3 min-h-[56px]">
@@ -355,17 +376,17 @@ export default function PublicEvalPage() {
                             </div>
                           </div>
                         </div>
-                        {isNao && (
+                        {/* Comentário sempre opcional — mostra quando resposta foi dada */}
+                        {val !== null && (
                           <div className="pb-3 space-y-1">
-                            <label className="text-[10px] font-black italic uppercase text-[#862200]">Justificativa <span>*</span> obrigatória quando NÃO</label>
+                            <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
                             <textarea
                               rows={2}
-                              placeholder={`Justifique por que ${item.label.toLowerCase()} não foi atendido...`}
-                              value={cenoAnswers[commentKey]?.toString() ?? ""}
-                              onChange={e => setCenoAnswers(f => ({ ...f, [commentKey]: e.target.value }))}
+                              placeholder={isNao ? `Descreva o que aconteceu...` : `Alguma observação? (opcional)`}
+                              value={cenoAnswers[item.commentKey]?.toString() ?? ""}
+                              onChange={e => setCenoAnswers(f => ({ ...f, [item.commentKey]: e.target.value }))}
                               className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
                             />
-                            {commentMissing && <p className="text-[10px] font-bold italic text-[#862200]">Preencha a justificativa antes de enviar.</p>}
                           </div>
                         )}
                       </div>
@@ -375,11 +396,13 @@ export default function PublicEvalPage() {
               </div>
 
               <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-2 ${HARD_SHADOW}`}>
-                <label className="block text-sm font-black italic uppercase text-[#191c1e]">Alguém faltou ou atrasou por mais de 30 minutos?</label>
-                <p className="text-[11px] text-[#747a60] italic">Especifique nomes e motivo. Se ninguém faltou, deixe em branco.</p>
+                <label className="block text-sm font-black italic uppercase text-[#191c1e]">
+                  Alguém faltou ou atrasou por mais de 30 minutos? <span className="text-[#ba1a1a]">*</span>
+                </label>
+                <p className="text-[11px] text-[#747a60] italic">Especifique nomes e motivo. Se ninguém faltou, escreva "Não".</p>
                 <textarea
                   rows={3}
-                  placeholder="Ex.: João Silva — faltou sem aviso."
+                  placeholder='Ex.: "João Silva — faltou sem aviso." ou "Não"'
                   value={cenoAnswers.absencesReport}
                   onChange={e => setCenoAnswers(f => ({ ...f, absencesReport: e.target.value }))}
                   className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
@@ -387,12 +410,14 @@ export default function PublicEvalPage() {
               </div>
 
               <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-3 ${HARD_SHADOW}`}>
-                <label className="block text-sm font-black italic uppercase text-[#191c1e]">Algum profissional teve um desempenho fora da curva?</label>
+                <label className="block text-sm font-black italic uppercase text-[#191c1e]">
+                  Algum profissional teve um desempenho fora da curva? <span className="text-[#ba1a1a]">*</span>
+                </label>
                 <div className="flex gap-2">
                   <button type="button"
                     onClick={() => setCenoAnswers(f => ({ ...f, standoutResponse: false, standoutJustification: "" }))}
                     className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${cenoAnswers.standoutResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                  >Não, dentro do padrão esperado</button>
+                  >Não, tudo dentro do padrão esperado</button>
                   <button type="button"
                     onClick={() => setCenoAnswers(f => ({ ...f, standoutResponse: true }))}
                     className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${cenoAnswers.standoutResponse === true ? "bg-[#506600] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
@@ -419,7 +444,6 @@ export default function PublicEvalPage() {
         {/* ── Ferramentas conformity form ──────────────────────────────────── */}
         {isConformityFerramentas && (() => {
           const isNao = ferramentasAnswer === false;
-          const commentMissing = isNao && !ferramentasComment.trim();
           return (
             <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
               <div className="bg-[#191c1e] px-5 py-3">
@@ -432,7 +456,7 @@ export default function PublicEvalPage() {
                     {isNao && <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>}
                     <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
                       <button type="button"
-                        onClick={() => { setFerramentasAnswer(true); setFerramentasComment(""); }}
+                        onClick={() => { setFerramentasAnswer(true); }}
                         className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${ferramentasAnswer === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                       >Sim</button>
                       <button type="button"
@@ -442,17 +466,17 @@ export default function PublicEvalPage() {
                     </div>
                   </div>
                 </div>
-                {isNao && (
+                {/* Comentário sempre opcional — mostra quando resposta foi dada */}
+                {ferramentasAnswer !== null && (
                   <div className="pb-3 space-y-1">
-                    <label className="text-[10px] font-black italic uppercase text-[#862200]">Justificativa <span>*</span> obrigatória quando NÃO</label>
+                    <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
                     <textarea
                       rows={2}
-                      placeholder="Descreva o que aconteceu com os equipamentos/ferramentas..."
+                      placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
                       value={ferramentasComment}
                       onChange={e => setFerramentasComment(e.target.value)}
                       className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
                     />
-                    {commentMissing && <p className="text-[10px] font-bold italic text-[#862200]">Preencha a justificativa antes de enviar.</p>}
                   </div>
                 )}
               </div>

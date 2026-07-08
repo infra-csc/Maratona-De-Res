@@ -146,8 +146,8 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
     return;
   }
   const numScore = parseFloat(score);
-  if (isNaN(numScore) || numScore < 1 || numScore > 10) {
-    res.status(400).json({ error: "A nota deve estar entre 1 e 10 (nota 0 não é permitida na avaliação oficial)" });
+  if (isNaN(numScore) || numScore < 0 || numScore > 10) {
+    res.status(400).json({ error: "A nota deve estar entre 0 e 10" });
     return;
   }
   if (audioUrl !== undefined && audioUrl !== null && !isValidAudioPath(audioUrl)) {
@@ -234,8 +234,8 @@ router.patch("/evaluations/:id", async (req, res) => {
   }
 
   const numScore = score !== undefined ? parseFloat(score) : parseFloat(existing.score as unknown as string);
-  if (score !== undefined && (isNaN(numScore) || numScore < 1 || numScore > 10)) {
-    res.status(400).json({ error: "A nota deve estar entre 1 e 10 (nota 0 não é permitida)" });
+  if (score !== undefined && (isNaN(numScore) || numScore < 0 || numScore > 10)) {
+    res.status(400).json({ error: "A nota deve estar entre 0 e 10" });
     return;
   }
   if (audioUrl !== undefined && audioUrl !== null && !isValidAudioPath(audioUrl)) {
