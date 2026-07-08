@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle } from "lucide-react";
+import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle, Settings2 } from "lucide-react";
 import { useAllCriterionRoutings, useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
 
@@ -67,6 +68,105 @@ function CriterionWeightCell({
         <X size={14} />
       </button>
     </div>
+  );
+}
+
+function EvaluatorPickerCell({
+  criterionId, currentRouting, evaluators, onSaved,
+}: {
+  criterionId: number;
+  currentRouting: CriterionRouting | undefined;
+  evaluators: { id: number; name: string }[];
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const saveMutation = useSaveCriterionRouting(criterionId);
+
+  const handleSelect = (userId: number | null) => {
+    saveMutation.mutate({
+      defaultEvaluatorId: userId,
+      commentRequired: currentRouting?.commentRequired ?? true,
+      redirectMode: currentRouting?.redirectMode ?? "none",
+      redirectAreaId: currentRouting?.redirectAreaId ?? null,
+      redirectUserIds: currentRouting?.redirectUsers?.map(u => u.id) ?? [],
+    }, {
+      onSuccess: () => { setOpen(false); setSearch(""); onSaved(); },
+    });
+  };
+
+  const filtered = evaluators.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
+  const current = currentRouting?.defaultEvaluatorName ?? null;
+
+  return (
+    <Popover open={open} onOpenChange={v => { setOpen(v); if (!v) setSearch(""); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 group/ev text-left"
+          title="Clique para definir o avaliador padrão"
+        >
+          {current ? (
+            <span className="flex items-center gap-1.5 text-sm font-bold italic text-[#191c1e] group-hover/ev:text-[#506600] transition-colors">
+              <UserCheck size={13} className="text-[#506600] shrink-0" />
+              {current}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#e55050] group-hover/ev:text-[#c03030] transition-colors">
+              <AlertCircle size={12} /> Sem avaliador
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-64 p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e]"
+        align="start"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-2 border-b-2 border-[#191c1e] bg-[#f7f9fb]">
+          <p className="text-[10px] font-black uppercase italic tracking-wider text-[#444933] mb-1.5">Avaliador Padrão</p>
+          <Input
+            placeholder="Buscar avaliador..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-7 text-xs rounded-none border-2 border-[#191c1e] focus-visible:ring-0"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-52 overflow-y-auto">
+          {current && (
+            <button
+              type="button"
+              onClick={() => handleSelect(null)}
+              disabled={saveMutation.isPending}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold italic text-[#e55050] hover:bg-[#fff0f0] border-b border-[#eceef0] transition-colors"
+            >
+              <X size={11} /> Remover avaliador
+            </button>
+          )}
+          {filtered.length === 0 && (
+            <p className="text-center text-xs text-[#747a60] italic py-4">Nenhum encontrado</p>
+          )}
+          {filtered.map(u => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => handleSelect(u.id)}
+              disabled={saveMutation.isPending}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold italic text-left hover:bg-[#f0f5e0] transition-colors border-b border-[#eceef0] last:border-b-0 ${u.id === currentRouting?.defaultEvaluatorId ? "bg-[#f0f5e0] text-[#506600]" : "text-[#191c1e]"}`}
+            >
+              {u.id === currentRouting?.defaultEvaluatorId && <Check size={11} className="shrink-0 text-[#506600]" />}
+              <span>{u.name}</span>
+            </button>
+          ))}
+        </div>
+        {saveMutation.isPending && (
+          <div className="p-2 border-t-2 border-[#191c1e] bg-[#f7f9fb] text-center text-[10px] font-bold italic text-[#747a60]">
+            Salvando...
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -381,24 +481,6 @@ export default function CriteriaPage() {
             <p className="text-base md:text-lg text-[#444933] italic mt-2">Configure os quesitos de avaliação, seus respectivos pesos e roteamento de avaliadores.</p>
           </div>
 
-          {/* Metric Card: Soma dos Pesos */}
-          <div className={`bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden skew-x-[-3deg] min-w-[260px] ${HARD_SHADOW}`}>
-            <div className="absolute top-0 right-0 p-1 bg-[#191c1e] text-[#ccff00]">
-              <Zap size={16} />
-            </div>
-            <div className="skew-x-[3deg]">
-              <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933] mb-1 flex items-center gap-1.5">
-                Soma dos Pesos Ativos
-              </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[40px] leading-none italic font-black">{totalWeight}</span>
-                <span className="text-2xl italic font-bold text-[#747a60]">pts</span>
-              </div>
-              <p className="text-[10px] font-bold uppercase italic mt-2 text-[#747a60]">
-                Vira o alvo de peso dos próximos eventos criados
-              </p>
-            </div>
-          </div>
         </section>
 
         {/* Actions */}
@@ -548,36 +630,22 @@ export default function CriteriaPage() {
                           />
                         </td>
                         <td className="px-6 py-4">
-                          <button
-                            type="button"
-                            onClick={() => setRoutingDialogId(c.id)}
-                            className="flex flex-col items-start gap-1 group/routing"
-                            title="Configurar roteamento de avaliador"
-                          >
-                            {routing?.defaultEvaluatorName ? (
-                              <>
-                                <span className="flex items-center gap-1.5 text-sm font-bold italic text-[#191c1e] group-hover/routing:text-[#506600] transition-colors">
-                                  <UserCheck size={13} className="text-[#506600]" />
-                                  {routing.defaultEvaluatorName}
-                                </span>
-                                {routing.redirectMode === "specific" && (routing.redirectUsers?.length ?? 0) > 0 && (
-                                  <span className="flex items-center gap-1 text-[10px] font-bold italic uppercase text-[#747a60] group-hover/routing:text-[#506600] transition-colors">
-                                    <Users size={10} />
-                                    {routing.redirectUsers!.length} backup{routing.redirectUsers!.length > 1 ? "s" : ""}
-                                  </span>
-                                )}
-                                {routing.redirectMode === "area" && routing.redirectAreaName && (
-                                  <span className="flex items-center gap-1 text-[10px] font-bold italic uppercase text-[#747a60] group-hover/routing:text-[#506600] transition-colors">
-                                    <Route size={10} /> {routing.redirectAreaName}
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#e55050] group-hover/routing:text-[#c03030] transition-colors">
-                                <AlertCircle size={12} /> Sem avaliador
-                              </span>
-                            )}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <EvaluatorPickerCell
+                              criterionId={c.id}
+                              currentRouting={routing}
+                              evaluators={evaluators}
+                              onSaved={() => qc.invalidateQueries()}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setRoutingDialogId(c.id)}
+                              title="Configurar roteamento e redirecionamento"
+                              className="p-1 text-[#747a60] hover:text-[#191c1e] transition-colors shrink-0"
+                            >
+                              <Settings2 size={13} />
+                            </button>
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-3">
