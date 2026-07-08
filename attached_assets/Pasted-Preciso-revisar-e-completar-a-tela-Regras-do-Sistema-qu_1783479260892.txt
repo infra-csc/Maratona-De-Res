@@ -1,0 +1,87 @@
+Preciso revisar e completar a tela "Regras do Sistema", que ainda tem pendências da 
+migração de Pelotão → Faixas de Bônus, além de outras melhorias de clareza.
+
+═══════════════════════════════════════
+1. SUBSTITUIR "PELOTÕES & PREMIAÇÃO" PELA NOVA TABELA DE FAIXAS DE BÔNUS
+═══════════════════════════════════════
+
+- A seção "PELOTÕES & PREMIAÇÃO" (com Pelotão Quênia, Azul, Verde, Branco, intervalo 
+  de pontos e bônus R$) AINDA está presente nesta tela — precisa ser REMOVIDA e 
+  substituída pela nova tabela "SIMULADOR DE BÔNUS" já especificada anteriormente:
+
+| Nota Média   | Prêmio Base (8 Eventos) | Bônus por Evento Adicional |
+|--------------|------------------------|------------------------------|
+| 70 – 74,99   | R$ 1.200,00             | R$ 200,00                     |
+| 75 – 79,99   | R$ 1.700,00             | R$ 250,00                     |
+| 80 – 84,99   | R$ 2.200,00             | R$ 300,00                     |
+| 85 – 89,99   | R$ 2.700,00             | R$ 350,00                     |
+| 90 – 94,99   | R$ 3.200,00             | R$ 400,00                     |
+| 95 – 100     | R$ 3.700,00             | R$ 450,00                     |
+
+- Manter a estrutura de "+ Adicionar Faixa" (equivalente ao atual "+ Adicionar 
+  Pelotão"), com campos: Nome da Faixa (opcional, ex: "Elite"), Nota Mínima, Nota 
+  Máxima, Prêmio Base, Bônus por Evento Adicional.
+- Manter a validação já existente ("As faixas devem cobrir de 0 a 100 sem lacunas ou 
+  sobreposições"), adaptada para notas em vez de pontos de pelotão.
+
+═══════════════════════════════════════
+2. CORRIGIR TEXTOS QUE AINDA MENCIONAM "PELOTÃO"
+═══════════════════════════════════════
+
+- Subtítulo da página: "Defina os limites de performance e as bonificações 
+  financeiras dos pelotões. A agressividade das regras dita o ritmo da corrida." 
+  — trocar para algo como: "Defina os limites de performance e as bonificações 
+  financeiras por faixa de nota. A agressividade das regras dita o ritmo da corrida."
+
+═══════════════════════════════════════
+3. REVISAR OS CAMPOS DE "CÁLCULO DE BÔNUS"
+═══════════════════════════════════════
+
+Cada campo precisa de mais clareza/contexto:
+
+a) "PENALIDADE POR FALTA (desconto em pontos no resultado final, escala 0-100)" = 50
+   - Deixar claro SE isso é o valor padrão sugerido ao criar um novo lançamento de 
+     "Ausência Não Comunicada" na tela de Penalidades e Méritos, ou se é uma regra 
+     fixa e automática (ex: aplicada sozinha quando o sistema detecta falta, sem 
+     precisar lançamento manual). Confirmar qual dos dois é o comportamento real.
+
+b) "FORMA DE PAGAMENTO DO BÔNUS DO CICLO" = "caju"
+   - Esse campo é texto livre. Sugerir transformar em um SELECT com opções 
+     pré-definidas (ex: Caju, PIX, Transferência, Outro), para evitar erro de 
+     digitação/inconsistência (ex: alguém digitar "Caju" com maiúscula em um ciclo e 
+     "caju" minúsculo em outro, gerando relatórios inconsistentes).
+
+c) "PONTUAÇÃO MÁXIMA POR CRITÉRIO (escala 0-10)" = 10
+   - Confirmar se mudar esse valor recalcula automaticamente todas as notas já 
+     lançadas (ex: se mudar para escala 0-5, o que acontece com notas já dadas em 
+     escala 0-10?). Se for arriscado, considerar bloquear a edição deste campo após 
+     o primeiro evento do ciclo já ter sido avaliado, evitando inconsistência de 
+     dados históricos.
+
+d) "MÍNIMO DE AVALIAÇÕES SUBMETIDAS PARA FECHAR EVENTO" = 1
+   - Deixar mais explícito o que esse número representa: é a quantidade mínima de 
+     CRITÉRIOS respondidos (de todos os critérios daquele evento) para o evento 
+     poder ser considerado "fechado"/pronto para calibração? Adicionar um texto de 
+     ajuda (tooltip ou legenda) explicando isso.
+
+e) "MÍNIMO DE EVENTOS PARTICIPADOS NO CICLO PARA O COLABORADOR SER ELEGÍVEL AO 
+   BÔNUS" = 8
+   - Este já está correto e é a mesma regra usada no dashboard do colaborador 
+     ("Faltam X eventos para o bônus"). Apenas confirmar que uma mudança aqui reflete 
+     automaticamente em TODAS as telas que usam esse número (Dashboard do 
+     Colaborador, Bônus & Pagamentos, Simulador de Bônus).
+
+═══════════════════════════════════════
+4. ORGANIZAÇÃO GERAL DA PÁGINA
+═══════════════════════════════════════
+
+- Considerar agrupar os campos em seções mais claras, por exemplo:
+  - "REGRAS DE AVALIAÇÃO" (Pontuação Máxima por Critério, Mínimo de Avaliações para 
+    Fechar Evento)
+  - "REGRAS DE ELEGIBILIDADE E PENALIDADE" (Mínimo de Eventos Participados, 
+    Penalidade por Falta)
+  - "PAGAMENTO E BÔNUS" (Forma de Pagamento, Simulador de Bônus/Faixas)
+- Isso ajuda o Admin a entender rapidamente o que cada bloco de configuração afeta, 
+  ao invés de uma lista solta de campos.
+
+Manter a paleta de cores atual do sistema (preto/lima).

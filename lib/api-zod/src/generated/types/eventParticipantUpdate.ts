@@ -7,6 +7,11 @@
  */
 
 export interface EventParticipantUpdate {
+  /**
+     * Cargo/função do colaborador NESTE EVENTO ESPECÍFICO. Independente do cargo global no cadastro — é este valor que determina se a participação conta para nota (ex.: "Cenotécnica" conta, "Sup Ceno" não conta). Ao salvar, o cargo global do colaborador é atualizado automaticamente para refletir o último cargo usado.
+     * @nullable
+     */
+  functionName?: string | null;
   confirmed?: boolean;
   /**
      * Diárias realizadas (preenchidas manualmente pelo RH com base na presença real). As diárias previstas (scheduledDiaria*) não são editáveis por aqui — vêm apenas da sincronização com a logística interna.

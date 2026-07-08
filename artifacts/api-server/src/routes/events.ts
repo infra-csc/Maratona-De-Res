@@ -602,14 +602,15 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
-  const { confirmed, actualDiariaDates, comment, diariaQuickConfirmed } = req.body;
-  if (confirmed === undefined && actualDiariaDates === undefined && comment === undefined && diariaQuickConfirmed === undefined) {
-    res.status(400).json({ error: "informe confirmed, actualDiariaDates, diariaQuickConfirmed e/ou comment" });
+  const { confirmed, actualDiariaDates, comment, diariaQuickConfirmed, functionName } = req.body;
+  if (confirmed === undefined && actualDiariaDates === undefined && comment === undefined && diariaQuickConfirmed === undefined && functionName === undefined) {
+    res.status(400).json({ error: "informe confirmed, actualDiariaDates, diariaQuickConfirmed, functionName e/ou comment" });
     return;
   }
   if (confirmed !== undefined && typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed deve ser boolean" }); return; }
   if (diariaQuickConfirmed !== undefined && typeof diariaQuickConfirmed !== "boolean") { res.status(400).json({ error: "diariaQuickConfirmed deve ser boolean" }); return; }
   if (comment !== undefined && comment !== null && typeof comment !== "string") { res.status(400).json({ error: "comment deve ser string ou null" }); return; }
+  if (functionName !== undefined && functionName !== null && typeof functionName !== "string") { res.status(400).json({ error: "functionName deve ser string ou null" }); return; }
 
   let normalizedDates: string[] | null | undefined = undefined;
   if (actualDiariaDates !== undefined) {
@@ -628,7 +629,11 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
   if (!existing) { res.status(404).json({ error: "Participante não encontrado" }); return; }
   const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, existing.employeeId)).limit(1);
   const employmentType = emp?.employmentType ?? "casa";
-  const countsForScore = participantCountsForScore({ employmentType, functionName: existing.functionName });
+
+  // Se functionName for alterado, usa o novo valor para calcular countsForScore;
+  // caso contrário usa o valor já registrado no evento (nunca o cargo global atual).
+  const effectiveFunctionName = functionName !== undefined ? functionName : existing.functionName;
+  const countsForScore = participantCountsForScore({ employmentType, functionName: effectiveFunctionName });
 
   const changesDiaria = normalizedDates !== undefined;
   if (changesDiaria && !countsForScore) {
@@ -647,6 +652,7 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
   const [updated] = await db
     .update(eventParticipantsTable)
     .set({
+      ...(functionName !== undefined && { functionName: functionName ?? null }),
       ...(confirmed !== undefined && { confirmed }),
       ...(normalizedDates !== undefined && {
         actualDiariaDates: normalizedDates,
@@ -665,6 +671,17 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();
   if (!updated) { res.status(404).json({ error: "Participante não encontrado" }); return; }
+
+  // Sincroniza o cargo GLOBAL do colaborador com o cargo deste evento,
+  // para que sirva de sugestão pré-preenchida nos próximos eventos.
+  // Só atualiza quando functionName é explicitamente fornecido e não nulo —
+  // nunca sobrescreve o global com null.
+  if (functionName && existing.employeeId) {
+    await db.update(employeesTable)
+      .set({ functionName: functionName.trim() })
+      .where(eq(employeesTable.id, existing.employeeId));
+  }
+
   res.json({
     ...updated, employeeName: emp?.name ?? "", employmentType,
     countsForScore,

@@ -2937,6 +2937,14 @@ components:
     EventParticipantUpdate:
       type: object
       properties:
+        functionName:
+          type: ["string", "null"]
+          description: >-
+            Cargo/função do colaborador NESTE EVENTO ESPECÍFICO. Independente
+            do cargo global no cadastro — é este valor que determina se a
+            participação conta para nota (ex.: "Cenotécnica" conta,
+            "Sup Ceno" não conta). Ao salvar, o cargo global do colaborador
+            é atualizado automaticamente para refletir o último cargo usado.
         confirmed:
           type: boolean
         actualDiariaDates:

@@ -1066,6 +1066,7 @@ export const UpdateEventParticipantParams = zod.object({
 })
 
 export const UpdateEventParticipantBody = zod.object({
+  "functionName": zod.string().nullish().describe('Cargo\/função do colaborador NESTE EVENTO ESPECÍFICO. Independente do cargo global no cadastro — é este valor que determina se a participação conta para nota (ex.: \"Cenotécnica\" conta, \"Sup Ceno\" não conta). Ao salvar, o cargo global do colaborador é atualizado automaticamente para refletir o último cargo usado.'),
   "confirmed": zod.boolean().optional(),
   "actualDiariaDates": zod.array(zod.string()).nullish().describe('Diárias realizadas (preenchidas manualmente pelo RH com base na presença real). As diárias previstas (scheduledDiaria\*) não são editáveis por aqui — vêm apenas da sincronização com a logística interna.'),
   "diariaQuickConfirmed": zod.boolean().optional().describe('true = modo rápido: gestor confirmou presença sem comparar datas. Equivale a \"Realizadas = Previstas\". Registra timestamp de auditoria.'),

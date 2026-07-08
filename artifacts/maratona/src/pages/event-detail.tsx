@@ -906,6 +906,8 @@ export default function EventDetailPage() {
           toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
         } else if (vars.data.actualDiariaDates !== undefined) {
           toast({ title: "Diárias realizadas atualizadas" });
+        } else if (vars.data.functionName !== undefined) {
+          toast({ title: "Cargo no evento atualizado" });
         }
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
@@ -2471,10 +2473,30 @@ export default function EventDetailPage() {
                               )}
                             </div>
 
-                            {/* Linha 2: cargo/função */}
-                            <p className="text-[10px] font-bold italic uppercase text-[#747a60] leading-tight">
-                              {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}
-                            </p>
+                            {/* Linha 2: cargo/função — editável inline por Admin/RH */}
+                            {canManage ? (
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  value={matchParticipantFunction(p.functionName)}
+                                  onChange={(e) => {
+                                    if (e.target.value !== matchParticipantFunction(p.functionName)) {
+                                      updateParticipant.mutate({ id, participantId: p.id, data: { functionName: e.target.value } });
+                                    }
+                                  }}
+                                  className="text-[10px] font-bold italic uppercase text-[#747a60] bg-transparent border-0 border-b border-dashed border-[#747a60] focus:outline-none focus:border-[#191c1e] cursor-pointer px-0 py-0 leading-tight appearance-none pr-3"
+                                  title="Cargo/função deste colaborador neste evento"
+                                >
+                                  {PARTICIPANT_FUNCTIONS.map(fn => (
+                                    <option key={fn} value={fn}>{fn}</option>
+                                  ))}
+                                </select>
+                                {isInactive && <span className="text-[10px] font-bold italic uppercase text-[#862200]">· Inativo</span>}
+                              </div>
+                            ) : (
+                              <p className="text-[10px] font-bold italic uppercase text-[#747a60] leading-tight">
+                                {p.functionName}{isInactive && <span className="text-[#862200]"> · Inativo</span>}
+                              </p>
+                            )}
 
                             {/* Linha 3: tags (Casa/Freela + Não conta p/ nota) */}
                             <div className="flex flex-wrap items-center gap-1.5">
