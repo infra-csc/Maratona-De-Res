@@ -1,0 +1,57 @@
+✅ 33 identificados com confiança
+ID	Nome no sistema	E-mail (Office 365)
+59	ALINE CANDIDO DA SILVA	aline.candido@ttkmarketing.com.br
+34	Agatha	agatha.nadolsky@nortemkt.com
+67	Aline Soares	aline.soares@nortemkt.com
+61	Ana Cláudia Motta	ana.motta@nortemkt.com
+71	Anderson Andreotti	anderson.andreotti@ttkmarketing.com.br
+41	Camilla Lopes Pereira	camilla.lopes@nortemkt.com
+36	Edney Eduardo de Siqueira	edney.siqueira@ttkmarketing.com.br
+72	Eduardo Meira	eduardo.meira@cscdoesporte.com.br
+73	Fabio Santoniello	fabio.santoniello@ttkmarketing.com.br
+57	Fernanda Toussaint	fernanda.toussaint@ttkmarketing.com.br
+64	Geuderson	geuderson.silva@ttkmarketing.com.br
+32	Giovanni Bertoni	giovanni.bertoni@ttkmarketing.com.br
+42	Guilherme Flauzino	guilherme.flauzino@ttkmarketing.com.br
+70	Igor Pinheiro dos Santos	igor.santos@ttkmarketing.com.br
+74	Jaqueline Oshiro	jaqueline.oshiro@ttkmarketing.com.br
+35	Leonardo Almeida	leonardo.almeida@ttkmarketing.com.br
+33	Lucas vicenzo da Silva Proença	lucas.vicenzo@ttkmarketing.com.br
+40	Luciano do Nascimento	luciano.nascimento@ttkmarketing.com.br
+60	Manoel Carlos	manoel.alves@ttkmarketing.com.br
+77	Marcelo Toscano	marcelo.toscano@ttkmarketing.com.br
+78	Mirella Milani	mirella.milani@nortemkt.com
+48	Natasha Freitas	natasha.barbosa@ttkmarketing.com.br
+79	Oscar Silva Cardoso	oscar.cardoso@cscdoesporte.onmicrosoft.com
+39	Paulo Roberto da Silva	paulo.roberto@ttkmarketing.com.br
+69	Priscila Elias	priscila.elias@ttkmarketing.com.br
+58	RUBEM ISMAEL VASQUES	rubem.vasques@ttkmarketing.com.br
+51	Rafael Bispo da Silva	rafael.silva@ttkmarketing.com.br
+44	Reinaldo Ribeiro de Sousa	reinaldo.sousa@nortemkt.com
+43	Renan Mota	renan.mota@ttkmarketing.com.br
+82	Sandro Gomes	sandro.paiva@cscdoesporte.com.br (nome completo: Sandro Gomes Paiva)
+83	Tarcisio Viana Ferreira	tarcisio.ferreira@ttkmarketing.com.br
+63	Ulisses	ulisses.souza@cscdoesporte.com.br
+66	vinicius alexandre da silva	vinicius.alexandre@ttkmarketing.com.br
+❓ 19 com dúvida — preciso de você
+ID	Nome no sistema	Problema
+47	Bruna Cordeiro	Não existe no CSV
+54	Bruno Dias Gomes	Não existe no CSV
+37	FRED	Só primeiro nome, não existe no CSV
+53	Gabriel	Só primeiro nome — CSV tem 5 Gabriels diferentes
+38	Gabriel Bernardineli	Não existe no CSV
+45	Igor Pinheiro (INATIVO)	Provavelmente duplicata do ID 70
+55	Jeferson da costa lima	CSV tem "Jeferson Ferreira dos Santos" e "Jeferson Ribeiro dos Santos" — nenhum bate
+75	José Luciano Carlos	Não existe no CSV
+76	Larissa Souza de Azevedo	CSV tem "Larissa da Silva Saraiva" e "Larissa da Silva Mendes" — nenhum bate
+65	Luiz Henrique Falcão	Não existe no CSV
+50	Marta Andrade	Não existe no CSV
+46	Myrella Brito Del Freu	CSV tem "Myrella Mello de Souza Bias" — sobrenome diferente
+49	Naiara Daiane Souza	Não existe no CSV
+56	Nicolas	Só primeiro nome, não existe no CSV
+68	Priscila Moquedace	Não existe no CSV
+52	Raphael Schiabel Telles	Não existe no CSV
+80	Samuel de Arruda Lopes Nih	Não existe no CSV
+62	Sandro Paiva (INATIVO)	Provavelmente duplicata do ID 82 (Sandro Gomes Paiva)
+81	Santo	Só primeiro nome, não existe no CSV
+Confirme os 19 com dúvida e assim que tiver as respostas atualizo os e-mails dos 33 confirmados no sistema de uma vez. Quer que eu já faça a atualização dos confirmados agora?
