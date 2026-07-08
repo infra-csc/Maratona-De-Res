@@ -10,7 +10,7 @@ import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
-import { participantCountsForScore } from "../lib/participation.js";
+import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -281,7 +281,10 @@ router.get("/my-performance", async (req, res) => {
 
   const registrationEligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
   const quarterEligible = !quarterElig || quarterElig.eligible;
-  const eligible = registrationEligible && quarterEligible;
+  // Regra: participação como "Sup Ceno *" em qualquer evento do ciclo
+  // desqualifica do ranking/bônus — mesma regra do fechamento (results.ts).
+  const hasSupCenoParticipation = participations.some(p => isInformationalFunction(p.functionName));
+  const eligible = registrationEligible && quarterEligible && !hasSupCenoParticipation;
 
   let currentPlatoon = null;
   let currentBonus = null;

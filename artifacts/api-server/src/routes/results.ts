@@ -16,7 +16,7 @@ import {
 } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
-import { participantCountsForScore } from "../lib/participation.js";
+import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -259,6 +259,15 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
         .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
         .where(inArray(eventParticipantsTable.eventId, allCycleEventIds))
     : [];
+  // Colaboradores que participaram como "Sup Ceno *" em qualquer evento
+  // confirmado do ciclo são inelegíveis para o ranking/bônus, mesmo que
+  // tenham outras participações que contam para nota.
+  const supCenoEmployeeIds = new Set<number>();
+  for (const r of participationRows) {
+    if (!r.employeeId) continue;
+    if (isInformationalFunction(r.functionName)) supCenoEmployeeIds.add(r.employeeId);
+  }
+
   const participatedByEmployee = new Map<number, Set<number>>();
   for (const r of participationRows) {
     if (!r.employeeId) continue;
@@ -323,6 +332,14 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     if (eligible && participatedCount < minEvents) {
       eligible = false;
       eligibilityReason = `Participou de ${participatedCount} de ${minEvents} eventos exigidos no ciclo`;
+    }
+    // Regra: participação como "Sup Ceno *" em qualquer evento confirmado do
+    // ciclo desqualifica do ranking/bônus, mesmo que a pessoa tenha outras
+    // participações que contam para nota. A função supervisora é informativa,
+    // não avaliada — quem a exerce não pode ser ranqueado no mesmo ciclo.
+    if (eligible && supCenoEmployeeIds.has(employeeId)) {
+      eligible = false;
+      eligibilityReason = "Participou como Sup Ceno em um ou mais eventos do ciclo";
     }
 
     const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEvents) : [];
