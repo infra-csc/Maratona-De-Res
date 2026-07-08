@@ -135,7 +135,7 @@ export default function UsersPage() {
     setEmailMigLoading(true);
     try {
       const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("maratona_token");
       const res = await fetch(`${base}/api/users/bulk-update-emails`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
