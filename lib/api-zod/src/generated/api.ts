@@ -2723,6 +2723,15 @@ export const DeleteAbsenceParams = zod.object({
 
 
 /**
+ * @summary Insert default penalty/merit types if missing (admin only)
+ */
+export const SeedDefaultPenaltyTypesResponse = zod.object({
+  "inserted": zod.number().optional(),
+  "message": zod.string().optional()
+})
+
+
+/**
  * @summary List all penalty/merit types
  */
 export const GetPenaltyTypesResponseItem = zod.object({

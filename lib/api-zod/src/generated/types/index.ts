@@ -155,6 +155,7 @@ export * from './reviewRequestResolve';
 export * from './reviewRequestStatus';
 export * from './rule';
 export * from './ruleUpdate';
+export * from './seedDefaultPenaltyTypes200';
 export * from './surveyCatalogChanges';
 export * from './surveyCreatedAvaliador';
 export * from './surveyEventSuggestion';

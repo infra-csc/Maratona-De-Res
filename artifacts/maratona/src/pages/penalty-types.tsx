@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   useGetPenaltyTypes, useCreatePenaltyType, useUpdatePenaltyType, useDeletePenaltyType,
+  useSeedDefaultPenaltyTypes,
   getGetPenaltyTypesQueryKey,
 } from "@workspace/api-client-react";
 import type { PenaltyType } from "@workspace/api-client-react";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, Pencil, AlertTriangle, Award, Settings2 } from "lucide-react";
+import { Plus, Trash2, Pencil, AlertTriangle, Award, Settings2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 

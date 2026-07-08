@@ -129,6 +129,7 @@ import type {
   ReviewRequestResolve,
   Rule,
   RuleUpdate,
+  SeedDefaultPenaltyTypes200,
   SurveyImportInput,
   SurveyImportResult,
   SyncResult,
@@ -6091,6 +6092,76 @@ export const useDeleteAbsence = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteAbsenceMutationOptions(options));
+    }
+
+export const getSeedDefaultPenaltyTypesUrl = () => {
+
+
+
+
+  return `/penalty-types/seed-defaults`
+}
+
+/**
+ * @summary Insert default penalty/merit types if missing (admin only)
+ */
+export const seedDefaultPenaltyTypes = async ( options?: RequestInit): Promise<SeedDefaultPenaltyTypes200> => {
+
+  return customFetch<SeedDefaultPenaltyTypes200>(getSeedDefaultPenaltyTypesUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSeedDefaultPenaltyTypesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof seedDefaultPenaltyTypes>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof seedDefaultPenaltyTypes>>, TError,void, TContext> => {
+
+const mutationKey = ['seedDefaultPenaltyTypes'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof seedDefaultPenaltyTypes>>, void> = () => {
+
+
+          return  seedDefaultPenaltyTypes(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SeedDefaultPenaltyTypesMutationResult = NonNullable<Awaited<ReturnType<typeof seedDefaultPenaltyTypes>>>
+
+    export type SeedDefaultPenaltyTypesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Insert default penalty/merit types if missing (admin only)
+ */
+export const useSeedDefaultPenaltyTypes = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof seedDefaultPenaltyTypes>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof seedDefaultPenaltyTypes>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSeedDefaultPenaltyTypesMutationOptions(options));
     }
 
 export const getGetPenaltyTypesUrl = () => {

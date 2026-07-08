@@ -1685,6 +1685,11 @@ export type GetAbsencesParams = {
 employeeId?: number;
 };
 
+export type SeedDefaultPenaltyTypes200 = {
+  inserted?: number;
+  message?: string;
+};
+
 export type GetQuarterlyResultsParams = {
 employeeId?: number;
 platoon?: string;

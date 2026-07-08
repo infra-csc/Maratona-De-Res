@@ -20,6 +20,28 @@ router.get("/penalty-types", async (_req, res) => {
   res.json(rows);
 });
 
+const DEFAULT_PENALTY_TYPES = [
+  { slug: "falta", label: "Ausência Não Comunicada", points: 50, kind: "penalty" as const, requiresEvent: false, active: true, displayOrder: 1 },
+  { slug: "atraso", label: "Atraso > 30 Minutos", points: 10, kind: "penalty" as const, requiresEvent: false, active: true, displayOrder: 2 },
+  { slug: "inconformidade_ponto", label: "Inconformidade de Ponto", points: 10, kind: "penalty" as const, requiresEvent: false, active: true, displayOrder: 3 },
+  { slug: "merito_galpao", label: "Rei do Galpão", points: 50, kind: "merit" as const, requiresEvent: false, active: true, displayOrder: 4 },
+  { slug: "merito_evento", label: "Estrela do Evento", points: 25, kind: "merit" as const, requiresEvent: false, active: true, displayOrder: 5 },
+  { slug: "colega_top", label: "Colega Top", points: 10, kind: "merit" as const, requiresEvent: false, active: true, displayOrder: 6 },
+];
+
+router.post("/penalty-types/seed-defaults", requireRole("admin"), async (req, res) => {
+  const existing = await db.select({ slug: penaltyTypesTable.slug }).from(penaltyTypesTable);
+  const existingSlugs = new Set(existing.map(r => r.slug));
+  const toInsert = DEFAULT_PENALTY_TYPES.filter(d => !existingSlugs.has(d.slug));
+  if (toInsert.length === 0) {
+    res.json({ inserted: 0, message: "Todos os tipos padrão já existem" });
+    return;
+  }
+  const inserted = await db.insert(penaltyTypesTable).values(toInsert).returning();
+  await audit(req.user!.userId, "seed_defaults", "penalty_types", null, null, { inserted: inserted.map(r => r.slug) });
+  res.json({ inserted: inserted.length, types: inserted });
+});
+
 router.post("/penalty-types", requireRole("admin", "rh"), async (req, res) => {
   const { slug, label, points, kind, requiresEvent, active, displayOrder } = req.body;
   if (!slug || !label || points == null || !kind) {

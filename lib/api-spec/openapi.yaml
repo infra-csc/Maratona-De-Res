@@ -1750,6 +1750,24 @@ paths:
         "204":
           description: Deleted
 
+  /penalty-types/seed-defaults:
+    post:
+      operationId: seedDefaultPenaltyTypes
+      tags: [absences]
+      summary: Insert default penalty/merit types if missing (admin only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inserted:
+                    type: integer
+                  message:
+                    type: string
+
   /penalty-types:
     get:
       operationId: getPenaltyTypes
