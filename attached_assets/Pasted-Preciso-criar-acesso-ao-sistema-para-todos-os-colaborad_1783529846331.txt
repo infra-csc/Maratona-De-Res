@@ -1,0 +1,81 @@
+Preciso criar acesso ao sistema para todos os colaboradores já cadastrados (106 
+registros na tela "Colaboradores"), permitindo que cada um faça login e acesse sua 
+própria área ("Meu Desempenho").
+
+═══════════════════════════════════════
+1. GERAÇÃO EM MASSA DE CREDENCIAIS DE ACESSO
+═══════════════════════════════════════
+
+- Para TODOS os colaboradores já cadastrados no sistema (ativos e inativos, ou 
+  apenas ativos — definir conforme regra abaixo), criar um USUÁRIO DE LOGIN com:
+  - LOGIN = CPF do colaborador (somente números, sem pontos/traço, ou com máscara 
+    padronizada — definir um formato único e usar sempre o mesmo)
+  - SENHA PADRÃO INICIAL = uma senha genérica igual para todos (ex: os últimos 4 
+    dígitos do CPF, ou uma senha fixa tipo "Maratona@123", ou a data de nascimento 
+    do colaborador se esse dado existir no cadastro — escolher o critério mais 
+    seguro possível dado o que já está cadastrado)
+- Antes de rodar essa geração em massa, verificar se o campo CPF já existe no 
+  cadastro de todos os 106 colaboradores. Se algum colaborador não tiver CPF 
+  cadastrado, listar esses casos separadamente para eu completar o cadastro antes 
+  de gerar o acesso dele.
+
+═══════════════════════════════════════
+2. REGRA: SOMENTE COLABORADORES ATIVOS RECEBEM ACESSO
+═══════════════════════════════════════
+
+- Gerar login apenas para colaboradores com status "ATIVO".
+- Colaboradores "INATIVOS" não devem receber credenciais agora — se forem 
+  reativados no futuro, o acesso deve ser gerado nesse momento (ou seguir o mesmo 
+  fluxo de criação manual/individual, ver item 5).
+
+═══════════════════════════════════════
+3. TROCA OBRIGATÓRIA DE SENHA NO PRIMEIRO ACESSO
+═══════════════════════════════════════
+
+- Ao fazer login pela primeira vez com a senha padrão, o sistema deve OBRIGAR o 
+  colaborador a definir uma nova senha antes de conseguir acessar qualquer outra 
+  tela do sistema.
+- Tela de troca de senha obrigatória deve pedir:
+  - Nova senha (com regras mínimas de segurança: ex. mínimo 6-8 caracteres)
+  - Confirmação da nova senha
+- Após trocar a senha com sucesso, o colaborador é redirecionado normalmente para 
+  "Meu Desempenho".
+- Se o colaborador tentar navegar para outra URL do sistema sem trocar a senha 
+  primeiro, deve ser redirecionado de volta para a tela de troca obrigatória.
+
+═══════════════════════════════════════
+4. SEGURANÇA E ARMAZENAMENTO
+═══════════════════════════════════════
+
+- A senha (padrão ou definida pelo colaborador) deve ser armazenada de forma 
+  criptografada (hash), nunca em texto puro no banco de dados.
+- Login por CPF deve ter proteção básica contra tentativas de força bruta (ex: 
+  bloqueio temporário após várias tentativas incorretas).
+
+═══════════════════════════════════════
+5. CRIAÇÃO DE ACESSO PARA NOVOS COLABORADORES (DAQUI PRA FRENTE)
+═══════════════════════════════════════
+
+- Ao cadastrar um NOVO colaborador na tela "Colaboradores" (botão "+ Novo 
+  Colaborador"), o sistema deve automaticamente:
+  - Gerar o login (CPF) e a senha padrão para ele, seguindo a mesma regra da 
+    geração em massa.
+  - Assim que ele acessar pela primeira vez, também deve ser obrigado a trocar a 
+    senha (mesmo fluxo do item 3).
+- Isso evita que o Admin precise gerar credenciais manualmente toda vez que 
+  cadastrar alguém novo.
+
+═══════════════════════════════════════
+6. COMUNICAÇÃO DAS CREDENCIAIS AOS COLABORADORES
+═══════════════════════════════════════
+
+- Após gerar os acessos em massa, preciso de uma forma de EXPORTAR uma lista (CSV/
+  Excel) com: Nome do Colaborador, CPF (login) e a informação de qual é a senha 
+  padrão gerada — para que o RH possa comunicar individualmente a cada colaborador 
+  como acessar o sistema pela primeira vez.
+- Não enviar a senha por e-mail/WhatsApp automaticamente pelo sistema (a menos que 
+  seja solicitado depois); por ora, apenas gerar essa lista para comunicação manual 
+  pelo RH.
+
+Manter a paleta de cores atual do sistema (preto/lima) na tela de login e troca de 
+senha obrigatória.
