@@ -948,9 +948,11 @@ export default function CalibrationsPage() {
                       {isCollapsed && (
                         <span
                           data-testid={`badge-collapsed-score-${c.criterionId}`}
-                          className="inline-flex items-center gap-1.5 text-xs font-black italic bg-white border-2 border-[#191c1e] px-2 py-1"
+                          className={`inline-flex items-center gap-1.5 text-xs font-black italic border-2 border-[#191c1e] px-2 py-1 ${calVal != null ? "bg-[#506600] text-[#ccff00]" : "bg-white text-[#191c1e]"}`}
                         >
-                          <span className="text-[10px] font-bold uppercase text-[#747a60] not-italic">Nota</span>
+                          <span className={`text-[10px] font-bold uppercase not-italic ${calVal != null ? "text-[#ccff00]/70" : "text-[#747a60]"}`}>
+                            {calVal != null ? "Nota Calibrada" : avg != null ? "Nota Avaliador" : "Nota"}
+                          </span>
                           {finalVal != null ? finalVal.toFixed(2) : "—"}
                         </span>
                       )}
