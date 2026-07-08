@@ -1507,11 +1507,24 @@ export default function EventDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y-2 divide-[#eceef0]">
-                    {config.filter(item => item.active || showInactiveCriteria).map(item => {
+                    {(() => {
+                      // Pré-calcula qual criterionId é o "primeiro" de cada área
+                      // para mostrar o dropdown editável apenas uma vez por área.
+                      const firstCriterionPerArea: Map<number, number> = new Map();
+                      for (const item of config.filter(i => i.active || showInactiveCriteria)) {
+                        const aId = critMeta.get(item.criterionId)?.responsibleAreaId;
+                        if (aId != null && !firstCriterionPerArea.has(aId)) {
+                          firstCriterionPerArea.set(aId, item.criterionId);
+                        }
+                      }
+                      return config.filter(item => item.active || showInactiveCriteria).map(item => {
                       const meta = critMeta.get(item.criterionId);
                       const isEditingName = editingName[item.criterionId] !== undefined;
                       const areaId = meta?.responsibleAreaId ?? null;
-                      const areaEvaluators = areaId != null ? evaluatorsForArea(areaId) : [];
+                      const areaEvaluators = areaId != null
+                        ? [...evaluatorsForArea(areaId)].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+                        : [];
+                      const isFirstForArea = areaId != null && firstCriterionPerArea.get(areaId) === item.criterionId;
                       return (
                         <tr key={item.criterionId} data-testid={`row-event-criterion-${item.criterionId}`} className={`align-top ${!item.active ? "opacity-60 bg-[#f7f9fb]" : "bg-white"}`}>
                           <td className="px-4 py-3 min-w-[180px]">
@@ -1564,6 +1577,23 @@ export default function EventDetailPage() {
                               <span className="text-[11px] font-bold italic uppercase text-[#747a60]">—</span>
                             ) : areaEvaluators.length === 0 ? (
                               <p className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Nenhum avaliador vinculado a esta área</p>
+                            ) : !isFirstForArea ? (
+                              // Critérios subsequentes da mesma área: exibe o avaliador selecionado como texto
+                              (() => {
+                                const primary = primaryEvaluator[areaId] ?? null;
+                                const primaryName = areaEvaluators.find(u => u.id === primary)?.name;
+                                return (
+                                  <div className="space-y-1">
+                                    <p className="text-[9px] font-black italic uppercase text-[#747a60]">Avaliador Principal *</p>
+                                    {primaryName ? (
+                                      <span className="text-xs font-black italic text-[#191c1e]">{primaryName}</span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold italic uppercase text-[#ba1a1a]">Sem avaliador principal</span>
+                                    )}
+                                    <p className="text-[9px] italic text-[#9aa088]">Definido pela área acima</p>
+                                  </div>
+                                );
+                              })()
                             ) : (() => {
                               const primary = primaryEvaluator[areaId] ?? null;
                               const backups = (assignments[areaId] ?? []).filter(id => id !== primary);
@@ -1710,7 +1740,8 @@ export default function EventDetailPage() {
                           </td>
                         </tr>
                       );
-                    })}
+                    });
+                    })()}
                     {config.filter(item => item.active || showInactiveCriteria).length === 0 && (
                       <tr>
                         <td colSpan={5} className="p-6 text-center italic uppercase font-bold text-[#747a60]">Nenhum critério vinculado a este evento.</td>
