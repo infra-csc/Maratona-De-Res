@@ -1,0 +1,84 @@
+Preciso remover completamente o sistema de "Pelotões" (Quênia, Azul, Verde, Branco) 
+e substituir por uma nova estrutura de faixas de bônus, baseada em nota média + 
+quantidade de eventos.
+
+═══════════════════════════════════════
+1. REMOVER TUDO RELACIONADO A "PELOTÃO"
+═══════════════════════════════════════
+
+- Remover a tela/seção "Pelotões & Premiação" (com Pelotão Quênia, Azul, Verde, Branco).
+- Remover qualquer referência a "pelotão" em outras telas do sistema, incluindo:
+  - Card "SEU PELOTÃO" no dashboard do colaborador (já solicitado remover anteriormente)
+  - Qualquer coluna, filtro, ou menção a pelotão nas telas de Ranking, Resultados, 
+    Calibração, ou Relatórios
+  - Remover do banco de dados a lógica de vínculo colaborador → pelotão (ou manter 
+    apenas como histórico morto, sem uso ativo, se for arriscado apagar de vez)
+
+═══════════════════════════════════════
+2. NOVA TABELA: SIMULADOR DE BÔNUS (substituindo Pelotões & Premiação)
+═══════════════════════════════════════
+
+Criar uma nova tela/seção configurável pelo Admin, com a seguinte estrutura de faixas:
+
+| Nota Média   | Prêmio Base (8 Eventos) | Bônus por Evento Adicional | Total (Base + 3 Extra) |
+|--------------|------------------------|------------------------------|--------------------------|
+| 70 – 74,99   | R$ 1.200,00             | R$ 200,00                     | R$ 1.800,00              |
+| 75 – 79,99   | R$ 1.700,00             | R$ 250,00                     | R$ 2.450,00              |
+| 80 – 84,99   | R$ 2.200,00             | R$ 300,00                     | R$ 3.100,00              |
+| 85 – 89,99   | R$ 2.700,00             | R$ 350,00                     | R$ 3.750,00              |
+| 90 – 94,99   | R$ 3.200,00             | R$ 400,00                     | R$ 4.400,00              |
+| 95 – 100     | R$ 3.700,00             | R$ 450,00                     | R$ 5.050,00              |
+
+Regras de cálculo:
+- O "Prêmio Base" é o valor do bônus para quem atingir a nota média da faixa E 
+  completar os 8 eventos mínimos exigidos para elegibilidade.
+- O "Bônus por Evento Adicional" é somado ao prêmio base para CADA evento além dos 
+  8 mínimos (ex: se o colaborador participou de 11 eventos, são 3 eventos extras: 
+  8 base + 3 adicionais).
+- A coluna "Total (Base + 3 Extra)" é apenas um EXEMPLO de referência (mostrando o 
+  cálculo com 3 eventos extras), mas o sistema deve calcular dinamicamente o total 
+  real baseado na quantidade de eventos extras que o colaborador de fato teve, e não 
+  travar sempre em "3 extras".
+
+Fórmula geral:
+TOTAL = PRÊMIO_BASE(faixa da nota média) + (EVENTOS_EXTRAS × BÔNUS_POR_EVENTO_ADICIONAL(faixa da nota média))
+
+Onde:
+EVENTOS_EXTRAS = (total de eventos confirmados do colaborador) - 8, nunca menor que 0.
+
+═══════════════════════════════════════
+3. TELA DE CONFIGURAÇÃO (ADMIN)
+═══════════════════════════════════════
+
+- Manter editável pelo Admin, no mesmo padrão visual da tela "Pelotões & Premiação" 
+  atual (linhas com campos editáveis + botão salvar), mas com os campos:
+  - Faixa de Nota Média (de / até)
+  - Prêmio Base (R$)
+  - Bônus por Evento Adicional (R$)
+- Permitir adicionar, editar ou remover faixas (ex: "+ Adicionar Faixa"), assim como 
+  já existia a opção "+ Adicionar Pelotão".
+- Nome da seção: "SIMULADOR DE BÔNUS" ou "FAIXAS DE BÔNUS & PREMIAÇÃO".
+
+═══════════════════════════════════════
+4. ATUALIZAR CÁLCULO NO DASHBOARD DO COLABORADOR
+═══════════════════════════════════════
+
+- O card "BÔNUS CAJU" no dashboard do colaborador deve calcular o valor com base 
+  nessa nova tabela de faixas (nota média + eventos extras), e não mais no sistema 
+  de pelotão.
+- Se o colaborador ainda não atingiu 8 eventos confirmados (não elegível), o card 
+  deve mostrar "R$ 0" ou "Não elegível ainda" com a indicação de quantos eventos 
+  faltam (conforme já solicitado anteriormente).
+
+═══════════════════════════════════════
+5. RESULTADO ESPERADO
+═══════════════════════════════════════
+
+- Nenhuma referência a "pelotão" deve aparecer em qualquer tela do sistema.
+- O bônus de cada colaborador deve ser calculado dinamicamente pela fórmula acima, 
+  refletindo corretamente a nota média do ciclo e a quantidade real de eventos 
+  extras além dos 8 mínimos.
+
+Manter a paleta de cores atual do sistema (preto/lima) na nova tela de configuração, 
+adaptando o estilo visual da tabela mostrada como referência (título com destaque 
+laranja/branco pode ser substituído pelas cores padrão do sistema).

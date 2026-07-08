@@ -445,6 +445,25 @@ export default function EvaluationsPage() {
     myDirectCriterionIds.has(c.criterionId),
   );
 
+  // For primary-area evaluators: fallback redirect options from the criterion's responsible area.
+  // Placed after myCriteria because it references myCriteria.find() to look up the area.
+  const redirectCriterionAreaId = redirectDialogCriterionId != null
+    ? (myCriteria.find(c => c.criterionId === redirectDialogCriterionId)?.responsibleAreaId ?? null)
+    : null;
+  const { data: redirectAreaUsersRaw } = useGetUsersByArea(redirectCriterionAreaId!, {
+    query: {
+      enabled: redirectCriterionAreaId != null && redirectDialogCriterionId != null,
+      queryKey: ["users-by-area-redirect", redirectCriterionAreaId] as unknown[],
+    },
+  });
+  // Routing-configured list takes priority; falls back to area members (excluding self).
+  const effectiveRedirectOptions: { id: number; name: string }[] =
+    (redirectOptionsData?.length ?? 0) > 0
+      ? (redirectOptionsData ?? []).map(u => ({ id: u.id, name: u.name }))
+      : (redirectAreaUsersRaw ?? [])
+          .filter(u => u.id !== user?.id)
+          .map(u => ({ id: u.id, name: u.name }));
+
   // Avaliadores atribuídos a cada área (evento → área → avaliador[]); pode haver
   // mais de um por área — a nota final é a média entre eles.
   const assignedEvaluatorsByArea = new Map<number, { id: number; name: string }[]>();
@@ -1145,7 +1164,7 @@ export default function EvaluationsPage() {
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="bg-[#e6e8ea] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-black italic uppercase">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
                                   {c.responsibleAreaName && (
-                                    <span className="bg-[#ff5722] text-white border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1">
+                                    <span className="bg-[#e6e8ea] text-[#191c1e] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1">
                                       <Building2 size={11} /> {c.responsibleAreaName}
                                     </span>
                                   )}
@@ -1157,6 +1176,11 @@ export default function EvaluationsPage() {
                                   {isDraft && (
                                     <span className="bg-[#ffdbd1] text-[#862200] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1">
                                       <Clock size={12} /> Rascunho
+                                    </span>
+                                  )}
+                                  {criterionAssignments?.some(a => a.criterionId === c.criterionId && a.redirectedFromId === user?.id) && (
+                                    <span className="bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1">
+                                      <CornerDownRight size={11} /> Redirecionado
                                     </span>
                                   )}
                                 </div>
@@ -1191,13 +1215,17 @@ export default function EvaluationsPage() {
 
                             {!submitted && (
                               <div className="mt-4 border-2 p-4 border-[#191c1e] bg-[#f2f4f6]">
-                                <label className="text-xs font-black italic uppercase flex items-center gap-2 mb-2">
-                                  Justificativa / Feedback
-                                  <span className="text-[10px] text-[#444933] bg-[#e6e8ea] border border-[#191c1e] px-2 py-0.5 font-bold italic uppercase">Opcional</span>
-                                </label>
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                  <label className="text-xs font-black italic uppercase flex items-center gap-2">
+                                    Justificativa / Feedback
+                                    <span className="text-[10px] text-[#444933] bg-[#e6e8ea] border border-[#191c1e] px-2 py-0.5 font-bold italic uppercase">Opcional</span>
+                                  </label>
+                                  <span className="text-[10px] font-bold italic text-[#747a60] tabular-nums shrink-0">{comment.length}/300</span>
+                                </div>
                                 <Textarea
                                   placeholder="Comentários opcionais para a equipe (serão vistos anonimamente)..."
                                   value={comment}
+                                  maxLength={300}
                                   onChange={e => setComments(s => ({ ...s, [c.criterionId]: e.target.value }))}
                                   className="bg-white rounded-none border-2 resize-y min-h-24 italic focus-visible:ring-0 border-[#191c1e]"
                                 />
@@ -1217,26 +1245,14 @@ export default function EvaluationsPage() {
                                 </div>
 
                                 <div className="flex items-center justify-between pt-3 gap-3 flex-wrap">
-                                  {/* Redirect button — only for criteria with routing assignments and no submission yet */}
-                                  {(redirectOptionsData?.length ?? 0) > 0 && redirectDialogCriterionId === null && (
-                                    <button
-                                      type="button"
-                                      onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
-                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
-                                    >
-                                      <CornerDownRight size={14} /> Redirecionar
-                                    </button>
-                                  )}
-                                  {/* Always-visible redirect button when this criterion has an assignment */}
-                                  {myDirectCriterionIds.has(c.criterionId) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
-                                      className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
-                                    >
-                                      <CornerDownRight size={14} /> Redirecionar Critério
-                                    </button>
-                                  )}
+                                  {/* Redirect — available to every evaluator for all their criteria (area-primary or routing-assigned) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => { setRedirectDialogCriterionId(c.criterionId); setRedirectTargetId(null); }}
+                                    className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
+                                  >
+                                    <CornerDownRight size={14} /> Redirecionar
+                                  </button>
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
                                     disabled={score === 0 || needsAudio}
@@ -1773,13 +1789,13 @@ export default function EvaluationsPage() {
             <p className="text-sm italic text-[#444933]">
               Selecione para quem deseja redirecionar esta avaliação. O critério será reatribuído ao usuário escolhido.
             </p>
-            {(redirectOptionsData?.length ?? 0) === 0 ? (
+            {effectiveRedirectOptions.length === 0 ? (
               <div className="text-center py-6 border-2 border-dashed border-[#eceef0] italic font-bold text-[#747a60] text-xs uppercase">
                 Nenhuma opção de redirecionamento disponível para este critério.
               </div>
             ) : (
               <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-56 overflow-y-auto">
-                {(redirectOptionsData ?? []).map((opt: { id: number; name: string }) => (
+                {effectiveRedirectOptions.map((opt) => (
                   <label key={opt.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#f2f4f6] cursor-pointer">
                     <input
                       type="radio"
