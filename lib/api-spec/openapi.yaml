@@ -1123,6 +1123,35 @@ paths:
                         updated:
                           type: integer
 
+  /integration/fix-orphaned-evaluations:
+    post:
+      operationId: fixOrphanedEvaluations
+      tags: [integration]
+      summary: Admin — reactivates event_criteria rows that are inactive but have submitted evaluations (orphaned after a catalog migration). Idempotent and safe.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fixed, eventsAffected, criteriaReactivated]
+                properties:
+                  fixed:
+                    type: integer
+                  eventsAffected:
+                    type: integer
+                  criteriaReactivated:
+                    type: array
+                    items:
+                      type: object
+                      required: [eventId, criterionId]
+                      properties:
+                        eventId:
+                          type: integer
+                        criterionId:
+                          type: integer
+
   /integration/migrate-criteria-catalog:
     post:
       operationId: migrateCriteriaCatalog

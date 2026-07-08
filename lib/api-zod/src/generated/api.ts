@@ -2050,6 +2050,19 @@ export const FixCalibrationCriteriaResponse = zod.object({
 
 
 /**
+ * @summary Admin — reactivates event_criteria rows that are inactive but have submitted evaluations (orphaned after a catalog migration). Idempotent and safe.
+ */
+export const FixOrphanedEvaluationsResponse = zod.object({
+  "fixed": zod.number(),
+  "eventsAffected": zod.number(),
+  "criteriaReactivated": zod.array(zod.object({
+  "eventId": zod.number(),
+  "criterionId": zod.number()
+}))
+})
+
+
+/**
  * @summary Admin — migrate the global criteria catalog and all event_criteria to the current survey target criteria (idempotent). Works on all events including historical and results_confirmed ones.
  */
 export const MigrateCriteriaCatalogResponse = zod.object({

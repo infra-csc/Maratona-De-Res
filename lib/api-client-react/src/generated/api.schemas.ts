@@ -1475,6 +1475,17 @@ export type FixCalibrationCriteria200 = {
   results?: FixCalibrationCriteria200ResultsItem[];
 };
 
+export type FixOrphanedEvaluations200CriteriaReactivatedItem = {
+  eventId: number;
+  criterionId: number;
+};
+
+export type FixOrphanedEvaluations200 = {
+  fixed: number;
+  eventsAffected: number;
+  criteriaReactivated: FixOrphanedEvaluations200CriteriaReactivatedItem[];
+};
+
 export type MigrateCriteriaCatalog200 = {
   success: boolean;
   catalogDeactivated: number;

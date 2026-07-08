@@ -71,6 +71,7 @@ import type {
   EventUpdate,
   ExportEventResultsParams,
   FixCalibrationCriteria200,
+  FixOrphanedEvaluations200,
   ForceCloseInput,
   GetAbsencesParams,
   GetAuditLogsParams,
@@ -3948,6 +3949,76 @@ export const useFixCalibrationCriteria = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getFixCalibrationCriteriaMutationOptions(options));
+    }
+
+export const getFixOrphanedEvaluationsUrl = () => {
+
+
+
+
+  return `/integration/fix-orphaned-evaluations`
+}
+
+/**
+ * @summary Admin — reactivates event_criteria rows that are inactive but have submitted evaluations (orphaned after a catalog migration). Idempotent and safe.
+ */
+export const fixOrphanedEvaluations = async ( options?: RequestInit): Promise<FixOrphanedEvaluations200> => {
+
+  return customFetch<FixOrphanedEvaluations200>(getFixOrphanedEvaluationsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getFixOrphanedEvaluationsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fixOrphanedEvaluations>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof fixOrphanedEvaluations>>, TError,void, TContext> => {
+
+const mutationKey = ['fixOrphanedEvaluations'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof fixOrphanedEvaluations>>, void> = () => {
+
+
+          return  fixOrphanedEvaluations(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FixOrphanedEvaluationsMutationResult = NonNullable<Awaited<ReturnType<typeof fixOrphanedEvaluations>>>
+
+    export type FixOrphanedEvaluationsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin — reactivates event_criteria rows that are inactive but have submitted evaluations (orphaned after a catalog migration). Idempotent and safe.
+ */
+export const useFixOrphanedEvaluations = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fixOrphanedEvaluations>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof fixOrphanedEvaluations>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getFixOrphanedEvaluationsMutationOptions(options));
     }
 
 export const getMigrateCriteriaCatalogUrl = () => {

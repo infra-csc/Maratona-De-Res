@@ -1607,4 +1607,48 @@ router.post("/integration/evaluations/dedupe", requireRole("admin"), async (req,
   });
 });
 
+// Reativa event_criteria que estão inativos mas têm avaliações submetidas.
+// Isso acontece quando o catálogo de quesitos é migrado DEPOIS que avaliadores
+// já submeteram respostas para os quesitos antigos — as avaliações ficam
+// "órfãs" (criterio inativo, avaliação existe). Operação idempotente e segura.
+router.post("/integration/fix-orphaned-evaluations", requireRole("admin"), async (req, res) => {
+  const userId = req.user!.userId;
+
+  // Encontra event_criteria inativos que têm pelo menos uma avaliação submetida
+  const orphaned = await db
+    .selectDistinct({
+      eventCriteriaId: eventCriteriaTable.id,
+      eventId: eventCriteriaTable.eventId,
+      criterionId: eventCriteriaTable.criterionId,
+    })
+    .from(eventCriteriaTable)
+    .innerJoin(
+      evaluationsTable,
+      and(
+        eq(evaluationsTable.eventId, eventCriteriaTable.eventId),
+        eq(evaluationsTable.criterionId, eventCriteriaTable.criterionId),
+        eq(evaluationsTable.status, "submitted"),
+      ),
+    )
+    .where(eq(eventCriteriaTable.active, false));
+
+  if (orphaned.length === 0) {
+    res.json({ fixed: 0, eventsAffected: 0, criteriaReactivated: [] });
+    return;
+  }
+
+  const ids = orphaned.map(r => r.eventCriteriaId);
+  await db.update(eventCriteriaTable).set({ active: true }).where(inArray(eventCriteriaTable.id, ids));
+
+  const affectedEventIds = [...new Set(orphaned.map(r => r.eventId))];
+  const criteriaReactivated = orphaned.map(r => ({ eventId: r.eventId, criterionId: r.criterionId }));
+
+  await audit(userId, "fix_orphaned_evaluations", "event_criteria", undefined, null, {
+    fixed: ids.length,
+    eventsAffected: affectedEventIds.length,
+  });
+
+  res.json({ fixed: ids.length, eventsAffected: affectedEventIds.length, criteriaReactivated });
+});
+
 export default router;

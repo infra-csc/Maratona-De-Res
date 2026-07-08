@@ -1,4 +1,4 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200 } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -190,6 +190,21 @@ export default function IntegrationPage() {
       },
       onError: (e: { message?: string }) => {
         toast({ title: "Falha na migração", description: e.message ?? "Tente novamente.", variant: "destructive" });
+      },
+    },
+  });
+
+  const [fixOrphanedResult, setFixOrphanedResult] = useState<FixOrphanedEvaluations200 | null>(null);
+  const [fixOrphanedDialogOpen, setFixOrphanedDialogOpen] = useState(false);
+  const fixOrphanedMutation = useFixOrphanedEvaluations({
+    mutation: {
+      onSuccess: (data) => {
+        setFixOrphanedResult(data);
+        setFixOrphanedDialogOpen(true);
+        qc.invalidateQueries();
+      },
+      onError: (e: { message?: string }) => {
+        toast({ title: "Falha na correção", description: e.message ?? "Tente novamente.", variant: "destructive" });
       },
     },
   });
@@ -653,6 +668,35 @@ export default function IntegrationPage() {
       )}
 
       {isAdmin && (
+        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-teal-500">
+          <CardHeader className="bg-teal-50 border-b border-teal-100 pb-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-teal-800">
+              <Wrench size={18} /> Corrigir Avaliações Órfãs
+            </CardTitle>
+            <CardDescription className="text-teal-800/80">
+              Reativa quesitos desativados que ainda têm avaliações submetidas — evitando que notas desapareçam do evento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+              Quando o catálogo de quesitos é migrado <strong>depois</strong> que avaliadores já submeteram respostas, as avaliações ficam vinculadas a quesitos inativos e somem da visualização do evento.
+              Este botão detecta e reativa automaticamente esses vínculos. <strong>Operação segura e idempotente.</strong>
+            </p>
+            <Button
+              data-testid="button-fix-orphaned-evaluations"
+              variant="outline"
+              className="w-full bg-white shadow-sm border-dashed border-2 border-teal-400 hover:border-teal-600 hover:bg-teal-50 transition-colors"
+              onClick={() => fixOrphanedMutation.mutate()}
+              disabled={fixOrphanedMutation.isPending}
+            >
+              <Wrench size={16} className="mr-2 text-teal-600" />
+              {fixOrphanedMutation.isPending ? "Corrigindo..." : "Reativar quesitos com avaliações"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
         <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-red-500">
           <CardHeader className="bg-red-50 border-b border-red-100 pb-4">
             <CardTitle className="text-lg font-bold flex items-center gap-2 text-red-700">
@@ -801,6 +845,25 @@ export default function IntegrationPage() {
               <Trash2 size={16} className="mr-2" />
               {resetMutation.isPending ? "Apagando..." : "Apagar dados"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={fixOrphanedDialogOpen} onOpenChange={(open) => { setFixOrphanedDialogOpen(open); if (!open) setFixOrphanedResult(null); }}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-fix-orphaned-result">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench size={20} className="text-teal-600" />
+              Avaliações órfãs corrigidas
+            </DialogTitle>
+            <DialogDescription>
+              {(fixOrphanedResult?.fixed ?? 0) === 0
+                ? "Nenhum quesito órfão encontrado — tudo já está correto."
+                : `${fixOrphanedResult?.fixed} quesito(s) reativados em ${fixOrphanedResult?.eventsAffected} evento(s).`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFixOrphanedDialogOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

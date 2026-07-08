@@ -77,6 +77,8 @@ export * from './eventUpdate';
 export * from './exportEventResultsParams';
 export * from './fixCalibrationCriteria200';
 export * from './fixCalibrationCriteria200ResultsItem';
+export * from './fixOrphanedEvaluations200';
+export * from './fixOrphanedEvaluations200CriteriaReactivatedItem';
 export * from './forceCloseInput';
 export * from './getAbsencesParams';
 export * from './getAuditLogsParams';
