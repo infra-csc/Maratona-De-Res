@@ -22,6 +22,7 @@ import type {
 import type {
   Absence,
   AbsenceInput,
+  AbsenceUpdate,
   Area,
   AreaInput,
   AreaUpdate,
@@ -94,6 +95,8 @@ import type {
   MergeEventInput,
   MergeEventResult,
   MigrateCriteriaCatalog200,
+  PenaltyType,
+  PenaltyTypeInput,
   PlatoonDistribution,
   PlatoonRule,
   PlatoonRuleInput,
@@ -5497,6 +5500,78 @@ export const useCreateAbsence = <TError = ErrorType<unknown>,
       return useMutation(getCreateAbsenceMutationOptions(options));
     }
 
+export const getUpdateAbsenceUrl = (id: number,) => {
+
+
+
+
+  return `/absences/${id}`
+}
+
+/**
+ * @summary Update absence
+ */
+export const updateAbsence = async (id: number,
+    absenceUpdate: AbsenceUpdate, options?: RequestInit): Promise<Absence> => {
+
+  return customFetch<Absence>(getUpdateAbsenceUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      absenceUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateAbsenceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAbsence>>, TError,{id: number;data: BodyType<AbsenceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAbsence>>, TError,{id: number;data: BodyType<AbsenceUpdate>}, TContext> => {
+
+const mutationKey = ['updateAbsence'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAbsence>>, {id: number;data: BodyType<AbsenceUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAbsence(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAbsenceMutationResult = NonNullable<Awaited<ReturnType<typeof updateAbsence>>>
+    export type UpdateAbsenceMutationBody = BodyType<AbsenceUpdate>
+    export type UpdateAbsenceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update absence
+ */
+export const useUpdateAbsence = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAbsence>>, TError,{id: number;data: BodyType<AbsenceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAbsence>>,
+        TError,
+        {id: number;data: BodyType<AbsenceUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAbsenceMutationOptions(options));
+    }
+
 export const getDeleteAbsenceUrl = (id: number,) => {
 
 
@@ -5565,6 +5640,296 @@ export const useDeleteAbsence = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteAbsenceMutationOptions(options));
+    }
+
+export const getGetPenaltyTypesUrl = () => {
+
+
+
+
+  return `/penalty-types`
+}
+
+/**
+ * @summary List all penalty/merit types
+ */
+export const getPenaltyTypes = async ( options?: RequestInit): Promise<PenaltyType[]> => {
+
+  return customFetch<PenaltyType[]>(getGetPenaltyTypesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPenaltyTypesQueryKey = () => {
+    return [
+    `/penalty-types`
+    ] as const;
+    }
+
+
+export const getGetPenaltyTypesQueryOptions = <TData = Awaited<ReturnType<typeof getPenaltyTypes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPenaltyTypes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPenaltyTypesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPenaltyTypes>>> = ({ signal }) => getPenaltyTypes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPenaltyTypes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPenaltyTypesQueryResult = NonNullable<Awaited<ReturnType<typeof getPenaltyTypes>>>
+export type GetPenaltyTypesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all penalty/merit types
+ */
+
+export function useGetPenaltyTypes<TData = Awaited<ReturnType<typeof getPenaltyTypes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPenaltyTypes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPenaltyTypesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePenaltyTypeUrl = () => {
+
+
+
+
+  return `/penalty-types`
+}
+
+/**
+ * @summary Create a penalty/merit type
+ */
+export const createPenaltyType = async (penaltyTypeInput: PenaltyTypeInput, options?: RequestInit): Promise<PenaltyType> => {
+
+  return customFetch<PenaltyType>(getCreatePenaltyTypeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      penaltyTypeInput,)
+  }
+);}
+
+
+
+
+export const getCreatePenaltyTypeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPenaltyType>>, TError,{data: BodyType<PenaltyTypeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPenaltyType>>, TError,{data: BodyType<PenaltyTypeInput>}, TContext> => {
+
+const mutationKey = ['createPenaltyType'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPenaltyType>>, {data: BodyType<PenaltyTypeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPenaltyType(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePenaltyTypeMutationResult = NonNullable<Awaited<ReturnType<typeof createPenaltyType>>>
+    export type CreatePenaltyTypeMutationBody = BodyType<PenaltyTypeInput>
+    export type CreatePenaltyTypeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a penalty/merit type
+ */
+export const useCreatePenaltyType = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPenaltyType>>, TError,{data: BodyType<PenaltyTypeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPenaltyType>>,
+        TError,
+        {data: BodyType<PenaltyTypeInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePenaltyTypeMutationOptions(options));
+    }
+
+export const getUpdatePenaltyTypeUrl = (id: number,) => {
+
+
+
+
+  return `/penalty-types/${id}`
+}
+
+/**
+ * @summary Update a penalty/merit type
+ */
+export const updatePenaltyType = async (id: number,
+    penaltyTypeInput: PenaltyTypeInput, options?: RequestInit): Promise<PenaltyType> => {
+
+  return customFetch<PenaltyType>(getUpdatePenaltyTypeUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      penaltyTypeInput,)
+  }
+);}
+
+
+
+
+export const getUpdatePenaltyTypeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePenaltyType>>, TError,{id: number;data: BodyType<PenaltyTypeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePenaltyType>>, TError,{id: number;data: BodyType<PenaltyTypeInput>}, TContext> => {
+
+const mutationKey = ['updatePenaltyType'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePenaltyType>>, {id: number;data: BodyType<PenaltyTypeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePenaltyType(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePenaltyTypeMutationResult = NonNullable<Awaited<ReturnType<typeof updatePenaltyType>>>
+    export type UpdatePenaltyTypeMutationBody = BodyType<PenaltyTypeInput>
+    export type UpdatePenaltyTypeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a penalty/merit type
+ */
+export const useUpdatePenaltyType = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePenaltyType>>, TError,{id: number;data: BodyType<PenaltyTypeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePenaltyType>>,
+        TError,
+        {id: number;data: BodyType<PenaltyTypeInput>},
+        TContext
+      > => {
+      return useMutation(getUpdatePenaltyTypeMutationOptions(options));
+    }
+
+export const getDeletePenaltyTypeUrl = (id: number,) => {
+
+
+
+
+  return `/penalty-types/${id}`
+}
+
+/**
+ * @summary Delete a penalty/merit type
+ */
+export const deletePenaltyType = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeletePenaltyTypeUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeletePenaltyTypeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePenaltyType>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePenaltyType>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deletePenaltyType'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePenaltyType>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deletePenaltyType(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePenaltyTypeMutationResult = NonNullable<Awaited<ReturnType<typeof deletePenaltyType>>>
+
+    export type DeletePenaltyTypeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a penalty/merit type
+ */
+export const useDeletePenaltyType = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePenaltyType>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePenaltyType>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeletePenaltyTypeMutationOptions(options));
     }
 
 export const getGetReviewRequestsUrl = () => {

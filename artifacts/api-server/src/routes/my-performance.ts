@@ -9,7 +9,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
-import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
+import { loadPenaltyLabels } from "./penalty-types.js";
 import { participantCountsForScore } from "../lib/participation.js";
 
 const router = Router();
@@ -254,11 +254,12 @@ router.get("/my-performance", async (req, res) => {
   const totalAbsences = penaltyRows.reduce((s, a) => s + a.quantity, 0);
   const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
   const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
+  const penaltyLabels = await loadPenaltyLabels();
   const adjustments = absences
     .map(a => ({
       id: a.id,
       kind: a.kind === "merit" ? "merit" : "penalty",
-      penaltyType: MERIT_CATALOG[a.penaltyType]?.label ?? PENALTY_CATALOG[a.penaltyType]?.label ?? a.penaltyType,
+      penaltyType: penaltyLabels.get(a.penaltyType) ?? a.penaltyType,
       points: a.points,
       quantity: a.quantity,
       totalPoints: Math.round(a.points * a.quantity * 100) / 100,

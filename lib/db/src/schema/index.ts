@@ -7,6 +7,7 @@ export * from "./criteria";
 export * from "./event-assignments";
 export * from "./evaluations";
 export * from "./absences";
+export * from "./penalty-types";
 export * from "./rules";
 export * from "./platoon-rules";
 export * from "./quarterly-results";

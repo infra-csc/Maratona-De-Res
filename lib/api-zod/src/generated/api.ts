@@ -2525,7 +2525,7 @@ export const GetAbsencesResponse = zod.array(GetAbsencesResponseItem)
 export const CreateAbsenceBody = zod.object({
   "employeeId": zod.number(),
   "eventId": zod.number().nullish(),
-  "penaltyType": zod.enum(['falta', 'atraso', 'inconformidade_ponto', 'merito_galpao', 'merito_evento', 'colega_top']),
+  "penaltyType": zod.string(),
   "date": zod.string(),
   "quantity": zod.number().min(1).optional(),
   "reason": zod.string().optional()
@@ -2533,9 +2533,120 @@ export const CreateAbsenceBody = zod.object({
 
 
 /**
+ * @summary Update absence
+ */
+export const UpdateAbsenceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateAbsenceBody = zod.object({
+  "penaltyType": zod.string().optional(),
+  "eventId": zod.number().nullish(),
+  "date": zod.string().optional(),
+  "quantity": zod.number().min(1).optional(),
+  "reason": zod.string().nullish()
+})
+
+export const UpdateAbsenceResponse = zod.object({
+  "id": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string().optional(),
+  "eventId": zod.number().nullish(),
+  "eventName": zod.string().nullish(),
+  "penaltyType": zod.string(),
+  "kind": zod.enum(['penalty', 'merit']).optional(),
+  "points": zod.number(),
+  "date": zod.string(),
+  "cycleId": zod.number(),
+  "quantity": zod.number(),
+  "reason": zod.string().nullish(),
+  "registeredByUserId": zod.number().optional(),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
  * @summary Delete absence
  */
 export const DeleteAbsenceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary List all penalty/merit types
+ */
+export const GetPenaltyTypesResponseItem = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "label": zod.string(),
+  "points": zod.number(),
+  "kind": zod.enum(['penalty', 'merit']),
+  "requiresEvent": zod.boolean(),
+  "active": zod.boolean(),
+  "displayOrder": zod.number()
+})
+export const GetPenaltyTypesResponse = zod.array(GetPenaltyTypesResponseItem)
+
+
+/**
+ * @summary Create a penalty/merit type
+ */
+export const createPenaltyTypeBodyPointsMin = 0;
+
+
+
+export const CreatePenaltyTypeBody = zod.object({
+  "slug": zod.string(),
+  "label": zod.string(),
+  "points": zod.number().min(createPenaltyTypeBodyPointsMin),
+  "kind": zod.enum(['penalty', 'merit']),
+  "requiresEvent": zod.boolean().optional(),
+  "active": zod.boolean().optional(),
+  "displayOrder": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a penalty/merit type
+ */
+export const UpdatePenaltyTypeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updatePenaltyTypeBodyPointsMin = 0;
+
+
+
+export const UpdatePenaltyTypeBody = zod.object({
+  "slug": zod.string(),
+  "label": zod.string(),
+  "points": zod.number().min(updatePenaltyTypeBodyPointsMin),
+  "kind": zod.enum(['penalty', 'merit']),
+  "requiresEvent": zod.boolean().optional(),
+  "active": zod.boolean().optional(),
+  "displayOrder": zod.number().optional()
+})
+
+export const UpdatePenaltyTypeResponse = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "label": zod.string(),
+  "points": zod.number(),
+  "kind": zod.enum(['penalty', 'merit']),
+  "requiresEvent": zod.boolean(),
+  "active": zod.boolean(),
+  "displayOrder": zod.number()
+})
+
+
+/**
+ * @summary Delete a penalty/merit type
+ */
+export const DeletePenaltyTypeParams = zod.object({
   "id": zod.coerce.number()
 })
 

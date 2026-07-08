@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Calendar, Users, BarChart3, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck,
   Database, LogOut, Target, Menu, X, TrendingUp,
-  FolderLock, Flag, BookOpen
+  FolderLock, Flag, BookOpen, Settings2
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -40,6 +40,7 @@ const navGroups: NavGroup[] = [
       { label: "Critérios", path: "/criteria", icon: Star, roles: ["admin", "rh"] },
       { label: "Áreas", path: "/areas", icon: Building2, roles: ["admin", "rh"] },
       { label: "Usuários", path: "/users", icon: ShieldCheck, roles: ["admin", "rh"] },
+      { label: "Tipos de Lançamento", path: "/penalty-types", icon: Settings2, roles: ["admin", "rh"] },
     ]
   },
   {

@@ -14,6 +14,7 @@
 
 - [Criteria weights always editable](criteria-weight-freeze.md) — weights never freeze, always editable incl. after close; saving on closed event recomputes cycle + surfaces warnings; only active-flag/structure locks post-evaluation
 - [Penalties & Merits model](penalties-model.md) — penalties+merits share /absences via `kind` col; points positive, sign from kind; final=clamp(gross-pen+merit,0,100); qty must be int≥1
+- [Penalty type catalog in DB](penalty-catalog-db.md) — types in `penalty_types` table (not hardcoded); use loadPenaltyLabels() from penalty-types.ts for slug→label; loadCatalog() in absences.ts for full metadata
 - [Orval path+query collision](orval-path-query-collision.md) — never mix a path param + query params on one op (dup `GetXParams` export breaks codegen); make the id a query param
 - [Orval inline body collision](orval-inline-body-collision.md) — inline request body schema → orval generates same name in both api.ts (Zod) and types/ (TS type), causing TS2308 on re-export; always use $ref to a named component schema for body objects
 - [Event detail progress source](event-detail-progress.md) — loadEventDetail returns evaluationMatrix:[] always; use the evaluationProgress field (submitted/total evals) for any "% avaliado", never the matrix

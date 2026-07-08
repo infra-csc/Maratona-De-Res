@@ -12,6 +12,7 @@ import EmployeesPage from "@/pages/employees";
 import EvaluationsPage from "@/pages/evaluations";
 import CalibrationsPage from "@/pages/calibrations";
 import AbsencesPage from "@/pages/absences";
+import PenaltyTypesPage from "@/pages/penalty-types";
 import ResultsPage from "@/pages/results";
 import CriteriaPage from "@/pages/criteria";
 import AreasPage from "@/pages/areas";
@@ -111,6 +112,7 @@ function AppRoutes() {
       <Route path="/evaluations" component={() => <ProtectedRoute component={EvaluationsPage} />} />
       <Route path="/calibrations" component={() => <ProtectedRoute component={CalibrationsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} roles={["admin", "rh", "diretoria"]} />} />
+      <Route path="/penalty-types" component={() => <ProtectedRoute component={PenaltyTypesPage} roles={["admin", "rh"]} />} />
       <Route path="/review-requests" component={() => <ProtectedRoute component={ReviewRequestsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} />} />
       <Route path="/ranking"><Redirect to="/results" /></Route>

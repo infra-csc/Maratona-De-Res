@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AbsenceInput {
-  employeeId: number;
+export interface AbsenceUpdate {
+  penaltyType?: string;
   /** @nullable */
   eventId?: number | null;
-  penaltyType: string;
-  date: string;
+  date?: string;
   /** @minimum 1 */
   quantity?: number;
-  reason?: string;
+  /** @nullable */
+  reason?: string | null;
 }

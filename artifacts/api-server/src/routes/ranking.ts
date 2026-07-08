@@ -7,7 +7,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
-import { PENALTY_CATALOG, MERIT_CATALOG } from "./absences.js";
+import { loadPenaltyLabels } from "./penalty-types.js";
 import { computeEventTeamResult } from "./results.js";
 import { participantCountsForScore } from "../lib/participation.js";
 
@@ -201,7 +201,8 @@ router.get("/ranking-detail", async (req, res) => {
       eq(absencesTable.cycleId, cycle.id),
     ));
 
-  const label = (t: string) => MERIT_CATALOG[t]?.label ?? PENALTY_CATALOG[t]?.label ?? t;
+  const penaltyLabels = await loadPenaltyLabels();
+  const label = (t: string) => penaltyLabels.get(t) ?? t;
   const mapRow = (a: typeof absenceRows[number]) => ({
     id: a.id,
     type: a.penaltyType,

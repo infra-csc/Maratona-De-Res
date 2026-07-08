@@ -8,8 +8,8 @@
 
 export * from './absence';
 export * from './absenceInput';
-export * from './absenceInputPenaltyType';
 export * from './absenceKind';
+export * from './absenceUpdate';
 export * from './area';
 export * from './areaInput';
 export * from './areaUpdate';
@@ -105,6 +105,10 @@ export * from './loginInput';
 export * from './mergeEventInput';
 export * from './mergeEventResult';
 export * from './migrateCriteriaCatalog200';
+export * from './penaltyType';
+export * from './penaltyTypeInput';
+export * from './penaltyTypeInputKind';
+export * from './penaltyTypeKind';
 export * from './platoonDistribution';
 export * from './platoonRule';
 export * from './platoonRuleInput';

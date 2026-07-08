@@ -1581,10 +1581,103 @@ paths:
                 $ref: "#/components/schemas/Absence"
 
   /absences/{id}:
+    patch:
+      operationId: updateAbsence
+      tags: [absences]
+      summary: Update absence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbsenceUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Absence"
     delete:
       operationId: deleteAbsence
       tags: [absences]
       summary: Delete absence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /penalty-types:
+    get:
+      operationId: getPenaltyTypes
+      tags: [absences]
+      summary: List all penalty/merit types
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PenaltyType"
+    post:
+      operationId: createPenaltyType
+      tags: [absences]
+      summary: Create a penalty/merit type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PenaltyTypeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PenaltyType"
+
+  /penalty-types/{id}:
+    put:
+      operationId: updatePenaltyType
+      tags: [absences]
+      summary: Update a penalty/merit type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PenaltyTypeInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PenaltyType"
+    delete:
+      operationId: deletePenaltyType
+      tags: [absences]
+      summary: Delete a penalty/merit type
       parameters:
         - name: id
           in: path
@@ -3499,7 +3592,6 @@ components:
           type: ["integer", "null"]
         penaltyType:
           type: string
-          enum: [falta, atraso, inconformidade_ponto, merito_galpao, merito_evento, colega_top]
         date:
           type: string
         quantity:
@@ -3507,6 +3599,64 @@ components:
           minimum: 1
         reason:
           type: string
+
+    AbsenceUpdate:
+      type: object
+      properties:
+        penaltyType:
+          type: string
+        eventId:
+          type: ["integer", "null"]
+        date:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        reason:
+          type: ["string", "null"]
+
+    PenaltyType:
+      type: object
+      required: [id, slug, label, points, kind, requiresEvent, active, displayOrder]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        label:
+          type: string
+        points:
+          type: integer
+        kind:
+          type: string
+          enum: [penalty, merit]
+        requiresEvent:
+          type: boolean
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
+
+    PenaltyTypeInput:
+      type: object
+      required: [slug, label, points, kind]
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        points:
+          type: integer
+          minimum: 0
+        kind:
+          type: string
+          enum: [penalty, merit]
+        requiresEvent:
+          type: boolean
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
 
     Rule:
       type: object

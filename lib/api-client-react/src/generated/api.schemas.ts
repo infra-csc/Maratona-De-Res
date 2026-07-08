@@ -801,27 +801,64 @@ export interface ReviewRequestResolve {
   resolutionNotes?: string | null;
 }
 
-export type AbsenceInputPenaltyType = typeof AbsenceInputPenaltyType[keyof typeof AbsenceInputPenaltyType];
-
-
-export const AbsenceInputPenaltyType = {
-  falta: 'falta',
-  atraso: 'atraso',
-  inconformidade_ponto: 'inconformidade_ponto',
-  merito_galpao: 'merito_galpao',
-  merito_evento: 'merito_evento',
-  colega_top: 'colega_top',
-} as const;
-
 export interface AbsenceInput {
   employeeId: number;
   /** @nullable */
   eventId?: number | null;
-  penaltyType: AbsenceInputPenaltyType;
+  penaltyType: string;
   date: string;
   /** @minimum 1 */
   quantity?: number;
   reason?: string;
+}
+
+export interface AbsenceUpdate {
+  penaltyType?: string;
+  /** @nullable */
+  eventId?: number | null;
+  date?: string;
+  /** @minimum 1 */
+  quantity?: number;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export type PenaltyTypeKind = typeof PenaltyTypeKind[keyof typeof PenaltyTypeKind];
+
+
+export const PenaltyTypeKind = {
+  penalty: 'penalty',
+  merit: 'merit',
+} as const;
+
+export interface PenaltyType {
+  id: number;
+  slug: string;
+  label: string;
+  points: number;
+  kind: PenaltyTypeKind;
+  requiresEvent: boolean;
+  active: boolean;
+  displayOrder: number;
+}
+
+export type PenaltyTypeInputKind = typeof PenaltyTypeInputKind[keyof typeof PenaltyTypeInputKind];
+
+
+export const PenaltyTypeInputKind = {
+  penalty: 'penalty',
+  merit: 'merit',
+} as const;
+
+export interface PenaltyTypeInput {
+  slug: string;
+  label: string;
+  /** @minimum 0 */
+  points: number;
+  kind: PenaltyTypeInputKind;
+  requiresEvent?: boolean;
+  active?: boolean;
+  displayOrder?: number;
 }
 
 export interface Rule {
