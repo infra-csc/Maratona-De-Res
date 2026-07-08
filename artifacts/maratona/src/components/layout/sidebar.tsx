@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Calendar, Users, BarChart3, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck,
   Database, LogOut, Target, Menu, X, TrendingUp,
-  FolderLock, Flag
+  FolderLock, Flag, BookOpen
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -56,6 +56,7 @@ const navGroups: NavGroup[] = [
     name: "Colaborador",
     items: [
       { label: "Meu Desempenho", path: "/meu-desempenho", icon: TrendingUp },
+      { label: "Como Funciona", path: "/como-funciona", icon: BookOpen },
     ]
   }
 ];
@@ -102,8 +103,8 @@ export function Sidebar() {
             const visibleItems = group.items.filter(item => {
               // Avaliadores have a focused experience: only the Avaliações tab.
               if (user?.role === "avaliador") return item.path === "/evaluations";
-              // Colaboradores (visualizador) só veem Meu Desempenho.
-              if (user?.role === "visualizador") return item.path === "/meu-desempenho";
+              // Colaboradores (visualizador) só veem Meu Desempenho e Como Funciona.
+              if (user?.role === "visualizador") return ["/meu-desempenho", "/como-funciona"].includes(item.path);
               // Diretoria sees a focused set of sections (calibração e acompanhamento).
               if (user?.role === "diretoria") {
                 return ["/", "/calibrations", "/results", "/rules", "/absences", "/review-requests", "/criteria"].includes(item.path);

@@ -1,0 +1,62 @@
+Preciso ajustar a lógica do campo "CARGO" dos colaboradores. Hoje ele parece ser um 
+valor único e fixo no cadastro global do colaborador, mas isso está errado para fins 
+de pontuação.
+
+═══════════════════════════════════════
+1. REGRA CORRETA
+═══════════════════════════════════════
+
+- O campo "Cargo" no cadastro geral do colaborador (tela "Colaboradores") deve 
+  continuar existindo como um valor PADRÃO/REFERÊNCIA — sugerido automaticamente como 
+  o ÚLTIMO cargo que o colaborador exerceu em qualquer evento, mas o Admin/RH pode 
+  editar esse valor manualmente a qualquer momento.
+
+- PORÉM, para fins de PONTUAÇÃO/NOTA, o que sempre vale é o CARGO QUE O COLABORADOR 
+  TINHA NAQUELE EVENTO ESPECÍFICO no momento em que foi alocado a ele — e não o cargo 
+  atual/global do cadastro.
+
+- Exemplo prático: se hoje o cadastro geral do colaborador mostra "Sup Ceno" (cargo 
+  que NÃO conta nota, é só informativo), mas em um evento passado ele foi alocado 
+  como "Cenotécnica" (cargo que CONTA nota), aquele evento específico deve continuar 
+  contando nota normalmente, baseado no cargo "Cenotécnica" que ele tinha NAQUELE 
+  evento — independentemente do que o cadastro geral mostra hoje.
+
+═══════════════════════════════════════
+2. IMPLEMENTAÇÃO
+═══════════════════════════════════════
+
+- O cargo do colaborador deve ser armazenado como um atributo da ALOCAÇÃO no evento 
+  (tabela/registro de "Equipe Alocada" daquele evento específico), e não apenas como 
+  um campo único na tabela geral de colaboradores.
+- Ao adicionar um colaborador a um novo evento, o sistema pode sugerir automaticamente 
+  o cargo mais recente dele (do cadastro geral) como valor pré-preenchido — mas esse 
+  valor fica "congelado" para aquele evento assim que confirmado, e alterações futuras 
+  no cadastro geral do colaborador NÃO devem alterar retroativamente o cargo já 
+  registrado em eventos passados.
+- Ou seja: mudar o cargo geral do colaborador na tela "Colaboradores" afeta apenas a 
+  sugestão para PRÓXIMOS eventos, nunca os eventos já lançados/históricos.
+
+═══════════════════════════════════════
+3. IMPACTO NO CÁLCULO DE PONTUAÇÃO
+═══════════════════════════════════════
+
+- O cálculo de "conta nota" ou "não conta nota" (ex: Cenotécnica conta, Sup Ceno não 
+  conta) deve sempre olhar para o cargo registrado NAQUELE EVENTO específico, e não 
+  para o cargo atual do cadastro geral do colaborador.
+- Isso vale tanto para a nota individual do evento quanto para o cálculo da média do 
+  ciclo do colaborador — cada evento deve ser calculado com base no cargo que ele 
+  tinha NAQUELE evento.
+
+═══════════════════════════════════════
+4. RESULTADO ESPERADO
+═══════════════════════════════════════
+
+- Ao mudar o cargo geral de um colaborador (ex: de "Cenotécnica" para "Sup Ceno" 
+  porque ele foi promovido), os eventos JÁ REALIZADOS continuam com o cargo antigo 
+  e a pontuação correspondente, sem serem afetados retroativamente.
+- Apenas os PRÓXIMOS eventos que ele for alocado usarão o novo cargo do cadastro 
+  (ou o que o gestor escolher manualmente na alocação daquele evento).
+
+Testar o cenário: colaborador tem hoje cargo "Sup Ceno" (não conta nota) no cadastro 
+geral, mas em um evento de 2 meses atrás ele foi alocado como "Cenotécnica" (conta 
+nota) — verificar se aquele evento antigo ainda soma pontos corretamente na média/ranking.

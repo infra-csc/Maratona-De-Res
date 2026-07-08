@@ -32,6 +32,8 @@ interface PerformanceData {
     totalEvents: number;
     closedEvents: number;
     openEvents: number;
+    confirmedEvents: number;
+    minEventsForEligibility: number;
     totalAbsences: number;
     penaltyPoints: number;
     meritPoints: number;
@@ -95,6 +97,7 @@ interface CriterionDetail {
   publicComments: string[];
   evaluated: boolean;
   partialPublishedAt?: string | null;
+  reviewRequest?: ReviewRequest | null;
 }
 
 function formatDateTime(value: string): string {
@@ -110,6 +113,142 @@ function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null):
     case "blocked": return "Bloqueado — contate o RH";
     default: return "Resultado final — aguardando aprovação do RH";
   }
+}
+
+function CriterionReviewRequest({ event, criterion }: { event: EventSummary; criterion: CriterionDetail }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [resubmitting, setResubmitting] = useState(false);
+  const [comment, setComment] = useState(criterion.reviewRequest?.comment ?? "");
+
+  const mutation = useMutation({
+    mutationFn: async (text: string) => {
+      const token = localStorage.getItem("maratona_token");
+      const res = await fetch(`${import.meta.env.BASE_URL}api/my-performance/events/${event.eventId}/review-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ comment: `[Critério: ${criterion.criterionName}] ${text}` }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Não foi possível enviar a sinalização.");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setOpen(false);
+      setResubmitting(false);
+      queryClient.invalidateQueries({ queryKey: ["my-performance"] });
+    },
+  });
+
+  const hasRequest = !!criterion.reviewRequest;
+  const showForm = !hasRequest || resubmitting;
+  const isResolved = criterion.reviewRequest?.status === "resolved";
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) { setResubmitting(false); setComment(criterion.reviewRequest?.comment ?? ""); }
+      }}
+    >
+      <DialogTrigger asChild>
+        <button
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "flex items-center gap-1 text-[9px] font-bold uppercase italic px-1.5 py-0.5 border shrink-0 transition-colors mt-1",
+            hasRequest
+              ? isResolved
+                ? "border-[#506600] text-[#506600] bg-[#506600]/10"
+                : "border-[#862200] text-[#862200] bg-[#862200]/10"
+              : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
+          )}
+        >
+          <Flag size={9} />
+          {hasRequest ? (isResolved ? "Revisão resolvida" : "Revisão sinalizada") : "Sinalizar Revisão"}
+        </button>
+      </DialogTrigger>
+      <DialogContent onClick={(e) => e.stopPropagation()} className="bg-white border-2 border-[#191c1e]">
+        <DialogHeader>
+          <DialogTitle className="italic uppercase font-black flex items-center gap-2 text-[#191c1e]">
+            <Flag size={16} className="text-[#862200]" /> Sinalizar Revisão do Critério
+          </DialogTitle>
+          <DialogDescription className="italic text-[#444933]">
+            <span className="font-bold">{criterion.criterionName}</span> · {event.eventName}
+          </DialogDescription>
+        </DialogHeader>
+
+        {hasRequest && !showForm && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn(
+                "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
+                isResolved ? "bg-[#506600] text-white" : "bg-[#fff3cd] text-[#862200]"
+              )}>
+                {isResolved ? "Revisão resolvida" : "Revisão sinalizada"}
+              </span>
+              <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(criterion.reviewRequest!.createdAt)}</span>
+            </div>
+            <p className="text-sm text-[#444933] italic">"{criterion.reviewRequest!.comment}"</p>
+            {isResolved && criterion.reviewRequest!.resolutionNotes && (
+              <p className="text-sm text-[#506600] font-bold">Resposta: {criterion.reviewRequest!.resolutionNotes}</p>
+            )}
+            <button
+              onClick={() => { setComment(""); setResubmitting(true); }}
+              className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e] underline"
+            >
+              Sinalizar novamente
+            </button>
+          </div>
+        )}
+
+        {showForm && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase italic text-[#747a60]">Descreva o motivo da revisão</p>
+            <Textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder={`Ex: acredito que minha nota em "${criterion.criterionName}" não reflete minha atuação no evento...`}
+              className="bg-white text-sm"
+              rows={4}
+              autoFocus
+            />
+            {mutation.isError && (
+              <p className="text-xs font-bold text-[#862200]">{(mutation.error as Error).message}</p>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="flex-row items-center gap-2 sm:justify-end">
+          {showForm ? (
+            <>
+              {hasRequest && (
+                <button
+                  onClick={() => { setResubmitting(false); setComment(criterion.reviewRequest?.comment ?? ""); }}
+                  className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e]"
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                onClick={() => mutation.mutate(comment)}
+                disabled={!comment.trim() || mutation.isPending}
+                className="flex items-center gap-2 text-[11px] font-bold uppercase italic px-4 py-2 bg-[#191c1e] text-[#ccff00] hover:bg-[#191c1e]/90 transition-colors disabled:opacity-50"
+              >
+                <Send size={14} /> {mutation.isPending ? "Enviando..." : "Confirmar Revisão"}
+              </button>
+            </>
+          ) : (
+            <DialogClose asChild>
+              <button className="text-[11px] font-bold uppercase italic px-4 py-2 border-2 border-[#191c1e]">Fechar</button>
+            </DialogClose>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function EventReviewRequest({ event }: { event: EventSummary }) {
@@ -353,12 +492,15 @@ function EventCard({ event }: { event: EventSummary }) {
                     <p className="font-bold text-sm text-[#191c1e] leading-tight italic">{c.criterionName}</p>
                   </div>
 
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 flex flex-col items-end gap-1">
                     {c.scoreUsed !== null ? (
-                      <div className="flex items-end gap-1">
-                        <span className="font-black text-2xl text-[#191c1e] leading-none">{c.scoreUsed.toFixed(1)}</span>
-                        <span className="text-xs font-bold text-[#747a60] pb-1 italic">/10</span>
-                      </div>
+                      <>
+                        <div className="flex items-end gap-1">
+                          <span className="font-black text-2xl text-[#191c1e] leading-none">{c.scoreUsed.toFixed(1)}</span>
+                          <span className="text-xs font-bold text-[#747a60] pb-1 italic">/10</span>
+                        </div>
+                        <CriterionReviewRequest event={event} criterion={c} />
+                      </>
                     ) : (
                       <span className="text-[10px] font-bold uppercase italic px-2 py-1 bg-[#f2f4f6] text-[#747a60] border border-[#191c1e]">Pendente</span>
                     )}
@@ -507,26 +649,6 @@ export default function MyPerformancePage() {
               <div className="w-full h-2 bg-[#191c1e] mt-auto" />
             </div>
 
-            {/* Seu Pelotão */}
-            <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
-              <div className="z-10">
-                <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Seu Pelotão</p>
-                {summary.currentPlatoon ? (
-                  <>
-                    <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">{summary.currentPlatoon}</h2>
-                    <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-2">
-                      {summary.isQuarterClosed ? "Classificação Final" : "Projeção Atual"}
-                    </p>
-                  </>
-                ) : (
-                  <div className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</div>
-                )}
-              </div>
-              <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
-                <Target size={110} strokeWidth={1.5} />
-              </div>
-              <div className="w-full h-2 bg-[#506600] mt-auto" />
-            </div>
 
             {/* Bônus Caju */}
             <div className="bg-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden shadow-[4px_4px_0px_0px_#191c1e]">
@@ -552,24 +674,43 @@ export default function MyPerformancePage() {
               <div className="w-full h-2 bg-[#191c1e] mt-auto" />
             </div>
 
-            {/* Participação */}
-            <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
-              <div className="z-10">
-                <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Participação</p>
-                <h2 className="text-[40px] leading-none italic font-black mt-2">{summary.totalEvents}</h2>
-                <p className="text-[11px] font-bold uppercase italic text-[#506600] mt-1">eventos no ciclo</p>
-                {summary.openEvents > 0 && (
-                  <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-1">{summary.openEvents} em avaliação</p>
-                )}
-                {summary.totalAbsences > 0 && (
-                  <p className="text-[10px] font-bold uppercase italic text-[#862200] mt-1">{summary.totalAbsences} {summary.totalAbsences === 1 ? "penalidade" : "penalidades"}</p>
-                )}
-              </div>
-              <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
-                <Calendar size={110} strokeWidth={1.5} />
-              </div>
-              <div className="w-full h-2 bg-[#191c1e] mt-auto" />
-            </div>
+            {/* Participação / Elegibilidade */}
+            {(() => {
+              const confirmed = summary.confirmedEvents ?? 0;
+              const target = summary.minEventsForEligibility ?? 8;
+              const faltam = Math.max(0, target - confirmed);
+              const atingiu = confirmed >= target;
+              return (
+                <div className="bg-white border-2 border-[#191c1e] p-5 flex flex-col justify-between h-40 relative overflow-hidden group">
+                  <div className="z-10 space-y-1">
+                    <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Eventos Confirmados</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[36px] leading-none italic font-black text-[#191c1e]">{confirmed}</span>
+                      <span className="text-sm font-bold italic text-[#747a60]">de {target} p/ elegibilidade</span>
+                    </div>
+                    {atingiu ? (
+                      <p className="text-[10px] font-black uppercase italic text-[#506600] flex items-center gap-1">
+                        <CheckCircle2 size={11} /> Elegível ao bônus
+                      </p>
+                    ) : (
+                      <p className="text-[10px] font-black uppercase italic text-[#862200]">
+                        Faltam {faltam} evento{faltam !== 1 ? "s" : ""} para o bônus
+                      </p>
+                    )}
+                  </div>
+                  {/* barra de progresso */}
+                  <div className="w-full h-2 bg-[#eceef0] mt-auto relative overflow-hidden border border-[#191c1e]">
+                    <div
+                      className="absolute left-0 top-0 h-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, (confirmed / target) * 100)}%`,
+                        backgroundColor: atingiu ? "#ccff00" : "#191c1e",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Penalidades e Méritos */}

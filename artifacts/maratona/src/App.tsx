@@ -20,6 +20,7 @@ import RulesPage from "@/pages/rules";
 import IntegrationPage from "@/pages/integration";
 import AuditPage from "@/pages/audit";
 import MyPerformancePage from "@/pages/my-performance";
+import ComoFuncionaPage from "@/pages/como-funciona";
 import ReviewRequestsPage from "@/pages/review-requests";
 import NotFound from "@/pages/not-found";
 
@@ -118,6 +119,7 @@ function AppRoutes() {
       <Route path="/integration" component={() => <ProtectedRoute component={IntegrationPage} roles={["admin", "rh"]} />} />
       <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} roles={["admin", "rh"]} />} />
       <Route path="/meu-desempenho" component={() => <ProtectedRoute component={MyPerformancePage} />} />
+      <Route path="/como-funciona" component={() => <ProtectedRoute component={ComoFuncionaPage} />} />
       <Route component={NotFound} />
     </Switch>
   );

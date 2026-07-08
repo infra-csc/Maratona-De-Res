@@ -270,6 +270,7 @@ router.get("/my-performance", async (req, res) => {
   const openEvents = eventSummaries.filter(e => e.status === "open").length;
   const closedEvents = eventSummaries.filter(e => e.status === "closed").length;
 
+  const minEventsForEligibility = await getMinEventsForEligibility();
   const scoredEvents = eventSummaries.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
   const grossAverage = scoredEvents.length > 0
     ? scoredEvents.reduce((s, e) => s + e.eventScore, 0) / scoredEvents.length
@@ -296,11 +297,10 @@ router.get("/my-performance", async (req, res) => {
     const projectedFinalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints);
     const proj = getPlatoonByScore(projectedFinalResult, platoonRulesMapped);
     currentPlatoon = proj?.name ?? null;
-    const minEventsForProjection = await getMinEventsForEligibility();
     const scoredEventsWithDate = scoredEvents
       .filter(e => !!e.startDate)
       .map(e => ({ score: e.eventScore, date: e.startDate as string }));
-    const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEventsForProjection) : [];
+    const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEventsForEligibility) : [];
     currentBonus = eligible ? calculateTieredBonus(projectedFinalResult, extraEventScores, platoonRulesMapped) : 0;
     bonusStatus = eligible ? "projected" : "not_eligible";
     finalResult = projectedFinalResult;
@@ -325,6 +325,8 @@ router.get("/my-performance", async (req, res) => {
       totalEvents,
       closedEvents,
       openEvents,
+      confirmedEvents: scoredEvents.length,
+      minEventsForEligibility,
       totalAbsences,
       penaltyPoints: Math.round(penaltyPoints * 100) / 100,
       meritPoints: Math.round(meritPoints * 100) / 100,
