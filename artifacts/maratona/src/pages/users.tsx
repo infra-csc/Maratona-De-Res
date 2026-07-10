@@ -48,6 +48,7 @@ export default function UsersPage() {
   const [emailMigOpen, setEmailMigOpen] = useState(false);
   const [emailMigPreview, setEmailMigPreview] = useState<{ id: number; name?: string; emailFrom?: string | null; emailTo?: string; email?: string; status: string }[] | null>(null);
   const [emailMigLoading, setEmailMigLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
 
   const qKey = getGetUsersQueryKey();
   const { data: users, isLoading } = useGetUsers({ query: { queryKey: qKey } });
@@ -158,7 +159,17 @@ export default function UsersPage() {
     }
   }
 
-  const sortedUsers = [...(users ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const sortedUsers = [...(users ?? [])]
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+    .filter(u => {
+      const q = userSearch.trim().toLowerCase();
+      if (!q) return true;
+      const haystack = [u.name, u.email, u.cpfLogin, u.employeeName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
 
   const stats = {
     total: users?.length ?? 0,
@@ -403,6 +414,32 @@ export default function UsersPage() {
                 Selecione todos os usuários duplicados e o <strong>canônico</strong> (conta que será mantida). Avaliações e calibrações serão transferidas para o canônico e os duplicados serão desativados.
               </div>
             )}
+            <div className="px-6 py-3 border-b-2 border-[#eceef0] bg-[#f9fafb]">
+              <div className="relative max-w-sm">
+                <Users size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aa088]" />
+                <input
+                  type="text"
+                  data-testid="input-search-users"
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  placeholder="Buscar por nome, CPF ou e-mail..."
+                  className="w-full pl-9 pr-8 py-2 border-2 border-[#191c1e] text-sm italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                />
+                {userSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setUserSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]"
+                    aria-label="Limpar busca"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {userSearch && (
+                <p className="text-[11px] italic text-[#747a60] mt-1">{sortedUsers.length} resultado(s)</p>
+              )}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
