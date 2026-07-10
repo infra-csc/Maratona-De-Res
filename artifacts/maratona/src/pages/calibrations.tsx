@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
@@ -57,7 +57,9 @@ export default function CalibrationsPage() {
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
   const [weightEdits, setWeightEdits] = useState<Record<number, string>>({});
   const [savingWeightId, setSavingWeightId] = useState<number | null>(null);
+  // Cards de critério começam recolhidos; o usuário clica para expandir o que quer ver.
   const [collapsedCriteria, setCollapsedCriteria] = useState<Set<number>>(new Set());
+  const collapsedInitializedForEventId = useRef<number | null>(null);
   const [publishingFinalCritId, setPublishingFinalCritId] = useState<number | null>(null);
   const [publishingAllFinal, setPublishingAllFinal] = useState(false);
   const [publishingAllPartial, setPublishingAllPartial] = useState(false);
@@ -84,6 +86,13 @@ export default function CalibrationsPage() {
     { eventId: selectedEventId ?? undefined },
     { query: { enabled: !!selectedEventId, queryKey: ["evals", selectedEventId] as unknown[] } }
   );
+  useEffect(() => {
+    if (!selectedEventId || !criteria || criteria.length === 0) return;
+    if (collapsedInitializedForEventId.current === selectedEventId) return;
+    collapsedInitializedForEventId.current = selectedEventId;
+    setCollapsedCriteria(new Set(criteria.filter(c => c.active).map(c => c.criterionId)));
+  }, [selectedEventId, criteria]);
+
   const calQKey = getGetCalibrationsQueryKey({ eventId: selectedEventId ?? undefined });
   const { data: calibrations } = useGetCalibrations(
     { eventId: selectedEventId ?? undefined },
