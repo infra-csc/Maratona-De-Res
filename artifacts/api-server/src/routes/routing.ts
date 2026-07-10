@@ -227,10 +227,25 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
   const user = req.user!;
   const { assignedToId, action } = req.body;
 
-  const [assignment] = await db.select().from(eventCriterionAssignmentsTable)
+  let [assignment] = await db.select().from(eventCriterionAssignmentsTable)
     .where(and(eq(eventCriterionAssignmentsTable.eventId, eventId), eq(eventCriterionAssignmentsTable.criterionId, criterionId)))
     .limit(1);
-  if (!assignment) { res.status(404).json({ error: "Atribuição não encontrada" }); return; }
+
+  // A linha de atribuição só existe depois que alguém rodou o endpoint de
+  // geração de atribuições para o evento. Se o critério ainda não tem linha
+  // (evento novo, critério adicionado depois, etc.), criamos na hora usando
+  // o routing padrão do critério, em vez de falhar com 404 — evita o erro
+  // "Atribuição não encontrada" ao confirmar um redirecionamento.
+  if (!assignment) {
+    const [routingDefault] = await db.select().from(criterionRoutingTable)
+      .where(eq(criterionRoutingTable.criterionId, criterionId)).limit(1);
+    [assignment] = await db.insert(eventCriterionAssignmentsTable).values({
+      eventId,
+      criterionId,
+      assignedToId: routingDefault?.defaultEvaluatorId ?? null,
+      status: routingDefault?.defaultEvaluatorId ? "suggested" : "pending",
+    }).returning();
+  }
 
   // --- REDIRECIONAMENTO (avaliador atual passa para outro) ---
   if (action === "redirect") {
