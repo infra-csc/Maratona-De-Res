@@ -2099,11 +2099,11 @@ export default function EvaluationsPage() {
                 const canSave = true;
                 return (
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-3 px-1">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 px-1">
                       <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
                         <ShieldAlert size={22} /> Ferramentas e Case (Cenografia)
                       </h3>
-                      <div className="flex items-center gap-2 shrink-0 pt-1">
+                      <div className="flex items-center gap-2 flex-wrap shrink-0 pt-1">
                         <Popover open={redirectFerramentasOpen} onOpenChange={setRedirectFerramentasOpen}>
                           <PopoverTrigger asChild>
                             <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
@@ -2205,11 +2205,11 @@ export default function EvaluationsPage() {
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
                 return (
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-3 px-1">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 px-1">
                       <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
                         <ShieldAlert size={22} /> Cenografia
                       </h3>
-                      <div className="flex items-center gap-2 shrink-0 pt-1">
+                      <div className="flex items-center gap-2 flex-wrap shrink-0 pt-1">
                         <Popover open={redirectConformityOpen} onOpenChange={setRedirectConformityOpen}>
                           <PopoverTrigger asChild>
                             <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors">
