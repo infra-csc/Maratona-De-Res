@@ -53,15 +53,19 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "border-2 border-[#191c1e] p-2 md:p-3 flex flex-col items-center gap-0.5 transition-all w-full",
+        "border-2 border-[#191c1e] p-1.5 md:p-2 flex flex-col items-center gap-1 justify-start transition-all w-full min-h-[92px] md:min-h-[104px]",
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:-translate-y-1 active:translate-y-0",
         isSelected
-          ? "bg-[#ccff00] text-[#161e00]"
+          ? "bg-[#ccff00] text-[#161e00] border-[3px]"
           : "bg-white text-[#191c1e]"
       )}
     >
-      <span className="text-xl italic font-black">{score}</span>
-      {label && <span className="text-[9px] leading-tight text-center font-bold uppercase italic">{label}</span>}
+      <span className="text-lg md:text-xl italic font-black shrink-0">{score}</span>
+      {label && (
+        <span className="text-[8px] md:text-[9px] leading-[1.15] text-center font-bold uppercase italic break-words hyphens-auto whitespace-normal">
+          {label}
+        </span>
+      )}
     </button>
   );
 }
@@ -771,12 +775,9 @@ export default function EvaluationsPage() {
       toast({ title: "Comentário obrigatório", description: "Preencha o comentário antes de salvar.", variant: "destructive" });
       return;
     }
+    // Áudio é opcional — complemento ao comentário, não trava salvar/submeter.
     const audioUrl = currentAudio(criterionId);
-    if (!audioUrl) {
-      toast({ title: "Áudio obrigatório", description: "Grave um áudio explicando a avaliação antes de salvar.", variant: "destructive" });
-      return;
-    }
-    createMutation.mutate({ data: { eventId: selectedEventId, criterionId, score, comments: comment, audioUrl } });
+    createMutation.mutate({ data: { eventId: selectedEventId, criterionId, score, comments: comment, audioUrl: audioUrl ?? undefined } });
   }
 
   function handleScoreClick(criterionId: number, score: number) {
@@ -792,7 +793,6 @@ export default function EvaluationsPage() {
     if (score == null) return false;
     const comment = comments[criterionId] ?? ev?.comments ?? "";
     if (!comment.trim()) return false;
-    if (!currentAudio(criterionId)) return false;
     return true;
   }
 
@@ -1601,6 +1601,21 @@ export default function EvaluationsPage() {
                                         <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-nowrap hidden sm:inline-flex items-center gap-1 pr-0.5">
                                           <User size={11} className="shrink-0" /> {responsible ?? "Sem responsável"}
                                         </span>
+                                        {(() => {
+                                          const a = criterionAssignments?.find(x => x.criterionId === c.criterionId);
+                                          if (!a?.redirectedFromId) return null;
+                                          const date = a.updatedAt
+                                            ? new Date(a.updatedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                                            : null;
+                                          return (
+                                            <span
+                                              title={`Redirecionado de ${a.redirectedFromName ?? "?"} para ${a.assignedToName ?? "?"}${date ? ` em ${date}` : ""}`}
+                                              className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#e8f0fe] text-[#3451b2] border border-[#3451b2] px-1.5 py-0.5 shrink-0"
+                                            >
+                                              <CornerDownRight size={10} /> {a.redirectedFromName?.split(" ")[0] ?? "?"}→{a.assignedToName?.split(" ")[0] ?? "?"}{date ? ` · ${date}` : ""}
+                                            </span>
+                                          );
+                                        })()}
                                         {st.state === "submitted" ? (
                                           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1"><CheckCircle size={12} /> Preenchido</span>
                                         ) : st.state === "partial" ? (
@@ -1724,9 +1739,6 @@ export default function EvaluationsPage() {
                         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
                         const audio = currentAudio(c.criterionId);
 
-                        // Comentário e áudio são obrigatórios para salvar/submeter.
-                        const needsAudio = !audio;
-
                         return (
                           <div key={c.criterionId} className={cn("criterion-row border-l-4 pl-6 py-2", submitted ? "border-[#506600]" : isDraft ? "border-[#ff5722]" : score != null ? "border-[#ccff00]" : "border-[#191c1e]/20")}>
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
@@ -1768,6 +1780,9 @@ export default function EvaluationsPage() {
                                     );
                                   })()}
                                 </div>
+                                <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wider mb-0.5">
+                                  Critério {index + 1} de {g.criteria.length}
+                                </p>
                                 <h4 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">{index + 1}. {c.criterionName}</h4>
                                 <p className="text-sm text-[#444933] italic mt-1 leading-relaxed">
                                   {c.criterionDescription && c.criterionDescription.trim().length > 0
@@ -1783,7 +1798,7 @@ export default function EvaluationsPage() {
                             </div>
 
                             <div className="mb-4">
-                              <div className="grid grid-cols-11 gap-1">
+                              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-11 gap-1">
                                 {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
                                   <ScoreButton
                                     key={val}
@@ -1818,13 +1833,13 @@ export default function EvaluationsPage() {
                                   className="bg-white rounded-none border-2 resize-y min-h-24 italic focus-visible:ring-0 border-[#191c1e]"
                                 />
 
-                                <div className={cn("mt-4 border-2 p-4", needsAudio ? "border-[#ba1a1a] bg-[#ffdad6]/20" : "border-[#191c1e] bg-white")}>
+                                <div className="mt-4 border-2 p-4 border-[#191c1e] bg-white">
                                   <label className="text-xs font-black italic uppercase flex items-center gap-2 mb-2">
                                     Áudio da avaliação
-                                    <span className="text-[10px] text-white bg-[#ba1a1a] px-2 py-0.5 font-bold italic uppercase">Obrigatório</span>
+                                    <span className="text-[10px] text-[#444933] bg-[#e6e8ea] px-2 py-0.5 font-bold italic uppercase">Opcional</span>
                                   </label>
                                   <p className="text-[11px] text-[#444933] italic mb-3 leading-relaxed">
-                                    Grave um áudio explicando a nota. Sem áudio não é possível salvar nem submeter a avaliação.
+                                    Grave um áudio explicando a nota, se quiser complementar o comentário escrito.
                                   </p>
                                   <AudioRecorder
                                     value={audio}
@@ -1835,7 +1850,7 @@ export default function EvaluationsPage() {
                                 <div className="flex items-center justify-end pt-3 gap-3 flex-wrap">
                                   <button
                                     onClick={() => handleSaveDraft(c.criterionId)}
-                                    disabled={score == null || !comment.trim() || needsAudio}
+                                    disabled={score == null || !comment.trim()}
                                     data-testid={`button-save-draft-${c.criterionId}`}
                                     className="bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                                   >

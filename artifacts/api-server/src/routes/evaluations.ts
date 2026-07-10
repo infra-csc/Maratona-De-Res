@@ -137,7 +137,8 @@ router.get("/evaluations", async (req, res) => {
  * POST /evaluations
  * Cria/atualiza a nota do TIME para um critério do evento.
  * avaliador só pode avaliar critérios da sua área.
- * Escala oficial: 1 a 10 (nota 0 não é permitida). Áudio obrigatório no submit.
+ * Escala oficial: 1 a 10 (nota 0 não é permitida). Comentário obrigatório no
+ * submit (mesma exigência do formulário oficial do MS Forms); áudio é opcional.
  */
 router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req, res) => {
   const { eventId, criterionId, score, comments, commentVisibility, audioUrl } = req.body;
@@ -268,8 +269,11 @@ router.post("/evaluations/:id/submit", async (req, res) => {
       return;
     }
   }
-  if (!isValidAudioPath(existing.audioUrl)) {
-    res.status(400).json({ error: "Áudio obrigatório: grave um áudio explicando a avaliação antes de submeter." });
+  // Comentário/justificativa é o único campo obrigatório além da nota, igual
+  // ao formulário oficial do MS Forms. Áudio é opcional (complemento, não
+  // travamento de envio).
+  if (!existing.comments || !existing.comments.trim()) {
+    res.status(400).json({ error: "Comentário obrigatório: preencha a justificativa antes de submeter." });
     return;
   }
   const [evaluation] = await db.update(evaluationsTable).set({

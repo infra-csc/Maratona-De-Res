@@ -1,0 +1,87 @@
+No formulário de avaliação (Logística e demais áreas), encontrei os seguintes 
+problemas que precisam ser corrigidos.
+
+═══════════════════════════════════════
+1. BUG: EXIGÊNCIA DE ÁUDIO OBRIGATÓRIO — NÃO EXISTE NO FORMULÁRIO OFICIAL
+═══════════════════════════════════════
+
+- A tela está exigindo "ÁUDIO DA AVALIAÇÃO" como OBRIGATÓRIO, bloqueando a submissão 
+  ("Sem áudio não é possível salvar nem submeter a avaliação").
+- Essa exigência NÃO existe no formulário oficial do Microsoft Forms (que já 
+  comparamos anteriormente) — lá o único campo obrigatório, além da nota, é o 
+  comentário/justificativa em texto.
+- REMOVER a obrigatoriedade do áudio. Se a gravação de áudio for uma funcionalidade 
+  que queremos manter no sistema, ela deve ser OPCIONAL (um complemento ao 
+  comentário em texto, não um substituto obrigatório), já que o formulário oficial 
+  não prevê esse campo como travamento de envio.
+- Confirmar se isso está bloqueando indevidamente o avaliador de conseguir submeter 
+  a avaliação — o texto atual sugere que sim ("Sem áudio não é possível salvar nem 
+  submeter"), o que é um bug crítico de bloqueio de fluxo.
+
+═══════════════════════════════════════
+2. BUG: TEXTO CORTADO NAS CAIXAS DE NOTA (0-10)
+═══════════════════════════════════════
+
+- Nas caixas de nota (0 a 10), o texto descritivo dentro da última caixa (10) está 
+  sendo cortado/truncado ("PERFEIÇÃO, ATENDEU COMPLETAMENTE E SEM ERROS" aparece 
+  quebrado de forma apertada dentro da caixa, com aparência de texto cortado).
+- Ajustar o CSS das caixas de nota para que o texto sempre caiba corretamente, sem 
+  cortar palavras — aumentar a altura da caixa dinamicamente conforme o texto, ou 
+  reduzir o tamanho da fonte proporcionalmente ao espaço disponível, garantindo 
+  legibilidade completa em todas as caixas (0 a 10).
+- Verificar se esse problema ocorre em outras resoluções de tela (mobile/tablet) 
+  também, e testar responsividade.
+
+═══════════════════════════════════════
+3. FALTA HISTÓRICO DE REDIRECIONAMENTO E LINK PÚBLICO (JÁ SOLICITADO ANTERIORMENTE)
+═══════════════════════════════════════
+
+- Reforçando um pedido já feito: ao usar "REDIRECIONAR FORMULÁRIO" (visível no topo 
+  da tela) ou ao gerar um link público para freelancer, o sistema deve registrar um 
+  HISTÓRICO dessa ação, incluindo:
+  - Quem redirecionou (avaliador original)
+  - Para quem foi redirecionado (nome do avaliador interno) OU o nome informado do 
+    freelancer (link público)
+  - Data e hora da ação
+  - Se foi "redirecionamento interno" ou "link público"
+- Esse histórico deve ficar visível no próprio formulário (ex: uma pequena nota 
+  abaixo do título "FORMULÁRIO — LOGÍSTICA": "Redirecionado por Sandro Gomes para 
+  Sandro Paiva em 10/07/2026") — hoje isso não aparece em lugar nenhum.
+- Esse histórico também deve ficar acessível para o Admin, tanto na Central de 
+  Avaliações quanto na Atribuição de Avaliadores do evento.
+
+═══════════════════════════════════════
+4. OUTRAS MELHORIAS PARA DEIXAR A TELA 10/10
+═══════════════════════════════════════
+
+a) INDICADOR DE PROGRESSO POR CRITÉRIO DENTRO DO FORMULÁRIO
+   - O painel lateral mostra progresso geral (0%, "2 critérios pendentes"), mas 
+     dentro do formulário em si não há indicação visual de "Critério 1 de 2" ou 
+     navegação clara entre os critérios do mesmo formulário — adicionar um indicador 
+     tipo "Critério 1 de 2" no topo de cada bloco de pergunta, ajudando o avaliador a 
+     entender quanto falta.
+
+b) SALVAR RASCUNHO — GARANTIR QUE NÃO SE PERCA PROGRESSO
+   - Confirmar que "SALVAR RASCUNHO" salva a nota e o comentário parcialmente 
+     preenchidos mesmo sem áudio (após a correção do item 1), permitindo ao 
+     avaliador continuar depois de onde parou.
+
+c) CONTADOR DE CARACTERES NO COMENTÁRIO
+   - O campo "Justificativa/Feedback" mostra "0/300" — confirmar que esse limite de 
+     300 caracteres é suficiente e that o contador atualiza corretamente enquanto o 
+     avaliador digita.
+
+d) FEEDBACK VISUAL AO SELECIONAR UMA NOTA
+   - Ao clicar em uma das caixas de nota (0-10), a caixa selecionada deve ficar 
+     visualmente destacada (ex: fundo lima, borda mais grossa), dando feedback claro 
+     de qual nota foi escolhida — hoje não fica claro se isso já acontece.
+
+e) VALIDAÇÃO ANTES DE SUBMETER
+   - Ao clicar em enviar/submeter a avaliação completa, se algum critério estiver 
+     sem nota ou sem comentário preenchido, destacar visualmente qual critério 
+     específico está faltando (scroll automático até ele, ou destaque em vermelho), 
+     ao invés de só mostrar "2 critérios pendentes" no painel lateral sem indicar 
+     onde exatamente.
+
+Manter a paleta de cores atual do sistema (preto/lima, vermelho para campos 
+obrigatórios pendentes).

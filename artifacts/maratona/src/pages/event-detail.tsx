@@ -2062,7 +2062,10 @@ export default function EventDetailPage() {
                             <td className="px-4 py-3">
                               <span className="font-black italic uppercase text-sm text-[#191c1e]">{a.criterionName ?? `#${a.criterionId}`}</span>
                               {a.redirectedFromId && (
-                                <p className="text-[10px] font-bold italic text-[#747a60] mt-0.5">Redirecionado</p>
+                                <p className="text-[10px] font-bold italic text-[#747a60] mt-0.5">
+                                  Redirecionado de {a.redirectedFromName ?? "?"} para {a.assignedToName ?? "?"}
+                                  {a.updatedAt ? ` em ${new Date(a.updatedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}` : ""}
+                                </p>
                               )}
                             </td>
                             <td className="px-4 py-3">
