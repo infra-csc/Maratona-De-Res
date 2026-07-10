@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens } from "@/lib/routing-api";
+import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -349,6 +349,11 @@ export default function EvaluationsPage() {
   // Criterion assignments for the selected event (new routing system)
   const { data: criterionAssignments } = useEventCriterionAssignments(selectedEventId ?? 0);
   const patchCriterionAssignment = usePatchCriterionAssignment(selectedEventId ?? 0);
+  // Áreas em que o usuário logado é avaliador principal — dá visibilidade
+  // completa dos quesitos da área e permite atribuir/tomar/mover entre colegas.
+  const { data: myPrincipalAreas } = useMyPrincipalAreas();
+  const [areaAssignTarget, setAreaAssignTarget] = useState<{ criterionId: number; criterionName: string; areaId: number } | null>(null);
+  const { data: areaAssignUsers } = useUsersByArea(areaAssignTarget?.areaId ?? null);
   const [redirectDialogArea, setRedirectDialogArea] = useState<{ areaId: number; areaName: string; criteriaIds: number[]; firstCriterionId: number } | null>(null);
   const [redirectTargetId, setRedirectTargetId] = useState<number | null>(null);
   const [publicLinkDialogCriteriaIds, setPublicLinkDialogCriteriaIds] = useState<number[] | null>(null);
@@ -1162,6 +1167,117 @@ export default function EvaluationsPage() {
             )}
           </section>
         )}
+
+        {isEvaluator && selectedEventId && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (() => {
+          const principalAreaIds = new Set(myPrincipalAreas.map(a => a.id));
+          const areaCriteria = (criterionAssignments ?? []).filter(a => a.criterionAreaId != null && principalAreaIds.has(a.criterionAreaId));
+          if (areaCriteria.length === 0) return null;
+          const areaNameById = new Map(myPrincipalAreas.map(a => [a.id, a.name]));
+          return (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <Users size={22} />
+                <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">Quesitos da Minha Área</h3>
+              </div>
+              <p className="text-sm text-[#444933] italic px-1 -mt-1">
+                Como avaliador principal, você vê todos os quesitos da sua área neste evento e pode atribuir, tomar para si ou passar para outro colega.
+              </p>
+              <div className="bg-white border-2 border-[#191c1e] overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                      <th className="px-4 py-3 text-xs font-bold uppercase italic text-[#444933]">Critério</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase italic text-[#444933]">Área</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase italic text-[#444933]">Avaliador Atual</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase italic text-[#444933] text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-[#eceef0]">
+                    {areaCriteria.map(a => {
+                      const isMine = a.assignedToId === user?.id;
+                      const isSubmitted = a.status === "submitted";
+                      return (
+                        <tr key={a.criterionId} className={isMine ? "bg-[#f0ffe0]" : ""}>
+                          <td className="px-4 py-3 font-bold italic text-sm">{a.criterionName}</td>
+                          <td className="px-4 py-3 text-xs italic text-[#747a60]">{areaNameById.get(a.criterionAreaId!)}</td>
+                          <td className="px-4 py-3 text-sm italic">
+                            {a.assignedToName ?? <span className="text-[#c4c9ac]">Sem avaliador</span>}
+                            {isSubmitted && <span className="ml-2 text-[10px] font-black uppercase text-[#506600]">Enviada</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {isSubmitted ? (
+                              <span className="text-[11px] italic text-[#747a60]">—</span>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                {!isMine && (
+                                  <button
+                                    type="button"
+                                    data-testid={`button-take-criterion-${a.criterionId}`}
+                                    onClick={() => patchCriterionAssignment.mutate(
+                                      { criterionId: a.criterionId, assignedToId: user!.id, action: "assign" },
+                                      { onError: (e) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }) },
+                                    )}
+                                    className="text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-2 py-1 hover:bg-[#ccff00]"
+                                  >
+                                    Pegar para mim
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  data-testid={`button-assign-criterion-${a.criterionId}`}
+                                  onClick={() => setAreaAssignTarget({ criterionId: a.criterionId, criterionName: a.criterionName ?? "", areaId: a.criterionAreaId! })}
+                                  className="text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-2 py-1 hover:bg-[#eceef0]"
+                                >
+                                  Atribuir a...
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })()}
+
+        <Dialog open={!!areaAssignTarget} onOpenChange={(open) => { if (!open) setAreaAssignTarget(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="italic uppercase font-black">Atribuir "{areaAssignTarget?.criterionName}"</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label className="text-xs italic uppercase text-[#747a60]">Escolha o avaliador da área</Label>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {(areaAssignUsers ?? []).map(u => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    data-testid={`option-assign-user-${u.id}`}
+                    onClick={() => {
+                      if (!areaAssignTarget) return;
+                      patchCriterionAssignment.mutate(
+                        { criterionId: areaAssignTarget.criterionId, assignedToId: u.id, action: "assign" },
+                        {
+                          onError: (e) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
+                          onSuccess: () => setAreaAssignTarget(null),
+                        },
+                      );
+                    }}
+                    className={`w-full text-left px-3 py-2 border-2 border-[#191c1e] italic text-sm hover:bg-[#ccff00] ${u.id === user?.id ? "font-bold" : ""}`}
+                  >
+                    {u.name}{u.id === user?.id ? " (você)" : ""}
+                  </button>
+                ))}
+                {areaAssignUsers?.length === 0 && (
+                  <p className="text-xs italic text-[#747a60]">Nenhum usuário ativo encontrado nesta área.</p>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {!selectedEventId && crossEventLookupActive ? (
           <div className="space-y-4">

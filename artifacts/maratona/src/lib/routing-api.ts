@@ -31,6 +31,7 @@ export interface CriterionAssignment {
   eventId: number;
   criterionId: number;
   criterionName: string | null;
+  criterionAreaId: number | null;
   assignedToId: number | null;
   assignedToName: string | null;
   status: "pending" | "suggested" | "confirmed" | "submitted";
@@ -39,6 +40,11 @@ export interface CriterionAssignment {
   confirmedAt: string | null;
   updatedAt: string | null;
   createdAt: string | null;
+}
+
+export interface PrincipalArea {
+  id: number;
+  name: string;
 }
 
 export interface PublicToken {
@@ -150,13 +156,21 @@ export function useGenerateCriterionAssignments(eventId: number) {
   });
 }
 
-/** Confirma / reatribui / redireciona uma atribuição. */
+/** Áreas em que o usuário logado é avaliador principal (default evaluator de algum critério da área). */
+export function useMyPrincipalAreas() {
+  return useQuery<PrincipalArea[]>({
+    queryKey: ["my-principal-areas"],
+    queryFn: () => apiFetch<PrincipalArea[]>("/api/users/my-principal-areas"),
+  });
+}
+
+/** Confirma / reatribui / redireciona / atribui (avaliador principal) uma atribuição. */
 export function usePatchCriterionAssignment(eventId: number) {
   const qc = useQueryClient();
   return useMutation<
     CriterionAssignment,
     Error,
-    { criterionId: number; assignedToId?: number | null; action?: "confirm" | "redirect" }
+    { criterionId: number; assignedToId?: number | null; action?: "confirm" | "redirect" | "assign" }
   >({
     mutationFn: ({ criterionId, ...body }) =>
       apiFetch<CriterionAssignment>(`/api/events/${eventId}/criterion-assignments/${criterionId}`, {

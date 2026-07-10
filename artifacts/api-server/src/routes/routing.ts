@@ -15,6 +15,35 @@ const router = Router();
 router.use(requireAuth);
 
 // ---------------------------------------------------------------------------
+// Áreas em que o usuário é "avaliador principal": aquelas cujos critérios têm
+// este usuário como default_evaluator_id no roteamento. Usado para dar
+// visibilidade completa dos quesitos da área e permissão de atribuir/tomar
+// para si/mover entre colegas, sem precisar de papel admin/rh.
+// ---------------------------------------------------------------------------
+async function getPrincipalAreaIds(userId: number): Promise<number[]> {
+  const rows = await db.select({ areaId: criteriaTable.responsibleAreaId })
+    .from(criterionRoutingTable)
+    .innerJoin(criteriaTable, eq(criterionRoutingTable.criterionId, criteriaTable.id))
+    .where(eq(criterionRoutingTable.defaultEvaluatorId, userId));
+  return [...new Set(rows.map(r => r.areaId).filter((id): id is number => id != null))];
+}
+
+// ---------------------------------------------------------------------------
+// GET /users/my-principal-areas
+// Retorna as áreas em que o usuário logado é avaliador principal (default
+// evaluator de pelo menos um critério da área). Usado pelo front para
+// decidir se mostra o painel "Quesitos da minha área".
+// ---------------------------------------------------------------------------
+router.get("/users/my-principal-areas", async (req, res) => {
+  const user = req.user!;
+  const areaIds = await getPrincipalAreaIds(user.userId);
+  if (areaIds.length === 0) { res.json([]); return; }
+  const areas = await db.select({ id: areasTable.id, name: areasTable.name })
+    .from(areasTable).where(inArray(areasTable.id, areaIds));
+  res.json(areas);
+});
+
+// ---------------------------------------------------------------------------
 // GET /criterion-routing
 // Retorna o roteamento de todos os critérios (admin/rh).
 // ---------------------------------------------------------------------------
@@ -137,6 +166,7 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
     eventId: eventCriterionAssignmentsTable.eventId,
     criterionId: eventCriterionAssignmentsTable.criterionId,
     criterionName: criteriaTable.name,
+    criterionAreaId: criteriaTable.responsibleAreaId,
     assignedToId: eventCriterionAssignmentsTable.assignedToId,
     assignedToName: usersTable.name,
     status: eventCriterionAssignmentsTable.status,
@@ -164,7 +194,14 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
   }));
 
   if (user.role === "avaliador") {
-    res.json(enriched.filter(a => a.assignedToId === user.userId));
+    // Além das próprias, o avaliador principal de uma área vê TODAS as
+    // atribuições dos critérios daquela área (visibilidade completa),
+    // podendo depois atribuir/tomar/mover entre colegas via ação "assign".
+    const principalAreaIds = await getPrincipalAreaIds(user.userId);
+    res.json(enriched.filter(a =>
+      a.assignedToId === user.userId ||
+      (a.criterionAreaId != null && principalAreaIds.includes(a.criterionAreaId))
+    ));
     return;
   }
 
@@ -301,6 +338,55 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
       .returning();
 
     await audit(user.userId, "redirect", "event_criterion_assignments", assignment.id, assignment, updated);
+    res.json(updated);
+    return;
+  }
+
+  // --- ATRIBUIÇÃO PELO AVALIADOR PRINCIPAL DA ÁREA ---
+  // O avaliador principal (default evaluator de algum critério da área) pode
+  // atribuir qualquer critério da SUA área para si mesmo ou para outro colega
+  // da mesma área, independente de quem está atribuído atualmente — sem
+  // precisar de papel admin/rh. Diferente do redirect: não passa pelas
+  // regras de redirectMode (é o "chefe" da área decidindo, não um repasse).
+  if (action === "assign") {
+    const isManager = ["admin", "rh"].includes(user.role);
+    const [criterion] = await db.select({ areaId: criteriaTable.responsibleAreaId })
+      .from(criteriaTable).where(eq(criteriaTable.id, criterionId)).limit(1);
+    const principalAreaIds = isManager ? [] : await getPrincipalAreaIds(user.userId);
+    const isAreaPrincipal = !isManager && criterion?.areaId != null && principalAreaIds.includes(criterion.areaId);
+
+    if (!isManager && !isAreaPrincipal) {
+      res.status(403).json({ error: "Sem permissão para atribuir este critério" });
+      return;
+    }
+    if (assignment.status === "submitted") {
+      res.status(400).json({ error: "Avaliação já submetida, não pode ser reatribuída" });
+      return;
+    }
+    if (!assignedToId) {
+      res.status(400).json({ error: "Usuário destino obrigatório" });
+      return;
+    }
+    if (isAreaPrincipal) {
+      const [targetUser] = await db.select({ areaId: usersTable.areaId })
+        .from(usersTable).where(eq(usersTable.id, assignedToId)).limit(1);
+      if (!targetUser || targetUser.areaId !== criterion!.areaId) {
+        res.status(400).json({ error: "Usuário não pertence à sua área" });
+        return;
+      }
+    }
+
+    const [updated] = await db.update(eventCriterionAssignmentsTable).set({
+      assignedToId,
+      status: "confirmed",
+      redirectedFromId: assignment.assignedToId,
+      confirmedByUserId: user.userId,
+      confirmedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(and(eq(eventCriterionAssignmentsTable.eventId, eventId), eq(eventCriterionAssignmentsTable.criterionId, criterionId)))
+      .returning();
+
+    await audit(user.userId, "assign", "event_criterion_assignments", assignment.id, assignment, updated);
     res.json(updated);
     return;
   }
