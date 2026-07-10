@@ -2102,7 +2102,7 @@ export default function EvaluationsPage() {
                 const canSave = true;
                 return (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 px-1">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 px-1">
                       <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
                         <ShieldAlert size={22} /> Ferramentas e Case (Cenografia)
                       </h3>
@@ -2209,7 +2209,7 @@ export default function EvaluationsPage() {
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
                 return (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 px-1">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 px-1">
                       <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
                         <ShieldAlert size={22} /> Cenografia
                       </h3>
