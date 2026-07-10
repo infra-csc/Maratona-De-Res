@@ -2301,7 +2301,7 @@ export default function EventDetailPage() {
                     <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">Ferramentas:</span>
                     <Popover open={conformityEvaluatorFerramentasPickerOpen} onOpenChange={setConformityEvaluatorFerramentasPickerOpen}>
                       <PopoverTrigger asChild>
-                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors truncate max-w-[160px]">
+                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors flex-1 min-w-0">
                           <UserCheck size={10} className="shrink-0" />
                           <span className="truncate">{event?.conformityEvaluatorFerramentasName ?? "Sem avaliador"}</span>
                         </button>
@@ -2333,7 +2333,7 @@ export default function EventDetailPage() {
                     <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">Cenografia:</span>
                     <Popover open={conformityEvaluatorPickerOpen} onOpenChange={setConformityEvaluatorPickerOpen}>
                       <PopoverTrigger asChild>
-                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors truncate max-w-[160px]">
+                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors flex-1 min-w-0">
                           <UserCheck size={10} className="shrink-0" />
                           <span className="truncate">{event?.conformityEvaluatorName ?? "Sem avaliador"}</span>
                         </button>
