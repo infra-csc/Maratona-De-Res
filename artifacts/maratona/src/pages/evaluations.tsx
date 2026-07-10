@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2 } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -261,8 +261,11 @@ export default function EvaluationsPage() {
   });
   const conformityEvalMutation = useSetEventConformity({
     mutation: {
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["event-conformity-eval", selectedEventId] }),
-      onError: () => toast({ title: "Erro ao salvar conformidade", variant: "destructive" }),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["event-conformity-eval", selectedEventId] });
+        qc.invalidateQueries({ queryKey: ["conformity-admin", selectedEventId] });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e?.message ?? "Não foi possível salvar. Tente novamente.", variant: "destructive" }),
     },
   });
   // Users for redirect popups (loaded lazily)
@@ -2068,21 +2071,21 @@ export default function EvaluationsPage() {
                     </p>
                     <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
                       <div className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
-                        <div className="flex items-center justify-between gap-3 min-h-[56px]">
-                          <span className="text-sm font-bold italic text-[#191c1e] leading-snug">Todos os equipamentos e ferramentas retornaram?</span>
+                        <div className="flex flex-wrap items-center justify-between gap-3 min-h-[56px]">
+                          <span className="text-sm font-bold italic text-[#191c1e] leading-snug flex-1 min-w-[200px]">Todos os equipamentos e ferramentas retornaram?</span>
                           <div className="flex items-center gap-2 shrink-0">
                             {isNao && <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>}
                             <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
                               <button type="button"
-                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: null })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: null } }); }}
+                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: null })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
                                 className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === null ? "bg-[#d4a800] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                               >Pendente</button>
                               <button type="button"
-                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: true } }); }}
+                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: true } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
                                 className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                               >Sim</button>
                               <button type="button"
-                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: false } }); }}
+                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: false } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
                                 className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${val === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                               >Não</button>
                             </div>
@@ -2105,9 +2108,9 @@ export default function EvaluationsPage() {
                         <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
                           <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Salvar observação</span>
                           <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
-                            onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }); }}
+                            onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }, { onSuccess: () => toast({ title: "Observação salva" }) }); }}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
-                          ><Save size={12} /> Salvar</button>
+                          >{conformityEvalMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Salvar</button>
                         </div>
                       )}
                     </div>
@@ -2181,17 +2184,17 @@ export default function EvaluationsPage() {
                           const isNao = val === false;
                           return (
                             <div key={item.key} className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
-                              <div className="flex items-center justify-between gap-3 min-h-[56px]">
-                                <span className="text-sm font-bold italic text-[#191c1e] leading-snug">{item.question}</span>
+                              <div className="flex flex-wrap items-center justify-between gap-3 min-h-[56px]">
+                                <span className="text-sm font-bold italic text-[#191c1e] leading-snug flex-1 min-w-[200px]">{item.question}</span>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {isNao && <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>}
                                   <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
                                     <button type="button"
-                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: true } }); }}
+                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: true } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
                                       className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >Sim</button>
                                     <button type="button"
-                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: false } }); }}
+                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: false } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
                                       className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${val === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >Não</button>
                                   </div>
