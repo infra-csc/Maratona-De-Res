@@ -2243,7 +2243,7 @@ export default function EvaluationsPage() {
                         <label className="block text-sm font-black italic uppercase text-[#191c1e]">Algum profissional teve um desempenho fora da curva?</label>
                         <div className="flex gap-2">
                           <button type="button"
-                            onClick={() => { setConformityEvalForm(f => ({ ...f, standoutResponse: false, standoutJustification: '' })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { standoutResponse: false, standoutJustification: null } }); }}
+                            onClick={() => { setConformityEvalForm(f => ({ ...f, standoutResponse: false, standoutJustification: '' })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { standoutResponse: false, standoutJustification: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
                             className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${conformityEvalForm.standoutResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                           >Não, dentro do padrão esperado</button>
                           <button type="button"
@@ -2274,7 +2274,10 @@ export default function EvaluationsPage() {
                           if (!selectedEventId || !canSaveTexts) return;
                           const payload: Record<string, unknown> = { absencesReport: conformityEvalForm.absencesReport || null, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
                           cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
-                          conformityEvalMutation.mutate({ id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] });
+                          conformityEvalMutation.mutate(
+                            { id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] },
+                            { onSuccess: () => toast({ title: "Observações salvas" }) },
+                          );
                         }}
                         className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
                       ><Save size={14} /> Salvar observações</button>
