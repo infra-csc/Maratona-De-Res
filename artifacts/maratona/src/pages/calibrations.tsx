@@ -16,18 +16,6 @@ import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 
-function statusChip(status: string): { label: string; cls: string } {
-  const map: Record<string, { label: string; cls: string }> = {
-    open: { label: "Em avaliação", cls: "bg-[#ccff00] text-[#161e00]" },
-    closed: { label: "Fechado", cls: "bg-[#d8dadc] text-[#444933]" },
-    calibration: { label: "Calibração", cls: "bg-[#ff5722] text-white" },
-    calibrated: { label: "Calibrado", cls: "bg-[#506600] text-[#ccff00]" },
-    computed: { label: "Computado", cls: "bg-[#191c1e] text-[#ccff00]" },
-    pending: { label: "Pendente", cls: "bg-[#ffb5a0] text-[#3b0900]" },
-  };
-  return map[status] ?? { label: status, cls: "bg-[#d8dadc] text-[#444933]" };
-}
-
 // Badge do seletor de eventos: eventos históricos sempre "Fechado"; demais mostram
 // o estado real da publicação de feedback (final > parcial), nunca o status
 // bruto do evento — sem publicação nenhuma, continua "Em Avaliação" mesmo fechado.
@@ -598,9 +586,6 @@ export default function CalibrationsPage() {
                       <span className="text-2xl font-black italic text-[#506600] leading-none">{feedback.eventScore.toFixed(1)}<span className="text-sm text-[#747a60]">/100</span></span>
                     </div>
                   )}
-                  <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${statusChip(pickedEvent.status).cls}`}>
-                    <span className="inline-block skew-x-[8deg]">{statusChip(pickedEvent.status).label}</span>
-                  </span>
                   <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0 ${alreadyReleased ? "bg-[#191c1e] text-[#ccff00]" : partialPublishedAtDate ? "bg-[#ffb5a0] text-[#3b0900]" : "bg-[#d8dadc] text-[#444933]"}`}>
                     <span className="inline-block skew-x-[8deg]">{alreadyReleased ? "Avaliação Final" : partialPublishedAtDate ? "Avaliação Parcial" : "Não Publicada"}</span>
                   </span>
