@@ -2465,7 +2465,7 @@ export default function EvaluationsPage() {
                   {isEvaluator && (myCriteria.length > 0 || extraConformityItemsTotal > 0) && (
                     <div className="p-5 border-b-2 border-[#eceef0]">
                       <p className="text-xs font-bold italic uppercase text-[#444933] mb-3">Resumo das Notas</p>
-                      <div className="space-y-2">
+                      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                         {myCriteria.map(c => {
                           const ev = getEval(c.criterionId);
                           const score = currentScore(c.criterionId);
