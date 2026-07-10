@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle, Settings2, Search, Calendar } from "lucide-react";
+import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle, Settings2, Search, Calendar, Copy } from "lucide-react";
 import { useAllCriterionRoutings, useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
 
@@ -500,6 +500,34 @@ export default function CriteriaPage() {
 
   const routingCriterion = routingDialogId != null ? (criteria ?? []).find(c => c.id === routingDialogId) : null;
 
+  const [duplicateSourceId, setDuplicateSourceId] = useState<number | null>(null);
+  const [duplicateAreaId, setDuplicateAreaId] = useState<string>("");
+  const duplicateSource = duplicateSourceId != null ? (criteria ?? []).find(c => c.id === duplicateSourceId) : null;
+
+  const duplicateMutation = useCreateCriterion({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: qKey });
+        toast({ title: "Critério duplicado" });
+        setDuplicateSourceId(null);
+        setDuplicateAreaId("");
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao duplicar", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const handleDuplicate = () => {
+    if (!duplicateSource || !duplicateAreaId) return;
+    duplicateMutation.mutate({
+      data: {
+        name: duplicateSource.name,
+        description: duplicateSource.description ?? undefined,
+        defaultWeight: Number(duplicateSource.defaultWeight),
+        responsibleAreaId: Number(duplicateAreaId),
+      },
+    });
+  };
+
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="p-6 md:p-10 space-y-10">
@@ -659,13 +687,24 @@ export default function CriteriaPage() {
                           {c.description && <p className="text-xs text-[#747a60] mt-1 max-w-md leading-relaxed">{c.description}</p>}
                         </td>
                         <td className="px-6 py-4">
-                          {c.responsibleAreaName ? (
-                            <span className="bg-[#eceef0] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1.5">
-                              <span className="inline-flex items-center gap-1.5 skew-x-[8deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
-                            </span>
-                          ) : (
-                            <span className="text-[#c4c9ac]">—</span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {c.responsibleAreaName ? (
+                              <span className="bg-[#eceef0] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1.5 skew-x-[8deg]"><Building2 size={12} /> {c.responsibleAreaName}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[#c4c9ac]">—</span>
+                            )}
+                            <button
+                              type="button"
+                              data-testid={`button-duplicate-criterion-${c.id}`}
+                              onClick={() => { setDuplicateSourceId(c.id); setDuplicateAreaId(""); }}
+                              title="Duplicar este critério para outra área"
+                              className="p-1 text-[#747a60] hover:text-[#191c1e] transition-colors shrink-0"
+                            >
+                              <Copy size={13} />
+                            </button>
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-center">
                           <CriterionWeightCell
@@ -792,6 +831,51 @@ export default function CriteriaPage() {
               })()}
               onClose={() => setRoutingDialogId(null)}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate criterion dialog */}
+      <Dialog open={duplicateSourceId !== null} onOpenChange={(v) => { if (!v) { setDuplicateSourceId(null); setDuplicateAreaId(""); } }}>
+        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-xl italic uppercase font-black tracking-tight flex items-center gap-2">
+              <Copy size={18} /> Duplicar Critério
+            </DialogTitle>
+          </DialogHeader>
+          {duplicateSource && (
+            <div className="space-y-5 pt-2">
+              <p className="text-sm text-[#444933] italic">
+                Cria uma cópia de <span className="font-bold">"{duplicateSource.name}"</span> (mesma descrição e peso) vinculada a outra área. Útil quando mais de uma área avalia o mesmo quesito e a nota final é a média entre elas.
+              </p>
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nova Área Responsável <span className="text-[#ba1a1a]">*</span></Label>
+                <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
+                  <SelectTrigger data-testid="select-duplicate-area" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+                    <SelectValue placeholder="Selecione a área..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(areas ?? [])
+                      .filter(a => a.id !== duplicateSource.responsibleAreaId)
+                      .map(a => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+                <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setDuplicateSourceId(null); setDuplicateAreaId(""); }}>Cancelar</Button>
+                <button
+                  type="button"
+                  data-testid="button-confirm-duplicate"
+                  disabled={!duplicateAreaId || duplicateMutation.isPending}
+                  onClick={handleDuplicate}
+                  className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                >
+                  {duplicateMutation.isPending ? "Duplicando..." : "Duplicar Critério"}
+                </button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
