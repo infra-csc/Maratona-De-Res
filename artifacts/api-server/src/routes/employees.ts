@@ -129,7 +129,7 @@ router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(eligibilityReason !== undefined && { eligibilityReason }),
   }).where(eq(employeesTable.id, id)).returning();
   await audit(req.user!.userId, "update", "employees", id, before, employee);
-  if (active !== undefined || eligibleForBonus !== undefined || eligibilityStatus !== undefined) {
+  if (active !== undefined || eligibleForBonus !== undefined || eligibilityStatus !== undefined || (functionName !== undefined && functionName !== before.functionName)) {
     const cycle = await getCurrentCycle();
     if (cycle) await recomputeCycleResults(cycle.id, req.user!.userId);
   }
