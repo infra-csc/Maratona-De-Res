@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2, X } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -511,7 +511,10 @@ export default function EvaluationsPage() {
   // Evento, the filter must still return something — a cross-event overview
   // of that avaliador's assigned events, instead of the generic empty state.
   // Same query-key pattern as the evaluator overview above (deduped/cached).
-  const crossEventLookupActive = isConsultation && selectedAvaliadorId != null && !selectedEventId;
+  // Also activates with NO avaliador picked as long as Status is narrowed to
+  // Pendentes/Avaliadas — otherwise that filter had zero visible effect
+  // (the generic "Pronto para consultar" empty state ignored it entirely).
+  const crossEventLookupActive = isConsultation && !selectedEventId && (selectedAvaliadorId != null || statusFilter !== "all");
   const crossEventCriteriaQueries = useQueries({
     queries: crossEventLookupActive
       ? activeEvents.map(ev => ({
@@ -538,30 +541,51 @@ export default function EvaluationsPage() {
   });
   const crossEventAvaliadorStats = crossEventLookupActive
     ? activeEvents.map((ev, i) => {
-        const areaIds = new Set(
-          (crossEventDetailQueries[i]?.data?.areaAssignments ?? [])
-            .filter(a => a.evaluatorUserId === selectedAvaliadorId)
-            .map(a => a.areaId),
-        );
-        const crit = (crossEventCriteriaQueries[i]?.data ?? []).filter(
-          c => c.active && c.responsibleAreaId != null && areaIds.has(c.responsibleAreaId),
-        );
+        const detail = crossEventDetailQueries[i]?.data;
         const evs = crossEventEvalQueries[i]?.data ?? [];
-        const submitted = crit.filter(
-          c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === selectedAvaliadorId)?.status === "submitted",
-        ).length;
+        const critAll = (crossEventCriteriaQueries[i]?.data ?? []).filter(
+          c => c.active && c.responsibleAreaId != null,
+        );
+        if (selectedAvaliadorId != null) {
+          const areaIds = new Set(
+            (detail?.areaAssignments ?? [])
+              .filter(a => a.evaluatorUserId === selectedAvaliadorId)
+              .map(a => a.areaId),
+          );
+          const crit = critAll.filter(c => areaIds.has(c.responsibleAreaId!));
+          const submitted = crit.filter(
+            c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === selectedAvaliadorId)?.status === "submitted",
+          ).length;
+          const total = crit.length;
+          // Mesma trava: consulta de RH/gestores também só marca como concluído
+          // depois que os resultados do evento forem confirmados.
+          return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
+        }
+        // Sem avaliador selecionado: agrega TODOS os avaliadores designados —
+        // um critério só conta como concluído quando TODOS os avaliadores da
+        // área confirmaram (mesma regra de completude usada no evento aberto).
+        const evaluatorIdsByArea = new Map<number, number[]>();
+        for (const a of (detail?.areaAssignments ?? [])) {
+          if (a.evaluatorUserId == null) continue;
+          const list = evaluatorIdsByArea.get(a.areaId);
+          if (list) list.push(a.evaluatorUserId);
+          else evaluatorIdsByArea.set(a.areaId, [a.evaluatorUserId]);
+        }
+        const crit = critAll.filter(c => (evaluatorIdsByArea.get(c.responsibleAreaId!) ?? []).length > 0);
+        const submitted = crit.filter(c => {
+          const assignedIds = evaluatorIdsByArea.get(c.responsibleAreaId!) ?? [];
+          return assignedIds.every(uid => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === uid)?.status === "submitted");
+        }).length;
         const total = crit.length;
-        // Mesma trava: consulta de RH/gestores também só marca como concluído
-        // depois que os resultados do evento forem confirmados.
         return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
       }).filter(s => s.relevant)
     : [];
   const crossEventAvaliadorFiltered = statusFilter === "all"
     ? crossEventAvaliadorStats
     : crossEventAvaliadorStats.filter(s => (statusFilter === "done" ? s.done : !s.done));
-  const crossEventAvaliadorEvents = [...crossEventAvaliadorFiltered]
-    .sort((a, b) => (a.event.name ?? "").localeCompare(b.event.name ?? "", "pt-BR", { sensitivity: "base" }))
-    .map(s => s.event);
+  const crossEventAvaliadorEntries = [...crossEventAvaliadorFiltered]
+    .sort((a, b) => (a.event.name ?? "").localeCompare(b.event.name ?? "", "pt-BR", { sensitivity: "base" }));
+  const crossEventAvaliadorEvents = crossEventAvaliadorEntries.map(s => s.event);
   const selectedAvaliadorName = allAvaliadores.find(a => a.id === selectedAvaliadorId)?.name ?? null;
 
   // If the selected event stops being selectable (closed or criteria unconfirmed
@@ -1303,29 +1327,47 @@ export default function EvaluationsPage() {
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <User size={22} />
-              <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">Avaliações de {selectedAvaliadorName}</h3>
+              <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">
+                {selectedAvaliadorName ? `Avaliações de ${selectedAvaliadorName}` : "Avaliações — Todos os Avaliadores"}
+              </h3>
             </div>
             <p className="text-sm text-[#444933] italic px-1 -mt-1">
-              Todos os eventos com avaliações atribuídas a este avaliador. Clique em um evento para consultar os critérios em detalhe.
+              {selectedAvaliadorName
+                ? "Todos os eventos com avaliações atribuídas a este avaliador. Clique em um evento para consultar os critérios em detalhe."
+                : "Eventos filtrados pelo status selecionado, considerando todos os avaliadores. Clique em um evento para consultar os critérios em detalhe."}
             </p>
-            {crossEventAvaliadorEvents.length === 0 ? (
+            {crossEventAvaliadorEntries.length === 0 ? (
               <div className="text-center py-24 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
                 {statusFilter === "pending"
-                  ? `Nenhuma avaliação pendente para ${selectedAvaliadorName}.`
+                  ? `Nenhuma avaliação pendente${selectedAvaliadorName ? ` para ${selectedAvaliadorName}` : ""}.`
                   : statusFilter === "done"
-                    ? `Nenhuma avaliação concluída para ${selectedAvaliadorName}.`
-                    : `Nenhum evento com avaliações atribuídas a ${selectedAvaliadorName}.`}
+                    ? `Nenhuma avaliação concluída${selectedAvaliadorName ? ` para ${selectedAvaliadorName}` : ""}.`
+                    : `Nenhum evento com avaliações atribuídas${selectedAvaliadorName ? ` a ${selectedAvaliadorName}` : ""}.`}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {crossEventAvaliadorEvents.map(ev => (
-                  <EvaluatorEventCard
+                {crossEventAvaliadorEntries.map(({ event: ev, total, submitted, done }) => (
+                  <button
                     key={ev.id}
-                    event={ev}
-                    userId={selectedAvaliadorId ?? undefined}
-                    selected={false}
-                    onSelect={() => setSelectedEventId(ev.id)}
-                  />
+                    type="button"
+                    data-testid={`card-cross-event-${ev.id}`}
+                    onClick={() => setSelectedEventId(ev.id)}
+                    className={`text-left bg-white border-2 border-[#191c1e] p-5 transition-all hover:bg-[#f7f9fb] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <span className="font-black italic uppercase text-sm leading-tight">{ev.name}</span>
+                      {done ? (
+                        <CheckCircle size={16} className="shrink-0 text-[#506600]" />
+                      ) : (
+                        <span className="shrink-0 text-[9px] font-black italic uppercase text-[#862200] tracking-wide">pendente</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-bold italic uppercase text-[#747a60]">{ev.clientName}</p>
+                    <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2 mt-3 mb-1.5">
+                      <div className="bg-[#ccff00] h-full" style={{ width: `${total ? (submitted / total) * 100 : 0}%` }} />
+                    </div>
+                    <p className="text-[11px] text-[#747a60] italic">{submitted} de {total} critérios preenchidos.</p>
+                  </button>
                 ))}
               </div>
             )}
