@@ -115,6 +115,7 @@ async function loadEventDetail(id: number) {
       employeeName: employeesTable.name,
       employmentType: employeesTable.employmentType,
       functionName: eventParticipantsTable.functionName,
+      employeeFunction: employeesTable.functionName,
       teamName: eventParticipantsTable.teamName,
       confirmed: eventParticipantsTable.confirmed,
       scheduledDiariaCount: eventParticipantsTable.scheduledDiariaCount,
@@ -566,6 +567,7 @@ router.get("/events/:id/participants", async (req, res) => {
       employeeName: employeesTable.name,
       employmentType: employeesTable.employmentType,
       functionName: eventParticipantsTable.functionName,
+      employeeFunction: employeesTable.functionName,
       teamName: eventParticipantsTable.teamName,
       confirmed: eventParticipantsTable.confirmed,
       scheduledDiariaCount: eventParticipantsTable.scheduledDiariaCount,
@@ -592,7 +594,7 @@ router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, 
   const employmentType = emp?.employmentType ?? "casa";
   res.status(201).json({
     ...participant, employeeName: emp?.name ?? "", employmentType,
-    countsForScore: participantCountsForScore({ employmentType, functionName: participant.functionName }),
+    countsForScore: participantCountsForScore({ employmentType, functionName: participant.functionName, employeeFunction: emp?.functionName }),
   });
 });
 
@@ -636,9 +638,11 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
   const employmentType = emp?.employmentType ?? "casa";
 
   // Se functionName for alterado, usa o novo valor para calcular countsForScore;
-  // caso contrário usa o valor já registrado no evento (nunca o cargo global atual).
+  // caso contrário usa o valor já registrado no evento. O cargo global
+  // (emp.functionName) também é considerado — se for "Sup Ceno *", nunca
+  // conta para nota, independentemente do valor deste evento específico.
   const effectiveFunctionName = functionName !== undefined ? functionName : existing.functionName;
-  const countsForScore = participantCountsForScore({ employmentType, functionName: effectiveFunctionName });
+  const countsForScore = participantCountsForScore({ employmentType, functionName: effectiveFunctionName, employeeFunction: emp?.functionName });
 
   const changesDiaria = normalizedDates !== undefined;
   if (changesDiaria && !countsForScore) {

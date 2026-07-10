@@ -198,6 +198,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
       employeeId: eventParticipantsTable.employeeId,
       functionName: eventParticipantsTable.functionName,
       employmentType: employeesTable.employmentType,
+      employeeFunction: employeesTable.functionName,
     })
       .from(eventParticipantsTable)
       .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
@@ -254,6 +255,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
         eventId: eventParticipantsTable.eventId,
         functionName: eventParticipantsTable.functionName,
         employmentType: employeesTable.employmentType,
+        employeeFunction: employeesTable.functionName,
       })
         .from(eventParticipantsTable)
         .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
@@ -261,11 +263,13 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     : [];
   // Colaboradores que participaram como "Sup Ceno *" em qualquer evento
   // confirmado do ciclo são inelegíveis para o ranking/bônus, mesmo que
-  // tenham outras participações que contam para nota.
+  // tenham outras participações que contam para nota. O cargo global
+  // (employeeFunction) também marca como Sup Ceno mesmo se a participação
+  // pontual do evento tiver outra função registrada.
   const supCenoEmployeeIds = new Set<number>();
   for (const r of participationRows) {
     if (!r.employeeId) continue;
-    if (isInformationalFunction(r.functionName)) supCenoEmployeeIds.add(r.employeeId);
+    if (isInformationalFunction(r.functionName) || isInformationalFunction(r.employeeFunction)) supCenoEmployeeIds.add(r.employeeId);
   }
 
   const participatedByEmployee = new Map<number, Set<number>>();

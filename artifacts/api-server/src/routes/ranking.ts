@@ -142,7 +142,7 @@ router.get("/ranking-detail", async (req, res) => {
     // Freela/função informativa (ex.: "Sup Ceno *"): participação aparece no
     // histórico do colaborador mas não conta para nota — mesma regra do
     // fechamento (recomputeCycleResults, ver lib/participation.ts).
-    const countsForScore = participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName });
+    const countsForScore = participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName, employeeFunction: employee.functionName });
     const noScoreReason: string | null = countsForScore ? null
       : isInformationalFunction(p.functionName) ? "sup_ceno"
       : employee.employmentType === "freela" ? "freela"

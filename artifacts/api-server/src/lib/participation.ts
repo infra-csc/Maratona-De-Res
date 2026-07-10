@@ -63,12 +63,20 @@ export function isSyncableFunction(functionName?: string | null): boolean {
  * contam, independente de qual for a outra condição. Qualquer outra função
  * (inclusive em branco, para participantes adicionados manualmente) conta
  * normalmente — preserva o comportamento pré-existente.
+ *
+ * `employeeFunction` é o CARGO GLOBAL do colaborador (employees.functionName,
+ * exibido em Colaboradores). Se o cargo global for "Sup Ceno *", o
+ * colaborador nunca conta para nota em NENHUM evento, mesmo que uma
+ * participação específica tenha sido sincronizada com outra função — o cargo
+ * cadastral é a fonte da verdade, não o valor pontual do evento.
  */
 export function participantCountsForScore(params: {
   employmentType?: string | null;
   functionName?: string | null;
+  employeeFunction?: string | null;
 }): boolean {
   if (params.employmentType === "freela") return false;
   if (isInformationalFunction(params.functionName)) return false;
+  if (isInformationalFunction(params.employeeFunction)) return false;
   return true;
 }

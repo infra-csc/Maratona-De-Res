@@ -213,7 +213,7 @@ router.get("/my-performance", async (req, res) => {
       // Freela/função informativa (ex.: "Sup Ceno *"): participação aparece
       // no histórico mas não conta para a média/bônus — mesma regra do
       // fechamento (recomputeCycleResults, ver lib/participation.ts).
-      countsForScore: participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName }),
+      countsForScore: participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName, employeeFunction: employee.functionName }),
       // Trava mestra: evento só conta para média/elegibilidade depois de
       // confirmado por admin/RH (mesma regra de recomputeCycleResults).
       resultsConfirmed: p.resultsConfirmed ?? false,
