@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, useGetReviewRequests, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -218,6 +218,12 @@ export default function CalibrationsPage() {
   const { data: eventComments } = useGetEventComments(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-comments", selectedEventId] as unknown[] },
   });
+  const canSeeReviewRequests = ["admin", "rh", "diretoria"].includes(user?.role ?? "");
+  const { data: allReviewRequests } = useGetReviewRequests({
+    query: { enabled: canSeeReviewRequests, queryKey: ["review-requests"] as unknown[] },
+  });
+  const eventReviewRequests = (allReviewRequests ?? []).filter(r => r.eventId === selectedEventId);
+  const pendingEventReviewRequests = eventReviewRequests.filter(r => r.status === "pending");
 
   async function handlePublishCriterionPartial(criterionId: number) {
     if (!selectedEventId) return;
@@ -595,6 +601,37 @@ export default function CalibrationsPage() {
                   >
                     <ExternalLink size={12} /> Ver Gerenciamento
                   </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Revisão Sinalizada — pedido de revisão feito pelo colaborador para este evento */}
+            {eventReviewRequests.length > 0 && (
+              <div className={cn(
+                "border-2 border-[#191c1e] p-4",
+                pendingEventReviewRequests.length > 0 ? "bg-[#ffb5a0]" : "bg-[#f2f4f6]"
+              )}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Flag size={14} className="text-[#3b0900] shrink-0" />
+                  <span className="text-[11px] font-black italic uppercase tracking-wider text-[#3b0900]">
+                    Revisão Sinalizada {pendingEventReviewRequests.length > 0 && `— ${pendingEventReviewRequests.length} pendente${pendingEventReviewRequests.length === 1 ? "" : "s"}`}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {eventReviewRequests.map(r => (
+                    <div key={r.id} className="bg-white border-2 border-[#191c1e] p-3">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[11px] font-black italic uppercase text-[#191c1e] truncate">{r.employeeName}</span>
+                        <span className={`px-2 py-0.5 border border-[#191c1e] font-bold text-[9px] italic uppercase shrink-0 ${r.status === "pending" ? "bg-[#862200] text-white" : "bg-[#e0e3e5] text-[#444933]"}`}>
+                          {r.status === "pending" ? "Pendente" : "Resolvida"}
+                        </span>
+                      </div>
+                      <p className="text-xs italic text-[#444933]">"{r.comment}"</p>
+                      {r.status === "resolved" && r.resolutionNotes && (
+                        <p className="text-[10px] font-bold italic uppercase text-[#747a60] mt-1">Resposta: {r.resolutionNotes}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
