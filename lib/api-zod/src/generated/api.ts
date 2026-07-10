@@ -3118,6 +3118,18 @@ export const CloseQuarterResponse = zod.object({
 
 
 /**
+ * @summary Recompute the current cycle's results without closing it
+ */
+export const RecomputeQuarterResponse = zod.object({
+  "success": zod.boolean(),
+  "cycleId": zod.number().optional(),
+  "forced": zod.boolean().optional(),
+  "totalProcessed": zod.number(),
+  "warnings": zod.array(zod.string()).optional()
+})
+
+
+/**
  * @summary Update bonus payment status (Caju Saldo Livre)
  */
 export const UpdateBonusPaymentParams = zod.object({

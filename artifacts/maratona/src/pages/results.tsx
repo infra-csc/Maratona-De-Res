@@ -3,7 +3,7 @@ import {
   useGetRanking, getGetRankingQueryKey, exportRanking,
   useGetRankingDetail, getGetRankingDetailQueryKey,
   useGetQuarterlyResults, getGetQuarterlyResultsQueryKey, exportQuarterlyResults,
-  useCloseQuarter, useUpdateBonusPayment,
+  useCloseQuarter, useUpdateBonusPayment, useRecomputeQuarter,
 } from "@workspace/api-client-react";
 import type { QuarterlyResult } from "@workspace/api-client-react";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Download, LockKeyhole, Wallet, CheckCircle2, Wallet2, Users,
   Search, Trophy, Crown, Award, AlertTriangle, MapPin, ChevronRight, Table2, ListOrdered,
-  ArrowUpDown, ArrowUp, ArrowDown,
+  ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -914,6 +914,17 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
     });
   }
 
+  const recomputeMutation = useRecomputeQuarter({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: qKey });
+        qc.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        toast({ title: `Ciclo recalculado! ${data.totalProcessed} colaborador(es) processado(s).` });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao recalcular ciclo", description: e.message, variant: "destructive" }),
+    },
+  });
+
   const paymentMutation = useUpdateBonusPayment({
     mutation: {
       onSuccess: () => {
@@ -1007,6 +1018,18 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
         >
           <Download size={15} /> Exportar
         </button>
+
+        {canManage && (
+          <button
+            data-testid="button-recompute-quarter"
+            onClick={() => recomputeMutation.mutate()}
+            disabled={recomputeMutation.isPending}
+            title="Recalcula os resultados do ciclo atual agora, sem fechar o ciclo (ex.: após alterar o cargo de um colaborador)"
+            className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+          >
+            <RefreshCw size={15} className={recomputeMutation.isPending ? "animate-spin" : ""} /> {recomputeMutation.isPending ? "Recalculando..." : "Recalcular Ciclo"}
+          </button>
+        )}
 
         {canManage && (
           <AlertDialog onOpenChange={(o) => { if (!o) { setForceClose(false); setForceReason(""); } }}>

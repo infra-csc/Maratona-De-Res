@@ -713,6 +713,22 @@ router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"),
 });
 
 /**
+ * POST /results/quarterly/recompute
+ * Recalcula o ciclo atual (mesma lógica de recomputeCycleResults usada no
+ * fechamento/reabertura de eventos) SEM fechar o ciclo. Serve como um botão
+ * manual de "atualizar agora" para casos em que um dado que afeta o cálculo
+ * (ex.: cargo global de um colaborador) mudou fora do fluxo normal de evento
+ * e o usuário não quer esperar o próximo fechamento.
+ */
+router.post("/results/quarterly/recompute", requireRole("admin", "rh"), async (req, res) => {
+  const cycle = await getCurrentCycle();
+  if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
+  const { processed, warnings } = await recomputeCycleResults(cycle.id, req.user!.userId);
+  await audit(req.user!.userId, "recompute_cycle", "cycles", cycle.id, null, { totalProcessed: processed });
+  res.json({ success: true, cycleId: cycle.id, totalProcessed: processed, warnings, forced: false });
+});
+
+/**
  * PATCH /results/quarterly/:id/payment
  * Atualiza status/pagamento do bônus (Caju Saldo Livre).
  */

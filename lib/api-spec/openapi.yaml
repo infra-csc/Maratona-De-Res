@@ -2088,6 +2088,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuarterCloseResult"
 
+  /results/quarterly/recompute:
+    post:
+      operationId: recomputeQuarter
+      tags: [results]
+      summary: Recompute the current cycle's results without closing it
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuarterCloseResult"
+
   /results/quarterly/{id}/payment:
     patch:
       operationId: updateBonusPayment
