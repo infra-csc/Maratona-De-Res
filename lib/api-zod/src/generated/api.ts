@@ -2742,7 +2742,8 @@ export const GetPenaltyTypesResponseItem = zod.object({
   "kind": zod.enum(['penalty', 'merit']),
   "requiresEvent": zod.boolean(),
   "active": zod.boolean(),
-  "displayOrder": zod.number()
+  "displayOrder": zod.number(),
+  "retroactiveUpdated": zod.number().optional().describe('Quantidade de lançamentos já registrados no ciclo atual que também foram atualizados (só presente em respostas de update).')
 })
 export const GetPenaltyTypesResponse = zod.array(GetPenaltyTypesResponseItem)
 
@@ -2761,7 +2762,8 @@ export const CreatePenaltyTypeBody = zod.object({
   "kind": zod.enum(['penalty', 'merit']),
   "requiresEvent": zod.boolean().optional(),
   "active": zod.boolean().optional(),
-  "displayOrder": zod.number().optional()
+  "displayOrder": zod.number().optional(),
+  "applyScope": zod.enum(['future', 'cycle']).optional().describe('Ao editar points, define se a mudança vale só para novos lançamentos (future) ou também retroativamente para os já registrados no ciclo atual (cycle). Ignorado se points não mudou.')
 })
 
 
@@ -2783,7 +2785,8 @@ export const UpdatePenaltyTypeBody = zod.object({
   "kind": zod.enum(['penalty', 'merit']),
   "requiresEvent": zod.boolean().optional(),
   "active": zod.boolean().optional(),
-  "displayOrder": zod.number().optional()
+  "displayOrder": zod.number().optional(),
+  "applyScope": zod.enum(['future', 'cycle']).optional().describe('Ao editar points, define se a mudança vale só para novos lançamentos (future) ou também retroativamente para os já registrados no ciclo atual (cycle). Ignorado se points não mudou.')
 })
 
 export const UpdatePenaltyTypeResponse = zod.object({
@@ -2794,7 +2797,8 @@ export const UpdatePenaltyTypeResponse = zod.object({
   "kind": zod.enum(['penalty', 'merit']),
   "requiresEvent": zod.boolean(),
   "active": zod.boolean(),
-  "displayOrder": zod.number()
+  "displayOrder": zod.number(),
+  "retroactiveUpdated": zod.number().optional().describe('Quantidade de lançamentos já registrados no ciclo atual que também foram atualizados (só presente em respostas de update).')
 })
 
 

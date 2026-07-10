@@ -3949,6 +3949,9 @@ components:
           type: boolean
         displayOrder:
           type: integer
+        retroactiveUpdated:
+          type: integer
+          description: Quantidade de lançamentos já registrados no ciclo atual que também foram atualizados (só presente em respostas de update).
 
     PenaltyTypeInput:
       type: object
@@ -3970,6 +3973,10 @@ components:
           type: boolean
         displayOrder:
           type: integer
+        applyScope:
+          type: string
+          enum: [future, cycle]
+          description: Ao editar points, define se a mudança vale só para novos lançamentos (future) ou também retroativamente para os já registrados no ciclo atual (cycle). Ignorado se points não mudou.
 
     Rule:
       type: object

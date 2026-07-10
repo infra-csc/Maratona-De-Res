@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { PenaltyTypeInputApplyScope } from './penaltyTypeInputApplyScope';
 import type { PenaltyTypeInputKind } from './penaltyTypeInputKind';
 
 export interface PenaltyTypeInput {
@@ -16,4 +17,6 @@ export interface PenaltyTypeInput {
   requiresEvent?: boolean;
   active?: boolean;
   displayOrder?: number;
+  /** Ao editar points, define se a mudança vale só para novos lançamentos (future) ou também retroativamente para os já registrados no ciclo atual (cycle). Ignorado se points não mudou. */
+  applyScope?: PenaltyTypeInputApplyScope;
 }

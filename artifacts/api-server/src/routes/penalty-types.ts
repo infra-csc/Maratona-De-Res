@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { db, penaltyTypesTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { db, penaltyTypesTable, absencesTable } from "@workspace/db";
+import { eq, asc, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { getCurrentCycleId } from "../lib/cycle.js";
+import { recomputeCycleResults } from "./results.js";
 
 export async function loadPenaltyLabels(): Promise<Map<string, string>> {
   const rows = await db.select({ slug: penaltyTypesTable.slug, label: penaltyTypesTable.label }).from(penaltyTypesTable).orderBy(asc(penaltyTypesTable.id));
@@ -68,23 +70,46 @@ router.post("/penalty-types", requireRole("admin", "rh"), async (req, res) => {
 
 router.put("/penalty-types/:id", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const { label, points, requiresEvent, active, displayOrder } = req.body;
+  const { label, points, requiresEvent, active, displayOrder, applyScope } = req.body;
   const existing = await db.select().from(penaltyTypesTable).where(eq(penaltyTypesTable.id, id)).limit(1);
   if (!existing[0]) { res.status(404).json({ error: "Tipo não encontrado" }); return; }
   const update: Record<string, unknown> = {};
+  let pointsChanged = false;
   if (label !== undefined) update.label = label;
   if (points !== undefined) {
     if (!Number.isInteger(Number(points)) || Number(points) < 0) {
       res.status(400).json({ error: "points deve ser um inteiro não-negativo" }); return;
     }
     update.points = Number(points);
+    pointsChanged = Number(points) !== existing[0].points;
   }
   if (requiresEvent !== undefined) update.requiresEvent = requiresEvent;
   if (active !== undefined) update.active = active;
   if (displayOrder !== undefined) update.displayOrder = displayOrder;
   const [updated] = await db.update(penaltyTypesTable).set(update).where(eq(penaltyTypesTable.id, id)).returning();
   await audit(req.user!.userId, "update", "penalty_types", id, existing[0], updated);
-  res.json(updated);
+
+  // Se o valor em pontos mudou, o admin escolhe o alcance: só a partir de
+  // agora (lançamentos futuros já usam o novo valor automaticamente, pois
+  // são copiados do catálogo no momento do registro) ou retroativo, atualizando
+  // também os lançamentos já feitos neste tipo dentro do ciclo atual.
+  let retroactiveUpdated = 0;
+  if (pointsChanged && applyScope === "cycle") {
+    const cycleId = await getCurrentCycleId();
+    if (cycleId) {
+      const rows = await db
+        .update(absencesTable)
+        .set({ points: updated.points })
+        .where(and(eq(absencesTable.penaltyType, updated.slug), eq(absencesTable.cycleId, cycleId)))
+        .returning({ id: absencesTable.id });
+      retroactiveUpdated = rows.length;
+      if (retroactiveUpdated > 0) {
+        await recomputeCycleResults(cycleId, req.user!.userId);
+      }
+    }
+  }
+
+  res.json({ ...updated, retroactiveUpdated });
 });
 
 router.delete("/penalty-types/:id", requireRole("admin", "rh"), async (req, res) => {

@@ -941,6 +941,8 @@ export interface PenaltyType {
   requiresEvent: boolean;
   active: boolean;
   displayOrder: number;
+  /** Quantidade de lançamentos já registrados no ciclo atual que também foram atualizados (só presente em respostas de update). */
+  retroactiveUpdated?: number;
 }
 
 export type PenaltyTypeInputKind = typeof PenaltyTypeInputKind[keyof typeof PenaltyTypeInputKind];
@@ -949,6 +951,17 @@ export type PenaltyTypeInputKind = typeof PenaltyTypeInputKind[keyof typeof Pena
 export const PenaltyTypeInputKind = {
   penalty: 'penalty',
   merit: 'merit',
+} as const;
+
+/**
+ * Ao editar points, define se a mudança vale só para novos lançamentos (future) ou também retroativamente para os já registrados no ciclo atual (cycle). Ignorado se points não mudou.
+ */
+export type PenaltyTypeInputApplyScope = typeof PenaltyTypeInputApplyScope[keyof typeof PenaltyTypeInputApplyScope];
+
+
+export const PenaltyTypeInputApplyScope = {
+  future: 'future',
+  cycle: 'cycle',
 } as const;
 
 export interface PenaltyTypeInput {
@@ -960,6 +973,8 @@ export interface PenaltyTypeInput {
   requiresEvent?: boolean;
   active?: boolean;
   displayOrder?: number;
+  /** Ao editar points, define se a mudança vale só para novos lançamentos (future) ou também retroativamente para os já registrados no ciclo atual (cycle). Ignorado se points não mudou. */
+  applyScope?: PenaltyTypeInputApplyScope;
 }
 
 export interface Rule {

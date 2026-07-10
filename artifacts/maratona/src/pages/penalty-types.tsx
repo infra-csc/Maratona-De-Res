@@ -35,6 +35,8 @@ interface TypeFormData {
   displayOrder: number;
 }
 
+type ApplyScope = "future" | "cycle";
+
 export default function PenaltyTypesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -43,6 +45,7 @@ export default function PenaltyTypesPage() {
   const [open, setOpen] = useState(false);
   const [editingType, setEditingType] = useState<PenaltyType | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [applyScope, setApplyScope] = useState<ApplyScope>("future");
 
   const qKey = getGetPenaltyTypesQueryKey();
   const { data: types, isLoading } = useGetPenaltyTypes({ query: { queryKey: qKey } });
@@ -64,7 +67,18 @@ export default function PenaltyTypesPage() {
 
   const updateMutation = useUpdatePenaltyType({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: qKey }); toast({ title: "Tipo atualizado" }); setOpen(false); setEditingType(null); },
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: qKey });
+        const retro = (data as PenaltyType & { retroactiveUpdated?: number }).retroactiveUpdated ?? 0;
+        toast({
+          title: "Tipo atualizado",
+          description: retro > 0
+            ? `${retro} lançamento(s) já registrados neste ciclo foram atualizados com o novo valor. Os resultados foram recalculados.`
+            : undefined,
+        });
+        setOpen(false);
+        setEditingType(null);
+      },
       onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
     },
   });
@@ -101,6 +115,7 @@ export default function PenaltyTypesPage() {
 
   function openEdit(t: PenaltyType) {
     setEditingType(t);
+    setApplyScope("future");
     reset({
       slug: t.slug,
       label: t.label,
@@ -114,6 +129,7 @@ export default function PenaltyTypesPage() {
   }
 
   function onSubmit(d: TypeFormData) {
+    const pointsChanged = !!editingType && Number(d.points) !== editingType.points;
     const payload = {
       slug: d.slug.trim().toLowerCase().replace(/\s+/g, "_"),
       label: d.label.trim(),
@@ -122,6 +138,7 @@ export default function PenaltyTypesPage() {
       requiresEvent: d.requiresEvent,
       active: d.active,
       displayOrder: Number(d.displayOrder),
+      ...(pointsChanged ? { applyScope } : {}),
     };
     if (editingType) {
       updateMutation.mutate({ id: editingType.id, data: payload });
@@ -252,6 +269,42 @@ export default function PenaltyTypesPage() {
                 <Input type="number" min="0" {...register("points", { valueAsNumber: true, required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
               </div>
             </div>
+
+            {editingType && Number(watch("points")) !== editingType.points && (
+              <div className="space-y-2 border-2 border-[#191c1e] bg-[#fff8e1] px-4 py-3">
+                <p className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Aplicar mudança de pontos a partir de:</p>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setApplyScope("future")}
+                    className={cn(
+                      "w-full text-left px-3 py-2 border-2 border-[#191c1e] flex items-start gap-2",
+                      applyScope === "future" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white hover:bg-[#eceef0]",
+                    )}
+                  >
+                    <span className={cn("mt-0.5 h-3 w-3 rounded-full border-2 shrink-0", applyScope === "future" ? "bg-[#ccff00] border-[#ccff00]" : "border-[#191c1e]")} />
+                    <span>
+                      <span className="block font-black italic uppercase text-xs">Só a partir de agora</span>
+                      <span className="block text-[11px] italic opacity-80">Lançamentos já feitos neste ciclo mantêm o valor antigo. Só os novos usam o valor atualizado.</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApplyScope("cycle")}
+                    className={cn(
+                      "w-full text-left px-3 py-2 border-2 border-[#191c1e] flex items-start gap-2",
+                      applyScope === "cycle" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white hover:bg-[#eceef0]",
+                    )}
+                  >
+                    <span className={cn("mt-0.5 h-3 w-3 rounded-full border-2 shrink-0", applyScope === "cycle" ? "bg-[#ccff00] border-[#ccff00]" : "border-[#191c1e]")} />
+                    <span>
+                      <span className="block font-black italic uppercase text-xs">Todo o ciclo atual</span>
+                      <span className="block text-[11px] italic opacity-80">Atualiza também os lançamentos já registrados deste tipo no ciclo em andamento, e recalcula os resultados.</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo <span className="text-[#ba1a1a]">*</span></Label>

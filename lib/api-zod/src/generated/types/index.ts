@@ -124,6 +124,7 @@ export * from './mergeUserResult';
 export * from './migrateCriteriaCatalog200';
 export * from './penaltyType';
 export * from './penaltyTypeInput';
+export * from './penaltyTypeInputApplyScope';
 export * from './penaltyTypeInputKind';
 export * from './penaltyTypeKind';
 export * from './platoonDistribution';

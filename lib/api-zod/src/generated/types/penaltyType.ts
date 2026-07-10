@@ -16,4 +16,6 @@ export interface PenaltyType {
   requiresEvent: boolean;
   active: boolean;
   displayOrder: number;
+  /** Quantidade de lançamentos já registrados no ciclo atual que também foram atualizados (só presente em respostas de update). */
+  retroactiveUpdated?: number;
 }
