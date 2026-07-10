@@ -2200,12 +2200,12 @@ export default function EventDetailPage() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm italic text-[#444933]">
-                Enquanto os resultados não forem confirmados, este evento <strong>não conta</strong> na elegibilidade nem na nota final dos colaboradores — mesmo que já esteja fechado. Confirme após revisar as notas e a calibragem. Admin/RH pode confirmar ou reverter a qualquer momento.
+                A confirmação valida a <strong>equipe alocada</strong> que de fato participou do evento — pode ser feita em qualquer momento, mesmo com o evento aberto. Enquanto não confirmado, o evento não conta na elegibilidade dos colaboradores. Admin/RH pode confirmar ou reverter a qualquer momento.
               </p>
               {event.status !== "closed" && !event.resultsConfirmed && (
-                <p data-testid="text-confirm-requires-closed" className="text-sm italic text-[#ba1a1a] bg-[#ffedea] border-2 border-[#ba1a1a] px-3 py-2 flex items-start gap-2">
+                <p data-testid="text-confirm-requires-closed" className="text-sm italic text-[#444933] bg-[#f3f6e8] border-2 border-[#444933] px-3 py-2 flex items-start gap-2">
                   <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                  Este evento ainda está <strong>aberto</strong>. A confirmação só tem efeito depois que o evento for fechado (na tela de Calibração, em "Fechar Evento e Liberar Notas") — confirmar agora não muda nada nos resultados.
+                  Este evento ainda está <strong>aberto</strong>. Confirmar agora já garante a elegibilidade da equipe; a nota final só é calculada depois que o evento for fechado e as avaliações liberadas.
                 </p>
               )}
               {event.resultsConfirmed && event.resultsConfirmedAt && (
@@ -2227,8 +2227,7 @@ export default function EventDetailPage() {
                   <button
                     data-testid="button-confirm-results"
                     onClick={() => confirmResults.mutate({ id })}
-                    disabled={resultsConfirmBusy || event.status !== "closed"}
-                    title={event.status !== "closed" ? "Feche o evento antes de confirmar os resultados" : undefined}
+                    disabled={resultsConfirmBusy}
                     className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW}`}
                   >
                     <CheckCircle2 size={16} /> {resultsConfirmBusy ? "Confirmando..." : "Confirmar Resultados"}

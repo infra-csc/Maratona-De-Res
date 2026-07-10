@@ -1,27 +1,25 @@
 ---
-name: resultsConfirmed requires status=closed to have any effect
-description: Why confirming an event's results can silently do nothing — the confirm-results endpoint allows confirming regardless of status, but score aggregation ignores it unless the event is also closed
+name: resultsConfirmed is independent of event status
+description: Confirming a event's team/results is deliberately decoupled from open/closed status — only the final score calc needs closed
 ---
 
-# resultsConfirmed requires status=closed to have any effect
+# resultsConfirmed is independent of event status
 
 `POST /events/:id/confirm-results` sets `resultsConfirmed=true` unconditionally
-— by design it does not check `event.status` (comment in events.ts explicitly
-says "independente de status"). But `recomputeCycleResults` only includes an
-event in scoring (`closedEvents = confirmedCycleEvents.filter(e => e.status
-=== "closed")`) when it is BOTH `resultsConfirmed` AND `status === "closed"`.
+regardless of `event.status`. `recomputeCycleResults` already uses two
+separate filters: `confirmedCycleEvents` (resultsConfirmed only, drives
+`participatedEventsCount`/eligibility) vs `closedEvents` (resultsConfirmed AND
+status==="closed", drives the actual score/`eventsCount`). So confirming an
+open event DOES have immediate effect on eligibility — only the final score
+waits for close.
 
-**Why this matters:** confirming an open event "succeeds" (200, DB updated)
-but has zero visible effect on dashboard/results/ranking/bônus, since the
-event never enters `closedEvents`. This reads to users as "confirmation is
-broken" when it's actually working exactly as coded — the event just needs to
-be closed first (via the Calibração page's close/finalize flow).
+**Why this matters:** the confirm action's real purpose is validating the
+*allocated team that participated*, not gating the score. The frontend used
+to disable the confirm button and warn "confirming now changes nothing" while
+the event was open — that was misleading and got explicitly corrected by the
+user (2026-07-10): confirmation must be doable at any time.
 
-**How to apply:** when debugging "I confirmed but nothing changed", check
-`event.status` before assuming the confirm/recompute logic is broken. Verify
-via direct API test (login as seeded admin, curl the endpoint, inspect
-`quarterly_results`/`employee_event_results` row counts) rather than reading
-code alone — this isolates whether it's a data-state issue (event still open)
-vs an actual bug. The frontend now disables "Confirmar Resultados" and shows
-a warning while `status !== "closed"` (event-detail.tsx) to prevent this
-confusion at the source.
+**How to apply:** event-detail.tsx's "Confirmar Resultados" button has no
+status-based `disabled`; the info banner explains eligibility locks in
+immediately while final score still needs close+release. Don't reintroduce a
+status-gated disable/warning on this button.
