@@ -2205,7 +2205,9 @@ export default function EventDetailPage() {
               {event.status !== "closed" && !event.resultsConfirmed && (
                 <p data-testid="text-confirm-requires-closed" className="text-sm italic text-[#444933] bg-[#f3f6e8] border-2 border-[#444933] px-3 py-2 flex items-start gap-2">
                   <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                  Este evento ainda está <strong>aberto</strong>. Confirmar agora já garante a elegibilidade da equipe; a nota final só é calculada depois que o evento for fechado e as avaliações liberadas.
+                  <span>
+                    Este evento ainda está <strong>aberto</strong>. Confirmar agora já garante a elegibilidade da equipe; a nota final só é calculada depois que o evento for fechado e as avaliações liberadas.
+                  </span>
                 </p>
               )}
               {event.resultsConfirmed && event.resultsConfirmedAt && (
