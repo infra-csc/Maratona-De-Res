@@ -858,7 +858,24 @@ export default function EvaluationsPage() {
     return ev && (ev.status === "submitted" || ev.status === "draft");
   }).length;
 
-  const progressPct = myCriteria.length ? (completedCount / myCriteria.length) * 100 : 0;
+  // Beyond the scored criteria, avaliadores da Matriz de Conformidade also
+  // answer extra Sim/Não questions (Ferramentas e Case / Cenografia). Those
+  // must count toward "Resumo da Avaliação" too, or the sidebar undercounts
+  // this evaluator's real workload for the event.
+  const extraConformityItemsTotal =
+    (isFerramentasEvaluatorForEvent ? 1 : 0) +
+    (isConformityEvaluatorForEvent ? 4 : 0);
+  const extraConformityItemsCompleted =
+    (isFerramentasEvaluatorForEvent && conformityEvalForm.guardaEquipamentos !== null ? 1 : 0) +
+    (isConformityEvaluatorForEvent
+      ? [conformityEvalForm.epi, conformityEvalForm.estaiamentos, conformityEvalForm.conduta, conformityEvalForm.standoutResponse]
+          .filter(v => v !== null).length
+      : 0);
+
+  const totalItems = myCriteria.length + extraConformityItemsTotal;
+  const totalCompleted = completedCount + extraConformityItemsCompleted;
+
+  const progressPct = totalItems ? (totalCompleted / totalItems) * 100 : 0;
 
   async function handleExportPending() {
     try {
@@ -2306,7 +2323,9 @@ export default function EvaluationsPage() {
                     <p className="text-[11px] text-[#747a60] italic">
                       {isConsultation
                         ? `${teamSubmittedCount} de ${activeCriteria.length} critérios submetidos pelo time.`
-                        : `${completedCount} de ${myCriteria.length} critérios preenchidos (rascunho ou submetido).`}
+                        : extraConformityItemsTotal > 0
+                          ? `${totalCompleted} de ${totalItems} itens preenchidos — ${completedCount} de ${myCriteria.length} critérios e ${extraConformityItemsCompleted} de ${extraConformityItemsTotal} perguntas da matriz (rascunho ou submetido).`
+                          : `${completedCount} de ${myCriteria.length} critérios preenchidos (rascunho ou submetido).`}
                     </p>
                   </div>
 
@@ -2363,8 +2382,12 @@ export default function EvaluationsPage() {
                     </div>
                   )}
 
-                  {/* Grade summary — evaluators only */}
-                  {isEvaluator && myCriteria.length > 0 && (
+                  {/* Grade summary — evaluators only. Includes both scored
+                      criteria AND the extra Sim/Não questions from the
+                      Matriz de Conformidade (Ferramentas e Case / Cenografia),
+                      so nothing an avaliador has to fill out is left off the
+                      summary. */}
+                  {isEvaluator && (myCriteria.length > 0 || extraConformityItemsTotal > 0) && (
                     <div className="p-5 border-b-2 border-[#eceef0]">
                       <p className="text-xs font-bold italic uppercase text-[#444933] mb-3">Resumo das Notas</p>
                       <div className="space-y-2">
@@ -2389,6 +2412,31 @@ export default function EvaluationsPage() {
                             </div>
                           );
                         })}
+                        {isFerramentasEvaluatorForEvent && (
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[11px] font-bold italic uppercase text-[#191c1e] truncate">Guarda de Equipamentos</span>
+                            {conformityEvalForm.guardaEquipamentos === null ? (
+                              <span className="shrink-0 text-[10px] font-black italic uppercase text-[#862200] tracking-wide">pendente</span>
+                            ) : (
+                              <span className={`shrink-0 text-sm font-black italic ${conformityEvalForm.guardaEquipamentos ? "text-[#506600]" : "text-[#b02f00]"}`}>{conformityEvalForm.guardaEquipamentos ? "Sim" : "Não"}</span>
+                            )}
+                          </div>
+                        )}
+                        {isConformityEvaluatorForEvent && [
+                          { label: "EPI", val: conformityEvalForm.epi },
+                          { label: "Estaiamentos / Aterramentos", val: conformityEvalForm.estaiamentos },
+                          { label: "Conduta", val: conformityEvalForm.conduta },
+                          { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse },
+                        ].map(item => (
+                          <div key={item.label} className="flex items-center justify-between gap-3">
+                            <span className="text-[11px] font-bold italic uppercase text-[#191c1e] truncate">{item.label}</span>
+                            {item.val === null ? (
+                              <span className="shrink-0 text-[10px] font-black italic uppercase text-[#862200] tracking-wide">pendente</span>
+                            ) : (
+                              <span className={`shrink-0 text-sm font-black italic ${item.val ? "text-[#506600]" : "text-[#b02f00]"}`}>{item.val ? "Sim" : "Não"}</span>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
