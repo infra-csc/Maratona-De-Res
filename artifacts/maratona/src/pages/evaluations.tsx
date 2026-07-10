@@ -1449,7 +1449,7 @@ export default function EvaluationsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
 
               {/* Criteria Column / Evaluation Form */}
-              <div className="space-y-4">
+              <div className="space-y-4 order-2 lg:order-none">
                 <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
                   {isConsultation ? (<><ListChecks size={22} /> Status das Avaliações</>) : "Critérios de Avaliação"}
                 </h3>
@@ -2361,7 +2361,7 @@ export default function EvaluationsPage() {
               })()}
 
               {/* Right Sticky Panel */}
-              <div className="sticky top-6 space-y-6">
+              <div className="order-1 lg:order-none sticky top-2 lg:top-6 space-y-6 z-10">
                 <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                   <div className="bg-[#191c1e] text-[#ccff00] px-5 py-4 italic">
                     <h3 className="text-lg font-black uppercase tracking-tight">{isConsultation ? "Status do Time" : "Resumo da Avaliação"}</h3>
@@ -2453,17 +2453,24 @@ export default function EvaluationsPage() {
                           const hasScore = score != null;
                           const isSubmitted = ev?.status === "submitted";
                           const isDraft = ev?.status === "draft";
+                          const commentText = comments[c.criterionId] ?? ev?.comments ?? "";
+                          const missingComment = !isSubmitted && hasScore && !commentText.trim();
                           return (
-                            <div key={c.criterionId} className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-[11px] font-bold italic uppercase text-[#191c1e] truncate">{c.criterionName}</span>
-                                {isSubmitted && <Lock size={11} className="shrink-0 text-[#506600]" />}
-                                {isDraft && !isSubmitted && <span className="shrink-0 text-[9px] font-black italic uppercase text-[#862200] tracking-wide">rascunho</span>}
+                            <div key={c.criterionId} className="space-y-0.5">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[11px] font-bold italic uppercase text-[#191c1e] truncate">{c.criterionName}</span>
+                                  {isSubmitted && <Lock size={11} className="shrink-0 text-[#506600]" />}
+                                  {isDraft && !isSubmitted && <span className="shrink-0 text-[9px] font-black italic uppercase text-[#862200] tracking-wide">rascunho</span>}
+                                </div>
+                                {hasScore ? (
+                                  <span className="shrink-0 text-sm font-black italic text-[#506600]">{score}<span className="text-[10px] text-[#747a60]">/10</span></span>
+                                ) : (
+                                  <span className="shrink-0 text-sm font-black italic text-[#c2c6c9]">—</span>
+                                )}
                               </div>
-                              {hasScore ? (
-                                <span className="shrink-0 text-sm font-black italic text-[#506600]">{score}<span className="text-[10px] text-[#747a60]">/10</span></span>
-                              ) : (
-                                <span className="shrink-0 text-sm font-black italic text-[#c2c6c9]">—</span>
+                              {missingComment && (
+                                <p className="text-[10px] font-bold italic uppercase text-[#b02f00]">Falta preencher o comentário</p>
                               )}
                             </div>
                           );
