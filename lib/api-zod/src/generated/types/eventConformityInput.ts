@@ -24,6 +24,8 @@ export interface EventConformityInput {
   /** @nullable */
   condutaComment?: string | null;
   /** @nullable */
+  absencesResponse?: boolean | null;
+  /** @nullable */
   absencesReport?: string | null;
   /** @nullable */
   standoutResponse?: boolean | null;

@@ -179,11 +179,11 @@ export default function EvaluationsPage() {
   const [conformityEvalForm, setConformityEvalForm] = useState<{
     epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
     epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
-    absencesReport: string; standoutResponse: boolean | null; standoutJustification: string;
+    absencesResponse: boolean | null; absencesReport: string; standoutResponse: boolean | null; standoutJustification: string;
   }>({
     epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null,
     epiComment: '', estaiamentosComment: '', guardaEquipamentosComment: '', condutaComment: '',
-    absencesReport: '', standoutResponse: null, standoutJustification: '',
+    absencesResponse: null, absencesReport: '', standoutResponse: null, standoutJustification: '',
   });
   const [redirectConformityOpen, setRedirectConformityOpen] = useState(false);
   const [redirectConformityTargetId, setRedirectConformityTargetId] = useState<number | null>(null);
@@ -322,6 +322,7 @@ export default function EvaluationsPage() {
         estaiamentosComment: myConformityData.estaiamentosComment ?? '',
         guardaEquipamentosComment: myConformityData.guardaEquipamentosComment ?? '',
         condutaComment: myConformityData.condutaComment ?? '',
+        absencesResponse: myConformityData.absencesResponse ?? null,
         absencesReport: myConformityData.absencesReport ?? '',
         standoutResponse: myConformityData.standoutResponse ?? null,
         standoutJustification: myConformityData.standoutJustification ?? '',
@@ -330,7 +331,7 @@ export default function EvaluationsPage() {
       setConformityEvalForm({
         epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null,
         epiComment: '', estaiamentosComment: '', guardaEquipamentosComment: '', condutaComment: '',
-        absencesReport: '', standoutResponse: null, standoutJustification: '',
+        absencesResponse: null, absencesReport: '', standoutResponse: null, standoutJustification: '',
       });
     }
   }, [myConformityData?.id, selectedEventId]);
@@ -884,11 +885,11 @@ export default function EvaluationsPage() {
   // this evaluator's real workload for the event.
   const extraConformityItemsTotal =
     (isFerramentasEvaluatorForEvent ? 1 : 0) +
-    (isConformityEvaluatorForEvent ? 4 : 0);
+    (isConformityEvaluatorForEvent ? 5 : 0);
   const extraConformityItemsCompleted =
     (isFerramentasEvaluatorForEvent && conformityEvalForm.guardaEquipamentos !== null ? 1 : 0) +
     (isConformityEvaluatorForEvent
-      ? [conformityEvalForm.epi, conformityEvalForm.estaiamentos, conformityEvalForm.conduta, conformityEvalForm.standoutResponse]
+      ? [conformityEvalForm.epi, conformityEvalForm.estaiamentos, conformityEvalForm.conduta, conformityEvalForm.absencesResponse, conformityEvalForm.standoutResponse]
           .filter(v => v !== null).length
       : 0);
 
@@ -1712,10 +1713,12 @@ export default function EvaluationsPage() {
                                   ))}
                                 </ul>
                               )}
-                              {adminConformityData?.absencesReport ? (
-                                <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport}</p>
-                              ) : eventAbsences.length === 0 ? (
+                              {adminConformityData?.absencesResponse === true ? (
+                                <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport || "—"}</p>
+                              ) : adminConformityData?.absencesResponse === false ? (
                                 <p className="text-[11px] italic text-[#9aa088]">Nenhuma falta ou atraso registrada.</p>
+                              ) : eventAbsences.length === 0 ? (
+                                <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
                               ) : null}
                             </div>
 
@@ -2201,7 +2204,8 @@ export default function EvaluationsPage() {
                   { key: "conduta", commentKey: "condutaComment", label: "Conduta", question: "Conduta e comportamento foram adequados? (horários, ordens e regras)" },
                 ];
                 const standoutNeedsJustification = conformityEvalForm.standoutResponse === true && !conformityEvalForm.standoutJustification.trim();
-                const canSaveTexts = !standoutNeedsJustification;
+                const absencesNeedsReport = conformityEvalForm.absencesResponse === true && !conformityEvalForm.absencesReport.trim();
+                const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport;
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
                 return (
                   <div className="space-y-4">
@@ -2296,17 +2300,32 @@ export default function EvaluationsPage() {
                       )}
                     </div>
 
-                    {/* Absences text field */}
+                    {/* Absences question */}
                     <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-                      <div className="px-5 py-4 space-y-2">
+                      <div className="px-5 py-4 space-y-3">
                         <label className="block text-sm font-black italic uppercase text-[#191c1e]">Alguém faltou ou atrasou por mais de 30 minutos?</label>
-                        <p className="text-[11px] text-[#747a60] italic">Especifique nomes e motivo. Se ninguém faltou, deixe em branco.</p>
-                        <Textarea
-                          placeholder="Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso por trânsito."
-                          value={conformityEvalForm.absencesReport}
-                          onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
-                          className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
-                        />
+                        <div className="flex gap-2">
+                          <button type="button"
+                            onClick={() => { setConformityEvalForm(f => ({ ...f, absencesResponse: false, absencesReport: '' })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { absencesResponse: false, absencesReport: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
+                            className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${conformityEvalForm.absencesResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                          >Não, ninguém faltou/atrasou</button>
+                          <button type="button"
+                            onClick={() => setConformityEvalForm(f => ({ ...f, absencesResponse: true }))}
+                            className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${conformityEvalForm.absencesResponse === true ? "bg-[#b02f00] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                          >Sim, houve falta/atraso</button>
+                        </div>
+                        {conformityEvalForm.absencesResponse === true && (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black italic uppercase text-[#b02f00]">Especifique nomes e motivo <span>*</span> obrigatório</label>
+                            <Textarea
+                              placeholder="Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso por trânsito."
+                              value={conformityEvalForm.absencesReport}
+                              onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
+                              className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
+                            />
+                            {absencesNeedsReport && <p className="text-[10px] font-bold italic text-[#862200]">Descreva a ocorrência antes de salvar.</p>}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -2345,7 +2364,7 @@ export default function EvaluationsPage() {
                       <button type="button" disabled={!canSaveTexts || conformityEvalMutation.isPending}
                         onClick={() => {
                           if (!selectedEventId || !canSaveTexts) return;
-                          const payload: Record<string, unknown> = { absencesReport: conformityEvalForm.absencesReport || null, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
+                          const payload: Record<string, unknown> = { absencesResponse: conformityEvalForm.absencesResponse, absencesReport: conformityEvalForm.absencesReport || null, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
                           cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
                           conformityEvalMutation.mutate(
                             { id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] },
@@ -2421,7 +2440,7 @@ export default function EvaluationsPage() {
                               <span>Destaque de desempenho registrado</span>
                             </div>
                           )}
-                          {adminConformityData.absencesReport && (
+                          {adminConformityData.absencesResponse === true && (
                             <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#b02f00] bg-[#fff4e5] border border-[#b02f00] px-3 py-2">
                               <Clock size={13} className="shrink-0" />
                               <span>Faltas/atrasos registrados</span>
@@ -2489,6 +2508,7 @@ export default function EvaluationsPage() {
                           { label: "EPI", val: conformityEvalForm.epi },
                           { label: "Estaiamentos / Aterramentos", val: conformityEvalForm.estaiamentos },
                           { label: "Conduta", val: conformityEvalForm.conduta },
+                          { label: "Faltas/Atrasos", val: conformityEvalForm.absencesResponse },
                           { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse },
                         ].map(item => (
                           <div key={item.label} className="flex items-center justify-between gap-3">

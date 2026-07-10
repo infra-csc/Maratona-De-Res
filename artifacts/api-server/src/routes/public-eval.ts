@@ -286,6 +286,7 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
         if (answers.epiComment !== undefined) patch.epiComment = answers.epiComment || null;
         if (answers.estaiamentosComment !== undefined) patch.estaiamentosComment = answers.estaiamentosComment || null;
         if (answers.condutaComment !== undefined) patch.condutaComment = answers.condutaComment || null;
+        if (answers.absencesResponse !== undefined) patch.absencesResponse = answers.absencesResponse;
         if (answers.absencesReport !== undefined) patch.absencesReport = answers.absencesReport || null;
         if (answers.standoutResponse !== undefined) patch.standoutResponse = answers.standoutResponse;
         if (answers.standoutJustification !== undefined) patch.standoutJustification = answers.standoutJustification || null;
@@ -298,7 +299,7 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
         .set(patch)
         .where(eq(eventConformitiesTable.eventId, token.eventId));
     } else {
-      await tx.insert(eventConformitiesTable).values({
+      const insertValues: typeof eventConformitiesTable.$inferInsert = {
         eventId: token.eventId,
         epi: isCenografia ? (answers.epi ?? null) : null,
         estaiamentos: isCenografia ? (answers.estaiamentos ?? null) : null,
@@ -308,11 +309,13 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
         estaiamentosComment: isCenografia ? (answers.estaiamentosComment || null) : null,
         condutaComment: isCenografia ? (answers.condutaComment || null) : null,
         guardaEquipamentosComment: isFerramentas ? (answers.guardaEquipamentosComment || null) : null,
+        absencesResponse: isCenografia ? (answers.absencesResponse ?? null) : null,
         absencesReport: isCenografia ? (answers.absencesReport || null) : null,
         standoutResponse: isCenografia ? (answers.standoutResponse ?? null) : null,
         standoutJustification: isCenografia ? (answers.standoutJustification || null) : null,
-        createdByUserId: token.createdByUserId,
-      });
+        createdByUserId: token.createdByUserId!,
+      };
+      await tx.insert(eventConformitiesTable).values(insertValues);
     }
 
     await tx.update(publicEvalTokensTable).set({

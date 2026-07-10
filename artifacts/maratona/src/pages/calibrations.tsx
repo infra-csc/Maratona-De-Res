@@ -710,27 +710,27 @@ export default function CalibrationsPage() {
                             );
                           })}
                         </div>
-                        {/* Falta / Atraso — sempre exibido, com resposta SIM/NÃO explícita */}
-                        <div className={`mt-3 border-2 p-3 ${conformity.absencesReport ? "border-[#b02f00] bg-[#fff4e5]" : "border-[#191c1e]"}`}>
+                        {/* Falta / Atraso — distingue PENDENTE (nunca respondido) de SIM/NÃO explícito */}
+                        <div className={`mt-3 border-2 p-3 ${conformity.absencesResponse === true ? "border-[#b02f00] bg-[#fff4e5]" : "border-[#191c1e]"}`}>
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60] flex items-center gap-1"><User size={11} /> Faltas/Atrasos (+30 min)</p>
-                            <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border border-[#191c1e] shrink-0 ${conformity.absencesReport ? "bg-[#b02f00] text-white" : "bg-[#ccff00] text-[#161e00]"}`}>
-                              {conformity.absencesReport ? "SIM" : "NÃO"}
+                            <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border border-[#191c1e] shrink-0 ${conformity.absencesResponse === null ? "bg-[#d8dadc] text-[#444933]" : conformity.absencesResponse ? "bg-[#b02f00] text-white" : "bg-[#ccff00] text-[#161e00]"}`}>
+                              {conformity.absencesResponse === null ? "PENDENTE" : conformity.absencesResponse ? "SIM" : "NÃO"}
                             </span>
                           </div>
-                          {conformity.absencesReport && (
+                          {conformity.absencesResponse === true && conformity.absencesReport && (
                             <p className="text-[11px] italic text-[#191c1e] leading-snug whitespace-pre-wrap mt-1.5">{conformity.absencesReport}</p>
                           )}
                         </div>
-                        {/* Destaque — sempre exibido, com resposta SIM/NÃO explícita */}
-                        <div className={`mt-3 border-2 p-3 ${conformity.standoutResponse ? "border-[#506600] bg-[#f7ffe0]" : "border-[#191c1e]"}`}>
+                        {/* Destaque — distingue PENDENTE (nunca respondido) de SIM/NÃO explícito */}
+                        <div className={`mt-3 border-2 p-3 ${conformity.standoutResponse === true ? "border-[#506600] bg-[#f7ffe0]" : "border-[#191c1e]"}`}>
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#506600] flex items-center gap-1"><Trophy size={11} /> Destaque de Desempenho</p>
-                            <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border border-[#191c1e] shrink-0 ${conformity.standoutResponse ? "bg-[#ccff00] text-[#161e00]" : "bg-[#d8dadc] text-[#444933]"}`}>
-                              {conformity.standoutResponse ? "SIM" : "NÃO"}
+                            <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border border-[#191c1e] shrink-0 ${conformity.standoutResponse === null ? "bg-[#d8dadc] text-[#444933]" : conformity.standoutResponse ? "bg-[#ccff00] text-[#161e00]" : "bg-[#d8dadc] text-[#444933]"}`}>
+                              {conformity.standoutResponse === null ? "PENDENTE" : conformity.standoutResponse ? "SIM" : "NÃO"}
                             </span>
                           </div>
-                          {conformity.standoutResponse && conformity.standoutJustification && (
+                          {conformity.standoutResponse === true && conformity.standoutJustification && (
                             <p className="text-[11px] italic text-[#191c1e] leading-snug whitespace-pre-wrap mt-1.5">{conformity.standoutJustification}</p>
                           )}
                         </div>

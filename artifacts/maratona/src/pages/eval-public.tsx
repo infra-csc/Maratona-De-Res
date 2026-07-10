@@ -35,6 +35,7 @@ interface ConformityAnswers {
   epiComment: string;
   estaiamentosComment: string;
   condutaComment: string;
+  absencesResponse: boolean | null;
   absencesReport: string;
   standoutResponse: boolean | null;
   standoutJustification: string;
@@ -66,7 +67,7 @@ export default function PublicEvalPage() {
   const [cenoAnswers, setCenoAnswers] = useState<ConformityAnswers>({
     epi: null, estaiamentos: null, conduta: null,
     epiComment: "", estaiamentosComment: "", condutaComment: "",
-    absencesReport: "", standoutResponse: null, standoutJustification: "",
+    absencesResponse: null, absencesReport: "", standoutResponse: null, standoutJustification: "",
   });
 
   // Ferramentas conformity state
@@ -108,8 +109,9 @@ export default function PublicEvalPage() {
   // Cenografia: comentários são SEMPRE opcionais (mesmo quando Não)
   const cenoItems = ["epi", "estaiamentos", "conduta"] as const;
   const cenoAllAnswered = cenoItems.every(k => cenoAnswers[k] !== null);
+  const cenoAbsencesMissing = cenoAnswers.absencesResponse === null || (cenoAnswers.absencesResponse === true && !cenoAnswers.absencesReport.trim());
   const cenoStandoutMissing = cenoAnswers.standoutResponse === true && !cenoAnswers.standoutJustification.trim();
-  const cenoCanSubmit = cenoAllAnswered && !cenoStandoutMissing;
+  const cenoCanSubmit = cenoAllAnswered && !cenoAbsencesMissing && !cenoStandoutMissing;
 
   // Ferramentas: comentário SEMPRE opcional
   const ferramentasCanSubmit = ferramentasAnswer !== null;
@@ -165,6 +167,7 @@ export default function PublicEvalPage() {
           epiComment: cenoAnswers.epiComment || null,
           estaiamentosComment: cenoAnswers.estaiamentosComment || null,
           condutaComment: cenoAnswers.condutaComment || null,
+          absencesResponse: cenoAnswers.absencesResponse,
           absencesReport: cenoAnswers.absencesReport || null,
           standoutResponse: cenoAnswers.standoutResponse,
           standoutJustification: cenoAnswers.standoutJustification || null,
@@ -395,18 +398,33 @@ export default function PublicEvalPage() {
                 </div>
               </div>
 
-              <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-2 ${HARD_SHADOW}`}>
+              <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-3 ${HARD_SHADOW}`}>
                 <label className="block text-sm font-black italic uppercase text-[#191c1e]">
                   Alguém faltou ou atrasou por mais de 30 minutos? <span className="text-[#ba1a1a]">*</span>
                 </label>
-                <p className="text-[11px] text-[#747a60] italic">Especifique nomes e motivo. Se ninguém faltou, escreva "Não".</p>
-                <textarea
-                  rows={3}
-                  placeholder='Ex.: "João Silva — faltou sem aviso." ou "Não"'
-                  value={cenoAnswers.absencesReport}
-                  onChange={e => setCenoAnswers(f => ({ ...f, absencesReport: e.target.value }))}
-                  className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
-                />
+                <div className="flex gap-2">
+                  <button type="button"
+                    onClick={() => setCenoAnswers(f => ({ ...f, absencesResponse: false, absencesReport: "" }))}
+                    className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${cenoAnswers.absencesResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                  >Não, ninguém faltou/atrasou</button>
+                  <button type="button"
+                    onClick={() => setCenoAnswers(f => ({ ...f, absencesResponse: true }))}
+                    className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${cenoAnswers.absencesResponse === true ? "bg-[#b02f00] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                  >Sim, houve falta/atraso</button>
+                </div>
+                {cenoAnswers.absencesResponse === true && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black italic uppercase text-[#b02f00]">Especifique nomes e motivo <span>*</span> obrigatório</label>
+                    <textarea
+                      rows={3}
+                      placeholder='Ex.: "João Silva — faltou sem aviso."'
+                      value={cenoAnswers.absencesReport}
+                      onChange={e => setCenoAnswers(f => ({ ...f, absencesReport: e.target.value }))}
+                      className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
+                    />
+                    {cenoAnswers.absencesResponse === true && !cenoAnswers.absencesReport.trim() && <p className="text-[10px] font-bold italic text-[#862200]">Descreva a ocorrência antes de enviar.</p>}
+                  </div>
+                )}
               </div>
 
               <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-3 ${HARD_SHADOW}`}>

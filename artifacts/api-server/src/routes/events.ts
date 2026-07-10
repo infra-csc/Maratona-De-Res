@@ -801,7 +801,7 @@ router.post("/events/:id/conformity", async (req, res) => {
   const {
     epi, estaiamentos, guardaEquipamentos, conduta,
     epiComment, estaiamentosComment, guardaEquipamentosComment, condutaComment,
-    absencesReport, standoutResponse, standoutJustification,
+    absencesResponse, absencesReport, standoutResponse, standoutJustification,
   } = req.body;
 
   // Campos permitidos por grupo
@@ -820,6 +820,7 @@ router.post("/events/:id/conformity", async (req, res) => {
       if (epiComment !== undefined) patch.epiComment = epiComment || null;
       if (estaiamentosComment !== undefined) patch.estaiamentosComment = estaiamentosComment || null;
       if (condutaComment !== undefined) patch.condutaComment = condutaComment || null;
+      if (absencesResponse !== undefined) patch.absencesResponse = absencesResponse;
       if (absencesReport !== undefined) patch.absencesReport = absencesReport || null;
       if (standoutResponse !== undefined) patch.standoutResponse = standoutResponse;
       if (standoutJustification !== undefined) patch.standoutJustification = standoutJustification || null;
@@ -848,6 +849,7 @@ router.post("/events/:id/conformity", async (req, res) => {
         estaiamentosComment: canCenografia ? (estaiamentosComment || null) : null,
         guardaEquipamentosComment: canFerramentas ? (guardaEquipamentosComment || null) : null,
         condutaComment: canCenografia ? (condutaComment || null) : null,
+        absencesResponse: canCenografia && absencesResponse !== undefined ? absencesResponse : null,
         absencesReport: canCenografia ? (absencesReport || null) : null,
         standoutResponse: canCenografia && standoutResponse !== undefined ? standoutResponse : null,
         standoutJustification: canCenografia ? (standoutJustification || null) : null,

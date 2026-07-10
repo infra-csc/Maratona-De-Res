@@ -52,7 +52,9 @@ export const eventConformitiesTable = pgTable("event_conformities", {
   estaiamentosComment: text("estaiamentos_comment"),
   guardaEquipamentosComment: text("guarda_equipamentos_comment"),
   condutaComment: text("conduta_comment"),
-  // Cenografia — Q6: "Alguém faltou ou atrasou?" (texto livre, exibido na calibração)
+  // Cenografia — Q6: "Alguém faltou ou atrasou?"
+  // null = PENDENTE (avaliador ainda não respondeu), true = SIM (houve falta/atraso), false = NÃO (confirmado sem ocorrências)
+  absencesResponse: boolean("absences_response"),
   absencesReport: text("absences_report"),
   // Cenografia — Q7: "Destaque profissional?" (sim/não + justificativa → Fred/Frederico)
   standoutResponse: boolean("standout_response"),
