@@ -52,20 +52,16 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
       type="button"
       disabled={disabled}
       onClick={onClick}
+      title={label}
       className={cn(
-        "border-2 border-[#191c1e] p-1.5 md:p-2 flex flex-col items-center gap-1 justify-start transition-all w-full min-h-[92px] md:min-h-[104px]",
+        "border-2 border-[#191c1e] py-3 flex items-center justify-center transition-all w-full",
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:-translate-y-1 active:translate-y-0",
         isSelected
           ? "bg-[#ccff00] text-[#161e00] border-[3px]"
           : "bg-white text-[#191c1e]"
       )}
     >
-      <span className="text-lg md:text-xl italic font-black shrink-0">{score}</span>
-      {label && (
-        <span className="text-[8px] md:text-[9px] leading-[1.15] text-center font-bold uppercase italic break-words hyphens-auto whitespace-normal">
-          {label}
-        </span>
-      )}
+      <span className="text-lg md:text-xl italic font-black">{score}</span>
     </button>
   );
 }
@@ -2000,9 +1996,15 @@ export default function EvaluationsPage() {
                                   />
                                 ))}
                               </div>
-                              <div className="flex justify-between mt-1">
-                                <span className="text-[10px] italic text-[#747a60] font-bold max-w-[130px] leading-tight">{labels[0]}</span>
-                                <span className="text-[10px] italic text-[#747a60] font-bold max-w-[130px] text-right leading-tight">{labels[10]}</span>
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div className="flex items-start gap-1.5 text-[11px] italic text-[#862200]">
+                                  <span className="font-black shrink-0">0 —</span>
+                                  <span className="font-bold leading-tight">{labels[0]}</span>
+                                </div>
+                                <div className="flex items-start gap-1.5 text-[11px] italic text-[#506600] justify-self-end text-right">
+                                  <span className="font-bold leading-tight">{labels[10]}</span>
+                                  <span className="font-black shrink-0">— 10</span>
+                                </div>
                               </div>
                             </div>
 
