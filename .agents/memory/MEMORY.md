@@ -68,3 +68,4 @@
 - [Nullable email/User schema ripple](nullable-email-ripple.md) — making users.email optional (CPF-login feature) breaks all callers assuming non-null email; must fix every consumer, not just schema
 - [Area principal criterion authority](area-principal-authority.md) — default evaluator of a criterion becomes area "principal": sees ALL area criteria, can assign/take/move freely (own action type, bypasses redirectMode)
 - [Absences pending vs answered](absence-response-vs-report.md) — a free-text field's truthiness can't signal "answered"; give Sim/Não+detail questions their own nullable boolean flag
+- [Area-principal panel silently empty](area-principal-panel-empty.md) — self-service management UI must synthesize defaults, not assume an admin setup step already ran

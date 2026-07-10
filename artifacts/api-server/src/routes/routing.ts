@@ -198,10 +198,74 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
     // atribuições dos critérios daquela área (visibilidade completa),
     // podendo depois atribuir/tomar/mover entre colegas via ação "assign".
     const principalAreaIds = await getPrincipalAreaIds(user.userId);
-    res.json(enriched.filter(a =>
+    let result: Array<(typeof enriched)[number] | {
+      id: number | null;
+      eventId: number;
+      criterionId: number;
+      criterionName: string;
+      criterionAreaId: number | null;
+      assignedToId: number | null;
+      assignedToName: string | null;
+      status: "pending";
+      redirectedFromId: null;
+      confirmedAt: null;
+      updatedAt: null;
+      createdAt: null;
+      redirectedFromName: null;
+    }> = enriched.filter(a =>
       a.assignedToId === user.userId ||
       (a.criterionAreaId != null && principalAreaIds.includes(a.criterionAreaId))
-    ));
+    );
+
+    // Um critério só ganha uma linha em event_criterion_assignments depois
+    // que alguém roda "Gerar Sugestões" (admin) ou faz a primeira ação nele.
+    // Sem isso, um critério da área do principal que ainda não tem linha
+    // simplesmente não aparecia na lista — escondendo a gestão da área dele
+    // (quem está com o critério, poder de tomar/atribuir) até alguém mais
+    // gerar as sugestões. Preenchemos aqui com linhas "virtuais" (pending,
+    // sem id) para os critérios ativos do evento na área do principal que
+    // ainda não têm atribuição real, usando o default_evaluator do routing.
+    if (principalAreaIds.length > 0) {
+      const assignedCriterionIds = new Set(enriched.map(a => a.criterionId));
+      const areaCriteria = await db.select({
+        criterionId: criteriaTable.id,
+        criterionName: criteriaTable.name,
+        criterionAreaId: criteriaTable.responsibleAreaId,
+        defaultEvaluatorId: criterionRoutingTable.defaultEvaluatorId,
+        defaultEvaluatorName: usersTable.name,
+      })
+        .from(eventCriteriaTable)
+        .innerJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+        .leftJoin(criterionRoutingTable, eq(criterionRoutingTable.criterionId, criteriaTable.id))
+        .leftJoin(usersTable, eq(criterionRoutingTable.defaultEvaluatorId, usersTable.id))
+        .where(and(
+          eq(eventCriteriaTable.eventId, eventId),
+          eq(eventCriteriaTable.active, true),
+          inArray(criteriaTable.responsibleAreaId, principalAreaIds),
+        ));
+
+      const virtualRows = areaCriteria
+        .filter(c => !assignedCriterionIds.has(c.criterionId))
+        .map(c => ({
+          id: null as number | null,
+          eventId,
+          criterionId: c.criterionId,
+          criterionName: c.criterionName,
+          criterionAreaId: c.criterionAreaId,
+          assignedToId: c.defaultEvaluatorId ?? null,
+          assignedToName: c.defaultEvaluatorName ?? null,
+          status: "pending" as const,
+          redirectedFromId: null,
+          confirmedAt: null,
+          updatedAt: null,
+          createdAt: null,
+          redirectedFromName: null,
+        }));
+
+      result = [...result, ...virtualRows];
+    }
+
+    res.json(result);
     return;
   }
 
