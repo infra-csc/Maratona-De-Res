@@ -1003,7 +1003,19 @@ export default function EvaluationsPage() {
         {!isEvaluator && (
         <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 px-3 py-1.5 bg-[#ccff00] border-l-2 border-b-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider">ETAPA 01</div>
-          <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight mb-1">{isConsultation ? "Filtros" : "Selecionar Evento"}</h3>
+          <div className="flex items-start justify-between gap-4 mb-1">
+            <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">{isConsultation ? "Filtros" : "Selecionar Evento"}</h3>
+            {isConsultation && (selectedEventId != null || selectedAvaliadorId != null || statusFilter !== "all" || typeFilter !== "all") && (
+              <button
+                type="button"
+                data-testid="button-clear-filters"
+                onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); }}
+                className="shrink-0 mt-1 flex items-center gap-1.5 text-[11px] font-black italic uppercase tracking-wider text-[#862200] hover:underline"
+              >
+                <X size={13} /> Limpar filtros
+              </button>
+            )}
+          </div>
           <p className="text-sm text-[#444933] italic mb-5">{isConsultation ? "Selecione o evento e refine a consulta por avaliador ou status." : "Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação."}</p>
 
           <div className={cn("grid grid-cols-1 gap-4", isConsultation && "md:grid-cols-3")}>
