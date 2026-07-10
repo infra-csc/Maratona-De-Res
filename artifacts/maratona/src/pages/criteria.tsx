@@ -482,7 +482,6 @@ export default function CriteriaPage() {
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
   const inactiveCriteria = (criteria ?? []).filter(c => !c.active);
-  const totalWeight = activeCriteria.reduce((s, c) => s + Number(c.defaultWeight), 0);
   const baseDisplayed = showInactive ? (criteria ?? []) : activeCriteria;
 
   // Apply search + area filters
@@ -573,22 +572,6 @@ export default function CriteriaPage() {
             <p className="text-[10px] italic text-[#747a60] text-center max-w-[140px]">Adiciona um critério de avaliação com nota e peso</p>
           </div>
         </section>
-
-        {/* Resumo de pesos */}
-        {activeCriteria.length > 0 && (
-          <section className="flex items-center gap-4 text-sm">
-            <div className={`bg-white border-2 border-[#191c1e] px-5 py-3 flex items-center gap-3 ${HARD_SHADOW}`}>
-              <span className="text-xs font-bold italic uppercase text-[#747a60]">Peso total</span>
-              <span className={`text-2xl font-black italic ${Math.abs(totalWeight - 20) < 0.05 ? "text-[#506600]" : "text-[#d4a800]"}`}>{totalWeight.toFixed(0)}</span>
-              <span className="text-xs italic text-[#747a60]">/ 20</span>
-              {Math.abs(totalWeight - 20) < 0.05 && <Check size={16} className="text-[#506600]" />}
-            </div>
-            <div className={`bg-white border-2 border-[#191c1e] px-5 py-3 flex items-center gap-3 ${HARD_SHADOW}`}>
-              <span className="text-xs font-bold italic uppercase text-[#747a60]">Critérios ativos</span>
-              <span className="text-2xl font-black italic text-[#191c1e]">{activeCriteria.length}</span>
-            </div>
-          </section>
-        )}
 
         {/* Table */}
         {isLoading ? (
