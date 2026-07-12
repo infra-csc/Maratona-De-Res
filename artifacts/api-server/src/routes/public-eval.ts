@@ -174,6 +174,22 @@ router.post("/public-eval/:token/submit", async (req, res) => {
 
   await db.transaction(async (tx) => {
     for (const item of parsedEvaluations) {
+      const [existing] = await tx.select().from(evaluationsTable)
+        .where(and(
+          eq(evaluationsTable.eventId, token.eventId),
+          eq(evaluationsTable.criterionId, item.criterionId),
+          eq(evaluationsTable.evaluatorUserId, token.createdByUserId!),
+        )).limit(1);
+      if (existing) {
+        if (existing.status === "submitted") continue;
+        await tx.update(evaluationsTable).set({
+          score: item.score.toFixed(2),
+          comments: item.comments,
+          status: "submitted",
+          submittedAt: new Date(),
+        }).where(eq(evaluationsTable.id, existing.id));
+        continue;
+      }
       await tx.insert(evaluationsTable).values({
         eventId: token.eventId,
         criterionId: item.criterionId,

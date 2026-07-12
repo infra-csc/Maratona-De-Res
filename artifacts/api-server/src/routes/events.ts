@@ -346,7 +346,10 @@ router.post("/events", requireRole("admin", "rh"), async (req, res) => {
 
 router.patch("/events/:id", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const { name, clientName, location, city, state, startDate, endDate, status } = req.body;
+  // status é gerenciado exclusivamente pelas rotas /close e /reopen, que
+  // aplicam a lógica de negócio correta (forcedClosed, recomputeCycleResults).
+  // Trocar o status aqui contornaria isso e deixaria o ciclo desatualizado.
+  const { name, clientName, location, city, state, startDate, endDate } = req.body;
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
   const [ev] = await db.update(eventsTable).set({
@@ -357,7 +360,6 @@ router.patch("/events/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(state !== undefined && { state }),
     ...(startDate !== undefined && { startDate }),
     ...(endDate !== undefined && { endDate }),
-    ...(status !== undefined && { status }),
   }).where(eq(eventsTable.id, id)).returning();
   await audit(req.user!.userId, "update", "events", id, before, ev);
   res.json(ev);
@@ -404,8 +406,10 @@ router.patch("/events/:id/historical-result", requireRole("admin", "rh"), async 
 
 router.delete("/events/:id", requireRole("admin"), async (req, res) => {
   const id = parseInt(req.params.id as string);
+  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   await db.delete(eventsTable).where(eq(eventsTable.id, id));
   await audit(req.user!.userId, "delete", "events", id);
+  if (before) await recomputeCycleResults(before.cycleId, req.user!.userId);
   res.status(204).end();
 });
 
@@ -599,8 +603,14 @@ router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, 
 });
 
 router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
+  const [existing] = await db.select().from(eventParticipantsTable)
+    .where(and(eq(eventParticipantsTable.id, participantId), eq(eventParticipantsTable.eventId, eventId))).limit(1);
+  if (!existing) { res.status(404).json({ error: "Participante não encontrado neste evento" }); return; }
   await db.delete(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId));
+  const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (ev?.status === "closed") await recomputeCycleResults(ev.cycleId, req.user!.userId);
   res.status(204).end();
 });
 
@@ -632,8 +642,9 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
     }
   }
 
-  const [existing] = await db.select().from(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId)).limit(1);
-  if (!existing) { res.status(404).json({ error: "Participante não encontrado" }); return; }
+  const [existing] = await db.select().from(eventParticipantsTable)
+    .where(and(eq(eventParticipantsTable.id, participantId), eq(eventParticipantsTable.eventId, eventId))).limit(1);
+  if (!existing) { res.status(404).json({ error: "Participante não encontrado neste evento" }); return; }
   const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, existing.employeeId)).limit(1);
   const employmentType = emp?.employmentType ?? "casa";
 
@@ -680,6 +691,11 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();
   if (!updated) { res.status(404).json({ error: "Participante não encontrado" }); return; }
+
+  if (confirmed !== undefined || functionName !== undefined) {
+    const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (ev?.status === "closed") await recomputeCycleResults(ev.cycleId, req.user!.userId);
+  }
 
   // Sincroniza o cargo GLOBAL do colaborador com o cargo deste evento,
   // para que sirva de sugestão pré-preenchida nos próximos eventos.
@@ -1177,7 +1193,8 @@ router.post("/events/:id/criteria/resync", requireRole("admin", "rh"), async (re
       res.status(409).json({ error: message });
       return;
     }
-    res.status(404).json({ error: "Não encontrado" });
+    console.error(`Erro ao sincronizar critérios do evento ${eventId}:`, err);
+    res.status(500).json({ error: "Erro ao sincronizar critérios" });
   }
 });
 
@@ -1200,8 +1217,9 @@ router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (re
     .from(eventsTable)
     .where(eq(eventsTable.cycleId, cycle.id));
 
-  let processed = 0, skipped = 0, totalAdded = 0, totalDeactivated = 0, totalActivated = 0;
+  let processed = 0, skipped = 0, failed = 0, totalAdded = 0, totalDeactivated = 0, totalActivated = 0;
   const details: { id: number; name: string; added: number; deactivated: number; activated: number }[] = [];
+  const failures: { id: number; name: string; error: string }[] = [];
 
   for (const ev of events) {
     try {
@@ -1217,10 +1235,14 @@ router.post("/events/criteria/resync-all", requireRole("admin", "rh"), async (re
       }
     } catch (err) {
       if (err instanceof ResyncBlockedError) { skipped += 1; continue; }
+      failed += 1;
+      const message = err instanceof Error ? err.message : String(err);
+      failures.push({ id: ev.id, name: ev.name, error: message });
+      console.error(`Erro ao sincronizar critérios do evento ${ev.id} (resync-all):`, err);
     }
   }
 
-  res.json({ processed, skipped, totalAdded, totalDeactivated, totalActivated, events: details });
+  res.json({ processed, skipped, failed, totalAdded, totalDeactivated, totalActivated, events: details, failures });
 });
 
 router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (req, res) => {

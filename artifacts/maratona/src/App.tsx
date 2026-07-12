@@ -112,7 +112,9 @@ function AppRoutes() {
       </Route>
       <Route path="/" component={HomeRoute} />
       <Route path="/dashboard"><Redirect to="/meu-desempenho" /></Route>
-      <Route path="/events/:id" component={() => <ProtectedRoute component={EventDetailPage} />} />
+      <Route path="/events/:id">
+        {(params: { id: string }) => <ProtectedRoute key={params.id} component={EventDetailPage} />}
+      </Route>
       <Route path="/events" component={() => <ProtectedRoute component={EventsPage} />} />
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />
       <Route path="/evaluations" component={() => <ProtectedRoute component={EvaluationsPage} />} />
