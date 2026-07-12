@@ -606,16 +606,20 @@ export default function EvaluationsPage() {
       .filter(a => a.evaluatorUserId === user?.id)
       .map(a => a.areaId),
   );
-  // Also include criteria directly assigned to this user via the routing system
-  const myDirectCriterionIds = new Set(
-    (criterionAssignments ?? [])
-      .filter(a => a.assignedToId === user?.id && (a.status === "confirmed" || a.status === "suggested"))
-      .map(a => a.criterionId),
+  // Quando um critério já tem um registro de roteamento (foi atribuído/
+  // redirecionado individualmente), ele manda: só quem está atualmente
+  // designado enxerga o critério, mesmo que outra pessoa também pertença à
+  // área responsável — é isso que faz um redirecionamento remover de vez o
+  // critério da lista de quem redirecionou. Sem registro de roteamento
+  // (evento legado / nunca atribuído individualmente), cai na área.
+  const criterionAssignmentByCriterionId = new Map(
+    (criterionAssignments ?? []).map(a => [a.criterionId, a]),
   );
-  const myCriteria = activeCriteria.filter(c =>
-    (c.responsibleAreaId != null && myAssignedAreaIds.has(c.responsibleAreaId)) ||
-    myDirectCriterionIds.has(c.criterionId),
-  );
+  const myCriteria = activeCriteria.filter(c => {
+    const assignment = criterionAssignmentByCriterionId.get(c.criterionId);
+    if (assignment) return assignment.assignedToId === user?.id;
+    return c.responsibleAreaId != null && myAssignedAreaIds.has(c.responsibleAreaId);
+  });
 
   // For primary-area evaluators: fallback redirect options from the criterion's responsible area.
   // Placed after myCriteria because it references myCriteria.find() to look up the area.
@@ -1758,8 +1762,12 @@ export default function EvaluationsPage() {
                             <ul>
                               {g.criteria.map(c => {
                                 const st = criterionStatus(c.criterionId, c.responsibleAreaId ?? null);
+                                // Um registro de roteamento por critério (redirecionamento) manda
+                                // sobre a atribuição por área — sem isso, "Responsável" continuava
+                                // mostrando o avaliador da área mesmo depois de redirecionar.
+                                const directAssignment = criterionAssignments?.find(x => x.criterionId === c.criterionId);
                                 const assignedNames = c.responsibleAreaId != null ? (assignedEvaluatorsByArea.get(c.responsibleAreaId) ?? []).map(a => a.name) : [];
-                                const responsible = assignedNames.length > 0 ? assignedNames.join(", ") : (st.submittedNames[0] ?? null);
+                                const responsible = directAssignment?.assignedToName ?? (assignedNames.length > 0 ? assignedNames.join(", ") : (st.submittedNames[0] ?? null));
                                 const submittedEvals = getSubmittedEvals(c.criterionId);
                                 const isExpanded = expandedCriteria.has(c.criterionId);
                                 const hasContent = submittedEvals.length > 0;

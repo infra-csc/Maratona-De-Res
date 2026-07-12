@@ -22,19 +22,24 @@ function isValidAudioPath(value: unknown): value is string {
 }
 
 async function isAssignedForCriterion(eventId: number, criterionId: number, userId: number): Promise<boolean> {
-  // 1. Check direct criterion assignment (novo sistema de roteamento por critério)
+  // 1. Se já existe um registro de roteamento por critério (novo sistema),
+  // ele é a autoridade — só quem está atualmente designado (assignedToId)
+  // pode avaliar. Isso é o que faz um redirecionamento realmente tirar o
+  // acesso de quem redirecionou: depois de A redirecionar para B, só B (ou
+  // o avaliador padrão, se reatribuir a si mesmo) pode enviar a avaliação;
+  // sem este corte, o fallback por área abaixo continuaria autorizando A.
   const [criterionAssignment] = await db
-    .select({ id: eventCriterionAssignmentsTable.id })
+    .select({ assignedToId: eventCriterionAssignmentsTable.assignedToId })
     .from(eventCriterionAssignmentsTable)
     .where(and(
       eq(eventCriterionAssignmentsTable.eventId, eventId),
       eq(eventCriterionAssignmentsTable.criterionId, criterionId),
-      eq(eventCriterionAssignmentsTable.assignedToId, userId),
     ))
     .limit(1);
-  if (criterionAssignment) return true;
+  if (criterionAssignment) return criterionAssignment.assignedToId === userId;
 
-  // 2. Fallback: check area-level assignment (sistema legado evento→área→avaliador)
+  // 2. Sem registro de roteamento por critério ainda (evento legado ou nunca
+  // atribuído individualmente): cai no sistema antigo evento→área→avaliador.
   const [crit] = await db
     .select({ areaId: criteriaTable.responsibleAreaId })
     .from(criteriaTable)
