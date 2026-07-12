@@ -109,7 +109,7 @@ export default function PublicEvalPage() {
   // Cenografia: comentários são SEMPRE opcionais (mesmo quando Não)
   const cenoItems = ["epi", "estaiamentos", "conduta"] as const;
   const cenoAllAnswered = cenoItems.every(k => cenoAnswers[k] !== null);
-  const cenoAbsencesMissing = cenoAnswers.absencesResponse === null || (cenoAnswers.absencesResponse === true && !cenoAnswers.absencesReport.trim());
+  const cenoAbsencesMissing = !cenoAnswers.absencesReport.trim();
   const cenoStandoutMissing = cenoAnswers.standoutResponse === true && !cenoAnswers.standoutJustification.trim();
   const cenoCanSubmit = cenoAllAnswered && !cenoAbsencesMissing && !cenoStandoutMissing;
 
@@ -167,8 +167,8 @@ export default function PublicEvalPage() {
           epiComment: cenoAnswers.epiComment || null,
           estaiamentosComment: cenoAnswers.estaiamentosComment || null,
           condutaComment: cenoAnswers.condutaComment || null,
-          absencesResponse: cenoAnswers.absencesResponse,
-          absencesReport: cenoAnswers.absencesReport || null,
+          absencesResponse: true,
+          absencesReport: cenoAnswers.absencesReport,
           standoutResponse: cenoAnswers.standoutResponse,
           standoutJustification: cenoAnswers.standoutJustification || null,
         });
@@ -398,33 +398,18 @@ export default function PublicEvalPage() {
                 </div>
               </div>
 
-              <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-3 ${HARD_SHADOW}`}>
+              <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-1 ${HARD_SHADOW}`}>
                 <label className="block text-sm font-black italic uppercase text-[#191c1e]">
-                  Alguém faltou ou atrasou por mais de 30 minutos? <span className="text-[#ba1a1a]">*</span>
+                  Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span className="text-[#ba1a1a]">*</span> obrigatório
                 </label>
-                <div className="flex gap-2">
-                  <button type="button"
-                    onClick={() => setCenoAnswers(f => ({ ...f, absencesResponse: false, absencesReport: "" }))}
-                    className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${cenoAnswers.absencesResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                  >Não, ninguém faltou/atrasou</button>
-                  <button type="button"
-                    onClick={() => setCenoAnswers(f => ({ ...f, absencesResponse: true }))}
-                    className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${cenoAnswers.absencesResponse === true ? "bg-[#b02f00] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                  >Sim, houve falta/atraso</button>
-                </div>
-                {cenoAnswers.absencesResponse === true && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black italic uppercase text-[#b02f00]">Especifique nomes e motivo <span>*</span> obrigatório</label>
-                    <textarea
-                      rows={3}
-                      placeholder='Ex.: "João Silva — faltou sem aviso."'
-                      value={cenoAnswers.absencesReport}
-                      onChange={e => setCenoAnswers(f => ({ ...f, absencesReport: e.target.value }))}
-                      className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
-                    />
-                    {cenoAnswers.absencesResponse === true && !cenoAnswers.absencesReport.trim() && <p className="text-[10px] font-bold italic text-[#862200]">Descreva a ocorrência antes de enviar.</p>}
-                  </div>
-                )}
+                <textarea
+                  rows={3}
+                  placeholder='Ex.: "João Silva — faltou sem aviso." Se ninguém faltou/atrasou, escreva "Ninguém faltou ou atrasou".'
+                  value={cenoAnswers.absencesReport}
+                  onChange={e => setCenoAnswers(f => ({ ...f, absencesReport: e.target.value }))}
+                  className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
+                />
+                {!cenoAnswers.absencesReport.trim() && <p className="text-[10px] font-bold italic text-[#862200]">Especifique antes de enviar.</p>}
               </div>
 
               <div className={`bg-white border-2 border-[#191c1e] p-5 space-y-3 ${HARD_SHADOW}`}>

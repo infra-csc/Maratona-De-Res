@@ -889,8 +889,9 @@ export default function EvaluationsPage() {
   const extraConformityItemsCompleted =
     (isFerramentasEvaluatorForEvent && conformityEvalForm.guardaEquipamentos !== null ? 1 : 0) +
     (isConformityEvaluatorForEvent
-      ? [conformityEvalForm.epi, conformityEvalForm.estaiamentos, conformityEvalForm.conduta, conformityEvalForm.absencesResponse, conformityEvalForm.standoutResponse]
+      ? [conformityEvalForm.epi, conformityEvalForm.estaiamentos, conformityEvalForm.conduta, conformityEvalForm.standoutResponse]
           .filter(v => v !== null).length
+        + (conformityEvalForm.absencesReport.trim() ? 1 : 0)
       : 0);
 
   const totalItems = myCriteria.length + extraConformityItemsTotal;
@@ -2204,7 +2205,7 @@ export default function EvaluationsPage() {
                   { key: "conduta", commentKey: "condutaComment", label: "Conduta", question: "Conduta e comportamento foram adequados? (horários, ordens e regras)" },
                 ];
                 const standoutNeedsJustification = conformityEvalForm.standoutResponse === true && !conformityEvalForm.standoutJustification.trim();
-                const absencesNeedsReport = conformityEvalForm.absencesResponse === true && !conformityEvalForm.absencesReport.trim();
+                const absencesNeedsReport = !conformityEvalForm.absencesReport.trim();
                 const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport;
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
                 return (
@@ -2300,32 +2301,19 @@ export default function EvaluationsPage() {
                       )}
                     </div>
 
-                    {/* Absences question */}
+                    {/* Absences question — texto livre sempre obrigatório */}
                     <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-                      <div className="px-5 py-4 space-y-3">
-                        <label className="block text-sm font-black italic uppercase text-[#191c1e]">Alguém faltou ou atrasou por mais de 30 minutos?</label>
-                        <div className="flex gap-2">
-                          <button type="button"
-                            onClick={() => { setConformityEvalForm(f => ({ ...f, absencesResponse: false, absencesReport: '' })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { absencesResponse: false, absencesReport: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                            className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${conformityEvalForm.absencesResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                          >Não, ninguém faltou/atrasou</button>
-                          <button type="button"
-                            onClick={() => setConformityEvalForm(f => ({ ...f, absencesResponse: true }))}
-                            className={`flex-1 px-4 py-2.5 text-xs font-black italic uppercase border-2 border-[#191c1e] transition-all ${conformityEvalForm.absencesResponse === true ? "bg-[#b02f00] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                          >Sim, houve falta/atraso</button>
-                        </div>
-                        {conformityEvalForm.absencesResponse === true && (
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black italic uppercase text-[#b02f00]">Especifique nomes e motivo <span>*</span> obrigatório</label>
-                            <Textarea
-                              placeholder="Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso por trânsito."
-                              value={conformityEvalForm.absencesReport}
-                              onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
-                              className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
-                            />
-                            {absencesNeedsReport && <p className="text-[10px] font-bold italic text-[#862200]">Descreva a ocorrência antes de salvar.</p>}
-                          </div>
-                        )}
+                      <div className="px-5 py-4 space-y-1">
+                        <label className="block text-sm font-black italic uppercase text-[#191c1e]">
+                          Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span className="text-[#b02f00]">*</span> obrigatório
+                        </label>
+                        <Textarea
+                          placeholder="Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso por trânsito. Se ninguém faltou/atrasou, escreva &quot;Ninguém faltou ou atrasou&quot;."
+                          value={conformityEvalForm.absencesReport}
+                          onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
+                          className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
+                        />
+                        {absencesNeedsReport && <p className="text-[10px] font-bold italic text-[#862200]">Especifique antes de salvar.</p>}
                       </div>
                     </div>
 
@@ -2364,7 +2352,7 @@ export default function EvaluationsPage() {
                       <button type="button" disabled={!canSaveTexts || conformityEvalMutation.isPending}
                         onClick={() => {
                           if (!selectedEventId || !canSaveTexts) return;
-                          const payload: Record<string, unknown> = { absencesResponse: conformityEvalForm.absencesResponse, absencesReport: conformityEvalForm.absencesReport || null, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
+                          const payload: Record<string, unknown> = { absencesResponse: true, absencesReport: conformityEvalForm.absencesReport, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
                           cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
                           conformityEvalMutation.mutate(
                             { id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] },
@@ -2508,7 +2496,6 @@ export default function EvaluationsPage() {
                           { label: "EPI", val: conformityEvalForm.epi },
                           { label: "Estaiamentos / Aterramentos", val: conformityEvalForm.estaiamentos },
                           { label: "Conduta", val: conformityEvalForm.conduta },
-                          { label: "Faltas/Atrasos", val: conformityEvalForm.absencesResponse },
                           { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse },
                         ].map(item => (
                           <div key={item.label} className="flex items-center justify-between gap-3">
@@ -2520,6 +2507,16 @@ export default function EvaluationsPage() {
                             )}
                           </div>
                         ))}
+                        {isConformityEvaluatorForEvent && (
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[11px] font-bold italic uppercase text-[#191c1e] truncate">Faltas/Atrasos</span>
+                            {conformityEvalForm.absencesReport.trim() ? (
+                              <span className="shrink-0 text-sm font-black italic text-[#506600]">Respondido</span>
+                            ) : (
+                              <span className="shrink-0 text-[10px] font-black italic uppercase text-[#862200] tracking-wide">pendente</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

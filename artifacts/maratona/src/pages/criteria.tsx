@@ -698,7 +698,13 @@ export default function CriteriaPage() {
                             <button
                               type="button"
                               data-testid={`button-duplicate-criterion-${c.id}`}
-                              onClick={() => { setDuplicateSourceId(c.id); setDuplicateAreaId(""); }}
+                              onClick={() => {
+                                setDuplicateSourceId(c.id);
+                                const suggestedArea = c.name.trim().toLowerCase() === "qualidade da entrega"
+                                  ? (areas ?? []).find(a => a.name.trim().toLowerCase() === "ativação" && a.id !== c.responsibleAreaId)
+                                  : undefined;
+                                setDuplicateAreaId(suggestedArea ? String(suggestedArea.id) : "");
+                              }}
                               title="Duplicar este critério para outra área"
                               className="p-1 text-[#747a60] hover:text-[#191c1e] transition-colors shrink-0"
                             >

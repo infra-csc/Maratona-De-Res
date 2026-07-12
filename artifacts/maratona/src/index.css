@@ -57,11 +57,6 @@
   --color-sidebar-accent-border: var(--sidebar-accent-border);
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --color-platoon-quenia: hsl(var(--platoon-quenia));
-  --color-platoon-azul: hsl(var(--platoon-azul));
-  --color-platoon-verde: hsl(var(--platoon-verde));
-  --color-platoon-branco: hsl(var(--platoon-branco));
-
   --font-sans: var(--app-font-sans);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -116,11 +111,6 @@
 
   --input: 214 32% 91%;
   --ring: 221 83% 53%;
-
-  --platoon-quenia: 45 93% 47%; /* Gold */
-  --platoon-azul: 221 83% 53%; /* Vivid Blue */
-  --platoon-verde: 142 71% 45%; /* Green */
-  --platoon-branco: 215 16% 47%; /* Slate Gray/White equivalent */
 
   --chart-1: 221 83% 53%;
   --chart-2: 142 71% 45%;
@@ -189,11 +179,6 @@
 
   --input: 217 32% 20%;
   --ring: 221 83% 55%;
-
-  --platoon-quenia: 45 93% 55%;
-  --platoon-azul: 221 83% 60%;
-  --platoon-verde: 142 71% 55%;
-  --platoon-branco: 215 20% 70%;
 
   --chart-1: 221 83% 55%;
   --chart-2: 142 71% 50%;
