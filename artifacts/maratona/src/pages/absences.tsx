@@ -385,7 +385,7 @@ export default function AbsencesPage() {
                             {isMerit ? "+" : "-"}{a.points * a.quantity}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm font-bold italic text-[#747a60] uppercase tracking-tight max-w-xs truncate">
+                        <td className="px-6 py-4 text-sm font-bold italic text-[#747a60] uppercase tracking-tight max-w-xs truncate" title={a.reason || undefined}>
                           {a.reason || <span className="text-[#b0b7a0] not-italic normal-case font-normal">Sem justificativa</span>}
                         </td>
                         {canEdit && (
@@ -651,8 +651,9 @@ export default function AbsencesPage() {
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
+              disabled={deleteMutation.isPending}
               onClick={() => deleteTargetId && deleteMutation.mutate({ id: deleteTargetId })}
-              className="rounded-none bg-[#ba1a1a] text-white border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider hover:bg-[#93000a]"
+              className="rounded-none bg-[#ba1a1a] text-white border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider hover:bg-[#93000a] disabled:opacity-50"
             >
               Sim, excluir
             </AlertDialogAction>

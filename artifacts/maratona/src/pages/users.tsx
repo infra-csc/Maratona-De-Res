@@ -206,7 +206,7 @@ export default function UsersPage() {
                       <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Migrar Emails Office 365</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 pt-2">
-                      <p className="text-sm text-[#444933]">Atualiza os emails de <strong>34 avaliadores</strong> identificados no Office 365. Clique em <em>Prévia</em> para ver o que será alterado antes de confirmar.</p>
+                      <p className="text-sm text-[#444933]">Atualiza os emails dos avaliadores identificados no Office 365. Clique em <em>Prévia</em> para ver o que será alterado antes de confirmar.</p>
                       {!emailMigPreview && (
                         <button
                           onClick={() => runEmailMigration(true)}
@@ -594,7 +594,7 @@ export default function UsersPage() {
                             </button>}
                             {!mergeMode && <button
                               data-testid={`button-reset-pw-${u.id}`}
-                              onClick={() => setResetOpen(u.id)}
+                              onClick={() => { setNewPassword(""); setResetOpen(u.id); }}
                               title="Redefinir senha"
                               className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ff5722] hover:text-white transition-all"
                             >
@@ -635,14 +635,14 @@ export default function UsersPage() {
                       </tr>
                     );
                   })}
-                  {(users ?? []).length === 0 && (
-                    <tr><td colSpan={mergeMode ? 6 : 5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum usuário cadastrado.</td></tr>
+                  {sortedUsers.length === 0 && (
+                    <tr><td colSpan={mergeMode ? 6 : 5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">{userSearch ? "Nenhum usuário encontrado." : "Nenhum usuário cadastrado."}</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             <div className="px-6 py-4 border-t-2 border-[#eceef0] flex justify-between items-center">
-              <span className="text-xs font-bold italic uppercase text-[#747a60]">Mostrando {(users ?? []).length} de {stats.total} usuários</span>
+              <span className="text-xs font-bold italic uppercase text-[#747a60]">Mostrando {sortedUsers.length} de {stats.total} usuários</span>
             </div>
           </section>
         )}
@@ -749,7 +749,7 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={resetOpen !== null} onOpenChange={v => !v && setResetOpen(null)}>
+      <Dialog open={resetOpen !== null} onOpenChange={v => { if (!v) { setResetOpen(null); setNewPassword(""); } }}>
         <DialogContent className="max-w-sm rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
           <DialogHeader>
             <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Redefinir Senha</DialogTitle>
@@ -765,12 +765,15 @@ export default function UsersPage() {
                 placeholder="Mínimo 6 caracteres..."
                 className="h-11 rounded-none border-2 border-[#191c1e]"
               />
+              {newPassword.length > 0 && newPassword.length < 6 && (
+                <p className="text-[11px] font-bold italic text-[#862200]">A senha precisa ter pelo menos 6 caracteres.</p>
+              )}
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-              <Button variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setResetOpen(null)}>Cancelar</Button>
+              <Button variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setResetOpen(null); setNewPassword(""); }}>Cancelar</Button>
               <button
                 data-testid="button-confirm-reset-pw"
-                disabled={!newPassword || resetPwMutation.isPending}
+                disabled={newPassword.length < 6 || resetPwMutation.isPending}
                 onClick={() => resetOpen && resetPwMutation.mutate({ id: resetOpen, data: { newPassword } })}
                 className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
               >

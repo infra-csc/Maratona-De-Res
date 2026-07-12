@@ -2428,12 +2428,6 @@ export default function EvaluationsPage() {
                               <span>Destaque de desempenho registrado</span>
                             </div>
                           )}
-                          {adminConformityData.absencesResponse === true && (
-                            <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#b02f00] bg-[#fff4e5] border border-[#b02f00] px-3 py-2">
-                              <Clock size={13} className="shrink-0" />
-                              <span>Faltas/atrasos registrados</span>
-                            </div>
-                          )}
                           {[adminConformityData.epi, adminConformityData.estaiamentos, adminConformityData.conduta, adminConformityData.guardaEquipamentos].some(v => v === false) && (
                             <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-3 py-2">
                               <ShieldAlert size={13} className="shrink-0" />

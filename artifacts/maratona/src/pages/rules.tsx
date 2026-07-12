@@ -129,6 +129,10 @@ export default function RulesPage() {
     },
   });
 
+  function findOverlappingBand(min: number, max: number, excludeId?: number) {
+    return (platoonRules ?? []).find(p => p.id !== excludeId && min <= Number(p.maxScore) && max >= Number(p.minScore));
+  }
+
   function handleCreateBand() {
     if (newBand.minScore === "" || newBand.maxScore === "") {
       toast({ title: "Preencha nota mínima e máxima", variant: "destructive" });
@@ -136,6 +140,15 @@ export default function RulesPage() {
     }
     const min = parseFloat(newBand.minScore);
     const max = parseFloat(newBand.maxScore);
+    if (min > max) {
+      toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" });
+      return;
+    }
+    const conflict = findOverlappingBand(min, max);
+    if (conflict) {
+      toast({ title: "Faixa sobreposta", description: `O intervalo ${min}–${max} sobrepõe a faixa "${conflict.name}" (${conflict.minScore}–${conflict.maxScore}).`, variant: "destructive" });
+      return;
+    }
     const bandName = newBand.name.trim() || `${min}–${max}`;
     createPlatoonMutation.mutate({
       data: {
@@ -328,7 +341,21 @@ export default function RulesPage() {
                             data-testid={`button-save-platoon-${p.id}`}
                             className={`inline-flex items-center px-4 py-2 border-2 border-[#191c1e] font-bold text-sm italic uppercase transition-all disabled:opacity-40 disabled:pointer-events-none ${isDirty ? `bg-[#ccff00] text-[#161e00] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}` : "bg-white text-[#444933] hover:bg-[#eceef0]"}`}
                             disabled={!isDirty || updatePlatoonMutation.isPending}
-                            onClick={() => platoonValues[p.id] && updatePlatoonMutation.mutate({ id: p.id, data: platoonValues[p.id] })}
+                            onClick={() => {
+                              if (!platoonValues[p.id]) return;
+                              const min = platoonValues[p.id]?.minScore ?? Number(p.minScore);
+                              const max = platoonValues[p.id]?.maxScore ?? Number(p.maxScore);
+                              if (min > max) {
+                                toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" });
+                                return;
+                              }
+                              const conflict = findOverlappingBand(min, max, p.id);
+                              if (conflict) {
+                                toast({ title: "Faixa sobreposta", description: `O intervalo ${min}–${max} sobrepõe a faixa "${conflict.name}" (${conflict.minScore}–${conflict.maxScore}).`, variant: "destructive" });
+                                return;
+                              }
+                              updatePlatoonMutation.mutate({ id: p.id, data: platoonValues[p.id] });
+                            }}
                           >
                             <Save size={15} className="mr-1.5" /> Salvar
                           </button>
