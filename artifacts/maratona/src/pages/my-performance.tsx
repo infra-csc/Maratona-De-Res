@@ -159,7 +159,7 @@ function CriterionReviewRequest({ event, criterion }: { event: EventSummary; cri
         <button
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "flex items-center gap-1 text-[9px] font-bold uppercase italic px-1.5 py-0.5 border shrink-0 transition-colors mt-1",
+            "flex items-center gap-1 text-[10px] font-bold uppercase italic px-1.5 py-0.5 border shrink-0 transition-colors mt-1",
             hasRequest
               ? isResolved
                 ? "border-[#506600] text-[#506600] bg-[#506600]/10"

@@ -305,16 +305,13 @@ export default function EventsPage() {
               const score = ev.teamScore ?? ev.averageScore ?? null;
               const calibrated = ev.hasCalibration ?? false;
               const concluded = ev.status === "closed";
-              const fullyResolved = progress === 100 && (ev.fullyCalibrated ?? false);
               return (
                 <div key={ev.id} data-testid={`card-event-${ev.id}`} className={`bg-white border-2 border-[#191c1e] flex flex-col ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}>
                   <div className="p-5 flex-1">
                     <div className="flex justify-between items-start gap-4 mb-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                          {!(fullyResolved && !ev.criteriaConfirmed) && (
-                            <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
-                          )}
+                          <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
                           {ev.isHistorical && (
                             <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
                               <span className="inline-block skew-x-[8deg]">Ciclo Anterior</span>

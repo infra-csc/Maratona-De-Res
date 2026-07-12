@@ -164,7 +164,7 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-black uppercase italic flex items-center gap-2 text-[#ba1a1a] mb-4">
                   <AlertTriangle size={16} /> Zona de Risco
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
                   {summary.atRiskEmployees.map(emp => (
                     <div key={emp.employeeId} className="flex items-center justify-between p-3 border-2 border-[#ffdad6] bg-[#ffdad6]/30">
                       <span className="text-sm font-bold italic uppercase break-words flex-1 pr-2">{emp.employeeName}</span>
