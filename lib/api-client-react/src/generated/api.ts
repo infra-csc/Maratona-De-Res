@@ -24,6 +24,9 @@ import type {
   AbsenceInput,
   AbsenceUpdate,
   Area,
+  AreaConformityRouting,
+  AreaConformityRoutingInput,
+  AreaConformityRoutingListItem,
   AreaInput,
   AreaUpdate,
   AuditLogPage,
@@ -1553,6 +1556,155 @@ export const useUpdateArea = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateAreaMutationOptions(options));
     }
+
+export const getSetAreaConformityRoutingUrl = (id: number,) => {
+
+
+
+
+  return `/areas/${id}/conformity-routing`
+}
+
+/**
+ * @summary Set the default Matriz de Conformidade evaluator for an area
+ */
+export const setAreaConformityRouting = async (id: number,
+    areaConformityRoutingInput: AreaConformityRoutingInput, options?: RequestInit): Promise<AreaConformityRouting> => {
+
+  return customFetch<AreaConformityRouting>(getSetAreaConformityRoutingUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      areaConformityRoutingInput,)
+  }
+);}
+
+
+
+
+export const getSetAreaConformityRoutingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAreaConformityRouting>>, TError,{id: number;data: BodyType<AreaConformityRoutingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setAreaConformityRouting>>, TError,{id: number;data: BodyType<AreaConformityRoutingInput>}, TContext> => {
+
+const mutationKey = ['setAreaConformityRouting'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setAreaConformityRouting>>, {id: number;data: BodyType<AreaConformityRoutingInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setAreaConformityRouting(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetAreaConformityRoutingMutationResult = NonNullable<Awaited<ReturnType<typeof setAreaConformityRouting>>>
+    export type SetAreaConformityRoutingMutationBody = BodyType<AreaConformityRoutingInput>
+    export type SetAreaConformityRoutingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set the default Matriz de Conformidade evaluator for an area
+ */
+export const useSetAreaConformityRouting = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAreaConformityRouting>>, TError,{id: number;data: BodyType<AreaConformityRoutingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setAreaConformityRouting>>,
+        TError,
+        {id: number;data: BodyType<AreaConformityRoutingInput>},
+        TContext
+      > => {
+      return useMutation(getSetAreaConformityRoutingMutationOptions(options));
+    }
+
+export const getGetConformityRoutingUrl = () => {
+
+
+
+
+  return `/conformity-routing`
+}
+
+/**
+ * @summary List the default Matriz de Conformidade evaluator configured per area
+ */
+export const getConformityRouting = async ( options?: RequestInit): Promise<AreaConformityRoutingListItem[]> => {
+
+  return customFetch<AreaConformityRoutingListItem[]>(getGetConformityRoutingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConformityRoutingQueryKey = () => {
+    return [
+    `/conformity-routing`
+    ] as const;
+    }
+
+
+export const getGetConformityRoutingQueryOptions = <TData = Awaited<ReturnType<typeof getConformityRouting>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConformityRouting>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConformityRoutingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConformityRouting>>> = ({ signal }) => getConformityRouting({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConformityRouting>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConformityRoutingQueryResult = NonNullable<Awaited<ReturnType<typeof getConformityRouting>>>
+export type GetConformityRoutingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the default Matriz de Conformidade evaluator configured per area
+ */
+
+export function useGetConformityRouting<TData = Awaited<ReturnType<typeof getConformityRouting>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConformityRouting>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConformityRoutingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetEmployeesUrl = (params?: GetEmployeesParams,) => {
   const normalizedParams = new URLSearchParams();

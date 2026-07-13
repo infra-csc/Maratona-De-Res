@@ -1228,7 +1228,25 @@ export default function EvaluationsPage() {
 
         {isEvaluator && selectedEventId && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (() => {
           const principalAreaIds = new Set(myPrincipalAreas.map(a => a.id));
-          const areaCriteria = (criterionAssignments ?? []).filter(a => a.criterionAreaId != null && principalAreaIds.has(a.criterionAreaId));
+          // Deriva a partir dos critérios ATIVOS do evento (não das atribuições já
+          // geradas) — assim a área principal enxerga e gerencia seus quesitos desde
+          // o primeiro momento, mesmo que ninguém tenha rodado "Gerar Sugestões"
+          // ainda para este evento (a linha de atribuição é criada na hora, no
+          // primeiro "Pegar para mim"/"Atribuir a...", como já acontece no backend).
+          const assignmentByCriterionId = new Map((criterionAssignments ?? []).map(a => [a.criterionId, a]));
+          const areaCriteria = activeCriteria
+            .filter(c => c.responsibleAreaId != null && principalAreaIds.has(c.responsibleAreaId))
+            .map(c => {
+              const a = assignmentByCriterionId.get(c.criterionId);
+              return {
+                criterionId: c.criterionId,
+                criterionName: c.criterionName,
+                criterionAreaId: c.responsibleAreaId as number,
+                assignedToId: a?.assignedToId ?? null,
+                assignedToName: a?.assignedToName ?? null,
+                status: a?.status ?? "pending",
+              };
+            });
           if (areaCriteria.length === 0) return null;
           const areaNameById = new Map(myPrincipalAreas.map(a => [a.id, a.name]));
           return (
@@ -1507,7 +1525,7 @@ export default function EvaluationsPage() {
                                           onClick={() => { setAssignAreaPickerOpen(area.id); setAssignAreaUserIds(assigned.map(a => a.id)); }}
                                           className="flex items-center gap-1.5 px-2.5 py-1 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors text-[11px] font-black uppercase tracking-tight shrink-0"
                                         >
-                                          <UserPlus size={13} /> Alterar
+                                          <UserPlus size={13} /> {assigned.length === 0 ? "Atribuir" : "Alterar"}
                                         </button>
                                       )}
                                     </div>

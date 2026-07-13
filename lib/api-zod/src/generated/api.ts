@@ -347,6 +347,37 @@ export const UpdateAreaResponse = zod.object({
 
 
 /**
+ * @summary Set the default Matriz de Conformidade evaluator for an area
+ */
+export const SetAreaConformityRoutingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetAreaConformityRoutingBody = zod.object({
+  "defaultEvaluatorId": zod.number().nullish()
+})
+
+export const SetAreaConformityRoutingResponse = zod.object({
+  "id": zod.number(),
+  "areaId": zod.number(),
+  "defaultEvaluatorId": zod.number().nullable()
+})
+
+
+/**
+ * @summary List the default Matriz de Conformidade evaluator configured per area
+ */
+export const GetConformityRoutingResponseItem = zod.object({
+  "id": zod.number(),
+  "areaId": zod.number(),
+  "areaName": zod.string().nullable(),
+  "defaultEvaluatorId": zod.number().nullable(),
+  "defaultEvaluatorName": zod.string().nullable()
+})
+export const GetConformityRoutingResponse = zod.array(GetConformityRoutingResponseItem)
+
+
+/**
  * @summary List employees
  */
 export const GetEmployeesQueryParams = zod.object({

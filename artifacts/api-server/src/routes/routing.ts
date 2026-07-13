@@ -5,7 +5,7 @@ import {
   criterionRoutingTable, criterionRedirectUsersTable,
   eventCriterionAssignmentsTable, criteriaTable, usersTable,
   areasTable, eventsTable, eventCriteriaTable, publicEvalTokensTable,
-  publicEvalTokenCriteriaTable,
+  publicEvalTokenCriteriaTable, areaConformityRoutingTable,
 } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -793,6 +793,56 @@ router.get("/events/:id/public-tokens/conformity-ferramentas", async (req, res) 
     .orderBy(publicEvalTokensTable.createdAt);
 
   res.json(tokens);
+});
+
+// ---------------------------------------------------------------------------
+// GET /conformity-routing
+// Lista o avaliador padrão da Matriz de Conformidade configurado por área
+// (ex.: Cenografia → grupo 2 da matriz, Ferramentas e Case → grupo 1).
+// ---------------------------------------------------------------------------
+router.get("/conformity-routing", async (_req, res) => {
+  const rows = await db.select({
+    id: areaConformityRoutingTable.id,
+    areaId: areaConformityRoutingTable.areaId,
+    areaName: areasTable.name,
+    defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
+    defaultEvaluatorName: usersTable.name,
+  })
+    .from(areaConformityRoutingTable)
+    .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id))
+    .leftJoin(usersTable, eq(areaConformityRoutingTable.defaultEvaluatorId, usersTable.id));
+  res.json(rows);
+});
+
+// ---------------------------------------------------------------------------
+// PUT /areas/:id/conformity-routing
+// Define (ou remove, com defaultEvaluatorId: null) o avaliador padrão da
+// Matriz de Conformidade para esta área.
+// ---------------------------------------------------------------------------
+router.put("/areas/:id/conformity-routing", requireRole("admin", "rh"), async (req, res) => {
+  const areaId = parseInt(req.params.id as string);
+  const { defaultEvaluatorId } = req.body as { defaultEvaluatorId: number | null };
+
+  const [area] = await db.select().from(areasTable).where(eq(areasTable.id, areaId)).limit(1);
+  if (!area) { res.status(404).json({ error: "Área não encontrada" }); return; }
+
+  const [existing] = await db.select().from(areaConformityRoutingTable)
+    .where(eq(areaConformityRoutingTable.areaId, areaId)).limit(1);
+
+  let saved: typeof areaConformityRoutingTable.$inferSelect;
+  if (existing) {
+    [saved] = await db.update(areaConformityRoutingTable)
+      .set({ defaultEvaluatorId: defaultEvaluatorId ?? null, updatedAt: new Date() })
+      .where(eq(areaConformityRoutingTable.id, existing.id))
+      .returning();
+  } else {
+    [saved] = await db.insert(areaConformityRoutingTable)
+      .values({ areaId, defaultEvaluatorId: defaultEvaluatorId ?? null })
+      .returning();
+  }
+
+  await audit(req.user!.userId, "set_conformity_routing", "areas", areaId, existing ?? null, saved);
+  res.json(saved);
 });
 
 export default router;

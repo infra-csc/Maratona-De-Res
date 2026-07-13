@@ -180,6 +180,29 @@ export interface AreaUpdate {
   active?: boolean;
 }
 
+export interface AreaConformityRoutingInput {
+  /** @nullable */
+  defaultEvaluatorId?: number | null;
+}
+
+export interface AreaConformityRouting {
+  id: number;
+  areaId: number;
+  /** @nullable */
+  defaultEvaluatorId: number | null;
+}
+
+export interface AreaConformityRoutingListItem {
+  id: number;
+  areaId: number;
+  /** @nullable */
+  areaName: string | null;
+  /** @nullable */
+  defaultEvaluatorId: number | null;
+  /** @nullable */
+  defaultEvaluatorName: string | null;
+}
+
 export type EmployeeEmploymentType = typeof EmployeeEmploymentType[keyof typeof EmployeeEmploymentType];
 
 

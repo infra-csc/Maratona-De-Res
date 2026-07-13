@@ -32,6 +32,25 @@ export const criterionRoutingTable = pgTable("criterion_routing", {
 }));
 
 /**
+ * Avaliador padrão da Matriz de Conformidade, por ÁREA (não por critério —
+ * "Ferramentas e Case" não tem critério próprio no catálogo, só responde a
+ * matriz). Usado para pré-preencher event.conformityEvaluatorUserId /
+ * conformityEvaluatorFerramentasUserId quando um evento ainda não tem
+ * avaliador de conformidade definido. Configurado por admin/RH na tela de
+ * Critérios; uma linha por área (só faz sentido hoje para "Cenografia" e
+ * "Ferramentas e Case", mas não é restrito a essas duas).
+ */
+export const areaConformityRoutingTable = pgTable("area_conformity_routing", {
+  id: serial("id").primaryKey(),
+  areaId: integer("area_id").notNull().references(() => areasTable.id, { onDelete: "cascade" }),
+  defaultEvaluatorId: integer("default_evaluator_id").references(() => usersTable.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  areaUq: uniqueIndex("area_conformity_routing_area_uq").on(t.areaId),
+}));
+
+/**
  * Usuários permitidos como destino de redirecionamento quando
  * redirect_mode = 'specific'.
  */
@@ -100,11 +119,14 @@ export const publicEvalTokenCriteriaTable = pgTable("public_eval_token_criteria"
 
 export const insertCriterionRoutingSchema = createInsertSchema(criterionRoutingTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEventCriterionAssignmentSchema = createInsertSchema(eventCriterionAssignmentsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAreaConformityRoutingSchema = createInsertSchema(areaConformityRoutingTable).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type CriterionRouting = typeof criterionRoutingTable.$inferSelect;
 export type CriterionRedirectUser = typeof criterionRedirectUsersTable.$inferSelect;
 export type EventCriterionAssignment = typeof eventCriterionAssignmentsTable.$inferSelect;
 export type PublicEvalToken = typeof publicEvalTokensTable.$inferSelect;
 export type PublicEvalTokenCriterion = typeof publicEvalTokenCriteriaTable.$inferSelect;
+export type AreaConformityRouting = typeof areaConformityRoutingTable.$inferSelect;
 export type InsertCriterionRouting = z.infer<typeof insertCriterionRoutingSchema>;
 export type InsertEventCriterionAssignment = z.infer<typeof insertEventCriterionAssignmentSchema>;
+export type InsertAreaConformityRouting = z.infer<typeof insertAreaConformityRoutingSchema>;

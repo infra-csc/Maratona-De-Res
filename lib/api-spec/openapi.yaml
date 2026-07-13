@@ -367,6 +367,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/Area"
 
+  /areas/{id}/conformity-routing:
+    put:
+      operationId: setAreaConformityRouting
+      tags: [areas]
+      summary: Set the default Matriz de Conformidade evaluator for an area
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AreaConformityRoutingInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AreaConformityRouting"
+
+  /conformity-routing:
+    get:
+      operationId: getConformityRouting
+      tags: [areas]
+      summary: List the default Matriz de Conformidade evaluator configured per area
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AreaConformityRoutingListItem"
+
   /employees:
     get:
       operationId: getEmployees
@@ -2896,6 +2936,38 @@ components:
           type: string
         active:
           type: boolean
+
+    AreaConformityRoutingInput:
+      type: object
+      properties:
+        defaultEvaluatorId:
+          type: ["integer", "null"]
+
+    AreaConformityRouting:
+      type: object
+      required: [id, areaId, defaultEvaluatorId]
+      properties:
+        id:
+          type: integer
+        areaId:
+          type: integer
+        defaultEvaluatorId:
+          type: ["integer", "null"]
+
+    AreaConformityRoutingListItem:
+      type: object
+      required: [id, areaId, areaName, defaultEvaluatorId, defaultEvaluatorName]
+      properties:
+        id:
+          type: integer
+        areaId:
+          type: integer
+        areaName:
+          type: ["string", "null"]
+        defaultEvaluatorId:
+          type: ["integer", "null"]
+        defaultEvaluatorName:
+          type: ["string", "null"]
 
     Employee:
       type: object

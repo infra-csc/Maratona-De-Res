@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useGetCriteria, useCreateCriterion, useUpdateCriterion, useGetAreas, useResyncAllEventsCriteria, useGetUsers, getGetCriteriaQueryKey } from "@workspace/api-client-react";
+import { useGetCriteria, useCreateCriterion, useUpdateCriterion, useGetAreas, useResyncAllEventsCriteria, useGetUsers, getGetCriteriaQueryKey, useGetConformityRouting, useSetAreaConformityRouting, getGetConformityRoutingQueryKey } from "@workspace/api-client-react";
 import type { CriterionInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -164,6 +164,91 @@ function EvaluatorPickerCell({
           <div className="p-2 border-t-2 border-[#191c1e] bg-[#f7f9fb] text-center text-[10px] font-bold italic text-[#747a60]">
             Salvando...
           </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ConformityAreaEvaluatorPicker({
+  areaId, currentEvaluatorId, currentEvaluatorName, evaluators,
+}: {
+  areaId: number;
+  currentEvaluatorId: number | null;
+  currentEvaluatorName: string | null;
+  evaluators: { id: number; name: string }[];
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const saveMutation = useSetAreaConformityRouting({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetConformityRoutingQueryKey() });
+        setOpen(false);
+        setSearch("");
+        toast({ title: "Avaliador padrão da matriz salvo" });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const handleSelect = (userId: number | null) => {
+    saveMutation.mutate({ id: areaId, data: { defaultEvaluatorId: userId } });
+  };
+
+  const filtered = evaluators.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <Popover open={open} onOpenChange={v => { setOpen(v); if (!v) setSearch(""); }}>
+      <PopoverTrigger asChild>
+        <button type="button" className="flex items-center gap-1.5 group/ev text-left" title="Clique para definir o avaliador padrão da matriz">
+          {currentEvaluatorName ? (
+            <span className="flex items-center gap-1.5 text-sm font-bold italic text-[#191c1e] group-hover/ev:text-[#506600] transition-colors">
+              <UserCheck size={13} className="text-[#506600] shrink-0" />
+              {currentEvaluatorName}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#e55050] group-hover/ev:text-[#c03030] transition-colors">
+              <AlertCircle size={12} /> Sem avaliador
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e]" align="start" onClick={e => e.stopPropagation()}>
+        <div className="p-2 border-b-2 border-[#191c1e] bg-[#f7f9fb]">
+          <p className="text-[10px] font-black uppercase italic tracking-wider text-[#444933] mb-1.5">Avaliador Padrão da Matriz</p>
+          <Input
+            placeholder="Buscar por nome..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-7 text-xs rounded-none border-2 border-[#191c1e] focus-visible:ring-0"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-56 overflow-y-auto">
+          {currentEvaluatorId != null && (
+            <button type="button" onClick={() => handleSelect(null)} disabled={saveMutation.isPending}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold italic text-[#e55050] hover:bg-[#fff0f0] border-b border-[#eceef0] transition-colors"
+            >
+              <X size={11} /> Remover avaliador
+            </button>
+          )}
+          {filtered.length === 0 && (
+            <p className="text-center text-xs text-[#747a60] italic py-4">Nenhum resultado para "{search}"</p>
+          )}
+          {filtered.map(u => (
+            <button key={u.id} type="button" onClick={() => handleSelect(u.id)} disabled={saveMutation.isPending}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold italic text-left hover:bg-[#f0f5e0] transition-colors border-b border-[#eceef0] last:border-b-0 ${u.id === currentEvaluatorId ? "bg-[#f0f5e0] text-[#506600]" : "text-[#191c1e]"}`}
+            >
+              {u.id === currentEvaluatorId && <Check size={11} className="shrink-0 text-[#506600]" />}
+              <span>{u.name}</span>
+            </button>
+          ))}
+        </div>
+        {saveMutation.isPending && (
+          <div className="p-2 border-t-2 border-[#191c1e] bg-[#f7f9fb] text-center text-[10px] font-bold italic text-[#747a60]">Salvando...</div>
         )}
       </PopoverContent>
     </Popover>
@@ -381,6 +466,7 @@ export default function CriteriaPage() {
   const { data: areas } = useGetAreas();
   const { data: usersList } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
   const { data: routings } = useAllCriterionRoutings();
+  const { data: conformityRoutings } = useGetConformityRouting();
 
   // Todos os usuários ativos que podem ser avaliadores (exceto visualizadores)
   const evaluators = useMemo(() =>
@@ -766,6 +852,37 @@ export default function CriteriaPage() {
             </div>
           </section>
         )}
+
+        {/* Avaliador Padrão da Matriz de Conformidade — por área, não por critério
+            (Ferramentas e Case não tem critério próprio no catálogo). */}
+        <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+          <div className="px-6 py-4 border-b-2 border-[#191c1e] bg-[#191c1e] text-white">
+            <h2 className="text-lg font-black italic uppercase tracking-tight">Avaliador Padrão — Matriz de Conformidade</h2>
+            <p className="text-xs italic text-[#ccff00] mt-0.5">Usado para pré-preencher o avaliador da matriz ao configurar um evento novo.</p>
+          </div>
+          {(areas ?? []).length === 0 ? (
+            <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhuma área cadastrada.</div>
+          ) : (
+            <ul className="divide-y-2 divide-[#eceef0]">
+              {(areas ?? []).map(a => {
+                const routing = (conformityRoutings ?? []).find(r => r.areaId === a.id);
+                return (
+                  <li key={a.id} className="px-6 py-3 flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 font-bold italic uppercase text-sm text-[#191c1e]">
+                      <Building2 size={14} className="text-[#747a60]" /> {a.name}
+                    </span>
+                    <ConformityAreaEvaluatorPicker
+                      areaId={a.id}
+                      currentEvaluatorId={routing?.defaultEvaluatorId ?? null}
+                      currentEvaluatorName={routing?.defaultEvaluatorName ?? null}
+                      evaluators={evaluators}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
 
       {/* Create Criterion Dialog */}
