@@ -2,7 +2,7 @@ import { useRoute, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import {
   useEventCriterionAssignments, useGenerateCriterionAssignments,
-  usePatchCriterionAssignment, type CriterionAssignment,
+  usePatchCriterionAssignment, useAllCriterionRoutings, type CriterionAssignment,
 } from "@/lib/routing-api";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useGetAreas, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -981,6 +981,7 @@ export default function EventDetailPage() {
   const [primaryEvaluator, setPrimaryEvaluator] = useState<Record<number, number | null>>({});
   const [redirectExpanded, setRedirectExpanded] = useState<Record<number, boolean>>({});
   const [redirectSearch, setRedirectSearch] = useState<Record<number, string>>({});
+  const { data: allRoutings } = useAllCriterionRoutings();
 
   useEffect(() => {
     if (event?.areaAssignments) {
@@ -995,10 +996,26 @@ export default function EventDetailPage() {
         primMap[Number(areaId)] = ids[0] ?? null;
         map[Number(areaId)] = ids.slice(1); // rest are backups
       }
+      // Área sem NENHUMA atribuição salva ainda (evento novo/nunca configurado):
+      // sugere o avaliador padrão já configurado no roteamento de algum
+      // critério daquela área, em vez de deixar sempre em branco pro RH
+      // escolher do zero toda vez.
+      if (allRoutings) {
+        const routingByCriterionId = new Map(allRoutings.map(r => [r.criterionId, r]));
+        const areaIdsWithCriteria = new Set(
+          (event.criteria ?? []).filter(c => c.active && c.responsibleAreaId != null).map(c => c.responsibleAreaId as number),
+        );
+        for (const areaId of areaIdsWithCriteria) {
+          if (primMap[areaId] != null) continue;
+          const criterionInArea = (event.criteria ?? []).find(c => c.active && c.responsibleAreaId === areaId);
+          const suggested = criterionInArea ? routingByCriterionId.get(criterionInArea.criterionId)?.defaultEvaluatorId : null;
+          if (suggested != null) primMap[areaId] = suggested;
+        }
+      }
       setAssignments(map);
       setPrimaryEvaluator(primMap);
     }
-  }, [event?.areaAssignments]);
+  }, [event?.areaAssignments, event?.criteria, allRoutings]);
 
   // Duplicate dialog state
   const [duplicateDialog, setDuplicateDialog] = useState<{ criterionId: number; baseName: string } | null>(null);
