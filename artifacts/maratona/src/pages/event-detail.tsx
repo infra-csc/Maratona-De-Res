@@ -1034,6 +1034,10 @@ export default function EventDetailPage() {
   const patchAssignment = usePatchCriterionAssignment(id);
   const [assignPickerOpen, setAssignPickerOpen] = useState<{ criterionId: number; criterionName: string } | null>(null);
   const [assignPickerValue, setAssignPickerValue] = useState<number | null>(null);
+  // Recolhido por padrão: os avaliadores padrão já aparecem na tabela de
+  // critérios acima — esta seção só interessa pra dividir critérios de uma
+  // mesma área entre pessoas diferentes ou acompanhar redirecionamentos.
+  const [routingSectionOpen, setRoutingSectionOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -2034,17 +2038,27 @@ export default function EventDetailPage() {
           </section>
         )}
 
-        {/* Atribuições por Critério — roteamento fino (avançado) */}
+        {/* Atribuições por Critério — roteamento fino (avançado), recolhido por
+            padrão porque os avaliadores padrão já aparecem na tabela acima. */}
         {canManage && !event.isHistorical && (
           <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic">
+            <button
+              type="button"
+              onClick={() => setRoutingSectionOpen(o => !o)}
+              className="w-full bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic hover:bg-[#2a2e31] transition-colors"
+            >
               <div className="flex items-center gap-2">
                 <UserCheck size={18} />
                 <span className="font-black uppercase tracking-tight">Roteamento por Critério</span>
                 <span className="text-[10px] font-bold uppercase text-[#ccff00]/60 border border-[#ccff00]/30 px-1.5 py-0.5">Avançado</span>
               </div>
-            </div>
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-[#ccff00]/70">
+                {!routingSectionOpen && <span>Só se precisar dividir critérios de uma área ou redirecionar</span>}
+                {routingSectionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
+            </button>
 
+            {routingSectionOpen && (
             <div className="p-6 space-y-4">
               <div className="flex items-start gap-3 bg-[#f7f9fb] border-2 border-[#eceef0] px-4 py-3">
                 <Info size={16} className="text-[#506600] shrink-0 mt-0.5" />
@@ -2134,6 +2148,7 @@ export default function EventDetailPage() {
                 </div>
               )}
             </div>
+            )}
           </section>
         )}
 
@@ -2327,13 +2342,13 @@ export default function EventDetailPage() {
               </div>
               {/* Avaliadores por grupo — visível apenas para admin/RH */}
               {canManage ? (
-                <div className="flex divide-x-2 divide-[#eceef0] border-b-2 border-[#eceef0]">
+                <div className="flex flex-col min-[480px]:flex-row divide-y-2 min-[480px]:divide-y-0 min-[480px]:divide-x-2 divide-[#eceef0] border-b-2 border-[#eceef0]">
                   {/* Grupo 1: Ferramentas e Case */}
                   <div className="flex-1 px-4 py-2 flex items-center gap-2 min-w-0">
                     <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">Ferramentas:</span>
                     <Popover open={conformityEvaluatorFerramentasPickerOpen} onOpenChange={setConformityEvaluatorFerramentasPickerOpen}>
                       <PopoverTrigger asChild>
-                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors flex-1 min-w-0">
+                        <button type="button" title={event?.conformityEvaluatorFerramentasName ?? "Sem avaliador"} className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors flex-1 min-w-0">
                           <UserCheck size={10} className="shrink-0" />
                           <span className="truncate">{event?.conformityEvaluatorFerramentasName ?? "Sem avaliador"}</span>
                         </button>
@@ -2365,7 +2380,7 @@ export default function EventDetailPage() {
                     <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">Cenografia:</span>
                     <Popover open={conformityEvaluatorPickerOpen} onOpenChange={setConformityEvaluatorPickerOpen}>
                       <PopoverTrigger asChild>
-                        <button type="button" className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors flex-1 min-w-0">
+                        <button type="button" title={event?.conformityEvaluatorName ?? "Sem avaliador"} className="flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f5f5f5] border border-[#d0d0d0] hover:bg-[#eaeaea] px-2 py-0.5 transition-colors flex-1 min-w-0">
                           <UserCheck size={10} className="shrink-0" />
                           <span className="truncate">{event?.conformityEvaluatorName ?? "Sem avaliador"}</span>
                         </button>
@@ -2394,9 +2409,9 @@ export default function EventDetailPage() {
                   </div>
                 </div>
               ) : (event?.conformityEvaluatorName || event?.conformityEvaluatorFerramentasName) ? (
-                <div className="flex divide-x-2 divide-[#eceef0] border-b-2 border-[#eceef0] text-[10px] font-bold italic text-[#747a60]">
-                  <div className="flex-1 px-4 py-2 flex items-center gap-1.5"><span className="uppercase">Ferramentas:</span><span className="text-[#191c1e]">{event.conformityEvaluatorFerramentasName ?? "—"}</span></div>
-                  <div className="flex-1 px-4 py-2 flex items-center gap-1.5"><span className="uppercase">Cenografia:</span><span className="text-[#191c1e]">{event.conformityEvaluatorName ?? "—"}</span></div>
+                <div className="flex flex-col min-[480px]:flex-row divide-y-2 min-[480px]:divide-y-0 min-[480px]:divide-x-2 divide-[#eceef0] border-b-2 border-[#eceef0] text-[10px] font-bold italic text-[#747a60]">
+                  <div className="flex-1 px-4 py-2 flex items-center gap-1.5 min-w-0"><span className="uppercase shrink-0">Ferramentas:</span><span className="text-[#191c1e] truncate" title={event.conformityEvaluatorFerramentasName ?? "—"}>{event.conformityEvaluatorFerramentasName ?? "—"}</span></div>
+                  <div className="flex-1 px-4 py-2 flex items-center gap-1.5 min-w-0"><span className="uppercase shrink-0">Cenografia:</span><span className="text-[#191c1e] truncate" title={event.conformityEvaluatorName ?? "—"}>{event.conformityEvaluatorName ?? "—"}</span></div>
                 </div>
               ) : null}
               {!conformityData && importedConformityRatio && (
