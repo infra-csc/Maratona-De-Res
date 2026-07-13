@@ -24,7 +24,7 @@ export function ImpersonationBanner() {
   return (
     <div
       data-testid="impersonation-banner"
-      className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#191c1e] bg-[#ccff00] px-6 py-2.5"
+      className="sticky top-14 md:top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#191c1e] bg-[#ccff00] px-6 py-2.5"
       style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
     >
       <div className="flex items-center gap-3 text-[#161e00]">

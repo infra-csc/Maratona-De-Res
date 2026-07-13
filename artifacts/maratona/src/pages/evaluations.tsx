@@ -2591,7 +2591,7 @@ export default function EvaluationsPage() {
               })()}
 
               {/* Right Sticky Panel */}
-              <div className="order-1 lg:order-none sticky top-2 lg:top-6 space-y-6 z-10">
+              <div className="order-1 lg:order-none sticky top-16 md:top-2 lg:top-6 space-y-6 z-10">
                 <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                   <div className="bg-[#191c1e] text-[#ccff00] px-5 py-4 italic">
                     <h3 className="text-lg font-black uppercase tracking-tight">{isConsultation ? "Status do Time" : "Resumo da Avaliação"}</h3>
