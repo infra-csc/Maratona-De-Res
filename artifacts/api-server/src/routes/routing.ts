@@ -689,6 +689,25 @@ router.post("/events/:id/public-token/conformity", async (req, res) => {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Cenografia deste evento" }); return;
   }
 
+  // O formulário de conformidade é um só por evento — só pode existir UM link.
+  // Se já há um pendente, devolve o mesmo (reenvia se o freelancer perdeu);
+  // se já foi respondido, não faz sentido gerar outro.
+  const existing = await db.select({ id: publicEvalTokensTable.id, usedAt: publicEvalTokensTable.usedAt })
+    .from(publicEvalTokensTable)
+    .where(and(eq(publicEvalTokensTable.eventId, eventId), eq(publicEvalTokensTable.tokenType, "conformity_cenografia")));
+  if (existing.some(t => t.usedAt !== null)) {
+    res.status(409).json({ error: "Este formulário já foi respondido por um freelancer — não é possível gerar outro link" });
+    return;
+  }
+  const pending = existing.find(t => t.usedAt === null);
+  if (pending) {
+    await db.update(publicEvalTokensTable)
+      .set({ recipientName: recipientName.trim() })
+      .where(eq(publicEvalTokensTable.id, pending.id));
+    res.json({ tokenId: pending.id, reused: true });
+    return;
+  }
+
   const tokenId = randomUUID();
   await db.insert(publicEvalTokensTable).values({
     id: tokenId,
@@ -733,6 +752,23 @@ router.post("/events/:id/public-token/conformity-ferramentas", async (req, res) 
   const isAdminRh = ["admin", "rh"].includes(user.role);
   if (!isAdminRh && ev.conformityEvaluatorFerramentasUserId !== user.userId) {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Ferramentas deste evento" }); return;
+  }
+
+  // Um link só por evento — mesmo comportamento do formulário de Cenografia.
+  const existing = await db.select({ id: publicEvalTokensTable.id, usedAt: publicEvalTokensTable.usedAt })
+    .from(publicEvalTokensTable)
+    .where(and(eq(publicEvalTokensTable.eventId, eventId), eq(publicEvalTokensTable.tokenType, "conformity_ferramentas")));
+  if (existing.some(t => t.usedAt !== null)) {
+    res.status(409).json({ error: "Este formulário já foi respondido por um freelancer — não é possível gerar outro link" });
+    return;
+  }
+  const pending = existing.find(t => t.usedAt === null);
+  if (pending) {
+    await db.update(publicEvalTokensTable)
+      .set({ recipientName: recipientName.trim() })
+      .where(eq(publicEvalTokensTable.id, pending.id));
+    res.json({ tokenId: pending.id, reused: true });
+    return;
   }
 
   const tokenId = randomUUID();

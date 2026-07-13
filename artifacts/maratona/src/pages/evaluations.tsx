@@ -3128,112 +3128,132 @@ export default function EvaluationsPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <p className="text-sm italic text-[#444933]">
-              {conformityPublicLinkType === "cenografia"
-                ? "Gere um link único de uso único para um freelancer preencher o formulário de conformidade de Cenografia (EPI, Estaiamentos, Conduta, Ausências e Destaque)."
-                : "Gere um link único de uso único para um freelancer preencher o formulário de Guarda de Equipamentos."}
-            </p>
-
-            {!generatedConformityUrl ? (
-              <div className="space-y-2">
-                <Label className="text-xs font-black italic uppercase">Nome do destinatário</Label>
-                <input
-                  type="text"
-                  value={conformityPublicRecipientName}
-                  onChange={e => setConformityPublicRecipientName(e.target.value)}
-                  placeholder="Ex.: Fred Ribeiro"
-                  className="w-full border-2 border-[#191c1e] px-4 py-2.5 text-sm italic font-bold focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
-                />
-              </div>
-            ) : (
+          {(() => {
+            // Um link só por formulário: se já existe um pendente, mostramos o
+            // MESMO link pra reenviar; se já foi respondido, não há o que gerar.
+            const hist = conformityPublicLinkType === "cenografia"
+              ? (conformityPublicTokenHistory ?? [])
+              : (ferramentasPublicTokenHistory ?? []);
+            const answered = hist.find(t => t.usedAt != null);
+            const pending = hist.find(t => t.usedAt == null);
+            const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+            const existingUrl = pending ? `${base}/eval/${pending.id}` : null;
+            const shownUrl = generatedConformityUrl ?? existingUrl;
+            return (
               <>
-                <div className="border-2 border-[#506600] bg-[#f0fff0] p-3 flex items-start gap-2">
-                  <CheckCircle size={16} className="text-[#506600] shrink-0 mt-0.5" />
-                  <p className="text-xs font-bold italic text-[#506600]">Link gerado com sucesso! Copie e envie ao freelancer.</p>
-                </div>
-                <div className="border-2 border-[#191c1e] bg-[#f2f4f6] px-3 py-2 flex items-center gap-2 min-w-0">
-                  <span className="text-xs italic font-bold text-[#444933] truncate flex-1">{generatedConformityUrl}</span>
-                  <button type="button"
-                    onClick={() => { navigator.clipboard.writeText(generatedConformityUrl); setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2500); }}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#ccff00] border-2 border-[#191c1e] hover:bg-[#b8e600] transition-colors"
-                  >
-                    <Copy size={12} />{conformityLinkCopied ? "Copiado!" : "Copiar"}
-                  </button>
-                </div>
-                <p className="text-[11px] italic text-[#747a60]">
-                  Este link é de uso único e expira após o freelancer submeter o formulário.
-                </p>
-              </>
-            )}
-
-            {/* Histórico de tokens */}
-            {(() => {
-              const hist = conformityPublicLinkType === "cenografia"
-                ? (conformityPublicTokenHistory ?? [])
-                : (ferramentasPublicTokenHistory ?? []);
-              if (hist.length === 0) return null;
-              return (
-                <div>
-                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-2">Histórico de links enviados</p>
-                  <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-40 overflow-y-auto">
-                    {hist.map(t => (
-                      <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
-                          <p className="text-[10px] italic text-[#747a60]">
-                            Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
-                          </p>
-                        </div>
-                        {t.usedAt ? (
-                          <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
-                            <CheckCircle size={10} /> Respondido
-                          </span>
-                        ) : (
-                          <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
-                            Pendente
-                          </span>
-                        )}
+                <div className="space-y-4 py-2">
+                  {answered ? (
+                    <div className="border-2 border-[#506600] bg-[#f0fff0] p-3 flex items-start gap-2">
+                      <CheckCircle size={16} className="text-[#506600] shrink-0 mt-0.5" />
+                      <p className="text-xs font-bold italic text-[#506600]">
+                        Formulário já respondido por <span className="uppercase">{answered.submitterName ?? answered.recipientName ?? "freelancer"}</span>
+                        {answered.usedAt ? ` em ${new Date(answered.usedAt).toLocaleDateString("pt-BR")}` : ""}. Não é possível gerar outro link.
+                      </p>
+                    </div>
+                  ) : shownUrl ? (
+                    <>
+                      <p className="text-sm italic text-[#444933]">
+                        {pending && !generatedConformityUrl
+                          ? <>Já existe um link enviado para <strong>{pending.recipientName ?? "—"}</strong> aguardando resposta. Se a pessoa perdeu, copie e reenvie o mesmo link.</>
+                          : "Link gerado com sucesso! Copie e envie ao freelancer."}
+                      </p>
+                      <div className="border-2 border-[#191c1e] bg-[#f2f4f6] px-3 py-2 flex items-center gap-2 min-w-0">
+                        <span className="text-xs italic font-bold text-[#444933] truncate flex-1">{shownUrl}</span>
+                        <button type="button"
+                          onClick={() => { navigator.clipboard.writeText(shownUrl); setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2500); }}
+                          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#ccff00] border-2 border-[#191c1e] hover:bg-[#b8e600] transition-colors"
+                        >
+                          <Copy size={12} />{conformityLinkCopied ? "Copiado!" : "Copiar"}
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
+                      <p className="text-[11px] italic text-[#747a60]">
+                        Este link é de uso único e expira após o freelancer submeter o formulário.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm italic text-[#444933]">
+                        {conformityPublicLinkType === "cenografia"
+                          ? "Gere um link único para um freelancer preencher o formulário de conformidade de Cenografia (EPI, Estaiamentos, Conduta, Ausências e Destaque). Só pode existir um link por evento."
+                          : "Gere um link único para um freelancer preencher o formulário de Guarda de Equipamentos. Só pode existir um link por evento."}
+                      </p>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black italic uppercase">Nome do destinatário</Label>
+                        <input
+                          type="text"
+                          value={conformityPublicRecipientName}
+                          onChange={e => setConformityPublicRecipientName(e.target.value)}
+                          placeholder="Ex.: Fred Ribeiro"
+                          className="w-full border-2 border-[#191c1e] px-4 py-2.5 text-sm italic font-bold focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                        />
+                      </div>
+                    </>
+                  )}
 
-          <DialogFooter className="gap-2 pt-4">
-            <button type="button"
-              onClick={() => { setConformityPublicLinkType(null); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); }}
-              className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
-            >
-              {generatedConformityUrl ? "Fechar" : "Cancelar"}
-            </button>
-            {!generatedConformityUrl && (
-              <button type="button"
-                disabled={!conformityPublicRecipientName.trim() || createConformityPublicToken.isPending || createFerramentasPublicToken.isPending}
-                onClick={() => {
-                  if (!conformityPublicRecipientName.trim()) return;
-                  const mutation = conformityPublicLinkType === "cenografia" ? createConformityPublicToken : createFerramentasPublicToken;
-                  mutation.mutate(
-                    { recipientName: conformityPublicRecipientName.trim() },
-                    {
-                      onSuccess: ({ tokenId }) => {
-                        const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                        setGeneratedConformityUrl(`${base}/eval/${tokenId}`);
-                        if (conformityPublicLinkType === "cenografia") refetchConformityTokenHistory();
-                        else refetchFerramentasTokenHistory();
-                      },
-                      onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
-                    },
-                  );
-                }}
-                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
-              >
-                {(createConformityPublicToken.isPending || createFerramentasPublicToken.isPending) ? "Gerando..." : "Gerar Link"}
-              </button>
-            )}
-          </DialogFooter>
+                  {/* Registro do envio */}
+                  {hist.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-2">Registro</p>
+                      <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-40 overflow-y-auto">
+                        {hist.map(t => (
+                          <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
+                              <p className="text-[10px] italic text-[#747a60]">
+                                Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
+                                {t.usedAt ? ` · Respondido ${new Date(t.usedAt).toLocaleDateString("pt-BR")}` : ""}
+                              </p>
+                            </div>
+                            {t.usedAt ? (
+                              <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
+                                <CheckCircle size={10} /> Respondido
+                              </span>
+                            ) : (
+                              <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
+                                Pendente
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="gap-2 pt-4">
+                  <button type="button"
+                    onClick={() => { setConformityPublicLinkType(null); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); }}
+                    className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
+                  >
+                    {shownUrl || answered ? "Fechar" : "Cancelar"}
+                  </button>
+                  {!shownUrl && !answered && (
+                    <button type="button"
+                      disabled={!conformityPublicRecipientName.trim() || createConformityPublicToken.isPending || createFerramentasPublicToken.isPending}
+                      onClick={() => {
+                        if (!conformityPublicRecipientName.trim()) return;
+                        const mutation = conformityPublicLinkType === "cenografia" ? createConformityPublicToken : createFerramentasPublicToken;
+                        mutation.mutate(
+                          { recipientName: conformityPublicRecipientName.trim() },
+                          {
+                            onSuccess: ({ tokenId }) => {
+                              setGeneratedConformityUrl(`${base}/eval/${tokenId}`);
+                              if (conformityPublicLinkType === "cenografia") refetchConformityTokenHistory();
+                              else refetchFerramentasTokenHistory();
+                            },
+                            onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+                          },
+                        );
+                      }}
+                      className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
+                    >
+                      {(createConformityPublicToken.isPending || createFerramentasPublicToken.isPending) ? "Gerando..." : "Gerar Link"}
+                    </button>
+                  )}
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
