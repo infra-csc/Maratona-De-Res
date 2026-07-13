@@ -133,11 +133,19 @@ export function useSaveCriterionRouting(criterionId: number) {
   });
 }
 
+/** Fetch simples (sem hook) das atribuições de critérios de um evento —
+ *  usado em useQueries() para checar vários eventos de uma vez (ex.: a
+ *  visão "A Fazer" do avaliador, que precisa saber se um critério foi
+ *  redirecionado para outra pessoa antes de listar o evento como pendente). */
+export function getEventCriterionAssignments(eventId: number) {
+  return apiFetch<CriterionAssignment[]>(`/api/events/${eventId}/criterion-assignments`);
+}
+
 /** Atribuições de critérios para um evento. */
 export function useEventCriterionAssignments(eventId: number | null) {
   return useQuery<CriterionAssignment[]>({
     queryKey: eventCriterionAssignmentsKey(eventId ?? 0),
-    queryFn: () => apiFetch<CriterionAssignment[]>(`/api/events/${eventId}/criterion-assignments`),
+    queryFn: () => getEventCriterionAssignments(eventId ?? 0),
     enabled: eventId != null,
   });
 }

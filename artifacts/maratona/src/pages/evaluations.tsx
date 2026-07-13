@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens } from "@/lib/routing-api";
+import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -453,16 +453,36 @@ export default function EvaluationsPage() {
         }))
       : [],
   });
+  // Atribuição por critério (redirecionamento) manda sobre a atribuição por
+  // área — sem isso, um critério redirecionado para outra pessoa da área
+  // continuava marcando o evento como "a fazer" pra quem redirecionou.
+  const evaluatorCriterionAssignmentQueries = useQueries({
+    queries: isEvaluator
+      ? configuredEvents.map(ev => ({
+          queryKey: eventCriterionAssignmentsKey(ev.id),
+          queryFn: () => getEventCriterionAssignments(ev.id),
+        }))
+      : [],
+  });
+  function myCriteriaForEvent(i: number) {
+    const myAreaIds = new Set(
+      (evaluatorEventDetailQueries[i]?.data?.areaAssignments ?? [])
+        .filter(a => a.evaluatorUserId === user?.id)
+        .map(a => a.areaId),
+    );
+    const assignmentByCriterionId = new Map(
+      (evaluatorCriterionAssignmentQueries[i]?.data ?? []).map(a => [a.criterionId, a]),
+    );
+    return (evaluatorCriteriaQueries[i]?.data ?? []).filter(c => {
+      if (!c.active) return false;
+      const assignment = assignmentByCriterionId.get(c.criterionId);
+      if (assignment) return assignment.assignedToId === user?.id;
+      return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
+    });
+  }
   const relevantEvaluatorEvents = isEvaluator
     ? configuredEvents.filter((_, i) => {
-        const myAreaIds = new Set(
-          (evaluatorEventDetailQueries[i]?.data?.areaAssignments ?? [])
-            .filter(a => a.evaluatorUserId === user?.id)
-            .map(a => a.areaId),
-        );
-        const hasCriteria = (evaluatorCriteriaQueries[i]?.data ?? []).some(
-          c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
-        );
+        const hasCriteria = myCriteriaForEvent(i).length > 0;
         const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
         const isFerramentasEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
         return hasCriteria || isConformityEval || isFerramentasEval;
@@ -484,14 +504,7 @@ export default function EvaluationsPage() {
   // have criteria assigned to their area count as theirs).
   const evaluatorEventStats = isEvaluator
     ? configuredEvents.map((ev, i) => {
-        const myAreaIds = new Set(
-          (evaluatorEventDetailQueries[i]?.data?.areaAssignments ?? [])
-            .filter(a => a.evaluatorUserId === user?.id)
-            .map(a => a.areaId),
-        );
-        const myCrit = (evaluatorCriteriaQueries[i]?.data ?? []).filter(
-          c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
-        );
+        const myCrit = myCriteriaForEvent(i);
         const evs = evaluatorEvalQueries[i]?.data ?? [];
         const submitted = myCrit.filter(
           c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === user?.id)?.status === "submitted",
