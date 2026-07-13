@@ -1668,7 +1668,7 @@ export default function EventDetailPage() {
                                   <div>
                                     <p className="text-[9px] font-black italic uppercase text-[#747a60] mb-1">Avaliador Principal *</p>
                                     <Select
-                                      disabled={hasEvaluations && primary != null}
+                                      disabled={hasEvaluations && primary != null && areaEvaluators.some(u => u.id === primary)}
                                       value={primary?.toString() ?? ""}
                                       onValueChange={val => setPrimaryEvaluator(prev => ({ ...prev, [areaId]: val ? Number(val) : null }))}
                                     >
