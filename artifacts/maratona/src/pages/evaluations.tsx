@@ -1846,8 +1846,8 @@ export default function EvaluationsPage() {
                                         )}
                                         {hasContent && (
                                           <Link
-                                            href="/calibrations"
-                                            title="Ir para Calibração deste critério"
+                                            href={`/calibrations?eventId=${selectedEventId}`}
+                                            title="Ir para Calibração deste evento"
                                             className="inline-flex items-center gap-1 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1 hover:bg-[#506600] transition-colors shrink-0"
                                           >
                                             <SlidersHorizontal size={11} /> Cal.
