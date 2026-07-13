@@ -866,7 +866,7 @@ export default function CalibrationsPage() {
               <div className="sticky top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
                 {/* Linha 1: info + botões principais */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
                     <div className="min-w-0">
                       {readyToFinalize ? (
