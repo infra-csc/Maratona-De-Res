@@ -3105,6 +3105,12 @@ components:
           type: integer
         submittedCount:
           type: integer
+        evaluatedCriteria:
+          type: integer
+          description: Nº de critérios ativos já avaliados (ou calibrados) neste evento.
+        finalCalibratedCriteria:
+          type: integer
+          description: Nº de critérios ativos com calibração final publicada.
         averageScore:
           type: ["number", "null"]
         teamScore:

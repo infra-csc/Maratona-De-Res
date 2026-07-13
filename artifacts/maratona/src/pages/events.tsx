@@ -97,14 +97,16 @@ export default function EventsPage() {
       || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
       || (filterStatus === "unconfirmed" && !ev.resultsConfirmed)
       || (filterStatus === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
-      || (filterStatus === "fullyEval" && (ev.evaluationProgress ?? 0) >= 1)
+      || (filterStatus === "fullyEval" && !!ev.fullyCalibrated)
       || (filterStatus === "fullyCalibrated" && !!ev.fullyCalibrated);
     const matchCard = cardFilter === null
       || (cardFilter === "configured" && ev.criteriaConfirmed)
       || (cardFilter === "confirmed" && ev.resultsConfirmed)
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
       || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
-      || (cardFilter === "fullyEval" && (ev.evaluationProgress ?? 0) >= 1);
+      // "Avaliação 100%" = todas as calibrações FINAIS publicadas, de todos os
+      // critérios — não basta os avaliadores terem submetido as notas.
+      || (cardFilter === "fullyEval" && !!ev.fullyCalibrated);
     return matchSearch && matchConfig && matchCard;
   }).slice().sort((a, b) => {
     if (sortBy === "dateAsc") return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
@@ -207,7 +209,7 @@ export default function EventsPage() {
               const confirmed = all.filter(e => e.resultsConfirmed).length;
               const unconfirmed = all.filter(e => !e.resultsConfirmed).length;
               const pendingCal = all.filter(e => e.status === "closed" && !e.fullyCalibrated).length;
-              const fullyEval = all.filter(e => e.evaluationProgress === 1).length;
+              const fullyEval = all.filter(e => !!e.fullyCalibrated).length;
               const cards = [
                 { key: "configured", label: "Configurados", value: configured, color: "#506600" },
                 { key: "confirmed", label: "Confirmados", value: confirmed, color: "#506600" },
@@ -301,7 +303,6 @@ export default function EventsPage() {
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {filtered.map(ev => {
-              const progress = Math.round((ev.evaluationProgress ?? 0) * 100);
               const score = ev.teamScore ?? ev.averageScore ?? null;
               const calibrated = ev.hasCalibration ?? false;
               const concluded = ev.status === "closed";
@@ -388,38 +389,50 @@ export default function EventsPage() {
 
                   <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">
                     <div className="flex-1 max-w-[280px] space-y-2">
-                      <div>
-                        <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
-                          <span className="text-[#444933]">Avaliações dos Avaliadores</span>
-                          {(ev.totalCriteria ?? 0) === 0 ? (
-                            <span className="text-[#747a60]">—</span>
-                          ) : (
-                            <span className={progress === 100 ? "text-[#506600]" : "text-[#191c1e]"}>
-                              {progress}% ({ev.submittedCount ?? 0} / {ev.totalCriteria})
-                            </span>
-                          )}
-                        </div>
-                        <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
-                          {(ev.totalCriteria ?? 0) > 0 && (
-                            <div className={progress === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${progress}%` }} />
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-bold italic uppercase">
-                        <span className="text-[#444933]">Calibragem</span>
-                        <span className="flex items-center gap-1.5">
-                          {(() => {
-                            const fc = ev.fullyCalibrated ?? false;
-                            const dotColor = fc ? "bg-[#506600]" : calibrated ? "bg-[#ffb300]" : "bg-[#cfd4d8]";
-                            const txtColor = fc ? "text-[#506600]" : calibrated ? "text-[#a06a00]" : "text-[#747a60]";
-                            const label = fc ? "Concluída" : calibrated ? "Em andamento" : "Pendente";
-                            return (<>
-                              <span className={`inline-block w-2 h-2 border border-[#191c1e] ${dotColor}`} />
-                              <span className={txtColor}>{label}</span>
-                            </>);
-                          })()}
-                        </span>
-                      </div>
+                      {(() => {
+                        const total = ev.totalCriteria ?? 0;
+                        const evaluated = ev.evaluatedCriteria ?? 0;
+                        const calCount = ev.finalCalibratedCriteria ?? 0;
+                        const evalPct = total > 0 ? Math.round((evaluated / total) * 100) : 0;
+                        const calPct = total > 0 ? Math.round((calCount / total) * 100) : 0;
+                        const fc = ev.fullyCalibrated ?? false;
+                        return (<>
+                          <div>
+                            <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
+                              <span className="text-[#444933]">Quesitos Avaliados</span>
+                              {total === 0 ? (
+                                <span className="text-[#747a60]">—</span>
+                              ) : (
+                                <span className={evalPct === 100 ? "text-[#506600]" : "text-[#191c1e]"}>
+                                  {evaluated} / {total}
+                                </span>
+                              )}
+                            </div>
+                            <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
+                              {total > 0 && (
+                                <div className={evalPct === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${evalPct}%` }} />
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
+                              <span className="text-[#444933]">Calibrações Finais</span>
+                              {total === 0 ? (
+                                <span className="text-[#747a60]">—</span>
+                              ) : (
+                                <span className={fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}>
+                                  {calCount} / {total}{fc ? " · Concluída" : calCount > 0 || calibrated ? " · Em andamento" : " · Pendente"}
+                                </span>
+                              )}
+                            </div>
+                            <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
+                              {total > 0 && (
+                                <div className={fc ? "h-full bg-[#506600]" : "h-full bg-[#ffb300]"} style={{ width: `${calPct}%` }} />
+                              )}
+                            </div>
+                          </div>
+                        </>);
+                      })()}
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">

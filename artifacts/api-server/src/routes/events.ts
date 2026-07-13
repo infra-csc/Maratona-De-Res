@@ -92,7 +92,8 @@ router.get("/events", async (req, res) => {
 
     // Totalmente calibrado = todo critério ativo já teve a calibração
     // publicada como final (não basta ter calibração parcial/rascunho).
-    const fullyCalibrated = activeCriteria.length > 0 && activeCriteria.every(c => c.finalPublishedAt != null);
+    const finalCalibratedCriteria = activeCriteria.filter(c => c.finalPublishedAt != null).length;
+    const fullyCalibrated = activeCriteria.length > 0 && finalCalibratedCriteria === activeCriteria.length;
 
     // Rollup do evento = mais recente publicação parcial entre os critérios
     // ativos (a granularidade real agora é por critério, ver /events/:id/criteria).
@@ -109,7 +110,7 @@ router.get("/events", async (req, res) => {
       .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, evaluatedCriteria, finalCalibratedCriteria, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
   });
   res.json(enriched);
 });
