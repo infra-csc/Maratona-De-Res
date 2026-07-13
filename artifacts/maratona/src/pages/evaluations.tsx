@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2, X } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2, X, AlertCircle } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -2273,7 +2273,9 @@ export default function EvaluationsPage() {
                 const val = conformityEvalForm.guardaEquipamentos;
                 const isNao = val === false;
                 const commentMissing = isNao && !conformityEvalForm.guardaEquipamentosComment.trim();
-                const canSave = !commentMissing;
+                // O comentário na tela difere do que está salvo no servidor?
+                const commentDirty = conformityEvalForm.guardaEquipamentosComment !== (myConformityData?.guardaEquipamentosComment ?? "");
+                const canSave = !commentMissing && commentDirty;
                 const hasSentLink = (ferramentasPublicTokenHistory?.length ?? 0) > 0;
                 return (
                   <div className="space-y-4">
@@ -2369,7 +2371,11 @@ export default function EvaluationsPage() {
                           {/* Save comment */}
                           {val !== null && (
                             <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
-                              <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Salvar observação</span>
+                              {commentDirty ? (
+                                <span className="text-[10px] font-bold italic uppercase text-[#b02f00] flex items-center gap-1"><AlertCircle size={11} /> Alterações não salvas</span>
+                              ) : (
+                                <span className="text-[10px] font-bold italic uppercase text-[#506600] flex items-center gap-1"><CheckCircle size={11} /> Salvo</span>
+                              )}
                               <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
                                 onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }, { onSuccess: () => toast({ title: "Observação salva" }) }); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
@@ -2395,7 +2401,12 @@ export default function EvaluationsPage() {
                 const standoutNeedsJustification = conformityEvalForm.standoutResponse === true && !conformityEvalForm.standoutJustification.trim();
                 const absencesNeedsReport = !conformityEvalForm.absencesReport.trim();
                 const missingRequiredComments = cenografiaItems.some(i => conformityEvalForm[i.key] === false && !conformityEvalForm[i.commentKey].trim());
-                const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport && !missingRequiredComments;
+                // Algum campo de texto na tela difere do que está salvo no servidor?
+                const textsDirty =
+                  cenografiaItems.some(i => conformityEvalForm[i.commentKey] !== (myConformityData?.[i.commentKey] ?? "")) ||
+                  conformityEvalForm.absencesReport !== (myConformityData?.absencesReport ?? "") ||
+                  conformityEvalForm.standoutJustification !== (myConformityData?.standoutJustification ?? "");
+                const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport && !missingRequiredComments && textsDirty;
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
                 const hasSentLink = (conformityPublicTokenHistory?.length ?? 0) > 0;
                 return (
@@ -2552,7 +2563,13 @@ export default function EvaluationsPage() {
 
                     {/* Save text fields button */}
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-[11px] text-[#747a60] italic">Salva justificativas, ausências e destaque.</span>
+                      {textsDirty ? (
+                        <span className="text-[11px] font-bold italic uppercase text-[#b02f00] flex items-center gap-1"><AlertCircle size={12} /> Alterações não salvas</span>
+                      ) : (conformityEvalForm.absencesReport.trim() || cenografiaItems.some(i => conformityEvalForm[i.commentKey].trim()) || conformityEvalForm.standoutJustification.trim()) ? (
+                        <span className="text-[11px] font-bold italic uppercase text-[#506600] flex items-center gap-1"><CheckCircle size={12} /> Observações salvas</span>
+                      ) : (
+                        <span className="text-[11px] text-[#747a60] italic">Salva justificativas, ausências e destaque.</span>
+                      )}
                       <button type="button" disabled={!canSaveTexts || conformityEvalMutation.isPending}
                         onClick={() => {
                           if (!selectedEventId || !canSaveTexts) return;
