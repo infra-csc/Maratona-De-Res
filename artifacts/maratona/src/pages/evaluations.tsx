@@ -67,12 +67,13 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
 }
 
 function EvaluatorEventCard({
-  event, userId, selected, onSelect,
+  event, userId, selected, onSelect, principalAreaIds,
 }: {
   event: { id: number; name: string; clientName?: string | null; city?: string | null; state?: string | null; cycleName?: string };
   userId: number | undefined;
   selected: boolean;
   onSelect: () => void;
+  principalAreaIds?: Set<number>;
 }) {
   const { data: criteria } = useGetEventCriteria(event.id, {
     query: { queryKey: ["event-criteria", event.id] as unknown[] },
@@ -84,38 +85,60 @@ function EvaluatorEventCard({
     { eventId: event.id },
     { query: { queryKey: getGetEvaluationsQueryKey({ eventId: event.id }) } },
   );
+  const { data: criterionAssignments } = useEventCriterionAssignments(event.id);
 
   // Esta avaliação é por atribuição evento→área→avaliador, não pela área do perfil.
   const myAreaIds = new Set(
     (detail?.areaAssignments ?? []).filter(a => a.evaluatorUserId === userId).map(a => a.areaId),
   );
-  const myCriteria = (criteria ?? []).filter(
-    c => c.active && c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId),
-  );
+  // Atribuição por critério (redirecionamento) manda sobre a atribuição por área —
+  // sem isso, um critério redirecionado para outra pessoa continuava contando
+  // aqui como "meu" mesmo depois de passar pra outro avaliador.
+  const assignmentByCriterionId = new Map((criterionAssignments ?? []).map(a => [a.criterionId, a]));
+  const myCriteria = (criteria ?? []).filter(c => {
+    if (!c.active) return false;
+    const assignment = assignmentByCriterionId.get(c.criterionId);
+    if (assignment) return assignment.assignedToId === userId;
+    return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
+  });
+  // Como avaliador principal, quesitos da área que foram redirecionados pra
+  // outro colega somem da lista acima — mas ela precisa saber, sem entrar no
+  // evento, que já tem alguém cuidando disso.
+  const delegatedCriteria = (criteria ?? []).filter(c => {
+    if (!c.active || c.responsibleAreaId == null || !principalAreaIds?.has(c.responsibleAreaId)) return false;
+    const assignment = assignmentByCriterionId.get(c.criterionId);
+    return !!assignment?.assignedToId && assignment.assignedToId !== userId;
+  }).map(c => ({ name: c.criterionName, assignee: assignmentByCriterionId.get(c.criterionId)?.assignedToName ?? "?" }));
   // Only events that actually have criteria for this avaliador's area are theirs to do.
-  if (myCriteria.length === 0) return null;
+  if (myCriteria.length === 0 && delegatedCriteria.length === 0) return null;
 
   const myEval = (cid: number) => (evals ?? []).find(e => e.criterionId === cid && e.evaluatorUserId === userId);
   const total = myCriteria.length;
   const submitted = myCriteria.filter(c => myEval(c.criterionId)?.status === "submitted").length;
   const drafts = myCriteria.filter(c => myEval(c.criterionId)?.status === "draft").length;
-  const allSubmitted = submitted === total;
+  const allSubmitted = total > 0 && submitted === total;
   // Submeter todos os critérios não basta: só conta como "Concluída" para o
   // avaliador depois que RH/Admin confirmar os resultados do evento (mesma
   // trava usada para colaboradores em resultados/ranking/my-performance).
   const done = allSubmitted && !!detail?.resultsConfirmed;
   const awaitingConfirmation = allSubmitted && !detail?.resultsConfirmed;
   const inProgress = !allSubmitted && (submitted > 0 || drafts > 0);
+  // Todos os quesitos da área principal foram redirecionados pra outra
+  // pessoa — não sobrou nada pra ela fazer aqui, mas ela ainda precisa ver
+  // isso sem clicar no evento.
+  const allDelegated = total === 0 && delegatedCriteria.length > 0;
 
-  const badge = done
-    ? { label: "Concluída", cls: "bg-[#506600] text-[#ccff00]", Icon: CheckCircle }
-    : awaitingConfirmation
-      ? { label: "Aguardando confirmação", cls: "bg-[#fff4c2] text-[#5c4a00]", Icon: Clock }
-      : inProgress
-        ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
-        : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
+  const badge = allDelegated
+    ? { label: "Delegado", cls: "bg-[#e6e9ef] text-[#444933]", Icon: Users }
+    : done
+      ? { label: "Concluída", cls: "bg-[#506600] text-[#ccff00]", Icon: CheckCircle }
+      : awaitingConfirmation
+        ? { label: "Aguardando confirmação", cls: "bg-[#fff4c2] text-[#5c4a00]", Icon: Clock }
+        : inProgress
+          ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
+          : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
   const Badge = badge.Icon;
-  const pct = Math.round((submitted / total) * 100);
+  const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
 
   return (
     <button
@@ -136,18 +159,29 @@ function EvaluatorEventCard({
       </div>
       <h4 className="text-lg italic uppercase font-black tracking-tight leading-tight">{event.name}</h4>
       {formatEventSubtitle(event) && <p className="text-[12px] font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{formatEventSubtitle(event)}</p>}
-      <div className="mt-4">
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-[11px] font-bold italic uppercase text-[#444933]">{submitted} de {total} critérios submetidos</span>
-          <span className="text-xs font-black italic text-[#506600]">{pct}%</span>
+      {total > 0 && (
+        <div className="mt-4">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[11px] font-bold italic uppercase text-[#444933]">{submitted} de {total} critérios submetidos</span>
+            <span className="text-xs font-black italic text-[#506600]">{pct}%</span>
+          </div>
+          <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2">
+            <div className="bg-[#ccff00] h-full transition-[width]" style={{ width: `${pct}%` }} />
+          </div>
+          {drafts > 0 && (
+            <p className="text-[11px] text-[#862200] italic mt-1.5 font-bold uppercase">{drafts} em rascunho — submeta para concluir</p>
+          )}
         </div>
-        <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2">
-          <div className="bg-[#ccff00] h-full transition-[width]" style={{ width: `${pct}%` }} />
+      )}
+      {delegatedCriteria.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-dashed border-[#dde0e3] space-y-0.5">
+          {delegatedCriteria.map((d, i) => (
+            <p key={i} className="text-[11px] italic text-[#747a60]">
+              <span className="font-bold uppercase">{d.name}</span> está com <span className="font-bold">{d.assignee}</span>
+            </p>
+          ))}
         </div>
-        {drafts > 0 && (
-          <p className="text-[11px] text-[#862200] italic mt-1.5 font-bold uppercase">{drafts} em rascunho — submeta para concluir</p>
-        )}
-      </div>
+      )}
     </button>
   );
 }
@@ -480,12 +514,27 @@ export default function EvaluationsPage() {
       return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
     });
   }
+  const principalAreaIds = new Set((myPrincipalAreas ?? []).map(a => a.id));
+  // Quesitos da área principal que foram redirecionados pra outro colega —
+  // saem de myCriteriaForEvent, mas o avaliador principal ainda precisa ver
+  // que o evento existe e quem está com o quesito, sem clicar pra dentro.
+  function hasDelegatedCriteriaForEvent(i: number): boolean {
+    if (principalAreaIds.size === 0) return false;
+    const assignmentByCriterionId = new Map(
+      (evaluatorCriterionAssignmentQueries[i]?.data ?? []).map(a => [a.criterionId, a]),
+    );
+    return (evaluatorCriteriaQueries[i]?.data ?? []).some(c => {
+      if (!c.active || c.responsibleAreaId == null || !principalAreaIds.has(c.responsibleAreaId)) return false;
+      const assignment = assignmentByCriterionId.get(c.criterionId);
+      return !!assignment?.assignedToId && assignment.assignedToId !== user?.id;
+    });
+  }
   const relevantEvaluatorEvents = isEvaluator
     ? configuredEvents.filter((_, i) => {
         const hasCriteria = myCriteriaForEvent(i).length > 0;
         const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
         const isFerramentasEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
-        return hasCriteria || isConformityEval || isFerramentasEval;
+        return hasCriteria || isConformityEval || isFerramentasEval || hasDelegatedCriteriaForEvent(i);
       })
     : [];
 
@@ -514,7 +563,8 @@ export default function EvaluationsPage() {
         // evento forem confirmados por RH/Admin — enviar tudo não basta.
         const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
         const isFerramentasEval2 = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
-        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval || isFerramentasEval2 };
+        const hasDelegated = hasDelegatedCriteriaForEvent(i);
+        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval || isFerramentasEval2 || hasDelegated };
       }).filter(s => s.relevant)
     : [];
   const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
@@ -1213,6 +1263,7 @@ export default function EvaluationsPage() {
                           userId={user?.id}
                           selected={selectedEventId === ev.id}
                           onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                          principalAreaIds={principalAreaIds}
                         />
                       ))}
                     </div>
@@ -1232,6 +1283,7 @@ export default function EvaluationsPage() {
                           userId={user?.id}
                           selected={selectedEventId === ev.id}
                           onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                          principalAreaIds={principalAreaIds}
                         />
                       ))}
                     </div>
