@@ -508,6 +508,38 @@ export interface EmployeeEventResult {
   criteriaDetails?: CriterionScoreDetail[];
 }
 
+export interface EventConformity {
+  id: number;
+  eventId: number;
+  /** @nullable */
+  epi?: boolean | null;
+  /** @nullable */
+  estaiamentos?: boolean | null;
+  /** @nullable */
+  guardaEquipamentos?: boolean | null;
+  /** @nullable */
+  conduta?: boolean | null;
+  /** @nullable */
+  epiComment?: string | null;
+  /** @nullable */
+  estaiamentosComment?: string | null;
+  /** @nullable */
+  guardaEquipamentosComment?: string | null;
+  /** @nullable */
+  condutaComment?: string | null;
+  /** @nullable */
+  absencesResponse?: boolean | null;
+  /** @nullable */
+  absencesReport?: string | null;
+  /** @nullable */
+  standoutResponse?: boolean | null;
+  /** @nullable */
+  standoutJustification?: string | null;
+  createdByUserId: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface EventDetail {
   id: number;
   name: string;
@@ -554,6 +586,7 @@ export interface EventDetail {
   conformityEvaluatorFerramentasUserId?: number | null;
   /** @nullable */
   conformityEvaluatorFerramentasName?: string | null;
+  conformity?: EventConformity | null;
 }
 
 export interface EventInput {
@@ -682,38 +715,6 @@ export interface ConformityEvaluatorInput {
 
 export interface ConformityEvaluatorRedirectInput {
   userId: number;
-}
-
-export interface EventConformity {
-  id: number;
-  eventId: number;
-  /** @nullable */
-  epi?: boolean | null;
-  /** @nullable */
-  estaiamentos?: boolean | null;
-  /** @nullable */
-  guardaEquipamentos?: boolean | null;
-  /** @nullable */
-  conduta?: boolean | null;
-  /** @nullable */
-  epiComment?: string | null;
-  /** @nullable */
-  estaiamentosComment?: string | null;
-  /** @nullable */
-  guardaEquipamentosComment?: string | null;
-  /** @nullable */
-  condutaComment?: string | null;
-  /** @nullable */
-  absencesResponse?: boolean | null;
-  /** @nullable */
-  absencesReport?: string | null;
-  /** @nullable */
-  standoutResponse?: boolean | null;
-  /** @nullable */
-  standoutJustification?: string | null;
-  createdByUserId: number;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface EventConformityInput {

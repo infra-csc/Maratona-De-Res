@@ -98,7 +98,10 @@ function EvaluatorEventCard({
   const myCriteria = (criteria ?? []).filter(c => {
     if (!c.active) return false;
     const assignment = assignmentByCriterionId.get(c.criterionId);
-    if (assignment) return assignment.assignedToId === userId;
+    // Só uma designação real corta o fallback por área — uma linha pending
+    // sem assignedToId (gerada automaticamente sem avaliador padrão) não
+    // pode esconder o critério de quem foi atribuído pela área.
+    if (assignment?.assignedToId != null) return assignment.assignedToId === userId;
     return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
   });
   // Como avaliador principal, quesitos da área que foram redirecionados pra
@@ -109,24 +112,46 @@ function EvaluatorEventCard({
     const assignment = assignmentByCriterionId.get(c.criterionId);
     return !!assignment?.assignedToId && assignment.assignedToId !== userId;
   }).map(c => ({ name: c.criterionName, assignee: assignmentByCriterionId.get(c.criterionId)?.assignedToName ?? "?" }));
-  // Only events that actually have criteria for this avaliador's area are theirs to do.
-  if (myCriteria.length === 0 && delegatedCriteria.length === 0) return null;
+
+  // Responsabilidades da Matriz de Conformidade também são trabalho deste
+  // avaliador neste evento — sem isso, quem só responde a matriz não via
+  // card nenhum e o evento nunca ia para "Concluídas".
+  const isConformityEval = detail?.conformityEvaluatorUserId === userId;
+  const isFerramentasEval = detail?.conformityEvaluatorFerramentasUserId === userId;
+  const conf = detail?.conformity;
+  // Mesma contagem do "Resumo da Avaliação": Cenografia = 5 itens
+  // (EPI, Estaiamentos, Conduta, destaque e faltas), Ferramentas = 1.
+  const conformityTotal = (isConformityEval ? 5 : 0) + (isFerramentasEval ? 1 : 0);
+  const conformityDoneCount =
+    (isConformityEval
+      ? [conf?.epi, conf?.estaiamentos, conf?.conduta, conf?.standoutResponse].filter(v => v != null).length
+        + (conf?.absencesReport?.trim() ? 1 : 0)
+      : 0)
+    + (isFerramentasEval && conf?.guardaEquipamentos != null ? 1 : 0);
+  const conformityComplete = conformityTotal > 0 && conformityDoneCount === conformityTotal;
+
+  // Only events that actually have work for this avaliador are theirs to do.
+  if (myCriteria.length === 0 && delegatedCriteria.length === 0 && conformityTotal === 0) return null;
 
   const myEval = (cid: number) => (evals ?? []).find(e => e.criterionId === cid && e.evaluatorUserId === userId);
   const total = myCriteria.length;
   const submitted = myCriteria.filter(c => myEval(c.criterionId)?.status === "submitted").length;
   const drafts = myCriteria.filter(c => myEval(c.criterionId)?.status === "draft").length;
-  const allSubmitted = total > 0 && submitted === total;
-  // Submeter todos os critérios não basta: só conta como "Concluída" para o
-  // avaliador depois que RH/Admin confirmar os resultados do evento (mesma
-  // trava usada para colaboradores em resultados/ranking/my-performance).
+  // Tudo que é deste avaliador foi entregue: critérios submetidos E, se ele
+  // responde a matriz, todas as perguntas dela preenchidas.
+  const allSubmitted = (total > 0 || conformityTotal > 0)
+    && submitted === total
+    && (conformityTotal === 0 || conformityComplete);
+  // Submeter tudo não basta: só conta como "Concluída" para o avaliador
+  // depois que RH/Admin confirmar os resultados do evento (mesma trava usada
+  // para colaboradores em resultados/ranking/my-performance).
   const done = allSubmitted && !!detail?.resultsConfirmed;
   const awaitingConfirmation = allSubmitted && !detail?.resultsConfirmed;
-  const inProgress = !allSubmitted && (submitted > 0 || drafts > 0);
+  const inProgress = !allSubmitted && (submitted > 0 || drafts > 0 || conformityDoneCount > 0);
   // Todos os quesitos da área principal foram redirecionados pra outra
   // pessoa — não sobrou nada pra ela fazer aqui, mas ela ainda precisa ver
   // isso sem clicar no evento.
-  const allDelegated = total === 0 && delegatedCriteria.length > 0;
+  const allDelegated = total === 0 && conformityTotal === 0 && delegatedCriteria.length > 0;
 
   const badge = allDelegated
     ? { label: "Delegado", cls: "bg-[#e6e9ef] text-[#444933]", Icon: Users }
@@ -172,6 +197,11 @@ function EvaluatorEventCard({
             <p className="text-[11px] text-[#862200] italic mt-1.5 font-bold uppercase">{drafts} em rascunho — submeta para concluir</p>
           )}
         </div>
+      )}
+      {conformityTotal > 0 && (
+        <p className={`text-[11px] italic mt-3 font-bold uppercase ${conformityComplete ? "text-[#506600]" : "text-[#862200]"}`}>
+          Matriz de Conformidade: {conformityDoneCount} de {conformityTotal} perguntas
+        </p>
       )}
       {delegatedCriteria.length > 0 && (
         <div className="mt-3 pt-3 border-t border-dashed border-[#dde0e3] space-y-0.5">
@@ -544,7 +574,9 @@ export default function EvaluationsPage() {
     return (evaluatorCriteriaQueries[i]?.data ?? []).filter(c => {
       if (!c.active) return false;
       const assignment = assignmentByCriterionId.get(c.criterionId);
-      if (assignment) return assignment.assignedToId === user?.id;
+      // Linha pending sem assignedToId não corta o fallback por área (mesma
+      // regra do backend em isAssignedForCriterion).
+      if (assignment?.assignedToId != null) return assignment.assignedToId === user?.id;
       return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
     });
   }
@@ -595,10 +627,22 @@ export default function EvaluationsPage() {
         const total = myCrit.length;
         // Só conta como concluído para o avaliador depois que os resultados do
         // evento forem confirmados por RH/Admin — enviar tudo não basta.
-        const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
-        const isFerramentasEval2 = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
+        const detail = evaluatorEventDetailQueries[i]?.data;
+        const isConformityEval = detail?.conformityEvaluatorUserId === user?.id;
+        const isFerramentasEval2 = detail?.conformityEvaluatorFerramentasUserId === user?.id;
         const hasDelegated = hasDelegatedCriteriaForEvent(i);
-        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval || isFerramentasEval2 || hasDelegated };
+        // Matriz de Conformidade conta como trabalho deste avaliador — mesma
+        // contagem do card e do "Resumo da Avaliação" (Cenografia 5, Ferramentas 1).
+        const conf = detail?.conformity;
+        const confTotal = (isConformityEval ? 5 : 0) + (isFerramentasEval2 ? 1 : 0);
+        const confDone =
+          (isConformityEval
+            ? [conf?.epi, conf?.estaiamentos, conf?.conduta, conf?.standoutResponse].filter(v => v != null).length
+              + (conf?.absencesReport?.trim() ? 1 : 0)
+            : 0)
+          + (isFerramentasEval2 && conf?.guardaEquipamentos != null ? 1 : 0);
+        const allWorkDone = (total > 0 || confTotal > 0) && submitted === total && confDone === confTotal;
+        return { event: ev, total, submitted, done: allWorkDone && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval || isFerramentasEval2 || hasDelegated };
       }).filter(s => s.relevant)
     : [];
   const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);

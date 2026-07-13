@@ -871,35 +871,55 @@ export default function CriteriaPage() {
           </section>
         )}
 
-        {/* Avaliador Padrão da Matriz de Conformidade — por área, não por critério
-            (Ferramentas e Case não tem critério próprio no catálogo). */}
+        {/* Avaliador Padrão da Matriz de Conformidade — espelha o Forms oficial:
+            só existem dois papéis na matriz, o de Cenografia (3 perguntas +
+            faltas e destaque) e o de Ferramentas e Case (1 pergunta). Ao liberar
+            as avaliações de um evento, esses padrões pré-preenchem os dois
+            avaliadores da matriz automaticamente. */}
         <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
           <div className="px-6 py-4 border-b-2 border-[#191c1e] bg-[#191c1e] text-white">
             <h2 className="text-lg font-black italic uppercase tracking-tight">Avaliador Padrão — Matriz de Conformidade</h2>
-            <p className="text-xs italic text-[#ccff00] mt-0.5">Usado para pré-preencher o avaliador da matriz ao configurar um evento novo.</p>
+            <p className="text-xs italic text-[#ccff00] mt-0.5">Ao liberar as avaliações de um evento, estes dois avaliadores já vêm preenchidos na matriz — troque no evento só se precisar.</p>
           </div>
-          {(areas ?? []).length === 0 ? (
-            <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhuma área cadastrada.</div>
-          ) : (
-            <ul className="divide-y-2 divide-[#eceef0]">
-              {(areas ?? []).map(a => {
-                const routing = (conformityRoutings ?? []).find(r => r.areaId === a.id);
-                return (
-                  <li key={a.id} className="px-6 py-3 flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 font-bold italic uppercase text-sm text-[#191c1e]">
-                      <Building2 size={14} className="text-[#747a60]" /> {a.name}
-                    </span>
-                    <ConformityAreaEvaluatorPicker
-                      areaId={a.id}
-                      currentEvaluatorId={routing?.defaultEvaluatorId ?? null}
-                      currentEvaluatorName={routing?.defaultEvaluatorName ?? null}
-                      evaluators={evaluators}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          {(() => {
+            const conformityAreas = (areas ?? [])
+              .filter(a => {
+                const n = a.name.trim().toLowerCase();
+                return n.includes("cenografia") || n.includes("ferramentas");
+              })
+              .map(a => ({
+                ...a,
+                description: a.name.trim().toLowerCase().includes("ferramentas")
+                  ? "1 pergunta: Guarda de Equipamentos"
+                  : "3 perguntas (EPI, Estaiamentos, Conduta) + faltas/atrasos e destaque",
+              }));
+            if (conformityAreas.length === 0) {
+              return <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Áreas "Cenografia" e "Ferramentas e Case" não encontradas.</div>;
+            }
+            return (
+              <ul className="divide-y-2 divide-[#eceef0]">
+                {conformityAreas.map(a => {
+                  const routing = (conformityRoutings ?? []).find(r => r.areaId === a.id);
+                  return (
+                    <li key={a.id} className="px-6 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="inline-flex items-center gap-2 font-bold italic uppercase text-sm text-[#191c1e]">
+                          <Building2 size={14} className="text-[#747a60]" /> {a.name}
+                        </span>
+                        <p className="text-[11px] italic text-[#747a60] mt-0.5">{a.description}</p>
+                      </div>
+                      <ConformityAreaEvaluatorPicker
+                        areaId={a.id}
+                        currentEvaluatorId={routing?.defaultEvaluatorId ?? null}
+                        currentEvaluatorName={routing?.defaultEvaluatorName ?? null}
+                        evaluators={evaluators}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+          })()}
         </section>
       </div>
 

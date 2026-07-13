@@ -8,6 +8,7 @@
 import type { EmployeeEventResult } from './employeeEventResult';
 import type { EvaluationMatrixRow } from './evaluationMatrixRow';
 import type { EventAreaAssignment } from './eventAreaAssignment';
+import type { EventConformity } from './eventConformity';
 import type { EventCriterion } from './eventCriterion';
 import type { EventParticipant } from './eventParticipant';
 
@@ -57,4 +58,5 @@ export interface EventDetail {
   conformityEvaluatorFerramentasUserId?: number | null;
   /** @nullable */
   conformityEvaluatorFerramentasName?: string | null;
+  conformity?: EventConformity | null;
 }

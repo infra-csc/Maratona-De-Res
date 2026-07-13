@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, areaConformityRoutingTable } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -1289,6 +1289,35 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
   // pula critérios que já têm atribuição, então não sobrescreve nada).
   if (confirmed) {
     await generateCriterionAssignments(id);
+
+    // Matriz de Conformidade: espelha o Forms oficial — 3 perguntas para o
+    // avaliador de Cenografia (EPI, Estaiamentos, Conduta) e 1 para o de
+    // Ferramentas e Case (Guarda de Equipamentos). Pré-preenche os dois a
+    // partir dos padrões configurados em Critérios, sem sobrescrever uma
+    // escolha manual já feita neste evento.
+    if (ev.conformityEvaluatorUserId == null || ev.conformityEvaluatorFerramentasUserId == null) {
+      const conformityDefaults = await db.select({
+        areaName: areasTable.name,
+        defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
+      })
+        .from(areaConformityRoutingTable)
+        .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id));
+      const byName = (needle: string) => conformityDefaults.find(
+        d => (d.areaName ?? "").trim().toLowerCase().includes(needle),
+      )?.defaultEvaluatorId ?? null;
+      const patch: Partial<typeof eventsTable.$inferInsert> = {};
+      if (ev.conformityEvaluatorUserId == null) {
+        const cenografiaDefault = byName("cenografia");
+        if (cenografiaDefault != null) patch.conformityEvaluatorUserId = cenografiaDefault;
+      }
+      if (ev.conformityEvaluatorFerramentasUserId == null) {
+        const ferramentasDefault = byName("ferramentas");
+        if (ferramentasDefault != null) patch.conformityEvaluatorFerramentasUserId = ferramentasDefault;
+      }
+      if (Object.keys(patch).length > 0) {
+        await db.update(eventsTable).set(patch).where(eq(eventsTable.id, id));
+      }
+    }
   }
 
   res.json(await loadEventDetail(id));

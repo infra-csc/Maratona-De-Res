@@ -3274,6 +3274,10 @@ components:
           type: ["integer", "null"]
         conformityEvaluatorFerramentasName:
           type: ["string", "null"]
+        conformity:
+          oneOf:
+            - $ref: "#/components/schemas/EventConformity"
+            - type: "null"
 
     EventInput:
       type: object

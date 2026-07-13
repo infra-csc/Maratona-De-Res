@@ -36,7 +36,12 @@ async function isAssignedForCriterion(eventId: number, criterionId: number, user
       eq(eventCriterionAssignmentsTable.criterionId, criterionId),
     ))
     .limit(1);
-  if (criterionAssignment) return criterionAssignment.assignedToId === userId;
+  // Uma linha "pending" sem ninguém designado (criada pela geração automática
+  // quando o critério não tem avaliador padrão no routing) NÃO pode bloquear
+  // o fallback por área — senão nenhum avaliador consegue enviar. Só uma
+  // designação real (assignedToId preenchido, ex.: após redirecionamento)
+  // tem autoridade para cortar o acesso dos demais.
+  if (criterionAssignment?.assignedToId != null) return criterionAssignment.assignedToId === userId;
 
   // 2. Sem registro de roteamento por critério ainda (evento legado ou nunca
   // atribuído individualmente): cai no sistema antigo evento→área→avaliador.

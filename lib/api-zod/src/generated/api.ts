@@ -714,7 +714,26 @@ export const GetEventResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
@@ -1418,7 +1437,26 @@ export const SetConformityEvaluatorResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
@@ -1532,7 +1570,26 @@ export const RedirectConformityEvaluatorResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
@@ -1646,7 +1703,26 @@ export const SetConformityEvaluatorFerramentasResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
@@ -1760,7 +1836,26 @@ export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
@@ -2012,7 +2107,26 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
@@ -2126,7 +2240,26 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
@@ -2236,7 +2369,26 @@ export const ResyncEventCriteriaResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 }).and(zod.object({
   "removedStale": zod.number().optional(),
   "addedNew": zod.number().optional()
@@ -2462,7 +2614,26 @@ export const DeleteEventCriterionResponse = zod.object({
   "conformityEvaluatorUserId": zod.number().nullish(),
   "conformityEvaluatorName": zod.string().nullish(),
   "conformityEvaluatorFerramentasUserId": zod.number().nullish(),
-  "conformityEvaluatorFerramentasName": zod.string().nullish()
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
 })
 
 
