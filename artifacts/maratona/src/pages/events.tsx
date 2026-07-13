@@ -312,6 +312,12 @@ export default function EventsPage() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
+                          <span
+                            title="Confirmar resultados garante a elegibilidade da equipe deste evento, independente da nota final"
+                            className={`px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block ${ev.resultsConfirmed ? "bg-[#eceef0] text-[#506600]" : "bg-[#fff4e5] text-[#a06a00]"}`}
+                          >
+                            <span className="inline-block skew-x-[8deg]">{ev.resultsConfirmed ? "Elegibilidade OK" : "Elegibilidade Pendente"}</span>
+                          </span>
                           {ev.isHistorical && (
                             <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
                               <span className="inline-block skew-x-[8deg]">Ciclo Anterior</span>
@@ -372,6 +378,12 @@ export default function EventsPage() {
                         <span>{ev.participantCount} participantes</span>
                       </div>
                     </div>
+                    {!!ev.unassignedAreaNames && ev.unassignedAreaNames.length > 0 && (
+                      <p className="mt-2 text-[11px] font-bold italic uppercase text-[#b02f00] flex items-start gap-1.5">
+                        <Info size={12} className="shrink-0 mt-0.5" />
+                        Sem avaliador: {ev.unassignedAreaNames.join(", ")}
+                      </p>
+                    )}
                   </div>
 
                   <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">

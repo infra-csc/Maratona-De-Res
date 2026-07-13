@@ -50,5 +50,7 @@ export interface Event {
   resultsConfirmedAt?: string | null;
   /** @nullable */
   resultsConfirmedBy?: number | null;
+  /** Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído. */
+  unassignedAreaNames?: string[];
   createdAt?: string;
 }

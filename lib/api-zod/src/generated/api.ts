@@ -588,6 +588,7 @@ export const GetEventsResponseItem = zod.object({
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
+  "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -767,6 +768,7 @@ export const UpdateEventResponse = zod.object({
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
+  "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "createdAt": zod.string().optional()
 })
 
@@ -866,6 +868,7 @@ export const MergeEventResponse = zod.object({
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
+  "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "createdAt": zod.string().optional()
 }),
   "warnings": zod.array(zod.string())
@@ -916,6 +919,7 @@ export const CloseEventResponse = zod.object({
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
+  "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "createdAt": zod.string().optional()
 })
 
@@ -959,6 +963,7 @@ export const ReopenEventResponse = zod.object({
   "resultsConfirmed": zod.boolean().optional(),
   "resultsConfirmedAt": zod.string().nullish(),
   "resultsConfirmedBy": zod.number().nullish(),
+  "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "createdAt": zod.string().optional()
 })
 

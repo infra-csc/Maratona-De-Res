@@ -26,7 +26,7 @@ router.get("/events", async (req, res) => {
   const eventIds = events.map(e => e.id);
 
   // Busca em lote para evitar N+1 (uma query por relação, não por evento).
-  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows] = await Promise.all([
+  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas] = await Promise.all([
     db.select({ eventId: eventParticipantsTable.eventId })
       .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
@@ -37,7 +37,9 @@ router.get("/events", async (req, res) => {
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
     db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
       .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, eventIds)),
+    db.select({ id: areasTable.id, name: areasTable.name }).from(areasTable),
   ]);
+  const areaNameById = new Map(allAreas.map(a => [a.id, a.name]));
 
   // Filtra eventos dentro do período do ciclo atual (se o ciclo tiver datas definidas;
   // um ciclo sem startDate/endDate configurados não filtra, evitando excluir tudo por engano)
@@ -99,7 +101,15 @@ router.get("/events", async (req, res) => {
       ? new Date(Math.max(...partialTimestamps.map(d => d.getTime())))
       : null;
 
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt };
+    // Áreas com critério ativo mas nenhum avaliador atribuído ainda — dá
+    // visibilidade na listagem de eventos sem precisar entrar em cada um.
+    const areaIdsWithActiveCriteria = new Set(activeCriteria.map(c => c.responsibleAreaId).filter((id): id is number => id != null));
+    const unassignedAreaNames = [...areaIdsWithActiveCriteria]
+      .filter(areaId => !assignedByArea.has(areaId) || assignedByArea.get(areaId)!.size === 0)
+      .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
   });
   res.json(enriched);
 });

@@ -3131,6 +3131,11 @@ components:
           type: ["string", "null"]
         resultsConfirmedBy:
           type: ["integer", "null"]
+        unassignedAreaNames:
+          type: array
+          items:
+            type: string
+          description: Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.
         createdAt:
           type: string
 
