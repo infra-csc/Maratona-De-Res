@@ -276,17 +276,18 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
 // POST /events/:id/criterion-assignments/generate
 // Gera atribuições "suggested" para todos os critérios ativos do evento
 // com base no criterion_routing. Pula critérios que já têm atribuição.
+// Extraída em função para poder ser chamada tanto pela rota manual abaixo
+// quanto automaticamente ao liberar as avaliações do evento (o avaliador
+// padrão já vem pré-determinado do routing — não faz sentido depender de
+// um clique manual de RH pra isso existir).
 // ---------------------------------------------------------------------------
-router.post("/events/:id/criterion-assignments/generate", requireRole("admin", "rh"), async (req, res) => {
-  const eventId = parseInt(req.params.id as string);
-
+export async function generateCriterionAssignments(eventId: number) {
   const eventCriteria = await db.select({ criterionId: eventCriteriaTable.criterionId })
     .from(eventCriteriaTable)
     .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
 
   if (eventCriteria.length === 0) {
-    res.json({ generated: 0, skipped: 0 });
-    return;
+    return { generated: 0, skipped: 0 };
   }
 
   const criterionIds = eventCriteria.map(ec => ec.criterionId);
@@ -314,7 +315,13 @@ router.post("/events/:id/criterion-assignments/generate", requireRole("admin", "
     generated++;
   }
 
-  res.json({ generated, skipped });
+  return { generated, skipped };
+}
+
+router.post("/events/:id/criterion-assignments/generate", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const result = await generateCriterionAssignments(eventId);
+  res.json(result);
 });
 
 // ---------------------------------------------------------------------------
@@ -790,6 +797,32 @@ router.get("/events/:id/public-tokens/conformity-ferramentas", async (req, res) 
       eq(publicEvalTokensTable.createdByUserId, user.userId),
       eq(publicEvalTokensTable.tokenType, "conformity_ferramentas"),
     ))
+    .orderBy(publicEvalTokensTable.createdAt);
+
+  res.json(tokens);
+});
+
+// ---------------------------------------------------------------------------
+// GET /events/:id/public-tokens/all
+// Admin/RH: lista TODOS os links públicos gerados para este evento (qualquer
+// avaliador, qualquer formulário — critérios, Cenografia, Ferramentas e Case),
+// para dar visibilidade central de quem enviou o quê e se já foi respondido.
+// ---------------------------------------------------------------------------
+router.get("/events/:id/public-tokens/all", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+
+  const tokens = await db.select({
+    id: publicEvalTokensTable.id,
+    tokenType: publicEvalTokensTable.tokenType,
+    recipientName: publicEvalTokensTable.recipientName,
+    submitterName: publicEvalTokensTable.submitterName,
+    usedAt: publicEvalTokensTable.usedAt,
+    createdAt: publicEvalTokensTable.createdAt,
+    createdByName: usersTable.name,
+  })
+    .from(publicEvalTokensTable)
+    .leftJoin(usersTable, eq(publicEvalTokensTable.createdByUserId, usersTable.id))
+    .where(eq(publicEvalTokensTable.eventId, eventId))
     .orderBy(publicEvalTokensTable.createdAt);
 
   res.json(tokens);

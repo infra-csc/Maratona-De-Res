@@ -2019,7 +2019,7 @@ export default function EventDetailPage() {
                     <strong>Para que serve:</strong> Quando dois avaliadores de uma mesma área precisam dividir critérios diferentes (ex.: Sandro Gomes avalia Logística e Sandro Paiva avalia Abastecimento), use esta seção para rotear cada critério individualmente.
                   </p>
                   <p>
-                    Clique em <strong>Gerar Sugestões</strong> para pré-preencher a partir das atribuições de área e depois <strong>Atribuir Avaliador</strong> em cada linha para confirmar ou ajustar.
+                    As atribuições já são geradas automaticamente ao liberar as avaliações, usando o avaliador padrão de cada critério. Use <strong>Gerar Sugestões</strong> só se adicionar um critério novo depois de liberado, e <strong>Atribuir Avaliador</strong> em cada linha pra ajustar manualmente.
                   </p>
                   <p className="text-[#506600]">
                     <strong>Freelancers / link externo:</strong> Avaliadores convidados (sem conta no sistema) recebem um link individual gerado no painel de cada critério após a atribuição.
@@ -2031,7 +2031,7 @@ export default function EventDetailPage() {
                 <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs">Carregando atribuições...</div>
               ) : !criterionAssignmentsData || criterionAssignmentsData.length === 0 ? (
                 <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs border-2 border-dashed border-[#eceef0]">
-                  Nenhuma atribuição gerada ainda. Clique em &ldquo;Gerar Sugestões&rdquo; para criar automaticamente.
+                  Nenhuma atribuição ainda — elas são geradas automaticamente ao liberar as avaliações. Se o evento já foi liberado e nada aparece aqui, clique em &ldquo;Gerar Sugestões&rdquo;.
                 </div>
               ) : (
                 <div className="overflow-x-auto border-2 border-[#191c1e]">

@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
+import { generateCriterionAssignments } from "./routing.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { participantCountsForScore } from "../lib/participation.js";
 
@@ -1299,6 +1300,15 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
     criteriaConfirmedAt: confirmed ? new Date() : null,
   }).where(eq(eventsTable.id, id)).returning();
   await audit(req.user!.userId, confirmed ? "confirm_criteria" : "reopen_criteria", "events", id, before, ev);
+
+  // O avaliador padrão de cada critério já vem pré-determinado pelo roteamento
+  // global — não faz sentido depender de um clique manual em "Gerar Sugestões"
+  // pra isso existir. Gera automaticamente ao liberar as avaliações (idempotente:
+  // pula critérios que já têm atribuição, então não sobrescreve nada).
+  if (confirmed) {
+    await generateCriterionAssignments(id);
+  }
+
   res.json(await loadEventDetail(id));
 });
 

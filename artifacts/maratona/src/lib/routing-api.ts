@@ -284,6 +284,15 @@ export function useFerramentasPublicTokens(eventId: number | null) {
   });
 }
 
+/** Admin/RH: todos os links públicos gerados para o evento, de qualquer avaliador/formulário. */
+export function useAllPublicTokens(eventId: number | null) {
+  return useQuery<(PublicToken & { tokenType: "criteria" | "conformity_cenografia" | "conformity_ferramentas" })[]>({
+    queryKey: ["all-public-tokens", eventId ?? 0],
+    queryFn: () => apiFetch(`/api/events/${eventId}/public-tokens/all`),
+    enabled: eventId != null,
+  });
+}
+
 /** Usuários de uma área (para popular pickers). */
 export function useUsersByArea(areaId: number | null) {
   return useQuery<RouteUser[]>({

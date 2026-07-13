@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea } from "@/lib/routing-api";
+import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -383,6 +383,9 @@ export default function EvaluationsPage() {
   const { data: ferramentasPublicTokenHistory, refetch: refetchFerramentasTokenHistory } = useFerramentasPublicTokens(
     conformityPublicLinkType === "ferramentas" ? (selectedEventId ?? null) : null,
   );
+  // Admin/RH: histórico consolidado de todos os links públicos do evento,
+  // de qualquer avaliador/formulário — dá visibilidade central de quem enviou o quê.
+  const { data: allPublicTokens } = useAllPublicTokens(isManager ? (selectedEventId ?? null) : null);
 
   const createMutation = useCreateEvaluation({
     mutation: {
@@ -2460,6 +2463,34 @@ export default function EvaluationsPage() {
                               <span>Não-conformidade na matriz</span>
                             </div>
                           )}
+                        </div>
+                      )}
+                      {/* Links públicos enviados — visão consolidada, qualquer avaliador/formulário */}
+                      {!!allPublicTokens && allPublicTokens.length > 0 && (
+                        <div className="pt-2 border-t-2 border-[#e0e3e5] space-y-2">
+                          <p className="text-xs font-bold italic uppercase text-[#444933]">Links Públicos Enviados</p>
+                          <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-48 overflow-y-auto bg-white">
+                            {allPublicTokens.map(t => (
+                              <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
+                                  <p className="text-[10px] italic text-[#747a60] truncate">
+                                    {t.tokenType === "conformity_cenografia" ? "Matriz — Cenografia" : t.tokenType === "conformity_ferramentas" ? "Matriz — Ferramentas" : "Critérios"}
+                                    {" · "}enviado por {t.createdByName ?? "—"} em {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
+                                  </p>
+                                </div>
+                                {t.usedAt ? (
+                                  <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
+                                    <CheckCircle size={10} /> Respondido
+                                  </span>
+                                ) : (
+                                  <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
+                                    Pendente
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
