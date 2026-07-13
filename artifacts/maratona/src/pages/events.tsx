@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ArrowUpDown, Info } from "lucide-react";
+import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ArrowUpDown, Info, LayoutGrid, List } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -38,6 +38,15 @@ export default function EventsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [cardFilter, setCardFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("dateDesc");
+  // Preferência de visualização persiste entre sessões — quem gerencia muitos
+  // eventos tende a preferir a tabela compacta sempre.
+  const [viewMode, setViewModeState] = useState<"cards" | "table">(
+    () => (localStorage.getItem("events_view_mode") === "table" ? "table" : "cards"),
+  );
+  const setViewMode = (mode: "cards" | "table") => {
+    setViewModeState(mode);
+    localStorage.setItem("events_view_mode", mode);
+  };
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeForEvent, setMergeForEvent] = useState<{ id: number; name: string } | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>("");
@@ -285,6 +294,26 @@ export default function EventsPage() {
                 <SelectItem value="status">Por Status</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex border-2 border-[#191c1e] h-11 overflow-hidden shrink-0">
+              <button
+                type="button"
+                data-testid="button-view-cards"
+                title="Visualizar em cards"
+                onClick={() => setViewMode("cards")}
+                className={`px-3 flex items-center transition-colors ${viewMode === "cards" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                data-testid="button-view-table"
+                title="Visualizar em tabela compacta"
+                onClick={() => setViewMode("table")}
+                className={`px-3 flex items-center border-l-2 border-[#191c1e] transition-colors ${viewMode === "table" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
+              >
+                <List size={16} />
+              </button>
+            </div>
           </div>
         </section>
 
@@ -299,6 +328,98 @@ export default function EventsPage() {
             <Calendar size={48} className="mx-auto mb-4 opacity-20" />
             <h3 className="text-xl font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
             <p className="text-[#747a60] italic mt-1">Tente ajustar os filtros ou sincronizar os eventos via integração.</p>
+          </div>
+        ) : viewMode === "table" ? (
+          <div className={`bg-white border-2 border-[#191c1e] overflow-x-auto ${HARD_SHADOW}`}>
+            <table className="w-full text-left border-collapse min-w-[960px]">
+              <thead>
+                <tr className="border-b-2 border-[#191c1e] bg-[#191c1e]">
+                  <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#ccff00]">Evento</th>
+                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00]">Período</th>
+                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Part.</th>
+                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Avaliados</th>
+                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Calibr. Finais</th>
+                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Score</th>
+                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00]">Status</th>
+                  <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y-2 divide-[#eceef0]">
+                {filtered.map(ev => {
+                  const score = ev.teamScore ?? ev.averageScore ?? null;
+                  const concluded = ev.status === "closed";
+                  const total = ev.totalCriteria ?? 0;
+                  const evaluated = ev.evaluatedCriteria ?? 0;
+                  const calCount = ev.finalCalibratedCriteria ?? 0;
+                  const fc = ev.fullyCalibrated ?? false;
+                  const isScoreFinal = concluded && fc;
+                  const missing = ev.unassignedAreaNames ?? [];
+                  return (
+                    <tr key={ev.id} data-testid={`row-event-${ev.id}`} className="hover:bg-[#f7f9fb] transition-colors">
+                      <td className="px-4 py-2.5 max-w-[280px]">
+                        <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-sm text-[#191c1e] hover:text-[#506600] leading-tight block truncate" title={ev.name}>{ev.name}</Link>
+                        <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
+                          {[ev.clientName, ev.city].filter(Boolean).join(" · ") || "—"}
+                        </p>
+                        {missing.length > 0 && (
+                          <p className="text-[10px] font-bold italic uppercase text-[#b02f00] truncate" title={`Sem avaliador: ${missing.join(", ")}`}>
+                            Sem avaliador: {missing.join(", ")}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] whitespace-nowrap">
+                        {new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — {new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
+                      <td className={`px-3 py-2.5 text-xs font-black italic text-center ${total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
+                        {total === 0 ? "—" : `${evaluated}/${total}`}
+                      </td>
+                      <td className={`px-3 py-2.5 text-xs font-black italic text-center ${fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}`}>
+                        {total === 0 ? "—" : `${calCount}/${total}`}
+                      </td>
+                      <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                        {score == null ? (
+                          <span className="text-xs italic text-[#c4c9ac]">—</span>
+                        ) : (
+                          <>
+                            <span className="text-sm font-black italic text-[#191c1e]">{score.toFixed(1)}</span>
+                            <span className={`block text-[9px] font-bold italic uppercase leading-none ${isScoreFinal ? "text-[#506600]" : "text-[#a06a00]"}`}>
+                              {isScoreFinal ? "Final" : concluded ? "Parcial" : "Provisório"}
+                            </span>
+                          </>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5 text-[10px] font-bold italic uppercase leading-tight">
+                          <span className={ev.criteriaConfirmed ? "text-[#506600]" : "text-[#b02f00]"}>
+                            {ev.criteriaConfirmed ? "Liberado" : "Aguardando RH"}
+                          </span>
+                          <span className={ev.resultsConfirmed ? "text-[#506600]" : "text-[#a06a00]"}>
+                            {ev.resultsConfirmed ? "Elegibilidade OK" : "Elegib. pendente"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                            <Link href={`/calibrations?eventId=${ev.id}`}>
+                              <button title="Ir para calibração deste evento" className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                                <SlidersHorizontal size={12} />
+                              </button>
+                            </Link>
+                          )}
+                          <Link href={`/events/${ev.id}`}>
+                            <button className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all">
+                              Gerenciar
+                            </button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
