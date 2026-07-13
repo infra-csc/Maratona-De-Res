@@ -106,15 +106,18 @@ export default function PublicEvalPage() {
     return ans?.score !== null && ans?.score !== undefined && ans?.comments?.trim().length > 0;
   });
 
-  // Cenografia: comentários são SEMPRE opcionais (mesmo quando Não)
+  // Cenografia: resposta "Não" exige comentário explicando o que aconteceu
   const cenoItems = ["epi", "estaiamentos", "conduta"] as const;
+  const cenoCommentKeyOf = { epi: "epiComment", estaiamentos: "estaiamentosComment", conduta: "condutaComment" } as const;
   const cenoAllAnswered = cenoItems.every(k => cenoAnswers[k] !== null);
+  const cenoCommentMissing = cenoItems.some(k => cenoAnswers[k] === false && !cenoAnswers[cenoCommentKeyOf[k]].trim());
   const cenoAbsencesMissing = !cenoAnswers.absencesReport.trim();
   const cenoStandoutMissing = cenoAnswers.standoutResponse === true && !cenoAnswers.standoutJustification.trim();
-  const cenoCanSubmit = cenoAllAnswered && !cenoAbsencesMissing && !cenoStandoutMissing;
+  const cenoCanSubmit = cenoAllAnswered && !cenoCommentMissing && !cenoAbsencesMissing && !cenoStandoutMissing;
 
-  // Ferramentas: comentário SEMPRE opcional
-  const ferramentasCanSubmit = ferramentasAnswer !== null;
+  // Ferramentas: resposta "Não" exige comentário
+  const ferramentasCanSubmit = ferramentasAnswer !== null
+    && (ferramentasAnswer !== false || !!ferramentasComment.trim());
 
   function setScore(criterionId: number, score: number) {
     setAnswers((prev) => ({ ...prev, [criterionId]: { score, comments: prev[criterionId]?.comments ?? "" } }));
@@ -379,10 +382,11 @@ export default function PublicEvalPage() {
                             </div>
                           </div>
                         </div>
-                        {/* Comentário sempre opcional — mostra quando resposta foi dada */}
                         {val !== null && (
                           <div className="pb-3 space-y-1">
-                            <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
+                            <label className="text-[10px] font-bold italic uppercase text-[#747a60]">
+                              Comentário {isNao ? <span className="text-[#b02f00] normal-case">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                            </label>
                             <textarea
                               rows={2}
                               placeholder={isNao ? `Descreva o que aconteceu...` : `Alguma observação? (opcional)`}
@@ -390,6 +394,9 @@ export default function PublicEvalPage() {
                               onChange={e => setCenoAnswers(f => ({ ...f, [item.commentKey]: e.target.value }))}
                               className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
                             />
+                            {isNao && !cenoAnswers[item.commentKey].trim() && (
+                              <p className="text-[10px] font-bold italic text-[#862200]">Comentário obrigatório quando a resposta é Não.</p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -469,10 +476,11 @@ export default function PublicEvalPage() {
                     </div>
                   </div>
                 </div>
-                {/* Comentário sempre opcional — mostra quando resposta foi dada */}
                 {ferramentasAnswer !== null && (
                   <div className="pb-3 space-y-1">
-                    <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
+                    <label className="text-[10px] font-bold italic uppercase text-[#747a60]">
+                      Comentário {isNao ? <span className="text-[#b02f00] normal-case">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                    </label>
                     <textarea
                       rows={2}
                       placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
@@ -480,6 +488,9 @@ export default function PublicEvalPage() {
                       onChange={e => setFerramentasComment(e.target.value)}
                       className="w-full border-2 border-[#191c1e] px-3 py-2 text-sm italic resize-none focus:outline-none"
                     />
+                    {isNao && !ferramentasComment.trim() && (
+                      <p className="text-[10px] font-bold italic text-[#862200]">Comentário obrigatório quando a resposta é Não.</p>
+                    )}
                   </div>
                 )}
               </div>

@@ -279,10 +279,22 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
       res.status(400).json({ error: "EPI, Estaiamentos e Conduta são obrigatórios" });
       return;
     }
+    // Resposta "Não" precisa vir com o comentário explicando o que aconteceu.
+    const naoSemComentario = (
+      [["epi", "epiComment"], ["estaiamentos", "estaiamentosComment"], ["conduta", "condutaComment"]] as const
+    ).find(([key, commentKey]) => answers[key] === false && !(typeof answers[commentKey] === "string" && answers[commentKey].trim()));
+    if (naoSemComentario) {
+      res.status(400).json({ error: "Comentário é obrigatório quando a resposta é Não" });
+      return;
+    }
   }
   if (isFerramentas) {
     if (answers.guardaEquipamentos === undefined) {
       res.status(400).json({ error: "Guarda de Equipamentos é obrigatório" });
+      return;
+    }
+    if (answers.guardaEquipamentos === false && !(typeof answers.guardaEquipamentosComment === "string" && answers.guardaEquipamentosComment.trim())) {
+      res.status(400).json({ error: "Comentário é obrigatório quando a resposta é Não" });
       return;
     }
   }
