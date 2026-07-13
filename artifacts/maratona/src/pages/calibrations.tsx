@@ -195,6 +195,7 @@ export default function CalibrationsPage() {
   // para não disparar uma notificação por critério. O resumo é exibido no fim.
   const bulkMutation = useCreateCalibration();
   const [savingAll, setSavingAll] = useState(false);
+  const [savingAutoFill, setSavingAutoFill] = useState(false);
 
   // Finalização do evento (fechar + liberar notas aos funcionários).
   const [finalizeOpen, setFinalizeOpen] = useState(false);
@@ -401,6 +402,51 @@ export default function CalibrationsPage() {
   // fechamento e depois falhar com erro 400.
   const evaluationsComplete = !!feedback?.isComplete;
   const readyToFinalize = allCalibrated && evaluationsComplete && canFinalize;
+
+  // Auto-preenche calibrações para critérios que têm nota do avaliador mas ainda
+  // não têm calibração — útil após importar avaliações via formulário.
+  const autoFillableCriteria = scoredCriteria.filter(c => !getCalibration(c.criterionId));
+  async function autoFillFromEvaluator() {
+    if (autoFillableCriteria.length === 0) return;
+    setSavingAutoFill(true);
+    let ok = 0;
+    const failed: number[] = [];
+    let firstError: string | null = null;
+    const allWarnings: string[] = [];
+    for (const c of autoFillableCriteria) {
+      const avg = getAvgScore(c.criterionId);
+      if (avg == null) continue;
+      try {
+        const result = await bulkMutation.mutateAsync({
+          data: {
+            eventId: selectedEventId!,
+            criterionId: c.criterionId,
+            calibratedScore: avg,
+            originalAverageScore: avg,
+          },
+        });
+        if (result.warnings) allWarnings.push(...result.warnings);
+        ok++;
+      } catch (e) {
+        failed.push(c.criterionId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+      }
+    }
+    setSavingAutoFill(false);
+    qc.invalidateQueries({ queryKey: calQKey });
+    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    qc.invalidateQueries({ queryKey: fbQKey });
+    const uniqueWarnings = Array.from(new Set(allWarnings));
+    if (failed.length === 0) {
+      toast({
+        title: `${ok} calibraç${ok === 1 ? "ão preenchida" : "ões preenchidas"} com nota do avaliador`,
+        description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined,
+        variant: uniqueWarnings.length > 0 ? "destructive" : undefined,
+      });
+    } else {
+      toast({ title: `${ok} preenchida(s), ${failed.length} com erro`, description: firstError ?? "Revise os critérios e tente novamente.", variant: "destructive" });
+    }
+  }
 
   // Grava TODAS as calibrações preenchidas de uma vez (a diretoria preenche tudo
   // e salva em um clique, em vez de critério por critério).
@@ -850,6 +896,18 @@ export default function CalibrationsPage() {
                         className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
                       >
                         <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                      </button>
+                    )}
+                    {canFinalize && autoFillableCriteria.length > 0 && (
+                      <button
+                        data-testid="button-autofill-from-evaluator"
+                        type="button"
+                        disabled={savingAutoFill || savingAll}
+                        onClick={autoFillFromEvaluator}
+                        title="Cria calibrações iguais à nota do avaliador para todos os critérios ainda sem calibração"
+                        className="bg-[#e0e3e5] text-[#191c1e] border-2 border-[#e0e3e5] px-4 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
+                      >
+                        <Check size={16} /> {savingAutoFill ? "Preenchendo..." : `Liberar Sem Calibração (${autoFillableCriteria.length})`}
                       </button>
                     )}
                     {canFinalize && (
