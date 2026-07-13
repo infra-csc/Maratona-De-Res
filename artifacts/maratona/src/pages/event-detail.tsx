@@ -1958,8 +1958,8 @@ export default function EventDetailPage() {
                     <button
                       data-testid="button-confirm-criteria"
                       onClick={handleConfirmAndRelease}
-                      disabled={!sumValid || !allAssigned || confirmBusy}
-                      title={!sumValid ? `A soma dos pesos ativos precisa ser ${fmt(targetWeightSum)}` : !allAssigned ? "Atribua um avaliador para todas as áreas antes de liberar" : undefined}
+                      disabled={!sumValid || (!hasEvaluations && !allAssigned) || confirmBusy}
+                      title={!sumValid ? `A soma dos pesos ativos precisa ser ${fmt(targetWeightSum)}` : (!hasEvaluations && !allAssigned) ? "Atribua um avaliador para todas as áreas antes de liberar" : undefined}
                       className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${HARD_SHADOW}`}
                     >
                       <CheckCircle2 size={16} /> {confirmBusy ? "Confirmando..." : "Confirmar e Liberar Avaliação"}
@@ -1967,7 +1967,7 @@ export default function EventDetailPage() {
                   </>
                 ) : (
                   <>
-                    {!hasEvaluations && assignmentsDirty && (
+                    {assignmentsDirty && (
                       <button
                         data-testid="button-save-assignments"
                         onClick={handleSaveAssignments}
