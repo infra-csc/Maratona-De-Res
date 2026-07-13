@@ -1,7 +1,7 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import {
-  useEventCriterionAssignments, useGenerateCriterionAssignments,
+  useEventCriterionAssignments,
   usePatchCriterionAssignment, useAllCriterionRoutings, type CriterionAssignment,
 } from "@/lib/routing-api";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useGetAreas, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
@@ -1031,7 +1031,6 @@ export default function EventDetailPage() {
 
   // ----- Atribuições por Critério (novo roteamento) -----
   const { data: criterionAssignmentsData, isLoading: criterionAssignmentsLoading } = useEventCriterionAssignments(id);
-  const generateAssignments = useGenerateCriterionAssignments(id);
   const patchAssignment = usePatchCriterionAssignment(id);
   const [assignPickerOpen, setAssignPickerOpen] = useState<{ criterionId: number; criterionName: string } | null>(null);
   const [assignPickerValue, setAssignPickerValue] = useState<number | null>(null);
@@ -1132,6 +1131,36 @@ export default function EventDetailPage() {
         .map(c => [c.responsibleAreaId as number, c.responsibleAreaName ?? `Área ${c.responsibleAreaId}`] as [number, string])
     ).entries()
   ).map(([areaId, areaName]) => ({ areaId, areaName }));
+
+  // Linhas do "Roteamento por Critério": mescla atribuições reais já
+  // salvas com sugestões sintéticas derivadas do avaliador padrão
+  // configurado em Critérios, para que a tabela já venha pré-preenchida
+  // sem precisar de um passo manual de "gerar sugestões".
+  const routingByCriterionId = new Map((allRoutings ?? []).map(r => [r.criterionId, r]));
+  const assignmentByCriterionId = new Map((criterionAssignmentsData ?? []).map(a => [a.criterionId, a]));
+  const criterionRoutingDisplayRows: CriterionAssignment[] = (event.criteria ?? [])
+    .filter(c => c.active)
+    .map(c => {
+      const existing = assignmentByCriterionId.get(c.criterionId);
+      if (existing) return existing;
+      const routing = routingByCriterionId.get(c.criterionId);
+      return {
+        id: -c.criterionId,
+        eventId: id,
+        criterionId: c.criterionId,
+        criterionName: c.criterionName,
+        criterionAreaId: c.responsibleAreaId ?? null,
+        assignedToId: routing?.defaultEvaluatorId ?? null,
+        assignedToName: routing?.defaultEvaluatorName ?? null,
+        status: routing?.defaultEvaluatorId ? "suggested" : "pending",
+        redirectedFromId: null,
+        redirectedFromName: null,
+        confirmedAt: null,
+        updatedAt: null,
+        createdAt: null,
+      } as CriterionAssignment;
+    });
+
   const buildOrderedEvaluatorIds = (areaId: number): number[] => {
     const primary = primaryEvaluator[areaId];
     const backups = (assignments[areaId] ?? []).filter(id => id !== primary);
@@ -2014,18 +2043,6 @@ export default function EventDetailPage() {
                 <span className="font-black uppercase tracking-tight">Roteamento por Critério</span>
                 <span className="text-[10px] font-bold uppercase text-[#ccff00]/60 border border-[#ccff00]/30 px-1.5 py-0.5">Avançado</span>
               </div>
-              <button
-                type="button"
-                disabled={generateAssignments.isPending}
-                onClick={() => generateAssignments.mutate(undefined, {
-                  onSuccess: (r) => toast({ title: `${r.generated} atribuição(ões) gerada(s)${r.skipped ? `, ${r.skipped} já existiam` : ""}` }),
-                  onError: (e: Error) => toast({ title: "Erro ao gerar atribuições", description: e.message, variant: "destructive" }),
-                })}
-                className="flex items-center gap-1.5 bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-3 py-1.5 text-[11px] font-black uppercase italic disabled:opacity-50"
-              >
-                <RefreshCw size={12} className={generateAssignments.isPending ? "animate-spin" : ""} />
-                {generateAssignments.isPending ? "Gerando..." : "Gerar Sugestões"}
-              </button>
             </div>
 
             <div className="p-6 space-y-4">
@@ -2036,7 +2053,7 @@ export default function EventDetailPage() {
                     <strong>Para que serve:</strong> Quando dois avaliadores de uma mesma área precisam dividir critérios diferentes (ex.: Sandro Gomes avalia Logística e Sandro Paiva avalia Abastecimento), use esta seção para rotear cada critério individualmente.
                   </p>
                   <p>
-                    As atribuições já são geradas automaticamente ao liberar as avaliações, usando o avaliador padrão de cada critério. Use <strong>Gerar Sugestões</strong> só se adicionar um critério novo depois de liberado, e <strong>Atribuir Avaliador</strong> em cada linha pra ajustar manualmente.
+                    Cada critério já vem com o avaliador padrão configurado em Critérios (tela de roteamento). Use <strong>Atribuir Avaliador</strong> em cada linha só pra confirmar ou trocar.
                   </p>
                   <p className="text-[#506600]">
                     <strong>Freelancers / link externo:</strong> Avaliadores convidados (sem conta no sistema) recebem um link individual gerado no painel de cada critério após a atribuição.
@@ -2046,9 +2063,9 @@ export default function EventDetailPage() {
 
               {criterionAssignmentsLoading ? (
                 <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs">Carregando atribuições...</div>
-              ) : !criterionAssignmentsData || criterionAssignmentsData.length === 0 ? (
+              ) : criterionRoutingDisplayRows.length === 0 ? (
                 <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs border-2 border-dashed border-[#eceef0]">
-                  Nenhuma atribuição ainda — elas são geradas automaticamente ao liberar as avaliações. Se o evento já foi liberado e nada aparece aqui, clique em &ldquo;Gerar Sugestões&rdquo;.
+                  Nenhum critério ativo neste evento.
                 </div>
               ) : (
                 <div className="overflow-x-auto border-2 border-[#191c1e]">
@@ -2062,7 +2079,7 @@ export default function EventDetailPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y-2 divide-[#eceef0]">
-                      {criterionAssignmentsData.map((a: CriterionAssignment) => {
+                      {criterionRoutingDisplayRows.map((a: CriterionAssignment) => {
                         const statusColors: Record<string, string> = {
                           pending: "bg-[#f2f4f6] text-[#747a60]",
                           suggested: "bg-[#fff4c2] text-[#5c4a00]",
