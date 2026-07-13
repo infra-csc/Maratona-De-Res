@@ -277,6 +277,7 @@ function RoutingConfigDialog({
   const [redirectSearch, setRedirectSearch] = useState("");
   const [redirectCollapsed, setRedirectCollapsed] = useState(true);
   const [evalSearch, setEvalSearch] = useState("");
+  const [allowPublicLink, setAllowPublicLink] = useState(currentRouting?.allowPublicLink ?? false);
 
   const toggleRedirectUser = (userId: number) => {
     setSelectedRedirectUsers(prev => {
@@ -302,6 +303,7 @@ function RoutingConfigDialog({
       redirectMode,
       redirectAreaId: redirectMode === "area" ? redirectAreaId : null,
       redirectUserIds: redirectMode === "specific" ? Array.from(selectedRedirectUsers) : undefined,
+      allowPublicLink,
     }, {
       onSuccess: () => { toast({ title: "Roteamento salvo" }); onClose(); },
       onError: (e: Error) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
@@ -434,6 +436,22 @@ function RoutingConfigDialog({
           )}
         </div>
       )}
+
+      {/* Link Freelancer */}
+      <div className="space-y-2 border-t-2 border-[#eceef0] pt-4">
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowPublicLink}
+            onChange={e => setAllowPublicLink(e.target.checked)}
+            className="h-4 w-4 mt-0.5 accent-[#506600]"
+          />
+          <span>
+            <span className="block font-bold italic uppercase text-xs tracking-wider text-[#444933]">Permite Link Freelancer</span>
+            <span className="block text-[11px] text-[#747a60] italic">Libera gerar um link público de avaliação (sem conta no sistema) para este critério — use só para áreas que recebem freelancers (ex.: Ativação, Produção, Cenografia). Logística e Atendimento são sempre time da casa, não precisam disso.</span>
+          </span>
+        </label>
+      </div>
 
       <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
         <button type="button" onClick={onClose} className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors">
