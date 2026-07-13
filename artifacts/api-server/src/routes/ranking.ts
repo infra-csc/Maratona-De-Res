@@ -39,6 +39,12 @@ router.get("/ranking", async (req, res) => {
       .where(and(
         eq(quarterlyResultsTable.cycleId, cycle.id),
         eq(employeesTable.employmentType, "casa"),
+        // O cargo GLOBAL cadastrado é a fonte da verdade (mesma regra de
+        // participantCountsForScore): se o colaborador está hoje classificado
+        // como "Sup Ceno *" (participação informativa), ele nunca deve
+        // aparecer no ranking, mesmo que algum evento antigo tenha ficado
+        // com functionName "Cenotécnica" gravado antes da mudança de cargo.
+        sql`(${employeesTable.functionName} IS NULL OR ${employeesTable.functionName} NOT ILIKE 'sup ceno%')`,
         exists(
           db.select({ one: sql`1` })
             .from(eventParticipantsTable)
