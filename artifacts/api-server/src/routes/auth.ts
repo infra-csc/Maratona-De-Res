@@ -1,7 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { db, usersTable, areasTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { signToken, requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES } from "../lib/credentials.js";
@@ -143,6 +144,45 @@ router.post("/auth/change-password", requireAuth, async (req, res) => {
     .where(eq(usersTable.id, user.id));
   await audit(user.id, "change_password", "users", user.id);
   res.json(await buildAuthResponse({ ...user, passwordHash, mustChangePassword: false }));
+});
+
+// SSO vindo do portal NORTE — valida JWT externo e emite token Maratona
+router.post("/auth/portal-sso", async (req, res) => {
+  const SESSION_SECRET = process.env.SESSION_SECRET;
+  if (!SESSION_SECRET) {
+    res.status(500).json({ error: "SESSION_SECRET não configurado no servidor" });
+    return;
+  }
+  const { token } = req.body as { token?: string };
+  if (!token) {
+    res.status(400).json({ error: "token obrigatório" });
+    return;
+  }
+  let payload: { email?: string; name?: string; role?: string; iss?: string };
+  try {
+    payload = jwt.verify(token, SESSION_SECRET, {
+      algorithms: ["HS256"],
+      issuer: "norte-portal",
+    }) as typeof payload;
+  } catch {
+    res.status(401).json({ error: "Token SSO inválido ou expirado" });
+    return;
+  }
+  if (!payload.email) {
+    res.status(401).json({ error: "Token SSO sem e-mail" });
+    return;
+  }
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(and(eq(usersTable.email, payload.email.toLowerCase().trim()), eq(usersTable.active, true)))
+    .limit(1);
+  if (!user) {
+    res.status(404).json({ error: "Usuário não encontrado ou inativo" });
+    return;
+  }
+  await audit(user.id, "portal_sso_login", "users", user.id);
+  res.json(await buildAuthResponse(user));
 });
 
 // Dev mode: admin issues a session token to view the app as any other user.

@@ -1,0 +1,54 @@
+Preciso implementar SSO automático vindo do portal NORTE (norte-app-hub.replit.app).
+
+Quando o usuário clica no card "Maratona de Resultados" no portal, ele é redirecionado para:
+https://maratona-de-resultados.replit.app/?portal_sso=<JWT>&portal_return=<url>
+
+O JWT vem assinado com HS256 usando a variável de ambiente SESSION_SECRET (a mesma que já existe no projeto). O payload contém: { email, name, role, level, app: "maratona", iss: "norte-portal" }. Expira em 10 minutos.
+
+Preciso de duas mudanças:
+
+---
+
+1. BACKEND — adicionar endpoint POST /api/auth/portal-sso
+
+Ele deve:
+- Receber { token: string } no body
+- Verificar o JWT usando SESSION_SECRET (algoritmo HS256, issuer "norte-portal")
+- Extrair o email do payload
+- Buscar o usuário no banco pelo email (tabela users, campo email, WHERE active = true)
+- Gerar e retornar um token de autenticação do Maratona para esse usuário (mesmo formato que o /api/auth/login retorna: { token, user })
+- Retornar 401 se o token for inválido ou expirado
+- Retornar 404 se o usuário não for encontrado
+
+Adicionar a variável SESSION_SECRET nos Secrets do Replit com o mesmo valor que está no projeto do portal NORTE.
+
+---
+
+2. FRONTEND — detectar portal_sso na URL ao carregar o app
+
+No arquivo de entrada (main.tsx ou equivalente), ANTES do createRoot/render, adicionar:
+
+const _params = new URLSearchParams(window.location.search);
+const _ssoToken = _params.get('portal_sso');
+if (_ssoToken) {
+  fetch('/api/auth/portal-sso', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: _ssoToken }),
+  })
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (data?.token && data?.user) {
+        localStorage.setItem('maratona_token', data.token);
+        localStorage.setItem('maratona_user', JSON.stringify(data.user));
+      }
+      _params.delete('portal_sso');
+      _params.delete('portal_return');
+      const newUrl = window.location.pathname + (_params.toString() ? '?' + _params.toString() : '');
+      window.history.replaceState({}, '', newUrl);
+    })
+    .catch(() => {})
+    .finally(() => { /* app já renderiza normalmente */ });
+}
+
+Esse código deve rodar de forma síncrona (sem await) para não bloquear o render. O app vai carregar normalmente e, quando o token for salvo no localStorage, o contexto de autenticação já vai estar preenchido na próxima inicialização — ou o usuário verá a tela logada imediatamente se o contexto for reativo ao localStorage.
