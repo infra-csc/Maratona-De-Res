@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens } from "@/lib/routing-api";
+import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, type PublicToken } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -183,6 +183,37 @@ function EvaluatorEventCard({
         </div>
       )}
     </button>
+  );
+}
+
+// Uma vez que um link foi enviado para um freelancer preencher um formulário
+// de conformidade, o avaliador titular deixa de ver o formulário interativo
+// (evita sobrescrever a resposta do freelancer) e passa a ver só este
+// histórico de envios — respondido ou não, e quando.
+function ConformityLinkHistory({ history }: { history: PublicToken[] }) {
+  return (
+    <div className="bg-white border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] overflow-hidden">
+      {history.map(t => (
+        <div key={t.id} className="flex items-center justify-between px-4 py-3 gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-bold italic truncate">{t.recipientName ?? "—"}</p>
+            <p className="text-[10px] italic text-[#747a60]">
+              Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
+              {t.usedAt ? ` · Respondido ${new Date(t.usedAt).toLocaleDateString("pt-BR")}` : ""}
+            </p>
+          </div>
+          {t.usedAt ? (
+            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
+              <CheckCircle size={10} /> Respondido
+            </span>
+          ) : (
+            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
+              Pendente
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -411,11 +442,14 @@ export default function EvaluationsPage() {
   const { data: publicTokenHistory, refetch: refetchTokenHistory } = usePublicTokens(
     publicLinkDialogCriteriaIds !== null ? (selectedEventId ?? null) : null,
   );
+  // Habilitado sempre que o avaliador é responsável pela conformidade deste
+  // evento (não só quando o dialog de link está aberto) — precisamos saber se
+  // já existe link enviado para trocar o formulário por uma view de histórico.
   const { data: conformityPublicTokenHistory, refetch: refetchConformityTokenHistory } = useConformityPublicTokens(
-    conformityPublicLinkType === "cenografia" ? (selectedEventId ?? null) : null,
+    isConformityEvaluatorForEvent ? (selectedEventId ?? null) : null,
   );
   const { data: ferramentasPublicTokenHistory, refetch: refetchFerramentasTokenHistory } = useFerramentasPublicTokens(
-    conformityPublicLinkType === "ferramentas" ? (selectedEventId ?? null) : null,
+    isFerramentasEvaluatorForEvent ? (selectedEventId ?? null) : null,
   );
   // Admin/RH: histórico consolidado de todos os links públicos do evento,
   // de qualquer avaliador/formulário — dá visibilidade central de quem enviou o quê.
@@ -2194,7 +2228,9 @@ export default function EvaluationsPage() {
               {isFerramentasEvaluatorForEvent && (() => {
                 const val = conformityEvalForm.guardaEquipamentos;
                 const isNao = val === false;
-                const canSave = true;
+                const commentMissing = isNao && !conformityEvalForm.guardaEquipamentosComment.trim();
+                const canSave = !commentMissing;
+                const hasSentLink = (ferramentasPublicTokenHistory?.length ?? 0) > 0;
                 return (
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 px-1">
@@ -2237,54 +2273,68 @@ export default function EvaluationsPage() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-sm text-[#444933] italic px-1 -mt-1">
-                      Você foi designado para avaliar o retorno de equipamentos e ferramentas.
-                    </p>
-                    <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-                      <div className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
-                        <div className="flex flex-wrap items-center justify-between gap-3 min-h-[56px]">
-                          <span className="text-sm font-bold italic text-[#191c1e] leading-snug flex-1 min-w-[200px]">Todos os equipamentos e ferramentas retornaram?</span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {isNao && <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>}
-                            <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
-                              <button type="button"
-                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: null })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === null ? "bg-[#d4a800] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                              >Pendente</button>
-                              <button type="button"
-                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: true } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                              >Sim</button>
-                              <button type="button"
-                                onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: false } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${val === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
-                              >Não</button>
+                    {hasSentLink ? (
+                      <>
+                        <p className="text-sm text-[#444933] italic px-1 -mt-1">
+                          Link enviado para um freelancer preencher este formulário. Acompanhe abaixo.
+                        </p>
+                        <ConformityLinkHistory history={ferramentasPublicTokenHistory ?? []} />
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-[#444933] italic px-1 -mt-1">
+                          Você foi designado para avaliar o retorno de equipamentos e ferramentas.
+                        </p>
+                        <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+                          <div className={`px-5 transition-colors ${isNao ? "bg-[#fdece6] border-l-4 border-[#862200]" : val === null ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
+                            <div className="flex flex-wrap items-center justify-between gap-3 min-h-[56px]">
+                              <span className="text-sm font-bold italic text-[#191c1e] leading-snug flex-1 min-w-[200px]">Todos os equipamentos e ferramentas retornaram?</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {isNao && <span className="text-[10px] font-black italic uppercase text-[#862200] whitespace-nowrap">-10 pts</span>}
+                                <div className="flex items-center border-2 border-[#191c1e] overflow-hidden">
+                                  <button type="button"
+                                    onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: null })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
+                                    className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === null ? "bg-[#d4a800] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                  >Pendente</button>
+                                  <button type="button"
+                                    onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: true } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
+                                    className={`px-3 py-1.5 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${val === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                  >Sim</button>
+                                  <button type="button"
+                                    onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: false } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
+                                    className={`px-3 py-1.5 text-[11px] font-black italic uppercase transition-all ${val === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                  >Não</button>
+                                </div>
+                              </div>
                             </div>
+                            {val !== null && (
+                              <div className="pb-3 space-y-1">
+                                <label className="text-[10px] font-bold italic uppercase text-[#747a60]">
+                                  Comentário {isNao ? <span className="text-[#b02f00] normal-case">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                                </label>
+                                <Textarea
+                                  placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
+                                  value={conformityEvalForm.guardaEquipamentosComment}
+                                  onChange={e => setConformityEvalForm(f => ({ ...f, guardaEquipamentosComment: e.target.value }))}
+                                  className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
+                                />
+                                {commentMissing && <p className="text-[10px] font-bold italic text-[#862200]">Comentário obrigatório quando a resposta é Não.</p>}
+                              </div>
+                            )}
                           </div>
+                          {/* Save comment */}
+                          {val !== null && (
+                            <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
+                              <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Salvar observação</span>
+                              <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
+                                onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }, { onSuccess: () => toast({ title: "Observação salva" }) }); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
+                              >{conformityEvalMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Salvar</button>
+                            </div>
+                          )}
                         </div>
-                        {val !== null && (
-                          <div className="pb-3 space-y-1">
-                            <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
-                            <Textarea
-                              placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
-                              value={conformityEvalForm.guardaEquipamentosComment}
-                              onChange={e => setConformityEvalForm(f => ({ ...f, guardaEquipamentosComment: e.target.value }))}
-                              className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[72px]"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      {/* Save comment */}
-                      {val !== null && (
-                        <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
-                          <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Salvar observação</span>
-                          <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
-                            onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }, { onSuccess: () => toast({ title: "Observação salva" }) }); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
-                          >{conformityEvalMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Salvar</button>
-                        </div>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </div>
                 );
               })()}
@@ -2300,8 +2350,10 @@ export default function EvaluationsPage() {
                 ];
                 const standoutNeedsJustification = conformityEvalForm.standoutResponse === true && !conformityEvalForm.standoutJustification.trim();
                 const absencesNeedsReport = !conformityEvalForm.absencesReport.trim();
-                const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport;
+                const missingRequiredComments = cenografiaItems.some(i => conformityEvalForm[i.key] === false && !conformityEvalForm[i.commentKey].trim());
+                const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport && !missingRequiredComments;
                 const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
+                const hasSentLink = (conformityPublicTokenHistory?.length ?? 0) > 0;
                 return (
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 px-1">
@@ -2344,6 +2396,15 @@ export default function EvaluationsPage() {
                         </button>
                       </div>
                     </div>
+                    {hasSentLink ? (
+                      <>
+                        <p className="text-sm text-[#444933] italic px-1 -mt-1">
+                          Link enviado para um freelancer preencher este formulário. Acompanhe abaixo.
+                        </p>
+                        <ConformityLinkHistory history={conformityPublicTokenHistory ?? []} />
+                      </>
+                    ) : (
+                      <>
                     <p className="text-sm text-[#444933] italic px-1 -mt-1">
                       Você foi designado para avaliar a conformidade da equipe de Cenografia neste evento.
                     </p>
@@ -2374,13 +2435,18 @@ export default function EvaluationsPage() {
                               </div>
                               {val !== null && (
                                 <div className="pb-3 space-y-1">
-                                  <label className="text-[10px] font-bold italic uppercase text-[#747a60]">Comentário <span className="font-normal normal-case">(opcional)</span></label>
+                                  <label className="text-[10px] font-bold italic uppercase text-[#747a60]">
+                                    Comentário {isNao ? <span className="text-[#b02f00] normal-case">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                                  </label>
                                   <Textarea
                                     placeholder={isNao ? `Descreva o que aconteceu com ${item.label.toLowerCase()}...` : "Alguma observação? (opcional)"}
                                     value={conformityEvalForm[item.commentKey]}
                                     onChange={e => setConformityEvalForm(f => ({ ...f, [item.commentKey]: e.target.value }))}
                                     className="rounded-none border-2 border-[#191c1e] text-sm italic resize-none min-h-[64px]"
                                   />
+                                  {isNao && !conformityEvalForm[item.commentKey].trim() && (
+                                    <p className="text-[10px] font-bold italic text-[#862200]">Comentário obrigatório quando a resposta é Não.</p>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -2456,6 +2522,8 @@ export default function EvaluationsPage() {
                         className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
                       ><Save size={14} /> Salvar observações</button>
                     </div>
+                      </>
+                    )}
 
                   </div>
                 );

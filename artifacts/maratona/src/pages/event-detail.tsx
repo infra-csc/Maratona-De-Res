@@ -1543,20 +1543,20 @@ export default function EventDetailPage() {
 
               {/* Banner de liberação — destaque visual quando não confirmado */}
               {!criteriaConfirmed && (
-                <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 border-2 px-5 py-4 ${allAssigned && sumValid ? "border-[#506600] bg-[#f0fff0]" : "border-[#ff5722] bg-[#fff8f5]"}`}>
+                <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 border-2 px-5 py-4 ${sumValid ? (allAssigned ? "border-[#506600] bg-[#f0fff0]" : "border-[#d4a800] bg-[#fffbf0]") : "border-[#ff5722] bg-[#fff8f5]"}`}>
                   <div className="flex items-start gap-3 flex-1 min-w-0">
-                    {allAssigned && sumValid
-                      ? <Unlock size={18} className="text-[#506600] shrink-0 mt-0.5" />
+                    {sumValid
+                      ? <Unlock size={18} className={allAssigned ? "text-[#506600] shrink-0 mt-0.5" : "text-[#d4a800] shrink-0 mt-0.5"} />
                       : <Lock size={18} className="text-[#ff5722] shrink-0 mt-0.5" />}
                     <div>
                       <p className="text-xs font-black italic uppercase text-[#191c1e]">
-                        {allAssigned && sumValid ? "Tudo pronto — libere para as áreas avaliarem" : "Avaliações ainda não liberadas"}
+                        {sumValid ? (allAssigned ? "Tudo pronto — libere para as áreas avaliarem" : "Pode liberar parcialmente") : "Avaliações ainda não liberadas"}
                       </p>
                       <p className="text-[11px] italic text-[#747a60] mt-0.5">
                         {!sumValid
                           ? `Pesos ativos precisam somar ${fmt(targetWeightSum)}.`
                           : !allAssigned
-                          ? `Atribua avaliador para: ${assignAreas.filter(a => primaryEvaluator[a.areaId] == null).map(a => a.areaName).join(", ")}.`
+                          ? `Ainda sem avaliador: ${assignAreas.filter(a => primaryEvaluator[a.areaId] == null).map(a => a.areaName).join(", ")}. Pode liberar mesmo assim — atribua quando a informação chegar.`
                           : "Clique em Liberar Avaliações para que as áreas possam começar a avaliar."}
                       </p>
                     </div>
@@ -1564,9 +1564,9 @@ export default function EventDetailPage() {
                   <button
                     data-testid="button-confirm-criteria-top"
                     onClick={handleConfirmAndRelease}
-                    disabled={!sumValid || !allAssigned || confirmBusy}
+                    disabled={!sumValid || confirmBusy}
                     className={`shrink-0 flex items-center gap-2 px-5 py-2.5 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider transition-all ${
-                      sumValid && allAssigned
+                      sumValid
                         ? `bg-[#ccff00] text-[#161e00] ${HARD_SHADOW} hover:translate-y-[1px]`
                         : "bg-[#eceef0] text-[#9aa088] cursor-not-allowed opacity-60"
                     }`}
@@ -1987,8 +1987,8 @@ export default function EventDetailPage() {
                     <button
                       data-testid="button-confirm-criteria"
                       onClick={handleConfirmAndRelease}
-                      disabled={!sumValid || (!hasEvaluations && !allAssigned) || confirmBusy}
-                      title={!sumValid ? `A soma dos pesos ativos precisa ser ${fmt(targetWeightSum)}` : (!hasEvaluations && !allAssigned) ? "Atribua um avaliador para todas as áreas antes de liberar" : undefined}
+                      disabled={!sumValid || confirmBusy}
+                      title={!sumValid ? `A soma dos pesos ativos precisa ser ${fmt(targetWeightSum)}` : (!hasEvaluations && !allAssigned) ? "Algumas áreas ainda não têm avaliador — pode liberar mesmo assim e atribuir depois" : undefined}
                       className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${HARD_SHADOW}`}
                     >
                       <CheckCircle2 size={16} /> {confirmBusy ? "Confirmando..." : "Confirmar e Liberar Avaliação"}

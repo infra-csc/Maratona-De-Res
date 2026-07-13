@@ -219,24 +219,6 @@ async function loadEventDetail(id: number) {
   return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null, conformityEvaluatorName, conformityEvaluatorFerramentasName };
 }
 
-/**
- * Distinct areas that have at least one ACTIVE criterion for this event.
- * These are the areas that MUST have an evaluator assigned before release.
- */
-async function areasNeedingAssignment(eventId: number): Promise<{ areaId: number; areaName: string | null }[]> {
-  const rows = await db
-    .select({ areaId: criteriaTable.responsibleAreaId, areaName: areasTable.name })
-    .from(eventCriteriaTable)
-    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-    .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
-    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
-  const seen = new Map<number, string | null>();
-  for (const r of rows) {
-    if (r.areaId != null && !seen.has(r.areaId)) seen.set(r.areaId, r.areaName);
-  }
-  return Array.from(seen.entries()).map(([areaId, areaName]) => ({ areaId, areaName }));
-}
-
 async function eventHasEvaluations(eventId: number) {
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)` })
@@ -1279,20 +1261,10 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
       return;
     }
 
-    // Atribuição obrigatória: toda área com critério ativo precisa ter um avaliador
-    // definido pelo RH antes de liberar a avaliação do evento.
-    const needAssign = await areasNeedingAssignment(id);
-    const assigned = await db
-      .select({ areaId: eventAreaAssignmentsTable.areaId })
-      .from(eventAreaAssignmentsTable)
-      .where(eq(eventAreaAssignmentsTable.eventId, id));
-    const assignedAreaIds = new Set(assigned.map(a => a.areaId));
-    const missing = needAssign.filter(a => !assignedAreaIds.has(a.areaId));
-    if (missing.length > 0) {
-      const names = missing.map(a => a.areaName ?? `área ${a.areaId}`).join(", ");
-      res.status(400).json({ error: `Defina um avaliador para todas as áreas antes de liberar. Áreas sem avaliador: ${names}` });
-      return;
-    }
+    // Nem toda área precisa ter avaliador definido no momento da liberação —
+    // essa atribuição pode chegar depois (ex.: freelancer ainda não confirmado).
+    // Libera parcialmente; áreas sem avaliador continuam visíveis como alerta
+    // em outras telas (unassignedAreaNames), mas não bloqueiam o fluxo.
 
     // Freeze each active criterion's effective weight so that later edits to the
     // global default weight can never alter an event locked for evaluation.
