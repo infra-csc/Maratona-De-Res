@@ -2430,8 +2430,11 @@ export default function EvaluationsPage() {
                             </div>
                             {val !== null && (
                               <div className="pb-3 space-y-1">
-                                <label className="text-[10px] font-bold italic uppercase text-[#747a60]">
-                                  Comentário {isNao ? <span className="text-[#b02f00] normal-case">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                                <label className="text-[10px] font-bold italic uppercase text-[#747a60] flex items-center gap-1.5">
+                                  Comentário {isNao ? <span className="text-[#b02f00] normal-case font-bold">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                                  {!commentDirty && conformityEvalForm.guardaEquipamentosComment && (
+                                    <span className="text-[#506600] flex items-center gap-0.5 font-bold"><CheckCircle size={9} /> salvo</span>
+                                  )}
                                 </label>
                                 <Textarea
                                   placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
@@ -2443,14 +2446,10 @@ export default function EvaluationsPage() {
                               </div>
                             )}
                           </div>
-                          {/* Save comment */}
-                          {val !== null && (
-                            <div className="px-5 py-3 bg-[#f2f4f6] border-t-2 border-[#eceef0] flex items-center justify-between gap-3">
-                              {commentDirty ? (
-                                <span className="text-[10px] font-bold italic uppercase text-[#b02f00] flex items-center gap-1"><AlertCircle size={11} /> Alterações não salvas</span>
-                              ) : (
-                                <span className="text-[10px] font-bold italic uppercase text-[#506600] flex items-center gap-1"><CheckCircle size={11} /> Salvo</span>
-                              )}
+                          {/* Save comment — só aparece quando há alterações */}
+                          {val !== null && commentDirty && (
+                            <div className="px-5 py-3 bg-[#fffbf0] border-t-2 border-[#d4a800] flex items-center justify-between gap-3">
+                              <span className="text-[10px] font-bold italic uppercase text-[#b02f00] flex items-center gap-1"><AlertCircle size={11} /> Alterações não salvas</span>
                               <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
                                 onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }, { onSuccess: () => toast({ title: "Observação salva" }) }); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
@@ -2636,28 +2635,24 @@ export default function EvaluationsPage() {
                       </div>
                     </div>
 
-                    {/* Save text fields button */}
-                    <div className="flex items-center justify-between gap-3">
-                      {textsDirty ? (
+                    {/* Save text fields — só aparece quando há alterações */}
+                    {textsDirty && (
+                      <div className="flex items-center justify-between gap-3 bg-[#fffbf0] border-2 border-[#d4a800] px-4 py-3">
                         <span className="text-[11px] font-bold italic uppercase text-[#b02f00] flex items-center gap-1"><AlertCircle size={12} /> Alterações não salvas</span>
-                      ) : (conformityEvalForm.absencesReport.trim() || cenografiaItems.some(i => conformityEvalForm[i.commentKey].trim()) || conformityEvalForm.standoutJustification.trim()) ? (
-                        <span className="text-[11px] font-bold italic uppercase text-[#506600] flex items-center gap-1"><CheckCircle size={12} /> Observações salvas</span>
-                      ) : (
-                        <span className="text-[11px] text-[#747a60] italic">Salva justificativas, ausências e destaque.</span>
-                      )}
-                      <button type="button" disabled={!canSaveTexts || conformityEvalMutation.isPending}
-                        onClick={() => {
-                          if (!selectedEventId || !canSaveTexts) return;
-                          const payload: Record<string, unknown> = { absencesResponse: true, absencesReport: conformityEvalForm.absencesReport, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
-                          cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
-                          conformityEvalMutation.mutate(
-                            { id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] },
-                            { onSuccess: () => toast({ title: "Observações salvas" }) },
-                          );
-                        }}
-                        className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
-                      ><Save size={14} /> Salvar observações</button>
-                    </div>
+                        <button type="button" disabled={!canSaveTexts || conformityEvalMutation.isPending}
+                          onClick={() => {
+                            if (!selectedEventId || !canSaveTexts) return;
+                            const payload: Record<string, unknown> = { absencesResponse: true, absencesReport: conformityEvalForm.absencesReport, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
+                            cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
+                            conformityEvalMutation.mutate(
+                              { id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] },
+                              { onSuccess: () => toast({ title: "Observações salvas" }) },
+                            );
+                          }}
+                          className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] disabled:opacity-40 hover:bg-[#333] transition-colors"
+                        ><Save size={14} /> Salvar observações</button>
+                      </div>
+                    )}
                       </>
                     )}
 
