@@ -1643,96 +1643,6 @@ export default function EvaluationsPage() {
                           <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#b02f00]">Critérios ainda não confirmados — as áreas não podem avaliar até a liberação.</p>
                         </div>
                       )}
-                      {/* Atribuição de Avaliadores por Área */}
-                      {isManager && (
-                        <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
-                          <div className="flex items-center gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
-                            <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight">
-                              <Target size={16} className="shrink-0" /> Atribuição de Avaliadores
-                            </span>
-                          </div>
-                          {eventAreasForAssignment.length === 0 ? (
-                            <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhuma área com critérios ativos neste evento.</div>
-                          ) : (
-                            <ul className="divide-y-2 divide-[#eceef0]">
-                              {eventAreasForAssignment.map(area => {
-                                const assigned = assignedEvaluatorsByArea.get(area.id) ?? [];
-                                const isEditingThis = assignAreaPickerOpen === area.id;
-                                return (
-                                  <li key={area.id} className="px-5 py-3 space-y-2">
-                                    <div className="flex items-center justify-between gap-3">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <Building2 size={13} className="shrink-0 text-[#747a60]" />
-                                        <span className="font-black italic uppercase text-sm text-[#191c1e] truncate">{area.name}</span>
-                                      </div>
-                                      {!isEditingThis && (
-                                        <button
-                                          type="button"
-                                          onClick={() => { setAssignAreaPickerOpen(area.id); setAssignAreaUserIds(assigned.map(a => a.id)); }}
-                                          className="flex items-center gap-1.5 px-2.5 py-1 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] transition-colors text-[11px] font-black uppercase tracking-tight shrink-0"
-                                        >
-                                          <UserPlus size={13} /> {assigned.length === 0 ? "Atribuir" : "Alterar"}
-                                        </button>
-                                      )}
-                                    </div>
-                                    {!isEditingThis && (
-                                      <div className="flex flex-wrap gap-1.5 pl-5">
-                                        {assigned.length === 0 ? (
-                                          <span className="text-[11px] italic font-bold uppercase text-[#9aa088]">Sem avaliador atribuído</span>
-                                        ) : assigned.map(a => (
-                                          <span key={a.id} className="inline-flex items-center gap-1 text-[10px] font-black italic uppercase bg-[#f2f4f6] border-2 border-[#191c1e] px-2 py-0.5">
-                                            <User size={10} /> {a.name}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {isEditingThis && (
-                                      <div className="pl-5 space-y-2">
-                                        <div className="max-h-48 overflow-y-auto space-y-0.5 border-2 border-[#191c1e] p-2 bg-[#f9fafb]">
-                                          {allAvaliadores.length === 0 && (
-                                            <p className="text-[11px] italic text-[#9aa088] px-2 py-1">Nenhum avaliador cadastrado.</p>
-                                          )}
-                                          {allAvaliadores.map(av => {
-                                            const checked = assignAreaUserIds.includes(av.id);
-                                            return (
-                                              <label key={av.id} className="flex items-center gap-2.5 cursor-pointer hover:bg-[#f2f4f6] px-2 py-1.5">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={checked}
-                                                  onChange={() => setAssignAreaUserIds(prev => checked ? prev.filter(id => id !== av.id) : [...prev, av.id])}
-                                                  className="w-3.5 h-3.5 accent-[#506600]"
-                                                />
-                                                <span className="text-[12px] font-bold italic uppercase text-[#191c1e]">{av.name}</span>
-                                              </label>
-                                            );
-                                          })}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <button
-                                            type="button"
-                                            disabled={updateAssignmentsMutation.isPending}
-                                            onClick={() => updateAssignmentsMutation.mutate({ id: selectedEventId!, data: { assignments: [{ areaId: area.id, evaluatorUserIds: assignAreaUserIds }] } })}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#ccff00] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[11px] font-black uppercase tracking-tight disabled:opacity-50"
-                                          >
-                                            <Save size={13} /> Salvar
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => setAssignAreaPickerOpen(null)}
-                                            className="px-3 py-1.5 border-2 border-[#191c1e] bg-white text-[#191c1e] hover:bg-[#f2f4f6] transition-colors text-[11px] font-black uppercase tracking-tight"
-                                          >
-                                            Cancelar
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                      )}
 
                       {/* Matriz de Conformidade + Perguntas de Evento */}
                       {isConsultation && !!selectedEventId && (
@@ -1913,16 +1823,77 @@ export default function EvaluationsPage() {
                       {filteredAreaGroups.map(g => {
                         const submittedInArea = g.criteria.filter(c => isCriterionDone(c)).length;
                         const areaDone = submittedInArea === g.criteria.length;
+                        const areaId = g.criteria[0]?.responsibleAreaId ?? null;
+                        const areaAssigned = areaId != null ? (assignedEvaluatorsByArea.get(areaId) ?? []) : [];
+                        const isEditingThisArea = isManager && assignAreaPickerOpen === areaId;
                         return (
                           <div key={g.area} data-testid={`status-area-${g.area}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                             <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
                               <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight min-w-0 truncate pr-1.5">
                                 <Building2 size={16} className="shrink-0" /> {g.area}
                               </span>
-                              <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block shrink-0", areaDone ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffb5a0] text-[#3b0900]")}>
-                                <span className="inline-block skew-x-[8deg]">{submittedInArea}/{g.criteria.length} {areaDone ? "Concluído" : "Pendente"}</span>
+                              <span className="flex items-center gap-2 shrink-0">
+                                {isManager && areaId != null && !isEditingThisArea && (
+                                  <>
+                                    {areaAssigned.map(a => (
+                                      <span key={a.id} className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black italic uppercase bg-white border border-[#d8dadc] px-2 py-0.5">
+                                        <User size={10} /> {a.name.split(" ")[0]}
+                                      </span>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => { setAssignAreaPickerOpen(areaId); setAssignAreaUserIds(areaAssigned.map(a => a.id)); }}
+                                      className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] transition-colors text-[10px] font-black uppercase tracking-tight"
+                                    >
+                                      <UserPlus size={11} /> {areaAssigned.length === 0 ? "Atribuir" : "Alterar"}
+                                    </button>
+                                  </>
+                                )}
+                                <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block", areaDone ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffb5a0] text-[#3b0900]")}>
+                                  <span className="inline-block skew-x-[8deg]">{submittedInArea}/{g.criteria.length} {areaDone ? "Concluído" : "Pendente"}</span>
+                                </span>
                               </span>
                             </div>
+                            {isEditingThisArea && areaId != null && (
+                              <div className="px-5 py-3 border-b-2 border-[#d8dadc] bg-[#fafbf5] space-y-2">
+                                <div className="max-h-40 overflow-y-auto space-y-0.5 border-2 border-[#191c1e] p-2 bg-[#f9fafb]">
+                                  {allAvaliadores.length === 0 && (
+                                    <p className="text-[11px] italic text-[#9aa088] px-2 py-1">Nenhum avaliador cadastrado.</p>
+                                  )}
+                                  {allAvaliadores.map(av => {
+                                    const checked = assignAreaUserIds.includes(av.id);
+                                    return (
+                                      <label key={av.id} className="flex items-center gap-2.5 cursor-pointer hover:bg-[#f2f4f6] px-2 py-1.5">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => setAssignAreaUserIds(prev => checked ? prev.filter(id => id !== av.id) : [...prev, av.id])}
+                                          className="w-3.5 h-3.5 accent-[#506600]"
+                                        />
+                                        <span className="text-[12px] font-bold italic uppercase text-[#191c1e]">{av.name}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={updateAssignmentsMutation.isPending}
+                                    onClick={() => updateAssignmentsMutation.mutate({ id: selectedEventId!, data: { assignments: [{ areaId, evaluatorUserIds: assignAreaUserIds }] } })}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#ccff00] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[11px] font-black uppercase tracking-tight disabled:opacity-50"
+                                  >
+                                    <Save size={13} /> Salvar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAssignAreaPickerOpen(null)}
+                                    className="px-3 py-1.5 border-2 border-[#191c1e] bg-white text-[#191c1e] hover:bg-[#f2f4f6] transition-colors text-[11px] font-black uppercase tracking-tight"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                             <ul>
                               {g.criteria.map(c => {
                                 const st = criterionStatus(c.criterionId, c.responsibleAreaId ?? null);
