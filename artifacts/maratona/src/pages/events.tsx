@@ -20,16 +20,6 @@ import { cn } from "@/lib/utils";
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
-function StatusChip({ confirmed }: { confirmed: boolean }) {
-  return (
-    <span
-      className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block ${confirmed ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"}`}
-    >
-      <span className="inline-block skew-x-[8deg]">{confirmed ? "Configurado" : "Aguardando RH"}</span>
-    </span>
-  );
-}
-
 export default function EventsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -38,10 +28,8 @@ export default function EventsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [cardFilter, setCardFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("dateDesc");
-  // Preferência de visualização persiste entre sessões — quem gerencia muitos
-  // eventos tende a preferir a tabela compacta sempre.
   const [viewMode, setViewModeState] = useState<"cards" | "table">(
-    () => (localStorage.getItem("events_view_mode") === "table" ? "table" : "cards"),
+    () => (localStorage.getItem("events_view_mode") === "cards" ? "cards" : "table"),
   );
   const setViewMode = (mode: "cards" | "table") => {
     setViewModeState(mode);
@@ -96,10 +84,16 @@ export default function EventsPage() {
     },
   });
 
-  // O backend já retorna apenas os eventos do ciclo atual (getEvents filtra por
-  // cycle.startDate/endDate) — aqui mostramos TODOS eles, abertos ou fechados,
-  // para que o card atualize ao vivo conforme os avaliadores forem enviando notas.
-  const filtered = (events ?? []).filter(ev => {
+  const all = events ?? [];
+  const statsData = [
+    { key: "configured",  label: "Configurados",     value: all.filter(e => e.criteriaConfirmed).length,                         color: "#506600" },
+    { key: "confirmed",   label: "Confirmados",       value: all.filter(e => e.resultsConfirmed).length,                          color: "#506600" },
+    { key: "unconfirmed", label: "Não confirmados",   value: all.filter(e => !e.resultsConfirmed).length,                         color: "#ff5722" },
+    { key: "pendingCal",  label: "Falta calibrar",    value: all.filter(e => e.status === "closed" && !e.fullyCalibrated).length, color: "#ffb300" },
+    { key: "fullyEval",   label: "Avaliação 100%",    value: all.filter(e => !!e.fullyCalibrated).length,                         color: "#ccff00" },
+  ];
+
+  const filtered = all.filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchConfig = filterStatus === "all"
       || (filterStatus === "configured" && !!ev.criteriaConfirmed)
@@ -113,177 +107,166 @@ export default function EventsPage() {
       || (cardFilter === "confirmed" && ev.resultsConfirmed)
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
       || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
-      // "Avaliação 100%" = todas as calibrações FINAIS publicadas, de todos os
-      // critérios — não basta os avaliadores terem submetido as notas.
       || (cardFilter === "fullyEval" && !!ev.fullyCalibrated);
     return matchSearch && matchConfig && matchCard;
   }).slice().sort((a, b) => {
-    if (sortBy === "dateAsc") return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    if (sortBy === "dateAsc")   return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     if (sortBy === "scoreDesc") return ((b.teamScore ?? b.averageScore) ?? -1) - ((a.teamScore ?? a.averageScore) ?? -1);
-    if (sortBy === "scoreAsc") return ((a.teamScore ?? a.averageScore) ?? 101) - ((b.teamScore ?? b.averageScore) ?? 101);
-    if (sortBy === "status") return (a.status ?? "").localeCompare(b.status ?? "");
+    if (sortBy === "scoreAsc")  return ((a.teamScore ?? a.averageScore) ?? 101) - ((b.teamScore ?? b.averageScore) ?? 101);
+    if (sortBy === "status")    return (a.status ?? "").localeCompare(b.status ?? "");
     return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
   });
 
   const canCreate = user && ["admin", "rh"].includes(user.role);
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-10">
-        {/* Page header */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
-          <div>
-            <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-              Gestão de <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Eventos</span>
-            </h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-xl">Acompanhe o andamento das avaliações das equipes nos eventos sincronizados.</p>
-          </div>
-          <div className="flex flex-col items-start md:items-end gap-2">
+    <div className="min-h-full flex flex-col text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+
+      {/* ── Top bar ── */}
+      <div className="bg-[#191c1e] px-6 py-3 flex items-center justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-4 min-w-0">
+          <h1 data-testid="text-page-title" className="text-xl italic uppercase tracking-tighter font-black leading-none text-white whitespace-nowrap">
+            Gestão de <span className="text-[#ccff00]">Eventos</span>
+          </h1>
+          <div className="hidden sm:block">
             <CycleBadge />
-            <div className="flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] bg-[#e6e8ea] border-2 border-[#191c1e] px-4 py-3 skew-x-[-4deg]">
-              <span className="inline-block skew-x-[4deg]">Eventos sincronizados via integração</span>
+          </div>
+          <span className="hidden md:inline-block text-[10px] font-bold italic uppercase text-white/40 border border-white/20 px-2 py-0.5 whitespace-nowrap">
+            Sincronizado via integração
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {canCreate && (
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <button
+                  data-testid="button-create-event"
+                  className="flex items-center gap-1.5 bg-[#ccff00] border-2 border-[#ccff00] px-4 py-1.5 font-black text-xs italic uppercase text-[#161e00] hover:bg-[#b8e600] transition-colors"
+                >
+                  <Plus size={14} /> Novo Evento
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Evento</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
+                  <div className="space-y-1.5">
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome do Evento <span className="text-[#ba1a1a]">*</span></Label>
+                    <Input data-testid="input-event-name" {...register("name", { required: true })} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cliente</Label>
+                    <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Início <span className="text-[#ba1a1a]">*</span></Label>
+                      <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Fim <span className="text-[#ba1a1a]">*</span></Label>
+                      <Input data-testid="input-event-end" type="date" {...register("endDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cidade</Label>
+                      <Input data-testid="input-event-city" {...register("city")} placeholder="Ex: São Paulo" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">UF</Label>
+                      <Input data-testid="input-event-state" {...register("state")} placeholder="Ex: SP" maxLength={2} className="h-11 rounded-none border-2 border-[#191c1e] uppercase" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Local</Label>
+                    <Input data-testid="input-event-location" {...register("location")} placeholder="Ex: Pavilhão de Exposições" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+                    <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+                    <button
+                      data-testid="button-submit-event"
+                      type="submit"
+                      disabled={createMutation.isPending}
+                      className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                    >
+                      {createMutation.isPending ? "Criando..." : "Criar Evento"}
+                    </button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+      </div>
+
+      {/* ── Body: sidebar + main ── */}
+      <div className="flex flex-1 min-h-0">
+
+        {/* ── Sidebar ── */}
+        <aside className="w-52 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col">
+          <div className="p-4 border-b-2 border-[#eceef0]">
+            <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-3">Filtrar por status</p>
+            <div className="space-y-0.5">
+              <button
+                onClick={() => setCardFilter(null)}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors border-l-2 ${
+                  cardFilter === null ? "bg-[#f0ffe0] border-[#506600]" : "border-transparent hover:bg-[#f7f9fb]"
+                }`}
+              >
+                <span className={`text-xs font-bold italic ${cardFilter === null ? "text-[#191c1e]" : "text-[#444933]"}`}>Todos</span>
+                <span className="text-sm font-black italic text-[#191c1e]">{all.length}</span>
+              </button>
+              {statsData.map(s => (
+                <button
+                  key={s.key}
+                  onClick={() => setCardFilter(cardFilter === s.key ? null : s.key)}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors border-l-2 ${
+                    cardFilter === s.key ? "bg-[#f0ffe0] border-[#506600]" : "border-transparent hover:bg-[#f7f9fb]"
+                  }`}
+                >
+                  <span className={`text-xs font-bold italic leading-tight ${cardFilter === s.key ? "text-[#191c1e]" : "text-[#444933]"}`}>{s.label}</span>
+                  <span className="text-sm font-black italic shrink-0" style={{ color: cardFilter === s.key ? "#191c1e" : s.color }}>{s.value}</span>
+                </button>
+              ))}
             </div>
-            {canCreate && (
-              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogTrigger asChild>
-                  <button
-                    data-testid="button-create-event"
-                    className={`bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-                  >
-                    <Plus size={18} /> Novo Evento
-                  </button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Evento</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome do Evento <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input data-testid="input-event-name" {...register("name", { required: true })} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cliente</Label>
-                      <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Início <span className="text-[#ba1a1a]">*</span></Label>
-                        <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Fim <span className="text-[#ba1a1a]">*</span></Label>
-                        <Input data-testid="input-event-end" type="date" {...register("endDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cidade</Label>
-                        <Input data-testid="input-event-city" {...register("city")} placeholder="Ex: São Paulo" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">UF</Label>
-                        <Input data-testid="input-event-state" {...register("state")} placeholder="Ex: SP" maxLength={2} className="h-11 rounded-none border-2 border-[#191c1e] uppercase" />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Local</Label>
-                      <Input data-testid="input-event-location" {...register("location")} placeholder="Ex: Pavilhão de Exposições" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                      <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-                      <button
-                        data-testid="button-submit-event"
-                        type="submit"
-                        disabled={createMutation.isPending}
-                        className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
-                      >
-                        {createMutation.isPending ? "Criando..." : "Criar Evento"}
-                      </button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
           </div>
-        </section>
 
-        {/* Summary cards */}
-        {events && events.length > 0 && (
-          <section className="space-y-2">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {(() => {
-              const all = events ?? [];
-              const configured = all.filter(e => e.criteriaConfirmed).length;
-              const confirmed = all.filter(e => e.resultsConfirmed).length;
-              const unconfirmed = all.filter(e => !e.resultsConfirmed).length;
-              const pendingCal = all.filter(e => e.status === "closed" && !e.fullyCalibrated).length;
-              const fullyEval = all.filter(e => !!e.fullyCalibrated).length;
-              const cards = [
-                { key: "configured", label: "Configurados", value: configured, color: "#506600" },
-                { key: "confirmed", label: "Confirmados", value: confirmed, color: "#506600" },
-                { key: "unconfirmed", label: "Não Confirmados", value: unconfirmed, color: "#ff5722" },
-                { key: "pendingCal", label: "Falta Calibrar", value: pendingCal, color: "#ffb300" },
-                { key: "fullyEval", label: "Avaliação 100%", value: fullyEval, color: "#ccff00" },
-              ];
-              return cards.map(c => {
-                const isActive = cardFilter === c.key;
-                return (
-                  <button
-                    key={c.label}
-                    onClick={() => setCardFilter(isActive ? null : c.key)}
-                    title={`Clique para filtrar: ${c.label}`}
-                    className={`bg-white border-2 p-4 flex flex-col justify-between h-28 relative overflow-hidden text-left cursor-pointer transition-all hover:translate-y-[-2px] ${isActive ? "border-[#ccff00] shadow-[4px_4px_0px_0px_#ccff00]" : "border-[#191c1e] hover:shadow-[2px_2px_0px_0px_#191c1e]"}`}
-                  >
-                    <div className="z-10">
-                      <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933]">{c.label}</p>
-                      <h2 className="text-[32px] leading-none italic font-black mt-1" style={{ color: c.color }}>{c.value}</h2>
-                      <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-1">de {all.length} eventos</p>
-                    </div>
-                    <div className="w-full h-1.5 mt-auto" style={{ backgroundColor: c.color }} />
-                    {isActive && <div className="absolute top-2 right-2 w-3 h-3 bg-[#ccff00] border-2 border-[#191c1e]" />}
-                  </button>
-                );
-              });
-            })()}
+          <div className="p-4 mt-auto border-t-2 border-[#eceef0]">
+            <p className="text-[9px] font-bold italic uppercase tracking-wider text-[#747a60] mb-3">Legenda</p>
+            {[
+              { color: "#ff5722", label: "Aguardando RH" },
+              { color: "#ffb300", label: "Em avaliação" },
+              { color: "#506600", label: "Avaliado" },
+              { color: "#ccff00", label: "100% completo" },
+            ].map(x => (
+              <div key={x.label} className="flex items-center gap-2 mb-1.5">
+                <div className="w-2 h-2 shrink-0" style={{ backgroundColor: x.color }} />
+                <span className="text-[10px] italic text-[#747a60]">{x.label}</span>
+              </div>
+            ))}
           </div>
-          <p className="flex items-center gap-1.5 text-[11px] italic font-bold text-[#747a60]">
-            <Info size={12} className="shrink-0" />
-            Clique em um card para filtrar a lista. As categorias podem se sobrepor — um evento pode aparecer em mais de um grupo ao mesmo tempo (ex: confirmado e aguardando calibração).
-          </p>
-          </section>
-        )}
+        </aside>
 
-        {/* Filter bar */}
-        <section className="bg-[#e6e8ea] border-2 border-[#191c1e] flex flex-col md:flex-row gap-4 items-stretch md:items-center p-4 skew-x-[-1deg]">
-          <div className="relative flex-1 skew-x-[1deg]">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-            <Input
-              data-testid="input-search-events"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-10 h-11 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
-              placeholder="Buscar por nome do evento, cliente ou cidade..."
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 w-full md:w-auto skew-x-[1deg]">
-            <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setCardFilter(null); }}>
-              <SelectTrigger data-testid="select-filter-status" className="w-full md:w-44 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="configured">Configurados</SelectItem>
-                <SelectItem value="confirmed">Confirmados</SelectItem>
-                <SelectItem value="unconfirmed">Não Confirmados</SelectItem>
-                <SelectItem value="pendingCal">Falta Calibrar</SelectItem>
-                <SelectItem value="fullyCalibrated">Calibragem Concluída</SelectItem>
-                <SelectItem value="fullyEval">Avaliação 100%</SelectItem>
-              </SelectContent>
-            </Select>
+        {/* ── Main ── */}
+        <main className="flex-1 flex flex-col min-w-0 bg-[#f7f9fb]">
+
+          {/* Search + sort + view toggle */}
+          <div className="bg-white border-b-2 border-[#eceef0] px-5 py-3 flex items-center gap-3 shrink-0">
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
+              <Input
+                data-testid="input-search-events"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 h-9 rounded-none border-2 border-[#191c1e] bg-[#f7f9fb] italic font-medium text-sm focus-visible:ring-0 focus-visible:bg-white"
+                placeholder="Buscar evento, cliente ou cidade..."
+              />
+            </div>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full md:w-44 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider focus:ring-0">
-                <ArrowUpDown size={14} className="mr-1 shrink-0 text-[#747a60]" />
+              <SelectTrigger className="w-44 h-9 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-[11px] focus:ring-0">
+                <ArrowUpDown size={12} className="mr-1 shrink-0 text-[#747a60]" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -294,304 +277,293 @@ export default function EventsPage() {
                 <SelectItem value="status">Por Status</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex border-2 border-[#191c1e] h-11 overflow-hidden shrink-0">
-              <button
-                type="button"
-                data-testid="button-view-cards"
-                title="Visualizar em cards"
-                onClick={() => setViewMode("cards")}
-                className={`px-3 flex items-center transition-colors ${viewMode === "cards" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
-              >
-                <LayoutGrid size={16} />
-              </button>
+            <div className="flex border-2 border-[#191c1e] h-9 overflow-hidden shrink-0">
               <button
                 type="button"
                 data-testid="button-view-table"
-                title="Visualizar em tabela compacta"
+                title="Tabela compacta"
                 onClick={() => setViewMode("table")}
-                className={`px-3 flex items-center border-l-2 border-[#191c1e] transition-colors ${viewMode === "table" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
+                className={`px-3 flex items-center transition-colors ${viewMode === "table" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
               >
-                <List size={16} />
+                <List size={15} />
+              </button>
+              <button
+                type="button"
+                data-testid="button-view-cards"
+                title="Visualização em cards"
+                onClick={() => setViewMode("cards")}
+                className={`px-3 flex items-center border-l-2 border-[#191c1e] transition-colors ${viewMode === "cards" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
+              >
+                <LayoutGrid size={15} />
               </button>
             </div>
           </div>
-        </section>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {[1,2,3].map(i => (
-              <div key={i} className="h-48 bg-[#eceef0] border-2 border-[#191c1e] animate-pulse" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-24 bg-white border-2 border-dashed border-[#191c1e]">
-            <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-            <h3 className="text-xl font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
-            <p className="text-[#747a60] italic mt-1">Tente ajustar os filtros ou sincronizar os eventos via integração.</p>
-          </div>
-        ) : viewMode === "table" ? (
-          <div className={`bg-white border-2 border-[#191c1e] overflow-x-auto ${HARD_SHADOW}`}>
-            <table className="w-full text-left border-collapse min-w-[960px]">
-              <thead>
-                <tr className="border-b-2 border-[#191c1e] bg-[#191c1e]">
-                  <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#ccff00]">Evento</th>
-                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00]">Período</th>
-                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Part.</th>
-                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Avaliados</th>
-                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Calibr. Finais</th>
-                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-center">Score</th>
-                  <th className="px-3 py-3 text-[11px] font-bold uppercase italic text-[#ccff00]">Status</th>
-                  <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#ccff00] text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y-2 divide-[#eceef0]">
+          {/* Content */}
+          <div className="flex-1 overflow-auto">
+            {isLoading ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-12 bg-white border-2 border-[#eceef0] animate-pulse" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <Calendar size={40} className="mb-4 opacity-20" />
+                <h3 className="text-lg font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
+                <p className="text-[#747a60] italic mt-1 text-sm">Ajuste os filtros ou sincronize via integração.</p>
+              </div>
+            ) : viewMode === "table" ? (
+              <div className="bg-white border-b-2 border-[#eceef0] overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[860px]">
+                  <thead>
+                    <tr className="border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10">
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase italic text-[#ccff00]">Evento</th>
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] whitespace-nowrap">Período</th>
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Part.</th>
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Avaliados</th>
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Calibr.</th>
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Score</th>
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00]">Status</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-[#eceef0]">
+                    {filtered.map(ev => {
+                      const score = ev.teamScore ?? ev.averageScore ?? null;
+                      const concluded = ev.status === "closed";
+                      const total = ev.totalCriteria ?? 0;
+                      const evaluated = ev.evaluatedCriteria ?? 0;
+                      const calCount = ev.finalCalibratedCriteria ?? 0;
+                      const fc = ev.fullyCalibrated ?? false;
+                      const isScoreFinal = concluded && fc;
+                      const missing = ev.unassignedAreaNames ?? [];
+                      const statusColor = !ev.criteriaConfirmed ? "#ff5722"
+                        : fc ? "#ccff00"
+                        : evaluated === total && total > 0 ? "#506600"
+                        : evaluated > 0 ? "#ffb300"
+                        : "#506600";
+                      return (
+                        <tr key={ev.id} data-testid={`row-event-${ev.id}`} className="hover:bg-[#f7f9fb] transition-colors">
+                          <td className="px-4 py-2.5 max-w-[260px]">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-[3px] h-9 shrink-0 rounded-sm" style={{ backgroundColor: statusColor }} />
+                              <div className="min-w-0">
+                                <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-xs text-[#191c1e] hover:text-[#506600] leading-tight block truncate" title={ev.name}>{ev.name}</Link>
+                                <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
+                                  {[ev.clientName, ev.city].filter(Boolean).join(" · ") || "—"}
+                                </p>
+                                {missing.length > 0 && (
+                                  <p className="text-[10px] font-bold italic uppercase text-[#b02f00] truncate" title={`Sem avaliador: ${missing.join(", ")}`}>
+                                    Sem avaliador: {missing.join(", ")}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] whitespace-nowrap">
+                            {new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — {new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
+                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
+                            {total === 0 ? "—" : `${evaluated}/${total}`}
+                          </td>
+                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}`}>
+                            {total === 0 ? "—" : `${calCount}/${total}`}
+                          </td>
+                          <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                            {score == null ? (
+                              <span className="text-xs italic text-[#c4c9ac]">—</span>
+                            ) : (
+                              <>
+                                <span className="text-sm font-black italic text-[#191c1e]">{score.toFixed(1)}</span>
+                                <span className={`block text-[9px] font-bold italic uppercase leading-none ${isScoreFinal ? "text-[#506600]" : "text-[#a06a00]"}`}>
+                                  {isScoreFinal ? "Final" : concluded ? "Parcial" : "Provisório"}
+                                </span>
+                              </>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex flex-col gap-0.5 text-[10px] font-bold italic uppercase leading-tight">
+                              <span className={ev.criteriaConfirmed ? "text-[#506600]" : "text-[#b02f00]"}>
+                                {ev.criteriaConfirmed ? "Liberado" : "Aguardando RH"}
+                              </span>
+                              <span className={ev.resultsConfirmed ? "text-[#506600]" : "text-[#a06a00]"}>
+                                {ev.resultsConfirmed ? "Elegib. OK" : "Elegib. pendente"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center justify-end gap-1">
+                              {user?.role === "admin" && (
+                                <button
+                                  data-testid={`button-merge-event-${ev.id}`}
+                                  title="Mesclar com evento duplicado"
+                                  onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
+                                  className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
+                                >
+                                  <GitMerge size={12} />
+                                </button>
+                              )}
+                              {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                                <Link href={`/calibrations?eventId=${ev.id}`}>
+                                  <button title="Ir para calibração" className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                                    <SlidersHorizontal size={12} />
+                                  </button>
+                                </Link>
+                              )}
+                              <Link href={`/events/${ev.id}`}>
+                                <button data-testid={`button-view-event-${ev.id}`} className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all whitespace-nowrap">
+                                  Gerenciar
+                                </button>
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-5 grid grid-cols-1 xl:grid-cols-2 gap-5">
                 {filtered.map(ev => {
                   const score = ev.teamScore ?? ev.averageScore ?? null;
+                  const calibrated = ev.hasCalibration ?? false;
                   const concluded = ev.status === "closed";
                   const total = ev.totalCriteria ?? 0;
                   const evaluated = ev.evaluatedCriteria ?? 0;
                   const calCount = ev.finalCalibratedCriteria ?? 0;
                   const fc = ev.fullyCalibrated ?? false;
+                  const evalPct = total > 0 ? Math.round((evaluated / total) * 100) : 0;
+                  const calPct  = total > 0 ? Math.round((calCount / total) * 100) : 0;
                   const isScoreFinal = concluded && fc;
-                  const missing = ev.unassignedAreaNames ?? [];
+                  const statusColor = !ev.criteriaConfirmed ? "#ff5722"
+                    : fc ? "#ccff00"
+                    : evaluated === total && total > 0 ? "#506600"
+                    : evaluated > 0 ? "#ffb300"
+                    : "#506600";
                   return (
-                    <tr key={ev.id} data-testid={`row-event-${ev.id}`} className="hover:bg-[#f7f9fb] transition-colors">
-                      <td className="px-4 py-2.5 max-w-[280px]">
-                        <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-sm text-[#191c1e] hover:text-[#506600] leading-tight block truncate" title={ev.name}>{ev.name}</Link>
-                        <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
-                          {[ev.clientName, ev.city].filter(Boolean).join(" · ") || "—"}
-                        </p>
-                        {missing.length > 0 && (
-                          <p className="text-[10px] font-bold italic uppercase text-[#b02f00] truncate" title={`Sem avaliador: ${missing.join(", ")}`}>
-                            Sem avaliador: {missing.join(", ")}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] whitespace-nowrap">
-                        {new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — {new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                      </td>
-                      <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
-                      <td className={`px-3 py-2.5 text-xs font-black italic text-center ${total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
-                        {total === 0 ? "—" : `${evaluated}/${total}`}
-                      </td>
-                      <td className={`px-3 py-2.5 text-xs font-black italic text-center ${fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}`}>
-                        {total === 0 ? "—" : `${calCount}/${total}`}
-                      </td>
-                      <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                        {score == null ? (
-                          <span className="text-xs italic text-[#c4c9ac]">—</span>
-                        ) : (
-                          <>
-                            <span className="text-sm font-black italic text-[#191c1e]">{score.toFixed(1)}</span>
-                            <span className={`block text-[9px] font-bold italic uppercase leading-none ${isScoreFinal ? "text-[#506600]" : "text-[#a06a00]"}`}>
-                              {isScoreFinal ? "Final" : concluded ? "Parcial" : "Provisório"}
-                            </span>
-                          </>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex flex-col gap-0.5 text-[10px] font-bold italic uppercase leading-tight">
-                          <span className={ev.criteriaConfirmed ? "text-[#506600]" : "text-[#b02f00]"}>
-                            {ev.criteriaConfirmed ? "Liberado" : "Aguardando RH"}
+                    <div key={ev.id} data-testid={`card-event-${ev.id}`} className={`bg-white border-2 border-[#191c1e] border-l-[5px] flex flex-col ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`} style={{ borderLeftColor: statusColor }}>
+                      <div className="p-5 flex-1">
+                        <div className="flex justify-between items-start gap-4 mb-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                              <span className={`px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block ${ev.criteriaConfirmed ? "bg-[#f0ffe0] text-[#506600]" : "bg-[#fff0ee] text-[#b02f00]"}`}>
+                                {ev.criteriaConfirmed ? "Liberado" : "Aguardando RH"}
+                              </span>
+                              <span className={`px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block ${ev.resultsConfirmed ? "bg-[#f0ffe0] text-[#506600]" : "bg-[#fff8e0] text-[#a06a00]"}`}>
+                                {ev.resultsConfirmed ? "Elegib. OK" : "Elegib. pendente"}
+                              </span>
+                              {ev.isHistorical && (
+                                <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block">Ciclo Anterior</span>
+                              )}
+                              {concluded && (
+                                <span className="bg-[#506600] text-white px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block">Concluído</span>
+                              )}
+                            </div>
+                            <Link href={`/events/${ev.id}`} className="font-black text-base italic uppercase tracking-tight text-[#191c1e] hover:text-[#506600] transition-colors leading-tight block">{ev.name}</Link>
+                            {ev.clientName && <p className="text-xs font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{ev.clientName}</p>}
+                          </div>
+                          {score != null && (
+                            <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[74px] shrink-0 ${isScoreFinal ? "bg-[#ccff00]" : "bg-[#fff8e1]"}`}>
+                              <span className="block text-[9px] uppercase font-bold italic text-[#161e00] mb-0.5">{isScoreFinal ? "Final" : "Provisório"}</span>
+                              <span className="text-xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold italic text-[#444933] mt-3 pt-3 border-t-2 border-dashed border-[#e0e3e5]">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar size={12} className="text-[#747a60]" />
+                            {new Date(ev.startDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })} – {new Date(ev.endDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })}
                           </span>
-                          <span className={ev.resultsConfirmed ? "text-[#506600]" : "text-[#a06a00]"}>
-                            {ev.resultsConfirmed ? "Elegibilidade OK" : "Elegib. pendente"}
+                          <span className="flex items-center gap-1.5">
+                            <MapPin size={12} className="text-[#747a60]" />
+                            {ev.city ? `${ev.city}${ev.state ? `, ${ev.state}` : ""}` : (ev.location || "Local n/d")}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Users size={12} className="text-[#747a60]" />
+                            {ev.participantCount} participantes
                           </span>
                         </div>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center justify-end gap-1.5">
+                        {!!ev.unassignedAreaNames && ev.unassignedAreaNames.length > 0 && (
+                          <p className="mt-2 text-[10px] font-bold italic uppercase text-[#b02f00] flex items-start gap-1.5">
+                            <Info size={11} className="shrink-0 mt-0.5" />
+                            Sem avaliador: {ev.unassignedAreaNames.join(", ")}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">
+                        <div className="flex-1 max-w-[240px] space-y-1.5">
+                          {total > 0 && (<>
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] mb-1 font-bold italic uppercase">
+                                <span className="text-[#444933]">Avaliados</span>
+                                <span className={evalPct === 100 ? "text-[#506600]" : "text-[#191c1e]"}>{evaluated}/{total}</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-[#eceef0] border border-[#191c1e] overflow-hidden">
+                                <div className={evalPct === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${evalPct}%` }} />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] mb-1 font-bold italic uppercase">
+                                <span className="text-[#444933]">Calibrações</span>
+                                <span className={fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}>{calCount}/{total}</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-[#eceef0] border border-[#191c1e] overflow-hidden">
+                                <div className={fc ? "h-full bg-[#506600]" : "h-full bg-[#ffb300]"} style={{ width: `${calPct}%` }} />
+                              </div>
+                            </div>
+                          </>)}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {user?.role === "admin" && (
+                            <button data-testid={`button-merge-event-${ev.id}`} title="Mesclar" onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }} className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                              <GitMerge size={14} />
+                            </button>
+                          )}
                           {user && ["admin", "rh", "diretoria"].includes(user.role) && (
                             <Link href={`/calibrations?eventId=${ev.id}`}>
-                              <button title="Ir para calibração deste evento" className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
-                                <SlidersHorizontal size={12} />
+                              <button data-testid={`button-calibrate-event-${ev.id}`} title="Calibrações" className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                                <SlidersHorizontal size={14} />
                               </button>
                             </Link>
                           )}
                           <Link href={`/events/${ev.id}`}>
-                            <button className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all">
-                              Gerenciar
+                            <button data-testid={`button-view-event-${ev.id}`} className="h-8 px-3 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all">
+                              Gerenciar <ChevronRight size={13} className="ml-1" />
                             </button>
                           </Link>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {filtered.map(ev => {
-              const score = ev.teamScore ?? ev.averageScore ?? null;
-              const calibrated = ev.hasCalibration ?? false;
-              const concluded = ev.status === "closed";
-              return (
-                <div key={ev.id} data-testid={`card-event-${ev.id}`} className={`bg-white border-2 border-[#191c1e] flex flex-col ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}>
-                  <div className="p-5 flex-1">
-                    <div className="flex justify-between items-start gap-4 mb-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <StatusChip confirmed={ev.criteriaConfirmed ?? false} />
-                          <span
-                            title="Confirmar resultados garante a elegibilidade da equipe deste evento, independente da nota final"
-                            className={`px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block ${ev.resultsConfirmed ? "bg-[#eceef0] text-[#506600]" : "bg-[#fff4e5] text-[#a06a00]"}`}
-                          >
-                            <span className="inline-block skew-x-[8deg]">{ev.resultsConfirmed ? "Elegibilidade OK" : "Elegibilidade Pendente"}</span>
-                          </span>
-                          {ev.isHistorical && (
-                            <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">Ciclo Anterior</span>
-                            </span>
-                          )}
-                          {ev.forcedClosed && (
-                            <span className="bg-[#ff5722] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">Fechamento Forçado</span>
-                            </span>
-                          )}
-                          {ev.cycleName && (
-                            <span className="bg-[#191c1e] text-[#ccff00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">{ev.cycleName}</span>
-                            </span>
-                          )}
-                          {concluded ? (
-                            <span className="bg-[#506600] text-white px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">Evento Concluído</span>
-                            </span>
-                          ) : score != null ? (
-                            <span className="bg-[#ffb5a0] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">Score Provisório</span>
-                            </span>
-                          ) : null}
-                        </div>
-                        <Link href={`/events/${ev.id}`} className="font-black text-xl italic uppercase tracking-tight text-[#191c1e] hover:text-[#506600] transition-colors leading-tight pr-1.5">{ev.name}</Link>
-                        {ev.clientName && <p className="text-sm font-bold italic uppercase text-[#747a60] mt-1 truncate pr-1.5">{ev.clientName}</p>}
-                      </div>
 
-                      {score != null && (() => {
-                        const isScoreFinal = concluded && (ev.fullyCalibrated ?? false);
-                        const isScorePartial = concluded && !(ev.fullyCalibrated ?? false);
-                        return (
-                          <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[86px] shrink-0 ${isScoreFinal ? "bg-[#ccff00]" : isScorePartial ? "bg-[#fff8e1]" : "bg-white"}`}>
-                            <span className="block text-[10px] uppercase font-bold italic text-[#161e00] mb-0.5">
-                              {isScoreFinal ? "Score Final" : isScorePartial ? "Score Parcial" : "Provisório"}
-                            </span>
-                            <span className="text-2xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
-                            <span className={`block text-[8px] uppercase font-bold italic mt-0.5 leading-none ${isScoreFinal ? "text-[#506600]" : isScorePartial ? "text-[#a06a00]" : "text-[#747a60]"}`}>
-                              {isScoreFinal ? "Pós-calibração" : isScorePartial ? "Cal. incompleta" : calibrated ? "Cal. parcial" : "Sem calibração"}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t-2 border-dashed border-[#e0e3e5] text-sm font-bold italic text-[#444933]">
-                      <div className="flex items-center gap-2 truncate">
-                        <Calendar size={14} className="text-[#747a60] shrink-0" />
-                        <span className="truncate">{new Date(ev.startDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})} — {new Date(ev.endDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin size={14} className="text-[#747a60] shrink-0" />
-                        <span>{ev.city ? `${ev.city}${ev.state ? `, ${ev.state}` : ""}` : (ev.location || "Local não definido")}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users size={14} className="text-[#747a60] shrink-0" />
-                        <span>{ev.participantCount} participantes</span>
-                      </div>
-                    </div>
-                    {!!ev.unassignedAreaNames && ev.unassignedAreaNames.length > 0 && (
-                      <p className="mt-2 text-[11px] font-bold italic uppercase text-[#b02f00] flex items-start gap-1.5">
-                        <Info size={12} className="shrink-0 mt-0.5" />
-                        Sem avaliador: {ev.unassignedAreaNames.join(", ")}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">
-                    <div className="flex-1 max-w-[280px] space-y-2">
-                      {(() => {
-                        const total = ev.totalCriteria ?? 0;
-                        const evaluated = ev.evaluatedCriteria ?? 0;
-                        const calCount = ev.finalCalibratedCriteria ?? 0;
-                        const evalPct = total > 0 ? Math.round((evaluated / total) * 100) : 0;
-                        const calPct = total > 0 ? Math.round((calCount / total) * 100) : 0;
-                        const fc = ev.fullyCalibrated ?? false;
-                        return (<>
-                          <div>
-                            <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
-                              <span className="text-[#444933]">Quesitos Avaliados</span>
-                              {total === 0 ? (
-                                <span className="text-[#747a60]">—</span>
-                              ) : (
-                                <span className={evalPct === 100 ? "text-[#506600]" : "text-[#191c1e]"}>
-                                  {evaluated} / {total}
-                                </span>
-                              )}
-                            </div>
-                            <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
-                              {total > 0 && (
-                                <div className={evalPct === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${evalPct}%` }} />
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center justify-between text-xs mb-1.5 font-bold italic uppercase">
-                              <span className="text-[#444933]">Calibrações Finais</span>
-                              {total === 0 ? (
-                                <span className="text-[#747a60]">—</span>
-                              ) : (
-                                <span className={fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}>
-                                  {calCount} / {total}{fc ? " · Concluída" : calCount > 0 || calibrated ? " · Em andamento" : " · Pendente"}
-                                </span>
-                              )}
-                            </div>
-                            <div className="h-2 w-full bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
-                              {total > 0 && (
-                                <div className={fc ? "h-full bg-[#506600]" : "h-full bg-[#ffb300]"} style={{ width: `${calPct}%` }} />
-                              )}
-                            </div>
-                          </div>
-                        </>);
-                      })()}
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {user?.role === "admin" && (
-                        <button
-                          data-testid={`button-merge-event-${ev.id}`}
-                          title="Mesclar com evento duplicado"
-                          className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] text-xs font-bold italic uppercase transition-all"
-                          onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
-                        >
-                          <GitMerge size={14} />
-                        </button>
-                      )}
-                      {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                        <Link href={`/calibrations?eventId=${ev.id}`}>
-                          <button
-                            data-testid={`button-calibrate-event-${ev.id}`}
-                            title="Ir para calibração deste evento"
-                            className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
-                          >
-                            <SlidersHorizontal size={14} />
-                          </button>
-                        </Link>
-                      )}
-                      <Link href={`/events/${ev.id}`}>
-                        <button data-testid={`button-view-event-${ev.id}`} className="h-8 px-3 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-xs font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all">
-                          Gerenciar <ChevronRight size={14} className="ml-1" />
-                        </button>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+          {/* Footer count */}
+          {!isLoading && (
+            <div className="bg-white border-t-2 border-[#eceef0] px-5 py-2 flex items-center justify-between shrink-0">
+              <span className="text-[11px] italic text-[#747a60]">
+                {filtered.length === all.length
+                  ? `${all.length} eventos no ciclo`
+                  : `${filtered.length} de ${all.length} eventos`}
+              </span>
+              {cardFilter && (
+                <button onClick={() => setCardFilter(null)} className="text-[10px] font-bold italic uppercase text-[#506600] hover:underline">
+                  Limpar filtro ×
+                </button>
+              )}
+            </div>
+          )}
+        </main>
       </div>
 
+      {/* ── Merge dialog ── */}
       <Dialog open={!!mergeForEvent} onOpenChange={(open) => { if (!open) { setMergeForEvent(null); setMergeTargetId(""); setMergeConflict(null); } }}>
         <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
           <DialogHeader>
@@ -599,7 +571,7 @@ export default function EventsPage() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-sm italic text-[#444933]">
-              Este evento (<strong>{mergeForEvent?.name}</strong>) será <strong>mantido</strong>. Escolha o evento duplicado abaixo — os dados vazios (cidade, local, UF, cliente) serão preenchidos com os dele, os participantes serão migrados e o duplicado será <strong>excluído</strong>.
+              Este evento (<strong>{mergeForEvent?.name}</strong>) será <strong>mantido</strong>. Escolha o evento duplicado abaixo — os dados vazios serão preenchidos, os participantes migrados e o duplicado <strong>excluído</strong>.
             </p>
             <div className="space-y-1.5">
               <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento duplicado a remover</Label>
@@ -664,10 +636,8 @@ export default function EventsPage() {
             {mergeConflict && (
               <div data-testid="alert-merge-conflict" className="border-2 border-[#191c1e] bg-[#fff3cd] p-3 text-sm italic text-[#5c4400] space-y-1">
                 <p className="font-bold uppercase">O duplicado já tem dado gravado:</p>
-                <p>
-                  {mergeConflict.evaluations} avaliação(ões), {mergeConflict.calibrations} calibração(ões), {mergeConflict.conformities} conformidade(s) e {mergeConflict.results} resultado(s).
-                </p>
-                <p>Esses dados do duplicado serão descartados; os dados do evento mantido não são afetados. Confirma a mesclagem mesmo assim?</p>
+                <p>{mergeConflict.evaluations} avaliação(ões), {mergeConflict.calibrations} calibração(ões), {mergeConflict.conformities} conformidade(s) e {mergeConflict.results} resultado(s).</p>
+                <p>Esses dados serão descartados. Confirma a mesclagem?</p>
               </div>
             )}
 
