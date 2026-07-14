@@ -128,7 +128,10 @@ export default function CalibrationsPage() {
 
   const createMutation = useCreateCalibration({
     mutation: {
-      onSuccess: (data) => {
+      onSuccess: (data, variables) => {
+        const savedCritId = variables.data.criterionId;
+        setCalScores(prev => { const n = { ...prev }; delete n[savedCritId]; return n; });
+        setCalReasons(prev => { const n = { ...prev }; delete n[savedCritId]; return n; });
         qc.invalidateQueries({ queryKey: calQKey });
         qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
         qc.invalidateQueries({ queryKey: fbQKey });
@@ -369,10 +372,12 @@ export default function CalibrationsPage() {
     ? activeCriteria.filter(c => !getCalibration(c.criterionId)).length
     : 0;
 
-  // Quantos critérios têm uma nota calibrada preenchida (e válida) pronta para salvar.
+  // Quantos critérios têm uma edição LOCAL pendente (digitada pelo usuário e ainda
+  // não salva). Não recai para o score já salvo na API para evitar falso-positivo
+  // de "pendente" em critérios que já foram gravados.
   function pendingScore(critId: number) {
-    const existing = getCalibration(critId);
-    const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
+    const raw = calScores[critId];
+    if (raw === undefined) return null;
     const score = Number(raw);
     if (!raw || isNaN(score) || score < 0 || score > 10) return null;
     return score;
@@ -482,6 +487,17 @@ export default function CalibrationsPage() {
       }
     }
     setSavingAll(false);
+    if (failed.length === 0) {
+      // Limpa edições locais apenas quando tudo salvou — critérios com erro
+      // permanecem editáveis para nova tentativa.
+      setCalScores({});
+      setCalReasons({});
+    } else {
+      // Limpa só os que salvaram com sucesso; mantém os que falharam.
+      const savedIds = toSave.filter(x => !failed.includes(x.critId)).map(x => x.critId);
+      setCalScores(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
+      setCalReasons(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
+    }
     qc.invalidateQueries({ queryKey: calQKey });
     qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
     qc.invalidateQueries({ queryKey: fbQKey });
