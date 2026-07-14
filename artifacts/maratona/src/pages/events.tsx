@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetEvents, useCreateEvent, useMergeEvent, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
+import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List } from "lucide-react";
+import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -42,6 +42,7 @@ export default function EventsPage() {
   const [mergeTargetId, setMergeTargetId] = useState<string>("");
   const [mergeTargetPickerOpen, setMergeTargetPickerOpen] = useState(false);
   const [mergeConflict, setMergeConflict] = useState<{ evaluations: number; calibrations: number; conformities: number; results: number } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -69,6 +70,17 @@ export default function EventsPage() {
         }
         toast({ title: "Erro ao mesclar", description: data?.error ?? e.message, variant: "destructive" });
       },
+    },
+  });
+
+  const deleteMutation = useDeleteEvent({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey });
+        toast({ title: "Evento excluído com sucesso." });
+        setDeleteTarget(null);
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -491,6 +503,16 @@ export default function EventsPage() {
                                   <GitMerge size={12} />
                                 </button>
                               )}
+                              {user?.role === "admin" && (
+                                <button
+                                  data-testid={`button-delete-event-${ev.id}`}
+                                  title="Excluir evento"
+                                  onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
+                                  className="h-7 px-2 flex items-center border-2 border-[#b02f00] bg-white text-[#b02f00] hover:bg-[#fff0ee] transition-all"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
                               {user && ["admin", "rh", "diretoria"].includes(user.role) && (
                                 <Link href={`/calibrations?eventId=${ev.id}`}>
                                   <button title="Ir para calibração" className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
@@ -608,6 +630,16 @@ export default function EventsPage() {
                           {user?.role === "admin" && (
                             <button data-testid={`button-merge-event-${ev.id}`} title="Mesclar" onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }} className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
                               <GitMerge size={14} />
+                            </button>
+                          )}
+                          {user?.role === "admin" && (
+                            <button
+                              data-testid={`button-delete-event-${ev.id}`}
+                              title="Excluir evento"
+                              onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
+                              className="h-8 px-2.5 flex items-center border-2 border-[#b02f00] bg-white text-[#b02f00] hover:bg-[#fff0ee] transition-all"
+                            >
+                              <Trash2 size={14} />
                             </button>
                           )}
                           {user && ["admin", "rh", "diretoria"].includes(user.role) && (
@@ -743,6 +775,36 @@ export default function EventsPage() {
                 }}
               >
                 {mergeMutation.isPending ? "Mesclando..." : mergeConflict ? "Mesclar Mesmo Assim" : "Mesclar e Excluir Duplicado"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete confirmation dialog ── */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight text-[#b02f00]">Excluir Evento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm italic text-[#444933]">
+              Tem certeza que deseja excluir <strong>{deleteTarget?.name}</strong>? Todos os participantes, avaliações, calibrações e resultados vinculados serão <strong>permanentemente removidos</strong>. Essa ação não pode ser desfeita.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="h-9 px-4 border-2 border-[#191c1e] bg-white text-[#191c1e] text-xs font-bold italic uppercase hover:bg-[#eceef0] transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={deleteMutation.isPending}
+                onClick={() => { if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id }); }}
+                className="h-9 px-4 border-2 border-[#b02f00] bg-[#b02f00] text-white text-xs font-bold italic uppercase hover:bg-[#8a2000] disabled:opacity-50 transition-all flex items-center gap-1.5"
+              >
+                <Trash2 size={13} />
+                {deleteMutation.isPending ? "Excluindo..." : "Excluir Definitivamente"}
               </button>
             </div>
           </div>
