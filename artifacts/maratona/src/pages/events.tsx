@@ -434,7 +434,8 @@ export default function EventsPage() {
                         : finalPubCount > 0 || partialOnlyCount > 0 ? "text-[#a06a00]"
                         : "text-[#747a60]";
                       const missing = ev.unassignedAreaNames ?? [];
-                      const statusColor = !ev.criteriaConfirmed ? "#ff5722"
+                      const hasEvals = evaluated > 0;
+                      const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
                         : fc ? "#ccff00"
                         : evaluated === total && total > 0 ? "#506600"
                         : evaluated > 0 ? "#ffb300"
@@ -449,7 +450,7 @@ export default function EventsPage() {
                                 <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
                                   {[ev.clientName, ev.city].filter(Boolean).join(" · ") || "—"}
                                 </p>
-                                {missing.length > 0 && (
+                                {missing.length > 0 && !hasEvals && (
                                   <p className="text-[10px] font-bold italic uppercase text-[#b02f00] truncate" title={`Sem avaliador: ${missing.join(", ")}`}>
                                     Sem avaliador: {missing.join(", ")}
                                   </p>
@@ -480,7 +481,7 @@ export default function EventsPage() {
                             )}
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">
-                            {!ev.criteriaConfirmed ? (
+                            {!ev.criteriaConfirmed && !hasEvals ? (
                               <span className="text-[10px] font-bold italic uppercase text-[#b02f00]">Aguardando RH</span>
                             ) : !ev.resultsConfirmed ? (
                               <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Elegib. pendente</span>
@@ -557,7 +558,8 @@ export default function EventsPage() {
                     ? "#506600"
                     : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
                     : "#747a60";
-                  const statusColor = !ev.criteriaConfirmed ? "#ff5722"
+                  const hasEvals = evaluated > 0;
+                  const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
                     : fc ? "#ccff00"
                     : evaluated === total && total > 0 ? "#506600"
                     : evaluated > 0 ? "#ffb300"
@@ -568,7 +570,7 @@ export default function EventsPage() {
                         <div className="flex justify-between items-start gap-4 mb-3">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                              {!ev.criteriaConfirmed && (
+                              {!ev.criteriaConfirmed && !hasEvals && (
                                 <span className="px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block bg-[#fff0ee] text-[#b02f00]">
                                   Aguardando RH
                                 </span>
