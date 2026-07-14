@@ -290,6 +290,7 @@ export default function EvaluationsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [activeEvalTab, setActiveEvalTab] = useState<"todo" | "done">("todo");
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
   const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
@@ -1385,7 +1386,7 @@ export default function EvaluationsPage() {
                 Nenhuma avaliação atribuída à sua área nos eventos abertos no momento.
               </div>
             ) : (
-              <Tabs defaultValue="todo" className="space-y-4">
+              <Tabs value={activeEvalTab} onValueChange={(v) => { setActiveEvalTab(v as "todo" | "done"); setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }} className="space-y-4">
                 <TabsList className="bg-transparent p-0 h-auto gap-2 justify-start rounded-none">
                   <TabsTrigger
                     value="todo"
@@ -1447,7 +1448,7 @@ export default function EvaluationsPage() {
           </section>
         )}
 
-        {isEvaluator && selectedEventId && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (() => {
+        {isEvaluator && selectedEventId && activeEvalTab === "todo" && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (() => {
           const principalAreaIds = new Set(myPrincipalAreas.map(a => a.id));
           // Deriva a partir dos critérios ATIVOS do evento (não das atribuições já
           // geradas) — assim a área principal enxerga e gerencia seus quesitos desde
