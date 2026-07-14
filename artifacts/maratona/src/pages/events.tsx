@@ -30,6 +30,7 @@ export default function EventsPage() {
   const [sortBy, setSortBy] = useState("dateDesc");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterWeekend, setFilterWeekend] = useState(false);
   const [viewMode, setViewModeState] = useState<"cards" | "table">(
     () => (localStorage.getItem("events_view_mode") === "cards" ? "cards" : "table"),
   );
@@ -141,9 +142,16 @@ export default function EventsPage() {
     return sortBy === colSortPairs[primary];
   };
 
+  const isWeekend = (dateStr: string | null | undefined) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + "T12:00:00");
+    return d.getDay() === 0 || d.getDay() === 6;
+  };
+
   const filtered = all.filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
+    const matchWeekend = !filterWeekend || isWeekend(ev.startDate) || isWeekend(ev.endDate);
     const matchConfig = filterStatus === "all"
       || (filterStatus === "configured" && !!ev.criteriaConfirmed)
       || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
@@ -157,7 +165,7 @@ export default function EventsPage() {
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && !ev.fullyCalibrated)
       || (cardFilter === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
-    return matchSearch && matchDate && matchConfig && matchCard;
+    return matchSearch && matchDate && matchWeekend && matchConfig && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
     const ec = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.evaluatedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
@@ -315,10 +323,17 @@ export default function EventsPage() {
                   className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
                 />
               </div>
-              {(filterDateFrom || filterDateTo) && (
+              <button
+                type="button"
+                onClick={() => setFilterWeekend(p => !p)}
+                className={`w-full h-8 px-3 text-[10px] font-black italic uppercase tracking-wide border-2 transition-colors ${filterWeekend ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"}`}
+              >
+                {filterWeekend ? "✓ " : ""}Fim de semana
+              </button>
+              {(filterDateFrom || filterDateTo || filterWeekend) && (
                 <button
                   type="button"
-                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }}
                   className="w-full text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5"
                 >
                   × Limpar datas
