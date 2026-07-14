@@ -429,11 +429,11 @@ export default function EventsPage() {
                         : "#506600";
                       return (
                         <tr key={ev.id} data-testid={`row-event-${ev.id}`} className="hover:bg-[#f7f9fb] transition-colors">
-                          <td className="px-4 py-2.5 max-w-[260px]">
+                          <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2.5">
                               <div className="w-[3px] h-9 shrink-0 rounded-sm" style={{ backgroundColor: statusColor }} />
                               <div className="min-w-0">
-                                <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-xs text-[#191c1e] hover:text-[#506600] leading-tight block truncate" title={ev.name}>{ev.name}</Link>
+                                <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-xs text-[#191c1e] hover:text-[#506600] leading-tight block">{ev.name}</Link>
                                 <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
                                   {[ev.clientName, ev.city].filter(Boolean).join(" · ") || "—"}
                                 </p>
