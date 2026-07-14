@@ -266,7 +266,7 @@ export default function EventsPage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── Sidebar ── */}
-        <aside className="w-52 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col">
+        <aside className="w-52 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-y-auto">
           <div className="p-4 border-b-2 border-[#eceef0]">
             <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-3">Filtrar por status</p>
             <div className="space-y-0.5">
@@ -327,20 +327,6 @@ export default function EventsPage() {
             </div>
           </div>
 
-          <div className="p-4 mt-auto border-t-2 border-[#eceef0]">
-            <p className="text-[9px] font-bold italic uppercase tracking-wider text-[#747a60] mb-3">Legenda</p>
-            {[
-              { color: "#ff5722", label: "Aguardando RH" },
-              { color: "#ffb300", label: "Em avaliação" },
-              { color: "#506600", label: "Avaliado" },
-              { color: "#ccff00", label: "100% completo" },
-            ].map(x => (
-              <div key={x.label} className="flex items-center gap-2 mb-1.5">
-                <div className="w-2 h-2 shrink-0" style={{ backgroundColor: x.color }} />
-                <span className="text-[10px] italic text-[#747a60]">{x.label}</span>
-              </div>
-            ))}
-          </div>
         </aside>
 
         {/* ── Main ── */}
@@ -481,15 +467,16 @@ export default function EventsPage() {
                               </>
                             )}
                           </td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex flex-col gap-0.5 text-[10px] font-bold italic uppercase leading-tight">
-                              <span className={ev.criteriaConfirmed ? "text-[#506600]" : "text-[#b02f00]"}>
-                                {ev.criteriaConfirmed ? "Liberado" : "Aguardando RH"}
-                              </span>
-                              <span className={ev.resultsConfirmed ? "text-[#506600]" : "text-[#a06a00]"}>
-                                {ev.resultsConfirmed ? "Elegib. OK" : "Elegib. pendente"}
-                              </span>
-                            </div>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {!ev.criteriaConfirmed ? (
+                              <span className="text-[10px] font-bold italic uppercase text-[#b02f00]">Aguardando RH</span>
+                            ) : !ev.resultsConfirmed ? (
+                              <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Elegib. pendente</span>
+                            ) : ev.status === "closed" ? (
+                              <span className="text-[10px] font-bold italic uppercase text-[#506600]">Concluído</span>
+                            ) : (
+                              <span className="text-[10px] font-bold italic uppercase text-[#506600]">OK</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center justify-end gap-1">
@@ -557,12 +544,16 @@ export default function EventsPage() {
                         <div className="flex justify-between items-start gap-4 mb-3">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                              <span className={`px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block ${ev.criteriaConfirmed ? "bg-[#f0ffe0] text-[#506600]" : "bg-[#fff0ee] text-[#b02f00]"}`}>
-                                {ev.criteriaConfirmed ? "Liberado" : "Aguardando RH"}
-                              </span>
-                              <span className={`px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block ${ev.resultsConfirmed ? "bg-[#f0ffe0] text-[#506600]" : "bg-[#fff8e0] text-[#a06a00]"}`}>
-                                {ev.resultsConfirmed ? "Elegib. OK" : "Elegib. pendente"}
-                              </span>
+                              {!ev.criteriaConfirmed && (
+                                <span className="px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block bg-[#fff0ee] text-[#b02f00]">
+                                  Aguardando RH
+                                </span>
+                              )}
+                              {!ev.resultsConfirmed && (
+                                <span className="px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block bg-[#fff8e0] text-[#a06a00]">
+                                  Elegib. pendente
+                                </span>
+                              )}
                               {ev.isHistorical && (
                                 <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block">Ciclo Anterior</span>
                               )}
