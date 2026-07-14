@@ -134,16 +134,8 @@ function EvaluatorPickerCell({
           />
         </div>
         <div className="max-h-56 overflow-y-auto">
-          {current && (
-            <button
-              type="button"
-              onClick={() => handleSelect(null)}
-              disabled={saveMutation.isPending}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold italic text-[#e55050] hover:bg-[#fff0f0] border-b border-[#eceef0] transition-colors"
-            >
-              <X size={11} /> Remover avaliador
-            </button>
-          )}
+          {/* Uma vez definido, o avaliador padrão não pode voltar a ficar em
+              branco — só ser trocado por outra pessoa. */}
           {filtered.length === 0 && (
             <p className="text-center text-xs text-[#747a60] italic py-4">Nenhum resultado para "{search}"</p>
           )}
@@ -228,13 +220,8 @@ function ConformityAreaEvaluatorPicker({
           />
         </div>
         <div className="max-h-56 overflow-y-auto">
-          {currentEvaluatorId != null && (
-            <button type="button" onClick={() => handleSelect(null)} disabled={saveMutation.isPending}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold italic text-[#e55050] hover:bg-[#fff0f0] border-b border-[#eceef0] transition-colors"
-            >
-              <X size={11} /> Remover avaliador
-            </button>
-          )}
+          {/* Uma vez definido, o avaliador padrão não pode voltar a ficar em
+              branco — só ser trocado por outra pessoa. */}
           {filtered.length === 0 && (
             <p className="text-center text-xs text-[#747a60] italic py-4">Nenhum resultado para "{search}"</p>
           )}
@@ -326,13 +313,17 @@ function RoutingConfigDialog({
           className="h-8 rounded-none border-2 border-[#191c1e] focus-visible:ring-0 text-sm"
         />
         <div className="border-2 border-[#191c1e] max-h-40 overflow-y-auto divide-y divide-[#eceef0]">
-          <button
-            type="button"
-            onClick={() => setDefaultEvaluatorId(null)}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-bold italic text-left ${defaultEvaluatorId == null ? "bg-[#f0f0f0] text-[#191c1e]" : "text-[#747a60] hover:bg-[#f2f4f6]"}`}
-          >
-            <span className="italic">— Sem avaliador</span>
-          </button>
+          {/* Uma vez definido, o avaliador padrão não volta a ficar em branco —
+              só pode ser trocado por outra pessoa. */}
+          {defaultEvaluatorId == null && (
+            <button
+              type="button"
+              onClick={() => setDefaultEvaluatorId(null)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold italic text-left bg-[#f0f0f0] text-[#191c1e]"
+            >
+              <span className="italic">— Sem avaliador</span>
+            </button>
+          )}
           {filteredEvaluators.map(u => (
             <button
               key={u.id}

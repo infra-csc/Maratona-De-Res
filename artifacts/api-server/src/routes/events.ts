@@ -1295,28 +1295,34 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
     // avaliador de Cenografia (EPI, Estaiamentos, Conduta) e 1 para o de
     // Ferramentas e Case (Guarda de Equipamentos). Pré-preenche os dois a
     // partir dos padrões configurados em Critérios, sem sobrescrever uma
-    // escolha manual já feita neste evento.
+    // escolha manual já feita neste evento. Recurso opcional: se falhar
+    // (ex.: tabela area_conformity_routing ainda não migrada no banco),
+    // loga e segue — não pode derrubar a liberação das avaliações.
     if (ev.conformityEvaluatorUserId == null || ev.conformityEvaluatorFerramentasUserId == null) {
-      const conformityDefaults = await db.select({
-        areaName: areasTable.name,
-        defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
-      })
-        .from(areaConformityRoutingTable)
-        .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id));
-      const byName = (needle: string) => conformityDefaults.find(
-        d => (d.areaName ?? "").trim().toLowerCase().includes(needle),
-      )?.defaultEvaluatorId ?? null;
-      const patch: Partial<typeof eventsTable.$inferInsert> = {};
-      if (ev.conformityEvaluatorUserId == null) {
-        const cenografiaDefault = byName("cenografia");
-        if (cenografiaDefault != null) patch.conformityEvaluatorUserId = cenografiaDefault;
-      }
-      if (ev.conformityEvaluatorFerramentasUserId == null) {
-        const ferramentasDefault = byName("ferramentas");
-        if (ferramentasDefault != null) patch.conformityEvaluatorFerramentasUserId = ferramentasDefault;
-      }
-      if (Object.keys(patch).length > 0) {
-        await db.update(eventsTable).set(patch).where(eq(eventsTable.id, id));
+      try {
+        const conformityDefaults = await db.select({
+          areaName: areasTable.name,
+          defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
+        })
+          .from(areaConformityRoutingTable)
+          .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id));
+        const byName = (needle: string) => conformityDefaults.find(
+          d => (d.areaName ?? "").trim().toLowerCase().includes(needle),
+        )?.defaultEvaluatorId ?? null;
+        const patch: Partial<typeof eventsTable.$inferInsert> = {};
+        if (ev.conformityEvaluatorUserId == null) {
+          const cenografiaDefault = byName("cenografia");
+          if (cenografiaDefault != null) patch.conformityEvaluatorUserId = cenografiaDefault;
+        }
+        if (ev.conformityEvaluatorFerramentasUserId == null) {
+          const ferramentasDefault = byName("ferramentas");
+          if (ferramentasDefault != null) patch.conformityEvaluatorFerramentasUserId = ferramentasDefault;
+        }
+        if (Object.keys(patch).length > 0) {
+          await db.update(eventsTable).set(patch).where(eq(eventsTable.id, id));
+        }
+      } catch (err) {
+        console.error(`[events] Falha ao pré-preencher avaliadores da matriz no evento ${id} (rodou o db push da tabela area_conformity_routing?):`, err);
       }
     }
   }

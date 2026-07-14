@@ -2170,7 +2170,11 @@ export default function EventDetailPage() {
                   <SelectValue placeholder="Selecione o avaliador..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none">— Sem atribuição</SelectItem>
+                  {/* Uma vez atribuído, o critério não volta a ficar sem
+                      avaliador — a opção em branco só existe enquanto vazio. */}
+                  {criterionRoutingDisplayRows.find(r => r.criterionId === assignPickerOpen?.criterionId)?.assignedToId == null && (
+                    <SelectItem value="__none">— Sem atribuição</SelectItem>
+                  )}
                   {evaluators.map(u => (
                     <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                   ))}
@@ -2187,7 +2191,7 @@ export default function EventDetailPage() {
               </button>
               <button
                 type="button"
-                disabled={patchAssignment.isPending}
+                disabled={patchAssignment.isPending || assignPickerValue == null}
                 onClick={() => {
                   if (!assignPickerOpen) return;
                   patchAssignment.mutate(
@@ -2359,10 +2363,13 @@ export default function EventDetailPage() {
                           <CommandList className="max-h-[280px]">
                             <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
                             <CommandGroup>
-                              <CommandItem value="Sem avaliador" onSelect={() => setConformityEvaluatorFerramentasMutation.mutate({ id, data: { userId: null } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
-                                <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorFerramentasUserId == null ? "opacity-100" : "opacity-0")} />
-                                <span className="text-xs font-bold italic uppercase text-[#747a60]">Sem avaliador</span>
-                              </CommandItem>
+                              {/* Uma vez atribuído, não volta a ficar sem avaliador — só troca. */}
+                              {event?.conformityEvaluatorFerramentasUserId == null && (
+                                <CommandItem value="Sem avaliador" onSelect={() => setConformityEvaluatorFerramentasMutation.mutate({ id, data: { userId: null } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
+                                  <Check size={14} className="shrink-0 opacity-100" />
+                                  <span className="text-xs font-bold italic uppercase text-[#747a60]">Sem avaliador</span>
+                                </CommandItem>
+                              )}
                               {evaluators.map(u => (
                                 <CommandItem key={u.id} value={u.name} onSelect={() => setConformityEvaluatorFerramentasMutation.mutate({ id, data: { userId: u.id } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
                                   <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorFerramentasUserId === u.id ? "opacity-100" : "opacity-0")} />
@@ -2391,10 +2398,13 @@ export default function EventDetailPage() {
                           <CommandList className="max-h-[280px]">
                             <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
                             <CommandGroup>
-                              <CommandItem value="Sem avaliador" onSelect={() => setConformityEvaluatorMutation.mutate({ id, data: { userId: null } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
-                                <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorUserId == null ? "opacity-100" : "opacity-0")} />
-                                <span className="text-xs font-bold italic uppercase text-[#747a60]">Sem avaliador</span>
-                              </CommandItem>
+                              {/* Uma vez atribuído, não volta a ficar sem avaliador — só troca. */}
+                              {event?.conformityEvaluatorUserId == null && (
+                                <CommandItem value="Sem avaliador" onSelect={() => setConformityEvaluatorMutation.mutate({ id, data: { userId: null } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
+                                  <Check size={14} className="shrink-0 opacity-100" />
+                                  <span className="text-xs font-bold italic uppercase text-[#747a60]">Sem avaliador</span>
+                                </CommandItem>
+                              )}
                               {evaluators.map(u => (
                                 <CommandItem key={u.id} value={u.name} onSelect={() => setConformityEvaluatorMutation.mutate({ id, data: { userId: u.id } })} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-3">
                                   <Check size={14} className={cn("shrink-0", event?.conformityEvaluatorUserId === u.id ? "opacity-100" : "opacity-0")} />

@@ -870,17 +870,24 @@ router.get("/events/:id/public-tokens/all", requireRole("admin", "rh"), async (r
 // (ex.: Cenografia → grupo 2 da matriz, Ferramentas e Case → grupo 1).
 // ---------------------------------------------------------------------------
 router.get("/conformity-routing", async (_req, res) => {
-  const rows = await db.select({
-    id: areaConformityRoutingTable.id,
-    areaId: areaConformityRoutingTable.areaId,
-    areaName: areasTable.name,
-    defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
-    defaultEvaluatorName: usersTable.name,
-  })
-    .from(areaConformityRoutingTable)
-    .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id))
-    .leftJoin(usersTable, eq(areaConformityRoutingTable.defaultEvaluatorId, usersTable.id));
-  res.json(rows);
+  try {
+    const rows = await db.select({
+      id: areaConformityRoutingTable.id,
+      areaId: areaConformityRoutingTable.areaId,
+      areaName: areasTable.name,
+      defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
+      defaultEvaluatorName: usersTable.name,
+    })
+      .from(areaConformityRoutingTable)
+      .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id))
+      .leftJoin(usersTable, eq(areaConformityRoutingTable.defaultEvaluatorId, usersTable.id));
+    res.json(rows);
+  } catch (err) {
+    // Tabela ainda não migrada no banco (falta rodar o db push) — devolve
+    // lista vazia em vez de derrubar a tela de Critérios inteira.
+    console.error("[routing] GET /conformity-routing falhou (rodou o db push da tabela area_conformity_routing?):", err);
+    res.json([]);
+  }
 });
 
 // ---------------------------------------------------------------------------
