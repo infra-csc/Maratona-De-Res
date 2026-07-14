@@ -89,8 +89,8 @@ export default function EventsPage() {
     { key: "configured",  label: "Configurados",     value: all.filter(e => e.criteriaConfirmed).length,                         color: "#506600" },
     { key: "confirmed",   label: "Confirmados",       value: all.filter(e => e.resultsConfirmed).length,                          color: "#506600" },
     { key: "unconfirmed", label: "Não confirmados",   value: all.filter(e => !e.resultsConfirmed).length,                         color: "#ff5722" },
-    { key: "pendingCal",  label: "Falta calibrar",    value: all.filter(e => e.status === "closed" && !e.fullyCalibrated).length, color: "#ffb300" },
-    { key: "fullyEval",   label: "Avaliação 100%",    value: all.filter(e => !!e.fullyCalibrated).length,                         color: "#ccff00" },
+    { key: "pendingCal",  label: "Falta calibrar",    value: all.filter(e => e.status === "closed" && (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) < (e.totalCriteria ?? 0)).length, color: "#ffb300" },
+    { key: "fullyEval",   label: "Avaliação 100%",    value: all.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length,                                         color: "#ccff00" },
   ];
 
   const colSortPairs: Record<string, string> = {
@@ -129,20 +129,20 @@ export default function EventsPage() {
       || (filterStatus === "configured" && !!ev.criteriaConfirmed)
       || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
       || (filterStatus === "unconfirmed" && !ev.resultsConfirmed)
-      || (filterStatus === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
-      || (filterStatus === "fullyEval" && !!ev.fullyCalibrated)
-      || (filterStatus === "fullyCalibrated" && !!ev.fullyCalibrated);
+      || (filterStatus === "pendingCal" && ev.status === "closed" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
+      || (filterStatus === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0))
+      || (filterStatus === "fullyCalibrated" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
     const matchCard = cardFilter === null
       || (cardFilter === "configured" && ev.criteriaConfirmed)
       || (cardFilter === "confirmed" && ev.resultsConfirmed)
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
-      || (cardFilter === "pendingCal" && ev.status === "closed" && !ev.fullyCalibrated)
-      || (cardFilter === "fullyEval" && !!ev.fullyCalibrated);
+      || (cardFilter === "pendingCal" && ev.status === "closed" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
+      || (cardFilter === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
     return matchSearch && matchConfig && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
     const ec = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.evaluatedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
-    const cc = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.finalCalibratedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
+    const cc = (ev: typeof a) => (ev.totalCriteria ?? 0) > 0 ? (ev.calibratedCriteriaCount ?? 0) / (ev.totalCriteria ?? 1) : -1;
     if (sortBy === "nameAsc")          return a.name.localeCompare(b.name);
     if (sortBy === "nameDesc")         return b.name.localeCompare(a.name);
     if (sortBy === "dateAsc")          return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
