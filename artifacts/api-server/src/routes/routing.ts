@@ -20,7 +20,7 @@ router.use(requireAuth);
 // visibilidade completa dos quesitos da área e permissão de atribuir/tomar
 // para si/mover entre colegas, sem precisar de papel admin/rh.
 // ---------------------------------------------------------------------------
-async function getPrincipalAreaIds(userId: number): Promise<number[]> {
+export async function getPrincipalAreaIds(userId: number): Promise<number[]> {
   const rows = await db.select({ areaId: criteriaTable.responsibleAreaId })
     .from(criterionRoutingTable)
     .innerJoin(criteriaTable, eq(criterionRoutingTable.criterionId, criteriaTable.id))

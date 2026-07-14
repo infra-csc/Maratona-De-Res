@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { getPrincipalAreaIds } from "./routing.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -117,19 +118,28 @@ router.get("/evaluations", async (req, res) => {
   .leftJoin(usersTable, eq(evaluationsTable.evaluatorUserId, usersTable.id))
   .$dynamic();
 
-  // Avaliador: só enxerga avaliações das áreas em que FOI DESIGNADO neste evento.
-  // O escopo agora é por atribuição evento→área→avaliador, não pela área fixa do perfil.
-  if (user.role === "avaliador") {
-    query = query.innerJoin(eventAreaAssignmentsTable, and(
-      eq(eventAreaAssignmentsTable.eventId, evaluationsTable.eventId),
-      eq(eventAreaAssignmentsTable.areaId, criteriaTable.responsibleAreaId),
-      eq(eventAreaAssignmentsTable.evaluatorUserId, user.userId),
-    ));
-  }
-
   const conditions = [];
   if (eventId) conditions.push(eq(evaluationsTable.eventId, parseInt(eventId as string)));
   if (status) conditions.push(eq(evaluationsTable.status, status as string));
+
+  // Avaliador: enxerga as PRÓPRIAS avaliações, as das áreas em que foi
+  // designado neste evento (atribuição evento→área→avaliador) e as das áreas
+  // em que é avaliador PRINCIPAL — o principal precisa ver quem respondeu
+  // cada quesito da área dele (inclusive delegados) e quando.
+  if (user.role === "avaliador") {
+    const [assignedAreas, principalAreaIds] = await Promise.all([
+      db.select({ areaId: eventAreaAssignmentsTable.areaId })
+        .from(eventAreaAssignmentsTable)
+        .where(eq(eventAreaAssignmentsTable.evaluatorUserId, user.userId)),
+      getPrincipalAreaIds(user.userId),
+    ]);
+    const visibleAreaIds = [...new Set([...assignedAreas.map(a => a.areaId), ...principalAreaIds])];
+    conditions.push(or(
+      eq(evaluationsTable.evaluatorUserId, user.userId),
+      visibleAreaIds.length > 0 ? inArray(criteriaTable.responsibleAreaId, visibleAreaIds) : sql`false`,
+    )!);
+  }
+
   if (conditions.length) query = query.where(and(...conditions));
 
   const evaluations = await query;

@@ -104,14 +104,24 @@ function EvaluatorEventCard({
     if (assignment?.assignedToId != null) return assignment.assignedToId === userId;
     return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
   });
-  // Como avaliador principal, quesitos da área que foram redirecionados pra
-  // outro colega somem da lista acima — mas ela precisa saber, sem entrar no
-  // evento, que já tem alguém cuidando disso.
+  // Como avaliador principal, os quesitos da área que estão com OUTRA pessoa
+  // também são responsabilidade de acompanhamento dela: o evento só conta
+  // como concluído quando a ÁREA inteira respondeu, e o card mostra quem
+  // respondeu cada quesito e quando (ou com quem está, se pendente).
+  const myCriterionIds = new Set(myCriteria.map(c => c.criterionId));
   const delegatedCriteria = (criteria ?? []).filter(c => {
     if (!c.active || c.responsibleAreaId == null || !principalAreaIds?.has(c.responsibleAreaId)) return false;
+    return !myCriterionIds.has(c.criterionId);
+  }).map(c => {
     const assignment = assignmentByCriterionId.get(c.criterionId);
-    return !!assignment?.assignedToId && assignment.assignedToId !== userId;
-  }).map(c => ({ name: c.criterionName, assignee: assignmentByCriterionId.get(c.criterionId)?.assignedToName ?? "?" }));
+    const submittedEval = (evals ?? []).find(e => e.criterionId === c.criterionId && e.status === "submitted");
+    return {
+      name: c.criterionName,
+      assignee: submittedEval?.evaluatorName ?? assignment?.assignedToName ?? null,
+      submitted: !!submittedEval,
+      submittedAt: submittedEval?.submittedAt ?? null,
+    };
+  });
 
   // Responsabilidades da Matriz de Conformidade também são trabalho deste
   // avaliador neste evento — sem isso, quem só responde a matriz não via
@@ -137,31 +147,22 @@ function EvaluatorEventCard({
   const total = myCriteria.length;
   const submitted = myCriteria.filter(c => myEval(c.criterionId)?.status === "submitted").length;
   const drafts = myCriteria.filter(c => myEval(c.criterionId)?.status === "draft").length;
-  // Tudo que é deste avaliador foi entregue: critérios submetidos E, se ele
-  // responde a matriz, todas as perguntas dela preenchidas.
-  const allSubmitted = (total > 0 || conformityTotal > 0)
+  const delegatedPending = delegatedCriteria.filter(d => !d.submitted).length;
+  // Concluída = tudo respondido: os quesitos do próprio avaliador, os da área
+  // dele que estão com colegas (visão do principal) e, se ele responde a
+  // matriz, todas as perguntas dela. Não depende de confirmação do RH — para
+  // o avaliador, respondido é concluído.
+  const done = (total > 0 || conformityTotal > 0 || delegatedCriteria.length > 0)
     && submitted === total
+    && delegatedPending === 0
     && (conformityTotal === 0 || conformityComplete);
-  // Submeter tudo não basta: só conta como "Concluída" para o avaliador
-  // depois que RH/Admin confirmar os resultados do evento (mesma trava usada
-  // para colaboradores em resultados/ranking/my-performance).
-  const done = allSubmitted && !!detail?.resultsConfirmed;
-  const awaitingConfirmation = allSubmitted && !detail?.resultsConfirmed;
-  const inProgress = !allSubmitted && (submitted > 0 || drafts > 0 || conformityDoneCount > 0);
-  // Todos os quesitos da área principal foram redirecionados pra outra
-  // pessoa — não sobrou nada pra ela fazer aqui, mas ela ainda precisa ver
-  // isso sem clicar no evento.
-  const allDelegated = total === 0 && conformityTotal === 0 && delegatedCriteria.length > 0;
+  const inProgress = !done && (submitted > 0 || drafts > 0 || conformityDoneCount > 0 || delegatedCriteria.some(d => d.submitted));
 
-  const badge = allDelegated
-    ? { label: "Delegado", cls: "bg-[#e6e9ef] text-[#444933]", Icon: Users }
-    : done
-      ? { label: "Concluída", cls: "bg-[#506600] text-[#ccff00]", Icon: CheckCircle }
-      : awaitingConfirmation
-        ? { label: "Aguardando confirmação", cls: "bg-[#fff4c2] text-[#5c4a00]", Icon: Clock }
-        : inProgress
-          ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
-          : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
+  const badge = done
+    ? { label: "Concluída", cls: "bg-[#506600] text-[#ccff00]", Icon: CheckCircle }
+    : inProgress
+      ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
+      : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
   const Badge = badge.Icon;
   const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
 
@@ -206,9 +207,16 @@ function EvaluatorEventCard({
       {delegatedCriteria.length > 0 && (
         <div className="mt-3 pt-3 border-t border-dashed border-[#dde0e3] space-y-0.5">
           {delegatedCriteria.map((d, i) => (
-            <p key={i} className="text-[11px] italic text-[#747a60]">
-              <span className="font-bold uppercase">{d.name}</span> está com <span className="font-bold">{d.assignee}</span>
-            </p>
+            d.submitted ? (
+              <p key={i} className="text-[11px] italic text-[#506600]">
+                <span className="font-bold uppercase">{d.name}</span> — respondido por <span className="font-bold">{d.assignee ?? "?"}</span>
+                {d.submittedAt ? ` em ${new Date(d.submittedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}
+              </p>
+            ) : (
+              <p key={i} className="text-[11px] italic text-[#747a60]">
+                <span className="font-bold uppercase">{d.name}</span> {d.assignee ? <>está com <span className="font-bold">{d.assignee}</span></> : <span className="text-[#b02f00] font-bold">sem avaliador</span>} — pendente
+              </p>
+            )
           ))}
         </div>
       )}
@@ -581,26 +589,23 @@ export default function EvaluationsPage() {
     });
   }
   const principalAreaIds = new Set((myPrincipalAreas ?? []).map(a => a.id));
-  // Quesitos da área principal que foram redirecionados pra outro colega —
-  // saem de myCriteriaForEvent, mas o avaliador principal ainda precisa ver
-  // que o evento existe e quem está com o quesito, sem clicar pra dentro.
-  function hasDelegatedCriteriaForEvent(i: number): boolean {
-    if (principalAreaIds.size === 0) return false;
-    const assignmentByCriterionId = new Map(
-      (evaluatorCriterionAssignmentQueries[i]?.data ?? []).map(a => [a.criterionId, a]),
+  // Quesitos da(s) área(s) em que o usuário é avaliador PRINCIPAL mas que
+  // estão com outra pessoa (delegados/redirecionados). O principal acompanha
+  // esses quesitos: o evento só vai para "Concluídas" quando a área inteira
+  // respondeu, e ele vê quem respondeu e quando.
+  function delegatedAreaCriteriaForEvent(i: number) {
+    if (principalAreaIds.size === 0) return [];
+    const mineIds = new Set(myCriteriaForEvent(i).map(c => c.criterionId));
+    return (evaluatorCriteriaQueries[i]?.data ?? []).filter(c =>
+      c.active && c.responsibleAreaId != null && principalAreaIds.has(c.responsibleAreaId) && !mineIds.has(c.criterionId),
     );
-    return (evaluatorCriteriaQueries[i]?.data ?? []).some(c => {
-      if (!c.active || c.responsibleAreaId == null || !principalAreaIds.has(c.responsibleAreaId)) return false;
-      const assignment = assignmentByCriterionId.get(c.criterionId);
-      return !!assignment?.assignedToId && assignment.assignedToId !== user?.id;
-    });
   }
   const relevantEvaluatorEvents = isEvaluator
     ? configuredEvents.filter((_, i) => {
         const hasCriteria = myCriteriaForEvent(i).length > 0;
         const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
         const isFerramentasEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
-        return hasCriteria || isConformityEval || isFerramentasEval || hasDelegatedCriteriaForEvent(i);
+        return hasCriteria || isConformityEval || isFerramentasEval || delegatedAreaCriteriaForEvent(i).length > 0;
       })
     : [];
 
@@ -630,7 +635,12 @@ export default function EvaluationsPage() {
         const detail = evaluatorEventDetailQueries[i]?.data;
         const isConformityEval = detail?.conformityEvaluatorUserId === user?.id;
         const isFerramentasEval2 = detail?.conformityEvaluatorFerramentasUserId === user?.id;
-        const hasDelegated = hasDelegatedCriteriaForEvent(i);
+        // Quesitos da área principal com outra pessoa: contam para o "concluído"
+        // do principal — respondidos por QUALQUER avaliador designado.
+        const delegated = delegatedAreaCriteriaForEvent(i);
+        const delegatedPending = delegated.filter(
+          c => !evs.some(e => e.criterionId === c.criterionId && e.status === "submitted"),
+        ).length;
         // Matriz de Conformidade conta como trabalho deste avaliador — mesma
         // contagem do card e do "Resumo da Avaliação" (Cenografia 5, Ferramentas 1).
         const conf = detail?.conformity;
@@ -641,8 +651,12 @@ export default function EvaluationsPage() {
               + (conf?.absencesReport?.trim() ? 1 : 0)
             : 0)
           + (isFerramentasEval2 && conf?.guardaEquipamentos != null ? 1 : 0);
-        const allWorkDone = (total > 0 || confTotal > 0) && submitted === total && confDone === confTotal;
-        return { event: ev, total, submitted, done: allWorkDone && !!ev.resultsConfirmed, relevant: total > 0 || isConformityEval || isFerramentasEval2 || hasDelegated };
+        // Respondido = concluído (não depende da confirmação de resultados do RH).
+        const allWorkDone = (total > 0 || confTotal > 0 || delegated.length > 0)
+          && submitted === total
+          && delegatedPending === 0
+          && confDone === confTotal;
+        return { event: ev, total, submitted, done: allWorkDone, relevant: total > 0 || isConformityEval || isFerramentasEval2 || delegated.length > 0 };
       }).filter(s => s.relevant)
     : [];
   const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
