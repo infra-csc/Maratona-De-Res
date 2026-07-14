@@ -28,6 +28,8 @@ export default function EventsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [cardFilter, setCardFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("dateDesc");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
   const [viewMode, setViewModeState] = useState<"cards" | "table">(
     () => (localStorage.getItem("events_view_mode") === "cards" ? "cards" : "table"),
   );
@@ -129,6 +131,7 @@ export default function EventsPage() {
 
   const filtered = all.filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
     const matchConfig = filterStatus === "all"
       || (filterStatus === "configured" && !!ev.criteriaConfirmed)
       || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
@@ -142,7 +145,7 @@ export default function EventsPage() {
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && hasNoPublication(ev))
       || (cardFilter === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
-    return matchSearch && matchConfig && matchCard;
+    return matchSearch && matchDate && matchConfig && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
     const ec = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.evaluatedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
@@ -276,6 +279,39 @@ export default function EventsPage() {
                   <span className="text-sm font-black italic shrink-0" style={{ color: cardFilter === s.key ? "#191c1e" : s.color }}>{s.value}</span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="p-4 border-b-2 border-[#eceef0]">
+            <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-3">Filtrar por data</p>
+            <div className="space-y-2">
+              <div>
+                <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">De</label>
+                <input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={e => setFilterDateFrom(e.target.value)}
+                  className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">Até</label>
+                <input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={e => setFilterDateTo(e.target.value)}
+                  className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
+                />
+              </div>
+              {(filterDateFrom || filterDateTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                  className="w-full text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5"
+                >
+                  × Limpar datas
+                </button>
+              )}
             </div>
           </div>
 
