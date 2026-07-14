@@ -519,9 +519,16 @@ export default function EventsPage() {
                             ) : (
                               <>
                                 <span className="text-sm font-black italic text-[#191c1e]">{score.toFixed(1)}</span>
-                                <span className={`block text-[9px] font-bold italic uppercase leading-none ${scoreLabelColor}`}>
-                                  {scoreLabel}
-                                </span>
+                                {finalPubCount > 0 && partialOnlyCount > 0 ? (
+                                  <>
+                                    <span className="block text-[9px] font-bold italic uppercase leading-none text-[#506600]">{finalPubCount} Final</span>
+                                    <span className="block text-[9px] font-bold italic uppercase leading-none text-[#a06a00]">{partialOnlyCount} Parcial</span>
+                                  </>
+                                ) : (
+                                  <span className={`block text-[9px] font-bold italic uppercase leading-none ${scoreLabelColor}`}>
+                                    {scoreLabel}
+                                  </span>
+                                )}
                               </>
                             )}
                           </td>
@@ -640,7 +647,14 @@ export default function EventsPage() {
                           </div>
                           {score != null && (
                             <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[74px] shrink-0 ${finalPubCount > 0 && partialOnlyCount === 0 ? "bg-[#ccff00]" : finalPubCount > 0 || partialOnlyCount > 0 ? "bg-[#fff8e1]" : "bg-[#f0f0f0]"}`}>
-                              <span className="block text-[9px] uppercase font-bold italic mb-0.5" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
+                              {finalPubCount > 0 && partialOnlyCount > 0 ? (
+                                <>
+                                  <span className="block text-[9px] font-bold italic uppercase leading-none text-[#506600]">{finalPubCount} Final</span>
+                                  <span className="block text-[9px] font-bold italic uppercase leading-none text-[#a06a00]">{partialOnlyCount} Parcial</span>
+                                </>
+                              ) : (
+                                <span className="block text-[9px] uppercase font-bold italic mb-0.5" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
+                              )}
                               <span className="text-xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
                             </div>
                           )}
