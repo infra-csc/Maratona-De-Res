@@ -1105,7 +1105,7 @@ export default function CalibrationsPage() {
                           <Send size={12} /> Parcial · {formatDateTime(new Date(c.partialPublishedAt))}
                         </span>
                       )}
-                      {canFinalize && !alreadyReleased && !isFinalPublished && (
+                      {canFinalize && !alreadyReleased && (
                         <button
                           data-testid={`button-publish-criterion-partial-${c.criterionId}`}
                           type="button"
