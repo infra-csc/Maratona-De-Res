@@ -1172,11 +1172,31 @@ export default function EvaluationsPage() {
                     <span className={cn("mt-0.5 shrink-0 w-3.5 flex items-center justify-center", isSelected ? "text-[#506600]" : "text-transparent")}>
                       <Check size={13} />
                     </span>
-                    <span className="flex flex-col min-w-0">
+                    <span className="flex flex-col min-w-0 gap-0.5">
                       <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
                       {formatEventSubtitle(ev) && (
-                        <span className="text-[10px] font-bold italic uppercase text-[#747a60] whitespace-normal mt-0.5">{formatEventSubtitle(ev)}</span>
+                        <span className="text-[10px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>
                       )}
+                      <span className="flex items-center flex-wrap gap-1 mt-0.5">
+                        {ev.feedbackReleased
+                          ? <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black italic uppercase bg-[#ccff00] text-[#161e00] border border-[#506600]">✓ Publicado</span>
+                          : ev.partialPublishedAt
+                            ? <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black italic uppercase bg-[#fff4c2] text-[#5c4a00] border border-[#c9a800]">◑ Parcial</span>
+                            : <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black italic uppercase bg-[#f0f0f0] text-[#747a60] border border-[#d0d0d0]">— Sem publicação</span>
+                        }
+                        {ev.evaluationProgress != null && (
+                          <span className={cn(
+                            "inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold italic uppercase border",
+                            (ev.evaluationProgress ?? 0) >= 1
+                              ? "bg-[#efffcf] text-[#506600] border-[#a0c830]"
+                              : (ev.evaluationProgress ?? 0) > 0
+                                ? "bg-[#fff8e1] text-[#7a5800] border-[#e0c840]"
+                                : "bg-[#f5f5f5] text-[#9aa08a] border-[#d8d8d8]"
+                          )}>
+                            {Math.round((ev.evaluationProgress ?? 0) * 100)}% aval.
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </CommandItem>
                 );
