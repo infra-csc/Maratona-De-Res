@@ -422,11 +422,19 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
         .where(eq(eventsTable.externalId, externalId))
         .limit(1);
     }
-    // 2ª tentativa: por nome (case-insensitive, trim)
+    // 2ª tentativa: por nome exato (case-insensitive, trim)
     if (!ev && name) {
       [ev] = await db.select({ id: eventsTable.id })
         .from(eventsTable)
         .where(ilike(eventsTable.name, name.trim()))
+        .limit(1);
+    }
+    // 3ª tentativa: nome como substring (normaliza travessões e espaços extras)
+    if (!ev && name) {
+      const normalized = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+      [ev] = await db.select({ id: eventsTable.id })
+        .from(eventsTable)
+        .where(ilike(eventsTable.name, `%${normalized}%`))
         .limit(1);
     }
     if (!ev) {
