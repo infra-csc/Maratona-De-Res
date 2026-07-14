@@ -2385,13 +2385,33 @@ export default function EvaluationsPage() {
                             </Command>
                           </PopoverContent>
                         </Popover>
-                        <button type="button"
-                          onClick={() => { setConformityPublicLinkType("ferramentas"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchFerramentasTokenHistory(); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors"
-                          title="Gerar link único para um freelancer responder o formulário de Ferramentas"
-                        >
-                          <Link2 size={12} /> Link Freelancer
-                        </button>
+                        {(() => {
+                          const pendingFerr = (ferramentasPublicTokenHistory ?? []).find(t => !t.usedAt);
+                          const answeredFerr = (ferramentasPublicTokenHistory ?? []).find(t => t.usedAt);
+                          const ferrBase = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+                          if (pendingFerr) {
+                            const pendingUrl = `${ferrBase}/eval/${pendingFerr.id}`;
+                            return (
+                              <button type="button"
+                                onClick={() => { navigator.clipboard.writeText(pendingUrl); toast({ title: "Link copiado!", description: `Para: ${pendingFerr.recipientName ?? "freelancer"}` }); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-[#f7ffd1] hover:bg-[#eeff99] transition-colors"
+                                title="Copiar link já enviado — só existe um link por evento"
+                              >
+                                <Copy size={12} /> Copiar link ({pendingFerr.recipientName ?? "freelancer"})
+                              </button>
+                            );
+                          }
+                          if (answeredFerr) return null;
+                          return (
+                            <button type="button"
+                              onClick={() => { setConformityPublicLinkType("ferramentas"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchFerramentasTokenHistory(); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors"
+                              title="Gerar link único para um freelancer responder o formulário de Ferramentas"
+                            >
+                              <Link2 size={12} /> Link Freelancer
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                     {hasSentLink ? (
@@ -2401,7 +2421,8 @@ export default function EvaluationsPage() {
                         </p>
                         <ConformityLinkHistory history={ferramentasPublicTokenHistory ?? []} />
                       </>
-                    ) : (
+                    ) : null}
+                    {!hasSentLink && (
                       <>
                         <p className="text-sm text-[#444933] italic px-1 -mt-1">
                           Você foi designado para avaliar o retorno de equipamentos e ferramentas.
@@ -2516,13 +2537,33 @@ export default function EvaluationsPage() {
                             </Command>
                           </PopoverContent>
                         </Popover>
-                        <button type="button"
-                          onClick={() => { setConformityPublicLinkType("cenografia"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchConformityTokenHistory(); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors"
-                          title="Gerar link único para um freelancer responder o formulário de Cenografia"
-                        >
-                          <Link2 size={12} /> Link Freelancer
-                        </button>
+                        {(() => {
+                          const pendingCeno = (conformityPublicTokenHistory ?? []).find(t => !t.usedAt);
+                          const answeredCeno = (conformityPublicTokenHistory ?? []).find(t => t.usedAt);
+                          const cenoBase = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+                          if (pendingCeno) {
+                            const pendingUrl = `${cenoBase}/eval/${pendingCeno.id}`;
+                            return (
+                              <button type="button"
+                                onClick={() => { navigator.clipboard.writeText(pendingUrl); toast({ title: "Link copiado!", description: `Para: ${pendingCeno.recipientName ?? "freelancer"}` }); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-[#f7ffd1] hover:bg-[#eeff99] transition-colors"
+                                title="Copiar link já enviado — só existe um link por evento"
+                              >
+                                <Copy size={12} /> Copiar link ({pendingCeno.recipientName ?? "freelancer"})
+                              </button>
+                            );
+                          }
+                          if (answeredCeno) return null;
+                          return (
+                            <button type="button"
+                              onClick={() => { setConformityPublicLinkType("cenografia"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchConformityTokenHistory(); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors"
+                              title="Gerar link único para um freelancer responder o formulário de Cenografia"
+                            >
+                              <Link2 size={12} /> Link Freelancer
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                     {hasSentLink ? (
