@@ -73,7 +73,7 @@ type ExtEmployee = {
 type ExtEvent = {
   externalId?: string | number; id?: string | number; name: string;
   clientName?: string; client?: string; location?: string; city?: string; state?: string;
-  startDate?: string; endDate?: string; year?: number; quarter?: number;
+  startDate?: string; endDate?: string; date?: string; year?: number; quarter?: number;
 };
 type ExtParticipation = {
   eventExternalId?: string | number; eventId?: string | number;
@@ -247,11 +247,13 @@ router.post("/integration/sync", async (req, res) => {
     const cycleEndDate = cycle.endDate;
     const keptEvents = cycleStartDate && cycleEndDate
       ? extEvents.filter(ev => {
-          const end = ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate);
+          const singleDate = ev.date ? normalizeDate(ev.date) : null;
+          const end = singleDate ?? (ev.endDate ? normalizeDate(ev.endDate) : normalizeDate(ev.startDate));
           return end >= cycleStartDate && end <= cycleEndDate;
         })
       : extEvents.filter(ev => {
-          const yq = deriveYearQuarter(ev.startDate);
+          const singleDate = ev.date ? normalizeDate(ev.date) : null;
+          const yq = deriveYearQuarter(singleDate ?? ev.startDate);
           return (ev.year ?? yq.year) === TARGET_YEAR;
         });
     const keptEventIds = new Set(keptEvents.map(ev => extIdOf(ev)).filter((v): v is string => !!v));
@@ -306,8 +308,9 @@ router.post("/integration/sync", async (req, res) => {
       for (const ev of keptEvents) {
         const externalId = ev.externalId != null ? String(ev.externalId) : (ev.id != null ? String(ev.id) : null);
         if (!externalId || !ev.name) continue;
-        const startDate = normalizeDate(ev.startDate);
-        const endDate = ev.endDate ? normalizeDate(ev.endDate) : startDate;
+        const singleDate = ev.date ? normalizeDate(ev.date) : null;
+        const startDate = singleDate ?? normalizeDate(ev.startDate);
+        const endDate = singleDate ?? (ev.endDate ? normalizeDate(ev.endDate) : startDate);
         const fields = {
           name: ev.name,
           clientName: ev.clientName ?? ev.client ?? null,
