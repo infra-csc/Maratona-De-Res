@@ -113,7 +113,8 @@ router.get("/events", async (req, res) => {
       .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
+    const partialPublishedCount = partialTimestamps.length;
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
   });
   res.json(enriched);
 });

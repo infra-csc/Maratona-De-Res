@@ -421,6 +421,18 @@ export default function EventsPage() {
                       const calCount = ev.calibratedCriteriaCount ?? 0;
                       const fc = ev.fullyCalibrated ?? false;
                       const isScoreFinal = concluded && fc;
+                      const finalPubCount = ev.finalCalibratedCriteria ?? 0;
+                      const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
+                      const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
+                      const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
+                        ? `${finalPubCount}F · ${partialOnlyCount}P`
+                        : finalPubCount > 0 ? "Calibrado Final"
+                        : partialOnlyCount > 0 ? "Calibrado Parcial"
+                        : "Avaliador";
+                      const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0
+                        ? "text-[#506600]"
+                        : finalPubCount > 0 || partialOnlyCount > 0 ? "text-[#a06a00]"
+                        : "text-[#747a60]";
                       const missing = ev.unassignedAreaNames ?? [];
                       const statusColor = !ev.criteriaConfirmed ? "#ff5722"
                         : fc ? "#ccff00"
@@ -461,8 +473,8 @@ export default function EventsPage() {
                             ) : (
                               <>
                                 <span className="text-sm font-black italic text-[#191c1e]">{score.toFixed(1)}</span>
-                                <span className={`block text-[9px] font-bold italic uppercase leading-none ${isScoreFinal ? "text-[#506600]" : "text-[#a06a00]"}`}>
-                                  {isScoreFinal ? "Final" : concluded ? "Parcial" : "Provisório"}
+                                <span className={`block text-[9px] font-bold italic uppercase leading-none ${scoreLabelColor}`}>
+                                  {scoreLabel}
                                 </span>
                               </>
                             )}
@@ -533,6 +545,18 @@ export default function EventsPage() {
                   const evalPct = total > 0 ? Math.round((evaluated / total) * 100) : 0;
                   const calPct  = total > 0 ? Math.round((calCount / total) * 100) : 0;
                   const isScoreFinal = concluded && fc;
+                  const finalPubCount = ev.finalCalibratedCriteria ?? 0;
+                  const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
+                  const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
+                  const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
+                    ? `${finalPubCount}F · ${partialOnlyCount}P`
+                    : finalPubCount > 0 ? "Calibrado Final"
+                    : partialOnlyCount > 0 ? "Calibrado Parcial"
+                    : "Avaliador";
+                  const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0
+                    ? "#506600"
+                    : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
+                    : "#747a60";
                   const statusColor = !ev.criteriaConfirmed ? "#ff5722"
                     : fc ? "#ccff00"
                     : evaluated === total && total > 0 ? "#506600"
@@ -565,8 +589,8 @@ export default function EventsPage() {
                             {ev.clientName && <p className="text-xs font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{ev.clientName}</p>}
                           </div>
                           {score != null && (
-                            <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[74px] shrink-0 ${isScoreFinal ? "bg-[#ccff00]" : "bg-[#fff8e1]"}`}>
-                              <span className="block text-[9px] uppercase font-bold italic text-[#161e00] mb-0.5">{isScoreFinal ? "Final" : "Provisório"}</span>
+                            <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[74px] shrink-0 ${finalPubCount > 0 && partialOnlyCount === 0 ? "bg-[#ccff00]" : finalPubCount > 0 || partialOnlyCount > 0 ? "bg-[#fff8e1]" : "bg-[#f0f0f0]"}`}>
+                              <span className="block text-[9px] uppercase font-bold italic mb-0.5" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
                               <span className="text-xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
                             </div>
                           )}
