@@ -294,4 +294,21 @@ router.post("/events/:id/criteria/publish-final-all", requireRole("admin", "rh",
   res.json({ published: criteriaLinks.length, finalPublishedAt: now });
 });
 
+/**
+ * POST /events/:id/unrelease
+ * Desfaz a liberação final do feedback do evento, voltando ao estado pré-lançamento.
+ * Admin/RH only. Permite republicar as notas como parcial ou ajustar calibrações.
+ */
+router.post("/events/:id/unrelease", requireRole("admin", "rh"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (!event) { res.status(404).json({ error: "Evento não encontrado." }); return; }
+  if (!event.feedbackReleased) { res.status(400).json({ error: "Evento ainda não foi liberado." }); return; }
+  await db.update(eventsTable)
+    .set({ feedbackReleased: false, feedbackReleasedAt: null })
+    .where(eq(eventsTable.id, eventId));
+  await audit(req.user!.userId, "unrelease_feedback", "events", eventId, null, {});
+  res.json({ success: true });
+});
+
 export default router;

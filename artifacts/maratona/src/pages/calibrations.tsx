@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar, RotateCcw } from "lucide-react";
+import { getAuthToken } from "@/lib/custom-fetch";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -208,6 +209,29 @@ export default function CalibrationsPage() {
   });
   const closeMutation = useCloseEvent();
   const releaseMutation = useReleaseEventFeedback();
+  const [unreleasing, setUnreleasing] = useState(false);
+
+  async function handleUnrelease() {
+    if (!selectedEventId) return;
+    setUnreleasing(true);
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/events/${selectedEventId}/unrelease`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
+      qc.invalidateQueries({ queryKey: fbQKey });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId) });
+      toast({ title: "Liberação desfeita", description: "O evento voltou ao estado pré-lançamento. Você pode publicar parcial ou finalizar novamente." });
+    } catch (err: unknown) {
+      toast({ title: "Falha ao desfazer liberação", description: err instanceof Error ? err.message : "Tente novamente.", variant: "destructive" });
+    } finally {
+      setUnreleasing(false);
+    }
+  }
+
   const [publishingCritId, setPublishingCritId] = useState<number | null>(null);
   const publishCriterionPartialMutation = usePublishCriterionPartialFeedback();
   const publishCriterionFinalMutation = usePublishCriterionFinalFeedback();
@@ -853,10 +877,21 @@ export default function CalibrationsPage() {
             {alreadyReleased ? (
               <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#ccff00]">
                 <CheckCircle size={20} className="text-[#ccff00] shrink-0" />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Avaliação Final — notas liberadas{feedbackReleasedAtDate ? ` em ${formatDateTime(feedbackReleasedAtDate)}` : ""}</p>
                   <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">Os funcionários já veem estas notas. Ajustes ainda são possíveis e recalculam os resultados automaticamente.</p>
                 </div>
+                {canFinalize && (
+                  <button
+                    type="button"
+                    disabled={unreleasing}
+                    onClick={handleUnrelease}
+                    title="Desfaz a liberação final — funcionários deixam de ver as notas até nova publicação"
+                    className="shrink-0 flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white/10 text-white border border-white/30 px-3 py-2 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <RotateCcw size={12} /> {unreleasing ? "Revertendo..." : "Reverter"}
+                  </button>
+                )}
               </div>
             ) : partialPublishedAtDate ? (
               <div className="bg-[#ffb5a0] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
