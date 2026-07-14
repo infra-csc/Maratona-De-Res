@@ -454,7 +454,7 @@ export default function IntegrationPage() {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
       const data = await res.json() as { totalProcessed: number; warnings: string[] };
       setRecomputeResult(data as unknown as { processed: number; warnings: string[] });
-      qc.invalidateQueries();
+      await qc.resetQueries();
       toast({ title: `Ciclo recalculado — ${data.totalProcessed} colaborador(es) processado(s)${data.warnings.length > 0 ? ` · ${data.warnings.length} aviso(s)` : ""}` });
     } catch (err: unknown) {
       toast({ title: "Falha ao recalcular", description: err instanceof Error ? err.message : "Tente novamente.", variant: "destructive" });
