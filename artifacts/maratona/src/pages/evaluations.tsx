@@ -292,6 +292,9 @@ export default function EvaluationsPage() {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [activeEvalTab, setActiveEvalTab] = useState<"todo" | "done">("todo");
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterWeekend, setFilterWeekend] = useState(false);
   const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
   const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
@@ -559,11 +562,22 @@ export default function EvaluationsPage() {
   const activeEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
   // Only events whose criteria the RH has already confirmed can be evaluated.
   const configuredEvents = activeEvents.filter(e => e.criteriaConfirmed);
+  const isWeekend = (dateStr: string | null | undefined) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + "T12:00:00");
+    return d.getDay() === 0 || d.getDay() === 6;
+  };
   // Evaluators may only act on RH-released events; consultation roles may inspect any open event.
   // Ordenado alfabeticamente por nome do evento (pt-BR, ignorando maiúsc./acentos).
-  const selectableEvents = [...(isEvaluator ? configuredEvents : activeEvents)].sort((a, b) =>
-    (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" })
-  );
+  const selectableEvents = [...(isEvaluator ? configuredEvents : activeEvents)]
+    .filter(e => {
+      const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
+      const matchWeekend = !filterWeekend || isWeekend(e.startDate) || isWeekend(e.endDate);
+      return matchDate && matchWeekend;
+    })
+    .sort((a, b) =>
+      (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" })
+    );
   const pickedEvent = selectableEvents.find(e => e.id === selectedEventId);
 
   // For evaluators: fetch criteria for every selectable event so the overview
@@ -1259,6 +1273,28 @@ export default function EvaluationsPage() {
                 </div>
               </div>
 
+              <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
+                <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-2">Filtrar por data</p>
+                <div className="space-y-1.5">
+                  <div>
+                    <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">De</label>
+                    <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">Até</label>
+                    <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                  </div>
+                  <button type="button" onClick={() => setFilterWeekend(p => !p)} className={cn("w-full h-7 px-2 text-[9px] font-black italic uppercase tracking-wide border-2 transition-colors", filterWeekend ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                    {filterWeekend ? "✓ " : ""}Fim de semana
+                  </button>
+                  {(filterDateFrom || filterDateTo || filterWeekend) && (
+                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }} className="w-full text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5">
+                      × Limpar datas
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {isConsultation && (
                 <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
                   <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><Target size={10} /> Tipo</p>
@@ -1315,7 +1351,7 @@ export default function EvaluationsPage() {
 
               {(selectedEventId != null || selectedAvaliadorId != null || statusFilter !== "all" || typeFilter !== "all") && (
                 <div className="px-3 py-2 border-b-2 border-[#eceef0]">
-                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
+                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
                     <X size={11} /> Limpar filtros
                   </button>
                 </div>

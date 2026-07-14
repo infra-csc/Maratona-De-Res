@@ -41,6 +41,9 @@ export default function CalibrationsPage() {
   const [eventIdFromUrlApplied, setEventIdFromUrlApplied] = useState(false);
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [eventStatusFilter, setEventStatusFilter] = useState<"all" | "open" | "closed">("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterWeekend, setFilterWeekend] = useState(false);
   const [calScores, setCalScores] = useState<Record<number, string>>({});
   const [calReasons, setCalReasons] = useState<Record<number, string>>({});
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
@@ -94,9 +97,17 @@ export default function CalibrationsPage() {
   // Todos os eventos do ciclo aparecem — a calibração pode começar a qualquer
   // momento, inclusive antes de todas as avaliações serem enviadas.
   const calibratableEvents = events ?? [];
-  const filteredCalibratableEvents = eventStatusFilter === "all"
-    ? calibratableEvents
-    : calibratableEvents.filter(e => e.status === eventStatusFilter);
+  const isWeekend = (dateStr: string | null | undefined) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + "T12:00:00");
+    return d.getDay() === 0 || d.getDay() === 6;
+  };
+  const filteredCalibratableEvents = calibratableEvents.filter(e => {
+    const matchStatus = eventStatusFilter === "all" || e.status === eventStatusFilter;
+    const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
+    const matchWeekend = !filterWeekend || isWeekend(e.startDate) || isWeekend(e.endDate);
+    return matchStatus && matchDate && matchWeekend;
+  });
   const pickedEvent = calibratableEvents.find(e => e.id === selectedEventId);
 
   // Clear selection if the picked event no longer exists (e.g. removed/out of cycle)
@@ -595,6 +606,31 @@ export default function CalibrationsPage() {
                 </button>
               ))}
             </div>
+            {/* Filtro de data */}
+            <div className="mb-3 space-y-2">
+              <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60]">Filtrar por data</p>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">De</label>
+                  <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">Até</label>
+                  <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                </div>
+              </div>
+              <div className="flex gap-2 items-center">
+                <button type="button" onClick={() => setFilterWeekend(p => !p)} className={`flex-1 h-8 px-3 text-[10px] font-black italic uppercase tracking-wide border-2 transition-colors ${filterWeekend ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"}`}>
+                  {filterWeekend ? "✓ " : ""}Fim de semana
+                </button>
+                {(filterDateFrom || filterDateTo || filterWeekend) && (
+                  <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }} className="text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] whitespace-nowrap">
+                    × Limpar
+                  </button>
+                )}
+              </div>
+            </div>
+
             <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
               <PopoverTrigger asChild>
                 <button
