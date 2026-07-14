@@ -463,6 +463,43 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
         }
       }
     }
+    // 5ª tentativa: descarta o primeiro token (prefixo de marca, ex.: "Santander")
+    // e tenta o match com os tokens restantes.
+    // Cobre casos como "Santander Night Run - Palmas" → banco tem "Night Run - Etapa 1 - Palmas".
+    if (!ev && name) {
+      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
+      const tokens = parts
+        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
+        .filter(p => p.length >= 3);
+      // Sem primeiro token (prefixo de marca)
+      if (tokens.length >= 2) {
+        const withoutFirst = tokens.slice(1);
+        if (withoutFirst.length >= 1) {
+          const p1 = `%${withoutFirst.join("%")}%`;
+          [ev] = await db.select({ id: eventsTable.id })
+            .from(eventsTable)
+            .where(ilike(eventsTable.name, p1))
+            .limit(1);
+          if (!ev) {
+            const p1r = `%${[...withoutFirst].reverse().join("%")}%`;
+            [ev] = await db.select({ id: eventsTable.id })
+              .from(eventsTable)
+              .where(ilike(eventsTable.name, p1r))
+              .limit(1);
+          }
+        }
+      }
+      // Sem último token (sufixo opcional como "Patrocinador")
+      if (!ev && tokens.length >= 3) {
+        const withoutLast = tokens.slice(0, -1);
+        const p2 = `%${withoutLast.join("%")}%`;
+        [ev] = await db.select({ id: eventsTable.id })
+          .from(eventsTable)
+          .where(ilike(eventsTable.name, p2))
+          .limit(1);
+      }
+    }
     if (!ev) {
       notFound.push(name || externalId);
     } else {
