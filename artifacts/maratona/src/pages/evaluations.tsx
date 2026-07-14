@@ -87,27 +87,16 @@ function EvaluatorEventCard({
   );
   const { data: criterionAssignments } = useEventCriterionAssignments(event.id);
 
-  // Esta avaliação é por atribuição evento→área→avaliador, não pela área do perfil.
   const myAreaIds = new Set(
     (detail?.areaAssignments ?? []).filter(a => a.evaluatorUserId === userId).map(a => a.areaId),
   );
-  // Atribuição por critério (redirecionamento) manda sobre a atribuição por área —
-  // sem isso, um critério redirecionado para outra pessoa continuava contando
-  // aqui como "meu" mesmo depois de passar pra outro avaliador.
   const assignmentByCriterionId = new Map((criterionAssignments ?? []).map(a => [a.criterionId, a]));
   const myCriteria = (criteria ?? []).filter(c => {
     if (!c.active) return false;
     const assignment = assignmentByCriterionId.get(c.criterionId);
-    // Só uma designação real corta o fallback por área — uma linha pending
-    // sem assignedToId (gerada automaticamente sem avaliador padrão) não
-    // pode esconder o critério de quem foi atribuído pela área.
     if (assignment?.assignedToId != null) return assignment.assignedToId === userId;
     return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
   });
-  // Como avaliador principal, os quesitos da área que estão com OUTRA pessoa
-  // também são responsabilidade de acompanhamento dela: o evento só conta
-  // como concluído quando a ÁREA inteira respondeu, e o card mostra quem
-  // respondeu cada quesito e quando (ou com quem está, se pendente).
   const myCriterionIds = new Set(myCriteria.map(c => c.criterionId));
   const delegatedCriteria = (criteria ?? []).filter(c => {
     if (!c.active || c.responsibleAreaId == null || !principalAreaIds?.has(c.responsibleAreaId)) return false;
@@ -123,14 +112,9 @@ function EvaluatorEventCard({
     };
   });
 
-  // Responsabilidades da Matriz de Conformidade também são trabalho deste
-  // avaliador neste evento — sem isso, quem só responde a matriz não via
-  // card nenhum e o evento nunca ia para "Concluídas".
   const isConformityEval = detail?.conformityEvaluatorUserId === userId;
   const isFerramentasEval = detail?.conformityEvaluatorFerramentasUserId === userId;
   const conf = detail?.conformity;
-  // Mesma contagem do "Resumo da Avaliação": Cenografia = 5 itens
-  // (EPI, Estaiamentos, Conduta, destaque e faltas), Ferramentas = 1.
   const conformityTotal = (isConformityEval ? 5 : 0) + (isFerramentasEval ? 1 : 0);
   const conformityDoneCount =
     (isConformityEval
@@ -140,7 +124,6 @@ function EvaluatorEventCard({
     + (isFerramentasEval && conf?.guardaEquipamentos != null ? 1 : 0);
   const conformityComplete = conformityTotal > 0 && conformityDoneCount === conformityTotal;
 
-  // Only events that actually have work for this avaliador are theirs to do.
   if (myCriteria.length === 0 && delegatedCriteria.length === 0 && conformityTotal === 0) return null;
 
   const myEval = (cid: number) => (evals ?? []).find(e => e.criterionId === cid && e.evaluatorUserId === userId);
@@ -148,23 +131,20 @@ function EvaluatorEventCard({
   const submitted = myCriteria.filter(c => myEval(c.criterionId)?.status === "submitted").length;
   const drafts = myCriteria.filter(c => myEval(c.criterionId)?.status === "draft").length;
   const delegatedPending = delegatedCriteria.filter(d => !d.submitted).length;
-  // Concluída = tudo respondido: os quesitos do próprio avaliador, os da área
-  // dele que estão com colegas (visão do principal) e, se ele responde a
-  // matriz, todas as perguntas dela. Não depende de confirmação do RH — para
-  // o avaliador, respondido é concluído.
   const done = (total > 0 || conformityTotal > 0 || delegatedCriteria.length > 0)
     && submitted === total
     && delegatedPending === 0
     && (conformityTotal === 0 || conformityComplete);
   const inProgress = !done && (submitted > 0 || drafts > 0 || conformityDoneCount > 0 || delegatedCriteria.some(d => d.submitted));
 
-  const badge = done
-    ? { label: "Concluída", cls: "bg-[#506600] text-[#ccff00]", Icon: CheckCircle }
+  const statusConfig = done
+    ? { label: "Concluída", badgeCls: "bg-[#ccff00] text-[#161e00] border-[#506600]", borderCls: "border-l-[#506600]", Icon: CheckCircle, iconCls: "text-[#506600]" }
     : inProgress
-      ? { label: "Em andamento", cls: "bg-[#ffdbd1] text-[#862200]", Icon: Clock }
-      : { label: "A fazer", cls: "bg-[#f2f4f6] text-[#747a60]", Icon: Clock };
-  const Badge = badge.Icon;
+      ? { label: "Em andamento", badgeCls: "bg-[#ffdbd1] text-[#862200] border-[#f0a090]", borderCls: "border-l-[#f28b6a]", Icon: Clock, iconCls: "text-[#862200]" }
+      : { label: "A fazer", badgeCls: "bg-[#f2f4f6] text-[#444933] border-[#c8cbd0]", borderCls: "border-l-[#191c1e]", Icon: ArrowRight, iconCls: "text-[#747a60]" };
+  const StatusIcon = statusConfig.Icon;
   const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
+  const subtitle = formatEventSubtitle(event);
 
   return (
     <button
@@ -172,54 +152,99 @@ function EvaluatorEventCard({
       onClick={onSelect}
       data-testid={`evaluator-event-${event.id}`}
       className={cn(
-        "text-left border-2 border-[#191c1e] p-5 transition-all",
+        "group text-left border-2 border-[#191c1e] border-l-4 transition-all w-full",
+        statusConfig.borderCls,
         HARD_SHADOW, HARD_SHADOW_HOVER,
-        selected ? "bg-[#f7ffd1]" : "bg-white",
+        selected ? "bg-[#f7ffd1]" : "bg-white hover:bg-[#fafbfc]",
       )}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block", badge.cls)}>
-          <span className="inline-flex items-center gap-1.5 skew-x-[8deg]"><Badge size={12} /> {badge.label}</span>
-        </span>
-        {event.cycleName && <span className="text-[11px] font-bold italic uppercase text-[#747a60] shrink-0">{event.cycleName}</span>}
-      </div>
-      <h4 className="text-lg italic uppercase font-black tracking-tight leading-tight">{event.name}</h4>
-      {formatEventSubtitle(event) && <p className="text-[12px] font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{formatEventSubtitle(event)}</p>}
-      {total > 0 && (
-        <div className="mt-4">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[11px] font-bold italic uppercase text-[#444933]">{submitted} de {total} critérios submetidos</span>
-            <span className="text-xs font-black italic text-[#506600]">{pct}%</span>
-          </div>
-          <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2">
-            <div className="bg-[#ccff00] h-full transition-[width]" style={{ width: `${pct}%` }} />
-          </div>
-          {drafts > 0 && (
-            <p className="text-[11px] text-[#862200] italic mt-1.5 font-bold uppercase">{drafts} em rascunho — submeta para concluir</p>
+      <div className="p-4 md:p-5 flex flex-col gap-3">
+        {/* Top row: badge + cycle tag */}
+        <div className="flex items-center justify-between gap-2">
+          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 border font-bold text-[11px] italic uppercase tracking-wide rounded-sm", statusConfig.badgeCls)}>
+            <StatusIcon size={11} /> {statusConfig.label}
+          </span>
+          {event.cycleName && (
+            <span className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wider shrink-0">{event.cycleName}</span>
           )}
         </div>
-      )}
-      {conformityTotal > 0 && (
-        <p className={`text-[11px] italic mt-3 font-bold uppercase ${conformityComplete ? "text-[#506600]" : "text-[#862200]"}`}>
-          Matriz de Conformidade: {conformityDoneCount} de {conformityTotal} perguntas
-        </p>
-      )}
-      {delegatedCriteria.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-dashed border-[#dde0e3] space-y-0.5">
-          {delegatedCriteria.map((d, i) => (
-            d.submitted ? (
-              <p key={i} className="text-[11px] italic text-[#506600]">
-                <span className="font-bold uppercase">{d.name}</span> — respondido por <span className="font-bold">{d.assignee ?? "?"}</span>
-                {d.submittedAt ? ` em ${new Date(d.submittedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}
-              </p>
-            ) : (
-              <p key={i} className="text-[11px] italic text-[#747a60]">
-                <span className="font-bold uppercase">{d.name}</span> {d.assignee ? <>está com <span className="font-bold">{d.assignee}</span></> : <span className="text-[#b02f00] font-bold">sem avaliador</span>} — pendente
-              </p>
-            )
-          ))}
+
+        {/* Event name + subtitle */}
+        <div className="min-w-0">
+          <h4 className="text-base md:text-lg italic uppercase font-black tracking-tight leading-tight text-[#191c1e]">{event.name}</h4>
+          {subtitle && (
+            <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5 truncate flex items-center gap-1">
+              <MapPin size={10} className="shrink-0" />{subtitle}
+            </p>
+          )}
         </div>
-      )}
+
+        {/* Progress bar (criteria) */}
+        {total > 0 && (
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[11px] font-bold italic uppercase text-[#444933]">
+                {submitted} de {total} {total === 1 ? "critério" : "critérios"} submetidos
+              </span>
+              <span className={cn("text-xs font-black italic", done ? "text-[#506600]" : "text-[#191c1e]")}>{pct}%</span>
+            </div>
+            <div className="w-full bg-[#eceef0] border border-[#c8cbd0] h-2.5 rounded-sm overflow-hidden">
+              <div
+                className={cn("h-full transition-[width] rounded-sm", done ? "bg-[#ccff00]" : inProgress ? "bg-[#f28b6a]" : "bg-[#c8cbd0]")}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            {drafts > 0 && (
+              <p className="text-[11px] text-[#862200] italic mt-1.5 font-bold uppercase flex items-center gap-1">
+                <AlertCircle size={11} /> {drafts} em rascunho — submeta para concluir
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Conformity */}
+        {conformityTotal > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-[#eceef0] border border-[#c8cbd0] h-2.5 rounded-sm overflow-hidden">
+              <div
+                className={cn("h-full transition-[width] rounded-sm", conformityComplete ? "bg-[#ccff00]" : "bg-[#f28b6a]")}
+                style={{ width: `${Math.round((conformityDoneCount / conformityTotal) * 100)}%` }}
+              />
+            </div>
+            <span className={cn("text-[11px] italic font-bold uppercase shrink-0", conformityComplete ? "text-[#506600]" : "text-[#862200]")}>
+              Conformidade {conformityDoneCount}/{conformityTotal}
+            </span>
+          </div>
+        )}
+
+        {/* Delegated criteria */}
+        {delegatedCriteria.length > 0 && (
+          <div className="pt-2 border-t border-dashed border-[#dde0e3] space-y-0.5">
+            {delegatedCriteria.map((d, i) => (
+              d.submitted ? (
+                <p key={i} className="text-[11px] italic text-[#506600] flex items-start gap-1">
+                  <CheckCircle size={11} className="mt-0.5 shrink-0" />
+                  <span><span className="font-bold uppercase">{d.name}</span> — <span className="font-bold">{d.assignee ?? "?"}</span>{d.submittedAt ? ` · ${new Date(d.submittedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}</span>
+                </p>
+              ) : (
+                <p key={i} className="text-[11px] italic text-[#747a60] flex items-start gap-1">
+                  <Clock size={11} className="mt-0.5 shrink-0" />
+                  <span><span className="font-bold uppercase">{d.name}</span> — {d.assignee ? <span className="font-bold">{d.assignee}</span> : <span className="text-[#b02f00] font-bold">sem avaliador</span>}</span>
+                </p>
+              )
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* CTA footer */}
+      <div className={cn(
+        "px-4 md:px-5 py-2.5 border-t-2 border-[#191c1e] flex items-center justify-between text-[11px] font-black italic uppercase tracking-wide transition-colors",
+        selected ? "bg-[#ccff00] text-[#161e00]" : "bg-[#f2f4f6] text-[#747a60] group-hover:bg-[#e8f0cc] group-hover:text-[#444933]",
+      )}>
+        <span>{selected ? "Avaliando este evento" : "Clique para avaliar"}</span>
+        <ArrowRight size={14} className={cn("transition-transform", selected ? "" : "group-hover:translate-x-0.5")} />
+      </div>
     </button>
   );
 }
@@ -1083,44 +1108,78 @@ export default function EvaluationsPage() {
           aria-expanded={eventPickerOpen}
           data-testid="select-event"
           disabled={selectableEvents.length === 0}
-          className={`${compact ? "w-full md:w-[20rem] min-h-[3rem] px-3 py-2" : "w-full min-h-[3.25rem] px-4 py-3"} flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#f7f9fb] ${HARD_SHADOW}`}
-        >
-          {pickedEvent ? (
-            <span className="flex flex-col min-w-0">
-              <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e]">{pickedEvent.name}</span>
-              {formatEventSubtitle(pickedEvent) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>}
-            </span>
-          ) : (
-            <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60] truncate">
-              {selectableEvents.length === 0
-                ? (isConsultation ? "Nenhum evento disponível" : "Nenhum evento disponível")
-                : (isConsultation ? "Selecione um evento para consultar..." : (compact ? "Selecionar evento..." : "Selecione um evento para avaliar..."))}
-            </span>
+          className={cn(
+            "group flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+            compact
+              ? "w-full md:w-[22rem] px-3 py-2.5 bg-white hover:bg-[#f7ffd1]"
+              : "w-full px-4 py-3.5 bg-white hover:bg-[#f7ffd1]",
+            HARD_SHADOW,
           )}
-          <ChevronsUpDown size={compact ? 16 : 18} className="shrink-0 text-[#191c1e]" />
+        >
+          <span className="flex items-center gap-2.5 min-w-0">
+            <Flag size={compact ? 15 : 17} className={cn("shrink-0 transition-colors", pickedEvent ? "text-[#506600]" : "text-[#9aa08a]")} />
+            {pickedEvent ? (
+              <span className="flex flex-col min-w-0">
+                <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
+                {formatEventSubtitle(pickedEvent) && (
+                  <span className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>
+                )}
+              </span>
+            ) : (
+              <span className="font-bold italic uppercase text-xs tracking-wider text-[#9aa08a]">
+                {selectableEvents.length === 0
+                  ? "Nenhum evento disponível"
+                  : isConsultation
+                    ? "Selecione um evento..."
+                    : "Escolha um evento para avaliar"}
+              </span>
+            )}
+          </span>
+          <span className={cn("shrink-0 flex items-center gap-1 text-[10px] font-black italic uppercase tracking-wide transition-colors", pickedEvent ? "text-[#506600]" : "text-[#9aa08a]", "group-hover:text-[#191c1e]")}>
+            {pickedEvent && <span className="hidden md:inline">trocar</span>}
+            <ChevronsUpDown size={14} />
+          </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align={compact ? "end" : "start"} className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+      <PopoverContent align={compact ? "end" : "start"} className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)] min-w-[280px]">
         <Command className="rounded-none">
-          <CommandInput data-testid="input-event-search" placeholder="Buscar por evento ou cliente..." className="italic" />
-          <CommandList className="max-h-[320px]">
-            <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+          <div className="border-b-2 border-[#191c1e]">
+            <CommandInput
+              data-testid="input-event-search"
+              placeholder="Buscar evento ou cliente..."
+              className="italic text-sm h-10"
+            />
+          </div>
+          <CommandList className="max-h-[300px]">
+            <CommandEmpty className="py-8 text-center text-xs italic font-bold uppercase text-[#9aa08a]">Nenhum evento encontrado.</CommandEmpty>
             <CommandGroup>
-              {selectableEvents.map(ev => (
-                <CommandItem
-                  key={ev.id}
-                  value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
-                  data-testid={`option-event-${ev.id}`}
-                  onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setEventPickerOpen(false); }}
-                  className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
-                >
-                  <Check size={16} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
-                  <span className="flex flex-col min-w-0">
-                    <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
-                    {formatEventSubtitle(ev) && <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
-                  </span>
-                </CommandItem>
-              ))}
+              {selectableEvents.map(ev => {
+                const isSelected = selectedEventId === ev.id;
+                return (
+                  <CommandItem
+                    key={ev.id}
+                    value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
+                    data-testid={`option-event-${ev.id}`}
+                    onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setEventPickerOpen(false); }}
+                    className={cn(
+                      "rounded-none cursor-pointer py-2.5 px-3 gap-2.5 items-start border-b border-[#eceef0] last:border-0",
+                      isSelected
+                        ? "bg-[#f7ffd1] text-[#161e00]"
+                        : "hover:bg-[#f7f9fb]",
+                    )}
+                  >
+                    <span className={cn("mt-0.5 shrink-0 w-3.5 flex items-center justify-center", isSelected ? "text-[#506600]" : "text-transparent")}>
+                      <Check size={13} />
+                    </span>
+                    <span className="flex flex-col min-w-0">
+                      <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
+                      {formatEventSubtitle(ev) && (
+                        <span className="text-[10px] font-bold italic uppercase text-[#747a60] whitespace-normal mt-0.5">{formatEventSubtitle(ev)}</span>
+                      )}
+                    </span>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
@@ -1152,8 +1211,10 @@ export default function EvaluationsPage() {
             </button>
           )}
           {isEvaluator && (
-            <div className="flex flex-col gap-1 md:items-end">
-              <span className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] px-1">Selecionar evento</span>
+            <div className="flex flex-col gap-1.5 md:items-end w-full md:w-auto">
+              <span className="flex items-center gap-1.5 text-[10px] font-black italic uppercase tracking-wider text-[#747a60] px-0.5">
+                <Flag size={11} /> Evento em avaliação
+              </span>
               {renderEventPicker(true)}
             </div>
           )}
