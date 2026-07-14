@@ -90,6 +90,9 @@ router.get("/events", async (req, res) => {
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
     const progress = activeCriteria.length > 0 ? evaluatedCriteria / activeCriteria.length : 0;
 
+    // Calibrações salvas (score preenchido, independente de publicação de feedback).
+    const calibratedCriteriaCount = criteriaForCalc.filter(c => c.calibratedScore !== null).length;
+
     // Totalmente calibrado = todo critério ativo já teve a calibração
     // publicada como final (não basta ter calibração parcial/rascunho).
     const finalCalibratedCriteria = activeCriteria.filter(c => c.finalPublishedAt != null).length;
@@ -110,7 +113,7 @@ router.get("/events", async (req, res) => {
       .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, evaluatedCriteria, finalCalibratedCriteria, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
   });
   res.json(enriched);
 });

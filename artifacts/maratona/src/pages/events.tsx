@@ -380,7 +380,7 @@ export default function EventsPage() {
                       const concluded = ev.status === "closed";
                       const total = ev.totalCriteria ?? 0;
                       const evaluated = ev.evaluatedCriteria ?? 0;
-                      const calCount = ev.finalCalibratedCriteria ?? 0;
+                      const calCount = ev.calibratedCriteriaCount ?? 0;
                       const fc = ev.fullyCalibrated ?? false;
                       const isScoreFinal = concluded && fc;
                       const missing = ev.unassignedAreaNames ?? [];

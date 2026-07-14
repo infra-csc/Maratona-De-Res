@@ -314,6 +314,8 @@ export interface Event {
   submittedCount?: number;
   /** Nº de critérios ativos já avaliados (ou calibrados) neste evento. */
   evaluatedCriteria?: number;
+  /** Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback). */
+  calibratedCriteriaCount?: number;
   /** Nº de critérios ativos com calibração final publicada. */
   finalCalibratedCriteria?: number;
   /** @nullable */

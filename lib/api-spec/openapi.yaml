@@ -3108,6 +3108,9 @@ components:
         evaluatedCriteria:
           type: integer
           description: Nº de critérios ativos já avaliados (ou calibrados) neste evento.
+        calibratedCriteriaCount:
+          type: integer
+          description: Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).
         finalCalibratedCriteria:
           type: integer
           description: Nº de critérios ativos com calibração final publicada.
