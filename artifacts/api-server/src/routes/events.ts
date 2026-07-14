@@ -437,6 +437,32 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
         .where(ilike(eventsTable.name, `%${normalized}%`))
         .limit(1);
     }
+    // 4ª tentativa: match por tokens extraídos do nome (ignora ordem do ano/estação).
+    // Necessário porque o xlsx usa "Série 2026 - Estação - Cidade" enquanto o banco
+    // armazena "Série Estação - Cidade - 2026" — a posição do ano é invertida.
+    if (!ev && name) {
+      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
+      // Remove tokens que são só ano (ex: "2026") e tira o ano embutido de outros tokens
+      const tokens = parts
+        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
+        .filter(p => p.length >= 3);
+      if (tokens.length >= 2) {
+        const pattern = `%${tokens.join("%")}%`;
+        [ev] = await db.select({ id: eventsTable.id })
+          .from(eventsTable)
+          .where(ilike(eventsTable.name, pattern))
+          .limit(1);
+        // Tenta ordem inversa dos tokens caso DB tenha cidade antes da estação
+        if (!ev) {
+          const reversePattern = `%${[...tokens].reverse().join("%")}%`;
+          [ev] = await db.select({ id: eventsTable.id })
+            .from(eventsTable)
+            .where(ilike(eventsTable.name, reversePattern))
+            .limit(1);
+        }
+      }
+    }
     if (!ev) {
       notFound.push(name || externalId);
     } else {
