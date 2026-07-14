@@ -432,11 +432,20 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
 
 router.delete("/events/:id", requireRole("admin"), async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
-  await db.delete(eventsTable).where(eq(eventsTable.id, id));
-  await audit(req.user!.userId, "delete", "events", id);
-  if (before) await recomputeCycleResults(before.cycleId, req.user!.userId);
-  res.status(204).end();
+  if (Number.isNaN(id)) { res.status(400).json({ error: "ID inválido." }); return; }
+  try {
+    const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
+    if (!before) { res.status(404).json({ error: "Evento não encontrado." }); return; }
+    // absences.event_id não tem onDelete cascade — anular antes de deletar
+    await db.update(absencesTable).set({ eventId: null }).where(eq(absencesTable.eventId, id));
+    await db.delete(eventsTable).where(eq(eventsTable.id, id));
+    await audit(req.user!.userId, "delete", "events", id);
+    await recomputeCycleResults(before.cycleId, req.user!.userId);
+    res.status(204).end();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `Falha ao excluir evento: ${msg}` });
+  }
 });
 
 // Mescla dois eventos que representam a mesma corrida (duplicata por nome divergente):
