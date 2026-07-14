@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ArrowUpDown, Info, LayoutGrid, List } from "lucide-react";
+import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -93,6 +93,36 @@ export default function EventsPage() {
     { key: "fullyEval",   label: "Avaliação 100%",    value: all.filter(e => !!e.fullyCalibrated).length,                         color: "#ccff00" },
   ];
 
+  const colSortPairs: Record<string, string> = {
+    nameAsc: "nameDesc", nameDesc: "nameAsc",
+    dateDesc: "dateAsc", dateAsc: "dateDesc",
+    participantsDesc: "participantsAsc", participantsAsc: "participantsDesc",
+    evaluatedDesc: "evaluatedAsc", evaluatedAsc: "evaluatedDesc",
+    calibrDesc: "calibrAsc", calibrAsc: "calibrDesc",
+    scoreDesc: "scoreAsc", scoreAsc: "scoreDesc",
+    statusAsc: "statusDesc", statusDesc: "statusAsc",
+  };
+  const colPrimary: Record<string, string> = {
+    name: "nameAsc", date: "dateDesc", participants: "participantsDesc",
+    evaluated: "evaluatedDesc", calibr: "calibrDesc", score: "scoreDesc", status: "statusAsc",
+  };
+  const handleColSort = (col: string) => {
+    const primary = colPrimary[col];
+    if (sortBy === primary || sortBy === colSortPairs[primary]) {
+      setSortBy(colSortPairs[sortBy] ?? primary);
+    } else {
+      setSortBy(primary);
+    }
+  };
+  const colActive = (col: string) => {
+    const primary = colPrimary[col];
+    return sortBy === primary || sortBy === colSortPairs[primary];
+  };
+  const sortAsc = (col: string) => {
+    const primary = colPrimary[col];
+    return sortBy === colSortPairs[primary];
+  };
+
   const filtered = all.filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchConfig = filterStatus === "all"
@@ -110,10 +140,22 @@ export default function EventsPage() {
       || (cardFilter === "fullyEval" && !!ev.fullyCalibrated);
     return matchSearch && matchConfig && matchCard;
   }).slice().sort((a, b) => {
-    if (sortBy === "dateAsc")   return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
-    if (sortBy === "scoreDesc") return ((b.teamScore ?? b.averageScore) ?? -1) - ((a.teamScore ?? a.averageScore) ?? -1);
-    if (sortBy === "scoreAsc")  return ((a.teamScore ?? a.averageScore) ?? 101) - ((b.teamScore ?? b.averageScore) ?? 101);
-    if (sortBy === "status")    return (a.status ?? "").localeCompare(b.status ?? "");
+    const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
+    const ec = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.evaluatedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
+    const cc = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.finalCalibratedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
+    if (sortBy === "nameAsc")          return a.name.localeCompare(b.name);
+    if (sortBy === "nameDesc")         return b.name.localeCompare(a.name);
+    if (sortBy === "dateAsc")          return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    if (sortBy === "participantsDesc") return (b.participantCount ?? 0) - (a.participantCount ?? 0);
+    if (sortBy === "participantsAsc")  return (a.participantCount ?? 0) - (b.participantCount ?? 0);
+    if (sortBy === "evaluatedDesc")    return ec(b) - ec(a);
+    if (sortBy === "evaluatedAsc")     return ec(a) - ec(b);
+    if (sortBy === "calibrDesc")       return cc(b) - cc(a);
+    if (sortBy === "calibrAsc")        return cc(a) - cc(b);
+    if (sortBy === "scoreDesc")        return (sc(b) ?? -1) - (sc(a) ?? -1);
+    if (sortBy === "scoreAsc")         return (sc(a) ?? 101) - (sc(b) ?? 101);
+    if (sortBy === "statusAsc")        return (a.status ?? "").localeCompare(b.status ?? "");
+    if (sortBy === "statusDesc")       return (b.status ?? "").localeCompare(a.status ?? "");
     return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
   });
 
@@ -264,19 +306,6 @@ export default function EventsPage() {
                 placeholder="Buscar evento, cliente ou cidade..."
               />
             </div>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-44 h-9 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-[11px] focus:ring-0">
-                <ArrowUpDown size={12} className="mr-1 shrink-0 text-[#747a60]" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dateDesc">Mais Recente</SelectItem>
-                <SelectItem value="dateAsc">Mais Antigo</SelectItem>
-                <SelectItem value="scoreDesc">Maior Score</SelectItem>
-                <SelectItem value="scoreAsc">Menor Score</SelectItem>
-                <SelectItem value="status">Por Status</SelectItem>
-              </SelectContent>
-            </Select>
             <div className="flex border-2 border-[#191c1e] h-9 overflow-hidden shrink-0">
               <button
                 type="button"
@@ -318,14 +347,31 @@ export default function EventsPage() {
                 <table className="w-full text-left border-collapse min-w-[860px]">
                   <thead>
                     <tr className="border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10">
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase italic text-[#ccff00]">Evento</th>
-                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] whitespace-nowrap">Período</th>
-                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Part.</th>
-                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Avaliados</th>
-                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Calibr.</th>
-                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-center">Score</th>
-                      <th className="px-3 py-3 text-[10px] font-bold uppercase italic text-[#ccff00]">Status</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase italic text-[#ccff00] text-right">Ações</th>
+                      {(["name","date","participants","evaluated","calibr","score","status"] as const).map((col, i) => {
+                        const labels: Record<string, string> = { name:"Evento", date:"Período", participants:"Part.", evaluated:"Avaliados", calibr:"Calibr.", score:"Score", status:"Status" };
+                        const centered = ["participants","evaluated","calibr","score"].includes(col);
+                        const active = colActive(col);
+                        const asc = sortAsc(col);
+                        return (
+                          <th
+                            key={col}
+                            onClick={() => handleColSort(col)}
+                            className={`py-3 text-[10px] font-bold uppercase italic cursor-pointer select-none whitespace-nowrap group transition-colors
+                              ${i === 0 ? "px-4" : "px-3"}
+                              ${centered ? "text-center" : ""}
+                              ${active ? "text-[#ccff00]" : "text-[#ccff00]/60 hover:text-[#ccff00]"}`}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {labels[col]}
+                              <span className={`inline-flex flex-col leading-none transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}>
+                                <ChevronUp size={8} className={active && asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
+                                <ChevronDown size={8} className={active && !asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
+                              </span>
+                            </span>
+                          </th>
+                        );
+                      })}
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase italic text-[#ccff00]/60 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y-2 divide-[#eceef0]">
