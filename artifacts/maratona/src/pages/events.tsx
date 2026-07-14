@@ -477,7 +477,9 @@ export default function EventsPage() {
                             </div>
                           </td>
                           <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] whitespace-nowrap">
-                            {new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — {new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                            {ev.startDate === ev.endDate
+                              ? new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                              : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — ${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`}
                           </td>
                           <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
                           <td className={`px-3 py-2.5 text-xs font-black italic text-center ${total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
@@ -622,7 +624,9 @@ export default function EventsPage() {
                         <div className="flex flex-wrap items-center gap-4 text-xs font-bold italic text-[#444933] mt-3 pt-3 border-t-2 border-dashed border-[#e0e3e5]">
                           <span className="flex items-center gap-1.5">
                             <Calendar size={12} className="text-[#747a60]" />
-                            {new Date(ev.startDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })} – {new Date(ev.endDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })}
+                            {ev.startDate === ev.endDate
+                              ? new Date(ev.startDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
+                              : `${new Date(ev.startDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })} – ${new Date(ev.endDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })}`}
                           </span>
                           <span className="flex items-center gap-1.5">
                             <MapPin size={12} className="text-[#747a60]" />
