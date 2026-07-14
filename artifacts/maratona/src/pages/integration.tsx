@@ -439,6 +439,30 @@ export default function IntegrationPage() {
     }
   }
 
+  const [recomputePending, setRecomputePending] = useState(false);
+  const [recomputeResult, setRecomputeResult] = useState<{ processed: number; warnings: string[] } | null>(null);
+
+  async function handleRecompute() {
+    setRecomputePending(true);
+    setRecomputeResult(null);
+    try {
+      const token = getAuthToken();
+      const res = await fetch("/api/results/quarterly/recompute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
+      const data = await res.json() as { processed: number; warnings: string[] };
+      setRecomputeResult(data);
+      qc.invalidateQueries();
+      toast({ title: `Ciclo recalculado — ${data.processed} colaborador(es) processado(s)${data.warnings.length > 0 ? ` · ${data.warnings.length} aviso(s)` : ""}` });
+    } catch (err: unknown) {
+      toast({ title: "Falha ao recalcular", description: err instanceof Error ? err.message : "Tente novamente.", variant: "destructive" });
+    } finally {
+      setRecomputePending(false);
+    }
+  }
+
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto bg-slate-50/30 min-h-full">
       <div>
@@ -810,6 +834,38 @@ export default function IntegrationPage() {
                   {dateSyncResult.notFoundIds.length > 0 && (
                     <p className="text-xs mt-1 opacity-70">IDs não encontrados: {dateSyncResult.notFoundIds.join(", ")}</p>
                   )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {(isAdmin || user?.role === "rh") && (
+        <Card className="border-none shadow-sm bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <RefreshCw size={18} className="text-primary" /> Recalcular Ciclo
+            </CardTitle>
+            <CardDescription>Refaz o snapshot de ranking, elegibilidade e bônus para o ciclo atual. Use após ajustes de critérios, exclusão de participantes Sup Ceno ou outras correções manuais.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-3">
+            <Button
+              disabled={recomputePending}
+              onClick={handleRecompute}
+              className="w-full"
+            >
+              <RefreshCw size={16} className={`mr-2 ${recomputePending ? "animate-spin" : ""}`} />
+              {recomputePending ? "Recalculando…" : "Recalcular Resultados do Ciclo"}
+            </Button>
+            {recomputeResult && (
+              <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${recomputeResult.warnings.length > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+                {recomputeResult.warnings.length > 0 ? <AlertTriangle size={16} className="shrink-0 mt-0.5" /> : <CheckCircle2 size={16} className="shrink-0 mt-0.5" />}
+                <div>
+                  <p>{recomputeResult.processed} colaborador(es) processado(s).</p>
+                  {recomputeResult.warnings.map((w, i) => (
+                    <p key={i} className="text-xs mt-1 opacity-80">{w}</p>
+                  ))}
                 </div>
               </div>
             )}

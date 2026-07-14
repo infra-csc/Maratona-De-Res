@@ -264,13 +264,22 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
         .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
         .where(inArray(eventParticipantsTable.eventId, allCycleEventIds))
     : [];
-  // Colaboradores que participaram como "Sup Ceno *" em qualquer evento
-  // confirmado do ciclo são inelegíveis para o ranking/bônus, mesmo que
-  // tenham outras participações que contam para nota. O cargo global
-  // (employeeFunction) também marca como Sup Ceno mesmo se a participação
-  // pontual do evento tiver outra função registrada.
+  // Colaboradores que participaram como "Sup Ceno *" em QUALQUER evento do
+  // ciclo (confirmado ou não) são inelegíveis para o ranking/bônus. Usamos
+  // allCycleEventIdsUnfiltered para não deixar passar quem tem papel de Sup
+  // Ceno apenas em eventos ainda sem resultsConfirmed.
+  const supCenoCheckRows = allCycleEventIdsUnfiltered.length > 0
+    ? await db.select({
+        employeeId: eventParticipantsTable.employeeId,
+        functionName: eventParticipantsTable.functionName,
+        employeeFunction: employeesTable.functionName,
+      })
+        .from(eventParticipantsTable)
+        .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
+        .where(inArray(eventParticipantsTable.eventId, allCycleEventIdsUnfiltered))
+    : [];
   const supCenoEmployeeIds = new Set<number>();
-  for (const r of participationRows) {
+  for (const r of supCenoCheckRows) {
     if (!r.employeeId) continue;
     if (isInformationalFunction(r.functionName) || isInformationalFunction(r.employeeFunction)) supCenoEmployeeIds.add(r.employeeId);
   }
@@ -340,11 +349,10 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
       eligible = false;
       eligibilityReason = `Participou de ${participatedCount} de ${minEvents} eventos exigidos no ciclo`;
     }
-    // Regra: participação como "Sup Ceno *" em qualquer evento confirmado do
-    // ciclo desqualifica do ranking/bônus, mesmo que a pessoa tenha outras
-    // participações que contam para nota. A função supervisora é informativa,
-    // não avaliada — quem a exerce não pode ser ranqueado no mesmo ciclo.
-    if (eligible && supCenoEmployeeIds.has(employeeId)) {
+    // Regra: participação como "Sup Ceno *" em qualquer evento do ciclo
+    // (confirmado ou não) desqualifica do ranking/bônus. Também verifica o
+    // cargo global do colaborador como segunda camada de proteção.
+    if (eligible && (supCenoEmployeeIds.has(employeeId) || isInformationalFunction(employee.functionName))) {
       eligible = false;
       eligibilityReason = "Participou como Sup Ceno em um ou mais eventos do ciclo";
     }
