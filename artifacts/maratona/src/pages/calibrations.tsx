@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, useGetReviewRequests, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,23 @@ const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 // Badge do seletor de eventos: eventos históricos sempre "Fechado"; demais mostram
 // o estado real da publicação de feedback (final > parcial), nunca o status
 // bruto do evento — sem publicação nenhuma, continua "Em Avaliação" mesmo fechado.
+function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
+  const result: { sat: string; sun: string; label: string }[] = [];
+  const end = new Date(endDate + "T12:00:00");
+  const d = new Date(startDate + "T12:00:00");
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+  while (d <= end) {
+    const sat = d.toISOString().split("T")[0];
+    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
+    const sun = sunD.toISOString().split("T")[0];
+    const label = `${String(d.getDate()).padStart(2,"0")}–${String(sunD.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+    result.push({ sat, sun, label });
+    d.setDate(d.getDate() + 7);
+  }
+  return result;
+}
+
 function calibrationEventChip(ev: { isHistorical?: boolean; feedbackReleased?: boolean; partialPublishedAt?: string | null }): { label: string; cls: string } {
   if (ev.isHistorical) return { label: "Fechado", cls: "bg-[#d8dadc] text-[#444933]" };
   if (ev.feedbackReleased) return { label: "Avaliação Final", cls: "bg-[#191c1e] text-[#ccff00]" };
@@ -43,7 +60,6 @@ export default function CalibrationsPage() {
   const [eventStatusFilter, setEventStatusFilter] = useState<"all" | "open" | "closed">("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [filterWeekend, setFilterWeekend] = useState(false);
   const [calScores, setCalScores] = useState<Record<number, string>>({});
   const [calReasons, setCalReasons] = useState<Record<number, string>>({});
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
@@ -71,6 +87,7 @@ export default function CalibrationsPage() {
   }
 
   const { data: events } = useGetEvents();
+  const { data: cycle } = useGetCurrentCycle();
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["ec", selectedEventId] as unknown[] },
   });
@@ -97,16 +114,11 @@ export default function CalibrationsPage() {
   // Todos os eventos do ciclo aparecem — a calibração pode começar a qualquer
   // momento, inclusive antes de todas as avaliações serem enviadas.
   const calibratableEvents = events ?? [];
-  const isWeekend = (dateStr: string | null | undefined) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr + "T12:00:00");
-    return d.getDay() === 0 || d.getDay() === 6;
-  };
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
   const filteredCalibratableEvents = calibratableEvents.filter(e => {
     const matchStatus = eventStatusFilter === "all" || e.status === eventStatusFilter;
     const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
-    const matchWeekend = !filterWeekend || isWeekend(e.startDate) || isWeekend(e.endDate);
-    return matchStatus && matchDate && matchWeekend;
+    return matchStatus && matchDate;
   });
   const pickedEvent = calibratableEvents.find(e => e.id === selectedEventId);
 
@@ -619,16 +631,31 @@ export default function CalibrationsPage() {
                   <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
                 </div>
               </div>
-              <div className="flex gap-2 items-center">
-                <button type="button" onClick={() => setFilterWeekend(p => !p)} className={`flex-1 h-8 px-3 text-[10px] font-black italic uppercase tracking-wide border-2 transition-colors ${filterWeekend ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"}`}>
-                  {filterWeekend ? "✓ " : ""}Fim de semana
+              {cycleWeekends.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-1">Fim de semana</p>
+                  <div className="flex flex-wrap gap-1">
+                    {cycleWeekends.map(w => {
+                      const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                      return (
+                        <button
+                          key={w.sat}
+                          type="button"
+                          onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
+                          className={`px-2 py-1 text-[9px] font-black italic uppercase border-2 transition-colors ${active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"}`}
+                        >
+                          {w.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {(filterDateFrom || filterDateTo) && (
+                <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] whitespace-nowrap">
+                  × Limpar
                 </button>
-                {(filterDateFrom || filterDateTo || filterWeekend) && (
-                  <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }} className="text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] whitespace-nowrap">
-                    × Limpar
-                  </button>
-                )}
-              </div>
+              )}
             </div>
 
             <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>

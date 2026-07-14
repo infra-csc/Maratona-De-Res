@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetEmployees, useAddEventParticipant, useRemoveEventParticipant, useUpdateEventParticipant, useGetAbsences, useUpdateEventAssignments, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetEmployees, useAddEventParticipant, useRemoveEventParticipant, useUpdateEventParticipant, useGetAbsences, useUpdateEventAssignments, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useGetCurrentCycle, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -280,6 +280,23 @@ function ConformityLinkHistory({ history }: { history: PublicToken[] }) {
   );
 }
 
+function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
+  const result: { sat: string; sun: string; label: string }[] = [];
+  const end = new Date(endDate + "T12:00:00");
+  const d = new Date(startDate + "T12:00:00");
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+  while (d <= end) {
+    const sat = d.toISOString().split("T")[0];
+    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
+    const sun = sunD.toISOString().split("T")[0];
+    const label = `${String(d.getDate()).padStart(2,"0")}–${String(sunD.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+    result.push({ sat, sun, label });
+    d.setDate(d.getDate() + 7);
+  }
+  return result;
+}
+
 export default function EvaluationsPage() {
   const { user } = useAuth();
   const isManager = !!user && ["admin", "rh", "diretoria"].includes(user.role);
@@ -294,7 +311,6 @@ export default function EvaluationsPage() {
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [filterWeekend, setFilterWeekend] = useState(false);
   const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
   const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
@@ -339,6 +355,7 @@ export default function EvaluationsPage() {
   const [ferramentasPickerUserId, setFerramentasPickerUserId] = useState<number | null>(null);
 
   const { data: events } = useGetEvents({});
+  const { data: cycle } = useGetCurrentCycle();
 
   // Lista global de avaliadores (independe do evento selecionado) para permitir
   // filtrar por Avaliador antes ou sem escolher um Evento.
@@ -562,18 +579,13 @@ export default function EvaluationsPage() {
   const activeEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
   // Only events whose criteria the RH has already confirmed can be evaluated.
   const configuredEvents = activeEvents.filter(e => e.criteriaConfirmed);
-  const isWeekend = (dateStr: string | null | undefined) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr + "T12:00:00");
-    return d.getDay() === 0 || d.getDay() === 6;
-  };
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
   // Evaluators may only act on RH-released events; consultation roles may inspect any open event.
   // Ordenado alfabeticamente por nome do evento (pt-BR, ignorando maiúsc./acentos).
   const selectableEvents = [...(isEvaluator ? configuredEvents : activeEvents)]
     .filter(e => {
       const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
-      const matchWeekend = !filterWeekend || isWeekend(e.startDate) || isWeekend(e.endDate);
-      return matchDate && matchWeekend;
+      return matchDate;
     })
     .sort((a, b) =>
       (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" })
@@ -1284,11 +1296,28 @@ export default function EvaluationsPage() {
                     <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">Até</label>
                     <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
                   </div>
-                  <button type="button" onClick={() => setFilterWeekend(p => !p)} className={cn("w-full h-7 px-2 text-[9px] font-black italic uppercase tracking-wide border-2 transition-colors", filterWeekend ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                    {filterWeekend ? "✓ " : ""}Fim de semana
-                  </button>
-                  {(filterDateFrom || filterDateTo || filterWeekend) && (
-                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }} className="w-full text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5">
+                  {cycleWeekends.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-0.5">Fim de semana</p>
+                      <div className="flex flex-wrap gap-1">
+                        {cycleWeekends.map(w => {
+                          const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                          return (
+                            <button
+                              key={w.sat}
+                              type="button"
+                              onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
+                              className={cn("px-1.5 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}
+                            >
+                              {w.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {(filterDateFrom || filterDateTo) && (
+                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="w-full text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5">
                       × Limpar datas
                     </button>
                   )}

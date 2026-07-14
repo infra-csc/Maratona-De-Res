@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
+import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurrentCycle, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -20,6 +20,23 @@ import { cn } from "@/lib/utils";
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
+function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
+  const result: { sat: string; sun: string; label: string }[] = [];
+  const end = new Date(endDate + "T12:00:00");
+  const d = new Date(startDate + "T12:00:00");
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+  while (d <= end) {
+    const sat = d.toISOString().split("T")[0];
+    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
+    const sun = sunD.toISOString().split("T")[0];
+    const label = `${String(d.getDate()).padStart(2,"0")}–${String(sunD.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+    result.push({ sat, sun, label });
+    d.setDate(d.getDate() + 7);
+  }
+  return result;
+}
+
 export default function EventsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -30,7 +47,6 @@ export default function EventsPage() {
   const [sortBy, setSortBy] = useState("dateDesc");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [filterWeekend, setFilterWeekend] = useState(false);
   const [viewMode, setViewModeState] = useState<"cards" | "table">(
     () => (localStorage.getItem("events_view_mode") === "cards" ? "cards" : "table"),
   );
@@ -50,6 +66,7 @@ export default function EventsPage() {
     undefined,
     { query: { queryKey, refetchInterval: 15000, refetchOnWindowFocus: true } }
   );
+  const { data: cycle } = useGetCurrentCycle();
 
   const mergeMutation = useMergeEvent({
     mutation: {
@@ -142,16 +159,11 @@ export default function EventsPage() {
     return sortBy === colSortPairs[primary];
   };
 
-  const isWeekend = (dateStr: string | null | undefined) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr + "T12:00:00");
-    return d.getDay() === 0 || d.getDay() === 6;
-  };
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
 
   const filtered = all.filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
-    const matchWeekend = !filterWeekend || isWeekend(ev.startDate) || isWeekend(ev.endDate);
     const matchConfig = filterStatus === "all"
       || (filterStatus === "configured" && !!ev.criteriaConfirmed)
       || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
@@ -165,7 +177,7 @@ export default function EventsPage() {
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && !ev.fullyCalibrated)
       || (cardFilter === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
-    return matchSearch && matchDate && matchWeekend && matchConfig && matchCard;
+    return matchSearch && matchDate && matchConfig && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
     const ec = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.evaluatedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
@@ -323,17 +335,30 @@ export default function EventsPage() {
                   className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => setFilterWeekend(p => !p)}
-                className={`w-full h-8 px-3 text-[10px] font-black italic uppercase tracking-wide border-2 transition-colors ${filterWeekend ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"}`}
-              >
-                {filterWeekend ? "✓ " : ""}Fim de semana
-              </button>
-              {(filterDateFrom || filterDateTo || filterWeekend) && (
+              {cycleWeekends.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-1">Fim de semana</p>
+                  <div className="flex flex-wrap gap-1">
+                    {cycleWeekends.map(w => {
+                      const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                      return (
+                        <button
+                          key={w.sat}
+                          type="button"
+                          onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
+                          className={`px-2 py-1 text-[9px] font-black italic uppercase border-2 transition-colors ${active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"}`}
+                        >
+                          {w.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {(filterDateFrom || filterDateTo) && (
                 <button
                   type="button"
-                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }}
+                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
                   className="w-full text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5"
                 >
                   × Limpar datas
