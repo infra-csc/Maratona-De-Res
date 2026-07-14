@@ -1194,113 +1194,92 @@ export default function EvaluationsPage() {
   };
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-10">
-        {/* Page header */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
-          <div>
-            <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">Central de Avaliações</h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2">{isConsultation ? "Consulte o andamento das avaliações de cada evento em tempo real." : "Mantenha o ritmo. Avalie a sprint e impulsione a equipe."}</p>
-          </div>
+    <div className="bg-[#f7f9fb] min-h-screen flex flex-col text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+
+      {/* ── Top bar ── */}
+      <div className="bg-[#191c1e] px-5 py-3 flex items-center justify-between gap-4 shrink-0">
+        <h1 data-testid="text-page-title" className="text-lg italic uppercase tracking-tighter font-black leading-none text-white">
+          Central de <span className="text-[#ccff00]">Avaliações</span>
+        </h1>
+        <div className="flex items-center gap-2">
           {isManager && (
             <button
               data-testid="button-export-pending"
               onClick={handleExportPending}
-              className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+              className="flex items-center gap-1.5 border border-[#ccff00]/40 px-3 py-1.5 text-[11px] font-black italic uppercase text-[#ccff00] hover:border-[#ccff00] transition-colors"
             >
-              <Download size={18} /> Exportar Pendentes
+              <Download size={14} /> Exportar Pendentes
             </button>
           )}
-          {isEvaluator && (
-            <div className="flex flex-col gap-1.5 md:items-end w-full md:w-auto">
-              <span className="flex items-center gap-1.5 text-[10px] font-black italic uppercase tracking-wider text-[#747a60] px-0.5">
-                <Flag size={11} /> Evento em avaliação
-              </span>
-              {renderEventPicker(true)}
-            </div>
-          )}
-        </section>
+        </div>
+      </div>
 
-        {/* STEP 01 — Filtros (managers/consultation pick from the full panel) */}
-        {!isEvaluator && (
-        <section className="bg-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 px-3 py-1.5 bg-[#ccff00] border-l-2 border-b-2 border-[#191c1e] text-[10px] font-black italic uppercase tracking-wider">ETAPA 01</div>
-          <div className="flex items-start justify-between gap-4 mb-1">
-            <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">{isConsultation ? "Filtros" : "Selecionar Evento"}</h3>
-            {isConsultation && (selectedEventId != null || selectedAvaliadorId != null || statusFilter !== "all" || typeFilter !== "all") && (
-              <button
-                type="button"
-                data-testid="button-clear-filters"
-                onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); }}
-                className="shrink-0 mt-1 flex items-center gap-1.5 text-[11px] font-black italic uppercase tracking-wider text-[#862200] hover:underline"
-              >
-                <X size={13} /> Limpar filtros
-              </button>
-            )}
-          </div>
-          <p className="text-sm text-[#444933] italic mb-5">{isConsultation ? "Selecione o evento e refine a consulta por avaliador ou status." : "Busque pelo nome do evento ou do cliente e selecione para iniciar a avaliação."}</p>
+      {/* ── Body: sidebar + main ── */}
+      <div className="flex flex-1 min-h-0">
 
-          <div className={cn("grid grid-cols-1 gap-4", isConsultation && "md:grid-cols-3")}>
-            <div>
+        {/* ── Sidebar ── */}
+        <aside className="w-56 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
+
+          {/* Manager/consultation: event picker + filters */}
+          {!isEvaluator && (
+            <>
+              <div className="p-3 border-b-2 border-[#eceef0]">
+                <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><Calendar size={10} /> Evento</p>
+                {renderEventPicker(false)}
+              </div>
+
+              <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
+                <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><ListChecks size={10} /> Status</p>
+                <div className="flex gap-1">
+                  {(["all","pending","done"] as const).map(f => (
+                    <button key={f} onClick={() => setStatusFilter(f)} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", statusFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                      {f === "all" ? "Todos" : f === "pending" ? "Pend." : "Concl."}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {isConsultation && (
-                <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
-                  <Calendar size={12} /> Evento
-                </p>
+                <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
+                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><Target size={10} /> Tipo</p>
+                  <div className="flex gap-1">
+                    {(["all","com-nota","sem-nota"] as const).map(f => (
+                      <button key={f} onClick={() => setTypeFilter(f as "all" | "com-nota" | "sem-nota")} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", typeFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                        {f === "all" ? "Todos" : f === "com-nota" ? "Com nota" : "Sem nota"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-              {renderEventPicker(false)}
-            </div>
 
-            {isConsultation && (
-              <>
-                <div>
-                  <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
-                    <User size={12} /> Avaliador
-                  </p>
+              {isConsultation && (
+                <div className="p-3 border-b-2 border-[#eceef0]">
+                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><User size={10} /> Avaliador</p>
                   {(() => {
                     const avaliadorOptions = selectedEventId && avaliadorStats.length > 0
                       ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
                       : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
-                    const pickedAvaliador = avaliadorOptions.find(av => av.id === selectedAvaliadorId);
                     return (
                       <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
                         <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            role="combobox"
-                            aria-expanded={avaliadorPickerOpen}
-                            data-testid="select-avaliador"
-                            className="w-full h-[3.25rem] px-4 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase transition-all hover:bg-[#f7f9fb] disabled:opacity-50"
-                          >
-                            <span className="truncate text-[#191c1e]">
-                              {pickedAvaliador ? `${pickedAvaliador.name}${pickedAvaliador.suffix ? ` (${pickedAvaliador.suffix})` : ""}` : "Todos os avaliadores"}
-                            </span>
-                            <ChevronsUpDown size={16} className="shrink-0 text-[#191c1e]" />
+                          <button type="button" role="combobox" data-testid="select-avaliador" className="w-full h-8 px-2 flex items-center justify-between gap-2 text-left border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors">
+                            <span className="truncate text-[#191c1e]">{avaliadorOptions.find(a => a.id === selectedAvaliadorId)?.name ?? "Todos"}</span>
+                            <ChevronsUpDown size={12} className="shrink-0 text-[#191c1e]" />
                           </button>
                         </PopoverTrigger>
-                        <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
+                        <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-52">
                           <Command className="rounded-none">
-                            <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic" />
-                            <CommandList className="max-h-[320px]">
-                              <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum avaliador encontrado.</CommandEmpty>
+                            <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic text-xs" />
+                            <CommandList className="max-h-[240px]">
+                              <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
                               <CommandGroup>
-                                <CommandItem
-                                  value="Todos os avaliadores"
-                                  data-testid="option-avaliador-all"
-                                  onSelect={() => { setSelectedAvaliadorId(null); setAvaliadorPickerOpen(false); }}
-                                  className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3"
-                                >
-                                  <Check size={16} className={cn("shrink-0", selectedAvaliadorId == null ? "opacity-100" : "opacity-0")} />
-                                  <span className="font-bold italic uppercase text-xs">Todos os avaliadores</span>
+                                <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorId(null); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
+                                  <Check size={13} className={cn("shrink-0", selectedAvaliadorId == null ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-bold italic uppercase text-xs">Todos</span>
                                 </CommandItem>
                                 {avaliadorOptions.map(av => (
-                                  <CommandItem
-                                    key={av.id}
-                                    value={av.name}
-                                    data-testid={`option-avaliador-${av.id}`}
-                                    onSelect={() => { setSelectedAvaliadorId(av.id); setAvaliadorPickerOpen(false); }}
-                                    className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3"
-                                  >
-                                    <Check size={16} className={cn("shrink-0", selectedAvaliadorId === av.id ? "opacity-100" : "opacity-0")} />
+                                  <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => { setSelectedAvaliadorId(av.id); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
+                                    <Check size={13} className={cn("shrink-0", selectedAvaliadorId === av.id ? "opacity-100" : "opacity-0")} />
                                     <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
                                   </CommandItem>
                                 ))}
@@ -1312,141 +1291,66 @@ export default function EvaluationsPage() {
                     );
                   })()}
                 </div>
+              )}
 
-                <div>
-                  <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
-                    <ListChecks size={12} /> Status
-                  </p>
-                  <Select
-                    value={statusFilter}
-                    onValueChange={(v) => setStatusFilter(v as "all" | "pending" | "done")}
-                  >
-                    <SelectTrigger data-testid="select-status-filter" className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0 disabled:opacity-50">
-                      <SelectValue placeholder="Todas" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="pending">Pendentes</SelectItem>
-                      <SelectItem value="done">Avaliadas</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {(selectedEventId != null || selectedAvaliadorId != null || statusFilter !== "all" || typeFilter !== "all") && (
+                <div className="px-3 py-2 border-b-2 border-[#eceef0]">
+                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
+                    <X size={11} /> Limpar filtros
+                  </button>
                 </div>
+              )}
 
-                {isConsultation && (
-                  <div>
-                    <p className="text-[10px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1.5">
-                      <Target size={12} /> Tipo
-                    </p>
-                    <Select
-                      value={typeFilter}
-                      onValueChange={(v) => setTypeFilter(v as "all" | "com-nota" | "sem-nota")}
-                    >
-                      <SelectTrigger className="h-[3.25rem] rounded-none border-2 border-[#191c1e] bg-white italic font-bold text-xs uppercase focus:ring-0">
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="com-nota">Com nota</SelectItem>
-                        <SelectItem value="sem-nota">Sem nota (falta)</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div className="flex-1" />
+
+              <div className="p-3 border-t-2 border-[#eceef0]">
+                <p className="text-[9px] italic text-[#747a60] leading-snug">
+                  {isConsultation ? "Modo consulta — acompanhe o andamento sem editar notas." : "Apenas eventos configurados e liberados pelo RH aparecem."}
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Evaluator: A Fazer / Concluídas + event card list */}
+          {isEvaluator && (
+            <>
+              <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
+                <p className="text-[10px] font-black italic uppercase tracking-wider text-[#444933]">Minhas Avaliações</p>
+              </div>
+              {configuredEvents.length === 0 ? (
+                <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhum evento liberado no momento.</div>
+              ) : relevantEvaluatorEvents.length === 0 ? (
+                <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhuma avaliação atribuída à sua área.</div>
+              ) : (
+                <>
+                  <div className="flex border-b-2 border-[#eceef0]">
+                    <button data-testid="tab-todo" onClick={() => { setActiveEvalTab("todo"); setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }} className={cn("flex-1 py-2 text-[10px] font-black italic uppercase border-b-2 -mb-0.5 transition-colors", activeEvalTab === "todo" ? "border-[#ccff00] bg-[#f7ffe0] text-[#191c1e]" : "border-transparent text-[#747a60] hover:text-[#191c1e]")}>
+                      A Fazer ({todoEvents.length})
+                    </button>
+                    <button data-testid="tab-done" onClick={() => { setActiveEvalTab("done"); setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }} className={cn("flex-1 py-2 text-[10px] font-black italic uppercase border-b-2 -mb-0.5 transition-colors", activeEvalTab === "done" ? "border-[#ccff00] bg-[#f7ffe0] text-[#191c1e]" : "border-transparent text-[#747a60] hover:text-[#191c1e]")}>
+                      Concl. ({doneEvents.length})
+                    </button>
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                  <div className="flex-1 overflow-auto">
+                    {(activeEvalTab === "todo" ? todoEvents : doneEvents).length === 0 ? (
+                      <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">
+                        {activeEvalTab === "todo" ? "Tudo em dia!" : "Nenhuma concluída ainda."}
+                      </div>
+                    ) : (
+                      (activeEvalTab === "todo" ? todoEvents : doneEvents).map(ev => (
+                        <EvaluatorEventCard key={ev.id} event={ev} userId={user?.id} selected={selectedEventId === ev.id} onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }} principalAreaIds={principalAreaIds} />
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </aside>
 
-          <div className="mt-4 flex items-start gap-2.5 bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-            <Info size={16} className="shrink-0 mt-0.5 text-[#444933]" />
-            <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#444933]">
-              {isConsultation
-                ? "Modo consulta: acompanhe o status de cada avaliação por evento, sem editar notas."
-                : "Apenas eventos já configurados e liberados pelo RH aparecem nesta lista."}
-            </p>
-          </div>
-        </section>
-        )}
-
-        {/* Evaluator overview — pending vs completed evaluations at a glance */}
-        {isEvaluator && (
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <ListChecks size={22} />
-              <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">Minhas Avaliações</h3>
-            </div>
-            <p className="text-sm text-[#444933] italic px-1 -mt-1">
-              Foque no que ainda falta avaliar. As avaliações concluídas ficam na aba ao lado. Clique em um evento para avaliar ou rever.
-            </p>
-            {configuredEvents.length === 0 ? (
-              <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
-                Nenhum evento liberado para avaliação no momento.
-              </div>
-            ) : relevantEvaluatorEvents.length === 0 ? (
-              <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
-                Nenhuma avaliação atribuída à sua área nos eventos abertos no momento.
-              </div>
-            ) : (
-              <Tabs value={activeEvalTab} onValueChange={(v) => { setActiveEvalTab(v as "todo" | "done"); setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }} className="space-y-4">
-                <TabsList className="bg-transparent p-0 h-auto gap-2 justify-start rounded-none">
-                  <TabsTrigger
-                    value="todo"
-                    data-testid="tab-todo"
-                    className="rounded-none border-2 border-[#191c1e] bg-white px-4 py-2 font-black italic uppercase text-xs tracking-wider data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none"
-                  >
-                    A Fazer ({todoEvents.length})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="done"
-                    data-testid="tab-done"
-                    className="rounded-none border-2 border-[#191c1e] bg-white px-4 py-2 font-black italic uppercase text-xs tracking-wider data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none"
-                  >
-                    Concluídas ({doneEvents.length})
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="todo" className="mt-0">
-                  {todoEvents.length === 0 ? (
-                    <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
-                      Tudo em dia! Nenhuma avaliação pendente no momento.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {todoEvents.map(ev => (
-                        <EvaluatorEventCard
-                          key={ev.id}
-                          event={ev}
-                          userId={user?.id}
-                          selected={selectedEventId === ev.id}
-                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                          principalAreaIds={principalAreaIds}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-                <TabsContent value="done" className="mt-0">
-                  {doneEvents.length === 0 ? (
-                    <div className="text-center py-10 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
-                      Nenhuma avaliação concluída ainda.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {doneEvents.map(ev => (
-                        <EvaluatorEventCard
-                          key={ev.id}
-                          event={ev}
-                          userId={user?.id}
-                          selected={selectedEventId === ev.id}
-                          onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                          principalAreaIds={principalAreaIds}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            )}
-          </section>
-        )}
+        {/* ── Main content ── */}
+        <div className="flex-1 overflow-auto min-w-0">
+          <div className="p-6 md:p-8 space-y-8">
 
         {isEvaluator && selectedEventId && activeEvalTab === "todo" && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (() => {
           const principalAreaIds = new Set(myPrincipalAreas.map(a => a.id));
@@ -1632,7 +1536,7 @@ export default function EvaluationsPage() {
               <CheckCircle className="text-[#161e00] skew-x-[6deg]" size={32} />
             </div>
             <h2 className="text-2xl italic uppercase font-black tracking-tight mb-2">{isConsultation ? "Pronto para consultar" : "Pronto para avaliar"}</h2>
-            <p className="text-[#444933] italic max-w-md">{isConsultation ? "Selecione um evento no menu acima para consultar o andamento das avaliações da equipe." : "Selecione um evento no menu acima para iniciar ou continuar a avaliação da equipe responsável."}</p>
+            <p className="text-[#444933] italic max-w-md">{isConsultation ? "Selecione um evento na barra lateral para consultar o andamento das avaliações da equipe." : "Selecione um evento na barra lateral para iniciar ou continuar a avaliação da equipe responsável."}</p>
           </div>
         ) : (
           <div className="space-y-10">
@@ -3006,6 +2910,8 @@ export default function EvaluationsPage() {
             </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {/* Redirect dialog — avaliador redireciona o formulário inteiro (todos os critérios da área) */}
