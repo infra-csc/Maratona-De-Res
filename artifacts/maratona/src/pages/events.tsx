@@ -85,11 +85,14 @@ export default function EventsPage() {
   });
 
   const all = events ?? [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isPastOrClosed = (e: typeof all[0]) => e.status === "closed" || (!!e.endDate && new Date(e.endDate) < today);
   const statsData = [
     { key: "configured",  label: "Configurados",     value: all.filter(e => e.criteriaConfirmed).length,                         color: "#506600" },
     { key: "confirmed",   label: "Confirmados",       value: all.filter(e => e.resultsConfirmed).length,                          color: "#506600" },
     { key: "unconfirmed", label: "Não confirmados",   value: all.filter(e => !e.resultsConfirmed).length,                         color: "#ff5722" },
-    { key: "pendingCal",  label: "Falta calibrar",    value: all.filter(e => e.status === "closed" && (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) < (e.totalCriteria ?? 0)).length, color: "#ffb300" },
+    { key: "pendingCal",  label: "Falta calibrar",    value: all.filter(e => isPastOrClosed(e) && (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) < (e.totalCriteria ?? 0)).length, color: "#ffb300" },
     { key: "fullyEval",   label: "Avaliação 100%",    value: all.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length,                                         color: "#ccff00" },
   ];
 
@@ -129,14 +132,14 @@ export default function EventsPage() {
       || (filterStatus === "configured" && !!ev.criteriaConfirmed)
       || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
       || (filterStatus === "unconfirmed" && !ev.resultsConfirmed)
-      || (filterStatus === "pendingCal" && ev.status === "closed" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
+      || (filterStatus === "pendingCal" && isPastOrClosed(ev) && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
       || (filterStatus === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0))
       || (filterStatus === "fullyCalibrated" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
     const matchCard = cardFilter === null
       || (cardFilter === "configured" && ev.criteriaConfirmed)
       || (cardFilter === "confirmed" && ev.resultsConfirmed)
       || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
-      || (cardFilter === "pendingCal" && ev.status === "closed" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
+      || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
       || (cardFilter === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
     return matchSearch && matchConfig && matchCard;
   }).slice().sort((a, b) => {
