@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, areaConformityRoutingTable } from "@workspace/db";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, ilike, or } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
@@ -401,29 +401,40 @@ router.patch("/events/:id/historical-result", requireRole("admin", "rh"), async 
   res.json({ ...ev, warnings });
 });
 
-// Atualiza startDate e endDate de eventos em lote pelo externalId.
-// Usado para corrigir datas vindas de planilhas (data única → startDate = endDate).
+// Atualiza startDate, endDate e name dos eventos em lote.
+// Tenta bater por externalId primeiro; se não encontrar, tenta pelo nome (ilike).
 router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => {
-  const updates = req.body?.updates as { externalId: string; date: string }[] | undefined;
+  const updates = req.body?.updates as { externalId: string; name: string; date: string }[] | undefined;
   if (!Array.isArray(updates) || updates.length === 0) {
-    res.status(400).json({ error: "Campo updates (array {externalId, date}) é obrigatório." });
+    res.status(400).json({ error: "Campo updates (array {externalId, name, date}) é obrigatório." });
     return;
   }
   const updated: string[] = [];
   const notFound: string[] = [];
-  for (const { externalId, date } of updates) {
-    if (!externalId || !date) continue;
-    const [ev] = await db.select({ id: eventsTable.id })
-      .from(eventsTable)
-      .where(eq(eventsTable.externalId, externalId))
-      .limit(1);
+  for (const { externalId, name, date } of updates) {
+    if (!date) continue;
+    // 1ª tentativa: por externalId
+    let ev: { id: number } | undefined;
+    if (externalId) {
+      [ev] = await db.select({ id: eventsTable.id })
+        .from(eventsTable)
+        .where(eq(eventsTable.externalId, externalId))
+        .limit(1);
+    }
+    // 2ª tentativa: por nome (case-insensitive, trim)
+    if (!ev && name) {
+      [ev] = await db.select({ id: eventsTable.id })
+        .from(eventsTable)
+        .where(ilike(eventsTable.name, name.trim()))
+        .limit(1);
+    }
     if (!ev) {
-      notFound.push(externalId);
+      notFound.push(name || externalId);
     } else {
-      await db.update(eventsTable)
-        .set({ startDate: date, endDate: date })
-        .where(eq(eventsTable.id, ev.id));
-      updated.push(externalId);
+      const setFields: Record<string, unknown> = { startDate: date, endDate: date };
+      if (name) setFields.name = name.trim();
+      await db.update(eventsTable).set(setFields).where(eq(eventsTable.id, ev.id));
+      updated.push(name || externalId);
     }
   }
   await audit(req.user!.userId, "update", "events", 0, null, { bulkDateSync: updates.length });

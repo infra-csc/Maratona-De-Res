@@ -424,7 +424,7 @@ export default function IntegrationPage() {
       const res = await fetch("/api/events/bulk-date-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ updates: dateSyncPreview.map(e => ({ externalId: e.externalId, date: e.date })) }),
+        body: JSON.stringify({ updates: dateSyncPreview.map(e => ({ externalId: e.externalId, name: e.name, date: e.date })) }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
       const data = await res.json() as { updated: number; notFound: number; notFoundIds: string[] };
