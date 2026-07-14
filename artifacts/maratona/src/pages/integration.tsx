@@ -452,10 +452,10 @@ export default function IntegrationPage() {
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
-      const data = await res.json() as { processed: number; warnings: string[] };
-      setRecomputeResult(data);
+      const data = await res.json() as { totalProcessed: number; warnings: string[] };
+      setRecomputeResult(data as unknown as { processed: number; warnings: string[] });
       qc.invalidateQueries();
-      toast({ title: `Ciclo recalculado — ${data.processed} colaborador(es) processado(s)${data.warnings.length > 0 ? ` · ${data.warnings.length} aviso(s)` : ""}` });
+      toast({ title: `Ciclo recalculado — ${data.totalProcessed} colaborador(es) processado(s)${data.warnings.length > 0 ? ` · ${data.warnings.length} aviso(s)` : ""}` });
     } catch (err: unknown) {
       toast({ title: "Falha ao recalcular", description: err instanceof Error ? err.message : "Tente novamente.", variant: "destructive" });
     } finally {
@@ -862,7 +862,7 @@ export default function IntegrationPage() {
               <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${recomputeResult.warnings.length > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
                 {recomputeResult.warnings.length > 0 ? <AlertTriangle size={16} className="shrink-0 mt-0.5" /> : <CheckCircle2 size={16} className="shrink-0 mt-0.5" />}
                 <div>
-                  <p>{recomputeResult.processed} colaborador(es) processado(s).</p>
+                  <p>{(recomputeResult as unknown as { totalProcessed: number }).totalProcessed ?? (recomputeResult as { processed?: number }).processed} colaborador(es) processado(s).</p>
                   {recomputeResult.warnings.map((w, i) => (
                     <p key={i} className="text-xs mt-1 opacity-80">{w}</p>
                   ))}
