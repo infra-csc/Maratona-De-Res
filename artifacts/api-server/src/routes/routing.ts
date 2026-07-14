@@ -902,23 +902,28 @@ router.put("/areas/:id/conformity-routing", requireRole("admin", "rh"), async (r
   const [area] = await db.select().from(areasTable).where(eq(areasTable.id, areaId)).limit(1);
   if (!area) { res.status(404).json({ error: "Área não encontrada" }); return; }
 
-  const [existing] = await db.select().from(areaConformityRoutingTable)
-    .where(eq(areaConformityRoutingTable.areaId, areaId)).limit(1);
+  try {
+    const [existing] = await db.select().from(areaConformityRoutingTable)
+      .where(eq(areaConformityRoutingTable.areaId, areaId)).limit(1);
 
-  let saved: typeof areaConformityRoutingTable.$inferSelect;
-  if (existing) {
-    [saved] = await db.update(areaConformityRoutingTable)
-      .set({ defaultEvaluatorId: defaultEvaluatorId ?? null, updatedAt: new Date() })
-      .where(eq(areaConformityRoutingTable.id, existing.id))
-      .returning();
-  } else {
-    [saved] = await db.insert(areaConformityRoutingTable)
-      .values({ areaId, defaultEvaluatorId: defaultEvaluatorId ?? null })
-      .returning();
+    let saved: typeof areaConformityRoutingTable.$inferSelect;
+    if (existing) {
+      [saved] = await db.update(areaConformityRoutingTable)
+        .set({ defaultEvaluatorId: defaultEvaluatorId ?? null, updatedAt: new Date() })
+        .where(eq(areaConformityRoutingTable.id, existing.id))
+        .returning();
+    } else {
+      [saved] = await db.insert(areaConformityRoutingTable)
+        .values({ areaId, defaultEvaluatorId: defaultEvaluatorId ?? null })
+        .returning();
+    }
+
+    await audit(req.user!.userId, "set_conformity_routing", "areas", areaId, existing ?? null, saved);
+    res.json(saved);
+  } catch (err) {
+    console.error("[routing] PUT /areas/:id/conformity-routing falhou (rodou o db push da tabela area_conformity_routing?):", err);
+    res.status(500).json({ error: "Banco de dados desatualizado — rode a migração do schema (db push) e tente novamente" });
   }
-
-  await audit(req.user!.userId, "set_conformity_routing", "areas", areaId, existing ?? null, saved);
-  res.json(saved);
 });
 
 export default router;

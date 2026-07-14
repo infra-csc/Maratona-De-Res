@@ -5,7 +5,7 @@ import {
   platoonRulesTable, employeesTable, areasTable, employeeCycleEligibilityTable,
   eventAreaAssignmentsTable, eventReviewRequestsTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
@@ -65,6 +65,7 @@ router.get("/my-performance", async (req, res) => {
       startDate: eventsTable.startDate,
       endDate: eventsTable.endDate,
       functionName: eventParticipantsTable.functionName,
+      participantConfirmed: eventParticipantsTable.confirmed,
       resultsConfirmed: eventsTable.resultsConfirmed,
     })
     .from(eventParticipantsTable)
@@ -74,10 +75,15 @@ router.get("/my-performance", async (req, res) => {
       eq(eventsTable.cycleId, cycle.id),
     ));
 
+  // Histórico completo fica no log (tela de Revisões Sinalizadas); para o
+  // colaborador só interessa o pedido MAIS RECENTE de cada evento.
   const reviewRequests = await db.select().from(eventReviewRequestsTable)
-    .where(eq(eventReviewRequestsTable.employeeId, employeeId));
+    .where(eq(eventReviewRequestsTable.employeeId, employeeId))
+    .orderBy(desc(eventReviewRequestsTable.createdAt));
   const reviewRequestByEvent = new Map<number, typeof reviewRequests[number]>();
-  for (const rr of reviewRequests) reviewRequestByEvent.set(rr.eventId, rr);
+  for (const rr of reviewRequests) {
+    if (!reviewRequestByEvent.has(rr.eventId)) reviewRequestByEvent.set(rr.eventId, rr);
+  }
 
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
   const platoonRulesMapped = platoonRules.map(r => ({
@@ -92,6 +98,9 @@ router.get("/my-performance", async (req, res) => {
   const eventSummaries = [];
   for (const p of participations) {
     if (!p.eventId) continue;
+    // Marcado como inativo no evento ("não participou de fato"): o evento não
+    // conta para o colaborador — mesma regra do fechamento e do ranking da prova.
+    if (p.participantConfirmed === false) continue;
 
     const eventCriteriaRows = await db
       .select({
@@ -379,19 +388,23 @@ router.post("/my-performance/events/:eventId/review-request", async (req, res) =
     return;
   }
 
-  const [existing] = await db.select().from(eventReviewRequestsTable)
-    .where(and(eq(eventReviewRequestsTable.eventId, eventId), eq(eventReviewRequestsTable.employeeId, employeeId)))
+  // Log de pedidos: cada sinalização preserva o histórico. Um pedido ainda
+  // PENDENTE é atualizado (não duplica pendências em aberto); depois de
+  // resolvido (aprovado/negado), sinalizar de novo cria um REGISTRO NOVO —
+  // o desfecho anterior fica guardado no log de Revisões Sinalizadas.
+  const [existingPending] = await db.select().from(eventReviewRequestsTable)
+    .where(and(
+      eq(eventReviewRequestsTable.eventId, eventId),
+      eq(eventReviewRequestsTable.employeeId, employeeId),
+      eq(eventReviewRequestsTable.status, "pending"),
+    ))
     .limit(1);
 
   let reviewRequest;
-  if (existing) {
+  if (existingPending) {
     [reviewRequest] = await db.update(eventReviewRequestsTable).set({
       comment,
-      status: "pending",
-      resolvedAt: null,
-      resolvedByUserId: null,
-      resolutionNotes: null,
-    }).where(eq(eventReviewRequestsTable.id, existing.id)).returning();
+    }).where(eq(eventReviewRequestsTable.id, existingPending.id)).returning();
   } else {
     [reviewRequest] = await db.insert(eventReviewRequestsTable).values({
       eventId,
@@ -401,7 +414,7 @@ router.post("/my-performance/events/:eventId/review-request", async (req, res) =
     }).returning();
   }
 
-  res.status(existing ? 200 : 201).json(reviewRequest);
+  res.status(existingPending ? 200 : 201).json(reviewRequest);
 });
 
 export default router;

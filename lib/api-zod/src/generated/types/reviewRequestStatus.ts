@@ -12,4 +12,6 @@ export type ReviewRequestStatus = typeof ReviewRequestStatus[keyof typeof Review
 export const ReviewRequestStatus = {
   pending: 'pending',
   resolved: 'resolved',
+  approved: 'approved',
+  denied: 'denied',
 } as const;

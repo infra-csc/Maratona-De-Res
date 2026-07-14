@@ -156,6 +156,7 @@ export * from './resyncAllEventsCriteria200EventsItem';
 export * from './resyncEventCriteria200';
 export * from './reviewRequest';
 export * from './reviewRequestResolve';
+export * from './reviewRequestResolveResolution';
 export * from './reviewRequestStatus';
 export * from './rule';
 export * from './ruleUpdate';

@@ -34,8 +34,9 @@ router.get("/review-requests", requireRole("admin", "rh", "diretoria"), async (_
 
 /**
  * PATCH /review-requests/:id/resolve
- * Marca um pedido de revisão como resolvido, com uma nota opcional explicando
- * o desfecho (ex.: "nota corrigida", "revisado, sem alteração").
+ * Resolve um pedido de revisão com um desfecho explícito — "approved"
+ * (revisão procede, algo foi corrigido) ou "denied" (revisado, mantido) —
+ * e uma nota opcional. Sem `resolution` no body cai no legado "resolved".
  */
 router.patch("/review-requests/:id/resolve", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
@@ -43,11 +44,12 @@ router.patch("/review-requests/:id/resolve", requireRole("admin", "rh"), async (
     res.status(400).json({ error: "ID inválido." });
     return;
   }
-  const { resolutionNotes } = req.body;
+  const { resolutionNotes, resolution } = req.body;
+  const status = resolution === "approved" || resolution === "denied" ? resolution : "resolved";
   const [before] = await db.select().from(eventReviewRequestsTable).where(eq(eventReviewRequestsTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
   const [updated] = await db.update(eventReviewRequestsTable).set({
-    status: "resolved",
+    status,
     resolvedAt: new Date(),
     resolvedByUserId: req.user!.userId,
     resolutionNotes: resolutionNotes ?? null,

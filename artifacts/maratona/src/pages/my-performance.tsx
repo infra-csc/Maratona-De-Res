@@ -59,7 +59,7 @@ interface Adjustment {
 interface ReviewRequest {
   id: number;
   comment: string;
-  status: "pending" | "resolved";
+  status: "pending" | "resolved" | "approved" | "denied";
   createdAt: string;
   resolvedAt: string | null;
   resolutionNotes: string | null;
@@ -105,6 +105,18 @@ function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// Rótulo/cores por desfecho do pedido de revisão. "resolved" é legado
+// (resolvido antes de existir aprovado/negado).
+function reviewStatusInfo(status: string | undefined | null) {
+  switch (status) {
+    case "pending": return { label: "Revisão solicitada", badgeCls: "bg-[#fff3cd] text-[#862200]", btnCls: "border-[#862200] text-[#862200] bg-[#862200]/10" };
+    case "approved": return { label: "Revisão aprovada", badgeCls: "bg-[#506600] text-white", btnCls: "border-[#506600] text-[#506600] bg-[#506600]/10" };
+    case "denied": return { label: "Revisão negada", badgeCls: "bg-[#862200] text-white", btnCls: "border-[#862200] text-[#862200] bg-[#862200]/10" };
+    case "resolved": return { label: "Revisão resolvida", badgeCls: "bg-[#506600] text-white", btnCls: "border-[#506600] text-[#506600] bg-[#506600]/10" };
+    default: return null;
+  }
+}
+
 function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null): string {
   if (!isQuarterClosed) return "Valor parcial — projeção do ciclo em andamento";
   switch (bonusStatus) {
@@ -145,7 +157,8 @@ function CriterionReviewRequest({ event, criterion }: { event: EventSummary; cri
 
   const hasRequest = !!criterion.reviewRequest;
   const showForm = !hasRequest || resubmitting;
-  const isResolved = criterion.reviewRequest?.status === "resolved";
+  const statusInfo = reviewStatusInfo(criterion.reviewRequest?.status);
+  const isResolved = hasRequest && criterion.reviewRequest!.status !== "pending";
 
   return (
     <Dialog
@@ -160,15 +173,11 @@ function CriterionReviewRequest({ event, criterion }: { event: EventSummary; cri
           onClick={(e) => e.stopPropagation()}
           className={cn(
             "flex items-center gap-1 text-[10px] font-bold uppercase italic px-1.5 py-0.5 border shrink-0 transition-colors mt-1",
-            hasRequest
-              ? isResolved
-                ? "border-[#506600] text-[#506600] bg-[#506600]/10"
-                : "border-[#862200] text-[#862200] bg-[#862200]/10"
-              : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
+            statusInfo ? statusInfo.btnCls : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
           )}
         >
           <Flag size={9} />
-          {hasRequest ? (isResolved ? "Revisão resolvida" : "Revisão sinalizada") : "Sinalizar Revisão"}
+          {statusInfo ? statusInfo.label : "Sinalizar Revisão"}
         </button>
       </DialogTrigger>
       <DialogContent onClick={(e) => e.stopPropagation()} className="bg-white border-2 border-[#191c1e]">
@@ -186,9 +195,9 @@ function CriterionReviewRequest({ event, criterion }: { event: EventSummary; cri
             <div className="flex items-center gap-2 flex-wrap">
               <span className={cn(
                 "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
-                isResolved ? "bg-[#506600] text-white" : "bg-[#fff3cd] text-[#862200]"
+                statusInfo?.badgeCls ?? "bg-[#fff3cd] text-[#862200]"
               )}>
-                {isResolved ? "Revisão resolvida" : "Revisão sinalizada"}
+                {statusInfo?.label ?? "Revisão sinalizada"}
               </span>
               <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(criterion.reviewRequest!.createdAt)}</span>
             </div>
@@ -281,7 +290,8 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
 
   const hasRequest = !!event.reviewRequest;
   const showForm = !hasRequest || resubmitting;
-  const isResolved = event.reviewRequest?.status === "resolved";
+  const statusInfo = reviewStatusInfo(event.reviewRequest?.status);
+  const isResolved = hasRequest && event.reviewRequest!.status !== "pending";
 
   return (
     <Dialog
@@ -297,14 +307,10 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
           onClick={(e) => e.stopPropagation()}
           className={cn(
             "flex items-center gap-1.5 text-[10px] font-bold uppercase italic px-2 py-1 border-2 shrink-0 transition-colors",
-            hasRequest
-              ? isResolved
-                ? "border-[#506600] text-[#506600] bg-[#506600]/10"
-                : "border-[#862200] text-[#862200] bg-[#862200]/10"
-              : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
+            statusInfo ? statusInfo.btnCls : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
           )}
         >
-          <Flag size={12} /> {hasRequest ? (isResolved ? "Revisão resolvida" : "Revisão sinalizada") : "Sinalizar Revisão"}
+          <Flag size={12} /> {statusInfo ? statusInfo.label : "Sinalizar Revisão"}
         </button>
       </DialogTrigger>
       <DialogContent onClick={(e) => e.stopPropagation()} className="bg-white border-2 border-[#191c1e]">
@@ -320,9 +326,9 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
             <div className="flex items-center gap-2 flex-wrap">
               <span className={cn(
                 "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
-                isResolved ? "bg-[#506600] text-white" : "bg-[#fff3cd] text-[#862200]"
+                statusInfo?.badgeCls ?? "bg-[#fff3cd] text-[#862200]"
               )}>
-                {isResolved ? "Revisão resolvida" : "Revisão sinalizada"}
+                {statusInfo?.label ?? "Revisão sinalizada"}
               </span>
               <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(event.reviewRequest!.createdAt)}</span>
             </div>
@@ -454,20 +460,32 @@ function EventCard({ event }: { event: EventSummary }) {
         <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#191c1e]/20">
 
           {event.eventScore > 0 && (
-            <div className={cn(
-              "text-right border-2 border-[#191c1e] px-3 py-1.5",
-              event.countsForScore && !event.resultsConfirmed ? "bg-[#f2f4f6]" : "bg-[#ccff00]"
-            )}>
-              <span className="block text-[10px] uppercase font-bold text-[#191c1e] mb-0.5 italic">Nota</span>
-              <span className={cn(
-                "font-black text-xl",
-                event.countsForScore && !event.resultsConfirmed ? "text-[#747a60]" : "text-[#506600]"
-              )}>{event.eventScore.toFixed(1)}</span>
-              {event.countsForScore && !event.resultsConfirmed && (
-                <span className="block text-[8px] uppercase font-bold text-[#a15c00] italic mt-0.5 whitespace-nowrap">
-                  Não confirmada
-                </span>
-              )}
+            <div className="flex flex-col items-end gap-1.5">
+              <div className={cn(
+                "text-right border-2 border-[#191c1e] px-3 py-1.5",
+                event.countsForScore && !event.resultsConfirmed ? "bg-[#f2f4f6]" : "bg-[#ccff00]"
+              )}>
+                <span className="block text-[10px] uppercase font-bold text-[#191c1e] mb-0.5 italic">Nota</span>
+                <span className={cn(
+                  "font-black text-xl",
+                  event.countsForScore && !event.resultsConfirmed ? "text-[#747a60]" : "text-[#506600]"
+                )}>{event.eventScore.toFixed(1)}</span>
+                {event.countsForScore && !event.resultsConfirmed && (
+                  <span className="block text-[8px] uppercase font-bold text-[#a15c00] italic mt-0.5 whitespace-nowrap">
+                    Não confirmada
+                  </span>
+                )}
+              </div>
+              {/* Desfecho do pedido de revisão sempre visível ao lado da nota */}
+              {(() => {
+                const rs = reviewStatusInfo(event.reviewRequest?.status);
+                if (!rs) return null;
+                return (
+                  <span className={cn("flex items-center gap-1 text-[9px] font-black uppercase italic px-1.5 py-0.5 border-2 border-[#191c1e] whitespace-nowrap", rs.badgeCls)}>
+                    <Flag size={9} /> {rs.label}
+                  </span>
+                );
+              })()}
             </div>
           )}
         </div>

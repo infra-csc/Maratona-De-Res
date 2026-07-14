@@ -3985,7 +3985,7 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, resolved]
+          enum: [pending, resolved, approved, denied]
         createdAt:
           type: string
         resolvedAt:
@@ -3996,6 +3996,10 @@ components:
     ReviewRequestResolve:
       type: object
       properties:
+        resolution:
+          type: string
+          enum: [approved, denied]
+          description: Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido).
         resolutionNotes:
           type: ["string", "null"]
 

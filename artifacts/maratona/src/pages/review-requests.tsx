@@ -27,9 +27,9 @@ export default function ReviewRequestsPage() {
 
   const resolveMutation = useResolveReviewRequest({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (updated) => {
         qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Revisão marcada como resolvida" });
+        toast({ title: updated.status === "approved" ? "Revisão aprovada" : "Revisão negada" });
         setResolving(null);
         setResolutionNotes("");
       },
@@ -41,7 +41,10 @@ export default function ReviewRequestsPage() {
     const matchesSearch = search === "" ||
       (r.employeeName ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (r.eventName ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || r.status === statusFilter;
+    // "resolved" no filtro abrange qualquer desfecho (aprovado/negado/legado).
+    const matchesStatus = statusFilter === "all"
+      || (statusFilter === "pending" && r.status === "pending")
+      || (statusFilter === "resolved" && r.status !== "pending");
     return matchesSearch && matchesStatus;
   });
 
@@ -109,18 +112,24 @@ export default function ReviewRequestsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
                     <span className={`text-[10px] font-black uppercase italic px-2 py-0.5 border-2 border-[#191c1e] ${
-                      r.status === "resolved" ? "bg-[#506600] text-white" : "bg-[#fff3cd] text-[#862200]"
+                      r.status === "approved" ? "bg-[#506600] text-white"
+                      : r.status === "denied" ? "bg-[#862200] text-white"
+                      : r.status === "resolved" ? "bg-[#506600] text-white"
+                      : "bg-[#fff3cd] text-[#862200]"
                     }`}>
-                      {r.status === "resolved" ? "Resolvido" : "Pendente"}
+                      {r.status === "approved" ? "Aprovado" : r.status === "denied" ? "Negado" : r.status === "resolved" ? "Resolvido" : "Pendente"}
                     </span>
-                    <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(r.createdAt)}</span>
+                    <span className="text-[10px] font-medium italic text-[#747a60]">
+                      {formatDateTime(r.createdAt)}
+                      {r.status !== "pending" && r.resolvedAt ? ` · resolvido em ${formatDateTime(r.resolvedAt)}` : ""}
+                    </span>
                   </div>
                   <p className="font-black italic uppercase text-sm text-[#191c1e]">{r.employeeName || "—"}</p>
                   <p className="flex items-center gap-1 text-xs font-bold italic text-[#747a60] mt-1">
                     <Calendar size={12} /> {r.eventName || "—"}
                   </p>
                   <p className="text-xs text-[#444933] italic mt-2">"{r.comment}"</p>
-                  {r.status === "resolved" && r.resolutionNotes && (
+                  {r.status !== "pending" && r.resolutionNotes && (
                     <p className="text-xs text-[#506600] font-bold mt-2">Resposta: {r.resolutionNotes}</p>
                   )}
                 </div>
@@ -155,7 +164,7 @@ export default function ReviewRequestsPage() {
               className="rounded-none border-2 border-[#191c1e]"
               rows={4}
             />
-            <div className="flex justify-end gap-3 pt-2 border-t-2 border-[#eceef0]">
+            <div className="flex flex-wrap justify-end gap-3 pt-2 border-t-2 border-[#eceef0]">
               <button
                 type="button"
                 onClick={() => setResolving(null)}
@@ -164,12 +173,20 @@ export default function ReviewRequestsPage() {
                 Cancelar
               </button>
               <button
-                data-testid="button-confirm-resolve"
+                data-testid="button-deny-review"
                 disabled={resolveMutation.isPending}
-                onClick={() => resolving && resolveMutation.mutate({ id: resolving.id, data: { resolutionNotes: resolutionNotes || null } })}
-                className={`bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                onClick={() => resolving && resolveMutation.mutate({ id: resolving.id, data: { resolution: "denied", resolutionNotes: resolutionNotes || null } })}
+                className={`bg-[#862200] text-white border-2 border-[#191c1e] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
               >
-                {resolveMutation.isPending ? "Salvando..." : "Confirmar"}
+                {resolveMutation.isPending ? "Salvando..." : "Negar"}
+              </button>
+              <button
+                data-testid="button-approve-review"
+                disabled={resolveMutation.isPending}
+                onClick={() => resolving && resolveMutation.mutate({ id: resolving.id, data: { resolution: "approved", resolutionNotes: resolutionNotes || null } })}
+                className={`bg-[#506600] text-white border-2 border-[#191c1e] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+              >
+                {resolveMutation.isPending ? "Salvando..." : "Aprovar"}
               </button>
             </div>
           </div>

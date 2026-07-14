@@ -5,8 +5,11 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { ReviewRequestResolveResolution } from './reviewRequestResolveResolution';
 
 export interface ReviewRequestResolve {
+  /** Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido). */
+  resolution?: ReviewRequestResolveResolution;
   /** @nullable */
   resolutionNotes?: string | null;
 }

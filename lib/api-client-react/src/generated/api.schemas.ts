@@ -912,6 +912,8 @@ export type ReviewRequestStatus = typeof ReviewRequestStatus[keyof typeof Review
 export const ReviewRequestStatus = {
   pending: 'pending',
   resolved: 'resolved',
+  approved: 'approved',
+  denied: 'denied',
 } as const;
 
 export interface ReviewRequest {
@@ -931,7 +933,20 @@ export interface ReviewRequest {
   resolutionNotes?: string | null;
 }
 
+/**
+ * Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido).
+ */
+export type ReviewRequestResolveResolution = typeof ReviewRequestResolveResolution[keyof typeof ReviewRequestResolveResolution];
+
+
+export const ReviewRequestResolveResolution = {
+  approved: 'approved',
+  denied: 'denied',
+} as const;
+
 export interface ReviewRequestResolve {
+  /** Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido). */
+  resolution?: ReviewRequestResolveResolution;
   /** @nullable */
   resolutionNotes?: string | null;
 }

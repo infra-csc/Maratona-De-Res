@@ -197,6 +197,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     const eventParticipantsRaw = await db.select({
       employeeId: eventParticipantsTable.employeeId,
       functionName: eventParticipantsTable.functionName,
+      confirmed: eventParticipantsTable.confirmed,
       employmentType: employeesTable.employmentType,
       employeeFunction: employeesTable.functionName,
     })
@@ -205,8 +206,10 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
       .where(eq(eventParticipantsTable.eventId, ev.id));
     // Freelancers e funções informativas ("Sup Ceno *") participam do evento
     // (aparecem na Equipe Alocada) mas NUNCA contam para nota — não geram
-    // linha em employee_event_results (ver lib/participation.ts).
-    const eventParticipants = eventParticipantsRaw.filter(p => participantCountsForScore(p));
+    // linha em employee_event_results (ver lib/participation.ts). Participante
+    // marcado como INATIVO no evento (confirmed === false, "não participou de
+    // fato") também fica de fora da nota e da elegibilidade.
+    const eventParticipants = eventParticipantsRaw.filter(p => p.confirmed !== false && participantCountsForScore(p));
 
     if (ev.isHistorical) {
       const historicalScore = parseFloat(ev.importedScore as unknown as string);
@@ -440,6 +443,7 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
       employeeId: eventParticipantsTable.employeeId,
       employeeName: employeesTable.name,
       functionName: eventParticipantsTable.functionName,
+      confirmed: eventParticipantsTable.confirmed,
       employeeFunction: employeesTable.functionName,
       employmentType: employeesTable.employmentType,
       eligibleForBonus: employeesTable.eligibleForBonus,
@@ -452,7 +456,9 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
   // NUNCA contam para nota (ver lib/participation.ts) — não entram nesta lista
   // de resultado por participante, senão herdariam a nota do time e um badge
   // "Elegível" que não correspondem à realidade (não geram employee_event_results).
-  const participants = allParticipants.filter(p => participantCountsForScore(p));
+  // Participante marcado como INATIVO no evento (confirmed === false) idem —
+  // "não participou de fato", não herda nota nem aparece no ranking da prova.
+  const participants = allParticipants.filter(p => p.confirmed !== false && participantCountsForScore(p));
 
   // Evento histórico: não há avaliações reais — a nota final já vem pronta
   // como importedScore. Porém, se o evento tem event_criteria configurados,

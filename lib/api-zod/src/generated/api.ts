@@ -3041,7 +3041,7 @@ export const GetReviewRequestsResponseItem = zod.object({
   "employeeId": zod.number(),
   "employeeName": zod.string().nullish(),
   "comment": zod.string(),
-  "status": zod.enum(['pending', 'resolved']),
+  "status": zod.enum(['pending', 'resolved', 'approved', 'denied']),
   "createdAt": zod.string(),
   "resolvedAt": zod.string().nullish(),
   "resolutionNotes": zod.string().nullish()
@@ -3057,6 +3057,7 @@ export const ResolveReviewRequestParams = zod.object({
 })
 
 export const ResolveReviewRequestBody = zod.object({
+  "resolution": zod.enum(['approved', 'denied']).optional().describe('Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido).'),
   "resolutionNotes": zod.string().nullish()
 })
 
@@ -3067,7 +3068,7 @@ export const ResolveReviewRequestResponse = zod.object({
   "employeeId": zod.number(),
   "employeeName": zod.string().nullish(),
   "comment": zod.string(),
-  "status": zod.enum(['pending', 'resolved']),
+  "status": zod.enum(['pending', 'resolved', 'approved', 'denied']),
   "createdAt": zod.string(),
   "resolvedAt": zod.string().nullish(),
   "resolutionNotes": zod.string().nullish()
