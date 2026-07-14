@@ -1501,11 +1501,11 @@ export default function EvaluationsPage() {
                             {a.assignedToName ?? <span className="text-[#c4c9ac]">Sem avaliador</span>}
                             {isSubmitted && <span className="ml-2 text-[10px] font-black uppercase text-[#506600]">Enviada</span>}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right w-px">
                             {isSubmitted ? (
                               <span className="text-[11px] italic text-[#747a60]">—</span>
                             ) : (
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                                 {!isMine && (
                                   <button
                                     type="button"
@@ -1514,7 +1514,7 @@ export default function EvaluationsPage() {
                                       { criterionId: a.criterionId, assignedToId: user!.id, action: "assign" },
                                       { onError: (e) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }) },
                                     )}
-                                    className="text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-2 py-1 hover:bg-[#ccff00]"
+                                    className="text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-2 py-1 hover:bg-[#ccff00] whitespace-nowrap"
                                   >
                                     Pegar para mim
                                   </button>
@@ -1523,7 +1523,7 @@ export default function EvaluationsPage() {
                                   type="button"
                                   data-testid={`button-assign-criterion-${a.criterionId}`}
                                   onClick={() => setAreaAssignTarget({ criterionId: a.criterionId, criterionName: a.criterionName ?? "", areaId: a.criterionAreaId! })}
-                                  className="text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-2 py-1 hover:bg-[#eceef0]"
+                                  className="text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-2 py-1 hover:bg-[#eceef0] whitespace-nowrap"
                                 >
                                   Atribuir a...
                                 </button>
