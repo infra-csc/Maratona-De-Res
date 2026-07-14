@@ -401,6 +401,35 @@ router.patch("/events/:id/historical-result", requireRole("admin", "rh"), async 
   res.json({ ...ev, warnings });
 });
 
+// Atualiza startDate e endDate de eventos em lote pelo externalId.
+// Usado para corrigir datas vindas de planilhas (data única → startDate = endDate).
+router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => {
+  const updates = req.body?.updates as { externalId: string; date: string }[] | undefined;
+  if (!Array.isArray(updates) || updates.length === 0) {
+    res.status(400).json({ error: "Campo updates (array {externalId, date}) é obrigatório." });
+    return;
+  }
+  const updated: string[] = [];
+  const notFound: string[] = [];
+  for (const { externalId, date } of updates) {
+    if (!externalId || !date) continue;
+    const [ev] = await db.select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(eq(eventsTable.externalId, externalId))
+      .limit(1);
+    if (!ev) {
+      notFound.push(externalId);
+    } else {
+      await db.update(eventsTable)
+        .set({ startDate: date, endDate: date })
+        .where(eq(eventsTable.id, ev.id));
+      updated.push(externalId);
+    }
+  }
+  await audit(req.user!.userId, "update", "events", 0, null, { bulkDateSync: updates.length });
+  res.json({ updated: updated.length, notFound: notFound.length, notFoundIds: notFound });
+});
+
 router.delete("/events/:id", requireRole("admin"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);

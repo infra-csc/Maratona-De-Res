@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History, ClipboardList, KeyRound, Eraser, Wrench } from "lucide-react";
+import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History, ClipboardList, KeyRound, Eraser, Wrench, CalendarCheck } from "lucide-react";
+import { getAuthToken } from "@/lib/custom-fetch";
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -209,6 +210,11 @@ export default function IntegrationPage() {
     },
   });
 
+  const [dateSyncPreview, setDateSyncPreview] = useState<{ externalId: string; name: string; date: string }[] | null>(null);
+  const [dateSyncPending, setDateSyncPending] = useState(false);
+  const [dateSyncResult, setDateSyncResult] = useState<{ updated: number; notFound: number; notFoundIds: string[] } | null>(null);
+  const dateSyncFileRef = useRef<HTMLInputElement>(null);
+
   const [fixCalResult, setFixCalResult] = useState<FixCalibrationCriteria200 | null>(null);
   const [fixCalDialogOpen, setFixCalDialogOpen] = useState(false);
   const fixCalMutation = useFixCalibrationCriteria({
@@ -385,6 +391,53 @@ export default function IntegrationPage() {
   }
 
   const surveyAllResolved = !!surveyPreview && surveyPreview.groups.every((g) => !!surveyLinkOverrides[g.groupKey]);
+
+  function handleDateSyncFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    file.arrayBuffer().then(buffer => {
+      const wb = XLSX.read(buffer, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false }) as string[][];
+      const parsed = rows.slice(1)
+        .filter(r => r[1] && r[3])
+        .map(r => {
+          const parts = String(r[3]).split("/");
+          if (parts.length !== 3) return null;
+          const [m, d, y] = parts;
+          const year = parseInt(y) < 100 ? 2000 + parseInt(y) : parseInt(y);
+          const date = `${year}-${String(parseInt(m)).padStart(2,"0")}-${String(parseInt(d)).padStart(2,"0")}`;
+          return { externalId: String(r[1]).trim(), name: String(r[2]).trim(), date };
+        })
+        .filter((x): x is { externalId: string; name: string; date: string } => x !== null);
+      setDateSyncPreview(parsed);
+      setDateSyncResult(null);
+    }).catch(() => toast({ title: "Erro ao ler arquivo", variant: "destructive" }));
+    e.target.value = "";
+  }
+
+  async function handleDateSyncApply() {
+    if (!dateSyncPreview) return;
+    setDateSyncPending(true);
+    try {
+      const token = getAuthToken();
+      const res = await fetch("/api/events/bulk-date-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ updates: dateSyncPreview.map(e => ({ externalId: e.externalId, date: e.date })) }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
+      const data = await res.json() as { updated: number; notFound: number; notFoundIds: string[] };
+      setDateSyncResult(data);
+      setDateSyncPreview(null);
+      toast({ title: `${data.updated} evento(s) atualizado(s)${data.notFound > 0 ? `, ${data.notFound} não encontrado(s)` : ""}` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Tente novamente.";
+      toast({ title: "Falha ao atualizar datas", description: msg, variant: "destructive" });
+    } finally {
+      setDateSyncPending(false);
+    }
+  }
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto bg-slate-50/30 min-h-full">
@@ -692,6 +745,74 @@ export default function IntegrationPage() {
               <Wrench size={16} className="mr-2 text-teal-600" />
               {fixOrphanedMutation.isPending ? "Corrigindo..." : "Reativar quesitos com avaliações"}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-blue-500">
+          <CardHeader className="bg-blue-50 border-b border-blue-100 pb-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-blue-800">
+              <CalendarCheck size={18} /> Atualizar Datas dos Eventos
+            </CardTitle>
+            <CardDescription className="text-blue-800/80">
+              Importa a planilha de eventos (colunas: SKU, ID Evento, Evento, Data Evento) e define a data de cada evento usando o ID externo como chave.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Útil quando os eventos têm data única (não período). O sistema iguala <strong>início = fim = data da planilha</strong> para cada evento localizado pelo ID externo.
+            </p>
+
+            <input ref={dateSyncFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleDateSyncFileUpload} />
+            <Button
+              variant="outline"
+              className="w-full bg-white shadow-sm border-dashed border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50 transition-colors"
+              onClick={() => { setDateSyncPreview(null); setDateSyncResult(null); dateSyncFileRef.current?.click(); }}
+            >
+              <Upload size={16} className="mr-2 text-blue-600" />
+              Selecionar planilha .xlsx
+            </Button>
+
+            {dateSyncPreview && (
+              <div className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm font-bold text-blue-800">{dateSyncPreview.length} evento(s) encontrado(s) na planilha</span>
+                  <span className="text-xs text-blue-600">{dateSyncPreview[0]?.date} → {dateSyncPreview[dateSyncPreview.length - 1]?.date}</span>
+                </div>
+                <div className="max-h-40 overflow-y-auto border rounded-lg divide-y text-xs">
+                  {dateSyncPreview.slice(0, 10).map(e => (
+                    <div key={e.externalId} className="px-3 py-1.5 flex items-center justify-between gap-2 bg-white">
+                      <span className="text-slate-600 truncate">{e.name}</span>
+                      <span className="font-mono font-bold text-blue-700 shrink-0">{e.date}</span>
+                    </div>
+                  ))}
+                  {dateSyncPreview.length > 10 && (
+                    <div className="px-3 py-1.5 text-slate-400 text-center">+{dateSyncPreview.length - 10} mais…</div>
+                  )}
+                </div>
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={dateSyncPending}
+                  onClick={handleDateSyncApply}
+                >
+                  <CalendarCheck size={16} className="mr-2" />
+                  {dateSyncPending ? "Atualizando…" : `Aplicar ${dateSyncPreview.length} datas em produção`}
+                </Button>
+              </div>
+            )}
+
+            {dateSyncResult && (
+              <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${dateSyncResult.notFound > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+                <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+                <div>
+                  <p>{dateSyncResult.updated} evento(s) atualizado(s){dateSyncResult.notFound > 0 ? `, ${dateSyncResult.notFound} ID(s) não encontrado(s) no banco` : " com sucesso."}.</p>
+                  {dateSyncResult.notFoundIds.length > 0 && (
+                    <p className="text-xs mt-1 opacity-70">IDs não encontrados: {dateSyncResult.notFoundIds.join(", ")}</p>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
