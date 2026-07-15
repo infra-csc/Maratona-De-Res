@@ -51,11 +51,40 @@ router.get("/events", async (req, res) => {
   const enriched = cycleEvents.map((ev) => {
     const participantCount = participants.filter(p => p.eventId === ev.id).length;
 
-    // Evento histórico importado: nota já vem pronta (calibrada) de fora, sem
-    // critérios/avaliações para calcular — usa importedScore diretamente.
+    // Evento histórico importado: nota já vem pronta (calibrada) de fora.
+    // Ainda calcula critérios/calibrações caso existam (históricos podem ter
+    // calibrações complementares importadas via planilha).
     if (ev.isHistorical) {
       const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
-      return { ...ev, participantCount, evaluationProgress: 1, totalCriteria: 0, submittedCount: 0, averageScore: score, teamScore: score, hasCalibration: true, fullyCalibrated: true, partialPublishedAt: null };
+      const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active);
+      const evCals = calibrations.filter(c => c.eventId === ev.id);
+      const calibratedCriteriaCount = activeCriteria.filter(c =>
+        evCals.some(cal => cal.criterionId === c.criterionId && cal.calibratedScore !== null)
+      ).length;
+      const finalCalibratedCriteria = activeCriteria.filter(c => c.finalPublishedAt != null).length;
+      const fullyCalibrated = activeCriteria.length > 0 && finalCalibratedCriteria === activeCriteria.length;
+      const partialTimestamps = activeCriteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
+      const partialPublishedAt = partialTimestamps.length > 0
+        ? new Date(Math.max(...partialTimestamps.map(d => d.getTime()))) : null;
+      const partialPublishedCount = partialTimestamps.length;
+      return {
+        ...ev,
+        participantCount,
+        evaluationProgress: 1,
+        totalCriteria: activeCriteria.length,
+        evaluatedCriteria: calibratedCriteriaCount,
+        submittedCount: 0,
+        averageScore: score,
+        teamScore: score,
+        hasCalibration: calibratedCriteriaCount > 0,
+        fullyCalibrated,
+        calibratedCriteriaCount,
+        finalCalibratedCriteria,
+        partialPublishedCount,
+        partialPublishedAt,
+        criteriaConfirmed: true,
+        unassignedAreaNames: [],
+      };
     }
 
     const evEvals = evals.filter(e => e.eventId === ev.id);

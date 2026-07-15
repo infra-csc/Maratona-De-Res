@@ -531,7 +531,9 @@ export default function EventsPage() {
                             )}
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">
-                            {!ev.criteriaConfirmed && !hasEvals ? (
+                            {ev.isHistorical ? (
+                              <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Histórico</span>
+                            ) : !ev.criteriaConfirmed && !hasEvals ? (
                               <span className="text-[10px] font-bold italic uppercase text-[#b02f00]">Aguardando RH</span>
                             ) : !ev.resultsConfirmed ? (
                               <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Elegib. pendente</span>
