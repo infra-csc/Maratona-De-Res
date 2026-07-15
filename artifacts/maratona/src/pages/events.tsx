@@ -473,17 +473,23 @@ export default function EventsPage() {
                       const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
                       const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
                       const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
-                      const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
-                        ? `${finalPubCount}F · ${partialOnlyCount}P`
-                        : finalPubCount > 0 ? "Calibrado Final"
-                        : partialOnlyCount > 0 ? "Calibrado Parcial"
-                        : calSaved > 0 ? "Calibrado"
-                        : "Avaliador";
-                      const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0
-                        ? "text-[#506600]"
-                        : finalPubCount > 0 || partialOnlyCount > 0 ? "text-[#a06a00]"
-                        : calSaved > 0 ? "text-[#b06000]"
-                        : "text-[#747a60]";
+                      // Eventos históricos sem registros reais de calibração usam importedScore
+                      const isPureHistorical = !!ev.isHistorical && calSaved === 0;
+                      const scoreLabel = isPureHistorical
+                        ? "Importado"
+                        : finalPubCount > 0 && partialOnlyCount > 0
+                          ? `${finalPubCount}F · ${partialOnlyCount}P`
+                          : finalPubCount > 0 ? "Calibrado Final"
+                          : partialOnlyCount > 0 ? "Calibrado Parcial"
+                          : calSaved > 0 ? "Calibrado"
+                          : "Avaliador";
+                      const scoreLabelColor = isPureHistorical
+                        ? "text-[#a06a00]"
+                        : finalPubCount > 0 && partialOnlyCount === 0
+                          ? "text-[#506600]"
+                          : finalPubCount > 0 || partialOnlyCount > 0 ? "text-[#a06a00]"
+                          : calSaved > 0 ? "text-[#b06000]"
+                          : "text-[#747a60]";
                       const missing = ev.unassignedAreaNames ?? [];
                       const hasEvals = evaluated > 0;
                       const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
@@ -517,11 +523,11 @@ export default function EventsPage() {
                               : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — ${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`}
                           </td>
                           <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
-                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
-                            {total === 0 ? "—" : `${evaluated}/${total}`}
+                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${!isPureHistorical && total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
+                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 ? "—" : `${evaluated}/${total}`}
                           </td>
                           <td className={`px-3 py-2.5 text-xs font-black italic text-center ${fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}`}>
-                            {total === 0 ? "—" : `${calCount}/${total}`}
+                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 ? "—" : `${calCount}/${total}`}
                           </td>
                           <td className="px-3 py-2.5 text-center whitespace-nowrap">
                             {score == null ? (
@@ -543,17 +549,22 @@ export default function EventsPage() {
                             )}
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">
-                            {ev.isHistorical ? (
-                              <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Histórico</span>
-                            ) : !ev.criteriaConfirmed && !hasEvals ? (
-                              <span className="text-[10px] font-bold italic uppercase text-[#b02f00]">Aguardando RH</span>
-                            ) : !ev.resultsConfirmed ? (
-                              <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Elegib. pendente</span>
-                            ) : ev.status === "closed" ? (
-                              <span className="text-[10px] font-bold italic uppercase text-[#506600]">Concluído</span>
-                            ) : (
-                              <span className="text-[10px] font-bold italic uppercase text-[#506600]">OK</span>
-                            )}
+                            <div className="flex flex-col gap-0.5">
+                              {ev.isHistorical && (
+                                <span className="text-[9px] font-bold italic uppercase text-[#a06a00] leading-none">Histórico</span>
+                              )}
+                              {/* Status operacional — não deixa isHistorical curto-circuitar quando há nota real */}
+                              {isPureHistorical && score == null ? null
+                                : !ev.criteriaConfirmed && !hasEvals ? (
+                                  <span className="text-[10px] font-bold italic uppercase text-[#b02f00]">Aguardando RH</span>
+                                ) : !ev.resultsConfirmed ? (
+                                  <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Elegib. pendente</span>
+                                ) : (ev.status === "closed" || ev.isHistorical) ? (
+                                  <span className="text-[10px] font-bold italic uppercase text-[#506600]">Concluído</span>
+                                ) : (
+                                  <span className="text-[10px] font-bold italic uppercase text-[#506600]">OK</span>
+                                )}
+                            </div>
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
