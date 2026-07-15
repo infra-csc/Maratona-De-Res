@@ -789,12 +789,12 @@ export default function CalibrationsPage() {
                       relevantParticipants.length === 0 ? (
                         <p className="text-xs italic text-[#747a60]">Nenhum colaborador ativo alocado.</p>
                       ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                        <div className="space-y-1">
                           {relevantParticipants.map(p => {
                             const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
                             return (
-                              <div key={p.id} className="flex items-center gap-1.5 bg-[#f2f4f6] border border-[#d8dadc] px-2 py-1.5">
-                                <div className="w-6 h-6 bg-[#eceef0] border border-[#191c1e] flex items-center justify-center font-black italic text-[9px] shrink-0">
+                              <div key={p.id} className="flex items-center gap-2 bg-[#f2f4f6] border border-[#d8dadc] px-2 py-1.5">
+                                <div className="w-7 h-7 bg-[#191c1e] flex items-center justify-center font-black italic text-[10px] text-[#ccff00] shrink-0">
                                   {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
                                 </div>
                                 <div className="min-w-0 flex-1">
@@ -802,7 +802,7 @@ export default function CalibrationsPage() {
                                   <p className="text-[9px] font-bold italic uppercase text-[#747a60] truncate">{p.functionName}</p>
                                 </div>
                                 {realizadasCount != null && (
-                                  <span className="text-[9px] font-bold italic uppercase text-[#747a60] shrink-0 flex items-center gap-0.5">
+                                  <span className="text-[9px] font-bold italic uppercase text-[#506600] shrink-0 flex items-center gap-0.5 bg-[#f0ffe0] border border-[#c4cda8] px-1.5 py-0.5">
                                     <Calendar size={9} /> {realizadasCount}d
                                   </span>
                                 )}
@@ -1056,13 +1056,18 @@ export default function CalibrationsPage() {
                                 </div>
                                 <textarea
                                   data-testid={`input-cal-reason-inline-${c.criterionId}`}
-                                  rows={2}
+                                  rows={1}
                                   value={reasonVal}
                                   onClick={e => e.stopPropagation()}
-                                  onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
+                                  onChange={e => {
+                                    setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }));
+                                    e.target.style.height = "auto";
+                                    e.target.style.height = e.target.scrollHeight + "px";
+                                  }}
+                                  onFocus={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
                                   placeholder="Escreva a justificativa…"
                                   className={cn(
-                                    "w-full px-2 py-1 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] resize-none leading-snug",
+                                    "w-full px-2 py-1 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] resize-none leading-snug overflow-hidden",
                                     reasonChanged ? "border-[#ff5722] bg-[#fff3f0]" :
                                     reasonVal ? "border-[#c4cda8] bg-[#f8fdf0]" :
                                     "border-[#e0e2da] bg-[#fafafa]"
@@ -1153,21 +1158,25 @@ export default function CalibrationsPage() {
                               <td className="px-2 py-2.5 hidden md:table-cell" onClick={e => e.stopPropagation()}>
                                 <div className="flex items-center justify-center gap-1 flex-wrap">
                                   {isFinalPublished ? (
-                                    <span
-                                      data-testid={`badge-criterion-final-${c.criterionId}`}
-                                      title={`Final publicado em ${formatDateTime(new Date(c.finalPublishedAt!))}`}
-                                      className="text-[9px] font-bold italic uppercase bg-[#506600] text-[#ccff00] border border-[#506600] px-1.5 py-0.5 flex items-center gap-0.5"
-                                    >
-                                      <ShieldCheck size={9} /> Final
-                                    </span>
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span
+                                        data-testid={`badge-criterion-final-${c.criterionId}`}
+                                        className="text-[9px] font-bold italic uppercase bg-[#506600] text-[#ccff00] border border-[#506600] px-1.5 py-0.5 flex items-center gap-0.5 whitespace-nowrap"
+                                      >
+                                        <ShieldCheck size={9} /> Final
+                                      </span>
+                                      <span className="text-[8px] italic text-[#747a60] whitespace-nowrap">{formatDateTime(new Date(c.finalPublishedAt!))}</span>
+                                    </div>
                                   ) : c.partialPublishedAt ? (
-                                    <span
-                                      data-testid={`badge-criterion-partial-${c.criterionId}`}
-                                      title={`Parcial publicado em ${formatDateTime(new Date(c.partialPublishedAt))}`}
-                                      className="text-[9px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5 flex items-center gap-0.5"
-                                    >
-                                      <Send size={9} /> Parcial
-                                    </span>
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span
+                                        data-testid={`badge-criterion-partial-${c.criterionId}`}
+                                        className="text-[9px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5 flex items-center gap-0.5 whitespace-nowrap"
+                                      >
+                                        <Send size={9} /> Parcial
+                                      </span>
+                                      <span className="text-[8px] italic text-[#747a60] whitespace-nowrap">{formatDateTime(new Date(c.partialPublishedAt))}</span>
+                                    </div>
                                   ) : null}
                                   <button
                                     data-testid={`button-publish-criterion-partial-${c.criterionId}`}
