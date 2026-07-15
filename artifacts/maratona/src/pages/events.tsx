@@ -110,7 +110,7 @@ export default function EventsPage() {
 
   const normalizeDatesMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("maratona_token");
       const res = await fetch("/api/events/admin/normalize-dates", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -127,7 +127,7 @@ export default function EventsPage() {
 
   const editMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: EditEventInput }) => {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("maratona_token");
       const res = await fetch(`/api/events/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
