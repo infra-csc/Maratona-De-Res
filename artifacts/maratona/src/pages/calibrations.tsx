@@ -672,13 +672,13 @@ export default function CalibrationsPage() {
         {/* Publication status badge */}
         {pickedEvent && (
           <span className={cn("shrink-0 px-2 py-0.5 font-bold text-[10px] italic uppercase hidden sm:inline border",
-            alreadyReleased ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" :
+            (alreadyReleased || allCriteriaFinalPublished) ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" :
             partialPublishedAtDate ? "bg-[#ffb5a0] text-[#3b0900] border-[#ffb5a0]" :
             "bg-white/10 text-white/60 border-white/20"
           )}
-            title={alreadyReleased ? `Final liberado em ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}` : partialPublishedAtDate ? `Parcial publicado em ${formatDateTime(partialPublishedAtDate)}` : "Notas não publicadas"}
+            title={(alreadyReleased || allCriteriaFinalPublished) ? `Final liberado em ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}` : partialPublishedAtDate ? `Parcial publicado em ${formatDateTime(partialPublishedAtDate)}` : "Notas não publicadas"}
           >
-            {alreadyReleased ? "Final" : partialPublishedAtDate ? "Parcial" : "Não pub."}
+            {(alreadyReleased || allCriteriaFinalPublished) ? "Final" : partialPublishedAtDate ? "Parcial" : "Não pub."}
           </span>
         )}
 
