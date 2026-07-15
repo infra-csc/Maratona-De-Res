@@ -692,24 +692,9 @@ export default function CalibrationsPage() {
           </span>
         )}
 
-        {/* Context toggle */}
-        {selectedEventId && (
-          <button
-            type="button"
-            onClick={() => setContextOpen(v => !v)}
-            title={contextOpen ? "Fechar painel de contexto" : "Ver contexto do evento: equipe, conformidade, pedidos de revisão, comentários"}
-            className={cn(
-              "shrink-0 flex items-center gap-1 px-2 py-1 border font-bold text-[10px] italic uppercase transition-colors",
-              contextOpen ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" : "border-white/25 text-white/60 hover:border-white/60 hover:text-white"
-            )}
-          >
-            <Info size={12} />
-            <span className="hidden sm:inline">Contexto</span>
-          </button>
-        )}
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-4">
         {/* ── PLACEHOLDER: nenhum evento selecionado ── */}
         {!selectedEventId && (
           <div className="flex flex-col items-center justify-center py-24 text-center bg-white border-2 border-dashed border-[#191c1e]">
@@ -722,10 +707,10 @@ export default function CalibrationsPage() {
         )}
 
         {selectedEventId && (
-        <>
-          {/* ── COLLAPSIBLE CONTEXT DRAWER ── */}
-          {contextOpen && (
-            <div className="bg-white border-2 border-[#191c1e] divide-y-2 divide-[#e8eaec]">
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+
+          {/* ── RIGHT SIDEBAR: Context always visible ── */}
+          <aside className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-4 self-start lg:order-2 bg-white border-2 border-[#191c1e] divide-y-2 divide-[#e8eaec] max-h-[50vh] lg:max-h-[calc(100vh-80px)] overflow-y-auto">
 
               {/* Event summary bar */}
               {pickedEvent && (
@@ -882,10 +867,12 @@ export default function CalibrationsPage() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
+          </aside>
 
-          {/* ── COMPACT ACTION BAR ── */}
+          {/* ── LEFT COLUMN: Calibrations table ── */}
+          <div className="flex-1 min-w-0 space-y-3 lg:order-1">
+
+            {/* ── COMPACT ACTION BAR ── */}
           {activeCriteria.length === 0 ? (
             <div className="bg-white border-2 border-[#191c1e] text-center py-10 italic uppercase font-bold text-[#747a60] text-sm">
               Nenhum critério ativo para este evento.
@@ -1268,7 +1255,8 @@ export default function CalibrationsPage() {
               )}
             </>
           )}
-        </>
+          </div>{/* end left column */}
+        </div>
         )}
 
       </div>
