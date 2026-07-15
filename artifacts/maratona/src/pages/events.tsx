@@ -122,11 +122,9 @@ export default function EventsPage() {
   const isPastOrClosed = (e: typeof all[0]) => e.status === "closed" || (!!e.endDate && new Date(e.endDate) < today);
   const hasNoPublication = (e: typeof all[0]) => !e.feedbackReleased && !e.partialPublishedAt;
   const statsData = [
-    { key: "configured",  label: "Configurados",     value: all.filter(e => e.criteriaConfirmed).length,                         color: "#506600" },
-    { key: "confirmed",   label: "Confirmados",       value: all.filter(e => e.resultsConfirmed).length,                          color: "#506600" },
-    { key: "unconfirmed", label: "Não confirmados",   value: all.filter(e => !e.resultsConfirmed).length,                         color: "#ff5722" },
-    { key: "pendingCal",  label: "Falta calibrar",    value: all.filter(e => isPastOrClosed(e) && !e.fullyCalibrated).length, color: "#ffb300" },
-    { key: "fullyEval",   label: "Avaliação 100%",    value: all.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length,                                         color: "#ccff00" },
+    { key: "pendingRH",  label: "Aguardando RH",  value: all.filter(e => !e.criteriaConfirmed).length,                                                                              color: "#ff5722" },
+    { key: "pendingCal", label: "Falta calibrar", value: all.filter(e => isPastOrClosed(e) && !e.fullyCalibrated).length,                                                           color: "#ffb300" },
+    { key: "fullyEval",  label: "Avaliação 100%", value: all.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length, color: "#ccff00" },
   ];
 
   const colSortPairs: Record<string, string> = {
@@ -164,19 +162,11 @@ export default function EventsPage() {
   const filtered = all.filter(ev => {
     const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
-    const matchConfig = filterStatus === "all"
-      || (filterStatus === "configured" && !!ev.criteriaConfirmed)
-      || (filterStatus === "confirmed" && !!ev.resultsConfirmed)
-      || (filterStatus === "unconfirmed" && !ev.resultsConfirmed)
-      || (filterStatus === "pendingCal" && isPastOrClosed(ev) && !ev.fullyCalibrated)
-      || (filterStatus === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0))
-      || (filterStatus === "fullyCalibrated" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
+    const matchConfig = true;
     const matchCard = cardFilter === null
-      || (cardFilter === "configured" && ev.criteriaConfirmed)
-      || (cardFilter === "confirmed" && ev.resultsConfirmed)
-      || (cardFilter === "unconfirmed" && !ev.resultsConfirmed)
+      || (cardFilter === "pendingRH"  && !ev.criteriaConfirmed)
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && !ev.fullyCalibrated)
-      || (cardFilter === "fullyEval" && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
+      || (cardFilter === "fullyEval"  && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
     return matchSearch && matchDate && matchConfig && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
