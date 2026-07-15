@@ -1547,37 +1547,22 @@ export default function EventDetailPage() {
 
               {/* Banner de liberação — destaque visual quando não confirmado */}
               {!criteriaConfirmed && (
-                <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 border-2 px-5 py-4 ${sumValid ? (allAssigned ? "border-[#506600] bg-[#f0fff0]" : "border-[#d4a800] bg-[#fffbf0]") : "border-[#ff5722] bg-[#fff8f5]"}`}>
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    {sumValid
-                      ? <Unlock size={18} className={allAssigned ? "text-[#506600] shrink-0 mt-0.5" : "text-[#d4a800] shrink-0 mt-0.5"} />
-                      : <Lock size={18} className="text-[#ff5722] shrink-0 mt-0.5" />}
-                    <div>
-                      <p className="text-xs font-black italic uppercase text-[#191c1e]">
-                        {sumValid ? (allAssigned ? "Tudo pronto — libere para as áreas avaliarem" : "Pode liberar parcialmente") : "Avaliações ainda não liberadas"}
-                      </p>
-                      <p className="text-[11px] italic text-[#747a60] mt-0.5">
-                        {!sumValid
-                          ? `Pesos ativos precisam somar ${fmt(targetWeightSum)}.`
-                          : !allAssigned
-                          ? `Ainda sem avaliador: ${assignAreas.filter(a => primaryEvaluator[a.areaId] == null).map(a => a.areaName).join(", ")}. Pode liberar mesmo assim — atribua quando a informação chegar.`
-                          : "Clique em Liberar Avaliações para que as áreas possam começar a avaliar."}
-                      </p>
-                    </div>
+                <div className={`flex items-start gap-3 border-2 px-5 py-4 ${sumValid ? (allAssigned ? "border-[#506600] bg-[#f0fff0]" : "border-[#d4a800] bg-[#fffbf0]") : "border-[#ff5722] bg-[#fff8f5]"}`}>
+                  {sumValid
+                    ? <Unlock size={18} className={allAssigned ? "text-[#506600] shrink-0 mt-0.5" : "text-[#d4a800] shrink-0 mt-0.5"} />
+                    : <Lock size={18} className="text-[#ff5722] shrink-0 mt-0.5" />}
+                  <div>
+                    <p className="text-xs font-black italic uppercase text-[#191c1e]">
+                      {sumValid ? (allAssigned ? "Tudo pronto — clique em Confirmar e Liberar Avaliação abaixo" : "Pode liberar parcialmente") : "Avaliações ainda não liberadas"}
+                    </p>
+                    <p className="text-[11px] italic text-[#747a60] mt-0.5">
+                      {!sumValid
+                        ? `Pesos ativos precisam somar ${fmt(targetWeightSum)}.`
+                        : !allAssigned
+                        ? `Ainda sem avaliador: ${assignAreas.filter(a => primaryEvaluator[a.areaId] == null).map(a => a.areaName).join(", ")}. Pode liberar mesmo assim — atribua quando a informação chegar.`
+                        : "Use o botão abaixo para liberar as avaliações para as áreas."}
+                    </p>
                   </div>
-                  <button
-                    data-testid="button-confirm-criteria-top"
-                    onClick={handleConfirmAndRelease}
-                    disabled={!sumValid || confirmBusy}
-                    className={`shrink-0 flex items-center gap-2 px-5 py-2.5 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider transition-all ${
-                      sumValid
-                        ? `bg-[#ccff00] text-[#161e00] ${HARD_SHADOW} hover:translate-y-[1px]`
-                        : "bg-[#eceef0] text-[#9aa088] cursor-not-allowed opacity-60"
-                    }`}
-                  >
-                    {confirmBusy ? <RefreshCw size={14} className="animate-spin" /> : <Unlock size={14} />}
-                    {confirmBusy ? "Liberando..." : "Liberar Avaliações"}
-                  </button>
                 </div>
               )}
 
