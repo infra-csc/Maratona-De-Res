@@ -1228,6 +1228,8 @@ export default function EvaluationsPage() {
                     sidebarEvents.map(ev => {
                       const isSelected = selectedEventId === ev.id;
                       const prog = ev.evaluationProgress ?? 0;
+                      const done = prog >= 1;
+                      const partial = prog > 0 && prog < 1;
                       return (
                         <button
                           key={ev.id}
@@ -1235,30 +1237,49 @@ export default function EvaluationsPage() {
                           data-testid={`option-event-${ev.id}`}
                           onClick={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
                           className={cn(
-                            "w-full text-left px-3 py-2 border-b border-[#eceef0] last:border-0 transition-colors",
-                            isSelected ? "bg-[#f7ffd1] border-l-[3px] border-l-[#506600] pl-2.5" : "hover:bg-[#f7f9fb]"
+                            "w-full text-left px-3 py-2.5 border-b border-[#eceef0] last:border-0 transition-colors border-l-[3px]",
+                            isSelected
+                              ? "bg-[#eeffaa] border-l-[#ccff00]"
+                              : done
+                                ? "bg-[#f3ffdf] border-l-[#a0c830] hover:bg-[#ecffcc]"
+                                : partial
+                                  ? "bg-[#fffcf0] border-l-[#e0c840] hover:bg-[#fff9e0]"
+                                  : "bg-white border-l-transparent hover:bg-[#f7f9fb]"
                           )}
                         >
-                          <p className="font-black italic uppercase text-[10px] leading-tight text-[#191c1e] line-clamp-2 mb-0.5">{ev.name}</p>
+                          {/* Name + done icon */}
+                          <div className="flex items-start justify-between gap-1.5 mb-0.5">
+                            <p className={cn("font-black italic uppercase text-[10px] leading-tight line-clamp-2 flex-1", done ? "text-[#2e4400]" : "text-[#191c1e]")}>{ev.name}</p>
+                            {done && <CheckCircle size={13} className="shrink-0 mt-0.5 text-[#506600]" />}
+                          </div>
+
+                          {/* Subtitle */}
                           {formatEventSubtitle(ev) && (
-                            <p className="text-[9px] italic font-bold text-[#747a60] truncate mb-1">{formatEventSubtitle(ev)}</p>
+                            <p className="text-[9px] italic font-bold text-[#747a60] truncate mb-1.5">{formatEventSubtitle(ev)}</p>
                           )}
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {ev.feedbackReleased
-                              ? <span className="text-[8px] font-black italic uppercase bg-[#ccff00] text-[#161e00] px-1.5 py-0.5 border border-[#506600]">✓ Final</span>
-                              : ev.partialPublishedAt
-                                ? <span className="text-[8px] font-black italic uppercase bg-[#fff4c2] text-[#5c4a00] px-1.5 py-0.5 border border-[#c9a800]">◑ Parcial</span>
-                                : <span className="text-[8px] font-black italic uppercase bg-[#f0f0f0] text-[#747a60] px-1.5 py-0.5 border border-[#d0d0d0]">— Sem pub.</span>
-                            }
-                            <span className={cn(
-                              "text-[8px] font-bold italic uppercase px-1.5 py-0.5 border",
-                              prog >= 1 ? "bg-[#efffcf] text-[#506600] border-[#a0c830]"
-                                : prog > 0 ? "bg-[#fff8e1] text-[#7a5800] border-[#e0c840]"
-                                : "bg-[#f5f5f5] text-[#9aa08a] border-[#d8d8d8]"
+
+                          {/* Progress bar */}
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="flex-1 h-1 bg-[#dde5cc] overflow-hidden">
+                              <div
+                                className={cn("h-full transition-all", done ? "bg-[#ccff00]" : partial ? "bg-[#f0d000]" : "bg-transparent")}
+                                style={{ width: `${Math.round(prog * 100)}%` }}
+                              />
+                            </div>
+                            <span className={cn("text-[9px] font-black italic uppercase shrink-0 tabular-nums",
+                              done ? "text-[#506600]" : partial ? "text-[#7a5800]" : "text-[#9aa08a]"
                             )}>
-                              {Math.round(prog * 100)}% aval.
+                              {Math.round(prog * 100)}%
                             </span>
                           </div>
+
+                          {/* Publication badge (only if published) */}
+                          {ev.feedbackReleased
+                            ? <span className="text-[8px] font-black italic uppercase bg-[#ccff00] text-[#161e00] px-1.5 py-0.5 border border-[#506600]">✓ Final</span>
+                            : ev.partialPublishedAt
+                              ? <span className="text-[8px] font-black italic uppercase bg-[#fff4c2] text-[#5c4a00] px-1.5 py-0.5 border border-[#c9a800]">◑ Parcial</span>
+                              : null
+                          }
                         </button>
                       );
                     })
