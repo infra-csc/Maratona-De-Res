@@ -629,6 +629,67 @@ router.post("/events/:id/public-token", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /events/:id/admin-public-token
+// Admin/RH/Diretoria: gera link público para o questionário de QUALQUER
+// avaliador designado ao evento — sem checar allowPublicLink (admin tem
+// autoridade). O token usa createdByUserId = assignedToUserId para que a
+// submissão conte como avaliação desse avaliador.
+// Body: { assignedToUserId: number, criterionIds: number[], recipientName?: string }
+// ---------------------------------------------------------------------------
+router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const { assignedToUserId, criterionIds, recipientName } = req.body ?? {};
+
+  if (!assignedToUserId || !Array.isArray(criterionIds) || criterionIds.length === 0) {
+    res.status(400).json({ error: "assignedToUserId e criterionIds são obrigatórios" });
+    return;
+  }
+
+  const assignments = await db.select({
+    criterionId: eventCriterionAssignmentsTable.criterionId,
+    status: eventCriterionAssignmentsTable.status,
+  })
+    .from(eventCriterionAssignmentsTable)
+    .where(and(
+      eq(eventCriterionAssignmentsTable.eventId, eventId),
+      eq(eventCriterionAssignmentsTable.assignedToId, assignedToUserId),
+    ));
+
+  const assignedIds = new Set(assignments.filter(a => a.status !== "submitted").map(a => a.criterionId));
+  const validCriterionIds = (criterionIds as number[]).filter(id => assignedIds.has(id));
+
+  if (validCriterionIds.length === 0) {
+    res.status(400).json({ error: "Nenhum dos critérios está atribuído a este avaliador, ou todos já foram submetidos" });
+    return;
+  }
+
+  const [evaluatorUser] = await db.select({ name: usersTable.name })
+    .from(usersTable).where(eq(usersTable.id, assignedToUserId)).limit(1);
+
+  const finalRecipientName = (recipientName && typeof recipientName === "string" && recipientName.trim())
+    ? recipientName.trim()
+    : (evaluatorUser?.name ?? "Avaliador");
+
+  const tokenId = randomUUID();
+  await db.transaction(async (tx) => {
+    await tx.insert(publicEvalTokensTable).values({
+      id: tokenId,
+      eventId,
+      createdByUserId: assignedToUserId,
+      recipientName: finalRecipientName,
+    });
+    await tx.insert(publicEvalTokenCriteriaTable).values(
+      validCriterionIds.map(criterionId => ({ tokenId, criterionId })),
+    );
+  });
+
+  await audit(req.user!.userId, "create_admin_link", "public_eval_tokens", tokenId, null, {
+    eventId, assignedToUserId, criterionIds: validCriterionIds, recipientName: finalRecipientName,
+  });
+  res.json({ tokenId });
+});
+
+// ---------------------------------------------------------------------------
 // GET /events/:id/public-tokens
 // Lista os links públicos gerados pelo avaliador logado para este evento
 // (histórico exibido na tela de avaliação).
@@ -855,13 +916,30 @@ router.get("/events/:id/public-tokens/all", requireRole("admin", "rh"), async (r
     usedAt: publicEvalTokensTable.usedAt,
     createdAt: publicEvalTokensTable.createdAt,
     createdByName: usersTable.name,
+    createdByUserId: publicEvalTokensTable.createdByUserId,
   })
     .from(publicEvalTokensTable)
     .leftJoin(usersTable, eq(publicEvalTokensTable.createdByUserId, usersTable.id))
     .where(eq(publicEvalTokensTable.eventId, eventId))
     .orderBy(publicEvalTokensTable.createdAt);
 
-  res.json(tokens);
+  const tokenIds = tokens.map(t => t.id);
+  const tokenCriteria = tokenIds.length > 0
+    ? await db.select({
+        tokenId: publicEvalTokenCriteriaTable.tokenId,
+        criterionId: publicEvalTokenCriteriaTable.criterionId,
+      })
+        .from(publicEvalTokenCriteriaTable)
+        .where(inArray(publicEvalTokenCriteriaTable.tokenId, tokenIds))
+    : [];
+
+  const criterionIdsByToken = new Map<string, number[]>();
+  for (const tc of tokenCriteria) {
+    if (!criterionIdsByToken.has(tc.tokenId)) criterionIdsByToken.set(tc.tokenId, []);
+    criterionIdsByToken.get(tc.tokenId)!.push(tc.criterionId);
+  }
+
+  res.json(tokens.map(t => ({ ...t, criterionIds: criterionIdsByToken.get(t.id) ?? [] })));
 });
 
 // ---------------------------------------------------------------------------

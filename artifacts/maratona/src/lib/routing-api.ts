@@ -54,6 +54,8 @@ export interface PublicToken {
   usedAt: string | null;
   createdAt: string | null;
   createdByName: string | null;
+  criterionIds?: number[];
+  createdByUserId?: number;
 }
 
 export interface RouteUser {
@@ -298,6 +300,20 @@ export function useAllPublicTokens(eventId: number | null) {
     queryKey: ["all-public-tokens", eventId ?? 0],
     queryFn: () => apiFetch(`/api/events/${eventId}/public-tokens/all`),
     enabled: eventId != null,
+  });
+}
+
+/** Admin/RH/Diretoria: gera link público para o questionário de um avaliador designado (bypassa allowPublicLink). */
+export function useCreateAdminPublicToken(eventId: number) {
+  const qc = useQueryClient();
+  return useMutation<{ tokenId: string }, Error, { assignedToUserId: number; criterionIds: number[]; recipientName?: string }>({
+    mutationFn: (data) => apiFetch<{ tokenId: string }>(`/api/events/${eventId}/admin-public-token`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-public-tokens", eventId] });
+    },
   });
 }
 

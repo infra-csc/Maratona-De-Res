@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle } from "@/lib/utils";
-import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, type PublicToken } from "@/lib/routing-api";
+import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, useCreateAdminPublicToken, type PublicToken } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -543,7 +543,13 @@ export default function EvaluationsPage() {
   );
   // Admin/RH: histórico consolidado de todos os links públicos do evento,
   // de qualquer avaliador/formulário — dá visibilidade central de quem enviou o quê.
-  const { data: allPublicTokens } = useAllPublicTokens(isManager ? (selectedEventId ?? null) : null);
+  const { data: allPublicTokens, refetch: refetchAllPublicTokens } = useAllPublicTokens(isManager ? (selectedEventId ?? null) : null);
+  // Admin link dialog — gera link para qualquer avaliador designado
+  const [adminLinkDialog, setAdminLinkDialog] = useState<{ areaName: string; criterionIds: number[]; assigned: { id: number; name: string }[] } | null>(null);
+  const [adminLinkForUserId, setAdminLinkForUserId] = useState<number | null>(null);
+  const [adminLinkUrl, setAdminLinkUrl] = useState<string | null>(null);
+  const [adminLinkCopied, setAdminLinkCopied] = useState(false);
+  const createAdminPublicToken = useCreateAdminPublicToken(selectedEventId ?? 0);
 
   const createMutation = useCreateEvaluation({
     mutation: {
@@ -2048,6 +2054,22 @@ export default function EvaluationsPage() {
                                         <User size={10} /> {a.name.split(" ")[0]}
                                       </span>
                                     ))}
+                                    {areaAssigned.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAdminLinkDialog({ areaName: g.area, criterionIds: g.criteria.map(c => c.criterionId), assigned: areaAssigned });
+                                          setAdminLinkForUserId(areaAssigned.length === 1 ? areaAssigned[0].id : null);
+                                          setAdminLinkUrl(null);
+                                          setAdminLinkCopied(false);
+                                          refetchAllPublicTokens();
+                                        }}
+                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] transition-colors text-[10px] font-black uppercase tracking-tight"
+                                        title="Gerar link de avaliação para este avaliador"
+                                      >
+                                        <Link2 size={11} /> Link
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={() => { setAssignAreaPickerOpen(areaId); setAssignAreaUserIds(areaAssigned.map(a => a.id)); }}
@@ -3596,6 +3618,163 @@ export default function EvaluationsPage() {
               {addParticipant.isPending ? "Adicionando..." : "Adicionar à Equipe"}
             </button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin link dialog — gera link público para qualquer avaliador designado */}
+      <Dialog
+        open={adminLinkDialog !== null}
+        onOpenChange={(v) => {
+          if (!v) {
+            setAdminLinkDialog(null);
+            setAdminLinkForUserId(null);
+            setAdminLinkUrl(null);
+            setAdminLinkCopied(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-xl italic uppercase font-black tracking-tight flex items-center gap-2">
+              <Link2 size={18} /> Link de Avaliação
+            </DialogTitle>
+          </DialogHeader>
+          {adminLinkDialog && (
+            <div className="space-y-4 pt-2">
+              <div className="border-l-4 border-[#ccff00] pl-3">
+                <p className="text-[10px] font-bold italic uppercase text-[#747a60]">Formulário</p>
+                <p className="text-sm font-black italic uppercase">{adminLinkDialog.areaName}</p>
+              </div>
+
+              {adminLinkDialog.assigned.length > 1 && !adminLinkUrl && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-black italic uppercase text-[#747a60]">Gerar link para</p>
+                  <div className="space-y-1 border-2 border-[#191c1e] p-2">
+                    {adminLinkDialog.assigned.map(a => (
+                      <label key={a.id} className="flex items-center gap-2.5 cursor-pointer hover:bg-[#f2f4f6] px-2 py-1.5">
+                        <input
+                          type="radio"
+                          name="adminLinkUser"
+                          checked={adminLinkForUserId === a.id}
+                          onChange={() => setAdminLinkForUserId(a.id)}
+                          className="accent-[#506600]"
+                        />
+                        <span className="text-sm font-bold italic uppercase">{a.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {adminLinkDialog.assigned.length === 1 && !adminLinkUrl && (
+                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3 flex items-center gap-2">
+                  <User size={14} />
+                  <span className="text-sm font-black italic uppercase">{adminLinkDialog.assigned[0].name}</span>
+                </div>
+              )}
+
+              {!adminLinkUrl ? (
+                <>
+                  {(() => {
+                    const existingTokens = (allPublicTokens ?? []).filter(t =>
+                      t.tokenType === "criteria" &&
+                      !t.usedAt &&
+                      t.createdByUserId === adminLinkForUserId &&
+                      (t.criterionIds ?? []).some(id => adminLinkDialog.criterionIds.includes(id))
+                    );
+                    return existingTokens.length > 0 ? (
+                      <div className="bg-[#fffde7] border-2 border-[#f5c518] px-4 py-3 space-y-2">
+                        <p className="text-[10px] font-black italic uppercase text-[#7a6000]">
+                          Link pendente existente
+                        </p>
+                        {existingTokens.map(t => {
+                          const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+                          const url = `${base}/eval/${t.id}`;
+                          return (
+                            <div key={t.id} className="flex items-center gap-2">
+                              <input readOnly value={url} className="flex-1 min-w-0 bg-white border-2 border-[#191c1e] px-2 py-1.5 text-xs font-mono truncate" />
+                              <button
+                                type="button"
+                                onClick={() => { navigator.clipboard.writeText(url); toast({ title: "Link copiado!" }); }}
+                                className="shrink-0 flex items-center gap-1 px-3 py-1.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] text-[11px] font-black uppercase"
+                              >
+                                <Copy size={12} /> Copiar
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null;
+                  })()}
+                  <p className="text-sm italic text-[#444933]">
+                    Gere um link único para que o avaliador (ou qualquer pessoa) responda este formulário sem precisar fazer login. O link expira após o primeiro uso.
+                  </p>
+                  <DialogFooter className="gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => { setAdminLinkDialog(null); setAdminLinkForUserId(null); }}
+                      className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!adminLinkForUserId || createAdminPublicToken.isPending}
+                      onClick={() => {
+                        if (!adminLinkForUserId) return;
+                        const selectedUser = adminLinkDialog.assigned.find(a => a.id === adminLinkForUserId);
+                        createAdminPublicToken.mutate(
+                          { assignedToUserId: adminLinkForUserId, criterionIds: adminLinkDialog.criterionIds, recipientName: selectedUser?.name },
+                          {
+                            onSuccess: ({ tokenId }) => {
+                              const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+                              setAdminLinkUrl(`${base}/eval/${tokenId}`);
+                            },
+                            onError: (e) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+                          }
+                        );
+                      }}
+                      className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#191c1e] bg-[#191c1e] text-[#ccff00] font-bold italic uppercase text-xs hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors disabled:opacity-50"
+                    >
+                      {createAdminPublicToken.isPending ? "Gerando..." : <><Link2 size={13} /> Gerar Link</>}
+                    </button>
+                  </DialogFooter>
+                </>
+              ) : (
+                <>
+                  <div className="bg-[#f2ffd6] border-2 border-[#506600] px-4 py-4 space-y-3">
+                    <p className="text-[10px] font-black italic uppercase text-[#506600]">Link gerado com sucesso</p>
+                    <div className="flex items-center gap-2">
+                      <input readOnly value={adminLinkUrl} className="flex-1 min-w-0 bg-white border-2 border-[#191c1e] px-2 py-1.5 text-xs font-mono truncate" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(adminLinkUrl);
+                          setAdminLinkCopied(true);
+                          setTimeout(() => setAdminLinkCopied(false), 2000);
+                        }}
+                        className="shrink-0 flex items-center gap-1 px-3 py-1.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] text-[11px] font-black uppercase transition-colors"
+                      >
+                        <Copy size={12} /> {adminLinkCopied ? "Copiado!" : "Copiar"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] italic text-[#506600]">
+                      Envie este link para o avaliador ou qualquer pessoa que deva preencher o formulário. Ele expira após o primeiro uso.
+                    </p>
+                  </div>
+                  <DialogFooter className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => { setAdminLinkDialog(null); setAdminLinkForUserId(null); setAdminLinkUrl(null); setAdminLinkCopied(false); }}
+                      className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
+                    >
+                      Fechar
+                    </button>
+                  </DialogFooter>
+                </>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
