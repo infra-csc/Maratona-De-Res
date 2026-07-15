@@ -1568,6 +1568,42 @@ router.delete("/events/:id/comments/:commentId", async (req, res) => {
 // Seguro rodar múltiplas vezes (idempotente — só atualiza se o critério
 // de origem ainda existe nas calibrações).
 // ---------------------------------------------------------------------------
+router.post("/events/admin/normalize-dates", requireRole("admin"), async (req, res) => {
+  // 1. Corrige os 4 eventos com datas erradas (confirmadas pelo usuário)
+  const fixes: { id: number; date: string }[] = [
+    { id: 127, date: "2026-07-26" }, // Bravus Speed RJ – datas invertidas
+    { id: 95,  date: "2026-06-27" }, // Night Run Joinville
+    { id: 96,  date: "2026-06-27" }, // Night Run Manaus
+    { id: 873, date: "2026-08-23" }, // Netshoes Run SP
+  ];
+  let fixedCount = 0;
+  for (const fix of fixes) {
+    await db.update(eventsTable)
+      .set({ startDate: fix.date, endDate: fix.date })
+      .where(eq(eventsTable.id, fix.id));
+    fixedCount++;
+  }
+  const fixedIds = fixes.map(f => f.id);
+
+  // 2. Para todos os demais eventos multi-dia: startDate = endDate (data única)
+  const multiDay = await db.select({ id: eventsTable.id, endDate: eventsTable.endDate })
+    .from(eventsTable)
+    .where(sql`start_date <> end_date AND id NOT IN (${sql.join(fixedIds.map(id => sql`${id}`), sql`, `)})`);
+
+  let normalizedCount = 0;
+  for (const ev of multiDay) {
+    await db.update(eventsTable)
+      .set({ startDate: ev.endDate })
+      .where(eq(eventsTable.id, ev.id));
+    normalizedCount++;
+  }
+
+  await audit(req.user!.userId, "normalize_event_dates", "events", undefined,
+    { fixedCount, normalizedCount, fixedIds, normalizedIds: multiDay.map(e => e.id) }, undefined);
+
+  res.json({ ok: true, fixedCount, normalizedCount });
+});
+
 router.post("/events/admin/fix-calibration-criteria", requireRole("admin"), async (req, res) => {
   const nameMap: Record<string, string> = {
     "Qualidade e Acabamento da Montagem": "Qualidade da Entrega",

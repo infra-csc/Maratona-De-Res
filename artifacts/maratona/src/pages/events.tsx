@@ -108,6 +108,23 @@ export default function EventsPage() {
   type EditEventInput = { name: string; startDate: string; endDate: string; clientName?: string; city?: string; state?: string; location?: string };
   const { register: registerEdit, handleSubmit: handleSubmitEdit, reset: resetEdit } = useForm<EditEventInput>();
 
+  const normalizeDatesMutation = useMutation({
+    mutationFn: async () => {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch("/api/events/admin/normalize-dates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e as { error?: string }).error ?? `HTTP ${res.status}`); }
+      return res.json() as Promise<{ ok: boolean; fixedCount: number; normalizedCount: number }>;
+    },
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey });
+      toast({ title: "Datas normalizadas", description: `${d.fixedCount} corrigidos + ${d.normalizedCount} unificados para data única.` });
+    },
+    onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
   const editMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: EditEventInput }) => {
       const token = localStorage.getItem("auth_token");
@@ -262,6 +279,19 @@ export default function EventsPage() {
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {user?.role === "admin" && (
+            <button
+              onClick={() => {
+                if (!confirm("Isso vai:\n• Corrigir os 4 eventos com datas erradas\n• Unificar TODOS os eventos multi-dia para data única (startDate = endDate)\n\nConfirmar?")) return;
+                normalizeDatesMutation.mutate();
+              }}
+              disabled={normalizeDatesMutation.isPending}
+              className="flex items-center gap-1.5 bg-white/10 border-2 border-white/30 px-3 py-1.5 font-bold text-xs italic uppercase text-white hover:bg-white/20 transition-colors disabled:opacity-50"
+              title="Normalizar datas para data única"
+            >
+              {normalizeDatesMutation.isPending ? "..." : "Unificar Datas"}
+            </button>
+          )}
           {canCreate && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
