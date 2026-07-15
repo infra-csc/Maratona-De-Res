@@ -1025,6 +1025,8 @@ export default function CalibrationsPage() {
                         const hasUnsaved = calScores[c.criterionId] !== undefined;
                         const savedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
                         const changedFromSaved = hasUnsaved && String(savedScore) !== calScores[c.criterionId];
+                        const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
+                        const reasonChanged = calReasons[c.criterionId] !== undefined && calReasons[c.criterionId] !== (cal?.calibrationReason ?? "");
 
                         return (
                           <tr
@@ -1043,6 +1045,22 @@ export default function CalibrationsPage() {
                                 {areaScores.length > 0 && (
                                   <ChevronDown size={11} className="text-[#747a60] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
                                 )}
+                              </div>
+                              {/* Justificativa inline */}
+                              <div onClick={e => e.stopPropagation()} className="mt-1.5">
+                                <input
+                                  data-testid={`input-cal-reason-inline-${c.criterionId}`}
+                                  type="text"
+                                  value={reasonVal}
+                                  onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
+                                  placeholder="Justificativa da calibração…"
+                                  className={cn(
+                                    "w-full h-6 px-2 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] bg-transparent",
+                                    reasonChanged ? "border-[#ff5722] bg-[#fff3f0]" :
+                                    reasonVal ? "border-[#c4cda8] bg-[#f8fdf0]" :
+                                    "border-[#e0e2da] bg-transparent"
+                                  )}
+                                />
                               </div>
                             </td>
                             {/* Peso */}
