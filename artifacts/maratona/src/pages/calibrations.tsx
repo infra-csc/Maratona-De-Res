@@ -57,7 +57,7 @@ export default function CalibrationsPage() {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [eventIdFromUrlApplied, setEventIdFromUrlApplied] = useState(false);
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
-  const [eventStatusFilter, setEventStatusFilter] = useState<"all" | "open" | "closed">("all");
+  const [eventStatusFilter, setEventStatusFilter] = useState<"all" | "pending" | "inProgress" | "done">("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [calScores, setCalScores] = useState<Record<number, string>>({});
@@ -116,7 +116,14 @@ export default function CalibrationsPage() {
   const calibratableEvents = events ?? [];
   const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
   const filteredCalibratableEvents = calibratableEvents.filter(e => {
-    const matchStatus = eventStatusFilter === "all" || e.status === eventStatusFilter;
+    const evalCount = e.evaluatedCriteria ?? 0;
+    const calCount  = e.calibratedCriteriaCount ?? 0;
+    const total     = e.totalCriteria ?? 0;
+    const hasPub    = !!(e as Record<string, unknown>).partialPublishedAt || !!e.feedbackReleased || (e.finalCalibratedCriteria ?? 0) > 0;
+    const matchStatus = eventStatusFilter === "all"
+      || (eventStatusFilter === "pending"     && evalCount === 0 && calCount === 0)
+      || (eventStatusFilter === "inProgress"  && !!e.criteriaConfirmed && (evalCount > 0 || calCount > 0))
+      || (eventStatusFilter === "done"        && (e.status === "closed" || (total > 0 && evalCount >= total) || hasPub));
     const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
     return matchStatus && matchDate;
   });
@@ -600,9 +607,10 @@ export default function CalibrationsPage() {
           <div className="w-full max-w-2xl">
             <div className="flex flex-wrap gap-2 mb-3">
               {([
-                { value: "all", label: "Todos" },
-                { value: "open", label: "Em avaliação" },
-                { value: "closed", label: "Fechado" },
+                { value: "all",        label: "Todos" },
+                { value: "pending",    label: "Aguardando" },
+                { value: "inProgress", label: "Em avaliação" },
+                { value: "done",       label: "Fechado" },
               ] as const).map(opt => (
                 <button
                   key={opt.value}
