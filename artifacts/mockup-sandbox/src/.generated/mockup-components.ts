@@ -3,8 +3,10 @@ type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/calibrations-redesign/VarianteA.tsx": () => import("../components/mockups/calibrations-redesign/VarianteA.tsx"),
   "./components/mockups/calibrations-redesign/VarianteB.tsx": () => import("../components/mockups/calibrations-redesign/VarianteB.tsx"),
+  "./components/mockups/evaluations-redesign/OpcaoA.tsx": () => import("../components/mockups/evaluations-redesign/OpcaoA.tsx"),
+  "./components/mockups/evaluations-redesign/OpcaoB.tsx": () => import("../components/mockups/evaluations-redesign/OpcaoB.tsx"),
   "./components/mockups/events-redesign/OpcaoA.tsx": () => import("../components/mockups/events-redesign/OpcaoA.tsx"),
   "./components/mockups/events-redesign/OpcaoB.tsx": () => import("../components/mockups/events-redesign/OpcaoB.tsx"),
-  "./components/mockups/evaluations-redesign/OpcaoA.tsx": () => import("../components/mockups/evaluations-redesign/OpcaoA.tsx"),
-  "./components/mockups/evaluations-redesign/OpcaoB.tsx": () => import("../components/mockups/evaluations-redesign/OpcaoB.tsx")
+  "./components/mockups/events-redesign/VarianteA.tsx": () => import("../components/mockups/events-redesign/VarianteA.tsx"),
+  "./components/mockups/events-redesign/VarianteB.tsx": () => import("../components/mockups/events-redesign/VarianteB.tsx")
 };
