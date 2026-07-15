@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurrentCycle, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List, Trash2 } from "lucide-react";
+import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List, Trash2, Pencil } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -60,6 +60,7 @@ export default function EventsPage() {
   const [mergeTargetPickerOpen, setMergeTargetPickerOpen] = useState(false);
   const [mergeConflict, setMergeConflict] = useState<{ evaluations: number; calibrations: number; conformities: number; results: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [editingEvent, setEditingEvent] = useState<{ id: number; name: string; startDate: string; endDate: string; clientName?: string | null; city?: string | null; state?: string | null; location?: string | null } | null>(null);
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -103,6 +104,42 @@ export default function EventsPage() {
   });
 
   const { register, handleSubmit, reset } = useForm<EventInput>();
+
+  type EditEventInput = { name: string; startDate: string; endDate: string; clientName?: string; city?: string; state?: string; location?: string };
+  const { register: registerEdit, handleSubmit: handleSubmitEdit, reset: resetEdit } = useForm<EditEventInput>();
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: EditEventInput }) => {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`/api/events/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e as { error?: string }).error ?? `HTTP ${res.status}`); }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast({ title: "Evento atualizado com sucesso." });
+      setEditingEvent(null);
+    },
+    onError: (e: Error) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+  });
+
+  useEffect(() => {
+    if (editingEvent) {
+      resetEdit({
+        name: editingEvent.name,
+        startDate: editingEvent.startDate,
+        endDate: editingEvent.endDate,
+        clientName: editingEvent.clientName ?? "",
+        city: editingEvent.city ?? "",
+        state: editingEvent.state ?? "",
+        location: editingEvent.location ?? "",
+      });
+    }
+  }, [editingEvent, resetEdit]);
 
   const createMutation = useCreateEvent({
     mutation: {
@@ -565,6 +602,16 @@ export default function EventsPage() {
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
+                              {user && ["admin", "rh"].includes(user.role) && (
+                                <button
+                                  data-testid={`button-edit-event-${ev.id}`}
+                                  title="Editar evento"
+                                  onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
+                                  className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              )}
                               {user?.role === "admin" && (
                                 <button
                                   data-testid={`button-merge-event-${ev.id}`}
@@ -728,6 +775,16 @@ export default function EventsPage() {
                           </>)}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {user && ["admin", "rh"].includes(user.role) && (
+                            <button
+                              data-testid={`button-edit-event-${ev.id}`}
+                              title="Editar evento"
+                              onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
+                              className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          )}
                           {user?.role === "admin" && (
                             <button data-testid={`button-merge-event-${ev.id}`} title="Mesclar" onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }} className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
                               <GitMerge size={14} />
@@ -909,6 +966,60 @@ export default function EventsPage() {
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit event dialog ── */}
+      <Dialog open={!!editingEvent} onOpenChange={(open) => { if (!open) setEditingEvent(null); }}>
+        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Editar Evento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitEdit(d => { if (editingEvent) editMutation.mutate({ id: editingEvent.id, data: d }); })} className="space-y-5 pt-4">
+            <div className="space-y-1.5">
+              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome do Evento <span className="text-[#ba1a1a]">*</span></Label>
+              <Input data-testid="input-edit-event-name" {...registerEdit("name", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cliente</Label>
+              <Input data-testid="input-edit-event-client" {...registerEdit("clientName")} className="h-11 rounded-none border-2 border-[#191c1e]" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Início <span className="text-[#ba1a1a]">*</span></Label>
+                <Input data-testid="input-edit-event-start" type="date" {...registerEdit("startDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Fim <span className="text-[#ba1a1a]">*</span></Label>
+                <Input data-testid="input-edit-event-end" type="date" {...registerEdit("endDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cidade</Label>
+                <Input data-testid="input-edit-event-city" {...registerEdit("city")} className="h-11 rounded-none border-2 border-[#191c1e]" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">UF</Label>
+                <Input data-testid="input-edit-event-state" {...registerEdit("state")} maxLength={2} className="h-11 rounded-none border-2 border-[#191c1e] uppercase" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Local</Label>
+              <Input data-testid="input-edit-event-location" {...registerEdit("location")} className="h-11 rounded-none border-2 border-[#191c1e]" />
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
+              <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setEditingEvent(null)}>Cancelar</Button>
+              <button
+                data-testid="button-submit-edit-event"
+                type="submit"
+                disabled={editMutation.isPending}
+                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+              >
+                {editMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+              </button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
