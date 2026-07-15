@@ -1047,25 +1047,21 @@ export default function CalibrationsPage() {
                                 )}
                               </div>
                               {/* ── Comentário do avaliador (read-only) ── */}
-                              {areaScores.filter(s => s.comment).length > 0 && (
-                                <div className="mt-2 rounded-none border border-[#c4cda8] bg-[#f2ffd6]">
-                                  <div className="px-2 py-0.5 border-b border-[#c4cda8] flex items-center gap-1">
-                                    <span className="text-[8px] font-black italic uppercase text-[#506600] tracking-wider">Comentário Avaliador</span>
+                              {areaScores.filter(s => s.comment).map((s, i) => (
+                                <div key={i} className="mt-2 pt-1.5 border-t border-dashed border-[#c4cda8]">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="text-[8px] font-black italic uppercase tracking-wider text-[#506600] bg-[#e8f5d0] px-1 py-px">Avaliador</span>
+                                    <span className="text-[10px] font-bold italic text-[#444933]">{s.name}</span>
                                   </div>
-                                  {areaScores.filter(s => s.comment).map((s, i) => (
-                                    <div key={i} className="px-2 py-1">
-                                      <span className="text-[9px] font-black italic uppercase text-[#506600]">{s.name}</span>
-                                      <p className="text-[10px] italic text-[#444933] leading-snug line-clamp-2 mt-0.5">"{s.comment}"</p>
-                                    </div>
-                                  ))}
+                                  <p className="text-[11px] text-[#191c1e] leading-snug line-clamp-3">{s.comment}</p>
                                 </div>
-                              )}
+                              ))}
                               {/* ── Justificativa da calibração (editável) ── */}
-                              <div onClick={e => e.stopPropagation()} className="mt-2 rounded-none border border-[#d8dadc] bg-[#f7f9fb]">
-                                <div className="px-2 py-0.5 border-b border-[#d8dadc] flex items-center gap-1.5">
-                                  <span className="text-[8px] font-black italic uppercase text-[#747a60] tracking-wider">Justificativa Calibração</span>
+                              <div onClick={e => e.stopPropagation()} className="mt-2 pt-1.5 border-t border-dashed border-[#d0d2ca]">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className="text-[8px] font-black italic uppercase tracking-wider text-[#747a60] bg-[#eceef0] px-1 py-px">Calibração</span>
                                   {cal?.calibratedByName && (
-                                    <span className="text-[8px] italic text-[#747a60]">· {cal.calibratedByName}</span>
+                                    <span className="text-[10px] font-bold italic text-[#747a60]">{cal.calibratedByName}</span>
                                   )}
                                 </div>
                                 <input
@@ -1076,8 +1072,10 @@ export default function CalibrationsPage() {
                                   onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
                                   placeholder="Escreva a justificativa…"
                                   className={cn(
-                                    "w-full h-6 px-2 text-[11px] italic focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] bg-transparent",
-                                    reasonChanged ? "ring-1 ring-[#ff5722]" : ""
+                                    "w-full h-6 px-2 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0]",
+                                    reasonChanged ? "border-[#ff5722] bg-[#fff3f0]" :
+                                    reasonVal ? "border-[#c4cda8] bg-[#f8fdf0]" :
+                                    "border-[#e0e2da] bg-[#fafafa]"
                                   )}
                                 />
                               </div>
