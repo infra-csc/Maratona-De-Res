@@ -820,7 +820,7 @@ export default function CalibrationsPage() {
               {conformity && (
                 <div className="px-4 py-3">
                   <p className="text-[11px] font-black italic uppercase text-[#444933] mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                  <div className="grid grid-cols-2 gap-1.5 mb-2">
                     {([
                       { label: "EPI", key: "epi" as const, comment: conformity.epiComment },
                       { label: "Estaiamento", key: "estaiamentos" as const, comment: conformity.estaiamentosComment },
@@ -838,7 +838,7 @@ export default function CalibrationsPage() {
                       );
                     })}
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-1.5">
+                  <div className="flex flex-col gap-1.5">
                     <div className={`flex-1 border px-3 py-1.5 ${conformity.absencesReport ? "border-[#b02f00] bg-[#fff4e5]" : "border-[#d8dadc] bg-[#f2f4f6]"}`}>
                       <p className="text-[9px] font-bold uppercase italic text-[#747a60] mb-0.5 flex items-center gap-1"><User size={9} /> Faltas/Atrasos</p>
                       <p className="text-[11px] italic text-[#191c1e] leading-snug">{conformity.absencesReport ?? <span className="text-[#9aa088]">Sem registro</span>}</p>
