@@ -1155,8 +1155,8 @@ export default function CalibrationsPage() {
                             </td>
                             {/* Publicação */}
                             {canFinalize && !alreadyReleased && (
-                              <td className="px-2 py-2.5 hidden md:table-cell" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-center gap-1 flex-wrap">
+                              <td className="px-2 pt-2.5 pb-2 hidden md:table-cell align-top" onClick={e => e.stopPropagation()}>
+                                <div className="flex flex-col items-center gap-1">
                                   {isFinalPublished ? (
                                     <div className="flex flex-col items-center gap-0.5">
                                       <span
@@ -1178,26 +1178,28 @@ export default function CalibrationsPage() {
                                       <span className="text-[8px] italic text-[#747a60] whitespace-nowrap">{formatDateTime(new Date(c.partialPublishedAt))}</span>
                                     </div>
                                   ) : null}
-                                  <button
-                                    data-testid={`button-publish-criterion-partial-${c.criterionId}`}
-                                    type="button"
-                                    disabled={publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending}
-                                    onClick={() => handlePublishCriterionPartial(c.criterionId)}
-                                    title={isFinalPublished ? "Tornar Parcial" : "Publicar como Parcial"}
-                                    className="h-6 px-1.5 border border-[#191c1e] bg-white text-[9px] font-black italic uppercase text-[#191c1e] disabled:opacity-40 hover:bg-[#191c1e] hover:text-white transition-colors"
-                                  >
-                                    {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "·" : <Flag size={10} />}
-                                  </button>
-                                  <button
-                                    data-testid={`button-publish-criterion-final-${c.criterionId}`}
-                                    type="button"
-                                    disabled={publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending}
-                                    onClick={() => handlePublishCriterionFinal(c.criterionId)}
-                                    title={isFinalPublished ? "Republicar como Final" : "Publicar como Final"}
-                                    className={`h-6 px-1.5 border text-[9px] font-black italic uppercase disabled:opacity-40 transition-colors ${isFinalPublished ? "bg-[#506600] text-[#ccff00] border-[#506600] hover:bg-[#ccff00] hover:text-[#161e00]" : "bg-[#191c1e] text-[#ccff00] border-[#191c1e] hover:bg-[#506600]"}`}
-                                  >
-                                    {publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending ? "·" : <ShieldCheck size={10} />}
-                                  </button>
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      data-testid={`button-publish-criterion-partial-${c.criterionId}`}
+                                      type="button"
+                                      disabled={publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending}
+                                      onClick={() => handlePublishCriterionPartial(c.criterionId)}
+                                      title={isFinalPublished ? "Tornar Parcial" : "Publicar como Parcial"}
+                                      className="h-6 px-1.5 border border-[#191c1e] bg-white text-[9px] font-black italic uppercase text-[#191c1e] disabled:opacity-40 hover:bg-[#191c1e] hover:text-white transition-colors"
+                                    >
+                                      {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "·" : <Flag size={10} />}
+                                    </button>
+                                    <button
+                                      data-testid={`button-publish-criterion-final-${c.criterionId}`}
+                                      type="button"
+                                      disabled={publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending}
+                                      onClick={() => handlePublishCriterionFinal(c.criterionId)}
+                                      title={isFinalPublished ? "Republicar como Final" : "Publicar como Final"}
+                                      className={`h-6 px-1.5 border text-[9px] font-black italic uppercase disabled:opacity-40 transition-colors ${isFinalPublished ? "bg-[#506600] text-[#ccff00] border-[#506600] hover:bg-[#ccff00] hover:text-[#161e00]" : "bg-[#191c1e] text-[#ccff00] border-[#191c1e] hover:bg-[#506600]"}`}
+                                    >
+                                      {publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending ? "·" : <ShieldCheck size={10} />}
+                                    </button>
+                                  </div>
                                 </div>
                               </td>
                             )}
