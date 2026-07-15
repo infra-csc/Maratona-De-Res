@@ -1329,128 +1329,6 @@ export default function EvaluationsPage() {
                   </div>
                 )}
 
-                {/* Avaliador multi-select (consultation only) */}
-                {isConsultation && (
-                  <div className="px-3 py-2 border-b border-[#eceef0]">
-                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
-                      <span className="flex items-center gap-1"><User size={10} /> Avaliador</span>
-                      {selectedAvaliadorIds.length > 0 && (
-                        <button onClick={() => setSelectedAvaliadorIds([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedAvaliadorIds.length} sel. ×</button>
-                      )}
-                    </p>
-                    {(() => {
-                      const avaliadorOptions = selectedEventId && avaliadorStats.length > 0
-                        ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
-                        : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
-                      const toggleAvaliador = (id: number) =>
-                        setSelectedAvaliadorIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-                      return (
-                        <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
-                          <PopoverTrigger asChild>
-                            <button type="button" role="combobox" data-testid="select-avaliador" className="w-full h-8 px-2 flex items-center justify-between gap-2 text-left border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors">
-                              <span className="truncate text-[#191c1e]">
-                                {selectedAvaliadorIds.length === 0 ? "Todos" : selectedAvaliadorIds.length === 1 ? (avaliadorOptions.find(a => a.id === selectedAvaliadorIds[0])?.name ?? "1 sel.") : `${selectedAvaliadorIds.length} selecionados`}
-                              </span>
-                              <ChevronsUpDown size={12} className="shrink-0 text-[#191c1e]" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="start" side="right" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
-                            <Command className="rounded-none">
-                              <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic text-xs" />
-                              <CommandList className="max-h-[240px]">
-                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                  <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorIds([]); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
-                                    <Check size={13} className={cn("shrink-0", selectedAvaliadorIds.length === 0 ? "opacity-100" : "opacity-0")} />
-                                    <span className="font-bold italic uppercase text-xs">Todos</span>
-                                  </CommandItem>
-                                  {avaliadorOptions.map(av => (
-                                    <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => toggleAvaliador(av.id)} className="rounded-none cursor-pointer aria-selected:bg-[#eeffaa] aria-selected:text-[#161e00] py-2 gap-2">
-                                      <div className={cn("w-3.5 h-3.5 border-2 shrink-0 flex items-center justify-center", selectedAvaliadorIds.includes(av.id) ? "bg-[#191c1e] border-[#191c1e]" : "border-[#aaa] bg-white")}>
-                                        {selectedAvaliadorIds.includes(av.id) && <Check size={9} className="text-[#ccff00]" strokeWidth={3} />}
-                                      </div>
-                                      <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* Área multi-select (consultation + event selected) */}
-                {isConsultation && eventAreasForAssignment.length > 1 && (
-                  <div className="px-3 py-2 border-b border-[#eceef0]">
-                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
-                      <span className="flex items-center gap-1"><Building2 size={10} /> Área</span>
-                      {selectedAreaIds.length > 0 && (
-                        <button onClick={() => setSelectedAreaIds([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedAreaIds.length} sel. ×</button>
-                      )}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {eventAreasForAssignment.map(area => {
-                        const active = selectedAreaIds.includes(area.id);
-                        return (
-                          <button key={area.id} type="button" onClick={() => setSelectedAreaIds(prev => prev.includes(area.id) ? prev.filter(x => x !== area.id) : [...prev, area.id])}
-                            className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                            {area.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Critério multi-select (consultation + event selected) */}
-                {isConsultation && activeCriteria.length > 1 && !!selectedEventId && (
-                  <div className="px-3 py-2 border-b border-[#eceef0]">
-                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
-                      <span className="flex items-center gap-1"><ListChecks size={10} /> Critério</span>
-                      {selectedCriterionIds.length > 0 && (
-                        <button onClick={() => setSelectedCriterionIds([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedCriterionIds.length} sel. ×</button>
-                      )}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {activeCriteria.map(c => {
-                        const active = selectedCriterionIds.includes(c.criterionId);
-                        return (
-                          <button key={c.criterionId} type="button" onClick={() => setSelectedCriterionIds(prev => prev.includes(c.criterionId) ? prev.filter(x => x !== c.criterionId) : [...prev, c.criterionId])}
-                            className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                            {c.shortName ?? c.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Respostas de Matriz multi-select (consultation + event selected) */}
-                {isConsultation && !!selectedEventId && (
-                  <div className="px-3 py-2 border-b border-[#eceef0]">
-                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
-                      <span className="flex items-center gap-1"><ShieldAlert size={10} /> Respostas de Matriz</span>
-                      {selectedMatrixQuestions.length > 0 && (
-                        <button onClick={() => setSelectedMatrixQuestions([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedMatrixQuestions.length} sel. ×</button>
-                      )}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {([["epi","EPI"],["estaiamentos","Estaiamentos"],["guardaEquipamentos","Guarda Eq."],["conduta","Conduta"],["ausencias","Ausências"],["standout","Destaque"]] as const).map(([key, label]) => {
-                        const active = selectedMatrixQuestions.includes(key);
-                        return (
-                          <button key={key} type="button" onClick={() => setSelectedMatrixQuestions(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])}
-                            className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
                 {/* Período */}
                 <div className="px-3 py-2 border-b border-[#eceef0]">
                   <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1.5 flex items-center gap-1"><Calendar size={10} /> Período</p>
@@ -1496,7 +1374,7 @@ export default function EvaluationsPage() {
               </div>
 
               {/* Limpar filtros */}
-              {(selectedEventId != null || selectedAvaliadorIds.length > 0 || selectedAreaIds.length > 0 || selectedCriterionIds.length > 0 || selectedMatrixQuestions.length > 0 || statusFilter !== "all" || typeFilter !== "all" || progressFilter !== "all" || publicationFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
+              {(selectedEventId != null || statusFilter !== "all" || typeFilter !== "all" || progressFilter !== "all" || publicationFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
                 <div className="px-3 py-2 border-t-2 border-[#191c1e] shrink-0">
                   <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorIds([]); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); setStatusFilter("all"); setTypeFilter("all"); setProgressFilter("all"); setPublicationFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setEventSearch(""); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
                     <X size={11} /> Limpar todos os filtros
@@ -1795,6 +1673,131 @@ export default function EvaluationsPage() {
                   )}
                 </div>
               </section>
+            )}
+
+            {/* ── Barra de filtros de critérios (consultation + evento selecionado) ── */}
+            {isConsultation && !!selectedEventId && (
+              <div className="bg-white border-2 border-[#191c1e] flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
+
+                {/* Avaliador */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><User size={10}/> Avaliador</span>
+                  {(() => {
+                    const avaliadorOptions = avaliadorStats.length > 0
+                      ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
+                      : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
+                    const toggleAvaliador = (id: number) =>
+                      setSelectedAvaliadorIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+                    return (
+                      <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <button type="button" data-testid="select-avaliador" className="h-7 px-2.5 flex items-center gap-2 border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors max-w-[180px]">
+                            <span className="truncate text-[#191c1e]">
+                              {selectedAvaliadorIds.length === 0 ? "Todos" : selectedAvaliadorIds.length === 1 ? (avaliadorOptions.find(a => a.id === selectedAvaliadorIds[0])?.name ?? "1 sel.") : `${selectedAvaliadorIds.length} sel.`}
+                            </span>
+                            <ChevronsUpDown size={11} className="shrink-0 text-[#191c1e]" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" side="bottom" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64 z-50">
+                          <Command className="rounded-none">
+                            <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic text-xs" />
+                            <CommandList className="max-h-[240px]">
+                              <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorIds([]); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
+                                  <Check size={13} className={cn("shrink-0", selectedAvaliadorIds.length === 0 ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-bold italic uppercase text-xs">Todos</span>
+                                </CommandItem>
+                                {avaliadorOptions.map(av => (
+                                  <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => toggleAvaliador(av.id)} className="rounded-none cursor-pointer aria-selected:bg-[#eeffaa] aria-selected:text-[#161e00] py-2 gap-2">
+                                    <div className={cn("w-3.5 h-3.5 border-2 shrink-0 flex items-center justify-center", selectedAvaliadorIds.includes(av.id) ? "bg-[#191c1e] border-[#191c1e]" : "border-[#aaa] bg-white")}>
+                                      {selectedAvaliadorIds.includes(av.id) && <Check size={9} className="text-[#ccff00]" strokeWidth={3} />}
+                                    </div>
+                                    <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  })()}
+                </div>
+
+                {/* Área pills */}
+                {eventAreasForAssignment.length > 1 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><Building2 size={10}/> Área:</span>
+                    {eventAreasForAssignment.map(area => {
+                      const active = selectedAreaIds.includes(area.id);
+                      return (
+                        <button key={area.id} type="button" onClick={() => setSelectedAreaIds(prev => prev.includes(area.id) ? prev.filter(x => x !== area.id) : [...prev, area.id])}
+                          className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                          {area.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Critério multi-select (Popover) */}
+                {activeCriteria.length > 1 && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><ListChecks size={10}/> Critério</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="h-7 px-2.5 flex items-center gap-2 border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors max-w-[160px]">
+                          <span className="truncate text-[#191c1e]">
+                            {selectedCriterionIds.length === 0 ? "Todos" : `${selectedCriterionIds.length} sel.`}
+                          </span>
+                          <ChevronsUpDown size={11} className="shrink-0 text-[#191c1e]" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" side="bottom" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-56 z-50">
+                        <div className="max-h-56 overflow-y-auto divide-y divide-[#eceef0]">
+                          <button type="button" onClick={() => setSelectedCriterionIds([])} className={cn("w-full text-left px-3 py-2 text-[10px] font-bold italic uppercase flex items-center gap-2 hover:bg-[#f7f9fb]", selectedCriterionIds.length === 0 ? "bg-[#f0ffe0] text-[#191c1e]" : "text-[#747a60]")}>
+                            <Check size={11} className={selectedCriterionIds.length === 0 ? "opacity-100" : "opacity-0"} /> Todos
+                          </button>
+                          {activeCriteria.map(c => {
+                            const active = selectedCriterionIds.includes(c.criterionId);
+                            return (
+                              <button key={c.criterionId} type="button" onClick={() => setSelectedCriterionIds(prev => prev.includes(c.criterionId) ? prev.filter(x => x !== c.criterionId) : [...prev, c.criterionId])}
+                                className={cn("w-full text-left px-3 py-2 text-[10px] font-bold italic uppercase flex items-center gap-2 hover:bg-[#f7f9fb]", active ? "bg-[#eeffaa] text-[#191c1e]" : "text-[#747a60]")}>
+                                <div className={cn("w-3 h-3 border-2 shrink-0 flex items-center justify-center", active ? "bg-[#191c1e] border-[#191c1e]" : "border-[#aaa] bg-white")}>
+                                  {active && <Check size={8} className="text-[#ccff00]" strokeWidth={3} />}
+                                </div>
+                                {c.shortName ?? c.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+
+                {/* Respostas de Matriz pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><ShieldAlert size={10}/> Matriz:</span>
+                  {([["epi","EPI"],["estaiamentos","Estai."],["guardaEquipamentos","Guarda Eq."],["conduta","Conduta"],["ausencias","Ausências"],["standout","Destaque"]] as const).map(([key, label]) => {
+                    const active = selectedMatrixQuestions.includes(key);
+                    return (
+                      <button key={key} type="button" onClick={() => setSelectedMatrixQuestions(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])}
+                        className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Limpar filtros de critérios */}
+                {(selectedAvaliadorIds.length > 0 || selectedAreaIds.length > 0 || selectedCriterionIds.length > 0 || selectedMatrixQuestions.length > 0) && (
+                  <button type="button" onClick={() => { setSelectedAvaliadorIds([]); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); }} className="ml-auto text-[9px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1 shrink-0">
+                    <X size={10} /> Limpar
+                  </button>
+                )}
+              </div>
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
