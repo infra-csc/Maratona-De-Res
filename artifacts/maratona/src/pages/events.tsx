@@ -121,8 +121,13 @@ export default function EventsPage() {
   today.setHours(0, 0, 0, 0);
   const isPastOrClosed = (e: typeof all[0]) => e.status === "closed" || (!!e.endDate && new Date(e.endDate) < today);
   const hasNoPublication = (e: typeof all[0]) => !e.feedbackReleased && !e.partialPublishedAt;
+  const isInEvaluation = (e: typeof all[0]) =>
+    !!e.criteriaConfirmed &&
+    (e.evaluationProgress ?? 0) > 0 &&
+    (e.calibratedCriteriaCount ?? 0) === 0;
   const statsData = [
     { key: "pendingRH",  label: "Aguardando RH",  value: all.filter(e => !e.criteriaConfirmed).length,                                                                              color: "#ff5722" },
+    { key: "inEval",     label: "Em Avaliação",    value: all.filter(isInEvaluation).length,                                                                                         color: "#1565c0" },
     { key: "pendingCal", label: "Falta calibrar", value: all.filter(e => isPastOrClosed(e) && !e.fullyCalibrated).length,                                                           color: "#ffb300" },
     { key: "fullyEval",  label: "Avaliação 100%", value: all.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length, color: "#ccff00" },
   ];
@@ -165,6 +170,7 @@ export default function EventsPage() {
     const matchConfig = true;
     const matchCard = cardFilter === null
       || (cardFilter === "pendingRH"  && !ev.criteriaConfirmed)
+      || (cardFilter === "inEval"     && isInEvaluation(ev))
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && !ev.fullyCalibrated)
       || (cardFilter === "fullyEval"  && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
     return matchSearch && matchDate && matchConfig && matchCard;
