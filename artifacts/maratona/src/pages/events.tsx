@@ -490,9 +490,11 @@ export default function EventsPage() {
                               <div className="w-[3px] h-9 shrink-0 rounded-sm" style={{ backgroundColor: statusColor }} />
                               <div className="min-w-0">
                                 <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-xs text-[#191c1e] hover:text-[#506600] leading-tight block">{ev.name}</Link>
-                                <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
-                                  {[ev.clientName, ev.city].filter(Boolean).join(" · ") || "—"}
-                                </p>
+                                {([ev.clientName, ev.city].filter(Boolean).length > 0) && (
+                                  <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
+                                    {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
+                                  </p>
+                                )}
                                 {missing.length > 0 && !hasEvals && (
                                   <p className="text-[10px] font-bold italic uppercase text-[#b02f00] truncate" title={`Sem avaliador: ${missing.join(", ")}`}>
                                     Sem avaliador: {missing.join(", ")}
