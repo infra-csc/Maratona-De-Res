@@ -125,11 +125,23 @@ export default function EventsPage() {
     !!e.criteriaConfirmed &&
     (e.evaluationProgress ?? 0) > 0 &&
     (e.calibratedCriteriaCount ?? 0) === 0;
+
+  // Base para os contadores: aplica busca + filtro de data, mas NÃO o cardFilter
+  // (os próprios cards são o filtro de status — seus counts devem refletir a data selecionada)
+  const statsBase = all.filter(ev => {
+    const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase())
+      || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase())
+      || (ev.city ?? "").toLowerCase().includes(search.toLowerCase())
+      || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
+    return matchSearch && matchDate;
+  });
+
   const statsData = [
-    { key: "pendingRH",  label: "Aguardando RH",  value: all.filter(e => !e.criteriaConfirmed).length,                                                                              color: "#ff5722" },
-    { key: "inEval",     label: "Em Avaliação",    value: all.filter(isInEvaluation).length,                                                                                         color: "#1565c0" },
-    { key: "pendingCal", label: "Falta calibrar", value: all.filter(e => isPastOrClosed(e) && !e.fullyCalibrated).length,                                                           color: "#ffb300" },
-    { key: "fullyEval",  label: "Avaliação 100%", value: all.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length, color: "#ccff00" },
+    { key: "pendingRH",  label: "Aguardando RH",  value: statsBase.filter(e => !e.criteriaConfirmed).length,                                                                              color: "#ff5722" },
+    { key: "inEval",     label: "Em Avaliação",    value: statsBase.filter(isInEvaluation).length,                                                                                         color: "#1565c0" },
+    { key: "pendingCal", label: "Falta calibrar", value: statsBase.filter(e => isPastOrClosed(e) && !e.fullyCalibrated).length,                                                           color: "#ffb300" },
+    { key: "fullyEval",  label: "Avaliação 100%", value: statsBase.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length, color: "#ccff00" },
   ];
 
   const colSortPairs: Record<string, string> = {
@@ -293,7 +305,7 @@ export default function EventsPage() {
                 }`}
               >
                 <span className={`text-xs font-bold italic ${cardFilter === null ? "text-[#191c1e]" : "text-[#444933]"}`}>Todos</span>
-                <span className="text-sm font-black italic text-[#191c1e]">{all.length}</span>
+                <span className="text-sm font-black italic text-[#191c1e]">{statsBase.length}</span>
               </button>
               {statsData.map(s => (
                 <button
