@@ -1046,31 +1046,38 @@ export default function CalibrationsPage() {
                                   <ChevronDown size={11} className="text-[#747a60] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
                                 )}
                               </div>
-                              {/* Comentários dos avaliadores (read-only) */}
-                              {areaScores.filter(s => s.comment).map((s, i) => (
-                                <div key={i} className="mt-1.5 border-l-2 border-[#c4cda8] pl-2">
-                                  <span className="text-[9px] font-black italic uppercase text-[#506600] block">Avaliador · {s.name}</span>
-                                  <p className="text-[10px] italic text-[#444933] leading-snug line-clamp-2">"{s.comment}"</p>
+                              {/* ── Comentário do avaliador (read-only) ── */}
+                              {areaScores.filter(s => s.comment).length > 0 && (
+                                <div className="mt-2 rounded-none border border-[#c4cda8] bg-[#f2ffd6]">
+                                  <div className="px-2 py-0.5 border-b border-[#c4cda8] flex items-center gap-1">
+                                    <span className="text-[8px] font-black italic uppercase text-[#506600] tracking-wider">Comentário Avaliador</span>
+                                  </div>
+                                  {areaScores.filter(s => s.comment).map((s, i) => (
+                                    <div key={i} className="px-2 py-1">
+                                      <span className="text-[9px] font-black italic uppercase text-[#506600]">{s.name}</span>
+                                      <p className="text-[10px] italic text-[#444933] leading-snug line-clamp-2 mt-0.5">"{s.comment}"</p>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                              {/* Justificativa da calibração (editável) */}
-                              <div onClick={e => e.stopPropagation()} className="mt-1.5">
-                                {cal?.calibratedByName && (
-                                  <span className="text-[9px] font-black italic uppercase text-[#747a60] block mb-0.5">
-                                    Calibração · {cal.calibratedByName}
-                                  </span>
-                                )}
+                              )}
+                              {/* ── Justificativa da calibração (editável) ── */}
+                              <div onClick={e => e.stopPropagation()} className="mt-2 rounded-none border border-[#d8dadc] bg-[#f7f9fb]">
+                                <div className="px-2 py-0.5 border-b border-[#d8dadc] flex items-center gap-1.5">
+                                  <span className="text-[8px] font-black italic uppercase text-[#747a60] tracking-wider">Justificativa Calibração</span>
+                                  {cal?.calibratedByName && (
+                                    <span className="text-[8px] italic text-[#747a60]">· {cal.calibratedByName}</span>
+                                  )}
+                                </div>
                                 <input
                                   data-testid={`input-cal-reason-inline-${c.criterionId}`}
                                   type="text"
                                   value={reasonVal}
+                                  onClick={e => e.stopPropagation()}
                                   onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
-                                  placeholder="Justificativa da calibração…"
+                                  placeholder="Escreva a justificativa…"
                                   className={cn(
-                                    "w-full h-6 px-2 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] bg-transparent",
-                                    reasonChanged ? "border-[#ff5722] bg-[#fff3f0]" :
-                                    reasonVal ? "border-[#c4cda8] bg-[#f8fdf0]" :
-                                    "border-[#e0e2da] bg-transparent"
+                                    "w-full h-6 px-2 text-[11px] italic focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] bg-transparent",
+                                    reasonChanged ? "ring-1 ring-[#ff5722]" : ""
                                   )}
                                 />
                               </div>
