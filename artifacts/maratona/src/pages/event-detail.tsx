@@ -2205,8 +2205,25 @@ export default function EventDetailPage() {
                     : `Observações importadas indicam ${importedConformityRatio.sim}/${importedConformityRatio.total} itens "Sim" — não é possível identificar qual item pelo texto`}
                 </p>
               )}
-              <div className="divide-y-2 divide-[#eceef0]">
-                {conformityItems.map(item => {
+              <div>
+                {(["cenografia", "ferramentas"] as const).map(group => {
+                  const groupItems = conformityItems.filter(i => i.group === group);
+                  if (groupItems.length === 0) return null;
+                  const groupLabel = group === "cenografia" ? "Cenografia" : "Ferramentas e Case";
+                  const evaluatorName = group === "cenografia"
+                    ? (event?.conformityEvaluatorName ?? null)
+                    : (event?.conformityEvaluatorFerramentasName ?? null);
+                  return (
+                    <div key={group}>
+                      <div className="flex items-center gap-2 px-4 py-1.5 bg-[#f5f7f0] border-t-2 border-[#eceef0]">
+                        <span className="text-[10px] font-black italic uppercase text-[#444933]">{groupLabel}</span>
+                        {evaluatorName
+                          ? <span className="text-[10px] italic text-[#747a60]">— {evaluatorName}</span>
+                          : <span className="text-[10px] italic text-[#ba1a1a]">— sem avaliador atribuído</span>
+                        }
+                      </div>
+                      <div className="divide-y-2 divide-[#eceef0]">
+                {groupItems.map(item => {
                   const value = conformityForm[item.key];
                   const comment = conformityForm[item.commentKey];
                   const isNonConforming = value === false;
@@ -2216,14 +2233,11 @@ export default function EventDetailPage() {
                   return (
                     <div key={item.key} className={`px-4 transition-colors ${isNonConforming ? "bg-[#fdece6] border-l-4 border-[#862200]" : isPending ? "bg-[#fffbf0] border-l-4 border-[#d4a800]" : ""}`}>
                       <div
-                        className="grid items-center min-h-[56px]"
+                        className="grid items-center min-h-[52px]"
                         style={{ gridTemplateColumns: "1fr auto auto" }}
                       >
                         <div className="pr-4 py-3 leading-snug" style={{ maxWidth: 220 }}>
                           <span className="text-sm font-bold italic text-[#191c1e]">{item.label}</span>
-                          <p className="text-[9px] font-black italic uppercase text-[#9aa088] mt-0.5">
-                            {item.group === "ferramentas" ? "Avaliado por: Ferramentas e Case" : "Avaliado por: Cenografia"}
-                          </p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 py-2">
                           {isNonConforming && (
@@ -2320,8 +2334,12 @@ export default function EventDetailPage() {
                     </div>
                   );
                 })}
+                      </div>
+                    </div>
+                  );
+                })}
                 {(result?.conformityPenalty ?? 0) > 0 && (
-                  <div className="pt-3 border-t-2 border-[#eceef0]">
+                  <div className="px-4 pt-3 pb-2 border-t-2 border-[#eceef0]">
                     <p className="text-xs font-bold italic uppercase text-[#862200] flex items-center gap-1.5">
                       <AlertTriangle size={13} /> Desconto na nota final do evento: -{result?.conformityPenalty} pts
                     </p>
