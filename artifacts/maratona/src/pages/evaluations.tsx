@@ -1237,7 +1237,7 @@ export default function EvaluationsPage() {
                           data-testid={`option-event-${ev.id}`}
                           onClick={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
                           className={cn(
-                            "w-full text-left px-3 py-2.5 border-b border-[#eceef0] last:border-0 transition-colors border-l-[3px]",
+                            "w-full text-left px-3 py-1.5 border-b border-[#eceef0] last:border-0 transition-colors border-l-[3px] flex items-center gap-2",
                             isSelected
                               ? "bg-[#eeffaa] border-l-[#ccff00]"
                               : done
@@ -1247,39 +1247,20 @@ export default function EvaluationsPage() {
                                   : "bg-white border-l-transparent hover:bg-[#f7f9fb]"
                           )}
                         >
-                          {/* Name + done icon */}
-                          <div className="flex items-start justify-between gap-1.5 mb-0.5">
-                            <p className={cn("font-black italic uppercase text-[10px] leading-tight line-clamp-2 flex-1", done ? "text-[#2e4400]" : "text-[#191c1e]")}>{ev.name}</p>
-                            {done && <CheckCircle size={13} className="shrink-0 mt-0.5 text-[#506600]" />}
-                          </div>
-
-                          {/* Subtitle */}
-                          {formatEventSubtitle(ev) && (
-                            <p className="text-[9px] italic font-bold text-[#747a60] truncate mb-1.5">{formatEventSubtitle(ev)}</p>
-                          )}
-
-                          {/* Progress bar */}
-                          <div className="flex items-center gap-2 mb-1">
-                            <div className="flex-1 h-1 bg-[#dde5cc] overflow-hidden">
-                              <div
-                                className={cn("h-full transition-all", done ? "bg-[#ccff00]" : partial ? "bg-[#f0d000]" : "bg-transparent")}
-                                style={{ width: `${Math.round(prog * 100)}%` }}
-                              />
-                            </div>
-                            <span className={cn("text-[9px] font-black italic uppercase shrink-0 tabular-nums",
-                              done ? "text-[#506600]" : partial ? "text-[#7a5800]" : "text-[#9aa08a]"
-                            )}>
+                          <p className={cn("font-black italic uppercase text-[10px] leading-tight truncate flex-1 min-w-0", done ? "text-[#2e4400]" : "text-[#191c1e]")}>
+                            {ev.name}
+                          </p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {ev.feedbackReleased
+                              ? <span className="text-[8px] font-black italic text-[#506600]">✓</span>
+                              : ev.partialPublishedAt
+                                ? <span className="text-[8px] font-black italic text-[#7a5800]">◑</span>
+                                : null
+                            }
+                            <span className={cn("text-[9px] font-black italic tabular-nums", done ? "text-[#506600]" : partial ? "text-[#7a5800]" : "text-[#9aa08a]")}>
                               {Math.round(prog * 100)}%
                             </span>
                           </div>
-
-                          {/* Publication badge (only if published) */}
-                          {ev.feedbackReleased
-                            ? <span className="text-[8px] font-black italic uppercase bg-[#ccff00] text-[#161e00] px-1.5 py-0.5 border border-[#506600]">✓ Final</span>
-                            : ev.partialPublishedAt
-                              ? <span className="text-[8px] font-black italic uppercase bg-[#fff4c2] text-[#5c4a00] px-1.5 py-0.5 border border-[#c9a800]">◑ Parcial</span>
-                              : null
-                          }
                         </button>
                       );
                     })
