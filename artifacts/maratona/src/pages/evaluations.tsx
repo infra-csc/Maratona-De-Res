@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2, X, AlertCircle } from "lucide-react";
+import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2, X, AlertCircle, Search, Send, BarChart3 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
@@ -308,13 +308,15 @@ export default function EvaluationsPage() {
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [activeEvalTab, setActiveEvalTab] = useState<"todo" | "done">("todo");
-  const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [eventSearch, setEventSearch] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
   const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "com-nota" | "sem-nota">("all");
+  const [progressFilter, setProgressFilter] = useState<"all" | "not_started" | "partial" | "done">("all");
+  const [publicationFilter, setPublicationFilter] = useState<"all" | "none" | "partial" | "final">("all");
   const [expandedCriteria, setExpandedCriteria] = useState<Set<number>>(new Set());
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
@@ -591,6 +593,30 @@ export default function EvaluationsPage() {
       (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" })
     );
   const pickedEvent = selectableEvents.find(e => e.id === selectedEventId);
+
+  // Sidebar event list (manager/consultation only): filtered by eventSearch, progressFilter, publicationFilter
+  const sidebarEvents = [...(isEvaluator ? configuredEvents : activeEvents)]
+    .filter(e => {
+      const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
+      const q = eventSearch.toLowerCase();
+      const matchSearch = !q ||
+        (e.name ?? "").toLowerCase().includes(q) ||
+        (e.clientName ?? "").toLowerCase().includes(q) ||
+        (e.city ?? "").toLowerCase().includes(q);
+      const prog = e.evaluationProgress ?? 0;
+      const matchProgress = progressFilter === "all" || (
+        progressFilter === "not_started" ? prog === 0 :
+        progressFilter === "partial" ? prog > 0 && prog < 1 :
+        prog >= 1
+      );
+      const matchPub = publicationFilter === "all" || (
+        publicationFilter === "none" ? !e.feedbackReleased && !e.partialPublishedAt :
+        publicationFilter === "partial" ? !e.feedbackReleased && !!e.partialPublishedAt :
+        !!e.feedbackReleased
+      );
+      return matchDate && matchSearch && matchProgress && matchPub;
+    })
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" }));
 
   // For evaluators: fetch criteria for every selectable event so the overview
   // only lists events that actually have work for their area (and so the empty
@@ -1126,114 +1152,6 @@ export default function EvaluationsPage() {
     }
   }
 
-  const renderEventPicker = (compact: boolean) => (
-    <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          role="combobox"
-          aria-expanded={eventPickerOpen}
-          data-testid="select-event"
-          disabled={selectableEvents.length === 0}
-          className={cn(
-            "group flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] transition-all disabled:opacity-50 disabled:cursor-not-allowed",
-            compact
-              ? "w-full md:w-[22rem] px-3 py-2.5 bg-white hover:bg-[#f7ffd1]"
-              : "w-full px-4 py-3.5 bg-white hover:bg-[#f7ffd1]",
-            HARD_SHADOW,
-          )}
-        >
-          <span className="flex items-center gap-2.5 min-w-0">
-            <Flag size={compact ? 15 : 17} className={cn("shrink-0 transition-colors", pickedEvent ? "text-[#506600]" : "text-[#9aa08a]")} />
-            {pickedEvent ? (
-              <span className="flex flex-col min-w-0">
-                <span className="font-black italic uppercase text-sm leading-tight text-[#191c1e] truncate">{pickedEvent.name}</span>
-                {formatEventSubtitle(pickedEvent) && (
-                  <span className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">{formatEventSubtitle(pickedEvent)}</span>
-                )}
-              </span>
-            ) : (
-              <span className="font-bold italic uppercase text-xs tracking-wider text-[#9aa08a]">
-                {selectableEvents.length === 0
-                  ? "Nenhum evento disponível"
-                  : isConsultation
-                    ? "Selecione um evento..."
-                    : "Escolha um evento para avaliar"}
-              </span>
-            )}
-          </span>
-          <span className={cn("shrink-0 flex items-center gap-1 text-[10px] font-black italic uppercase tracking-wide transition-colors", pickedEvent ? "text-[#506600]" : "text-[#9aa08a]", "group-hover:text-[#191c1e]")}>
-            {pickedEvent && <span className="hidden md:inline">trocar</span>}
-            <ChevronsUpDown size={14} />
-          </span>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align={compact ? "end" : "start"} className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)] min-w-[280px]">
-        <Command className="rounded-none">
-          <div className="border-b-2 border-[#191c1e]">
-            <CommandInput
-              data-testid="input-event-search"
-              placeholder="Buscar evento ou cliente..."
-              className="italic text-sm h-10"
-            />
-          </div>
-          <CommandList className="max-h-[300px]">
-            <CommandEmpty className="py-8 text-center text-xs italic font-bold uppercase text-[#9aa08a]">Nenhum evento encontrado.</CommandEmpty>
-            <CommandGroup>
-              {selectableEvents.map(ev => {
-                const isSelected = selectedEventId === ev.id;
-                return (
-                  <CommandItem
-                    key={ev.id}
-                    value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
-                    data-testid={`option-event-${ev.id}`}
-                    onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); setEventPickerOpen(false); }}
-                    className={cn(
-                      "rounded-none cursor-pointer py-2.5 px-3 gap-2.5 items-start border-b border-[#eceef0] last:border-0",
-                      isSelected
-                        ? "bg-[#f7ffd1] text-[#161e00]"
-                        : "hover:bg-[#f7f9fb]",
-                    )}
-                  >
-                    <span className={cn("mt-0.5 shrink-0 w-3.5 flex items-center justify-center", isSelected ? "text-[#506600]" : "text-transparent")}>
-                      <Check size={13} />
-                    </span>
-                    <span className="flex flex-col min-w-0 gap-0.5">
-                      <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{ev.name}</span>
-                      {formatEventSubtitle(ev) && (
-                        <span className="text-[10px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>
-                      )}
-                      <span className="flex items-center flex-wrap gap-1 mt-0.5">
-                        {ev.feedbackReleased
-                          ? <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black italic uppercase bg-[#ccff00] text-[#161e00] border border-[#506600]">✓ Publicado</span>
-                          : ev.partialPublishedAt
-                            ? <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black italic uppercase bg-[#fff4c2] text-[#5c4a00] border border-[#c9a800]">◑ Parcial</span>
-                            : <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black italic uppercase bg-[#f0f0f0] text-[#747a60] border border-[#d0d0d0]">— Sem publicação</span>
-                        }
-                        {ev.evaluationProgress != null && (
-                          <span className={cn(
-                            "inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold italic uppercase border",
-                            (ev.evaluationProgress ?? 0) >= 1
-                              ? "bg-[#efffcf] text-[#506600] border-[#a0c830]"
-                              : (ev.evaluationProgress ?? 0) > 0
-                                ? "bg-[#fff8e1] text-[#7a5800] border-[#e0c840]"
-                                : "bg-[#f5f5f5] text-[#9aa08a] border-[#d8d8d8]"
-                          )}>
-                            {Math.round((ev.evaluationProgress ?? 0) * 100)}% aval.
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-
   const labels: Record<number, string> = {
     0: "Crítico, não atendeu ao básico",
     10: "Perfeição, atendeu completamente e sem erros",
@@ -1264,131 +1182,239 @@ export default function EvaluationsPage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── Sidebar ── */}
-        <aside className="w-56 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
+        <aside className="w-72 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
 
-          {/* Manager/consultation: event picker + filters */}
+          {/* Manager/consultation: inline event list + filters */}
           {!isEvaluator && (
             <>
-              <div className="p-3 border-b-2 border-[#eceef0]">
-                <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><Calendar size={10} /> Evento</p>
-                {renderEventPicker(false)}
-              </div>
-
-              <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
-                <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><ListChecks size={10} /> Status</p>
-                <div className="flex gap-1">
-                  {(["all","pending","done"] as const).map(f => (
-                    <button key={f} onClick={() => setStatusFilter(f)} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", statusFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                      {f === "all" ? "Todos" : f === "pending" ? "Pend." : "Concl."}
-                    </button>
-                  ))}
+              {/* ── Event list (top half, scrollable) ── */}
+              <div className="flex flex-col border-b-2 border-[#191c1e]" style={{ maxHeight: "52%" }}>
+                <div className="px-3 pt-2.5 pb-2 border-b border-[#eceef0] shrink-0">
+                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1"><Flag size={10} /> Evento</span>
+                    <span className="text-[#9aa08a]">{sidebarEvents.length}</span>
+                  </p>
+                  <div className="relative">
+                    <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9aa08a] pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Buscar evento ou cliente..."
+                      value={eventSearch}
+                      onChange={e => setEventSearch(e.target.value)}
+                      className="w-full pl-6 pr-2 h-7 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white placeholder:text-[#b0b8a0] placeholder:not-italic placeholder:normal-case"
+                    />
+                    {eventSearch && (
+                      <button type="button" onClick={() => setEventSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]">
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
-                <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-2">Filtrar por data</p>
-                <div className="space-y-1.5">
-                  <div>
-                    <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">De</label>
-                    <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">Até</label>
-                    <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
-                  </div>
-                  {cycleWeekends.length > 0 && (
-                    <div>
-                      <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-0.5">Fim de semana</p>
-                      <div className="flex flex-wrap gap-1">
-                        {cycleWeekends.map(w => {
-                          const active = filterDateFrom === w.sat && filterDateTo === w.sun;
-                          return (
-                            <button
-                              key={w.sat}
-                              type="button"
-                              onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                              className={cn("px-1.5 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}
-                            >
-                              {w.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                <div className="overflow-auto flex-1">
+                  {selectedEventId != null && (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }}
+                      className="w-full text-left px-3 py-1.5 text-[9px] font-black italic uppercase text-[#747a60] border-b border-[#eceef0] hover:bg-[#f7f9fb] flex items-center gap-1"
+                    >
+                      <X size={9} /> Todos os eventos
+                    </button>
+                  )}
+                  {sidebarEvents.length === 0 ? (
+                    <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">
+                      {eventSearch || progressFilter !== "all" || publicationFilter !== "all" ? "Sem resultados para esses filtros." : "Nenhum evento disponível."}
                     </div>
-                  )}
-                  {(filterDateFrom || filterDateTo) && (
-                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="w-full text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5">
-                      × Limpar datas
-                    </button>
+                  ) : (
+                    sidebarEvents.map(ev => {
+                      const isSelected = selectedEventId === ev.id;
+                      const prog = ev.evaluationProgress ?? 0;
+                      return (
+                        <button
+                          key={ev.id}
+                          type="button"
+                          data-testid={`option-event-${ev.id}`}
+                          onClick={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                          className={cn(
+                            "w-full text-left px-3 py-2 border-b border-[#eceef0] last:border-0 transition-colors",
+                            isSelected ? "bg-[#f7ffd1] border-l-[3px] border-l-[#506600] pl-2.5" : "hover:bg-[#f7f9fb]"
+                          )}
+                        >
+                          <p className="font-black italic uppercase text-[10px] leading-tight text-[#191c1e] line-clamp-2 mb-0.5">{ev.name}</p>
+                          {formatEventSubtitle(ev) && (
+                            <p className="text-[9px] italic font-bold text-[#747a60] truncate mb-1">{formatEventSubtitle(ev)}</p>
+                          )}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {ev.feedbackReleased
+                              ? <span className="text-[8px] font-black italic uppercase bg-[#ccff00] text-[#161e00] px-1.5 py-0.5 border border-[#506600]">✓ Final</span>
+                              : ev.partialPublishedAt
+                                ? <span className="text-[8px] font-black italic uppercase bg-[#fff4c2] text-[#5c4a00] px-1.5 py-0.5 border border-[#c9a800]">◑ Parcial</span>
+                                : <span className="text-[8px] font-black italic uppercase bg-[#f0f0f0] text-[#747a60] px-1.5 py-0.5 border border-[#d0d0d0]">— Sem pub.</span>
+                            }
+                            <span className={cn(
+                              "text-[8px] font-bold italic uppercase px-1.5 py-0.5 border",
+                              prog >= 1 ? "bg-[#efffcf] text-[#506600] border-[#a0c830]"
+                                : prog > 0 ? "bg-[#fff8e1] text-[#7a5800] border-[#e0c840]"
+                                : "bg-[#f5f5f5] text-[#9aa08a] border-[#d8d8d8]"
+                            )}>
+                              {Math.round(prog * 100)}% aval.
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </div>
 
-              {isConsultation && (
-                <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
-                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><Target size={10} /> Tipo</p>
+              {/* ── Filter sections (bottom half, scrollable) ── */}
+              <div className="flex-1 overflow-auto">
+
+                {/* Status */}
+                <div className="px-3 py-2 border-b border-[#eceef0]">
+                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><ListChecks size={10} /> Status</p>
                   <div className="flex gap-1">
-                    {(["all","com-nota","sem-nota"] as const).map(f => (
-                      <button key={f} onClick={() => setTypeFilter(f as "all" | "com-nota" | "sem-nota")} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", typeFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                        {f === "all" ? "Todos" : f === "com-nota" ? "Com nota" : "Sem nota"}
+                    {(["all","pending","done"] as const).map(f => (
+                      <button key={f} onClick={() => setStatusFilter(f)} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", statusFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                        {f === "all" ? "Todos" : f === "pending" ? "Pendentes" : "Concluídos"}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {isConsultation && (
-                <div className="p-3 border-b-2 border-[#eceef0]">
-                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-2 flex items-center gap-1"><User size={10} /> Avaliador</p>
-                  {(() => {
-                    const avaliadorOptions = selectedEventId && avaliadorStats.length > 0
-                      ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
-                      : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
-                    return (
-                      <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
-                        <PopoverTrigger asChild>
-                          <button type="button" role="combobox" data-testid="select-avaliador" className="w-full h-8 px-2 flex items-center justify-between gap-2 text-left border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors">
-                            <span className="truncate text-[#191c1e]">{avaliadorOptions.find(a => a.id === selectedAvaliadorId)?.name ?? "Todos"}</span>
-                            <ChevronsUpDown size={12} className="shrink-0 text-[#191c1e]" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-52">
-                          <Command className="rounded-none">
-                            <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic text-xs" />
-                            <CommandList className="max-h-[240px]">
-                              <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorId(null); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
-                                  <Check size={13} className={cn("shrink-0", selectedAvaliadorId == null ? "opacity-100" : "opacity-0")} />
-                                  <span className="font-bold italic uppercase text-xs">Todos</span>
-                                </CommandItem>
-                                {avaliadorOptions.map(av => (
-                                  <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => { setSelectedAvaliadorId(av.id); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
-                                    <Check size={13} className={cn("shrink-0", selectedAvaliadorId === av.id ? "opacity-100" : "opacity-0")} />
-                                    <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    );
-                  })()}
+                {/* Progresso */}
+                <div className="px-3 py-2 border-b border-[#eceef0]">
+                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><BarChart3 size={10} /> Progresso</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {([["all","Todos"],["not_started","Não iniciado"],["partial","Em andamento"],["done","Concluído"]] as const).map(([f, label]) => (
+                      <button key={f} onClick={() => setProgressFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 border transition-colors", progressFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
 
-              {(selectedEventId != null || selectedAvaliadorId != null || statusFilter !== "all" || typeFilter !== "all") && (
-                <div className="px-3 py-2 border-b-2 border-[#eceef0]">
-                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setFilterWeekend(false); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
-                    <X size={11} /> Limpar filtros
+                {/* Publicação */}
+                <div className="px-3 py-2 border-b border-[#eceef0]">
+                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><Send size={10} /> Publicação</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {([["all","Todos"],["none","Sem pub."],["partial","Parcial"],["final","Final"]] as const).map(([f, label]) => (
+                      <button key={f} onClick={() => setPublicationFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 border transition-colors", publicationFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tipo (consultation only) */}
+                {isConsultation && (
+                  <div className="px-3 py-2 border-b border-[#eceef0]">
+                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><Target size={10} /> Tipo de evento</p>
+                    <div className="flex gap-1">
+                      {(["all","com-nota","sem-nota"] as const).map(f => (
+                        <button key={f} onClick={() => setTypeFilter(f)} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", typeFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                          {f === "all" ? "Todos" : f === "com-nota" ? "Com nota" : "Sem nota"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Avaliador (consultation only) */}
+                {isConsultation && (
+                  <div className="px-3 py-2 border-b border-[#eceef0]">
+                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><User size={10} /> Avaliador</p>
+                    {(() => {
+                      const avaliadorOptions = selectedEventId && avaliadorStats.length > 0
+                        ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
+                        : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
+                      return (
+                        <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
+                          <PopoverTrigger asChild>
+                            <button type="button" role="combobox" data-testid="select-avaliador" className="w-full h-8 px-2 flex items-center justify-between gap-2 text-left border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors">
+                              <span className="truncate text-[#191c1e]">{avaliadorOptions.find(a => a.id === selectedAvaliadorId)?.name ?? "Todos"}</span>
+                              <ChevronsUpDown size={12} className="shrink-0 text-[#191c1e]" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" side="right" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64">
+                            <Command className="rounded-none">
+                              <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic text-xs" />
+                              <CommandList className="max-h-[240px]">
+                                <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                  <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorId(null); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
+                                    <Check size={13} className={cn("shrink-0", selectedAvaliadorId == null ? "opacity-100" : "opacity-0")} />
+                                    <span className="font-bold italic uppercase text-xs">Todos</span>
+                                  </CommandItem>
+                                  {avaliadorOptions.map(av => (
+                                    <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => { setSelectedAvaliadorId(av.id); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
+                                      <Check size={13} className={cn("shrink-0", selectedAvaliadorId === av.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Período */}
+                <div className="px-3 py-2 border-b border-[#eceef0]">
+                  <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1.5 flex items-center gap-1"><Calendar size={10} /> Período</p>
+                  <div className="space-y-1.5">
+                    <div className="flex gap-1.5">
+                      <div className="flex-1">
+                        <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">De</label>
+                        <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">Até</label>
+                        <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                      </div>
+                    </div>
+                    {cycleWeekends.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-0.5">Fim de semana</p>
+                        <div className="flex flex-wrap gap-1">
+                          {cycleWeekends.map(w => {
+                            const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                            return (
+                              <button
+                                key={w.sat}
+                                type="button"
+                                onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
+                                className={cn("px-1.5 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}
+                              >
+                                {w.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {(filterDateFrom || filterDateTo) && (
+                      <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00]">
+                        × Limpar datas
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Limpar filtros */}
+              {(selectedEventId != null || selectedAvaliadorId != null || statusFilter !== "all" || typeFilter !== "all" || progressFilter !== "all" || publicationFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
+                <div className="px-3 py-2 border-t-2 border-[#191c1e] shrink-0">
+                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); setProgressFilter("all"); setPublicationFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setEventSearch(""); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
+                    <X size={11} /> Limpar todos os filtros
                   </button>
                 </div>
               )}
 
-              <div className="flex-1" />
-
-              <div className="p-3 border-t-2 border-[#eceef0]">
+              <div className="px-3 py-2 border-t border-[#eceef0] shrink-0">
                 <p className="text-[9px] italic text-[#747a60] leading-snug">
                   {isConsultation ? "Modo consulta — acompanhe o andamento sem editar notas." : "Apenas eventos configurados e liberados pelo RH aparecem."}
                 </p>
