@@ -1052,6 +1052,8 @@ export default function EventDetailPage() {
     );
   }
 
+  const [activeTab, setActiveTab] = useState<"visaoGeral" | "quesitos" | "equipe" | "conformidade">("visaoGeral");
+
   const fmt = (v: number) => `${v.toFixed(1)}`;
   const activeCriteriaCount = (event.criteria ?? []).filter(c => c.active).length;
   const critMeta = new Map((event.criteria ?? []).map(c => [c.criterionId, c]));
@@ -1177,16 +1179,93 @@ export default function EventDetailPage() {
   ];
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-8 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <Link href="/events" className="inline-flex items-center gap-2 text-sm font-bold italic uppercase tracking-wider text-[#444933] hover:text-[#506600] transition-colors group">
-            <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Voltar para Eventos
+    <div className="bg-[#f7f9fb] min-h-screen text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+
+      {/* ── Sticky Header ── */}
+      <div className="sticky top-0 z-30 bg-[#191c1e] border-b-4 border-[#ccff00]">
+        {/* Row 1: breadcrumb + metrics + CTA */}
+        <div className="px-6 py-2 flex items-center gap-3 flex-wrap min-h-[44px]">
+          <Link href="/events" className="flex items-center gap-1.5 text-[#747a60] hover:text-[#ccff00] text-[11px] font-black italic uppercase transition-colors shrink-0 group">
+            <ArrowLeft size={12} className="transition-transform group-hover:-translate-x-0.5" /> Eventos
           </Link>
-          <Link href={`/calibrations?eventId=${event.id}`} className="inline-flex items-center gap-2 text-sm font-black italic uppercase tracking-wider text-white bg-[#191c1e] border-2 border-[#191c1e] px-3 py-1.5 hover:bg-[#506600] hover:border-[#506600] transition-colors">
-            <SlidersHorizontal size={14} /> Ir para Calibração
-          </Link>
+          <span className="text-[#3a3e30] text-xs">/</span>
+          <span className="text-[11px] font-black italic uppercase text-white truncate max-w-[240px]">{event.name}</span>
+          {event.resultsConfirmed && (
+            <span className="flex items-center gap-1 text-[9px] font-black italic uppercase bg-[#ccff00] text-[#161e00] px-2 py-0.5 shrink-0">
+              <CheckCircle2 size={8} /> Confirmado
+            </span>
+          )}
+          {event.isHistorical && (
+            <span className="text-[9px] font-black italic uppercase bg-[#ffb300] text-[#3b2900] px-2 py-0.5 shrink-0">Histórico</span>
+          )}
+          <div className="ml-auto flex items-center gap-4 flex-wrap">
+            {result && result.eventScore > 0 && (
+              <>
+                <div className="flex flex-col items-center leading-none">
+                  <span className="text-[8px] font-bold italic uppercase text-[#5a6040] mb-0.5">Score</span>
+                  <span className="text-[17px] font-black italic text-[#ccff00] leading-none">
+                    {fmt((result.conformityScore != null ? result.conformityScore : result.eventScore) as number)}
+                  </span>
+                </div>
+                <div className="w-px h-7 bg-[#2e3228]" />
+              </>
+            )}
+            <div className="flex flex-col items-center leading-none">
+              <span className="text-[8px] font-bold italic uppercase text-[#5a6040] mb-0.5">Avaliações</span>
+              <span className="text-[14px] font-black italic text-white leading-none">{evaluationProgress}%</span>
+            </div>
+            <div className="w-px h-7 bg-[#2e3228]" />
+            <div className="flex flex-col items-center leading-none">
+              <span className="text-[8px] font-bold italic uppercase text-[#5a6040] mb-0.5">Quesitos</span>
+              <span className="text-[14px] font-black italic text-white leading-none">
+                {result?.evaluatedCriteria ?? 0}/{result?.totalCriteria ?? activeCriteriaCount}
+              </span>
+            </div>
+            {(event.city || event.location) && (
+              <>
+                <div className="w-px h-7 bg-[#2e3228]" />
+                <div className="flex items-center gap-1 text-[#747a60] text-[10px] italic font-bold shrink-0">
+                  <MapPin size={10} />
+                  <span>{event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : event.location}</span>
+                </div>
+              </>
+            )}
+            <div className="w-px h-7 bg-[#2e3228]" />
+            <Link href={`/calibrations?eventId=${event.id}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#ccff00] text-[#161e00] text-[10px] font-black italic uppercase hover:bg-[#b8e600] transition-colors shrink-0">
+              <SlidersHorizontal size={11} /> Calibração
+            </Link>
+          </div>
         </div>
+        {/* Row 2: tab bar */}
+        <div className="flex px-4 gap-0">
+          {(["visaoGeral", "quesitos", "equipe", "conformidade"] as const).map(tab => {
+            const labels: Record<typeof tab, string> = {
+              visaoGeral: "Visão Geral",
+              quesitos: "Quesitos",
+              equipe: `Equipe (${event.participants?.length ?? 0})`,
+              conformidade: "Conformidade",
+            };
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-5 py-2.5 text-[10px] font-black italic uppercase tracking-wide transition-colors border-b-[3px] ${
+                  activeTab === tab
+                    ? "text-[#ccff00] border-[#ccff00]"
+                    : "text-[#5a6040] border-transparent hover:text-[#9aa088]"
+                }`}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+
+        {/* ══ TAB: Visão Geral ══ */}
+        {activeTab === "visaoGeral" && (<>
 
         {/* Hero */}
         <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
@@ -1460,6 +1539,11 @@ export default function EventDetailPage() {
             </div>
           </section>
         )}
+
+        </>)}
+
+        {/* ══ TAB: Quesitos ══ */}
+        {activeTab === "quesitos" && (<>
 
         {/* HR criteria configuration + evaluator assignment (merged) — não se aplica a eventos históricos/importados */}
         {canManage && !event.isHistorical && (
@@ -1984,6 +2068,11 @@ export default function EventDetailPage() {
         )}
 
 
+        </>)}
+
+        {/* ══ TAB: Visão Geral (cont.) ══ */}
+        {activeTab === "visaoGeral" && (<>
+
         {/* Eventos históricos/importados: sem atribuição de avaliadores — só observações importadas + mural de comentários */}
         {event.isHistorical && (
           <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
@@ -2065,9 +2154,11 @@ export default function EventDetailPage() {
           </section>
         )}
 
-        <div className={`grid grid-cols-1 gap-6 ${hasPerformanceTable ? "lg:grid-cols-3" : ""}`}>
-          {hasPerformanceTable && (
-          <div className="lg:col-span-2 space-y-6">
+        </>)}
+
+        <div className="grid grid-cols-1 gap-6">
+          {activeTab === "visaoGeral" && hasPerformanceTable && (
+          <div className="space-y-6">
             {result && result.eventScore > 0 && participantResults.length > 0 && (
               <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
                 <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
@@ -2111,7 +2202,8 @@ export default function EventDetailPage() {
           </div>
           )}
 
-          <div className={hasPerformanceTable ? "" : "lg:max-w-xl"}>
+          {activeTab === "conformidade" && (
+          <div>
             {/* Matriz de Conformidade */}
             <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
               <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
@@ -2348,7 +2440,11 @@ export default function EventDetailPage() {
               </div>
             </div>
           </div>
+          )}
         </div>
+
+        {/* ══ TAB: Equipe ══ */}
+        {activeTab === "equipe" && (<>
 
         {((event.participants && event.participants.length > 0) || canManage) && (
               <div id="equipe-alocada" className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
@@ -2692,7 +2788,9 @@ export default function EventDetailPage() {
               </DialogContent>
             </Dialog>
 
-        {!event.isHistorical && <EventCommentsPanel eventId={id} />}
+        </>)}
+
+        {!event.isHistorical && activeTab === "visaoGeral" && <EventCommentsPanel eventId={id} />}
       </div>
     </div>
   );
