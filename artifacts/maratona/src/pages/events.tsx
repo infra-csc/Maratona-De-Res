@@ -524,10 +524,10 @@ export default function EventsPage() {
                           </td>
                           <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
                           <td className={`px-3 py-2.5 text-xs font-black italic text-center ${!isPureHistorical && total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
-                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 ? "—" : `${evaluated}/${total}`}
+                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 && evaluated === 0 ? "—" : total === 0 ? `${evaluated}` : `${evaluated}/${total}`}
                           </td>
                           <td className={`px-3 py-2.5 text-xs font-black italic text-center ${fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}`}>
-                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 ? "—" : `${calCount}/${total}`}
+                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 && calCount === 0 ? "—" : total === 0 ? `${calCount}` : `${calCount}/${total}`}
                           </td>
                           <td className="px-3 py-2.5 text-center whitespace-nowrap">
                             {score == null ? (
@@ -550,9 +550,6 @@ export default function EventsPage() {
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">
                             <div className="flex flex-col gap-0.5">
-                              {ev.isHistorical && (
-                                <span className="text-[9px] font-bold italic uppercase text-[#a06a00] leading-none">Histórico</span>
-                              )}
                               {/* Status operacional — não deixa isHistorical curto-circuitar quando há nota real */}
                               {isPureHistorical && score == null ? null
                                 : !ev.criteriaConfirmed && !hasEvals ? (
