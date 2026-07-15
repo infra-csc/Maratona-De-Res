@@ -438,9 +438,12 @@ export default function CalibrationsPage() {
   }
   const fillableCount = activeCriteria.filter(c => pendingScore(c.criterionId) != null).length;
 
+  // Critérios com peso > 0 (únicos que entram nos contadores de calibração)
+  const scorableActiveCriteria = activeCriteria.filter(c => Number(c.weightOverride ?? c.originalWeight ?? 0) > 0);
+
   // Quantos critérios já publicados como Final
-  const finalPublishedCount = activeCriteria.filter(c => !!c.finalPublishedAt).length;
-  const allCriteriaFinalPublished = activeCriteria.length > 0 && finalPublishedCount === activeCriteria.length;
+  const finalPublishedCount = scorableActiveCriteria.filter(c => !!c.finalPublishedAt).length;
+  const allCriteriaFinalPublished = scorableActiveCriteria.length > 0 && finalPublishedCount === scorableActiveCriteria.length;
 
   // Critérios filtrados por criterionFilter
   const filteredActiveCriteria = criterionFilter === "uncalibrated"
@@ -957,8 +960,8 @@ export default function CalibrationsPage() {
 
                   {/* Spacer + progress + filters */}
                   <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                    <span className="text-[11px] font-bold italic uppercase text-[#747a60] flex items-center gap-1" title={`${finalPublishedCount} de ${activeCriteria.length} critérios publicados como Final`}>
-                      <ShieldCheck size={11} className="text-[#506600]" /> {finalPublishedCount}/{activeCriteria.length} final
+                    <span className="text-[11px] font-bold italic uppercase text-[#747a60] flex items-center gap-1" title={`${finalPublishedCount} de ${scorableActiveCriteria.length} critérios (peso > 0) publicados como Final`}>
+                      <ShieldCheck size={11} className="text-[#506600]" /> {finalPublishedCount}/{scorableActiveCriteria.length} final
                     </span>
                     <div className="flex items-center gap-0.5">
                       <Filter size={11} className="text-[#747a60] mr-1" />
