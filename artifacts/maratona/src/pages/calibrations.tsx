@@ -1051,15 +1051,15 @@ export default function CalibrationsPage() {
                                     <span className="text-[10px] font-bold italic text-[#747a60]">{cal.calibratedByName}</span>
                                   )}
                                 </div>
-                                <input
+                                <textarea
                                   data-testid={`input-cal-reason-inline-${c.criterionId}`}
-                                  type="text"
+                                  rows={2}
                                   value={reasonVal}
                                   onClick={e => e.stopPropagation()}
                                   onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
                                   placeholder="Escreva a justificativa…"
                                   className={cn(
-                                    "w-full h-6 px-2 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0]",
+                                    "w-full px-2 py-1 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] resize-none leading-snug",
                                     reasonChanged ? "border-[#ff5722] bg-[#fff3f0]" :
                                     reasonVal ? "border-[#c4cda8] bg-[#f8fdf0]" :
                                     "border-[#e0e2da] bg-[#fafafa]"
