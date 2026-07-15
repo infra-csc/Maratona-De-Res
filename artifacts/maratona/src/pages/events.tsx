@@ -478,17 +478,17 @@ export default function EventsPage() {
                       const scoreLabel = isPureHistorical
                         ? "Importado"
                         : finalPubCount > 0 && partialOnlyCount > 0
-                          ? `${finalPubCount}F · ${partialOnlyCount}P`
-                          : finalPubCount > 0 ? "Calibrado Final"
-                          : partialOnlyCount > 0 ? "Calibrado Parcial"
-                          : calSaved > 0 ? "Calibrado"
+                          ? `Misto (${finalPubCount}F·${partialOnlyCount}P)`
+                          : finalPubCount > 0 ? "Pub. Final"
+                          : partialOnlyCount > 0 ? "Pub. Parcial"
+                          : calSaved > 0 ? "Rascunho"
                           : "Avaliador";
                       const scoreLabelColor = isPureHistorical
                         ? "text-[#a06a00]"
                         : finalPubCount > 0 && partialOnlyCount === 0
                           ? "text-[#506600]"
                           : finalPubCount > 0 || partialOnlyCount > 0 ? "text-[#a06a00]"
-                          : calSaved > 0 ? "text-[#b06000]"
+                          : calSaved > 0 ? "text-[#1565c0]"
                           : "text-[#747a60]";
                       const missing = ev.unassignedAreaNames ?? [];
                       const hasEvals = evaluated > 0;
@@ -623,15 +623,15 @@ export default function EventsPage() {
                   const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
                   const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
                   const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
-                    ? `${finalPubCount}F · ${partialOnlyCount}P`
-                    : finalPubCount > 0 ? "Calibrado Final"
-                    : partialOnlyCount > 0 ? "Calibrado Parcial"
-                    : calSaved > 0 ? "Calibrado"
+                    ? `Misto (${finalPubCount}F·${partialOnlyCount}P)`
+                    : finalPubCount > 0 ? "Pub. Final"
+                    : partialOnlyCount > 0 ? "Pub. Parcial"
+                    : calSaved > 0 ? "Rascunho"
                     : "Avaliador";
                   const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0
                     ? "#506600"
                     : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
-                    : calSaved > 0 ? "#b06000"
+                    : calSaved > 0 ? "#1565c0"
                     : "#747a60";
                   const hasEvals = evaluated > 0;
                   const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
