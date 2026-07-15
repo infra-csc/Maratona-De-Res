@@ -1046,7 +1046,14 @@ export default function CalibrationsPage() {
                                   <ChevronDown size={11} className="text-[#747a60] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
                                 )}
                               </div>
-                              {/* Justificativa inline */}
+                              {/* Comentários dos avaliadores (read-only) */}
+                              {areaScores.filter(s => s.comment).map((s, i) => (
+                                <div key={i} className="mt-1 flex items-baseline gap-1">
+                                  <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">{s.name}:</span>
+                                  <p className="text-[10px] italic text-[#444933] leading-snug line-clamp-2">"{s.comment}"</p>
+                                </div>
+                              ))}
+                              {/* Justificativa da calibração (editável) */}
                               <div onClick={e => e.stopPropagation()} className="mt-1.5">
                                 <input
                                   data-testid={`input-cal-reason-inline-${c.criterionId}`}
