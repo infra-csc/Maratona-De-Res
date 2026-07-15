@@ -412,7 +412,7 @@ export default function EventsPage() {
               </div>
             ) : viewMode === "table" ? (
               <div className="bg-white border-b-2 border-[#eceef0] overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[860px]">
+                <table className="w-full text-left border-collapse min-w-[960px]">
                   <thead>
                     <tr className="border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10">
                       {(["name","date","participants","evaluated","calibr","score","status"] as const).map((col, i) => {
@@ -535,7 +535,7 @@ export default function EventsPage() {
                               <span className="text-[10px] font-bold italic uppercase text-[#506600]">OK</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
                               {user?.role === "admin" && (
                                 <button
