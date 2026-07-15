@@ -628,10 +628,6 @@ export default function CalibrationsPage() {
                 </div>
                 {/* Date filters */}
                 <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[#d8dadc] flex-wrap">
-                  <CalendarDays size={11} className="text-[#747a60] shrink-0" />
-                  <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="flex-1 min-w-0 h-6 px-1.5 text-[11px] border border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none" />
-                  <span className="text-[10px] text-[#747a60]">até</span>
-                  <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="flex-1 min-w-0 h-6 px-1.5 text-[11px] border border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none" />
                   {cycleWeekends.map(w => {
                     const active = filterDateFrom === w.sat && filterDateTo === w.sun;
                     return (
