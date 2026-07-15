@@ -440,6 +440,7 @@ export default function CalibrationsPage() {
 
   // Quantos critérios já publicados como Final
   const finalPublishedCount = activeCriteria.filter(c => !!c.finalPublishedAt).length;
+  const allCriteriaFinalPublished = activeCriteria.length > 0 && finalPublishedCount === activeCriteria.length;
 
   // Critérios filtrados por criterionFilter
   const filteredActiveCriteria = criterionFilter === "uncalibrated"
@@ -957,12 +958,20 @@ export default function CalibrationsPage() {
                     type="button"
                     disabled={unreleasing}
                     onClick={handleUnrelease}
-                    title="Desfaz a liberação final — funcionários deixam de ver as notas até nova publicação"
+                    title="Muda o evento de volta para publicação parcial — funcionários deixam de ver as notas finais"
                     className="shrink-0 flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white/10 text-white border border-white/30 px-3 py-2 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    <RotateCcw size={12} /> {unreleasing ? "Revertendo..." : "Reverter"}
+                    <RotateCcw size={12} /> {unreleasing ? "Revertendo..." : "Tornar Parcial"}
                   </button>
                 )}
+              </div>
+            ) : allCriteriaFinalPublished ? (
+              <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#ccff00]">
+                <ShieldCheck size={20} className="text-[#ccff00] shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Avaliação Final — {finalPublishedCount}/{activeCriteria.length} critério(s) publicados como final</p>
+                  <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">Os funcionários veem todas as notas como definitivas. Use "Liberar Notas" acima para o fechamento formal.</p>
+                </div>
               </div>
             ) : partialPublishedAtDate ? (
               <div className="bg-[#ffb5a0] border-2 border-[#191c1e] p-4 flex items-center gap-3 shadow-[4px_4px_0px_0px_#191c1e]">
@@ -1219,7 +1228,7 @@ export default function CalibrationsPage() {
                           onClick={() => handlePublishCriterionPartial(c.criterionId)}
                           className="inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white text-[#191c1e] border-2 border-[#191c1e] px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#191c1e] enabled:hover:text-white"
                         >
-                          <Send size={12} /> {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "Publicando..." : "Publicar Parcial"}
+                          <Send size={12} /> {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "Publicando..." : isFinalPublished ? "Tornar Parcial" : "Publicar Parcial"}
                         </button>
                       )}
                       {canFinalize && !alreadyReleased && (
