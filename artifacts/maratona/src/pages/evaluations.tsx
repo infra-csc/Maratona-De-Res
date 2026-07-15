@@ -311,8 +311,11 @@ export default function EvaluationsPage() {
   const [eventSearch, setEventSearch] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [selectedAvaliadorId, setSelectedAvaliadorId] = useState<number | null>(null);
+  const [selectedAvaliadorIds, setSelectedAvaliadorIds] = useState<number[]>([]);
   const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
+  const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>([]);
+  const [selectedCriterionIds, setSelectedCriterionIds] = useState<number[]>([]);
+  const [selectedMatrixQuestions, setSelectedMatrixQuestions] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "com-nota" | "sem-nota">("all");
   const [progressFilter, setProgressFilter] = useState<"all" | "not_started" | "partial" | "done">("all");
@@ -747,7 +750,7 @@ export default function EvaluationsPage() {
   // Also activates with NO avaliador picked as long as Status is narrowed to
   // Pendentes/Avaliadas — otherwise that filter had zero visible effect
   // (the generic "Pronto para consultar" empty state ignored it entirely).
-  const crossEventLookupActive = isConsultation && !selectedEventId && (selectedAvaliadorId != null || statusFilter !== "all");
+  const crossEventLookupActive = isConsultation && !selectedEventId && (selectedAvaliadorIds.length > 0 || statusFilter !== "all");
   const crossEventCriteriaQueries = useQueries({
     queries: crossEventLookupActive
       ? activeEvents.map(ev => ({
@@ -779,19 +782,17 @@ export default function EvaluationsPage() {
         const critAll = (crossEventCriteriaQueries[i]?.data ?? []).filter(
           c => c.active && c.responsibleAreaId != null,
         );
-        if (selectedAvaliadorId != null) {
-          const areaIds = new Set(
+        if (selectedAvaliadorIds.length > 0) {
+          const combinedAreaIds = new Set(
             (detail?.areaAssignments ?? [])
-              .filter(a => a.evaluatorUserId === selectedAvaliadorId)
+              .filter(a => a.evaluatorUserId != null && selectedAvaliadorIds.includes(a.evaluatorUserId))
               .map(a => a.areaId),
           );
-          const crit = critAll.filter(c => areaIds.has(c.responsibleAreaId!));
-          const submitted = crit.filter(
-            c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === selectedAvaliadorId)?.status === "submitted",
+          const crit = critAll.filter(c => combinedAreaIds.has(c.responsibleAreaId!));
+          const submitted = crit.filter(c =>
+            selectedAvaliadorIds.some(uid => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === uid)?.status === "submitted")
           ).length;
           const total = crit.length;
-          // Mesma trava: consulta de RH/gestores também só marca como concluído
-          // depois que os resultados do evento forem confirmados.
           return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
         }
         // Sem avaliador selecionado: agrega TODOS os avaliadores designados —
@@ -819,14 +820,16 @@ export default function EvaluationsPage() {
   const crossEventAvaliadorEntries = [...crossEventAvaliadorFiltered]
     .sort((a, b) => (a.event.name ?? "").localeCompare(b.event.name ?? "", "pt-BR", { sensitivity: "base" }));
   const crossEventAvaliadorEvents = crossEventAvaliadorEntries.map(s => s.event);
-  const selectedAvaliadorName = allAvaliadores.find(a => a.id === selectedAvaliadorId)?.name ?? null;
+  const selectedAvaliadorName = selectedAvaliadorIds.length === 1
+    ? (allAvaliadores.find(a => a.id === selectedAvaliadorIds[0])?.name ?? null)
+    : selectedAvaliadorIds.length > 1 ? `${selectedAvaliadorIds.length} avaliadores` : null;
 
   // If the selected event stops being selectable (closed or criteria unconfirmed
   // server-side), clear the selection so trigger text and loaded data stay in sync.
   useEffect(() => {
     if (selectedEventId == null || !events) return;
     const stillValid = events.some(e => e.id === selectedEventId && (e.status === "open" || e.status === "closed") && (isEvaluator ? e.criteriaConfirmed : true));
-    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorId(null); setStatusFilter("all"); }
+    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorIds([]); setStatusFilter("all"); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); }
   }, [selectedEventId, events, isEvaluator]);
   const canRelease = isManager;
   const eventComplete = eventResult?.isComplete ?? false;
@@ -981,15 +984,14 @@ export default function EvaluationsPage() {
     .filter(av => av.total > 0)
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
 
-  const selectedAvaliador = avaliadorStats.find(av => av.id === selectedAvaliadorId) ?? null;
-  // Com avaliador selecionado, "avaliado" = submissão DELE; sem seleção, usa a
-  // completude agregada do critério (todos os designados da área enviaram).
+  const selectedAvaliadores = avaliadorStats.filter(av => selectedAvaliadorIds.includes(av.id));
+  // Com avaliadores selecionados, "avaliado" = submissão de QUALQUER deles; sem seleção, completude agregada.
   const isCriterionDone = (c: (typeof activeCriteria)[number]) =>
-    selectedAvaliador
-      ? (evaluations ?? []).some(e => e.criterionId === c.criterionId && e.evaluatorUserId === selectedAvaliador.id && e.status === "submitted")
+    selectedAvaliadores.length > 0
+      ? selectedAvaliadores.some(av => (evaluations ?? []).some(e => e.criterionId === c.criterionId && e.evaluatorUserId === av.id && e.status === "submitted"))
       : criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted";
-  const avaliadorFilteredCriteria = selectedAvaliador
-    ? activeCriteria.filter(c => c.responsibleAreaId != null && selectedAvaliador.areaIds.has(c.responsibleAreaId))
+  const avaliadorFilteredCriteria = selectedAvaliadores.length > 0
+    ? activeCriteria.filter(c => c.responsibleAreaId != null && selectedAvaliadores.some(av => av.areaIds.has(c.responsibleAreaId!)))
     : activeCriteria;
   const statusFilteredCriteria = statusFilter === "all"
     ? avaliadorFilteredCriteria
@@ -999,7 +1001,13 @@ export default function EvaluationsPage() {
     : typeFilter === "com-nota"
       ? statusFilteredCriteria.filter(c => getSubmittedEvals(c.criterionId).length > 0)
       : statusFilteredCriteria.filter(c => getSubmittedEvals(c.criterionId).length === 0);
-  const filteredAreaGroups = groupByArea(typeFilteredCriteria);
+  const areaFilteredCriteria = selectedAreaIds.length > 0
+    ? typeFilteredCriteria.filter(c => c.responsibleAreaId != null && selectedAreaIds.includes(c.responsibleAreaId))
+    : typeFilteredCriteria;
+  const criterionFilteredCriteria = selectedCriterionIds.length > 0
+    ? areaFilteredCriteria.filter(c => selectedCriterionIds.includes(c.criterionId))
+    : areaFilteredCriteria;
+  const filteredAreaGroups = groupByArea(criterionFilteredCriteria);
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
@@ -1321,19 +1329,28 @@ export default function EvaluationsPage() {
                   </div>
                 )}
 
-                {/* Avaliador (consultation only) */}
+                {/* Avaliador multi-select (consultation only) */}
                 {isConsultation && (
                   <div className="px-3 py-2 border-b border-[#eceef0]">
-                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><User size={10} /> Avaliador</p>
+                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
+                      <span className="flex items-center gap-1"><User size={10} /> Avaliador</span>
+                      {selectedAvaliadorIds.length > 0 && (
+                        <button onClick={() => setSelectedAvaliadorIds([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedAvaliadorIds.length} sel. ×</button>
+                      )}
+                    </p>
                     {(() => {
                       const avaliadorOptions = selectedEventId && avaliadorStats.length > 0
                         ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
                         : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
+                      const toggleAvaliador = (id: number) =>
+                        setSelectedAvaliadorIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
                       return (
                         <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
                           <PopoverTrigger asChild>
                             <button type="button" role="combobox" data-testid="select-avaliador" className="w-full h-8 px-2 flex items-center justify-between gap-2 text-left border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors">
-                              <span className="truncate text-[#191c1e]">{avaliadorOptions.find(a => a.id === selectedAvaliadorId)?.name ?? "Todos"}</span>
+                              <span className="truncate text-[#191c1e]">
+                                {selectedAvaliadorIds.length === 0 ? "Todos" : selectedAvaliadorIds.length === 1 ? (avaliadorOptions.find(a => a.id === selectedAvaliadorIds[0])?.name ?? "1 sel.") : `${selectedAvaliadorIds.length} selecionados`}
+                              </span>
                               <ChevronsUpDown size={12} className="shrink-0 text-[#191c1e]" />
                             </button>
                           </PopoverTrigger>
@@ -1343,13 +1360,15 @@ export default function EvaluationsPage() {
                               <CommandList className="max-h-[240px]">
                                 <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
                                 <CommandGroup>
-                                  <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorId(null); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
-                                    <Check size={13} className={cn("shrink-0", selectedAvaliadorId == null ? "opacity-100" : "opacity-0")} />
+                                  <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorIds([]); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
+                                    <Check size={13} className={cn("shrink-0", selectedAvaliadorIds.length === 0 ? "opacity-100" : "opacity-0")} />
                                     <span className="font-bold italic uppercase text-xs">Todos</span>
                                   </CommandItem>
                                   {avaliadorOptions.map(av => (
-                                    <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => { setSelectedAvaliadorId(av.id); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
-                                      <Check size={13} className={cn("shrink-0", selectedAvaliadorId === av.id ? "opacity-100" : "opacity-0")} />
+                                    <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => toggleAvaliador(av.id)} className="rounded-none cursor-pointer aria-selected:bg-[#eeffaa] aria-selected:text-[#161e00] py-2 gap-2">
+                                      <div className={cn("w-3.5 h-3.5 border-2 shrink-0 flex items-center justify-center", selectedAvaliadorIds.includes(av.id) ? "bg-[#191c1e] border-[#191c1e]" : "border-[#aaa] bg-white")}>
+                                        {selectedAvaliadorIds.includes(av.id) && <Check size={9} className="text-[#ccff00]" strokeWidth={3} />}
+                                      </div>
                                       <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
                                     </CommandItem>
                                   ))}
@@ -1360,6 +1379,75 @@ export default function EvaluationsPage() {
                         </Popover>
                       );
                     })()}
+                  </div>
+                )}
+
+                {/* Área multi-select (consultation + event selected) */}
+                {isConsultation && eventAreasForAssignment.length > 1 && (
+                  <div className="px-3 py-2 border-b border-[#eceef0]">
+                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
+                      <span className="flex items-center gap-1"><Building2 size={10} /> Área</span>
+                      {selectedAreaIds.length > 0 && (
+                        <button onClick={() => setSelectedAreaIds([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedAreaIds.length} sel. ×</button>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {eventAreasForAssignment.map(area => {
+                        const active = selectedAreaIds.includes(area.id);
+                        return (
+                          <button key={area.id} type="button" onClick={() => setSelectedAreaIds(prev => prev.includes(area.id) ? prev.filter(x => x !== area.id) : [...prev, area.id])}
+                            className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                            {area.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Critério multi-select (consultation + event selected) */}
+                {isConsultation && activeCriteria.length > 1 && !!selectedEventId && (
+                  <div className="px-3 py-2 border-b border-[#eceef0]">
+                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
+                      <span className="flex items-center gap-1"><ListChecks size={10} /> Critério</span>
+                      {selectedCriterionIds.length > 0 && (
+                        <button onClick={() => setSelectedCriterionIds([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedCriterionIds.length} sel. ×</button>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {activeCriteria.map(c => {
+                        const active = selectedCriterionIds.includes(c.criterionId);
+                        return (
+                          <button key={c.criterionId} type="button" onClick={() => setSelectedCriterionIds(prev => prev.includes(c.criterionId) ? prev.filter(x => x !== c.criterionId) : [...prev, c.criterionId])}
+                            className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                            {c.shortName ?? c.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Respostas de Matriz multi-select (consultation + event selected) */}
+                {isConsultation && !!selectedEventId && (
+                  <div className="px-3 py-2 border-b border-[#eceef0]">
+                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between gap-1">
+                      <span className="flex items-center gap-1"><ShieldAlert size={10} /> Respostas de Matriz</span>
+                      {selectedMatrixQuestions.length > 0 && (
+                        <button onClick={() => setSelectedMatrixQuestions([])} className="text-[8px] font-black italic uppercase text-[#862200] hover:underline">{selectedMatrixQuestions.length} sel. ×</button>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {([["epi","EPI"],["estaiamentos","Estaiamentos"],["guardaEquipamentos","Guarda Eq."],["conduta","Conduta"],["ausencias","Ausências"],["standout","Destaque"]] as const).map(([key, label]) => {
+                        const active = selectedMatrixQuestions.includes(key);
+                        return (
+                          <button key={key} type="button" onClick={() => setSelectedMatrixQuestions(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])}
+                            className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -1408,9 +1496,9 @@ export default function EvaluationsPage() {
               </div>
 
               {/* Limpar filtros */}
-              {(selectedEventId != null || selectedAvaliadorId != null || statusFilter !== "all" || typeFilter !== "all" || progressFilter !== "all" || publicationFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
+              {(selectedEventId != null || selectedAvaliadorIds.length > 0 || selectedAreaIds.length > 0 || selectedCriterionIds.length > 0 || selectedMatrixQuestions.length > 0 || statusFilter !== "all" || typeFilter !== "all" || progressFilter !== "all" || publicationFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
                 <div className="px-3 py-2 border-t-2 border-[#191c1e] shrink-0">
-                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorId(null); setStatusFilter("all"); setTypeFilter("all"); setProgressFilter("all"); setPublicationFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setEventSearch(""); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
+                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorIds([]); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); setStatusFilter("all"); setTypeFilter("all"); setProgressFilter("all"); setPublicationFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setEventSearch(""); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
                     <X size={11} /> Limpar todos os filtros
                   </button>
                 </div>
@@ -1724,8 +1812,8 @@ export default function EvaluationsPage() {
                         ? "Nenhuma avaliação pendente com os filtros atuais."
                         : statusFilter === "done"
                           ? "Nenhuma avaliação concluída com os filtros atuais."
-                          : selectedAvaliador
-                            ? "Este avaliador não tem critérios atribuídos neste evento."
+                          : selectedAvaliadores.length > 0
+                            ? "Estes avaliadores não têm critérios atribuídos neste evento."
                             : "Nenhum critério ativo neste evento."}
                     </div>
                   ) : (
@@ -1840,75 +1928,85 @@ export default function EvaluationsPage() {
                             )}
 
                             {/* Respostas dos 4 critérios de matriz */}
-                            <div className="px-5 py-4">
-                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-3">Respostas da Matriz</p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {[
-                                  { label: "EPI", val: adminConformityData?.epi, comment: adminConformityData?.epiComment },
-                                  { label: "Estaiamentos/Aterramento", val: adminConformityData?.estaiamentos, comment: adminConformityData?.estaiamentosComment },
-                                  { label: "Conduta", val: adminConformityData?.conduta, comment: adminConformityData?.condutaComment },
-                                  { label: "Guarda de Equipamentos", val: adminConformityData?.guardaEquipamentos, comment: adminConformityData?.guardaEquipamentosComment },
-                                ].map(item => (
-                                  <div key={item.label} className="border-2 border-[#eceef0] p-3">
-                                    <div className="flex items-center justify-between gap-2 mb-1">
-                                      <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">{item.label}</span>
-                                      <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border shrink-0 ${item.val === null || item.val === undefined ? "bg-[#d8dadc] text-[#444933] border-[#c0c4c8]" : item.val ? "bg-[#ccff00] text-[#161e00] border-[#506600]" : "bg-[#ff5722] text-white border-[#8b1a00]"}`}>
-                                        {item.val === null || item.val === undefined ? "—" : item.val ? "SIM" : "NÃO"}
-                                      </span>
-                                    </div>
-                                    {item.comment && item.val === false && (
-                                      <p className="text-[11px] italic text-[#444933] leading-snug">{item.comment}</p>
-                                    )}
+                            {(() => {
+                              const matrixItems = [
+                                { key: "epi" as const, label: "EPI", val: adminConformityData?.epi, comment: adminConformityData?.epiComment },
+                                { key: "estaiamentos" as const, label: "Estaiamentos/Aterramento", val: adminConformityData?.estaiamentos, comment: adminConformityData?.estaiamentosComment },
+                                { key: "conduta" as const, label: "Conduta", val: adminConformityData?.conduta, comment: adminConformityData?.condutaComment },
+                                { key: "guardaEquipamentos" as const, label: "Guarda de Equipamentos", val: adminConformityData?.guardaEquipamentos, comment: adminConformityData?.guardaEquipamentosComment },
+                              ].filter(item => selectedMatrixQuestions.length === 0 || selectedMatrixQuestions.includes(item.key));
+                              if (matrixItems.length === 0) return null;
+                              return (
+                                <div className="px-5 py-4">
+                                  <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-3">Respostas da Matriz</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {matrixItems.map(item => (
+                                      <div key={item.key} className="border-2 border-[#eceef0] p-3">
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                          <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">{item.label}</span>
+                                          <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border shrink-0 ${item.val === null || item.val === undefined ? "bg-[#d8dadc] text-[#444933] border-[#c0c4c8]" : item.val ? "bg-[#ccff00] text-[#161e00] border-[#506600]" : "bg-[#ff5722] text-white border-[#8b1a00]"}`}>
+                                            {item.val === null || item.val === undefined ? "—" : item.val ? "SIM" : "NÃO"}
+                                          </span>
+                                        </div>
+                                        {item.comment && item.val === false && (
+                                          <p className="text-[11px] italic text-[#444933] leading-snug">{item.comment}</p>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
-                            </div>
+                                </div>
+                              );
+                            })()}
 
                             {/* Faltas/Atrasos */}
-                            <div className="px-5 py-4">
-                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
-                                <Clock size={12} /> Faltas/Atrasos (+30 min)
-                              </p>
-                              {eventAbsences.length > 0 && (
-                                <ul className="space-y-1.5 mb-2">
-                                  {eventAbsences.map(a => (
-                                    <li key={a.id} className="flex items-center justify-between gap-2 border-2 border-[#eceef0] px-3 py-1.5">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <User size={11} className="shrink-0 text-[#747a60]" />
-                                        <span className="font-black italic uppercase text-xs text-[#191c1e] truncate">{a.employeeName ?? "—"}</span>
-                                        <span className="text-[10px] font-bold italic uppercase text-[#747a60] shrink-0">
-                                          {a.penaltyType}{a.quantity && a.quantity > 1 ? ` ×${a.quantity}` : ""}
-                                        </span>
-                                      </div>
-                                      <span className="text-[10px] font-black italic text-[#b02f00] shrink-0">-{Number(a.points)} pts</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                              {adminConformityData?.absencesResponse === true ? (
-                                <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport || "—"}</p>
-                              ) : adminConformityData?.absencesResponse === false ? (
-                                <p className="text-[11px] italic text-[#9aa088]">Nenhuma falta ou atraso registrada.</p>
-                              ) : eventAbsences.length === 0 ? (
-                                <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
-                              ) : null}
-                            </div>
+                            {(selectedMatrixQuestions.length === 0 || selectedMatrixQuestions.includes("ausencias")) && (
+                              <div className="px-5 py-4">
+                                <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
+                                  <Clock size={12} /> Faltas/Atrasos (+30 min)
+                                </p>
+                                {eventAbsences.length > 0 && (
+                                  <ul className="space-y-1.5 mb-2">
+                                    {eventAbsences.map(a => (
+                                      <li key={a.id} className="flex items-center justify-between gap-2 border-2 border-[#eceef0] px-3 py-1.5">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <User size={11} className="shrink-0 text-[#747a60]" />
+                                          <span className="font-black italic uppercase text-xs text-[#191c1e] truncate">{a.employeeName ?? "—"}</span>
+                                          <span className="text-[10px] font-bold italic uppercase text-[#747a60] shrink-0">
+                                            {a.penaltyType}{a.quantity && a.quantity > 1 ? ` ×${a.quantity}` : ""}
+                                          </span>
+                                        </div>
+                                        <span className="text-[10px] font-black italic text-[#b02f00] shrink-0">-{Number(a.points)} pts</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {adminConformityData?.absencesResponse === true ? (
+                                  <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport || "—"}</p>
+                                ) : adminConformityData?.absencesResponse === false ? (
+                                  <p className="text-[11px] italic text-[#9aa088]">Nenhuma falta ou atraso registrada.</p>
+                                ) : eventAbsences.length === 0 ? (
+                                  <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
+                                ) : null}
+                              </div>
+                            )}
 
                             {/* Destaque de Desempenho */}
-                            <div className="px-5 py-4">
-                              <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
-                                <Trophy size={12} /> Destaque de Desempenho
-                              </p>
-                              {adminConformityData?.standoutResponse === true && adminConformityData.standoutJustification ? (
-                                <div className="border-2 border-[#506600] bg-[#f7ffe0] p-3">
-                                  <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap">{adminConformityData.standoutJustification}</p>
-                                </div>
-                              ) : adminConformityData?.standoutResponse === false ? (
-                                <p className="text-[11px] italic text-[#9aa088]">Nenhum destaque registrado.</p>
-                              ) : (
-                                <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
-                              )}
-                            </div>
+                            {(selectedMatrixQuestions.length === 0 || selectedMatrixQuestions.includes("standout")) && (
+                              <div className="px-5 py-4">
+                                <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
+                                  <Trophy size={12} /> Destaque de Desempenho
+                                </p>
+                                {adminConformityData?.standoutResponse === true && adminConformityData.standoutJustification ? (
+                                  <div className="border-2 border-[#506600] bg-[#f7ffe0] p-3">
+                                    <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap">{adminConformityData.standoutJustification}</p>
+                                  </div>
+                                ) : adminConformityData?.standoutResponse === false ? (
+                                  <p className="text-[11px] italic text-[#9aa088]">Nenhum destaque registrado.</p>
+                                ) : (
+                                  <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
