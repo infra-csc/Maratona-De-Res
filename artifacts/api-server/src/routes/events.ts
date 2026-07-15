@@ -140,14 +140,15 @@ router.get("/events", async (req, res) => {
       const calibratedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
       if (calibratedScore !== null) hasCalibration = true;
       const status = getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea);
-      if (calibratedScore !== null || status.isEvaluated) evaluatedCriteria++;
+      // Apenas critérios com peso > 0 contam como "avaliados" nos contadores.
+      if (weight > 0 && (calibratedScore !== null || status.isEvaluated)) evaluatedCriteria++;
       return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore };
     });
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
-    const progress = activeCriteria.length > 0 ? evaluatedCriteria / activeCriteria.length : 0;
 
     // Critérios com peso > 0 são os únicos que entram nos contadores de calibração.
     const scorableCount = criteriaForCalc.filter(c => c.weight > 0).length;
+    const progress = scorableCount > 0 ? evaluatedCriteria / scorableCount : 0;
 
     // Calibrações salvas (score preenchido, independente de publicação de feedback).
     const calibratedCriteriaCount = criteriaForCalc.filter(c => c.weight > 0 && c.calibratedScore !== null).length;
