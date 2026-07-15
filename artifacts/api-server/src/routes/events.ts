@@ -432,187 +432,109 @@ router.patch("/events/:id/historical-result", requireRole("admin", "rh"), async 
 });
 
 // Atualiza startDate, endDate e name dos eventos em lote.
-// Tenta bater por externalId primeiro; se não encontrar, tenta pelo nome (ilike).
+// Busca todos os eventos de uma vez e faz matching em JavaScript (sem unaccent).
 router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => {
   const updates = req.body?.updates as { externalId: string; name: string; date: string }[] | undefined;
   if (!Array.isArray(updates) || updates.length === 0) {
     res.status(400).json({ error: "Campo updates (array {externalId, name, date}) é obrigatório." });
     return;
   }
+
+  // Busca todos os eventos de uma vez — mais eficiente que N*8 queries SQL
+  // e não depende de extensão unaccent (não disponível em todos os ambientes).
+  const allEvents = await db.select({ id: eventsTable.id, name: eventsTable.name, externalId: eventsTable.externalId })
+    .from(eventsTable);
+
+  // Normaliza: remove acentos, lowercase, normaliza hífens e espaços
+  function norm(s: string): string {
+    return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase().replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+  }
+
+  // Extrai tokens relevantes de um nome normalizado (sem ano, sem tokens curtos)
+  function extractTokens(s: string): string[] {
+    return norm(s).split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3)
+      .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
+      .filter(p => p.length >= 3);
+  }
+
+  // Extrai palavras longas (≥5 chars) para matching por palavra individual
+  function extractWords(s: string): string[] {
+    const n = norm(s);
+    const segs = n.split(/\s*-\s*/).filter(p => p.length >= 3);
+    const src = segs.length >= 2 ? segs.slice(1).join(" ") : n;
+    return src.split(/[\s&,]+/)
+      .map(w => w.replace(/\b20\d\d\b/g, "").replace(/[%_°º]/g, "").trim())
+      .filter(w => w.length >= 5 && !/^\d+$/.test(w));
+  }
+
+  // Pré-computa nomes normalizados de todos os eventos
+  const allEventsNorm = allEvents.map(e => ({ ...e, normName: norm(e.name) }));
+  const byExternalId = new Map(allEventsNorm.filter(e => e.externalId).map(e => [e.externalId!, e]));
+  const byNormName = new Map(allEventsNorm.map(e => [e.normName, e]));
+
+  function findEvent(externalId: string, name: string) {
+    // 1ª: por externalId exato
+    if (externalId) {
+      const ev = byExternalId.get(externalId);
+      if (ev) return ev;
+    }
+    if (!name) return undefined;
+    const n = norm(name);
+
+    // 2ª: nome normalizado exato
+    const exact = byNormName.get(n);
+    if (exact) return exact;
+
+    // 3ª: substring simples (nome contém padrão ou padrão contém nome)
+    for (const ev of allEventsNorm) {
+      if (ev.normName.includes(n) || n.includes(ev.normName)) return ev;
+    }
+
+    // 4ª: todos os tokens devem estar presentes no nome (ordem qualquer)
+    const toks = extractTokens(name);
+    if (toks.length >= 2) {
+      for (const ev of allEventsNorm) {
+        if (toks.every(t => ev.normName.includes(t))) return ev;
+      }
+      const rev = [...toks].reverse();
+      for (const ev of allEventsNorm) {
+        if (rev.every(t => ev.normName.includes(t))) return ev;
+      }
+    }
+
+    // 5ª: sem primeiro token (prefixo de marca, ex.: "Santander")
+    if (toks.length >= 2) {
+      const withoutFirst = toks.slice(1);
+      for (const ev of allEventsNorm) {
+        if (withoutFirst.every(t => ev.normName.includes(t))) return ev;
+      }
+    }
+
+    // 6ª: sem último token (sufixo opcional)
+    if (toks.length >= 3) {
+      const withoutLast = toks.slice(0, -1);
+      for (const ev of allEventsNorm) {
+        if (withoutLast.every(t => ev.normName.includes(t))) return ev;
+      }
+    }
+
+    // 7ª: palavras longas individuais — resolve typos leves e ordens radicalmente diferentes
+    const words = extractWords(name);
+    if (words.length >= 2) {
+      for (const ev of allEventsNorm) {
+        if (words.every(w => ev.normName.includes(w))) return ev;
+      }
+    }
+
+    return undefined;
+  }
+
   const updated: string[] = [];
   const notFound: string[] = [];
   for (const { externalId, name, date } of updates) {
     if (!date) continue;
-    // 1ª tentativa: por externalId
-    let ev: { id: number } | undefined;
-    if (externalId) {
-      [ev] = await db.select({ id: eventsTable.id })
-        .from(eventsTable)
-        .where(eq(eventsTable.externalId, externalId))
-        .limit(1);
-    }
-    // 2ª tentativa: por nome exato (case-insensitive, trim)
-    if (!ev && name) {
-      [ev] = await db.select({ id: eventsTable.id })
-        .from(eventsTable)
-        .where(ilike(eventsTable.name, name.trim()))
-        .limit(1);
-    }
-    // 3ª tentativa: nome como substring (normaliza travessões e espaços extras)
-    if (!ev && name) {
-      const normalized = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
-      [ev] = await db.select({ id: eventsTable.id })
-        .from(eventsTable)
-        .where(ilike(eventsTable.name, `%${normalized}%`))
-        .limit(1);
-    }
-    // 4ª tentativa: match por tokens extraídos do nome (ignora ordem do ano/estação).
-    // Necessário porque o xlsx usa "Série 2026 - Estação - Cidade" enquanto o banco
-    // armazena "Série Estação - Cidade - 2026" — a posição do ano é invertida.
-    if (!ev && name) {
-      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
-      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
-      // Remove tokens que são só ano (ex: "2026") e tira o ano embutido de outros tokens
-      const tokens = parts
-        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
-        .filter(p => p.length >= 3);
-      if (tokens.length >= 2) {
-        const pattern = `%${tokens.join("%")}%`;
-        [ev] = await db.select({ id: eventsTable.id })
-          .from(eventsTable)
-          .where(ilike(eventsTable.name, pattern))
-          .limit(1);
-        // Tenta ordem inversa dos tokens caso DB tenha cidade antes da estação
-        if (!ev) {
-          const reversePattern = `%${[...tokens].reverse().join("%")}%`;
-          [ev] = await db.select({ id: eventsTable.id })
-            .from(eventsTable)
-            .where(ilike(eventsTable.name, reversePattern))
-            .limit(1);
-        }
-      }
-    }
-    // 5ª tentativa: descarta o primeiro token (prefixo de marca, ex.: "Santander")
-    // e tenta o match com os tokens restantes.
-    // Cobre casos como "Santander Night Run - Palmas" → banco tem "Night Run - Etapa 1 - Palmas".
-    if (!ev && name) {
-      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
-      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
-      const tokens = parts
-        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
-        .filter(p => p.length >= 3);
-      // Sem primeiro token (prefixo de marca)
-      if (tokens.length >= 2) {
-        const withoutFirst = tokens.slice(1);
-        if (withoutFirst.length >= 1) {
-          const p1 = `%${withoutFirst.join("%")}%`;
-          [ev] = await db.select({ id: eventsTable.id })
-            .from(eventsTable)
-            .where(ilike(eventsTable.name, p1))
-            .limit(1);
-          if (!ev) {
-            const p1r = `%${[...withoutFirst].reverse().join("%")}%`;
-            [ev] = await db.select({ id: eventsTable.id })
-              .from(eventsTable)
-              .where(ilike(eventsTable.name, p1r))
-              .limit(1);
-          }
-        }
-      }
-      // Sem último token (sufixo opcional como "Patrocinador")
-      if (!ev && tokens.length >= 3) {
-        const withoutLast = tokens.slice(0, -1);
-        const p2 = `%${withoutLast.join("%")}%`;
-        [ev] = await db.select({ id: eventsTable.id })
-          .from(eventsTable)
-          .where(ilike(eventsTable.name, p2))
-          .limit(1);
-      }
-    }
-    // 6ª tentativa: igual à 4ª mas com unaccent() — resolve acentuação divergente
-    // ex.: "Cuiabá" no xlsx vs "Cuiaba" no banco.
-    if (!ev && name) {
-      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
-      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
-      const tokens = parts
-        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
-        .filter(p => p.length >= 3);
-      if (tokens.length >= 2) {
-        const pattern = `%${tokens.join("%")}%`;
-        [ev] = await db.select({ id: eventsTable.id })
-          .from(eventsTable)
-          .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${pattern})`)
-          .limit(1);
-        if (!ev) {
-          const reversePattern = `%${[...tokens].reverse().join("%")}%`;
-          [ev] = await db.select({ id: eventsTable.id })
-            .from(eventsTable)
-            .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${reversePattern})`)
-            .limit(1);
-        }
-      }
-    }
-    // 7ª tentativa: igual à 5ª (sem primeiro / sem último token) mas com unaccent().
-    if (!ev && name) {
-      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
-      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
-      const tokens = parts
-        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
-        .filter(p => p.length >= 3);
-      if (tokens.length >= 2) {
-        const withoutFirst = tokens.slice(1);
-        if (withoutFirst.length >= 1) {
-          const p1 = `%${withoutFirst.join("%")}%`;
-          [ev] = await db.select({ id: eventsTable.id })
-            .from(eventsTable)
-            .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p1})`)
-            .limit(1);
-          if (!ev) {
-            const p1r = `%${[...withoutFirst].reverse().join("%")}%`;
-            [ev] = await db.select({ id: eventsTable.id })
-              .from(eventsTable)
-              .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p1r})`)
-              .limit(1);
-          }
-        }
-        if (!ev && tokens.length >= 3) {
-          const withoutLast = tokens.slice(0, -1);
-          const p2 = `%${withoutLast.join("%")}%`;
-          [ev] = await db.select({ id: eventsTable.id })
-            .from(eventsTable)
-            .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p2})`)
-            .limit(1);
-          if (!ev) {
-            const p2r = `%${[...withoutLast].reverse().join("%")}%`;
-            [ev] = await db.select({ id: eventsTable.id })
-              .from(eventsTable)
-              .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p2r})`)
-              .limit(1);
-          }
-        }
-      }
-    }
-    // 8ª tentativa: AND por palavra individual com unaccent — resolve typos (ex.: "NIGHT RUM"
-    // vs "Night Run") e ordens radicalmente diferentes. Extrai palavras ≥ 5 chars do nome
-    // completo (exceto o primeiro segmento inteiro = prefixo de marca) e exige que TODAS
-    // estejam presentes no nome do evento, em qualquer ordem.
-    if (!ev && name) {
-      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
-      const segments = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
-      // Remove o primeiro segmento (prefixo de marca/série) e extrai palavras individuais
-      const wordsSource = segments.length >= 2 ? segments.slice(1).join(" ") : norm;
-      const words = wordsSource
-        .split(/[\s&,]+/)
-        .map(w => w.replace(/\b20\d\d\b/g, "").replace(/[%_°º]/g, "").trim())
-        .filter(w => w.length >= 5 && !/^\d+$/.test(w));
-      if (words.length >= 2) {
-        const conditions = words.map(w => sql`unaccent(${eventsTable.name}) ILIKE unaccent(${`%${w}%`})`);
-        [ev] = await db.select({ id: eventsTable.id })
-          .from(eventsTable)
-          .where(and(...conditions))
-          .limit(1);
-      }
-    }
+    const ev = findEvent(externalId, name);
     if (!ev) {
       notFound.push(name || externalId);
     } else {
