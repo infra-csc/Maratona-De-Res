@@ -1048,13 +1048,18 @@ export default function CalibrationsPage() {
                               </div>
                               {/* Comentários dos avaliadores (read-only) */}
                               {areaScores.filter(s => s.comment).map((s, i) => (
-                                <div key={i} className="mt-1 flex items-baseline gap-1">
-                                  <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0">{s.name}:</span>
+                                <div key={i} className="mt-1.5 border-l-2 border-[#c4cda8] pl-2">
+                                  <span className="text-[9px] font-black italic uppercase text-[#506600] block">Avaliador · {s.name}</span>
                                   <p className="text-[10px] italic text-[#444933] leading-snug line-clamp-2">"{s.comment}"</p>
                                 </div>
                               ))}
                               {/* Justificativa da calibração (editável) */}
                               <div onClick={e => e.stopPropagation()} className="mt-1.5">
+                                {cal?.calibratedByName && (
+                                  <span className="text-[9px] font-black italic uppercase text-[#747a60] block mb-0.5">
+                                    Calibração · {cal.calibratedByName}
+                                  </span>
+                                )}
                                 <input
                                   data-testid={`input-cal-reason-inline-${c.criterionId}`}
                                   type="text"
