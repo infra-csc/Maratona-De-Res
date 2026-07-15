@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar, RotateCcw } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar, RotateCcw, Copy } from "lucide-react";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
@@ -1042,6 +1042,21 @@ export default function CalibrationsPage() {
                                   <div className="flex items-center gap-1.5 mb-0.5">
                                     <span className="text-[8px] font-black italic uppercase tracking-wider text-[#506600] bg-[#e8f5d0] px-1 py-px">Avaliador</span>
                                     <span className="text-[10px] font-bold italic text-[#444933]">{s.name}</span>
+                                    <button
+                                      type="button"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setCalReasons(prev => ({ ...prev, [c.criterionId]: s.comment }));
+                                        setTimeout(() => {
+                                          const el = document.querySelector(`[data-testid="input-cal-reason-inline-${c.criterionId}"]`) as HTMLTextAreaElement | null;
+                                          if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
+                                        }, 0);
+                                      }}
+                                      title="Copiar para justificativa da calibração"
+                                      className="ml-auto h-4 w-4 flex items-center justify-center text-[#506600] hover:text-[#191c1e] hover:bg-[#ccff00] transition-colors shrink-0"
+                                    >
+                                      <Copy size={9} />
+                                    </button>
                                   </div>
                                   <p className="text-[11px] text-[#191c1e] leading-snug line-clamp-3">{s.comment}</p>
                                 </div>
