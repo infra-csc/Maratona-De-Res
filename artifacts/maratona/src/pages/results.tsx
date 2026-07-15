@@ -139,7 +139,7 @@ function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: numb
 function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
+  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("eligible");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const qKey = getGetRankingQueryKey({ search: search || undefined });
@@ -286,6 +286,11 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                           <span className="text-[11px] font-bold uppercase italic text-[#444933] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">
                             <span className="inline-block skew-x-[8deg]">{entry.eventsCount} eventos</span>
                           </span>
+                          {entry.eligible === false && (
+                            <span className="text-[11px] font-bold uppercase italic text-white bg-[#ba1a1a] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">
+                              <span className="inline-block skew-x-[8deg]">Inelegível</span>
+                            </span>
+                          )}
                           {entry.absences > 0 && (
                             <span className="text-[11px] font-bold uppercase italic text-white bg-[#ba1a1a] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">
                               <span className="inline-block skew-x-[8deg]">{entry.absences} penalidades</span>
