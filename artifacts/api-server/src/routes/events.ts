@@ -500,6 +500,90 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
           .limit(1);
       }
     }
+    // 6ª tentativa: igual à 4ª mas com unaccent() — resolve acentuação divergente
+    // ex.: "Cuiabá" no xlsx vs "Cuiaba" no banco.
+    if (!ev && name) {
+      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
+      const tokens = parts
+        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
+        .filter(p => p.length >= 3);
+      if (tokens.length >= 2) {
+        const pattern = `%${tokens.join("%")}%`;
+        [ev] = await db.select({ id: eventsTable.id })
+          .from(eventsTable)
+          .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${pattern})`)
+          .limit(1);
+        if (!ev) {
+          const reversePattern = `%${[...tokens].reverse().join("%")}%`;
+          [ev] = await db.select({ id: eventsTable.id })
+            .from(eventsTable)
+            .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${reversePattern})`)
+            .limit(1);
+        }
+      }
+    }
+    // 7ª tentativa: igual à 5ª (sem primeiro / sem último token) mas com unaccent().
+    if (!ev && name) {
+      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+      const parts = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
+      const tokens = parts
+        .map(p => p.replace(/\b20\d\d\b/g, "").replace(/[%_]/g, "").trim())
+        .filter(p => p.length >= 3);
+      if (tokens.length >= 2) {
+        const withoutFirst = tokens.slice(1);
+        if (withoutFirst.length >= 1) {
+          const p1 = `%${withoutFirst.join("%")}%`;
+          [ev] = await db.select({ id: eventsTable.id })
+            .from(eventsTable)
+            .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p1})`)
+            .limit(1);
+          if (!ev) {
+            const p1r = `%${[...withoutFirst].reverse().join("%")}%`;
+            [ev] = await db.select({ id: eventsTable.id })
+              .from(eventsTable)
+              .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p1r})`)
+              .limit(1);
+          }
+        }
+        if (!ev && tokens.length >= 3) {
+          const withoutLast = tokens.slice(0, -1);
+          const p2 = `%${withoutLast.join("%")}%`;
+          [ev] = await db.select({ id: eventsTable.id })
+            .from(eventsTable)
+            .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p2})`)
+            .limit(1);
+          if (!ev) {
+            const p2r = `%${[...withoutLast].reverse().join("%")}%`;
+            [ev] = await db.select({ id: eventsTable.id })
+              .from(eventsTable)
+              .where(sql`unaccent(${eventsTable.name}) ILIKE unaccent(${p2r})`)
+              .limit(1);
+          }
+        }
+      }
+    }
+    // 8ª tentativa: AND por palavra individual com unaccent — resolve typos (ex.: "NIGHT RUM"
+    // vs "Night Run") e ordens radicalmente diferentes. Extrai palavras ≥ 5 chars do nome
+    // completo (exceto o primeiro segmento inteiro = prefixo de marca) e exige que TODAS
+    // estejam presentes no nome do evento, em qualquer ordem.
+    if (!ev && name) {
+      const norm = name.trim().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+      const segments = norm.split(/\s*-\s*/).map(p => p.trim()).filter(p => p.length >= 3);
+      // Remove o primeiro segmento (prefixo de marca/série) e extrai palavras individuais
+      const wordsSource = segments.length >= 2 ? segments.slice(1).join(" ") : norm;
+      const words = wordsSource
+        .split(/[\s&,]+/)
+        .map(w => w.replace(/\b20\d\d\b/g, "").replace(/[%_°º]/g, "").trim())
+        .filter(w => w.length >= 5 && !/^\d+$/.test(w));
+      if (words.length >= 2) {
+        const conditions = words.map(w => sql`unaccent(${eventsTable.name}) ILIKE unaccent(${`%${w}%`})`);
+        [ev] = await db.select({ id: eventsTable.id })
+          .from(eventsTable)
+          .where(and(...conditions))
+          .limit(1);
+      }
+    }
     if (!ev) {
       notFound.push(name || externalId);
     } else {
