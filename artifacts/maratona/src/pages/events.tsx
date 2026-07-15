@@ -11,7 +11,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List, Trash2, Pencil } from "lucide-react";
+import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List, Trash2, Pencil, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
@@ -630,50 +631,61 @@ export default function EventsPage() {
                                 )}
                             </div>
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap">
+                          <td className="px-3 py-2.5 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
-                              {user && ["admin", "rh"].includes(user.role) && (
-                                <button
-                                  data-testid={`button-edit-event-${ev.id}`}
-                                  title="Editar evento"
-                                  onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
-                                  className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                              )}
-                              {user?.role === "admin" && (
-                                <button
-                                  data-testid={`button-merge-event-${ev.id}`}
-                                  title="Mesclar com evento duplicado"
-                                  onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
-                                  className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
-                                >
-                                  <GitMerge size={12} />
-                                </button>
-                              )}
-                              {user?.role === "admin" && (
-                                <button
-                                  data-testid={`button-delete-event-${ev.id}`}
-                                  title="Excluir evento"
-                                  onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
-                                  className="h-7 px-2 flex items-center border-2 border-[#b02f00] bg-white text-[#b02f00] hover:bg-[#fff0ee] transition-all"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                              {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                                <Link href={`/calibrations?eventId=${ev.id}`}>
-                                  <button title="Ir para calibração" className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
-                                    <SlidersHorizontal size={12} />
-                                  </button>
-                                </Link>
-                              )}
+                              {/* Gerenciar — SEMPRE PRIMEIRO e visível */}
                               <Link href={`/events/${ev.id}`}>
                                 <button data-testid={`button-view-event-${ev.id}`} title="Gerenciar evento" className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] hover:bg-[#506600] hover:text-white transition-all">
                                   <ChevronRight size={13} />
                                 </button>
                               </Link>
+                              {/* Menu ⋮ para ações secundárias (admin/rh) */}
+                              {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                                      <MoreHorizontal size={12} />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] min-w-[160px]">
+                                    {user && ["admin", "rh"].includes(user.role) && (
+                                      <DropdownMenuItem
+                                        data-testid={`button-edit-event-${ev.id}`}
+                                        onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
+                                        className="gap-2 italic font-bold text-xs cursor-pointer"
+                                      >
+                                        <Pencil size={12} /> Editar
+                                      </DropdownMenuItem>
+                                    )}
+                                    {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                                      <DropdownMenuItem asChild className="gap-2 italic font-bold text-xs cursor-pointer">
+                                        <Link href={`/calibrations?eventId=${ev.id}`}>
+                                          <SlidersHorizontal size={12} /> Calibrações
+                                        </Link>
+                                      </DropdownMenuItem>
+                                    )}
+                                    {user?.role === "admin" && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          data-testid={`button-merge-event-${ev.id}`}
+                                          onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
+                                          className="gap-2 italic font-bold text-xs cursor-pointer"
+                                        >
+                                          <GitMerge size={12} /> Mesclar
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          data-testid={`button-delete-event-${ev.id}`}
+                                          onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
+                                          className="gap-2 italic font-bold text-xs cursor-pointer text-[#b02f00] focus:text-[#b02f00]"
+                                        >
+                                          <Trash2 size={12} /> Excluir
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
                             </div>
                           </td>
                         </tr>
