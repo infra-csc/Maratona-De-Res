@@ -1202,7 +1202,7 @@ export default function EvaluationsPage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── Sidebar ── */}
-        <aside className="w-80 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
+        <aside className="w-64 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
 
           {/* Manager/consultation: inline event list + filters */}
           {!isEvaluator && (
@@ -1410,46 +1410,83 @@ export default function EvaluationsPage() {
             </>
           )}
 
-          {/* Evaluator: A Fazer / Concluídas + event card list */}
+          {/* Evaluator: lista compacta A Fazer / Concluídas */}
           {isEvaluator && (
-            <>
-              <div className="px-3 py-2.5 border-b-2 border-[#eceef0]">
-                <p className="text-[10px] font-black italic uppercase tracking-wider text-[#444933]">Minhas Avaliações</p>
-              </div>
+            <div className="flex-1 overflow-y-auto">
               {configuredEvents.length === 0 ? (
                 <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhum evento liberado no momento.</div>
               ) : relevantEvaluatorEvents.length === 0 ? (
                 <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhuma avaliação atribuída à sua área.</div>
               ) : (
                 <>
-                  <div className="flex border-b-2 border-[#eceef0]">
-                    <button data-testid="tab-todo" onClick={() => { setActiveEvalTab("todo"); setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }} className={cn("flex-1 py-2 text-[10px] font-black italic uppercase border-b-2 -mb-0.5 transition-colors", activeEvalTab === "todo" ? "border-[#ccff00] bg-[#f7ffe0] text-[#191c1e]" : "border-transparent text-[#747a60] hover:text-[#191c1e]")}>
-                      A Fazer ({todoEvents.length})
-                    </button>
-                    <button data-testid="tab-done" onClick={() => { setActiveEvalTab("done"); setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }} className={cn("flex-1 py-2 text-[10px] font-black italic uppercase border-b-2 -mb-0.5 transition-colors", activeEvalTab === "done" ? "border-[#ccff00] bg-[#f7ffe0] text-[#191c1e]" : "border-transparent text-[#747a60] hover:text-[#191c1e]")}>
-                      Concl. ({doneEvents.length})
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-auto">
-                    {(activeEvalTab === "todo" ? todoEvents : doneEvents).length === 0 ? (
-                      <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">
-                        {activeEvalTab === "todo" ? "Tudo em dia!" : "Nenhuma concluída ainda."}
+                  {todoEvents.length > 0 && (
+                    <>
+                      <div className="px-3 pt-3 pb-1">
+                        <span className="text-[8px] font-black italic uppercase tracking-widest text-[#747a60]">A Fazer · {todoEvents.length}</span>
                       </div>
-                    ) : (
-                      (activeEvalTab === "todo" ? todoEvents : doneEvents).map(ev => (
-                        <EvaluatorEventCard key={ev.id} event={ev} userId={user?.id} selected={selectedEventId === ev.id} onSelect={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }} principalAreaIds={principalAreaIds} />
-                      ))
-                    )}
-                  </div>
+                      {todoEvents.map(ev => {
+                        const stats = evaluatorEventStats.find(s => s.event.id === ev.id);
+                        const pct = stats && stats.total > 0 ? Math.round((stats.submitted / stats.total) * 100) : 0;
+                        const active = selectedEventId === ev.id;
+                        return (
+                          <button key={ev.id} type="button" data-testid={`evaluator-event-${ev.id}`}
+                            onClick={() => { setActiveEvalTab("todo"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                            className={cn("w-full text-left px-3 py-2.5 border-l-[3px] border-l-[#f28b6a] flex flex-col gap-1 transition-colors", active ? "bg-[#f7ffd1]" : "hover:bg-[#f7f9fb]")}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={cn("text-[11px] font-black italic uppercase leading-tight truncate", active ? "text-[#191c1e]" : "text-[#2e3228]")}>{ev.name}</span>
+                              <div className="w-2 h-2 shrink-0 rounded-full bg-[#f28b6a]" />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 h-1 bg-[#eceef0] overflow-hidden">
+                                <div className="h-full bg-[#f28b6a]" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[8px] font-black italic text-[#747a60] shrink-0">{stats?.submitted ?? 0}/{stats?.total ?? 0}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                  {doneEvents.length > 0 && (
+                    <>
+                      <div className="px-3 pt-4 pb-1">
+                        <span className="text-[8px] font-black italic uppercase tracking-widest text-[#747a60]">Concluídas · {doneEvents.length}</span>
+                      </div>
+                      {doneEvents.map(ev => {
+                        const active = selectedEventId === ev.id;
+                        return (
+                          <button key={ev.id} type="button" data-testid={`evaluator-event-done-${ev.id}`}
+                            onClick={() => { setActiveEvalTab("done"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                            className={cn("w-full text-left px-3 py-2.5 border-l-[3px] border-l-[#506600] flex flex-col gap-1 transition-colors", active ? "bg-[#f7ffd1]" : "opacity-70 hover:opacity-100 hover:bg-[#f7f9fb]")}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[11px] font-black italic uppercase leading-tight truncate text-[#2e3228]">{ev.name}</span>
+                              <div className="w-2 h-2 shrink-0 rounded-full bg-[#ccff00]" />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 h-1 bg-[#eceef0] overflow-hidden">
+                                <div className="h-full bg-[#ccff00]" style={{ width: "100%" }} />
+                              </div>
+                              <span className="text-[8px] font-black italic text-[#506600] shrink-0">100%</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                  {todoEvents.length === 0 && doneEvents.length === 0 && (
+                    <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhuma avaliação.</div>
+                  )}
                 </>
               )}
-            </>
+            </div>
           )}
         </aside>
 
         {/* ── Main content ── */}
-        <div className="flex-1 overflow-auto min-w-0">
-          <div className="p-6 md:p-8 space-y-8">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className="flex-1 overflow-auto p-5 space-y-5">
 
         {isEvaluator && selectedEventId && activeEvalTab === "todo" && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (() => {
           const principalAreaIds = new Set(myPrincipalAreas.map(a => a.id));
@@ -1638,61 +1675,38 @@ export default function EvaluationsPage() {
             <p className="text-[#444933] italic max-w-md">{isConsultation ? "Selecione um evento na barra lateral para consultar o andamento das avaliações da equipe." : "Selecione um evento na barra lateral para iniciar ou continuar a avaliação da equipe responsável."}</p>
           </div>
         ) : (
-          <div className="space-y-10">
-            {/* Header Card */}
+          <div className="space-y-5">
+            {/* Header strip compacto */}
             {currentEvent && (
-              <section className={`bg-[#191c1e] text-white border-2 border-[#191c1e] p-6 md:p-8 relative overflow-hidden ${HARD_SHADOW}`}>
-                <div className="absolute top-0 right-0 p-8 opacity-10">
-                  <Users size={120} strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col md:flex-row justify-between gap-6 relative z-10">
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#ccff00] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
-                        <span className="inline-block skew-x-[8deg]">Aberto</span>
-                      </span>
-                      {currentEvent.cycleName && (
-                        <span className="bg-transparent text-white px-3 py-1 border-2 border-white/30 font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
-                          <span className="inline-block skew-x-[8deg]">{currentEvent.cycleName}</span>
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="text-3xl md:text-4xl italic uppercase font-black tracking-tighter leading-none mb-1">{currentEvent.name}</h2>
-                    <p className="text-[#ccff00] font-bold italic uppercase text-lg">{currentEvent.clientName}</p>
-
-                    <div className="flex flex-wrap items-center gap-6 mt-6 text-sm text-white/70 italic">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={16} />
-                        <span>{new Date(currentEvent.startDate).toLocaleDateString('pt-BR')} — {new Date(currentEvent.endDate).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                      {(currentEvent.city || currentEvent.location) && (
-                        <div className="flex items-center gap-2">
-                          <MapPin size={16} />
-                          <span>{currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `, ${currentEvent.state}` : ""}` : currentEvent.location}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Users size={16} />
-                        <span>{currentEvent.participantCount} participantes</span>
-                      </div>
-                    </div>
+              <div className="border-2 border-[#191c1e] bg-white px-5 py-3 flex items-center gap-4">
+                <div className="w-[3px] self-stretch shrink-0 bg-[#ccff00]" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-[15px] font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">{currentEvent.name}</h2>
+                    {currentEvent.cycleName && (
+                      <span className="text-[9px] font-black italic uppercase px-2 py-0.5 border border-[#c8cbd0] text-[#747a60] bg-[#f2f4f6]">{currentEvent.cycleName}</span>
+                    )}
+                    <span className="text-[9px] font-black italic uppercase px-2 py-0.5 bg-[#ccff00] text-[#161e00] border border-[#506600]">Aberto</span>
                   </div>
-
-                  {isManager && (
-                    <div className="flex flex-col justify-end">
-                      <div className="bg-black/30 border-2 border-white/20 p-4 w-full md:w-64">
-                        <p className="text-xs text-white/80 font-bold italic uppercase mb-2">Progresso Geral (Todo o time)</p>
-                        <div className="flex items-center justify-between mb-1 text-xs italic font-bold">
-                          <span>{Math.round(teamProgressPct)}% Concluído</span>
-                        </div>
-                        <div className="w-full bg-black/40 border border-white/20 h-2.5">
-                          <div className="bg-[#ccff00] h-full transition-[width]" style={{ width: `${teamProgressPct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-4 mt-0.5 text-[10px] italic text-[#747a60] flex-wrap">
+                    {currentEvent.clientName && <span>{currentEvent.clientName}</span>}
+                    {(currentEvent.city || currentEvent.location) && (
+                      <span className="flex items-center gap-1"><MapPin size={9} />{currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `, ${currentEvent.state}` : ""}` : currentEvent.location}</span>
+                    )}
+                    <span className="flex items-center gap-1"><Calendar size={9} />{new Date(currentEvent.startDate).toLocaleDateString('pt-BR')} — {new Date(currentEvent.endDate).toLocaleDateString('pt-BR')}</span>
+                    <span className="flex items-center gap-1"><Users size={9} />{currentEvent.participantCount} part.</span>
+                  </div>
                 </div>
-              </section>
+                {isManager && (
+                  <div className="flex items-center gap-2.5 shrink-0 border-l border-[#eceef0] pl-4">
+                    <span className="text-[9px] font-bold italic uppercase text-[#747a60]">Time</span>
+                    <div className="w-24 h-2 bg-[#eceef0] border border-[#dde0e3] overflow-hidden">
+                      <div className="h-full bg-[#ccff00] transition-[width]" style={{ width: `${teamProgressPct}%` }} />
+                    </div>
+                    <span className="text-[9px] font-black italic text-[#191c1e]">{Math.round(teamProgressPct)}%</span>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* ── Barra de filtros de critérios (consultation + evento selecionado) ── */}
