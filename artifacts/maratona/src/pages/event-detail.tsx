@@ -1,8 +1,7 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import {
-  useEventCriterionAssignments,
-  usePatchCriterionAssignment, useAllCriterionRoutings, type CriterionAssignment,
+  useAllCriterionRoutings,
 } from "@/lib/routing-api";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useGetAreas, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -1029,16 +1028,6 @@ export default function EventDetailPage() {
     },
   });
 
-  // ----- Atribuições por Critério (novo roteamento) -----
-  const { data: criterionAssignmentsData, isLoading: criterionAssignmentsLoading } = useEventCriterionAssignments(id);
-  const patchAssignment = usePatchCriterionAssignment(id);
-  const [assignPickerOpen, setAssignPickerOpen] = useState<{ criterionId: number; criterionName: string } | null>(null);
-  const [assignPickerValue, setAssignPickerValue] = useState<number | null>(null);
-  // Recolhido por padrão: os avaliadores padrão já aparecem na tabela de
-  // critérios acima — esta seção só interessa pra dividir critérios de uma
-  // mesma área entre pessoas diferentes ou acompanhar redirecionamentos.
-  const [routingSectionOpen, setRoutingSectionOpen] = useState(false);
-
   if (isLoading) {
     return (
       <div className="bg-[#f7f9fb] min-h-full p-6 md:p-10 max-w-6xl mx-auto space-y-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1135,35 +1124,6 @@ export default function EventDetailPage() {
         .map(c => [c.responsibleAreaId as number, c.responsibleAreaName ?? `Área ${c.responsibleAreaId}`] as [number, string])
     ).entries()
   ).map(([areaId, areaName]) => ({ areaId, areaName }));
-
-  // Linhas do "Roteamento por Critério": mescla atribuições reais já
-  // salvas com sugestões sintéticas derivadas do avaliador padrão
-  // configurado em Critérios, para que a tabela já venha pré-preenchida
-  // sem precisar de um passo manual de "gerar sugestões".
-  const routingByCriterionId = new Map((allRoutings ?? []).map(r => [r.criterionId, r]));
-  const assignmentByCriterionId = new Map((criterionAssignmentsData ?? []).map(a => [a.criterionId, a]));
-  const criterionRoutingDisplayRows: CriterionAssignment[] = (event.criteria ?? [])
-    .filter(c => c.active)
-    .map(c => {
-      const existing = assignmentByCriterionId.get(c.criterionId);
-      if (existing) return existing;
-      const routing = routingByCriterionId.get(c.criterionId);
-      return {
-        id: -c.criterionId,
-        eventId: id,
-        criterionId: c.criterionId,
-        criterionName: c.criterionName,
-        criterionAreaId: c.responsibleAreaId ?? null,
-        assignedToId: routing?.defaultEvaluatorId ?? null,
-        assignedToName: routing?.defaultEvaluatorName ?? null,
-        status: routing?.defaultEvaluatorId ? "suggested" : "pending",
-        redirectedFromId: null,
-        redirectedFromName: null,
-        confirmedAt: null,
-        updatedAt: null,
-        createdAt: null,
-      } as CriterionAssignment;
-    });
 
   const buildOrderedEvaluatorIds = (areaId: number): number[] => {
     const primary = primaryEvaluator[areaId];
@@ -2023,177 +1983,6 @@ export default function EventDetailPage() {
           </section>
         )}
 
-        {/* Atribuições por Critério — roteamento fino (avançado), recolhido por
-            padrão porque os avaliadores padrão já aparecem na tabela acima. */}
-        {canManage && !event.isHistorical && (
-          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-            <button
-              type="button"
-              onClick={() => setRoutingSectionOpen(o => !o)}
-              className="w-full bg-[#191c1e] text-[#ccff00] px-6 py-3 flex flex-wrap items-center justify-between gap-3 italic hover:bg-[#2a2e31] transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <UserCheck size={18} />
-                <span className="font-black uppercase tracking-tight">Roteamento por Critério</span>
-                <span className="text-[10px] font-bold uppercase text-[#ccff00]/60 border border-[#ccff00]/30 px-1.5 py-0.5">Avançado</span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-[#ccff00]/70">
-                {!routingSectionOpen && <span>Só se precisar dividir critérios de uma área ou redirecionar</span>}
-                {routingSectionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </div>
-            </button>
-
-            {routingSectionOpen && (
-            <div className="p-6 space-y-4">
-              <div className="flex items-start gap-3 bg-[#f7f9fb] border-2 border-[#eceef0] px-4 py-3">
-                <Info size={16} className="text-[#506600] shrink-0 mt-0.5" />
-                <div className="text-xs italic text-[#444933] space-y-1">
-                  <p>
-                    <strong>Para que serve:</strong> Quando dois avaliadores de uma mesma área precisam dividir critérios diferentes (ex.: Sandro Gomes avalia Logística e Sandro Paiva avalia Abastecimento), use esta seção para rotear cada critério individualmente.
-                  </p>
-                  <p>
-                    Cada critério já vem com o avaliador padrão configurado em Critérios (tela de roteamento). Use <strong>Atribuir Avaliador</strong> em cada linha só pra confirmar ou trocar.
-                  </p>
-                  <p className="text-[#506600]">
-                    <strong>Freelancers / link externo:</strong> Avaliadores convidados (sem conta no sistema) recebem um link individual gerado no painel de cada critério após a atribuição.
-                  </p>
-                </div>
-              </div>
-
-              {criterionAssignmentsLoading ? (
-                <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs">Carregando atribuições...</div>
-              ) : criterionRoutingDisplayRows.length === 0 ? (
-                <div className="text-center py-8 italic uppercase font-bold text-[#747a60] text-xs border-2 border-dashed border-[#eceef0]">
-                  Nenhum critério ativo neste evento.
-                </div>
-              ) : (
-                <div className="overflow-x-auto border-2 border-[#191c1e]">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Critério</th>
-                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Avaliador Atribuído</th>
-                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-center">Status</th>
-                        <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-right">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y-2 divide-[#eceef0]">
-                      {criterionRoutingDisplayRows.map((a: CriterionAssignment) => {
-                        const statusColors: Record<string, string> = {
-                          pending: "bg-[#f2f4f6] text-[#747a60]",
-                          suggested: "bg-[#fff4c2] text-[#5c4a00]",
-                          confirmed: "bg-[#d4edda] text-[#155724]",
-                          submitted: "bg-[#506600] text-[#ccff00]",
-                        };
-                        const statusLabels: Record<string, string> = {
-                          pending: "Pendente", suggested: "Sugerido", confirmed: "Confirmado", submitted: "Submetido",
-                        };
-                        return (
-                          <tr key={a.criterionId} className="bg-white hover:bg-[#f7f9fb] transition-colors">
-                            <td className="px-4 py-3">
-                              <span className="font-black italic uppercase text-sm text-[#191c1e]">{a.criterionName ?? `#${a.criterionId}`}</span>
-                              {a.redirectedFromId && (
-                                <p className="text-[10px] font-bold italic text-[#747a60] mt-0.5">
-                                  Redirecionado de {a.redirectedFromName ?? "?"} para {a.assignedToName ?? "?"}
-                                  {a.updatedAt ? ` em ${new Date(a.updatedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}` : ""}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {a.assignedToName ? (
-                                <span className="text-sm font-bold italic text-[#191c1e]">{a.assignedToName}</span>
-                              ) : (
-                                <span className="text-sm italic text-[#ba1a1a] font-bold">— Sem atribuição</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-1 text-[10px] font-black italic uppercase ${statusColors[a.status] ?? statusColors.pending}`}>
-                                {statusLabels[a.status] ?? a.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {a.status !== "submitted" && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setAssignPickerOpen({ criterionId: a.criterionId, criterionName: a.criterionName ?? `Critério ${a.criterionId}` });
-                                    setAssignPickerValue(a.assignedToId);
-                                  }}
-                                  className={`px-3 py-1.5 border-2 border-[#191c1e] text-[11px] font-black italic uppercase transition-colors ${a.assignedToId != null ? "bg-[#eceef0] hover:bg-[#dde0e3]" : "bg-[#ccff00] text-[#161e00] hover:bg-[#b8e600]"}`}
-                                >
-                                  {a.assignedToId != null ? "Alterar Avaliador" : "Atribuir Avaliador"}
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            )}
-          </section>
-        )}
-
-        {/* Dialog: Confirmar/Reatribuir avaliador */}
-        <Dialog open={assignPickerOpen !== null} onOpenChange={(v) => { if (!v) setAssignPickerOpen(null); }}>
-          <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-            <DialogHeader>
-              <DialogTitle className="text-xl italic uppercase font-black tracking-tight">
-                Atribuir Avaliador — {assignPickerOpen?.criterionName}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <p className="text-sm italic text-[#444933]">Selecione o avaliador que irá avaliar este critério neste evento.</p>
-              <Select
-                value={assignPickerValue != null ? String(assignPickerValue) : "__none"}
-                onValueChange={(v) => setAssignPickerValue(v === "__none" ? null : parseInt(v))}
-              >
-                <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs">
-                  <SelectValue placeholder="Selecione o avaliador..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Uma vez atribuído, o critério não volta a ficar sem
-                      avaliador — a opção em branco só existe enquanto vazio. */}
-                  {criterionRoutingDisplayRows.find(r => r.criterionId === assignPickerOpen?.criterionId)?.assignedToId == null && (
-                    <SelectItem value="__none">— Sem atribuição</SelectItem>
-                  )}
-                  {evaluators.map(u => (
-                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter className="gap-2 pt-4">
-              <button
-                type="button"
-                onClick={() => setAssignPickerOpen(null)}
-                className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={patchAssignment.isPending || assignPickerValue == null}
-                onClick={() => {
-                  if (!assignPickerOpen) return;
-                  patchAssignment.mutate(
-                    { criterionId: assignPickerOpen.criterionId, assignedToId: assignPickerValue, action: "confirm" },
-                    {
-                      onSuccess: () => { toast({ title: "Atribuição confirmada" }); setAssignPickerOpen(null); },
-                      onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-                    },
-                  );
-                }}
-                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
-              >
-                {patchAssignment.isPending ? "Salvando..." : "Confirmar"}
-              </button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* Eventos históricos/importados: sem atribuição de avaliadores — só observações importadas + mural de comentários */}
         {event.isHistorical && (
