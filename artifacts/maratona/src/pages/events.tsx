@@ -497,7 +497,7 @@ export default function EventsPage() {
               </div>
             ) : viewMode === "table" ? (
               <div className="bg-white border-b-2 border-[#eceef0] overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[960px]">
+                <table className="w-full text-left border-collapse min-w-[1040px]">
                   <thead>
                     <tr className="border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10">
                       {(["name","date","participants","evaluated","calibr","score","status"] as const).map((col, i) => {
@@ -670,8 +670,8 @@ export default function EventsPage() {
                                 </Link>
                               )}
                               <Link href={`/events/${ev.id}`}>
-                                <button data-testid={`button-view-event-${ev.id}`} className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all whitespace-nowrap">
-                                  Gerenciar
+                                <button data-testid={`button-view-event-${ev.id}`} title="Gerenciar evento" className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] hover:bg-[#506600] hover:text-white transition-all">
+                                  <ChevronRight size={13} />
                                 </button>
                               </Link>
                             </div>
