@@ -3145,6 +3145,12 @@ components:
           items:
             type: string
           description: Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.
+        conformityNeeded:
+          type: boolean
+          description: true se algum avaliador de Matriz de Conformidade (Cenografia ou Ferramentas) foi atribuído a este evento.
+        conformityComplete:
+          type: boolean
+          description: true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.
         createdAt:
           type: string
 

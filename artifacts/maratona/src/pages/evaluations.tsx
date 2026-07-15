@@ -320,6 +320,7 @@ export default function EvaluationsPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "com-nota" | "sem-nota">("all");
   const [progressFilter, setProgressFilter] = useState<"all" | "not_started" | "partial" | "done">("all");
   const [publicationFilter, setPublicationFilter] = useState<"all" | "none" | "partial" | "final">("all");
+  const [conformityFilter, setConformityFilter] = useState<"all" | "pending" | "done">("all");
   const [expandedCriteria, setExpandedCriteria] = useState<Set<number>>(new Set());
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
@@ -617,7 +618,12 @@ export default function EvaluationsPage() {
         publicationFilter === "partial" ? !e.feedbackReleased && !!e.partialPublishedAt :
         !!e.feedbackReleased
       );
-      return matchDate && matchSearch && matchProgress && matchPub;
+      const matchConformity = conformityFilter === "all" || (
+        conformityFilter === "pending"
+          ? ((e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityNeeded && !(e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityComplete)
+          : ((e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityNeeded && (e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityComplete)
+      );
+      return matchDate && matchSearch && matchProgress && matchPub && matchConformity;
     })
     .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" }));
 
@@ -1190,199 +1196,207 @@ export default function EvaluationsPage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── Sidebar ── */}
-        <aside className="w-72 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
+        <aside className="w-80 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
 
           {/* Manager/consultation: inline event list + filters */}
           {!isEvaluator && (
             <>
-              {/* ── Event list (top half, scrollable) ── */}
-              <div className="flex flex-col border-b-2 border-[#191c1e]" style={{ maxHeight: "52%" }}>
-                <div className="px-3 pt-2.5 pb-2 border-b border-[#eceef0] shrink-0">
-                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center justify-between">
-                    <span className="flex items-center gap-1"><Flag size={10} /> Evento</span>
-                    <span className="text-[#9aa08a]">{sidebarEvents.length}</span>
-                  </p>
-                  <div className="relative">
-                    <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9aa08a] pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Buscar evento ou cliente..."
-                      value={eventSearch}
-                      onChange={e => setEventSearch(e.target.value)}
-                      className="w-full pl-6 pr-2 h-7 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white placeholder:text-[#b0b8a0] placeholder:not-italic placeholder:normal-case"
-                    />
-                    {eventSearch && (
-                      <button type="button" onClick={() => setEventSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]">
-                        <X size={10} />
+              {/* ── Header: título + chips de filtro rápido + busca ── */}
+              <div className="px-3 pt-2.5 pb-2 border-b-2 border-[#191c1e] shrink-0 space-y-2">
+                <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] flex items-center justify-between">
+                  <span className="flex items-center gap-1"><Flag size={10} /> Eventos</span>
+                  <span className="text-[#9aa08a]">{sidebarEvents.length} / {activeEvents.length}</span>
+                </p>
+
+                {/* Progresso chips */}
+                <div>
+                  <p className="text-[8px] font-black italic uppercase tracking-wider text-[#9aa08a] mb-1 flex items-center gap-1"><BarChart3 size={8} /> Progresso</p>
+                  <div className="grid grid-cols-4 gap-0.5">
+                    {([["all","Todos"],["not_started","Não inic."],["partial","Em andamento"],["done","Concluído"]] as const).map(([f, label]) => (
+                      <button key={f} onClick={() => setProgressFilter(f)} className={cn("text-[8px] font-black italic uppercase py-1 px-0.5 border transition-colors leading-tight", progressFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                        {label}
                       </button>
-                    )}
+                    ))}
                   </div>
                 </div>
-                <div className="overflow-auto flex-1">
-                  {selectedEventId != null && (
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }}
-                      className="w-full text-left px-3 py-1.5 text-[9px] font-black italic uppercase text-[#747a60] border-b border-[#eceef0] hover:bg-[#f7f9fb] flex items-center gap-1"
-                    >
-                      <X size={9} /> Todos os eventos
+
+                {/* Matriz de Conformidade chips */}
+                <div>
+                  <p className="text-[8px] font-black italic uppercase tracking-wider text-[#9aa08a] mb-1 flex items-center gap-1"><ListChecks size={8} /> Matriz</p>
+                  <div className="grid grid-cols-3 gap-0.5">
+                    {([["all","Todas"],["pending","Pendente"],["done","Concluída"]] as const).map(([f, label]) => (
+                      <button key={f} onClick={() => setConformityFilter(f)} className={cn("text-[8px] font-black italic uppercase py-1 border transition-colors leading-tight", conformityFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Publicação chips */}
+                <div>
+                  <p className="text-[8px] font-black italic uppercase tracking-wider text-[#9aa08a] mb-1 flex items-center gap-1"><Send size={8} /> Publicação</p>
+                  <div className="grid grid-cols-4 gap-0.5">
+                    {([["all","Todos"],["none","Nenhuma"],["partial","Parcial"],["final","Final"]] as const).map(([f, label]) => (
+                      <button key={f} onClick={() => setPublicationFilter(f)} className={cn("text-[8px] font-black italic uppercase py-1 px-0.5 border transition-colors leading-tight", publicationFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Busca */}
+                <div className="relative">
+                  <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9aa08a] pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Buscar evento, cliente ou cidade..."
+                    value={eventSearch}
+                    onChange={e => setEventSearch(e.target.value)}
+                    className="w-full pl-6 pr-6 h-7 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white placeholder:text-[#b0b8a0] placeholder:not-italic placeholder:normal-case"
+                  />
+                  {eventSearch && (
+                    <button type="button" onClick={() => setEventSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]">
+                      <X size={10} />
                     </button>
-                  )}
-                  {sidebarEvents.length === 0 ? (
-                    <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">
-                      {eventSearch || progressFilter !== "all" || publicationFilter !== "all" ? "Sem resultados para esses filtros." : "Nenhum evento disponível."}
-                    </div>
-                  ) : (
-                    sidebarEvents.map(ev => {
-                      const isSelected = selectedEventId === ev.id;
-                      const prog = ev.evaluationProgress ?? 0;
-                      const done = prog >= 1;
-                      const partial = prog > 0 && prog < 1;
-                      return (
-                        <button
-                          key={ev.id}
-                          type="button"
-                          data-testid={`option-event-${ev.id}`}
-                          onClick={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                          className={cn(
-                            "w-full text-left px-3 py-1.5 border-b border-[#eceef0] last:border-0 transition-colors border-l-[3px] flex items-center gap-2",
-                            isSelected
-                              ? "bg-[#eeffaa] border-l-[#ccff00]"
-                              : done
-                                ? "bg-[#f3ffdf] border-l-[#a0c830] hover:bg-[#ecffcc]"
-                                : partial
-                                  ? "bg-[#fffcf0] border-l-[#e0c840] hover:bg-[#fff9e0]"
-                                  : "bg-white border-l-transparent hover:bg-[#f7f9fb]"
-                          )}
-                        >
-                          <p className={cn("font-black italic uppercase text-[10px] leading-tight truncate flex-1 min-w-0", done ? "text-[#2e4400]" : "text-[#191c1e]")}>
-                            {ev.name}
-                          </p>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {ev.feedbackReleased
-                              ? <span className="text-[8px] font-black italic text-[#506600]">✓</span>
-                              : ev.partialPublishedAt
-                                ? <span className="text-[8px] font-black italic text-[#7a5800]">◑</span>
-                                : null
-                            }
-                            <span className={cn("text-[9px] font-black italic tabular-nums", done ? "text-[#506600]" : partial ? "text-[#7a5800]" : "text-[#9aa08a]")}>
-                              {Math.round(prog * 100)}%
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })
                   )}
                 </div>
               </div>
 
-              {/* ── Filter sections (bottom half, scrollable) ── */}
-              <div className="flex-1 overflow-auto">
-
-                {/* Status */}
-                <div className="px-3 py-2 border-b border-[#eceef0]">
-                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><ListChecks size={10} /> Status</p>
-                  <div className="flex gap-1">
-                    {(["all","pending","done"] as const).map(f => (
-                      <button key={f} onClick={() => setStatusFilter(f)} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", statusFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                        {f === "all" ? "Todos" : f === "pending" ? "Pendentes" : "Concluídos"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Progresso */}
-                <div className="px-3 py-2 border-b border-[#eceef0]">
-                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><BarChart3 size={10} /> Progresso</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {([["all","Todos"],["not_started","Não iniciado"],["partial","Em andamento"],["done","Concluído"]] as const).map(([f, label]) => (
-                      <button key={f} onClick={() => setProgressFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 border transition-colors", progressFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Publicação */}
-                <div className="px-3 py-2 border-b border-[#eceef0]">
-                  <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><Send size={10} /> Publicação</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {([["all","Todos"],["none","Sem pub."],["partial","Parcial"],["final","Final"]] as const).map(([f, label]) => (
-                      <button key={f} onClick={() => setPublicationFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 border transition-colors", publicationFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Tipo (consultation only) */}
-                {isConsultation && (
-                  <div className="px-3 py-2 border-b border-[#eceef0]">
-                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] mb-1.5 flex items-center gap-1"><Target size={10} /> Tipo de evento</p>
-                    <div className="flex gap-1">
-                      {(["all","com-nota","sem-nota"] as const).map(f => (
-                        <button key={f} onClick={() => setTypeFilter(f)} className={cn("flex-1 text-[9px] font-black italic uppercase py-1 border transition-colors", typeFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                          {f === "all" ? "Todos" : f === "com-nota" ? "Com nota" : "Sem nota"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              {/* ── Event list (flex-1, scrollável) ── */}
+              <div className="overflow-auto flex-1">
+                {selectedEventId != null && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }}
+                    className="w-full text-left px-3 py-1.5 text-[9px] font-black italic uppercase text-[#747a60] border-b border-[#eceef0] hover:bg-[#f7f9fb] flex items-center gap-1"
+                  >
+                    <X size={9} /> Todos os eventos
+                  </button>
                 )}
-
-                {/* Período */}
-                <div className="px-3 py-2 border-b border-[#eceef0]">
-                  <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1.5 flex items-center gap-1"><Calendar size={10} /> Período</p>
-                  <div className="space-y-1.5">
-                    <div className="flex gap-1.5">
-                      <div className="flex-1">
-                        <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">De</label>
-                        <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
-                      </div>
-                      <div className="flex-1">
-                        <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">Até</label>
-                        <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
-                      </div>
-                    </div>
-                    {cycleWeekends.length > 0 && (
-                      <div>
-                        <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-0.5">Fim de semana</p>
-                        <div className="flex flex-wrap gap-1">
-                          {cycleWeekends.map(w => {
-                            const active = filterDateFrom === w.sat && filterDateTo === w.sun;
-                            return (
-                              <button
-                                key={w.sat}
-                                type="button"
-                                onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                                className={cn("px-1.5 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}
-                              >
-                                {w.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {(filterDateFrom || filterDateTo) && (
-                      <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00]">
-                        × Limpar datas
-                      </button>
-                    )}
+                {sidebarEvents.length === 0 ? (
+                  <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">
+                    {eventSearch || progressFilter !== "all" || publicationFilter !== "all" || conformityFilter !== "all"
+                      ? "Sem resultados para esses filtros."
+                      : "Nenhum evento disponível."}
                   </div>
-                </div>
+                ) : (
+                  sidebarEvents.map(ev => {
+                    const isSelected = selectedEventId === ev.id;
+                    const prog = ev.evaluationProgress ?? 0;
+                    const done = prog >= 1;
+                    const partial = prog > 0 && prog < 1;
+                    const evC = ev as { conformityNeeded?: boolean; conformityComplete?: boolean };
+                    const matrixNeeded = !!evC.conformityNeeded;
+                    const matrixDone = !!evC.conformityComplete;
+                    const progPct = Math.round(prog * 100);
+                    const progBarColor = done ? "#ccff00" : partial ? "#f0c820" : "#d4d8cc";
+                    return (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        data-testid={`option-event-${ev.id}`}
+                        onClick={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                        className={cn(
+                          "w-full text-left px-3 py-2.5 border-b border-[#eceef0] last:border-0 transition-colors border-l-[3px]",
+                          isSelected
+                            ? "bg-[#eeffaa] border-l-[#ccff00]"
+                            : done
+                              ? "bg-[#f5ffea] border-l-[#a0c830] hover:bg-[#ecffcc]"
+                              : partial
+                                ? "bg-[#fffdf0] border-l-[#d4b020] hover:bg-[#fff9e0]"
+                                : "bg-white border-l-transparent hover:bg-[#f7f9fb]"
+                        )}
+                      >
+                        {/* Nome */}
+                        <p className={cn("font-black italic uppercase text-[10px] leading-tight truncate", done ? "text-[#2e4400]" : "text-[#191c1e]")}>
+                          {ev.name}
+                        </p>
+                        {/* Cliente + cidade */}
+                        {(ev.clientName || ev.city) && (
+                          <p className="text-[9px] text-[#9aa08a] truncate mt-0.5">
+                            {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        {/* Barra de progresso + badges */}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex-1 h-1.5 bg-[#e8ece0] rounded-none overflow-hidden">
+                            <div style={{ width: `${progPct}%`, backgroundColor: progBarColor, transition: "width 0.3s" }} className="h-full" />
+                          </div>
+                          <span className={cn("text-[9px] font-black tabular-nums shrink-0", done ? "text-[#506600]" : partial ? "text-[#8a7000]" : "text-[#9aa08a]")}>
+                            {progPct}%
+                          </span>
+                          {/* Publicação badge */}
+                          {ev.feedbackReleased
+                            ? <span title="Feedback final publicado" className="text-[8px] font-black text-[#506600] shrink-0">✓</span>
+                            : ev.partialPublishedAt
+                              ? <span title="Feedback parcial publicado" className="text-[8px] font-black text-[#8a7000] shrink-0">◑</span>
+                              : null
+                          }
+                          {/* Matriz badge */}
+                          {matrixNeeded && (
+                            <span
+                              title={matrixDone ? "Matriz de conformidade concluída" : "Matriz de conformidade pendente"}
+                              className={cn("text-[8px] font-black italic uppercase shrink-0 px-1 border", matrixDone ? "text-[#506600] border-[#a0c830] bg-[#f0ffe0]" : "text-[#b02f00] border-[#f08080] bg-[#fff0ee]")}
+                            >
+                              M{matrixDone ? "✓" : "!"}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
 
+              {/* ── Período (compacto, no rodapé) ── */}
+              <div className="px-3 py-2 border-t border-[#eceef0] shrink-0">
+                <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1.5 flex items-center gap-1"><Calendar size={9} /> Período</p>
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <div className="flex-1">
+                      <label className="text-[8px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">De</label>
+                      <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[8px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">Até</label>
+                      <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
+                    </div>
+                  </div>
+                  {cycleWeekends.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {cycleWeekends.map(w => {
+                        const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                        return (
+                          <button
+                            key={w.sat}
+                            type="button"
+                            onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
+                            className={cn("px-1.5 py-0.5 text-[8px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}
+                          >
+                            {w.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {(filterDateFrom || filterDateTo) && (
+                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00]">
+                      × Limpar datas
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Limpar filtros */}
-              {(selectedEventId != null || statusFilter !== "all" || typeFilter !== "all" || progressFilter !== "all" || publicationFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
-                <div className="px-3 py-2 border-t-2 border-[#191c1e] shrink-0">
-                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorIds([]); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); setStatusFilter("all"); setTypeFilter("all"); setProgressFilter("all"); setPublicationFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setEventSearch(""); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
-                    <X size={11} /> Limpar todos os filtros
+              {(progressFilter !== "all" || publicationFilter !== "all" || conformityFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
+                <div className="px-3 py-1.5 border-t-2 border-[#191c1e] shrink-0">
+                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorIds([]); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); setStatusFilter("all"); setTypeFilter("all"); setProgressFilter("all"); setPublicationFilter("all"); setConformityFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setEventSearch(""); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
+                    <X size={11} /> Limpar filtros
                   </button>
                 </div>
               )}
 
-              <div className="px-3 py-2 border-t border-[#eceef0] shrink-0">
+              <div className="px-3 py-1.5 border-t border-[#eceef0] shrink-0">
                 <p className="text-[9px] italic text-[#747a60] leading-snug">
                   {isConsultation ? "Modo consulta — acompanhe o andamento sem editar notas." : "Apenas eventos configurados e liberados pelo RH aparecem."}
                 </p>

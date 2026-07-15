@@ -26,7 +26,7 @@ router.get("/events", async (req, res) => {
   const eventIds = events.map(e => e.id);
 
   // Busca em lote para evitar N+1 (uma query por relação, não por evento).
-  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas] = await Promise.all([
+  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas, conformityRows] = await Promise.all([
     db.select({ eventId: eventParticipantsTable.eventId })
       .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
@@ -38,8 +38,31 @@ router.get("/events", async (req, res) => {
     db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
       .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, eventIds)),
     db.select({ id: areasTable.id, name: areasTable.name }).from(areasTable),
+    db.select({
+      eventId: eventConformitiesTable.eventId,
+      epi: eventConformitiesTable.epi,
+      estaiamentos: eventConformitiesTable.estaiamentos,
+      guardaEquipamentos: eventConformitiesTable.guardaEquipamentos,
+      conduta: eventConformitiesTable.conduta,
+      standoutResponse: eventConformitiesTable.standoutResponse,
+      absencesResponse: eventConformitiesTable.absencesResponse,
+    }).from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, eventIds)),
   ]);
   const areaNameById = new Map(allAreas.map(a => [a.id, a.name]));
+
+  // Calcula se a Matriz de Conformidade foi preenchida por quem foi atribuído.
+  function getConformityStatus(ev: (typeof events)[0]) {
+    const cenoAssigned = ev.conformityEvaluatorUserId != null;
+    const ferrAssigned = ev.conformityEvaluatorFerramentasUserId != null;
+    const conformityNeeded = cenoAssigned || ferrAssigned;
+    if (!conformityNeeded) return { conformityNeeded: false, conformityComplete: false };
+    const conf = conformityRows.find(c => c.eventId === ev.id);
+    const cenoDone = !cenoAssigned || (conf != null &&
+      conf.epi != null && conf.estaiamentos != null && conf.conduta != null &&
+      conf.standoutResponse != null && conf.absencesResponse != null);
+    const ferrDone = !ferrAssigned || (conf != null && conf.guardaEquipamentos != null);
+    return { conformityNeeded, conformityComplete: cenoDone && ferrDone };
+  }
 
   // Filtra eventos dentro do período do ciclo atual (se o ciclo tiver datas definidas;
   // um ciclo sem startDate/endDate configurados não filtra, evitando excluir tudo por engano)
@@ -67,6 +90,7 @@ router.get("/events", async (req, res) => {
       const partialPublishedAt = partialTimestamps.length > 0
         ? new Date(Math.max(...partialTimestamps.map(d => d.getTime()))) : null;
       const partialPublishedCount = partialTimestamps.length;
+      const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
       return {
         ...ev,
         participantCount,
@@ -84,6 +108,8 @@ router.get("/events", async (req, res) => {
         partialPublishedAt,
         criteriaConfirmed: true,
         unassignedAreaNames: [],
+        conformityNeeded,
+        conformityComplete,
       };
     }
 
@@ -143,7 +169,8 @@ router.get("/events", async (req, res) => {
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
     const partialPublishedCount = partialTimestamps.length;
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames };
+    const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: activeCriteria.length, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };
   });
   res.json(enriched);
 });

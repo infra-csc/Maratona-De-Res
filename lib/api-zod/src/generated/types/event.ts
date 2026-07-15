@@ -58,5 +58,9 @@ export interface Event {
   resultsConfirmedBy?: number | null;
   /** Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído. */
   unassignedAreaNames?: string[];
+  /** true se algum avaliador de Matriz de Conformidade (Cenografia ou Ferramentas) foi atribuído a este evento. */
+  conformityNeeded?: boolean;
+  /** true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos. */
+  conformityComplete?: boolean;
   createdAt?: string;
 }
