@@ -5,7 +5,7 @@ import {
 } from "@/lib/routing-api";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria, useUpdateEventAssignments, useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useGetUsers, useGetAreas, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, ClipboardList, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search, Zap, Info } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, BarChart3, TrendingUp, CheckCircle2, ShieldAlert, SlidersHorizontal, Lock, Unlock, AlertCircle, AlertTriangle, Save, Trash2, RotateCcw, UserCheck, UserX, UserPlus, Copy, Check, ChevronsUpDown, MessageSquare, RefreshCw, User, ChevronDown, ChevronUp, Search, Zap, Info } from "lucide-react";
 import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1173,15 +1173,6 @@ export default function EventDetailPage() {
   };
   const confirmBusy = updateCriteria.isPending || updateAssignments.isPending || confirmCriteria.isPending;
 
-  const overview: { label: string; value: string }[] = [
-    { label: "Status", value: event.status },
-    { label: "Período", value: `${new Date(event.startDate).toLocaleDateString('pt-BR')} — ${new Date(event.endDate).toLocaleDateString('pt-BR')}` },
-    { label: "Local", value: event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : (event.location ?? "—") },
-    { label: "Cliente", value: event.clientName ?? "—" },
-    { label: "Participantes", value: String(event.participants?.length ?? 0) },
-    { label: "Progresso", value: `${evaluationProgress}% avaliado` },
-  ];
-
   return (
     <div className="bg-[#f7f9fb] min-h-screen text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
@@ -1331,6 +1322,7 @@ export default function EventDetailPage() {
           );
           return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Score Final */}
               <div className={`border-2 border-[#191c1e] p-4 flex flex-col ${displayScore != null ? (hasPenalty ? "bg-[#ffb300]" : "bg-[#ccff00]") : "bg-white"}`}>
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#444933] mb-1">
                   {concluded ? "Avaliação Final" : "Avaliação Parcial"}
@@ -1353,30 +1345,52 @@ export default function EventDetailPage() {
                     <AlertCircle size={9} />{calibrated ? "Cal. parcial" : "Sem calibragem"}
                   </span>
                 )}
+                {displayScore != null && (
+                  <div className="mt-2.5 w-full h-1.5 bg-[#161e00]/20 overflow-hidden">
+                    <div className="h-full bg-[#161e00]/50 transition-all" style={{ width: `${Math.min(100, displayScore)}%` }} />
+                  </div>
+                )}
               </div>
+              {/* Nota Avaliador */}
               <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Nota Avaliador</span>
                 {result && result.eventScore > 0 ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black italic text-[#191c1e] leading-none">{fmt(result.eventScore as number)}</span>
-                    <span className="text-xs font-black italic text-[#747a60]">/100</span>
-                  </div>
+                  <>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-black italic text-[#191c1e] leading-none">{fmt(result.eventScore as number)}</span>
+                      <span className="text-xs font-black italic text-[#747a60]">/100</span>
+                    </div>
+                    {displayScore != null && displayScore !== (result.eventScore as number) && (
+                      <span className={`mt-1 text-[9px] font-black italic flex items-center gap-1 ${displayScore > (result.eventScore as number) ? "text-[#506600]" : "text-[#862200]"}`}>
+                        <TrendingUp size={9} />
+                        {displayScore > (result.eventScore as number) ? "+" : ""}{(displayScore - (result.eventScore as number)).toFixed(1)} pós-cal.
+                      </span>
+                    )}
+                  </>
                 ) : (
                   <span className="text-2xl font-black italic text-[#9aa088]">—</span>
                 )}
               </div>
+              {/* Participantes */}
               <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Participantes</span>
-                <div className="flex items-baseline gap-1">
+                <div className="flex items-end gap-2">
                   <span data-testid="text-participant-count" className="text-4xl font-black italic text-[#191c1e] leading-none">{event.participants?.length ?? 0}</span>
-                  <span className="text-xs font-black italic text-[#747a60]">col.</span>
+                  <div className="flex items-baseline gap-1 mb-0.5">
+                    <span className="text-xs font-black italic text-[#747a60]">col.</span>
+                  </div>
+                  <Users size={18} className="text-[#d0d2ca] mb-1 ml-auto" />
                 </div>
               </div>
+              {/* Diárias Realizadas */}
               <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Diárias Realizadas</span>
-                <div className="flex items-baseline gap-1">
+                <div className="flex items-end gap-2">
                   <span className="text-4xl font-black italic text-[#191c1e] leading-none">{totalDiarias}</span>
-                  <span className="text-xs font-black italic text-[#747a60]">dias</span>
+                  <div className="flex items-baseline gap-1 mb-0.5">
+                    <span className="text-xs font-black italic text-[#747a60]">dias</span>
+                  </div>
+                  <Calendar size={18} className="text-[#d0d2ca] mb-1 ml-auto" />
                 </div>
               </div>
             </div>
@@ -1388,30 +1402,6 @@ export default function EventDetailPage() {
 
           {/* Left: Visão Geral + Criteria table */}
           <div className="flex-1 min-w-0 space-y-4">
-
-        {/* Visão Geral */}
-        <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-          <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-            <ClipboardList size={18} />
-            <span className="font-black uppercase tracking-tight">Visão Geral</span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 divide-x-2 divide-y-2 divide-[#eceef0] border-t-0">
-            {overview.map(item => (
-              <div key={item.label} data-testid={`overview-${item.label.toLowerCase()}`} className="p-5">
-                <p className="text-[10px] font-bold italic uppercase tracking-wider text-[#747a60] mb-1">{item.label}</p>
-                <p className="font-black italic uppercase text-sm text-[#191c1e] break-words">{item.value}</p>
-              </div>
-            ))}
-            {canViewResult && (
-              <div data-testid="overview-score" className="p-5 bg-[#ccff00]/20">
-                <p className="text-[10px] font-bold italic uppercase tracking-wider text-[#506600] mb-1">Score da Equipe</p>
-                <p className="font-black italic uppercase text-sm text-[#161e00]">
-                  {result && result.eventScore > 0 ? `${fmt(result.eventScore)} / 100` : "Sem nota ainda"}
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
 
         {/* Detalhamento por Critério — notas e calibrações */}
         {canViewResult && result && result.criteriaDetails && result.criteriaDetails.length > 0 && (
@@ -1428,14 +1418,14 @@ export default function EventDetailPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Critério</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Peso</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Avaliador</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Calibrada</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Final</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Δ</th>
-                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Contribuição</th>
+                  <tr className="border-b-2 border-[#191c1e] bg-[#f4f6ee]">
+                    <th className="px-6 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider">Critério</th>
+                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Peso</th>
+                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Nota Avaliador</th>
+                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Nota Calibrada</th>
+                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Nota Final</th>
+                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Δ</th>
+                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Contribuição</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-[#eceef0]">
@@ -1482,7 +1472,7 @@ export default function EventDetailPage() {
                                     <Check size={10} /> {fmt(c.calibratedScore as number)}
                                   </span>
                                   {c.calibrationReason && (
-                                    <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words text-left max-w-[220px] border-l-2 border-[#191c1e] bg-[#f7f9fb] px-2 py-1">
+                                    <p className="text-[11px] italic text-[#444933] leading-snug whitespace-pre-wrap break-words text-left max-w-[220px] border-l-2 border-[#ccff00] bg-[#fafcf5] px-2 py-1">
                                       {c.calibrationReason}
                                     </p>
                                   )}
@@ -1518,22 +1508,19 @@ export default function EventDetailPage() {
                         </td>
                         <td className="px-4 py-4 text-center">
                           {(() => {
-                            if (c.scoreUsed != null) {
-                              return (
-                                <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-3 py-1 border-2 border-[#191c1e]">
-                                  {fmt(c.scoreUsed)}
-                                </span>
-                              );
-                            }
-                            const imp = importedCriteriaMap.get(c.criterionId);
-                            if (imp && !imp.excluded) {
-                              return (
-                                <span className="inline-block bg-[#ccff00] text-[#161e00] font-black italic px-3 py-1 border-2 border-[#191c1e]">
-                                  {fmt(imp.score)}
-                                </span>
-                              );
-                            }
-                            return "—";
+                            const scoreVal = c.scoreUsed ?? (importedCriteriaMap.get(c.criterionId)?.excluded === false ? importedCriteriaMap.get(c.criterionId)?.score : null) ?? null;
+                            if (scoreVal == null) return <span className="text-[10px] italic text-[#9aa088]">—</span>;
+                            const tier = scoreVal >= 8 ? "high" : scoreVal >= 6 ? "mid" : "low";
+                            const tierCls = tier === "high"
+                              ? "bg-[#ccff00] text-[#161e00] border-[#506600]"
+                              : tier === "mid"
+                                ? "bg-[#fff8e6] text-[#191c1e] border-[#b58c00]"
+                                : "bg-[#ffede9] text-[#5c1400] border-[#b02f00]";
+                            return (
+                              <span className={`inline-block font-black italic px-3 py-1 border-2 text-sm ${tierCls}`}>
+                                {fmt(scoreVal)}
+                              </span>
+                            );
                           })()}
                         </td>
                         <td className="px-4 py-4 text-center">
