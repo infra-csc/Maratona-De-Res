@@ -31,7 +31,7 @@ router.get("/events", async (req, res) => {
       .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
-    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt, finalPublishedAt: eventCriteriaTable.finalPublishedAt, criterionActive: criteriaTable.active })
+    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt, finalPublishedAt: eventCriteriaTable.finalPublishedAt, criterionActive: criteriaTable.active, criterionEventScoped: criteriaTable.eventScoped })
       .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id)).where(inArray(eventCriteriaTable.eventId, eventIds)),
     db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
@@ -79,7 +79,7 @@ router.get("/events", async (req, res) => {
     // calibrações complementares importadas via planilha).
     if (ev.isHistorical) {
       const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
-      const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false);
+      const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false && !c.criterionEventScoped);
       const evCals = calibrations.filter(c => c.eventId === ev.id);
       const scorableActiveCriteria = activeCriteria.filter(c => parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string) > 0);
       const calibratedCriteriaCount = scorableActiveCriteria.filter(c =>
@@ -116,7 +116,7 @@ router.get("/events", async (req, res) => {
 
     const evEvals = evals.filter(e => e.eventId === ev.id);
     const submitted = evEvals.filter(e => e.status === "submitted");
-    const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false);
+    const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false && !c.criterionEventScoped);
     const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentRows.filter(a => a.eventId === ev.id));
     const scored = submitted.filter(e => e.score != null);
     const avgRaw = scored.length > 0
