@@ -62,6 +62,7 @@ export default function CalibrationsPage() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [calScores, setCalScores] = useState<Record<number, string>>({});
   const [calReasons, setCalReasons] = useState<Record<number, string>>({});
+  const [savedReasonIds, setSavedReasonIds] = useState<Set<number>>(new Set());
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
   const [weightEdits, setWeightEdits] = useState<Record<number, string>>({});
   const [savingWeightId, setSavingWeightId] = useState<number | null>(null);
@@ -1205,10 +1206,22 @@ export default function CalibrationsPage() {
                               ))}
                               {/* ── Justificativa da calibração (editável) ── */}
                               <div onClick={e => e.stopPropagation()} className="mt-2 pt-1.5 border-t border-dashed border-[#d0d2ca]">
-                                <div className="flex items-center gap-1.5 mb-0.5">
+                                <div className="flex items-center gap-1.5 mb-1">
                                   <span className="text-[8px] font-black italic uppercase tracking-wider text-[#747a60] bg-[#eceef0] px-1 py-px">Calibração</span>
                                   {cal?.calibratedByName && (
                                     <span className="text-[10px] font-bold italic text-[#747a60]">{cal.calibratedByName}</span>
+                                  )}
+                                  {/* ── Indicador de salvo ── */}
+                                  {savedReasonIds.has(c.criterionId) && !reasonChanged && (
+                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black italic uppercase text-[#3a7a00]">
+                                      <Check size={9} /> Salvo
+                                    </span>
+                                  )}
+                                  {/* ── Indicador de não salvo ── */}
+                                  {reasonChanged && (
+                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black italic uppercase text-[#c85000]">
+                                      <AlertCircle size={9} /> Não salvo
+                                    </span>
                                   )}
                                 </div>
                                 <textarea
@@ -1217,27 +1230,48 @@ export default function CalibrationsPage() {
                                   value={reasonVal}
                                   onClick={e => e.stopPropagation()}
                                   onChange={e => {
+                                    setSavedReasonIds(prev => { const n = new Set(prev); n.delete(c.criterionId); return n; });
                                     setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }));
                                     e.target.style.height = "auto";
                                     e.target.style.height = e.target.scrollHeight + "px";
                                   }}
                                   onFocus={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-                                  placeholder="Escreva a justificativa…"
+                                  onBlur={e => {
+                                    e.stopPropagation();
+                                    // Auto-save ao perder foco quando há uma calibração existente e razão mudou
+                                    if (reasonChanged && cal && !isSaving) {
+                                      saveCalibration(c.criterionId);
+                                      setSavedReasonIds(prev => new Set(prev).add(c.criterionId));
+                                    }
+                                  }}
+                                  placeholder="Escreva a justificativa e clique fora para salvar…"
                                   className={cn(
-                                    "w-full px-2 py-1 text-[11px] italic border focus:outline-none focus:ring-1 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] resize-none leading-snug overflow-hidden",
-                                    reasonChanged ? "border-[#ff5722] bg-[#fff3f0]" :
+                                    "w-full px-2 py-1.5 text-[11px] italic border focus:outline-none focus:ring-2 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] resize-none leading-snug overflow-hidden transition-colors",
+                                    reasonChanged ? "border-[#c85000] bg-[#fff8f5]" :
                                     reasonVal ? "border-[#c4cda8] bg-[#f8fdf0]" :
-                                    "border-[#e0e2da] bg-[#fafafa]"
+                                    "border-[#d8dace] bg-[#fafafa]"
                                   )}
                                 />
+                                {/* Ação manual quando não há calibração ainda ou usuário quer salvar explicitamente */}
                                 {reasonChanged && (
-                                  <div className="mt-0.5 flex items-center gap-1.5">
+                                  <div className="mt-1 flex items-center gap-2">
                                     {cal ? (
-                                      <button type="button" disabled={isSaving} onClick={e => { e.stopPropagation(); saveCalibration(c.criterionId); }} className="px-2 py-0.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors flex items-center gap-1">
-                                        <Save size={9} /> Salvar justificativa
+                                      <button
+                                        type="button"
+                                        disabled={isSaving}
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          saveCalibration(c.criterionId);
+                                          setSavedReasonIds(prev => new Set(prev).add(c.criterionId));
+                                        }}
+                                        className="px-2.5 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors flex items-center gap-1"
+                                      >
+                                        <Save size={10} /> Salvar justificativa
                                       </button>
                                     ) : (
-                                      <p className="text-[9px] italic text-[#9aa088]">Defina a nota calibrada para salvar a justificativa.</p>
+                                      <p className="text-[10px] italic text-[#9aa088] flex items-center gap-1">
+                                        <AlertCircle size={10} /> Salve a nota calibrada primeiro para gravar a justificativa.
+                                      </p>
                                     )}
                                   </div>
                                 )}
