@@ -1322,10 +1322,6 @@ export default function EventDetailPage() {
           const hasPenalty = (result?.conformityPenalty ?? 0) > 0;
           const concluded = !!event.feedbackReleased || event.status === "closed" || !!event.isHistorical;
           const calibrated = (result?.criteriaDetails ?? []).some(c => c.calibratedScore != null);
-          const totalDiarias = (event.participants ?? []).reduce(
-            (s, p) => s + (p.actualDiariaDates?.length ?? (p.actualDiariaCount ?? 0)),
-            0
-          );
           return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {/* Score Final */}
@@ -1386,17 +1382,6 @@ export default function EventDetailPage() {
                     <span className="text-xs font-black italic text-[#747a60]">col.</span>
                   </div>
                   <Users size={18} className="text-[#d0d2ca] mb-1 ml-auto" />
-                </div>
-              </div>
-              {/* Diárias Realizadas */}
-              <div className="bg-white border-2 border-[#191c1e] p-4 flex flex-col">
-                <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Diárias Realizadas</span>
-                <div className="flex items-end gap-2">
-                  <span className="text-4xl font-black italic text-[#191c1e] leading-none">{totalDiarias}</span>
-                  <div className="flex items-baseline gap-1 mb-0.5">
-                    <span className="text-xs font-black italic text-[#747a60]">dias</span>
-                  </div>
-                  <Calendar size={18} className="text-[#d0d2ca] mb-1 ml-auto" />
                 </div>
               </div>
             </div>
