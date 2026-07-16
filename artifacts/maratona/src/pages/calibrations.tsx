@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useSetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -269,10 +269,48 @@ export default function CalibrationsPage() {
   const publishAllPartialMutation = usePublishAllCriteriaPartialFeedback();
   const finalizing = closeMutation.isPending || releaseMutation.isPending;
 
-  // Contexto do evento: conformidade e comentários
+  // Conformidade
   const { data: conformity } = useGetEventConformity(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["conformity", selectedEventId] as unknown[] },
   });
+  const setConformityMutation = useSetEventConformity({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["conformity", selectedEventId] });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      },
+    },
+  });
+  const [conformityForm, setConformityForm] = useState<{
+    epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
+    epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
+    absencesReport: string; standoutResponse: boolean | null; standoutJustification: string;
+  }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "", absencesReport: "", standoutResponse: null, standoutJustification: "" });
+  const [conformityExpandedComments, setConformityExpandedComments] = useState<Set<string>>(new Set());
+  const canManageConformity = ["admin", "rh", "diretoria"].includes(user?.role ?? "")
+    || !!(user && fullEvent && (user.id === (fullEvent as unknown as Record<string, unknown>).conformityEvaluatorUserId))
+    || !!(user && fullEvent && (user.id === (fullEvent as unknown as Record<string, unknown>).conformityEvaluatorFerramentasUserId));
+  useEffect(() => {
+    setConformityExpandedComments(new Set());
+    if (conformity) {
+      setConformityForm({
+        epi: conformity.epi ?? null,
+        estaiamentos: conformity.estaiamentos ?? null,
+        guardaEquipamentos: conformity.guardaEquipamentos ?? null,
+        conduta: conformity.conduta ?? null,
+        epiComment: conformity.epiComment ?? "",
+        estaiamentosComment: conformity.estaiamentosComment ?? "",
+        guardaEquipamentosComment: conformity.guardaEquipamentosComment ?? "",
+        condutaComment: conformity.condutaComment ?? "",
+        absencesReport: (conformity as unknown as Record<string, unknown>).absencesReport as string ?? "",
+        standoutResponse: (conformity as unknown as Record<string, unknown>).standoutResponse as boolean | null ?? null,
+        standoutJustification: (conformity as unknown as Record<string, unknown>).standoutJustification as string ?? "",
+      });
+    } else {
+      setConformityForm({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "", absencesReport: "", standoutResponse: null, standoutJustification: "" });
+    }
+  }, [conformity, selectedEventId]);
+
   const { data: eventComments } = useGetEventComments(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-comments", selectedEventId] as unknown[] },
   });
@@ -812,38 +850,94 @@ export default function CalibrationsPage() {
                 );
               })()}
 
-              {/* Conformity */}
-              {conformity && (
+              {/* Conformidade — editável para gestores */}
+              {(conformity || canManageConformity) && (
                 <div className="px-4 py-3">
                   <p className="text-[11px] font-black italic uppercase text-[#444933] mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
-                  <div className="grid grid-cols-2 gap-1.5 mb-2">
+                  <div className="space-y-1 mb-2">
                     {([
-                      { label: "EPI", key: "epi" as const, comment: conformity.epiComment },
-                      { label: "Estaiamento", key: "estaiamentos" as const, comment: conformity.estaiamentosComment },
-                      { label: "Conduta", key: "conduta" as const, comment: conformity.condutaComment },
-                      { label: "Guarda Equip.", key: "guardaEquipamentos" as const, comment: conformity.guardaEquipamentosComment },
+                      { label: "EPI", key: "epi" as const, commentKey: "epiComment" as const },
+                      { label: "Estaiamento", key: "estaiamentos" as const, commentKey: "estaiamentosComment" as const },
+                      { label: "Conduta", key: "conduta" as const, commentKey: "condutaComment" as const },
+                      { label: "Guarda Equip.", key: "guardaEquipamentos" as const, commentKey: "guardaEquipamentosComment" as const },
                     ]).map(item => {
-                      const ok = (conformity as unknown as Record<string, boolean | null>)[item.key];
+                      const value = conformityForm[item.key];
+                      const comment = conformityForm[item.commentKey];
+                      const isExpanded = conformityExpandedComments.has(item.key);
                       return (
-                        <div key={item.key} className={`flex items-center justify-between gap-1 px-2 py-1.5 border ${ok === null ? "bg-[#f2f4f6] border-[#d8dadc]" : ok ? "bg-[#f2ffd6] border-[#506600]" : "bg-[#ffede9] border-[#b02f00]"}`}>
-                          <span className="text-[10px] font-bold italic uppercase text-[#191c1e] truncate" title={item.comment ?? undefined}>{item.label}</span>
-                          <span className={`text-[9px] font-black italic uppercase px-1.5 py-0.5 border shrink-0 ${ok === null ? "bg-[#d8dadc] text-[#444933] border-[#d8dadc]" : ok ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" : "bg-[#ff5722] text-white border-[#ff5722]"}`}>
-                            {ok === null ? "—" : ok ? "OK" : "Não"}
-                          </span>
+                        <div key={item.key} className={`border ${value === null ? "border-[#d8dadc] bg-[#f2f4f6]" : value ? "border-[#506600] bg-[#f2ffd6]" : "border-[#b02f00] bg-[#ffede9]"}`}>
+                          <div className="flex items-center gap-1 px-2 py-1.5">
+                            <span className="text-[10px] font-bold italic uppercase text-[#191c1e] flex-1 truncate">{item.label}</span>
+                            {canManageConformity ? (
+                              <div className="flex items-center border border-[#191c1e] overflow-hidden shrink-0">
+                                <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: true }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: true } }); }} className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border-r border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>S</button>
+                                <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: false }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: false } }); }} className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border-r border-[#191c1e] transition-all ${value === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>N</button>
+                                <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: null }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: null } }); }} className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase transition-all ${value === null ? "bg-[#f5e97a] text-[#4a3c00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>?</button>
+                              </div>
+                            ) : (
+                              <span className={`text-[9px] font-black italic uppercase px-1.5 py-0.5 border shrink-0 ${value === null ? "bg-[#d8dadc] text-[#444933] border-[#d8dadc]" : value ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" : "bg-[#ff5722] text-white border-[#ff5722]"}`}>
+                                {value === null ? "—" : value ? "OK" : "Não"}
+                              </span>
+                            )}
+                            {canManageConformity && (
+                              <button type="button" title={comment ? "Ver/editar comentário" : "Adicionar comentário"} onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); if (next.has(item.key)) next.delete(item.key); else next.add(item.key); return next; })} className={`p-0.5 border transition-all ml-0.5 ${comment ? "border-[#191c1e] bg-[#ccff00] text-[#191c1e]" : "border-[#d8dadc] text-[#747a60] bg-white hover:bg-[#f0f2e8]"}`}>
+                                <MessageSquare size={9} />
+                              </button>
+                            )}
+                          </div>
+                          {isExpanded && canManageConformity && (
+                            <div className="px-2 pb-2 space-y-1">
+                              <Textarea value={comment} onChange={e => setConformityForm(f => ({ ...f, [item.commentKey]: e.target.value }))} placeholder="Observação..." className="text-[10px] rounded-none bg-white resize-none min-h-[48px] border border-[#d4c98a] p-1.5" />
+                              <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { [item.commentKey]: comment || null } })} className="px-2 py-0.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors">
+                                Salvar
+                              </button>
+                            </div>
+                          )}
+                          {!isExpanded && comment && (
+                            <p className="px-2 pb-1 text-[9px] text-[#444933] italic line-clamp-1 cursor-pointer" onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); next.add(item.key); return next; })}>💬 {comment}</p>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <div className={`flex-1 border px-3 py-1.5 ${conformity.absencesReport ? "border-[#b02f00] bg-[#fff4e5]" : "border-[#d8dadc] bg-[#f2f4f6]"}`}>
-                      <p className="text-[9px] font-bold uppercase italic text-[#747a60] mb-0.5 flex items-center gap-1"><User size={9} /> Faltas/Atrasos</p>
-                      <p className="text-[11px] italic text-[#191c1e] leading-snug">{conformity.absencesReport ?? <span className="text-[#9aa088]">Sem registro</span>}</p>
+                    {/* Faltas/Atrasos */}
+                    <div className={`border px-2 py-1.5 ${conformityForm.absencesReport ? "border-[#b02f00] bg-[#fff4e5]" : "border-[#d8dadc] bg-[#f2f4f6]"}`}>
+                      <p className="text-[9px] font-bold uppercase italic text-[#747a60] mb-1 flex items-center gap-1"><User size={9} /> Faltas/Atrasos</p>
+                      {canManageConformity ? (
+                        <div className="flex gap-1">
+                          <Textarea value={conformityForm.absencesReport} onChange={e => setConformityForm(f => ({ ...f, absencesReport: e.target.value }))} placeholder="Sem registro" className="text-[10px] rounded-none bg-white resize-none min-h-[36px] border border-[#d8dadc] p-1 flex-1" />
+                          <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { absencesReport: conformityForm.absencesReport || null } })} className="px-1.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors shrink-0 self-start">
+                            <Save size={9} />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] italic text-[#191c1e] leading-snug">{conformityForm.absencesReport || <span className="text-[#9aa088]">Sem registro</span>}</p>
+                      )}
                     </div>
-                    <div className={`flex-1 border px-3 py-1.5 ${conformity.standoutResponse === true ? "border-[#506600] bg-[#f7ffe0]" : "border-[#d8dadc] bg-[#f2f4f6]"}`}>
-                      <p className="text-[9px] font-bold uppercase italic text-[#506600] mb-0.5 flex items-center gap-1"><Trophy size={9} /> Destaque</p>
-                      <p className="text-[11px] italic text-[#191c1e] leading-snug">
-                        {conformity.standoutResponse === null ? <span className="text-[#9aa088]">Pendente</span> : conformity.standoutResponse ? (conformity.standoutJustification ?? "Sim") : "Não"}
-                      </p>
+                    {/* Destaque */}
+                    <div className={`border px-2 py-1.5 ${conformityForm.standoutResponse === true ? "border-[#506600] bg-[#f7ffe0]" : "border-[#d8dadc] bg-[#f2f4f6]"}`}>
+                      <p className="text-[9px] font-bold uppercase italic text-[#506600] mb-1 flex items-center gap-1"><Trophy size={9} /> Destaque</p>
+                      {canManageConformity ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center border border-[#191c1e] overflow-hidden">
+                            <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: false } }); }} className={`flex-1 px-2 py-0.5 text-[9px] font-black italic uppercase border-r border-[#191c1e] transition-all ${conformityForm.standoutResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>Não</button>
+                            <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: true })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: true } }); }} className={`flex-1 px-2 py-0.5 text-[9px] font-black italic uppercase transition-all ${conformityForm.standoutResponse === true ? "bg-[#506600] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>Sim</button>
+                          </div>
+                          {conformityForm.standoutResponse === true && (
+                            <div className="flex gap-1">
+                              <Textarea value={conformityForm.standoutJustification} onChange={e => setConformityForm(f => ({ ...f, standoutJustification: e.target.value }))} placeholder="Justificativa do destaque..." className="text-[10px] rounded-none bg-white resize-none min-h-[36px] border border-[#d8dadc] p-1 flex-1" />
+                              <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { standoutJustification: conformityForm.standoutJustification || null } })} className="px-1.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors shrink-0 self-start">
+                                <Save size={9} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] italic text-[#191c1e] leading-snug">
+                          {conformityForm.standoutResponse === null ? <span className="text-[#9aa088]">Pendente</span> : conformityForm.standoutResponse ? (conformityForm.standoutJustification || "Sim") : "Não"}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
