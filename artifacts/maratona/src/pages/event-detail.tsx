@@ -2072,6 +2072,61 @@ export default function EventDetailPage() {
         )}
 
 
+        {/* Leitura de critérios para eventos históricos — configuração fica oculta, mas admins precisam ver/corrigir */}
+        {event.isHistorical && config.filter(i => i.active).length > 0 && (
+          <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
+            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
+              <SlidersHorizontal size={18} />
+              <span className="font-black uppercase tracking-tight">Critérios do Evento</span>
+            </div>
+            <div className="overflow-x-auto border-t-2 border-[#191c1e]">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933]">Critério</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-center">Peso</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-center">Calibração</th>
+                    {canManage && <th className="px-4 py-3 text-[11px] font-bold uppercase italic text-[#444933] text-right">Ações</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y-2 divide-[#eceef0]">
+                  {config.filter(item => item.active).map(item => {
+                    const hasCal = (result?.criteriaDetails ?? []).some(c => c.criterionId === item.criterionId && c.calibratedScore != null);
+                    return (
+                      <tr key={item.criterionId} className="bg-white align-middle">
+                        <td className="px-4 py-3 font-black italic uppercase text-sm text-[#191c1e]">
+                          {item.name ?? critMeta.get(item.criterionId)?.criterionName ?? `#${item.criterionId}`}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-[#444933]">{item.weight}</td>
+                        <td className="px-4 py-3 text-center">
+                          {hasCal
+                            ? <span className="inline-flex items-center gap-1 bg-[#ccff00] text-[#161e00] px-2 py-0.5 text-[10px] font-black uppercase"><Check size={10} /> Calibrado</span>
+                            : <span className="inline-flex items-center gap-1 bg-[#ff5722] text-white px-2 py-0.5 text-[10px] font-black uppercase"><AlertCircle size={10} /> Sem calibração</span>
+                          }
+                        </td>
+                        {canManage && (
+                          <td className="px-4 py-3 text-right">
+                            {!hasCal && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingRemoval(item.criterionId)}
+                                title="Desativar critério sem calibração"
+                                className="h-8 w-8 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] transition-all ml-auto"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
         </>)}
 
         {/* ══ TAB: Visão Geral (cont.) ══ */}

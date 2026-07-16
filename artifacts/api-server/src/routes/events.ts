@@ -81,7 +81,12 @@ router.get("/events", async (req, res) => {
       const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
       const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false && !c.criterionEventScoped);
       const evCals = calibrations.filter(c => c.eventId === ev.id);
-      const scorableActiveCriteria = activeCriteria.filter(c => parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string) > 0);
+      // Para históricos, só conta critérios com ao menos uma calibração salva —
+      // critérios ativos sem calibração são órfãos e não devem inflar o denominador.
+      const scorableActiveCriteria = activeCriteria.filter(c => {
+        const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
+        return w > 0 && evCals.some(cal => cal.criterionId === c.criterionId);
+      });
       const calibratedCriteriaCount = scorableActiveCriteria.filter(c =>
         evCals.some(cal => cal.criterionId === c.criterionId && cal.calibratedScore !== null)
       ).length;
