@@ -27,7 +27,7 @@ router.get("/events", async (req, res) => {
 
   // Busca em lote para evitar N+1 (uma query por relação, não por evento).
   const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas, conformityRows] = await Promise.all([
-    db.select({ eventId: eventParticipantsTable.eventId })
+    db.select({ eventId: eventParticipantsTable.eventId, employmentType: eventParticipantsTable.employmentType, functionName: eventParticipantsTable.functionName })
       .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
@@ -72,7 +72,7 @@ router.get("/events", async (req, res) => {
     : events;
 
   const enriched = cycleEvents.map((ev) => {
-    const participantCount = participants.filter(p => p.eventId === ev.id).length;
+    const participantCount = participants.filter(p => p.eventId === ev.id && participantCountsForScore(p)).length;
 
     // Evento histórico importado: nota já vem pronta (calibrada) de fora.
     // Ainda calcula critérios/calibrações caso existam (históricos podem ter

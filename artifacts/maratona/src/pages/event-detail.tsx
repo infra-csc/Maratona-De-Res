@@ -1243,7 +1243,7 @@ export default function EventDetailPage() {
             const labels: Record<typeof tab, string> = {
               visaoGeral: "Visão Geral",
               quesitos: "Quesitos",
-              equipe: `Equipe (${event.participants?.length ?? 0})`,
+              equipe: `Equipe (${event.participants?.filter(p => p.countsForScore !== false).length ?? 0})`,
               conformidade: "Conformidade",
             };
             return (
@@ -1377,7 +1377,7 @@ export default function EventDetailPage() {
               <div className="bg-white border-2 border-[#191c1e] p-4 flex flex-col">
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Participantes</span>
                 <div className="flex items-end gap-2">
-                  <span data-testid="text-participant-count" className="text-4xl font-black italic text-[#191c1e] leading-none">{event.participants?.length ?? 0}</span>
+                  <span data-testid="text-participant-count" className="text-4xl font-black italic text-[#191c1e] leading-none">{event.participants?.filter(p => p.countsForScore !== false).length ?? 0}</span>
                   <div className="flex items-baseline gap-1 mb-0.5">
                     <span className="text-xs font-black italic text-[#747a60]">col.</span>
                   </div>
@@ -1511,8 +1511,9 @@ export default function EventDetailPage() {
             const calCount = (result?.criteriaDetails ?? []).filter(c => c.calibratedScore != null).length;
             const totalCrit = result?.totalCriteria ?? activeCriteriaCount;
             const evalCrit = result?.evaluatedCriteria ?? 0;
-            const previewParticipants = (event.participants ?? []).slice(0, 5);
-            const remainingCount = Math.max(0, (event.participants?.length ?? 0) - 5);
+            const scoredParticipants = (event.participants ?? []).filter(p => p.countsForScore !== false);
+            const previewParticipants = scoredParticipants.slice(0, 5);
+            const remainingCount = Math.max(0, scoredParticipants.length - 5);
             return (
               <aside className="w-64 shrink-0 space-y-3">
 
@@ -1575,7 +1576,7 @@ export default function EventDetailPage() {
                       <span className="font-black uppercase tracking-tight text-[11px] text-[#444933] flex items-center gap-1.5">
                         <Users size={10} className="text-[#444933]" /> Equipe
                       </span>
-                      <span className="text-[8px] font-black italic uppercase text-[#747a60]">{event.participants?.length ?? 0} col.</span>
+                      <span className="text-[8px] font-black italic uppercase text-[#747a60]">{event.participants?.filter(p => p.countsForScore !== false).length ?? 0} col.</span>
                     </div>
                     <div className="p-3 space-y-1.5">
                       {previewParticipants.map(p => (
@@ -1641,7 +1642,7 @@ export default function EventDetailPage() {
                   onClick={e => { e.preventDefault(); document.getElementById("equipe-alocada")?.scrollIntoView({ behavior: "smooth" }); }}
                   className="inline-flex items-center gap-1 bg-transparent border border-[#ccff00]/40 px-2 py-0.5 text-[10px] font-black uppercase text-[#ccff00] hover:bg-[#ccff00]/10 transition-colors"
                 >
-                  <Users size={10} /> Ver Equipe ({event.participants?.length ?? 0})
+                  <Users size={10} /> Ver Equipe ({event.participants?.filter(p => p.countsForScore !== false).length ?? 0})
                 </a>
               </div>
             </div>
