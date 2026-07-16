@@ -891,16 +891,19 @@ export default function CalibrationsPage() {
               {(conformity || canManageConformity) && (
                 <div className="px-4 py-3">
                   <p className="text-[11px] font-black italic uppercase text-[#444933] mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
-                  {(fullEvent?.conformityEvaluatorName || fullEvent?.conformityEvaluatorFerramentasName) && (
-                    <div className="mb-2 space-y-0.5">
-                      {fullEvent.conformityEvaluatorName && (
-                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Cenografia: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorName}</span></p>
-                      )}
-                      {fullEvent.conformityEvaluatorFerramentasName && (
-                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Ferramentas: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorFerramentasName}</span></p>
-                      )}
-                    </div>
-                  )}
+                  <div className="mb-2 space-y-0.5">
+                    {fullEvent?.conformityEvaluatorName && (
+                      <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Cenografia: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorName}</span></p>
+                    )}
+                    {fullEvent?.conformityEvaluatorFerramentasName && (
+                      <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Ferramentas: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorFerramentasName}</span></p>
+                    )}
+                    {(conformity as unknown as Record<string, unknown>)?.createdByUserName && (
+                      <p className="text-[9px] italic text-[#506600] flex items-center gap-1 border-l-2 border-[#ccff00] pl-1.5">
+                        <Check size={9} /> Respondido por: <span className="font-bold text-[#191c1e] ml-0.5">{String((conformity as unknown as Record<string, unknown>).createdByUserName)}</span>
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-1 mb-2">
                     {([
                       { label: "EPI", key: "epi" as const, commentKey: "epiComment" as const },

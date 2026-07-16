@@ -982,7 +982,13 @@ router.patch("/events/:id/conformity-evaluator-ferramentas", async (req, res) =>
 router.get("/events/:id/conformity", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [conformity] = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, id));
-  res.json(conformity ?? null);
+  if (!conformity) { res.json(null); return; }
+  let createdByUserName: string | null = null;
+  if (conformity.createdByUserId) {
+    const [u] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, conformity.createdByUserId)).limit(1);
+    createdByUserName = u?.name ?? null;
+  }
+  res.json({ ...conformity, createdByUserName });
 });
 
 router.post("/events/:id/conformity", async (req, res) => {
