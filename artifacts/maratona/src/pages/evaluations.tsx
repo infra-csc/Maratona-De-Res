@@ -1202,69 +1202,77 @@ export default function EvaluationsPage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── Sidebar ── */}
-        <aside className="w-64 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
+        <aside className="w-72 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
 
           {/* Manager/consultation: inline event list + filters */}
           {!isEvaluator && (
             <>
               {/* ── Header: título + chips de filtro rápido + busca ── */}
-              <div className="px-3 pt-2.5 pb-2 border-b-2 border-[#191c1e] shrink-0 space-y-2">
-                <p className="text-[9px] font-black italic uppercase tracking-wider text-[#747a60] flex items-center justify-between">
-                  <span className="flex items-center gap-1"><Flag size={10} /> Eventos</span>
-                  <span className="text-[#9aa08a]">{sidebarEvents.length} / {activeEvents.length}</span>
-                </p>
+              <div className="shrink-0 border-b-2 border-[#191c1e]">
 
-                {/* Progresso chips */}
-                <div>
-                  <p className="text-[8px] font-black italic uppercase tracking-wider text-[#9aa08a] mb-1 flex items-center gap-1"><BarChart3 size={8} /> Progresso</p>
-                  <div className="grid grid-cols-4 gap-0.5">
-                    {([["all","Todos"],["not_started","Não inic."],["partial","Em andamento"],["done","Concluído"]] as const).map(([f, label]) => (
-                      <button key={f} onClick={() => setProgressFilter(f)} className={cn("text-[8px] font-black italic uppercase py-1 px-0.5 border transition-colors leading-tight", progressFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                {/* Barra título */}
+                <div className="bg-[#191c1e] px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-[11px] font-black italic uppercase tracking-widest text-[#ccff00] flex items-center gap-1.5">
+                    <Flag size={11} /> Eventos
+                  </span>
+                  <span className="text-[10px] font-black italic text-white/60 tabular-nums">
+                    {sidebarEvents.length}<span className="text-white/30">/{activeEvents.length}</span>
+                  </span>
                 </div>
 
-                {/* Matriz de Conformidade chips */}
-                <div>
-                  <p className="text-[8px] font-black italic uppercase tracking-wider text-[#9aa08a] mb-1 flex items-center gap-1"><ListChecks size={8} /> Matriz</p>
-                  <div className="grid grid-cols-3 gap-0.5">
-                    {([["all","Todas"],["pending","Pendente"],["done","Concluída"]] as const).map(([f, label]) => (
-                      <button key={f} onClick={() => setConformityFilter(f)} className={cn("text-[8px] font-black italic uppercase py-1 border transition-colors leading-tight", conformityFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                        {label}
+                <div className="px-3 pt-3 pb-3 space-y-3">
+                  {/* Busca */}
+                  <div className="relative">
+                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9aa08a] pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Buscar evento, cliente, cidade..."
+                      value={eventSearch}
+                      onChange={e => setEventSearch(e.target.value)}
+                      className="w-full pl-8 pr-7 h-8 text-[11px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white placeholder:text-[#b0b8a0] placeholder:not-italic placeholder:normal-case"
+                    />
+                    {eventSearch && (
+                      <button type="button" onClick={() => setEventSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]">
+                        <X size={11} />
                       </button>
-                    ))}
+                    )}
                   </div>
-                </div>
 
-                {/* Publicação chips */}
-                <div>
-                  <p className="text-[8px] font-black italic uppercase tracking-wider text-[#9aa08a] mb-1 flex items-center gap-1"><Send size={8} /> Publicação</p>
-                  <div className="grid grid-cols-4 gap-0.5">
-                    {([["all","Todos"],["none","Nenhuma"],["partial","Parcial"],["final","Final"]] as const).map(([f, label]) => (
-                      <button key={f} onClick={() => setPublicationFilter(f)} className={cn("text-[8px] font-black italic uppercase py-1 px-0.5 border transition-colors leading-tight", publicationFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:bg-[#f7f9fb]")}>
-                        {label}
-                      </button>
-                    ))}
+                  {/* Progresso chips */}
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#9aa08a] flex items-center gap-1"><BarChart3 size={9} /> Progresso</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {([["all","Todos"],["not_started","Não iniciado"],["partial","Em andamento"],["done","Concluído"]] as const).map(([f, label]) => (
+                        <button key={f} onClick={() => setProgressFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 px-2 border-2 transition-colors leading-tight", progressFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Busca */}
-                <div className="relative">
-                  <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9aa08a] pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Buscar evento, cliente ou cidade..."
-                    value={eventSearch}
-                    onChange={e => setEventSearch(e.target.value)}
-                    className="w-full pl-6 pr-6 h-7 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white placeholder:text-[#b0b8a0] placeholder:not-italic placeholder:normal-case"
-                  />
-                  {eventSearch && (
-                    <button type="button" onClick={() => setEventSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]">
-                      <X size={10} />
-                    </button>
-                  )}
+                  {/* Matriz + Publicação em linha */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black italic uppercase tracking-wider text-[#9aa08a] flex items-center gap-1"><ListChecks size={9} /> Matriz</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {([["all","Todas"],["pending","Pend."],["done","Ok"]] as const).map(([f, label]) => (
+                          <button key={f} onClick={() => setConformityFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 px-2 border-2 transition-colors leading-tight", conformityFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black italic uppercase tracking-wider text-[#9aa08a] flex items-center gap-1"><Send size={9} /> Publicação</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {([["all","Todos"],["none","—"],["partial","◑"],["final","✓"]] as const).map(([f, label]) => (
+                          <button key={f} onClick={() => setPublicationFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 px-2 border-2 transition-colors leading-tight", publicationFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1303,51 +1311,57 @@ export default function EvaluationsPage() {
                         data-testid={`option-event-${ev.id}`}
                         onClick={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
                         className={cn(
-                          "w-full text-left px-3 py-2.5 border-b border-[#eceef0] last:border-0 transition-colors border-l-[3px]",
+                          "w-full text-left px-4 py-3 border-b border-[#eceef0] last:border-0 transition-colors border-l-4",
                           isSelected
                             ? "bg-[#eeffaa] border-l-[#ccff00]"
                             : done
-                              ? "bg-[#f5ffea] border-l-[#a0c830] hover:bg-[#ecffcc]"
+                              ? "bg-[#f5ffea] border-l-[#88b800] hover:bg-[#ecffcc]"
                               : partial
                                 ? "bg-[#fffdf0] border-l-[#d4b020] hover:bg-[#fff9e0]"
                                 : "bg-white border-l-transparent hover:bg-[#f7f9fb]"
                         )}
                       >
-                        {/* Nome */}
-                        <p className={cn("font-black italic uppercase text-[10px] leading-tight truncate", done ? "text-[#2e4400]" : "text-[#191c1e]")}>
-                          {ev.name}
-                        </p>
+                        {/* Nome + status dot */}
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={cn("font-black italic uppercase text-[11px] leading-snug truncate flex-1", done ? "text-[#2e4400]" : "text-[#191c1e]")}>
+                            {ev.name}
+                          </p>
+                          <div className={cn("w-2 h-2 shrink-0 mt-1", done ? "bg-[#88b800]" : partial ? "bg-[#d4b020]" : "bg-[#d4d8cc]")} />
+                        </div>
                         {/* Cliente + cidade */}
                         {(ev.clientName || ev.city) && (
-                          <p className="text-[9px] text-[#9aa08a] truncate mt-0.5">
+                          <p className="text-[10px] text-[#9aa08a] truncate mt-0.5">
                             {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
                           </p>
                         )}
                         {/* Barra de progresso + badges */}
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <div className="flex-1 h-1.5 bg-[#e8ece0] rounded-none overflow-hidden">
-                            <div style={{ width: `${progPct}%`, backgroundColor: progBarColor, transition: "width 0.3s" }} className="h-full" />
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex-1 h-2 bg-[#e8ece0] overflow-hidden">
+                            <div style={{ width: `${progPct}%`, backgroundColor: progBarColor, transition: "width 0.4s" }} className="h-full" />
                           </div>
-                          <span className={cn("text-[9px] font-black tabular-nums shrink-0", done ? "text-[#506600]" : partial ? "text-[#8a7000]" : "text-[#9aa08a]")}>
+                          <span className={cn("text-[10px] font-black tabular-nums shrink-0 w-8 text-right", done ? "text-[#506600]" : partial ? "text-[#8a7000]" : "text-[#9aa08a]")}>
                             {progPct}%
                           </span>
-                          {/* Publicação badge */}
-                          {ev.feedbackReleased
-                            ? <span title="Feedback final publicado" className="text-[8px] font-black text-[#506600] shrink-0">✓</span>
-                            : ev.partialPublishedAt
-                              ? <span title="Feedback parcial publicado" className="text-[8px] font-black text-[#8a7000] shrink-0">◑</span>
-                              : null
-                          }
-                          {/* Matriz badge */}
-                          {matrixNeeded && (
-                            <span
-                              title={matrixDone ? "Matriz de conformidade concluída" : "Matriz de conformidade pendente"}
-                              className={cn("text-[8px] font-black italic uppercase shrink-0 px-1 border", matrixDone ? "text-[#506600] border-[#a0c830] bg-[#f0ffe0]" : "text-[#b02f00] border-[#f08080] bg-[#fff0ee]")}
-                            >
-                              M{matrixDone ? "✓" : "!"}
-                            </span>
-                          )}
                         </div>
+                        {/* Badges linha */}
+                        {(ev.feedbackReleased || ev.partialPublishedAt || matrixNeeded) && (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            {ev.feedbackReleased
+                              ? <span title="Feedback final publicado" className="text-[9px] font-black italic uppercase px-1.5 py-0.5 border border-[#88b800] bg-[#f0ffe0] text-[#506600] shrink-0">Final ✓</span>
+                              : ev.partialPublishedAt
+                                ? <span title="Feedback parcial publicado" className="text-[9px] font-black italic uppercase px-1.5 py-0.5 border border-[#d4b020] bg-[#fffbe0] text-[#8a7000] shrink-0">Parcial ◑</span>
+                                : null
+                            }
+                            {matrixNeeded && (
+                              <span
+                                title={matrixDone ? "Matriz de conformidade concluída" : "Matriz de conformidade pendente"}
+                                className={cn("text-[9px] font-black italic uppercase shrink-0 px-1.5 py-0.5 border", matrixDone ? "text-[#506600] border-[#a0c830] bg-[#f0ffe0]" : "text-[#b02f00] border-[#f08080] bg-[#fff0ee]")}
+                              >
+                                Matriz {matrixDone ? "✓" : "!"}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </button>
                     );
                   })
@@ -1413,16 +1427,40 @@ export default function EvaluationsPage() {
           {/* Evaluator: lista compacta A Fazer / Concluídas */}
           {isEvaluator && (
             <div className="flex-1 overflow-y-auto">
+              {/* Cabeçalho da sidebar do avaliador */}
+              <div className="bg-[#191c1e] px-4 py-2.5 flex items-center justify-between border-b-2 border-[#191c1e]">
+                <span className="text-[11px] font-black italic uppercase tracking-widest text-[#ccff00] flex items-center gap-1.5">
+                  <Target size={11} /> Minhas Avaliações
+                </span>
+                {evaluatorEventStats.length > 0 && (
+                  <span className="text-[10px] font-black italic text-white/60 tabular-nums">
+                    {doneEvents.length}<span className="text-white/30">/{evaluatorEventStats.length}</span>
+                  </span>
+                )}
+              </div>
               {configuredEvents.length === 0 ? (
-                <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhum evento liberado no momento.</div>
+                <div className="p-6 text-center space-y-2">
+                  <div className="w-10 h-10 bg-[#f2f4f6] border-2 border-[#191c1e] flex items-center justify-center mx-auto">
+                    <Clock size={18} className="text-[#9aa08a]" />
+                  </div>
+                  <p className="text-[10px] italic font-bold uppercase text-[#747a60]">Nenhum evento liberado no momento.</p>
+                </div>
               ) : relevantEvaluatorEvents.length === 0 ? (
-                <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhuma avaliação atribuída à sua área.</div>
+                <div className="p-6 text-center space-y-2">
+                  <div className="w-10 h-10 bg-[#f2f4f6] border-2 border-[#191c1e] flex items-center justify-center mx-auto">
+                    <Building2 size={18} className="text-[#9aa08a]" />
+                  </div>
+                  <p className="text-[10px] italic font-bold uppercase text-[#747a60]">Nenhuma avaliação atribuída à sua área.</p>
+                </div>
               ) : (
                 <>
                   {todoEvents.length > 0 && (
                     <>
-                      <div className="px-3 pt-3 pb-1">
-                        <span className="text-[8px] font-black italic uppercase tracking-widest text-[#747a60]">A Fazer · {todoEvents.length}</span>
+                      <div className="px-4 pt-4 pb-1.5 flex items-center justify-between">
+                        <span className="text-[9px] font-black italic uppercase tracking-widest text-[#b02f00] flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-[#f28b6a]" /> A Fazer
+                        </span>
+                        <span className="text-[9px] font-black italic text-[#9aa08a]">{todoEvents.length}</span>
                       </div>
                       {todoEvents.map(ev => {
                         const stats = evaluatorEventStats.find(s => s.event.id === ev.id);
@@ -1431,17 +1469,14 @@ export default function EvaluationsPage() {
                         return (
                           <button key={ev.id} type="button" data-testid={`evaluator-event-${ev.id}`}
                             onClick={() => { setActiveEvalTab("todo"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                            className={cn("w-full text-left px-3 py-2.5 border-l-[3px] border-l-[#f28b6a] flex flex-col gap-1 transition-colors", active ? "bg-[#f7ffd1]" : "hover:bg-[#f7f9fb]")}
+                            className={cn("w-full text-left px-4 py-3 border-l-4 border-l-[#f28b6a] border-b border-[#eceef0] flex flex-col gap-1.5 transition-colors", active ? "bg-[#fff8f5] border-l-[#e05020]" : "hover:bg-[#fff8f5]")}
                           >
-                            <div className="flex items-center justify-between gap-1">
-                              <span className={cn("text-[11px] font-black italic uppercase leading-tight truncate", active ? "text-[#191c1e]" : "text-[#2e3228]")}>{ev.name}</span>
-                              <div className="w-2 h-2 shrink-0 rounded-full bg-[#f28b6a]" />
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex-1 h-1 bg-[#eceef0] overflow-hidden">
-                                <div className="h-full bg-[#f28b6a]" style={{ width: `${pct}%` }} />
+                            <span className={cn("text-[11px] font-black italic uppercase leading-snug truncate", active ? "text-[#191c1e]" : "text-[#2e3228]")}>{ev.name}</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-[#f0e8e4] overflow-hidden">
+                                <div className="h-full bg-[#f28b6a]" style={{ width: `${pct}%`, transition: "width 0.3s" }} />
                               </div>
-                              <span className="text-[8px] font-black italic text-[#747a60] shrink-0">{stats?.submitted ?? 0}/{stats?.total ?? 0}</span>
+                              <span className="text-[9px] font-black italic text-[#9aa08a] shrink-0 tabular-nums">{stats?.submitted ?? 0}/{stats?.total ?? 0}</span>
                             </div>
                           </button>
                         );
@@ -1450,25 +1485,25 @@ export default function EvaluationsPage() {
                   )}
                   {doneEvents.length > 0 && (
                     <>
-                      <div className="px-3 pt-4 pb-1">
-                        <span className="text-[8px] font-black italic uppercase tracking-widest text-[#747a60]">Concluídas · {doneEvents.length}</span>
+                      <div className="px-4 pt-4 pb-1.5 flex items-center justify-between">
+                        <span className="text-[9px] font-black italic uppercase tracking-widest text-[#506600] flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-[#ccff00]" /> Concluídas
+                        </span>
+                        <span className="text-[9px] font-black italic text-[#9aa08a]">{doneEvents.length}</span>
                       </div>
                       {doneEvents.map(ev => {
                         const active = selectedEventId === ev.id;
                         return (
                           <button key={ev.id} type="button" data-testid={`evaluator-event-done-${ev.id}`}
                             onClick={() => { setActiveEvalTab("done"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                            className={cn("w-full text-left px-3 py-2.5 border-l-[3px] border-l-[#506600] flex flex-col gap-1 transition-colors", active ? "bg-[#f7ffd1]" : "opacity-70 hover:opacity-100 hover:bg-[#f7f9fb]")}
+                            className={cn("w-full text-left px-4 py-3 border-l-4 border-l-[#88b800] border-b border-[#eceef0] flex flex-col gap-1.5 transition-colors", active ? "bg-[#f5ffea]" : "opacity-75 hover:opacity-100 hover:bg-[#f5ffea]")}
                           >
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-[11px] font-black italic uppercase leading-tight truncate text-[#2e3228]">{ev.name}</span>
-                              <div className="w-2 h-2 shrink-0 rounded-full bg-[#ccff00]" />
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex-1 h-1 bg-[#eceef0] overflow-hidden">
+                            <span className="text-[11px] font-black italic uppercase leading-snug truncate text-[#2e4400]">{ev.name}</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-[#d8eebc] overflow-hidden">
                                 <div className="h-full bg-[#ccff00]" style={{ width: "100%" }} />
                               </div>
-                              <span className="text-[8px] font-black italic text-[#506600] shrink-0">100%</span>
+                              <span className="text-[9px] font-black italic text-[#506600] shrink-0">100%</span>
                             </div>
                           </button>
                         );
@@ -1476,7 +1511,7 @@ export default function EvaluationsPage() {
                     </>
                   )}
                   {todoEvents.length === 0 && doneEvents.length === 0 && (
-                    <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhuma avaliação.</div>
+                    <div className="p-6 text-center text-[10px] italic font-bold uppercase text-[#747a60]">Nenhuma avaliação.</div>
                   )}
                 </>
               )}
@@ -1667,43 +1702,76 @@ export default function EvaluationsPage() {
             )}
           </div>
         ) : !selectedEventId ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-[#191c1e] bg-white">
-            <div className="w-16 h-16 border-2 border-[#191c1e] bg-[#ccff00] flex items-center justify-center mb-4 skew-x-[-6deg]">
-              <CheckCircle className="text-[#161e00] skew-x-[6deg]" size={32} />
+          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-8">
+            <div className="border-2 border-[#191c1e] bg-white p-10 max-w-sm w-full flex flex-col items-center gap-4 relative">
+              <div className="w-20 h-20 border-2 border-[#191c1e] bg-[#191c1e] flex items-center justify-center skew-x-[-4deg]">
+                {isConsultation
+                  ? <BarChart3 className="text-[#ccff00] skew-x-[4deg]" size={36} />
+                  : <Rocket className="text-[#ccff00] skew-x-[4deg]" size={36} />
+                }
+              </div>
+              <div>
+                <h2 className="text-xl italic uppercase font-black tracking-tight text-[#191c1e] leading-tight">
+                  {isConsultation ? "Modo Consulta" : "Pronto para avaliar"}
+                </h2>
+                <p className="text-[#747a60] italic text-sm mt-1.5 leading-relaxed">
+                  {isConsultation
+                    ? "Selecione um evento ao lado para acompanhar o andamento das avaliações da equipe."
+                    : "Selecione um evento ao lado para iniciar ou continuar sua avaliação."}
+                </p>
+              </div>
+              {isManager && activeEvents.length > 0 && (
+                <div className="w-full border-t-2 border-[#eceef0] pt-4 grid grid-cols-2 gap-3 text-left">
+                  <div className="bg-[#f7f9fb] border border-[#eceef0] p-3">
+                    <p className="text-[20px] font-black italic text-[#191c1e] leading-none">{activeEvents.length}</p>
+                    <p className="text-[9px] font-black italic uppercase text-[#9aa08a] mt-0.5">eventos ativos</p>
+                  </div>
+                  <div className="bg-[#f7f9fb] border border-[#eceef0] p-3">
+                    <p className="text-[20px] font-black italic text-[#ccff00] leading-none" style={{WebkitTextStroke: "1px #191c1e"}}>
+                      {Math.round((activeEvents.filter(e => (e.evaluationProgress ?? 0) >= 1).length / Math.max(1, activeEvents.length)) * 100)}%
+                    </p>
+                    <p className="text-[9px] font-black italic uppercase text-[#9aa08a] mt-0.5">concluídos</p>
+                  </div>
+                </div>
+              )}
+              <div className="absolute -bottom-[3px] -right-[3px] w-full h-full border-2 border-[#191c1e] -z-10" />
             </div>
-            <h2 className="text-2xl italic uppercase font-black tracking-tight mb-2">{isConsultation ? "Pronto para consultar" : "Pronto para avaliar"}</h2>
-            <p className="text-[#444933] italic max-w-md">{isConsultation ? "Selecione um evento na barra lateral para consultar o andamento das avaliações da equipe." : "Selecione um evento na barra lateral para iniciar ou continuar a avaliação da equipe responsável."}</p>
           </div>
         ) : (
           <div className="space-y-5">
             {/* Header strip compacto */}
             {currentEvent && (
-              <div className="border-2 border-[#191c1e] bg-white px-5 py-3 flex items-center gap-4">
-                <div className="w-[3px] self-stretch shrink-0 bg-[#ccff00]" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-[15px] font-black italic uppercase tracking-tight text-[#191c1e] leading-tight">{currentEvent.name}</h2>
-                    {currentEvent.cycleName && (
-                      <span className="text-[9px] font-black italic uppercase px-2 py-0.5 border border-[#c8cbd0] text-[#747a60] bg-[#f2f4f6]">{currentEvent.cycleName}</span>
-                    )}
-                    <span className="text-[9px] font-black italic uppercase px-2 py-0.5 bg-[#ccff00] text-[#161e00] border border-[#506600]">Aberto</span>
+              <div className="border-2 border-[#191c1e] overflow-hidden">
+                {/* Banda título escura */}
+                <div className="bg-[#191c1e] px-5 py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-base font-black italic uppercase tracking-tight text-white leading-tight">{currentEvent.name}</h2>
+                      {currentEvent.cycleName && (
+                        <span className="text-[9px] font-black italic uppercase px-2 py-0.5 border border-white/20 text-white/50 bg-white/5">{currentEvent.cycleName}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 text-[10px] italic text-white/50 flex-wrap">
+                      {currentEvent.clientName && <span className="text-white/70 font-bold">{currentEvent.clientName}</span>}
+                      {(currentEvent.city || currentEvent.location) && (
+                        <span className="flex items-center gap-1"><MapPin size={9} />{currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `, ${currentEvent.state}` : ""}` : currentEvent.location}</span>
+                      )}
+                      <span className="flex items-center gap-1"><Calendar size={9} />{new Date(currentEvent.startDate).toLocaleDateString('pt-BR')} — {new Date(currentEvent.endDate).toLocaleDateString('pt-BR')}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 mt-0.5 text-[10px] italic text-[#747a60] flex-wrap">
-                    {currentEvent.clientName && <span>{currentEvent.clientName}</span>}
-                    {(currentEvent.city || currentEvent.location) && (
-                      <span className="flex items-center gap-1"><MapPin size={9} />{currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `, ${currentEvent.state}` : ""}` : currentEvent.location}</span>
-                    )}
-                    <span className="flex items-center gap-1"><Calendar size={9} />{new Date(currentEvent.startDate).toLocaleDateString('pt-BR')} — {new Date(currentEvent.endDate).toLocaleDateString('pt-BR')}</span>
-                    <span className="flex items-center gap-1"><Users size={9} />{currentEvent.participantCount} part.</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[9px] font-black italic uppercase px-2.5 py-1 bg-[#ccff00] text-[#161e00] border border-[#ccff00]">Aberto</span>
+                    <span className="text-[10px] font-black italic text-white/60 flex items-center gap-1"><Users size={11} />{currentEvent.participantCount} part.</span>
                   </div>
                 </div>
+                {/* Barra progresso da equipe (manager) */}
                 {isManager && (
-                  <div className="flex items-center gap-2.5 shrink-0 border-l border-[#eceef0] pl-4">
-                    <span className="text-[9px] font-bold italic uppercase text-[#747a60]">Time</span>
-                    <div className="w-24 h-2 bg-[#eceef0] border border-[#dde0e3] overflow-hidden">
+                  <div className="bg-[#f7f9fb] border-t border-[#eceef0] px-5 py-2 flex items-center gap-3">
+                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><BarChart3 size={9} /> Progresso do Time</span>
+                    <div className="flex-1 h-2 bg-[#e0e3da] overflow-hidden">
                       <div className="h-full bg-[#ccff00] transition-[width]" style={{ width: `${teamProgressPct}%` }} />
                     </div>
-                    <span className="text-[9px] font-black italic text-[#191c1e]">{Math.round(teamProgressPct)}%</span>
+                    <span className="text-[11px] font-black italic text-[#191c1e] shrink-0 tabular-nums w-9 text-right">{Math.round(teamProgressPct)}%</span>
                   </div>
                 )}
               </div>
