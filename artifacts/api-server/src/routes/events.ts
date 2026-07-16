@@ -27,8 +27,8 @@ router.get("/events", async (req, res) => {
 
   // Busca em lote para evitar N+1 (uma query por relação, não por evento).
   const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas, conformityRows] = await Promise.all([
-    db.select({ eventId: eventParticipantsTable.eventId, employmentType: eventParticipantsTable.employmentType, functionName: eventParticipantsTable.functionName })
-      .from(eventParticipantsTable).where(inArray(eventParticipantsTable.eventId, eventIds)),
+    db.select({ eventId: eventParticipantsTable.eventId, functionName: eventParticipantsTable.functionName, employmentType: employeesTable.employmentType, employeeFunction: employeesTable.functionName })
+      .from(eventParticipantsTable).leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id)).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
     db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt, finalPublishedAt: eventCriteriaTable.finalPublishedAt, criterionActive: criteriaTable.active, criterionEventScoped: criteriaTable.eventScoped })
