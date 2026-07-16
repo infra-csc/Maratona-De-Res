@@ -1028,6 +1028,8 @@ export default function EventDetailPage() {
     },
   });
 
+  const [activeTab, setActiveTab] = useState<"visaoGeral" | "quesitos" | "equipe" | "conformidade">("visaoGeral");
+
   if (isLoading) {
     return (
       <div className="bg-[#f7f9fb] min-h-full p-6 md:p-10 max-w-6xl mx-auto space-y-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1051,8 +1053,6 @@ export default function EventDetailPage() {
       </div>
     );
   }
-
-  const [activeTab, setActiveTab] = useState<"visaoGeral" | "quesitos" | "equipe" | "conformidade">("visaoGeral");
 
   const fmt = (v: number) => `${v.toFixed(1)}`;
   const activeCriteriaCount = (event.criteria ?? []).filter(c => c.active).length;
