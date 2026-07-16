@@ -202,6 +202,7 @@ router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("ad
 
   const [updated] = await db.update(eventCriteriaTable).set({
     partialPublishedAt: new Date(),
+    finalPublishedAt: null,  // Downgrade final→parcial: limpa o carimbo de final
   }).where(eq(eventCriteriaTable.id, link.id)).returning();
   await audit(req.user!.userId, "publish_partial_feedback", "event_criteria", updated.id, null, { eventId, criterionId });
 
