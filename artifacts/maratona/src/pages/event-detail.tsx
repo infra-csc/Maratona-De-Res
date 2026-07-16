@@ -1951,26 +1951,6 @@ export default function EventDetailPage() {
                 </DialogContent>
               </Dialog>
 
-              <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
-                <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover critério?</AlertDialogTitle>
-                    <AlertDialogDescription className="italic text-[#444933]">
-                      O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? ""}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>{fmt(targetWeightSum)}</strong> antes de salvar ou confirmar.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel data-testid="button-cancel-remove-criterion" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      data-testid="button-confirm-remove-criterion"
-                      onClick={() => { if (pendingRemoval !== null) setCriterionActive(pendingRemoval, false); setPendingRemoval(null); }}
-                      className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
-                    >
-                      <Trash2 size={16} className="mr-1.5" /> Remover
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
 
               <AlertDialog open={pendingDelete !== null} onOpenChange={o => { if (!o) setPendingDelete(null); }}>
                 <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
@@ -2126,6 +2106,40 @@ export default function EventDetailPage() {
             </div>
           </section>
         )}
+
+        {/* Dialog de confirmação de remoção — fora dos blocos condicionais para funcionar em históricos também */}
+        <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
+          <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover critério?</AlertDialogTitle>
+              <AlertDialogDescription className="italic text-[#444933]">
+                {event.isHistorical
+                  ? <>O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? config.find(c => c.criterionId === (pendingRemoval ?? -1))?.name ?? ""}</strong> será desativado neste evento. Esta ação é imediatamente salva.</>
+                  : <>O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? ""}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>{fmt(targetWeightSum)}</strong> antes de salvar ou confirmar.</>
+                }
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-remove-criterion" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                data-testid="button-confirm-remove-criterion"
+                onClick={() => {
+                  if (pendingRemoval !== null) {
+                    if (event.isHistorical) {
+                      updateCriteria.mutate({ id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.criterionId === pendingRemoval ? false : c.active, weight: Number(c.weight) || 0 })) } });
+                    } else {
+                      setCriterionActive(pendingRemoval, false);
+                    }
+                    setPendingRemoval(null);
+                  }
+                }}
+                className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
+              >
+                <Trash2 size={16} className="mr-1.5" /> Remover
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         </>)}
 
