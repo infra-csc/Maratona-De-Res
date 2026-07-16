@@ -2652,7 +2652,12 @@ export default function EventDetailPage() {
                   <div className="py-8 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum colaborador alocado.</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 p-4 items-stretch">
-                    {event.participants.map(p => {
+                    {event.participants.slice().sort((a, b) => {
+                      const aScores = a.countsForScore !== false ? 0 : 1;
+                      const bScores = b.countsForScore !== false ? 0 : 1;
+                      if (aScores !== bScores) return aScores - bScores;
+                      return a.employeeName.localeCompare(b.employeeName, "pt-BR");
+                    }).map(p => {
                       const isInactive = p.confirmed === false;
                       const isConfirmed = p.confirmed === true;
                       const isInformational = p.countsForScore === false;
