@@ -3730,6 +3730,8 @@ components:
           type: number
         eventScoped:
           type: boolean
+        sourceCriterionId:
+          type: ["integer", "null"]
         partialPublishedAt:
           type: ["string", "null"]
         finalPublishedAt:

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, numeric, timestamp, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areasTable } from "./areas";
@@ -17,6 +17,9 @@ export const criteriaTable = pgTable("criteria", {
   // Não aparece na lista global de critérios nem é anexado automaticamente a
   // outros eventos na sincronização.
   eventScoped: boolean("event_scoped").notNull().default(false),
+  // Critério de origem do qual este foi duplicado (preenchido somente quando
+  // eventScoped=true). Permite agrupar cópias com o original na calibração.
+  sourceCriterionId: integer("source_criterion_id").references((): AnyPgColumn => criteriaTable.id),
 });
 
 export const eventCriteriaTable = pgTable("event_criteria", {

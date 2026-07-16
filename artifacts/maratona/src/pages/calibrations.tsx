@@ -362,7 +362,7 @@ export default function CalibrationsPage() {
       qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
       qc.invalidateQueries({ queryKey: fbQKey });
       qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      const count = (result as { published?: number })?.published ?? activeCriteria.length;
+      const count = (result as { published?: number })?.published ?? displayActiveCriteria.length;
       toast({ title: `${count} critério(s) publicados como Final`, description: "Os funcionários veem todas as notas como definitivas." });
     } catch (e) {
       const msg = (e as { message?: string })?.message;
@@ -380,7 +380,7 @@ export default function CalibrationsPage() {
       qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
       qc.invalidateQueries({ queryKey: fbQKey });
       qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      const count = (result as { published?: number })?.published ?? activeCriteria.length;
+      const count = (result as { published?: number })?.published ?? displayActiveCriteria.length;
       toast({ title: `${count} critério(s) publicados como Parcial`, description: "Os funcionários veem uma prévia de todas as notas." });
     } catch (e) {
       const msg = (e as { message?: string })?.message;
@@ -420,8 +420,12 @@ export default function CalibrationsPage() {
   }
 
   function getAreaScores(critId: number) {
+    // Inclui avaliações dos critérios eventScoped "filhos" (cópias duplicadas
+    // ligadas a este critério). O map é calculado abaixo após activeCriteria.
+    const children = childCriterionIdsMap.get(critId) ?? [];
+    const allIds = [critId, ...children];
     return (evaluations ?? [])
-      .filter(e => e.criterionId === critId && e.status === "submitted")
+      .filter(e => allIds.includes(e.criterionId) && e.status === "submitted")
       .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null }));
   }
 
@@ -454,13 +458,45 @@ export default function CalibrationsPage() {
         originalAverageScore: avg ?? undefined,
       },
     });
+    // Propaga a mesma nota calibrada para critérios filhos (cópias eventScoped)
+    const children = childCriterionIdsMap.get(critId) ?? [];
+    children.forEach(childId => {
+      createMutation.mutate({
+        data: {
+          eventId: selectedEventId!,
+          criterionId: childId,
+          calibratedScore: score,
+          calibrationReason: reason,
+          originalAverageScore: avg ?? undefined,
+        },
+      });
+    });
   }
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
+
+  // Mapa: criterionId → [IDs dos critérios eventScoped que têm este como fonte].
+  // Permite fundir avaliações de duplicatas ("Qualidade de Entrega" + "(2)")
+  // numa única linha na tabela de calibrações.
+  const childCriterionIdsMap = new Map<number, number[]>();
+  activeCriteria.forEach(c => {
+    if (c.eventScoped && c.sourceCriterionId != null) {
+      const arr = childCriterionIdsMap.get(c.sourceCriterionId) ?? [];
+      arr.push(c.criterionId);
+      childCriterionIdsMap.set(c.sourceCriterionId, arr);
+    }
+  });
+  // Conjunto de IDs de critérios "filhos" — ocultos da tabela (fundidos no pai)
+  const childCriterionIdSet = new Set<number>(
+    activeCriteria.filter(c => c.eventScoped && c.sourceCriterionId != null).map(c => c.criterionId)
+  );
+  // Lista de exibição: exclui os filhos (suas notas aparecem na linha do pai)
+  const displayActiveCriteria = activeCriteria.filter(c => !childCriterionIdSet.has(c.criterionId));
+
   // Todo critério ativo sem calibração conta como pendente — mesmo os que ainda
   // não receberam nota da área (a calibração pode preencher a lacuna).
   const pendingCount = selectedEventId
-    ? activeCriteria.filter(c => !getCalibration(c.criterionId)).length
+    ? displayActiveCriteria.filter(c => !getCalibration(c.criterionId)).length
     : 0;
 
   // Quantos critérios têm uma edição LOCAL pendente (digitada pelo usuário e ainda
@@ -473,10 +509,10 @@ export default function CalibrationsPage() {
     if (!raw || isNaN(score) || score < 0 || score > 10) return null;
     return score;
   }
-  const fillableCount = activeCriteria.filter(c => pendingScore(c.criterionId) != null).length;
+  const fillableCount = displayActiveCriteria.filter(c => pendingScore(c.criterionId) != null).length;
 
   // Critérios com peso > 0 (únicos que entram nos contadores de calibração)
-  const scorableActiveCriteria = activeCriteria.filter(c => Number(c.weightOverride ?? c.originalWeight ?? 0) > 0);
+  const scorableActiveCriteria = displayActiveCriteria.filter(c => Number(c.weightOverride ?? c.originalWeight ?? 0) > 0);
 
   // Quantos critérios já publicados como Final
   const finalPublishedCount = scorableActiveCriteria.filter(c => !!c.finalPublishedAt).length;
@@ -484,13 +520,13 @@ export default function CalibrationsPage() {
 
   // Critérios filtrados por criterionFilter
   const filteredActiveCriteria = criterionFilter === "uncalibrated"
-    ? activeCriteria.filter(c => !getCalibration(c.criterionId))
+    ? displayActiveCriteria.filter(c => !getCalibration(c.criterionId))
     : criterionFilter === "calibrated"
-    ? activeCriteria.filter(c => !!getCalibration(c.criterionId))
-    : activeCriteria;
+    ? displayActiveCriteria.filter(c => !!getCalibration(c.criterionId))
+    : displayActiveCriteria;
 
   // Pronto para finalizar: todos os critérios com nota da área já foram calibrados.
-  const scoredCriteria = activeCriteria.filter(c => getAvgScore(c.criterionId) != null);
+  const scoredCriteria = displayActiveCriteria.filter(c => getAvgScore(c.criterionId) != null);
   const allCalibrated = scoredCriteria.length > 0 && scoredCriteria.every(c => getCalibration(c.criterionId));
   const alreadyReleased = !!feedback?.feedbackReleased;
   const feedbackReleasedAtDate = feedback?.feedbackReleasedAt ? new Date(feedback.feedbackReleasedAt) : null;
@@ -551,7 +587,8 @@ export default function CalibrationsPage() {
   // Grava TODAS as calibrações preenchidas de uma vez (a diretoria preenche tudo
   // e salva em um clique, em vez de critério por critério).
   async function saveAllCalibrations() {
-    const toSave = activeCriteria
+    // Salva apenas critérios de exibição (pais); os filhos são propagados abaixo.
+    const toSave = displayActiveCriteria
       .map(c => ({ critId: c.criterionId, score: pendingScore(c.criterionId), reason: (calReasons[c.criterionId] ?? getCalibration(c.criterionId)?.calibrationReason ?? "").trim() }))
       .filter((x): x is { critId: number; score: number; reason: string } => x.score != null);
     if (toSave.length === 0) {
@@ -576,6 +613,19 @@ export default function CalibrationsPage() {
         });
         if (result.warnings) allWarnings.push(...result.warnings);
         ok++;
+        // Propaga para critérios filhos (eventScoped) com a mesma nota
+        const children = childCriterionIdsMap.get(x.critId) ?? [];
+        for (const childId of children) {
+          await bulkMutation.mutateAsync({
+            data: {
+              eventId: selectedEventId!,
+              criterionId: childId,
+              calibratedScore: x.score,
+              calibrationReason: x.reason,
+              originalAverageScore: getAvgScore(x.critId) ?? undefined,
+            },
+          });
+        }
       } catch (e) {
         failed.push(x.critId);
         if (!firstError) firstError = (e as { message?: string })?.message ?? null;
@@ -972,7 +1022,7 @@ export default function CalibrationsPage() {
           <div className="flex-1 min-w-0 space-y-3 lg:order-1">
 
             {/* ── COMPACT ACTION BAR ── */}
-          {activeCriteria.length === 0 ? (
+          {displayActiveCriteria.length === 0 ? (
             <div className="bg-white border-2 border-[#191c1e] text-center py-10 italic uppercase font-bold text-[#747a60] text-sm">
               Nenhum critério ativo para este evento.
             </div>
@@ -1079,7 +1129,7 @@ export default function CalibrationsPage() {
               )}
 
               {/* ── CRITERIA TABLE ── */}
-              {filteredActiveCriteria.length === 0 && activeCriteria.length > 0 ? (
+              {filteredActiveCriteria.length === 0 && displayActiveCriteria.length > 0 ? (
                 <div className="bg-[#d8dadc] border-2 border-[#191c1e] px-5 py-4 text-center">
                   <p className="text-sm italic font-bold uppercase text-[#444933]">Nenhum critério para o filtro selecionado.</p>
                 </div>

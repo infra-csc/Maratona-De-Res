@@ -1086,6 +1086,7 @@ router.get("/events/:id/criteria", async (req, res) => {
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
       eventScoped: criteriaTable.eventScoped,
+      sourceCriterionId: criteriaTable.sourceCriterionId,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
     })
@@ -1264,6 +1265,7 @@ router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async 
     active: true,
     displayOrder: source.displayOrder,
     eventScoped: true,
+    sourceCriterionId: sourceCriterionId,
   }).returning();
 
   // Começa com peso 0 para não quebrar a soma de 20; o RH redistribui depois.

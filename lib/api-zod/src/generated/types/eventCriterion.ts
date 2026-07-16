@@ -25,6 +25,8 @@ export interface EventCriterion {
   weight?: number;
   eventScoped?: boolean;
   /** @nullable */
+  sourceCriterionId?: number | null;
+  /** @nullable */
   partialPublishedAt?: string | null;
   /** @nullable */
   finalPublishedAt?: string | null;
