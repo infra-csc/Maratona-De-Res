@@ -724,7 +724,9 @@ export default function EventDetailPage() {
   const [conformityForm, setConformityForm] = useState<{
     epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
     epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
-  }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "" });
+    absencesResponse: boolean | null; absencesReport: string;
+    standoutResponse: boolean | null; standoutJustification: string;
+  }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "", absencesResponse: null, absencesReport: "", standoutResponse: null, standoutJustification: "" });
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const conformityItems: { key: ConformityKey; label: string; commentKey: ConformityCommentKey; group: "cenografia" | "ferramentas" }[] = [
     { key: "epi", label: "Uso de EPI", commentKey: "epiComment", group: "cenografia" },
@@ -755,6 +757,10 @@ export default function EventDetailPage() {
         estaiamentosComment: conformityData.estaiamentosComment ?? "",
         guardaEquipamentosComment: conformityData.guardaEquipamentosComment ?? "",
         condutaComment: conformityData.condutaComment ?? "",
+        absencesResponse: conformityData.absencesResponse ?? null,
+        absencesReport: conformityData.absencesReport ?? "",
+        standoutResponse: conformityData.standoutResponse ?? null,
+        standoutJustification: conformityData.standoutJustification ?? "",
       });
     } else if (importedConformityAllValue !== null) {
       setConformityForm(f => ({
@@ -2602,6 +2608,117 @@ export default function EventDetailPage() {
                     </div>
                   );
                 })}
+                {/* Respostas Extras — Cenografia (absences + standout) */}
+                {(conformityData || canManageConformity) && (
+                  <div>
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-[#f5f7f0] border-t-2 border-[#eceef0]">
+                      <span className="text-[10px] font-black italic uppercase text-[#444933]">Cenografia</span>
+                      <span className="text-[10px] italic text-[#747a60]">— Respostas Extras</span>
+                    </div>
+                    <div className="divide-y-2 divide-[#eceef0]">
+                      {/* Faltou / Atrasou */}
+                      <div className="px-4 py-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold italic text-[#191c1e]">Faltou / Atrasou?</span>
+                          {conformityForm.absencesResponse !== null
+                            ? <span className="text-[10px] font-black italic uppercase text-[#506600] bg-[#eaffe0] border border-[#506600] px-2 py-0.5">Respondido</span>
+                            : <span className="text-[10px] font-black italic uppercase text-[#747a60] bg-[#f5e97a] border border-[#d4c98a] px-2 py-0.5">Não respondido</span>
+                          }
+                        </div>
+                        {canManageConformity ? (
+                          <div className="space-y-1.5">
+                            <Textarea
+                              value={conformityForm.absencesReport}
+                              onChange={e => setConformityForm(f => ({ ...f, absencesReport: e.target.value }))}
+                              placeholder='Ex.: "João Silva — faltou sem aviso." Se ninguém faltou/atrasou, escreva "Ninguém faltou ou atrasou".'
+                              className="text-xs rounded-none bg-white resize-none min-h-[60px] border border-[#d4c98a]"
+                            />
+                            <button
+                              type="button"
+                              disabled={setConformity.isPending}
+                              onClick={() => setConformity.mutate({ id, data: { absencesResponse: conformityForm.absencesReport.trim() ? true : null, absencesReport: conformityForm.absencesReport || null } })}
+                              className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors"
+                            >
+                              {setConformity.isPending ? "Salvando..." : "Salvar"}
+                            </button>
+                          </div>
+                        ) : conformityForm.absencesReport ? (
+                          <p className="text-sm italic text-[#444933] whitespace-pre-wrap">{conformityForm.absencesReport}</p>
+                        ) : (
+                          <p className="text-xs italic text-[#747a60]">—</p>
+                        )}
+                      </div>
+                      {/* Destaque / Mérito */}
+                      <div className="px-4 py-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-sm font-bold italic text-[#191c1e]">Desempenho Fora da Curva?</span>
+                          {canManageConformity ? (
+                            <div className="flex items-center border-2 border-[#191c1e] overflow-hidden shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" }));
+                                  setConformity.mutate({ id, data: { standoutResponse: false, standoutJustification: null } });
+                                }}
+                                className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${conformityForm.standoutResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >
+                                Não
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConformityForm(f => ({ ...f, standoutResponse: true }));
+                                  setConformity.mutate({ id, data: { standoutResponse: true } });
+                                }}
+                                className={`px-2.5 py-1 text-[11px] font-black italic uppercase border-r-2 border-[#191c1e] transition-all ${conformityForm.standoutResponse === true ? "bg-[#506600] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >
+                                Sim
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConformityForm(f => ({ ...f, standoutResponse: null }));
+                                  setConformity.mutate({ id, data: { standoutResponse: null } });
+                                }}
+                                className={`px-2.5 py-1 text-[11px] font-black italic uppercase transition-all ${conformityForm.standoutResponse === null ? "bg-[#f5e97a] text-[#4a3c00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                              >
+                                Pendente
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={`text-[11px] font-black italic uppercase px-2.5 py-1 border-2 border-[#191c1e] shrink-0 ${conformityForm.standoutResponse === true ? "bg-[#506600] text-white" : conformityForm.standoutResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-[#f5e97a] text-[#4a3c00]"}`}>
+                              {conformityForm.standoutResponse === true ? "Sim" : conformityForm.standoutResponse === false ? "Não" : "Pendente"}
+                            </span>
+                          )}
+                        </div>
+                        {conformityForm.standoutResponse === true && (
+                          canManageConformity ? (
+                            <div className="space-y-1.5">
+                              <Textarea
+                                value={conformityForm.standoutJustification}
+                                onChange={e => setConformityForm(f => ({ ...f, standoutJustification: e.target.value }))}
+                                placeholder="Nome do profissional e por que se destacou..."
+                                className="text-xs rounded-none bg-white resize-none min-h-[60px] border border-[#d4c98a]"
+                              />
+                              <button
+                                type="button"
+                                disabled={setConformity.isPending}
+                                onClick={() => setConformity.mutate({ id, data: { standoutJustification: conformityForm.standoutJustification || null } })}
+                                className="px-3 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors"
+                              >
+                                {setConformity.isPending ? "Salvando..." : "Salvar Destaque"}
+                              </button>
+                            </div>
+                          ) : conformityForm.standoutJustification ? (
+                            <p className="text-sm italic text-[#444933] whitespace-pre-wrap">{conformityForm.standoutJustification}</p>
+                          ) : (
+                            <p className="text-xs italic text-[#747a60]">—</p>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {(result?.conformityPenalty ?? 0) > 0 && (
                   <div className="px-4 pt-3 pb-2 border-t-2 border-[#eceef0]">
                     <p className="text-xs font-bold italic uppercase text-[#862200] flex items-center gap-1.5">
