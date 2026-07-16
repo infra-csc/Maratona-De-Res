@@ -1075,6 +1075,10 @@ export default function EventDetailPage() {
 
   const setCriterionActive = (criterionId: number, active: boolean) =>
     setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, active } : c)));
+
+  // Critério pode ser desativado mesmo com evento bloqueado, desde que não tenha avaliações submetidas
+  const criterionHasEvals = (criterionId: number) =>
+    (evaluations ?? []).some(e => e.criterionId === criterionId && e.status === "submitted");
   const setCriterionWeight = (criterionId: number, weight: number) =>
     setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, weight } : c)));
   const handleSaveCriteria = () =>
@@ -1840,9 +1844,9 @@ export default function EventDetailPage() {
                                 <button
                                   type="button"
                                   data-testid={`button-remove-event-criterion-${item.criterionId}`}
-                                  disabled={editLocked}
+                                  disabled={editLocked && criterionHasEvals(item.criterionId)}
                                   onClick={() => setPendingRemoval(item.criterionId)}
-                                  title="Remover critério"
+                                  title={editLocked && !criterionHasEvals(item.criterionId) ? "Desativar critério sem avaliações" : "Remover critério"}
                                   className="h-9 w-9 flex items-center justify-center border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ffe5e0] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                                 >
                                   <Trash2 size={16} />

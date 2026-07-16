@@ -1124,17 +1124,29 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(eq(eventCriteriaTable.eventId, eventId));
 
-  // Os pesos podem sempre ser editados (inclusive durante calibração/após o
-  // evento fechado) e o resultado é recalculado na hora. Mas a estrutura do
-  // evento (quais critérios estão ativos) fica travada após haver avaliação,
-  // pois isso muda a lógica de "critério avaliado" (getCriterionEvaluationStatus).
+  // Os pesos podem sempre ser editados. A estrutura (ativar/desativar) fica
+  // parcialmente travada: ativar um critério inativo após avaliações cria
+  // dados inconsistentes; reativar é sempre bloqueado. Desativar, porém, é
+  // permitido quando o critério ainda não tem nenhuma avaliação submetida —
+  // isso corrige critérios "órfãos" que ficaram ativos sem nunca serem avaliados.
   if (hasEvaluations) {
-    const changesActiveFlag = existing.some(ec => {
+    // Critérios com ao menos uma avaliação submetida
+    const evaldRows = await db
+      .select({ criterionId: evaluationsTable.criterionId })
+      .from(evaluationsTable)
+      .where(and(eq(evaluationsTable.eventId, eventId), eq(evaluationsTable.status, "submitted")));
+    const evaldCriterionIds = new Set(evaldRows.map(e => e.criterionId));
+
+    const illegalChange = existing.some(ec => {
       const item = items.find(i => i.criterionId === ec.criterionId);
-      return item && item.active !== ec.active;
+      if (!item || item.active === ec.active) return false;
+      // Ativar (false→true) sempre bloqueado quando há avaliações no evento
+      if (item.active && !ec.active) return true;
+      // Desativar (true→false): bloqueado só se o critério já tem avaliações
+      return evaldCriterionIds.has(ec.criterionId);
     });
-    if (changesActiveFlag) {
-      res.status(409).json({ error: "Este evento já possui avaliações. Critérios não podem ser ativados/desativados, mas os pesos continuam editáveis." });
+    if (illegalChange) {
+      res.status(409).json({ error: "Este evento já possui avaliações. Só é possível desativar critérios que ainda não foram avaliados." });
       return;
     }
   }
