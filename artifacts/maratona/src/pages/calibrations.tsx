@@ -854,6 +854,16 @@ export default function CalibrationsPage() {
               {(conformity || canManageConformity) && (
                 <div className="px-4 py-3">
                   <p className="text-[11px] font-black italic uppercase text-[#444933] mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
+                  {(fullEvent?.conformityEvaluatorName || fullEvent?.conformityEvaluatorFerramentasName) && (
+                    <div className="mb-2 space-y-0.5">
+                      {fullEvent.conformityEvaluatorName && (
+                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Cenografia: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorName}</span></p>
+                      )}
+                      {fullEvent.conformityEvaluatorFerramentasName && (
+                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Ferramentas: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorFerramentasName}</span></p>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-1 mb-2">
                     {([
                       { label: "EPI", key: "epi" as const, commentKey: "epiComment" as const },
@@ -1178,6 +1188,17 @@ export default function CalibrationsPage() {
                                     "border-[#e0e2da] bg-[#fafafa]"
                                   )}
                                 />
+                                {reasonChanged && (
+                                  <div className="mt-0.5 flex items-center gap-1.5">
+                                    {cal ? (
+                                      <button type="button" disabled={isSaving} onClick={e => { e.stopPropagation(); saveCalibration(c.criterionId); }} className="px-2 py-0.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors flex items-center gap-1">
+                                        <Save size={9} /> Salvar justificativa
+                                      </button>
+                                    ) : (
+                                      <p className="text-[9px] italic text-[#9aa088]">Defina a nota calibrada para salvar a justificativa.</p>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </td>
                             {/* Peso */}
