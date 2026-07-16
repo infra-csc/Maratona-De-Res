@@ -1329,36 +1329,36 @@ export default function EventDetailPage() {
           return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {/* Score Final */}
-              <div className={`border-2 border-[#191c1e] p-4 flex flex-col ${displayScore != null ? (hasPenalty ? "bg-[#ffb300]" : "bg-[#ccff00]") : "bg-white"}`}>
-                <span className="text-[9px] font-black italic uppercase tracking-widest text-[#444933] mb-1">
+              <div className="border-2 border-[#191c1e] bg-[#191c1e] p-4 flex flex-col">
+                <span className="text-[9px] font-black italic uppercase tracking-widest text-[#9aa088] mb-1">
                   {concluded ? "Avaliação Final" : "Avaliação Parcial"}
                 </span>
                 {displayScore != null ? (
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black italic text-[#161e00] leading-none">{fmt(displayScore)}</span>
-                    <span className="text-xs font-black italic text-[#506600]">/100</span>
+                    <span className="text-4xl font-black italic text-[#ccff00] leading-none">{fmt(displayScore)}</span>
+                    <span className="text-xs font-black italic text-[#747a60]">/100</span>
                   </div>
                 ) : (
                   <span className="text-2xl font-black italic text-[#9aa088]">—</span>
                 )}
                 {displayScore != null && hasPenalty && (
-                  <span className="mt-1 text-[9px] font-black italic uppercase text-[#862200] bg-white border border-[#862200] px-1.5 py-0.5 self-start">
+                  <span className="mt-1 text-[9px] font-black italic uppercase text-[#ffb300] bg-[#3a2000] border border-[#ffb300] px-1.5 py-0.5 self-start">
                     -{result!.conformityPenalty} pts conf.
                   </span>
                 )}
                 {displayScore != null && !concluded && !event.isHistorical && (
-                  <span className="mt-1.5 inline-flex items-center gap-1 bg-[#191c1e] text-[#ffb300] text-[8px] font-black italic uppercase px-1.5 py-0.5 self-start" data-testid="badge-calibration-pending">
+                  <span className="mt-1.5 inline-flex items-center gap-1 bg-[#2a2e30] text-[#ffb300] text-[8px] font-black italic uppercase px-1.5 py-0.5 self-start" data-testid="badge-calibration-pending">
                     <AlertCircle size={9} />{calibrated ? "Cal. parcial" : "Sem calibragem"}
                   </span>
                 )}
                 {displayScore != null && (
-                  <div className="mt-2.5 w-full h-1.5 bg-[#161e00]/20 overflow-hidden">
-                    <div className="h-full bg-[#161e00]/50 transition-all" style={{ width: `${Math.min(100, displayScore)}%` }} />
+                  <div className="mt-2.5 w-full h-2 bg-[#2a2e30] overflow-hidden">
+                    <div className="h-full transition-all" style={{ width: `${Math.min(100, displayScore)}%`, backgroundColor: displayScore >= 80 ? "#ccff00" : displayScore >= 60 ? "#a8c900" : "#f59e0b" }} />
                   </div>
                 )}
               </div>
               {/* Nota Avaliador */}
-              <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
+              <div className="bg-white border-2 border-[#191c1e] p-4 flex flex-col">
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Nota Avaliador</span>
                 {result && result.eventScore > 0 ? (
                   <>
@@ -1378,7 +1378,7 @@ export default function EventDetailPage() {
                 )}
               </div>
               {/* Participantes */}
-              <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
+              <div className="bg-white border-2 border-[#191c1e] p-4 flex flex-col">
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Participantes</span>
                 <div className="flex items-end gap-2">
                   <span data-testid="text-participant-count" className="text-4xl font-black italic text-[#191c1e] leading-none">{event.participants?.length ?? 0}</span>
@@ -1389,7 +1389,7 @@ export default function EventDetailPage() {
                 </div>
               </div>
               {/* Diárias Realizadas */}
-              <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
+              <div className="bg-white border-2 border-[#191c1e] p-4 flex flex-col">
                 <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Diárias Realizadas</span>
                 <div className="flex items-end gap-2">
                   <span className="text-4xl font-black italic text-[#191c1e] leading-none">{totalDiarias}</span>
@@ -1586,9 +1586,9 @@ export default function EventDetailPage() {
 
                 {/* Progress */}
                 <div className="bg-white border-2 border-[#191c1e]">
-                  <div className="bg-[#191c1e] text-[#ccff00] px-4 py-2 flex items-center gap-2 italic">
-                    <TrendingUp size={14} />
-                    <span className="font-black uppercase tracking-tight text-[11px]">Progresso</span>
+                  <div className="bg-[#f4f6ee] border-b-2 border-[#191c1e] px-4 py-2 flex items-center gap-2 italic">
+                    <TrendingUp size={12} className="text-[#444933]" />
+                    <span className="font-black uppercase tracking-tight text-[11px] text-[#444933]">Progresso</span>
                   </div>
                   <div className="p-4 space-y-3">
                     {[
@@ -1617,9 +1617,11 @@ export default function EventDetailPage() {
                 {/* Equipe preview */}
                 {previewParticipants.length > 0 && (
                   <div className="bg-white border-2 border-[#191c1e]">
-                    <div className="bg-[#191c1e] text-[#ccff00] px-4 py-2 flex items-center gap-2 italic">
-                      <Users size={14} />
-                      <span className="font-black uppercase tracking-tight text-[11px]">Equipe</span>
+                    <div className="bg-[#f4f6ee] border-b-2 border-[#191c1e] px-4 py-2 flex items-center justify-between italic">
+                      <span className="font-black uppercase tracking-tight text-[11px] text-[#444933] flex items-center gap-1.5">
+                        <Users size={10} className="text-[#444933]" /> Equipe
+                      </span>
+                      <span className="text-[8px] font-black italic uppercase text-[#747a60]">{event.participants?.length ?? 0} col.</span>
                     </div>
                     <div className="p-3 space-y-1.5">
                       {previewParticipants.map(p => (
