@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar, RotateCcw, Copy } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar, Copy } from "lucide-react";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 
@@ -474,7 +474,7 @@ export default function CalibrationsPage() {
     });
   }
 
-  const activeCriteria = (criteria ?? []).filter(c => c.active);
+  const activeCriteria = (criteria ?? []).filter(c => c.active).sort((a, b) => a.criterionId - b.criterionId);
 
   // Mapa: criterionId → [IDs dos critérios eventScoped que têm este como fonte].
   // Permite fundir avaliações de duplicatas ("Qualidade de Entrega" + "(2)")
@@ -1032,18 +1032,6 @@ export default function CalibrationsPage() {
                   >
                     <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${fillableCount > 0 ? ` (${fillableCount})` : " Todas"}`}
                   </button>
-                  )}
-
-                  {/* Tornar Parcial — só quando já liberado */}
-                  {alreadyReleased && canFinalize && (
-                    <button
-                      type="button"
-                      disabled={unreleasing}
-                      onClick={handleUnrelease}
-                      className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#c85000] bg-white text-[#c85000] font-black text-xs italic uppercase hover:bg-[#c85000] hover:text-white disabled:opacity-40 transition-colors"
-                    >
-                      <RotateCcw size={13} /> {unreleasing ? "Revertendo..." : "Tornar Parcial"}
-                    </button>
                   )}
 
                   {/* Publicar dropdown — visível sempre que canFinalize (antes e depois de liberar) */}
