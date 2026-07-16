@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurrentCycle, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
 import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
@@ -56,6 +56,7 @@ export default function EventsPage() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const weekendRowRef = useRef<HTMLDivElement>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeForEvent, setMergeForEvent] = useState<{ id: number; name: string } | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>("");
@@ -246,6 +247,15 @@ export default function EventsPage() {
   const canCreate = user && ["admin", "rh"].includes(user.role);
   const hasDateFilter = !!(filterDateFrom || filterDateTo);
 
+  useEffect(() => {
+    if (!weekendRowRef.current || cycleWeekends.length === 0) return;
+    const todayStr = new Date().toISOString().split("T")[0];
+    const idx = cycleWeekends.findIndex(w => w.sun >= todayStr);
+    const targetIdx = idx >= 0 ? idx : cycleWeekends.length - 1;
+    const chip = weekendRowRef.current.children[targetIdx] as HTMLElement | undefined;
+    if (chip) chip.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
+  }, [cycle?.startDate]);
+
   const GRID_COLS = "1fr 90px 56px 130px 130px 80px 120px 72px";
 
   const chipFilters = [
@@ -428,31 +438,6 @@ export default function EventsPage() {
                 className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
               />
             </div>
-            {cycleWeekends.length > 0 && (
-              <div>
-                <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-1">Fim de semana</p>
-                <div className="flex flex-wrap gap-1">
-                  {cycleWeekends.map(w => {
-                    const active = filterDateFrom === w.sat && filterDateTo === w.sun;
-                    return (
-                      <button
-                        key={w.sat}
-                        type="button"
-                        onClick={() => {
-                          if (active) { setFilterDateFrom(""); setFilterDateTo(""); }
-                          else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); }
-                        }}
-                        className={`px-2 py-1 text-[9px] font-black italic uppercase border-2 transition-colors ${
-                          active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"
-                        }`}
-                      >
-                        {w.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
             {hasDateFilter && (
               <button
                 type="button"
@@ -465,6 +450,47 @@ export default function EventsPage() {
           </PopoverContent>
         </Popover>
       </div>
+
+      {/* ── Weekend chips row ── */}
+      {cycleWeekends.length > 0 && (
+        <div className="bg-[#f4f6ee] border-b-2 border-[#191c1e] px-5 py-1.5 flex items-center gap-3 shrink-0">
+          <span className="text-[9px] font-black italic uppercase tracking-widest text-[#506600] shrink-0 flex items-center gap-1.5">
+            <Calendar size={10} />
+            Fim de Semana
+          </span>
+          <div ref={weekendRowRef} className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {cycleWeekends.map(w => {
+              const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+              return (
+                <button
+                  key={w.sat}
+                  type="button"
+                  onClick={() => {
+                    if (active) { setFilterDateFrom(""); setFilterDateTo(""); }
+                    else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); }
+                  }}
+                  className={`px-2.5 py-1 text-[9px] font-black italic uppercase whitespace-nowrap border-2 transition-colors shrink-0 ${
+                    active
+                      ? "bg-[#ccff00] text-[#161e00] border-[#191c1e]"
+                      : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"
+                  }`}
+                >
+                  {w.label}
+                </button>
+              );
+            })}
+          </div>
+          {hasDateFilter && filterDateFrom && filterDateTo && (
+            <button
+              type="button"
+              onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+              className="ml-auto text-[9px] font-bold italic uppercase text-[#9aa088] hover:text-[#b02f00] shrink-0"
+            >
+              × limpar
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Content ── */}
       <div className="flex-1 overflow-auto px-5 py-4">
