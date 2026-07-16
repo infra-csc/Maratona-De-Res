@@ -1271,123 +1271,123 @@ export default function EventDetailPage() {
         {/* ══ TAB: Visão Geral ══ */}
         {activeTab === "visaoGeral" && (<>
 
-        {/* Hero */}
-        <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-          <div className="h-2 bg-[#ccff00] border-b-2 border-[#191c1e]" />
-          <div className="p-6 md:p-8">
-            <div className="flex flex-col md:flex-row gap-6 justify-between items-start">
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-3 mb-3">
-                  {event.isHistorical && (
-                    <span data-testid="badge-historical" className="bg-[#ffb300] text-[#3b2900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                      <span className="inline-block skew-x-[8deg]">Histórico</span>
-                    </span>
-                  )}
-                  {event.cycleName && (
-                    <span className="bg-[#191c1e] text-[#ccff00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-block">
-                      <span className="inline-block skew-x-[8deg]">{event.cycleName}</span>
-                    </span>
-                  )}
-                  {event.forcedClosed && (
-                    <span className="bg-[#ff5722] text-[#3b0900] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
-                      <span className="inline-flex items-center gap-1 skew-x-[8deg]"><ShieldAlert size={10} /> Fechamento Forçado</span>
-                    </span>
-                  )}
-                  {event.resultsConfirmed ? (
-                    <span data-testid="badge-results-confirmed" className="bg-[#ccff00] text-[#161e00] px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
-                      <span className="inline-flex items-center gap-1 skew-x-[8deg]"><CheckCircle2 size={10} /> Resultados Confirmados</span>
-                    </span>
-                  ) : (
-                    <span data-testid="badge-results-pending" className="bg-[#ff5722] text-white px-2 py-1 border-2 border-[#191c1e] font-bold text-[10px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
-                      <span className="inline-flex items-center gap-1 skew-x-[8deg]"><AlertCircle size={10} /> Resultados Não Confirmados</span>
-                    </span>
-                  )}
-                </div>
-                <h1 data-testid="text-event-name" className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter leading-none mb-2 pr-1.5">{event.name}</h1>
-                {event.clientName && <p className="text-base md:text-lg font-bold italic uppercase text-[#506600] mb-6">{event.clientName}</p>}
-
-                <div className="flex flex-wrap items-center gap-5 text-sm font-bold italic text-[#444933]">
-                  <div className="flex items-center gap-2">
-                    <Calendar size={16} className="text-[#506600]" />
-                    <span>{new Date(event.startDate).toLocaleDateString('pt-BR')} — {new Date(event.endDate).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                  {(event.city || event.location) && (
-                    <div className="flex items-center gap-2">
-                      <MapPin size={16} className="text-[#506600]" />
-                      <span>{event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : event.location}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 size={16} className="text-[#506600]" />
-                    <span className={evaluationProgress === 100 ? "text-[#506600] font-black" : ""}>{evaluationProgress}% Avaliado</span>
-                  </div>
-                </div>
+        {/* ── Event title + badges ── */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              {event.isHistorical && (
+                <span data-testid="badge-historical" className="bg-[#ffb300] text-[#3b2900] px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block">
+                  <span className="inline-block skew-x-[8deg]">Histórico</span>
+                </span>
+              )}
+              {event.cycleName && (
+                <span className="bg-[#191c1e] text-[#ccff00] px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block">
+                  <span className="inline-block skew-x-[8deg]">{event.cycleName}</span>
+                </span>
+              )}
+              {event.forcedClosed && (
+                <span className="bg-[#ff5722] text-[#3b0900] px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 skew-x-[8deg]"><ShieldAlert size={8} /> Fechamento Forçado</span>
+                </span>
+              )}
+              {event.resultsConfirmed ? (
+                <span data-testid="badge-results-confirmed" className="bg-[#ccff00] text-[#161e00] px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 skew-x-[8deg]"><CheckCircle2 size={8} /> Confirmado</span>
+                </span>
+              ) : (
+                <span data-testid="badge-results-pending" className="bg-[#ff5722] text-white px-2 py-0.5 border-2 border-[#191c1e] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 skew-x-[8deg]"><AlertCircle size={8} /> Não Confirmado</span>
+                </span>
+              )}
+            </div>
+            <h1 data-testid="text-event-name" className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter leading-none mb-1">{event.name}</h1>
+            {event.clientName && <p className="text-sm font-bold italic uppercase text-[#506600]">{event.clientName}</p>}
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold italic text-[#747a60] mt-1.5">
+              <div className="flex items-center gap-1.5">
+                <Calendar size={12} className="text-[#506600]" />
+                <span>{new Date(event.startDate).toLocaleDateString('pt-BR')} — {new Date(event.endDate).toLocaleDateString('pt-BR')}</span>
               </div>
-
-              {result && result.eventScore > 0 && (() => {
-                const concluded = !!event.feedbackReleased || event.status === "closed" || !!event.isHistorical;
-                const calibrated = (result.criteriaDetails ?? []).some(c => c.calibratedScore != null);
-                const displayScore = (result.conformityScore != null ? result.conformityScore : result.eventScore) as number;
-                const hasPenalty = (result.conformityPenalty ?? 0) > 0;
-                return (
-                <div className={`shrink-0 border-2 border-[#191c1e] p-6 flex flex-col items-center justify-center min-w-[160px] -skew-x-6 ${hasPenalty ? "bg-[#ffb300]" : "bg-[#ccff00]"}`}>
-                  <div className="skew-x-6 flex flex-col items-center">
-                    <span className="text-[10px] font-black italic uppercase tracking-widest text-[#161e00] mb-1">{concluded ? "Avaliação Final" : "Avaliação Parcial"}</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-5xl font-black italic text-[#161e00] leading-none">{fmt(displayScore)}</span>
-                      <span className="text-sm font-black italic text-[#506600]">/100</span>
-                    </div>
-                    {hasPenalty && (
-                      <span className="mt-1 text-[9px] font-black italic uppercase text-[#862200] bg-white border border-[#862200] px-1.5 py-0.5">
-                        -{result.conformityPenalty} pts conformidade
-                      </span>
-                    )}
-                    {!concluded && !event.isHistorical && (
-                      <span className="mt-2 inline-flex items-center gap-1 bg-[#191c1e] text-[#ffb300] text-[9px] font-black italic uppercase tracking-wider px-2 py-1" data-testid="badge-calibration-pending">
-                        <AlertCircle size={11} />
-                        {calibrated ? "Calibragem parcial" : "Aguardando calibragem"}
-                      </span>
-                    )}
-                  </div>
+              {(event.city || event.location) && (
+                <div className="flex items-center gap-1.5">
+                  <MapPin size={12} className="text-[#506600]" />
+                  <span>{event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : event.location}</span>
                 </div>
-                );
-              })()}
-            </div>
-          </div>
-        </section>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className={`bg-white border-2 border-[#191c1e] p-5 flex items-center gap-4 ${HARD_SHADOW}`}>
-            <div className="w-12 h-12 bg-[#ccff00] border-2 border-[#191c1e] flex items-center justify-center text-[#161e00] shrink-0">
-              <Users size={24} />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold italic text-[#747a60] uppercase tracking-wider mb-0.5">Participantes</p>
-              <p data-testid="text-participant-count" className="text-2xl font-black italic text-[#191c1e]">{event.participants?.length ?? 0}</p>
-            </div>
-          </div>
-
-          <div className={`bg-white border-2 border-[#191c1e] p-5 flex items-center gap-4 ${HARD_SHADOW}`}>
-            <div className="w-12 h-12 bg-[#ccff00] border-2 border-[#191c1e] flex items-center justify-center text-[#161e00] shrink-0">
-              <BarChart3 size={24} />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold italic text-[#747a60] uppercase tracking-wider mb-0.5">Critérios Ativos</p>
-              <p className="text-2xl font-black italic text-[#191c1e]">{activeCriteriaCount}</p>
-            </div>
-          </div>
-
-          <div className={`bg-white border-2 border-[#191c1e] p-5 flex items-center gap-4 ${HARD_SHADOW}`}>
-            <div className="w-12 h-12 bg-[#ccff00] border-2 border-[#191c1e] flex items-center justify-center text-[#161e00] shrink-0">
-              <TrendingUp size={24} />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold italic text-[#747a60] uppercase tracking-wider mb-0.5">Quesitos Avaliados</p>
-              <p className="text-2xl font-black italic text-[#191c1e]">{result?.evaluatedCriteria ?? 0} / {result?.totalCriteria ?? activeCriteriaCount}</p>
+              )}
             </div>
           </div>
         </div>
+
+        {/* ── Compact stat cards ── */}
+        {(() => {
+          const displayScore = result && result.eventScore > 0
+            ? (result.conformityScore != null ? result.conformityScore : result.eventScore) as number
+            : null;
+          const hasPenalty = (result?.conformityPenalty ?? 0) > 0;
+          const concluded = !!event.feedbackReleased || event.status === "closed" || !!event.isHistorical;
+          const calibrated = (result?.criteriaDetails ?? []).some(c => c.calibratedScore != null);
+          const totalDiarias = (event.participants ?? []).reduce(
+            (s, p) => s + (p.actualDiariaDates?.length ?? (p.actualDiariaCount ?? 0)),
+            0
+          );
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className={`border-2 border-[#191c1e] p-4 flex flex-col ${displayScore != null ? (hasPenalty ? "bg-[#ffb300]" : "bg-[#ccff00]") : "bg-white"}`}>
+                <span className="text-[9px] font-black italic uppercase tracking-widest text-[#444933] mb-1">
+                  {concluded ? "Avaliação Final" : "Avaliação Parcial"}
+                </span>
+                {displayScore != null ? (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black italic text-[#161e00] leading-none">{fmt(displayScore)}</span>
+                    <span className="text-xs font-black italic text-[#506600]">/100</span>
+                  </div>
+                ) : (
+                  <span className="text-2xl font-black italic text-[#9aa088]">—</span>
+                )}
+                {displayScore != null && hasPenalty && (
+                  <span className="mt-1 text-[9px] font-black italic uppercase text-[#862200] bg-white border border-[#862200] px-1.5 py-0.5 self-start">
+                    -{result!.conformityPenalty} pts conf.
+                  </span>
+                )}
+                {displayScore != null && !concluded && !event.isHistorical && (
+                  <span className="mt-1.5 inline-flex items-center gap-1 bg-[#191c1e] text-[#ffb300] text-[8px] font-black italic uppercase px-1.5 py-0.5 self-start" data-testid="badge-calibration-pending">
+                    <AlertCircle size={9} />{calibrated ? "Cal. parcial" : "Sem calibragem"}
+                  </span>
+                )}
+              </div>
+              <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
+                <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Nota Avaliador</span>
+                {result && result.eventScore > 0 ? (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black italic text-[#191c1e] leading-none">{fmt(result.eventScore as number)}</span>
+                    <span className="text-xs font-black italic text-[#747a60]">/100</span>
+                  </div>
+                ) : (
+                  <span className="text-2xl font-black italic text-[#9aa088]">—</span>
+                )}
+              </div>
+              <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
+                <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Participantes</span>
+                <div className="flex items-baseline gap-1">
+                  <span data-testid="text-participant-count" className="text-4xl font-black italic text-[#191c1e] leading-none">{event.participants?.length ?? 0}</span>
+                  <span className="text-xs font-black italic text-[#747a60]">col.</span>
+                </div>
+              </div>
+              <div className={`bg-white border-2 border-[#191c1e] p-4 flex flex-col ${HARD_SHADOW}`}>
+                <span className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1">Diárias Realizadas</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-black italic text-[#191c1e] leading-none">{totalDiarias}</span>
+                  <span className="text-xs font-black italic text-[#747a60]">dias</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Main content + right sidebar ── */}
+        <div className="flex gap-5 items-start">
+
+          {/* Left: Visão Geral + Criteria table */}
+          <div className="flex-1 min-w-0 space-y-4">
 
         {/* Visão Geral */}
         <section className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
@@ -1434,6 +1434,7 @@ export default function EventDetailPage() {
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Avaliador</th>
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Calibrada</th>
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Nota Final</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Δ</th>
                     <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Contribuição</th>
                   </tr>
                 </thead>
@@ -1441,6 +1442,9 @@ export default function EventDetailPage() {
                   {result.criteriaDetails.map(c => {
                     const calibrated = c.calibratedScore != null;
                     const justifications = justificationsFor(c.criterionId);
+                    const delta = calibrated && c.averageScore != null
+                      ? (c.calibratedScore as number) - (c.averageScore as number)
+                      : null;
                     return (
                       <tr key={c.criterionId} data-testid={`row-criterion-detail-${c.criterionId}`} className="hover:bg-[#f2f4f6] transition-all align-top">
                         <td className="px-6 py-4">
@@ -1532,6 +1536,15 @@ export default function EventDetailPage() {
                             return "—";
                           })()}
                         </td>
+                        <td className="px-4 py-4 text-center">
+                          {delta != null ? (
+                            <span className={`text-xs font-black italic ${delta > 0 ? "text-[#506600]" : delta < 0 ? "text-[#862200]" : "text-[#747a60]"}`}>
+                              {delta > 0 ? "+" : ""}{delta.toFixed(1)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] italic text-[#9aa088]">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">
                           {c.criterionTotal != null ? fmt(c.criterionTotal) : "—"}
                         </td>
@@ -1543,6 +1556,105 @@ export default function EventDetailPage() {
             </div>
           </section>
         )}
+
+          </div>{/* End left column */}
+
+          {/* ── Right sidebar ── */}
+          {(() => {
+            const calCount = (result?.criteriaDetails ?? []).filter(c => c.calibratedScore != null).length;
+            const totalCrit = result?.totalCriteria ?? activeCriteriaCount;
+            const evalCrit = result?.evaluatedCriteria ?? 0;
+            const previewParticipants = (event.participants ?? []).slice(0, 5);
+            const remainingCount = Math.max(0, (event.participants?.length ?? 0) - 5);
+            return (
+              <aside className="w-64 shrink-0 space-y-3">
+
+                {/* Quick Actions */}
+                <div className="bg-white border-2 border-[#191c1e]">
+                  <div className="bg-[#191c1e] text-[#ccff00] px-4 py-2 flex items-center gap-2 italic">
+                    <Zap size={14} />
+                    <span className="font-black uppercase tracking-tight text-[11px]">Ações Rápidas</span>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <Link
+                      href={`/calibrations?eventId=${event.id}`}
+                      className="flex items-center gap-2 w-full px-3 py-2 border-2 border-[#191c1e] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#161e00] transition-colors text-[10px] font-black italic uppercase tracking-tight"
+                    >
+                      <SlidersHorizontal size={12} /> Ver Calibrações
+                    </Link>
+                    <Link
+                      href="/results"
+                      className="flex items-center gap-2 w-full px-3 py-2 border-2 border-[#191c1e] bg-white text-[#191c1e] hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors text-[10px] font-black italic uppercase tracking-tight"
+                    >
+                      <BarChart3 size={12} /> Resultados
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Progress */}
+                <div className="bg-white border-2 border-[#191c1e]">
+                  <div className="bg-[#191c1e] text-[#ccff00] px-4 py-2 flex items-center gap-2 italic">
+                    <TrendingUp size={14} />
+                    <span className="font-black uppercase tracking-tight text-[11px]">Progresso</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {[
+                      { label: "Avaliações", value: evalCrit, total: totalCrit },
+                      { label: "Calibrações", value: calCount, total: totalCrit },
+                    ].map(({ label, value, total }) => {
+                      const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                      return (
+                        <div key={label}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[9px] font-black italic uppercase tracking-wide text-[#747a60]">{label}</span>
+                            <span className="text-[10px] font-black italic text-[#191c1e]">{value}/{total}</span>
+                          </div>
+                          <div className="h-1.5 bg-[#eceef0] border border-[#d0d4c4]">
+                            <div
+                              className="h-full bg-[#ccff00] transition-all duration-300"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Equipe preview */}
+                {previewParticipants.length > 0 && (
+                  <div className="bg-white border-2 border-[#191c1e]">
+                    <div className="bg-[#191c1e] text-[#ccff00] px-4 py-2 flex items-center gap-2 italic">
+                      <Users size={14} />
+                      <span className="font-black uppercase tracking-tight text-[11px]">Equipe</span>
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                      {previewParticipants.map(p => (
+                        <div key={p.id} className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-[#eceef0] border border-[#191c1e] flex items-center justify-center font-black italic text-[8px] text-[#191c1e] shrink-0">
+                            {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                          </div>
+                          <span className="text-[10px] font-bold italic text-[#191c1e] truncate leading-tight">{p.employeeName}</span>
+                        </div>
+                      ))}
+                      {remainingCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("equipe")}
+                          className="text-[9px] font-black italic uppercase text-[#506600] hover:underline mt-0.5"
+                        >
+                          + {remainingCount} mais → ver equipe
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </aside>
+            );
+          })()}
+
+        </div>{/* End flex layout */}
 
         </>)}
 
