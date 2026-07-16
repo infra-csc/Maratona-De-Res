@@ -1418,7 +1418,7 @@ export default function EventDetailPage() {
             </div>
             <div className="px-6 py-3 border-b-2 border-[#eceef0]">
               <p className="text-xs italic text-[#444933]">
-                <strong>Nota Avaliador</strong> é a nota dada pela área avaliadora. <strong>Nota Calibrada</strong> é o valor ajustado na calibração. <strong>Nota Final</strong> é a que entra no cálculo do score da equipe.
+                <strong>Nota Avaliador</strong> é a nota dada pela área avaliadora. <strong>Nota Calibrada</strong> é o valor ajustado na calibração e entra no cálculo do score da equipe.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -1429,8 +1429,6 @@ export default function EventDetailPage() {
                     <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Peso</th>
                     <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Nota Avaliador</th>
                     <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Nota Calibrada</th>
-                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Nota Final</th>
-                    <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Δ</th>
                     <th className="px-4 py-3 text-[9px] font-black uppercase italic text-[#747a60] tracking-wider text-center">Contribuição</th>
                   </tr>
                 </thead>
@@ -1438,9 +1436,6 @@ export default function EventDetailPage() {
                   {result.criteriaDetails.map(c => {
                     const calibrated = c.calibratedScore != null;
                     const justifications = justificationsFor(c.criterionId);
-                    const delta = calibrated && c.averageScore != null
-                      ? (c.calibratedScore as number) - (c.averageScore as number)
-                      : null;
                     return (
                       <tr key={c.criterionId} data-testid={`row-criterion-detail-${c.criterionId}`} className="hover:bg-[#f2f4f6] transition-all align-top">
                         <td className="px-6 py-4">
@@ -1511,32 +1506,6 @@ export default function EventDetailPage() {
                               </div>
                             );
                           })()}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          {(() => {
-                            const scoreVal = c.scoreUsed ?? (importedCriteriaMap.get(c.criterionId)?.excluded === false ? importedCriteriaMap.get(c.criterionId)?.score : null) ?? null;
-                            if (scoreVal == null) return <span className="text-[10px] italic text-[#9aa088]">—</span>;
-                            const tier = scoreVal >= 8 ? "high" : scoreVal >= 6 ? "mid" : "low";
-                            const tierCls = tier === "high"
-                              ? "bg-[#ccff00] text-[#161e00] border-[#506600]"
-                              : tier === "mid"
-                                ? "bg-[#fff8e6] text-[#191c1e] border-[#b58c00]"
-                                : "bg-[#ffede9] text-[#5c1400] border-[#b02f00]";
-                            return (
-                              <span className={`inline-block font-black italic px-3 py-1 border-2 text-sm ${tierCls}`}>
-                                {fmt(scoreVal)}
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          {delta != null ? (
-                            <span className={`text-xs font-black italic ${delta > 0 ? "text-[#506600]" : delta < 0 ? "text-[#862200]" : "text-[#747a60]"}`}>
-                              {delta > 0 ? "+" : ""}{delta.toFixed(1)}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] italic text-[#9aa088]">—</span>
-                          )}
                         </td>
                         <td className="px-4 py-4 text-center font-bold italic text-sm text-[#444933]">
                           {c.criterionTotal != null ? fmt(c.criterionTotal) : "—"}
