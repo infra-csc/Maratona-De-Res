@@ -515,6 +515,22 @@ export default function CalibrationsPage() {
   // Critérios com peso > 0 (únicos que entram nos contadores de calibração)
   const scorableActiveCriteria = displayActiveCriteria.filter(c => Number(c.weightOverride ?? c.originalWeight ?? 0) > 0);
 
+  // Pendências para o "Salvar Tudo": comentários isolados (critério já calibrado
+  // mas com razão editada localmente sem nova nota) + pesos editados.
+  const pendingReasonOnlyCrits = displayActiveCriteria.filter(c => {
+    if (pendingScore(c.criterionId) != null) return false; // já coberto pelo fillableCount
+    const localReason = calReasons[c.criterionId];
+    if (localReason === undefined) return false;
+    const existing = getCalibration(c.criterionId);
+    if (!existing) return false; // sem calibração existente, não há score para reusar
+    return localReason.trim() !== (existing.calibrationReason ?? "").trim();
+  });
+  const pendingWeightCritIds = Object.keys(weightEdits).map(Number).filter(id => {
+    const raw = (weightEdits[id] ?? "").replace(",", ".").trim();
+    return raw !== "" && !isNaN(Number(raw)) && Number(raw) >= 0;
+  });
+  const totalDirtyCount = fillableCount + pendingReasonOnlyCrits.length + pendingWeightCritIds.length;
+
   // Quantos critérios já publicados como Final
   const finalPublishedCount = scorableActiveCriteria.filter(c => !!c.finalPublishedAt).length;
   const allCriteriaFinalPublished = scorableActiveCriteria.length > 0 && finalPublishedCount === scorableActiveCriteria.length;
@@ -656,6 +672,98 @@ export default function CalibrationsPage() {
       });
     } else {
       toast({ title: `${ok} salva(s), ${failed.length} com erro`, description: firstError ?? "Revise os critérios destacados e tente novamente.", variant: "destructive" });
+    }
+  }
+
+  // Salva TUDO de uma vez: calibrações com nota nova, comentários pendentes em
+  // calibrações já salvas, e edições de peso.
+  async function handleSaveAll() {
+    if (totalDirtyCount === 0) return;
+    setSavingAll(true);
+    let okCal = 0, okWeight = 0;
+    const failedCal: number[] = [], failedWeight: number[] = [];
+    let firstError: string | null = null;
+    const allWarnings: string[] = [];
+
+    // 1. Calibrações com nota nova (+ comentário)
+    const toSaveScores = displayActiveCriteria
+      .map(c => ({ critId: c.criterionId, score: pendingScore(c.criterionId), reason: (calReasons[c.criterionId] ?? getCalibration(c.criterionId)?.calibrationReason ?? "").trim() }))
+      .filter((x): x is { critId: number; score: number; reason: string } => x.score != null);
+    for (const x of toSaveScores) {
+      try {
+        const result = await bulkMutation.mutateAsync({
+          data: { eventId: selectedEventId!, criterionId: x.critId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined },
+        });
+        if (result.warnings) allWarnings.push(...result.warnings);
+        okCal++;
+        for (const childId of (childCriterionIdsMap.get(x.critId) ?? [])) {
+          await bulkMutation.mutateAsync({ data: { eventId: selectedEventId!, criterionId: childId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined } });
+        }
+      } catch (e) {
+        failedCal.push(x.critId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+      }
+    }
+
+    // 2. Comentários pendentes em calibrações já salvas (sem nova nota)
+    for (const c of pendingReasonOnlyCrits) {
+      const existing = getCalibration(c.criterionId);
+      if (!existing) continue;
+      const score = parseFloat(existing.calibratedScore as unknown as string);
+      const reason = (calReasons[c.criterionId] ?? "").trim();
+      try {
+        await bulkMutation.mutateAsync({
+          data: { eventId: selectedEventId!, criterionId: c.criterionId, calibratedScore: score, calibrationReason: reason, originalAverageScore: getAvgScore(c.criterionId) ?? undefined },
+        });
+        okCal++;
+      } catch (e) {
+        failedCal.push(c.criterionId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+      }
+    }
+
+    // 3. Pesos editados
+    for (const critId of pendingWeightCritIds) {
+      const raw = (weightEdits[critId] ?? "").replace(",", ".").trim();
+      const w = Number(raw);
+      const crit = displayActiveCriteria.find(c => c.criterionId === critId);
+      if (!crit || isNaN(w)) continue;
+      try {
+        await updateWeightMutation.mutateAsync({ id: selectedEventId!, data: { criteria: [{ criterionId: critId, active: crit.active ?? true, weight: w }] } });
+        okWeight++;
+        setWeightEdits(prev => { const n = { ...prev }; delete n[critId]; return n; });
+      } catch (e) {
+        failedWeight.push(critId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+      }
+    }
+
+    setSavingAll(false);
+    const totalOk = okCal + okWeight;
+    const totalFailed = failedCal.length + failedWeight.length;
+
+    if (failedCal.length === 0) {
+      setCalScores({});
+      setCalReasons({});
+    } else {
+      const savedIds = [...toSaveScores.filter(x => !failedCal.includes(x.critId)).map(x => x.critId), ...pendingReasonOnlyCrits.filter(c => !failedCal.includes(c.criterionId)).map(c => c.criterionId)];
+      setCalScores(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
+      setCalReasons(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
+    }
+
+    qc.invalidateQueries({ queryKey: calQKey });
+    qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
+    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    qc.invalidateQueries({ queryKey: fbQKey });
+
+    const uniqueWarnings = Array.from(new Set(allWarnings));
+    if (totalFailed === 0) {
+      const parts: string[] = [];
+      if (okCal > 0) parts.push(`${okCal} calibraç${okCal === 1 ? "ão" : "ões"}`);
+      if (okWeight > 0) parts.push(`${okWeight} peso${okWeight === 1 ? "" : "s"}`);
+      toast({ title: `Tudo salvo — ${parts.join(", ")}`, description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined, variant: uniqueWarnings.length > 0 ? "destructive" : undefined });
+    } else {
+      toast({ title: `${totalOk} salvo(s), ${totalFailed} com erro`, description: firstError ?? "Revise os itens destacados.", variant: "destructive" });
     }
   }
 
@@ -1023,17 +1131,17 @@ export default function CalibrationsPage() {
           ) : (
             <>
               <div className="flex items-center gap-2 flex-wrap bg-white border-2 border-[#191c1e] px-3 py-2">
-                  {/* Salvar — só disponível antes de liberar */}
+                  {/* Salvar Tudo — calibrações, comentários e pesos */}
                   {!alreadyReleased && (
                   <button
                     data-testid="button-save-all-cal"
                     type="button"
-                    disabled={savingAll || fillableCount === 0}
-                    onClick={saveAllCalibrations}
-                    title={fillableCount === 0 ? "Preencha ao menos uma nota calibrada (0–10) para salvar" : `Salvar ${fillableCount} calibração(ões) digitada(s)`}
+                    disabled={savingAll || totalDirtyCount === 0}
+                    onClick={handleSaveAll}
+                    title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
                     className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors enabled:hover:bg-[#191c1e] enabled:hover:text-[#ccff00]"
                   >
-                    <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${fillableCount > 0 ? ` (${fillableCount})` : " Todas"}`}
+                    <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
                   </button>
                   )}
 
