@@ -95,7 +95,7 @@ router.get("/events", async (req, res) => {
       const partialTimestamps = activeCriteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
       const partialPublishedAt = partialTimestamps.length > 0
         ? new Date(Math.max(...partialTimestamps.map(d => d.getTime()))) : null;
-      const partialPublishedCount = partialTimestamps.length;
+      const partialPublishedCount = scorableActiveCriteria.filter(c => c.partialPublishedAt != null).length;
       const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
       return {
         ...ev,
@@ -181,7 +181,10 @@ router.get("/events", async (req, res) => {
       .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
-    const partialPublishedCount = partialTimestamps.length;
+    const partialPublishedCount = activeCriteria.filter(c => {
+      const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
+      return w > 0 && c.partialPublishedAt != null;
+    }).length;
     const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
     return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };
   });
