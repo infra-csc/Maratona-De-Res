@@ -6,20 +6,16 @@ import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, MapPin, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Info, LayoutGrid, List, Trash2, Pencil, MoreHorizontal } from "lucide-react";
+import { Search, Calendar, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Trash2, Pencil, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
 import { cn } from "@/lib/utils";
-
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
 function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
   if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
@@ -38,23 +34,28 @@ function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
   return result;
 }
 
+function MiniBar({ value, total, color }: { value: number; total: number; color: string }) {
+  const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+  return (
+    <div className="flex flex-col gap-0.5 w-full">
+      <div className="h-1 bg-[#e8eae0] w-full overflow-hidden">
+        <div className="h-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-[9px] font-black italic" style={{ color }}>{value}/{total}</span>
+    </div>
+  );
+}
+
 export default function EventsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [cardFilter, setCardFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("dateDesc");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [viewMode, setViewModeState] = useState<"cards" | "table">(
-    () => (localStorage.getItem("events_view_mode") === "cards" ? "cards" : "table"),
-  );
-  const setViewMode = (mode: "cards" | "table") => {
-    setViewModeState(mode);
-    localStorage.setItem("events_view_mode", mode);
-  };
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeForEvent, setMergeForEvent] = useState<{ id: number; name: string } | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>("");
@@ -175,29 +176,12 @@ export default function EventsPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const isPastOrClosed = (e: typeof all[0]) => e.status === "closed" || (!!e.endDate && new Date(e.endDate) < today);
-  const hasNoPublication = (e: typeof all[0]) => !e.feedbackReleased && !e.partialPublishedAt;
   const isInEvaluation = (e: typeof all[0]) =>
     !!e.criteriaConfirmed &&
     (e.evaluationProgress ?? 0) > 0 &&
     (e.calibratedCriteriaCount ?? 0) === 0;
 
-  // Base para os contadores: aplica busca + filtro de data, mas NÃO o cardFilter
-  // (os próprios cards são o filtro de status — seus counts devem refletir a data selecionada)
-  const statsBase = all.filter(ev => {
-    const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase())
-      || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase())
-      || (ev.city ?? "").toLowerCase().includes(search.toLowerCase())
-      || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
-    return matchSearch && matchDate;
-  });
-
-  const statsData = [
-    { key: "pendingRH",  label: "Aguardando RH",  value: statsBase.filter(e => !e.criteriaConfirmed).length,                                                                              color: "#ff5722" },
-    { key: "inEval",     label: "Em Avaliação",    value: statsBase.filter(isInEvaluation).length,                                                                                         color: "#1565c0" },
-    { key: "pendingCal", label: "Falta calibrar", value: statsBase.filter(e => isPastOrClosed(e) && (e.calibratedCriteriaCount ?? 0) < (e.totalCriteria ?? 0)).length,                color: "#ffb300" },
-    { key: "fullyEval",  label: "Avaliação 100%", value: statsBase.filter(e => (e.totalCriteria ?? 0) > 0 && (e.calibratedCriteriaCount ?? 0) >= (e.totalCriteria ?? 0)).length, color: "#ccff00" },
-  ];
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
 
   const colSortPairs: Record<string, string> = {
     nameAsc: "nameDesc", nameDesc: "nameAsc",
@@ -206,11 +190,10 @@ export default function EventsPage() {
     evaluatedDesc: "evaluatedAsc", evaluatedAsc: "evaluatedDesc",
     calibrDesc: "calibrAsc", calibrAsc: "calibrDesc",
     scoreDesc: "scoreAsc", scoreAsc: "scoreDesc",
-    statusAsc: "statusDesc", statusDesc: "statusAsc",
   };
   const colPrimary: Record<string, string> = {
     name: "nameAsc", date: "dateDesc", participants: "participantsDesc",
-    evaluated: "evaluatedDesc", calibr: "calibrDesc", score: "scoreDesc", status: "statusAsc",
+    evaluated: "evaluatedDesc", calibr: "calibrDesc", score: "scoreDesc",
   };
   const handleColSort = (col: string) => {
     const primary = colPrimary[col];
@@ -229,21 +212,22 @@ export default function EventsPage() {
     return sortBy === colSortPairs[primary];
   };
 
-  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
-
   const filtered = all.filter(ev => {
-    const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase()) || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.city ?? "").toLowerCase().includes(search.toLowerCase()) || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchSearch = ev.name.toLowerCase().includes(search.toLowerCase())
+      || (ev.clientName ?? "").toLowerCase().includes(search.toLowerCase())
+      || (ev.city ?? "").toLowerCase().includes(search.toLowerCase())
+      || (ev.location ?? "").toLowerCase().includes(search.toLowerCase());
     const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
-    const matchConfig = true;
     const matchCard = cardFilter === null
       || (cardFilter === "pendingRH"  && !ev.criteriaConfirmed)
       || (cardFilter === "inEval"     && isInEvaluation(ev))
+      || (cardFilter === "concluded"  && ev.status === "closed")
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
       || (cardFilter === "fullyEval"  && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
-    return matchSearch && matchDate && matchConfig && matchCard;
+    return matchSearch && matchDate && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
-    const ec = (ev: typeof a) => ev.totalCriteria ?? 0 > 0 ? (ev.evaluatedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
+    const ec = (ev: typeof a) => (ev.totalCriteria ?? 0) > 0 ? (ev.evaluatedCriteria ?? 0) / (ev.totalCriteria ?? 1) : -1;
     const cc = (ev: typeof a) => (ev.totalCriteria ?? 0) > 0 ? (ev.calibratedCriteriaCount ?? 0) / (ev.totalCriteria ?? 1) : -1;
     if (sortBy === "nameAsc")          return a.name.localeCompare(b.name);
     if (sortBy === "nameDesc")         return b.name.localeCompare(a.name);
@@ -256,30 +240,54 @@ export default function EventsPage() {
     if (sortBy === "calibrAsc")        return cc(a) - cc(b);
     if (sortBy === "scoreDesc")        return (sc(b) ?? -1) - (sc(a) ?? -1);
     if (sortBy === "scoreAsc")         return (sc(a) ?? 101) - (sc(b) ?? 101);
-    if (sortBy === "statusAsc")        return (a.status ?? "").localeCompare(b.status ?? "");
-    if (sortBy === "statusDesc")       return (b.status ?? "").localeCompare(a.status ?? "");
     return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
   });
 
   const canCreate = user && ["admin", "rh"].includes(user.role);
+  const hasDateFilter = !!(filterDateFrom || filterDateTo);
+
+  const GRID_COLS = "1fr 90px 56px 130px 130px 80px 120px 72px";
+
+  const chipFilters = [
+    { key: null,          label: "Todos" },
+    { key: "inEval",      label: "Em Avaliação" },
+    { key: "pendingRH",   label: "Aguardando RH" },
+    { key: "concluded",   label: "Concluídos" },
+    { key: "fullyEval",   label: "Pub. Final" },
+    { key: "pendingCal",  label: "Falta Cal." },
+  ];
 
   return (
     <div className="min-h-full flex flex-col text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
-      {/* ── Top bar ── */}
-      <div className="bg-[#191c1e] px-6 py-3 flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-4 min-w-0">
-          <h1 data-testid="text-page-title" className="text-xl italic uppercase tracking-tighter font-black leading-none text-white whitespace-nowrap">
-            Gestão de <span className="text-[#ccff00]">Eventos</span>
-          </h1>
-          <div className="hidden sm:block">
-            <CycleBadge />
-          </div>
-          <span className="hidden md:inline-block text-[10px] font-bold italic uppercase text-white/40 border border-white/20 px-2 py-0.5 whitespace-nowrap">
-            Sincronizado via integração
-          </span>
+      {/* ── Dark header ── */}
+      <div className="bg-[#191c1e] border-b-4 border-[#ccff00] px-5 py-3 flex items-center gap-4 shrink-0 flex-wrap">
+        <div className="shrink-0">
+          <span className="text-[9px] font-black italic uppercase text-[#747a60] tracking-wider block">Gerenciar</span>
+          <h1 data-testid="text-page-title" className="text-[15px] font-black italic uppercase text-white leading-tight">Eventos do Ciclo</h1>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+
+        <div className="shrink-0">
+          <CycleBadge />
+        </div>
+
+        {/* Quick stats */}
+        <div className="flex items-center border-l border-[#333] pl-4 gap-0">
+          {[
+            { val: all.length,                                                label: "Eventos",    color: "text-white" },
+            { val: all.filter(e => e.status === "open").length,               label: "Abertos",    color: "text-[#ccff00]" },
+            { val: all.filter(e => e.status === "closed").length,             label: "Concluídos", color: "text-[#9aa088]" },
+            { val: all.filter(e => e.fullyCalibrated).length,                 label: "Pub. Final", color: "text-[#768f00]" },
+          ].map((s, i) => (
+            <div key={i} className="px-3 py-1 border-r border-[#333] last:border-0">
+              <span className={`block text-[17px] font-black italic leading-none ${s.color}`}>{s.val}</span>
+              <span className="text-[8px] font-bold italic uppercase text-[#747a60]">{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Action buttons */}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           {user?.role === "admin" && (
             <button
               onClick={() => {
@@ -287,8 +295,7 @@ export default function EventsPage() {
                 normalizeDatesMutation.mutate();
               }}
               disabled={normalizeDatesMutation.isPending}
-              className="flex items-center gap-1.5 bg-white/10 border-2 border-white/30 px-3 py-1.5 font-bold text-xs italic uppercase text-white hover:bg-white/20 transition-colors disabled:opacity-50"
-              title="Normalizar datas para data única"
+              className="h-8 px-3 border border-[#333] text-[9px] font-bold italic uppercase text-[#9aa088] hover:border-[#ccff00] hover:text-[#ccff00] transition-colors disabled:opacity-50 flex items-center gap-1.5"
             >
               {normalizeDatesMutation.isPending ? "..." : "Unificar Datas"}
             </button>
@@ -298,9 +305,9 @@ export default function EventsPage() {
               <DialogTrigger asChild>
                 <button
                   data-testid="button-create-event"
-                  className="flex items-center gap-1.5 bg-[#ccff00] border-2 border-[#ccff00] px-4 py-1.5 font-black text-xs italic uppercase text-[#161e00] hover:bg-[#b8e600] transition-colors"
+                  className="h-8 px-3 bg-[#ccff00] text-[#161e00] text-[9px] font-black italic uppercase flex items-center gap-1.5 hover:bg-[#b8e800] transition-colors"
                 >
-                  <Plus size={14} /> Novo Evento
+                  <Plus size={10} /> Novo Evento
                 </button>
               </DialogTrigger>
               <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
@@ -358,527 +365,398 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* ── Body: sidebar + main ── */}
-      <div className="flex flex-1 min-h-0">
+      {/* ── Filter bar ── */}
+      <div className="bg-white border-b border-[#e0e2da] px-5 py-2 flex items-center gap-2 shrink-0 flex-wrap">
+        {/* Search */}
+        <div className="flex items-center gap-1.5 border border-[#d0d2ca] px-2.5 py-1.5 w-64 shrink-0">
+          <Search size={10} className="text-[#9aa088] shrink-0" />
+          <input
+            data-testid="input-search-events"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar evento, cliente ou cidade…"
+            className="text-[10px] italic text-[#191c1e] bg-transparent outline-none w-full placeholder:text-[#b0b8a0]"
+          />
+        </div>
 
-        {/* ── Sidebar ── */}
-        <aside className="w-52 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-y-auto">
-          <div className="p-4 border-b-2 border-[#eceef0]">
-            <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-3">Filtrar por status</p>
-            <div className="space-y-0.5">
-              <button
-                onClick={() => setCardFilter(null)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors border-l-2 ${
-                  cardFilter === null ? "bg-[#f0ffe0] border-[#506600]" : "border-transparent hover:bg-[#f7f9fb]"
-                }`}
-              >
-                <span className={`text-xs font-bold italic ${cardFilter === null ? "text-[#191c1e]" : "text-[#444933]"}`}>Todos</span>
-                <span className="text-sm font-black italic text-[#191c1e]">{statsBase.length}</span>
-              </button>
-              {statsData.map(s => (
-                <button
-                  key={s.key}
-                  onClick={() => setCardFilter(cardFilter === s.key ? null : s.key)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors border-l-2 ${
-                    cardFilter === s.key ? "bg-[#f0ffe0] border-[#506600]" : "border-transparent hover:bg-[#f7f9fb]"
-                  }`}
-                >
-                  <span className={`text-xs font-bold italic leading-tight ${cardFilter === s.key ? "text-[#191c1e]" : "text-[#444933]"}`}>{s.label}</span>
-                  <span className="text-sm font-black italic shrink-0" style={{ color: cardFilter === s.key ? "#191c1e" : s.color }}>{s.value}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Status chip filters */}
+        {chipFilters.map((f) => (
+          <button
+            key={String(f.key)}
+            onClick={() => setCardFilter(f.key)}
+            className={`h-7 px-2.5 text-[9px] font-bold italic uppercase border transition-colors shrink-0 ${
+              cardFilter === f.key
+                ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]"
+                : "bg-white text-[#747a60] border-[#d0d2ca] hover:border-[#191c1e] hover:text-[#191c1e]"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
 
-          <div className="p-4 border-b-2 border-[#eceef0]">
-            <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-3">Filtrar por data</p>
-            <div className="space-y-2">
-              <div>
-                <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">De</label>
-                <input
-                  type="date"
-                  value={filterDateFrom}
-                  onChange={e => setFilterDateFrom(e.target.value)}
-                  className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">Até</label>
-                <input
-                  type="date"
-                  value={filterDateTo}
-                  onChange={e => setFilterDateTo(e.target.value)}
-                  className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
-                />
-              </div>
-              {cycleWeekends.length > 0 && (
-                <div>
-                  <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-1">Fim de semana</p>
-                  <div className="flex flex-wrap gap-1">
-                    {cycleWeekends.map(w => {
-                      const active = filterDateFrom === w.sat && filterDateTo === w.sun;
-                      return (
-                        <button
-                          key={w.sat}
-                          type="button"
-                          onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                          className={`px-2 py-1 text-[9px] font-black italic uppercase border-2 transition-colors ${active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"}`}
-                        >
-                          {w.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {(filterDateFrom || filterDateTo) && (
-                <button
-                  type="button"
-                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-                  className="w-full text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left pt-0.5"
-                >
-                  × Limpar datas
-                </button>
-              )}
-            </div>
-          </div>
-
-        </aside>
-
-        {/* ── Main ── */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[#f7f9fb]">
-
-          {/* Search + sort + view toggle */}
-          <div className="bg-white border-b-2 border-[#eceef0] px-5 py-3 flex items-center gap-3 shrink-0">
-            <div className="relative flex-1">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-              <Input
-                data-testid="input-search-events"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-9 h-9 rounded-none border-2 border-[#191c1e] bg-[#f7f9fb] italic font-medium text-sm focus-visible:ring-0 focus-visible:bg-white"
-                placeholder="Buscar evento, cliente ou cidade..."
+        {/* Date filter popover */}
+        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className={`ml-auto h-7 px-3 border text-[9px] font-bold italic uppercase flex items-center gap-1.5 transition-colors shrink-0 ${
+                hasDateFilter
+                  ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]"
+                  : "border-[#d0d2ca] text-[#747a60] hover:border-[#191c1e] hover:text-[#191c1e]"
+              }`}
+            >
+              <SlidersHorizontal size={10} />
+              {hasDateFilter ? "Datas ●" : "Filtrar Datas"}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] p-4 space-y-3">
+            <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60]">Filtrar por data</p>
+            <div>
+              <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">De</label>
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={e => setFilterDateFrom(e.target.value)}
+                className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
               />
             </div>
-            <div className="flex border-2 border-[#191c1e] h-9 overflow-hidden shrink-0">
-              <button
-                type="button"
-                data-testid="button-view-table"
-                title="Tabela compacta"
-                onClick={() => setViewMode("table")}
-                className={`px-3 flex items-center transition-colors ${viewMode === "table" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
-              >
-                <List size={15} />
-              </button>
-              <button
-                type="button"
-                data-testid="button-view-cards"
-                title="Visualização em cards"
-                onClick={() => setViewMode("cards")}
-                className={`px-3 flex items-center border-l-2 border-[#191c1e] transition-colors ${viewMode === "cards" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#747a60] hover:bg-[#eceef0]"}`}
-              >
-                <LayoutGrid size={15} />
-              </button>
+            <div>
+              <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">Até</label>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={e => setFilterDateTo(e.target.value)}
+                className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
+              />
             </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-auto">
-            {isLoading ? (
-              <div className="p-6 space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-12 bg-white border-2 border-[#eceef0] animate-pulse" />
-                ))}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <Calendar size={40} className="mb-4 opacity-20" />
-                <h3 className="text-lg font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
-                <p className="text-[#747a60] italic mt-1 text-sm">Ajuste os filtros ou sincronize via integração.</p>
-              </div>
-            ) : viewMode === "table" ? (
-              <div className="bg-white border-b-2 border-[#eceef0] overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1040px]">
-                  <thead>
-                    <tr className="border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10">
-                      {(["name","date","participants","evaluated","calibr","score","status"] as const).map((col, i) => {
-                        const labels: Record<string, string> = { name:"Evento", date:"Período", participants:"Part.", evaluated:"Avaliados", calibr:"Calibr.", score:"Score", status:"Status" };
-                        const centered = ["participants","evaluated","calibr","score"].includes(col);
-                        const active = colActive(col);
-                        const asc = sortAsc(col);
-                        return (
-                          <th
-                            key={col}
-                            onClick={() => handleColSort(col)}
-                            className={`py-3 text-[10px] font-bold uppercase italic cursor-pointer select-none whitespace-nowrap group transition-colors
-                              ${i === 0 ? "px-4" : "px-3"}
-                              ${centered ? "text-center" : ""}
-                              ${active ? "text-[#ccff00]" : "text-[#ccff00]/60 hover:text-[#ccff00]"}`}
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              {labels[col]}
-                              <span className={`inline-flex flex-col leading-none transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}>
-                                <ChevronUp size={8} className={active && asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
-                                <ChevronDown size={8} className={active && !asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
-                              </span>
-                            </span>
-                          </th>
-                        );
-                      })}
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase italic text-[#ccff00]/60 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y-2 divide-[#eceef0]">
-                    {filtered.map(ev => {
-                      const score = ev.teamScore ?? ev.averageScore ?? null;
-                      const concluded = ev.status === "closed";
-                      const total = ev.totalCriteria ?? 0;
-                      const evaluated = ev.evaluatedCriteria ?? 0;
-                      const calCount = ev.calibratedCriteriaCount ?? 0;
-                      const fc = ev.fullyCalibrated ?? false;
-                      const isScoreFinal = concluded && fc;
-                      const finalPubCount = ev.finalCalibratedCriteria ?? 0;
-                      const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
-                      const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
-                      const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
-                      // Eventos históricos sem registros reais de calibração usam importedScore
-                      const isPureHistorical = !!ev.isHistorical && calSaved === 0;
-                      const scoreLabel = isPureHistorical
-                        ? "Importado"
-                        : finalPubCount > 0 && partialOnlyCount > 0
-                          ? `Misto (${finalPubCount}F·${partialOnlyCount}P)`
-                          : finalPubCount > 0 ? "Pub. Final"
-                          : partialOnlyCount > 0 ? "Pub. Parcial"
-                          : calSaved > 0 ? "Rascunho"
-                          : "Avaliador";
-                      const scoreLabelColor = isPureHistorical
-                        ? "text-[#a06a00]"
-                        : finalPubCount > 0 && partialOnlyCount === 0
-                          ? "text-[#506600]"
-                          : finalPubCount > 0 || partialOnlyCount > 0 ? "text-[#a06a00]"
-                          : calSaved > 0 ? "text-[#1565c0]"
-                          : "text-[#747a60]";
-                      const missing = ev.unassignedAreaNames ?? [];
-                      const hasEvals = evaluated > 0;
-                      const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
-                        : fc ? "#ccff00"
-                        : evaluated === total && total > 0 ? "#506600"
-                        : evaluated > 0 ? "#ffb300"
-                        : "#506600";
-                      return (
-                        <tr key={ev.id} data-testid={`row-event-${ev.id}`} className="hover:bg-[#f7f9fb] transition-colors">
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-[3px] h-9 shrink-0 rounded-sm" style={{ backgroundColor: statusColor }} />
-                              <div className="min-w-0">
-                                <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-xs text-[#191c1e] hover:text-[#506600] leading-tight block">{ev.name}</Link>
-                                {([ev.clientName, ev.city].filter(Boolean).length > 0) && (
-                                  <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
-                                    {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
-                                  </p>
-                                )}
-                                {missing.length > 0 && !hasEvals && (
-                                  <p className="text-[10px] font-bold italic uppercase text-[#b02f00] truncate" title={`Sem avaliador: ${missing.join(", ")}`}>
-                                    Sem avaliador: {missing.join(", ")}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] whitespace-nowrap">
-                            {ev.startDate === ev.endDate
-                              ? new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-                              : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — ${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
-                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${!isPureHistorical && total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
-                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 && evaluated === 0 ? "—" : total === 0 ? `${evaluated}` : `${evaluated}/${total}`}
-                          </td>
-                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}`}>
-                            {isPureHistorical ? <span className="text-[#c4c9ac]">—</span> : total === 0 && calCount === 0 ? "—" : total === 0 ? `${calCount}` : `${calCount}/${total}`}
-                          </td>
-                          <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                            {score == null ? (
-                              <span className="text-xs italic text-[#c4c9ac]">—</span>
-                            ) : (
-                              <>
-                                <span className="text-sm font-black italic text-[#191c1e]">{score.toFixed(1)}</span>
-                                {finalPubCount > 0 && partialOnlyCount > 0 ? (
-                                  <>
-                                    <span className="block text-[9px] font-bold italic uppercase leading-none text-[#506600]">{finalPubCount} Final</span>
-                                    <span className="block text-[9px] font-bold italic uppercase leading-none text-[#a06a00]">{partialOnlyCount} Parcial</span>
-                                  </>
-                                ) : (
-                                  <span className={`block text-[9px] font-bold italic uppercase leading-none ${scoreLabelColor}`}>
-                                    {scoreLabel}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">
-                            <div className="flex flex-col gap-0.5">
-                              {/* Status operacional — não deixa isHistorical curto-circuitar quando há nota real */}
-                              {isPureHistorical && score == null ? null
-                                : !ev.criteriaConfirmed && !hasEvals ? (
-                                  <span className="text-[10px] font-bold italic uppercase text-[#b02f00]">Aguardando RH</span>
-                                ) : !ev.resultsConfirmed ? (
-                                  <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Elegib. pendente</span>
-                                ) : (ev.status === "closed" || ev.isHistorical) ? (
-                                  <span className="text-[10px] font-bold italic uppercase text-[#506600]">Concluído</span>
-                                ) : (
-                                  <span className="text-[10px] font-bold italic uppercase text-[#506600]">OK</span>
-                                )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Gerenciar — SEMPRE PRIMEIRO e visível */}
-                              <Link href={`/events/${ev.id}`}>
-                                <button data-testid={`button-view-event-${ev.id}`} title="Gerenciar evento" className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] hover:bg-[#506600] hover:text-white transition-all">
-                                  <ChevronRight size={13} />
-                                </button>
-                              </Link>
-                              {/* Menu ⋮ para ações secundárias (admin/rh) */}
-                              {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
-                                      <MoreHorizontal size={12} />
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] min-w-[160px]">
-                                    {user && ["admin", "rh"].includes(user.role) && (
-                                      <DropdownMenuItem
-                                        data-testid={`button-edit-event-${ev.id}`}
-                                        onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
-                                        className="gap-2 italic font-bold text-xs cursor-pointer"
-                                      >
-                                        <Pencil size={12} /> Editar
-                                      </DropdownMenuItem>
-                                    )}
-                                    {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                                      <DropdownMenuItem asChild className="gap-2 italic font-bold text-xs cursor-pointer">
-                                        <Link href={`/calibrations?eventId=${ev.id}`}>
-                                          <SlidersHorizontal size={12} /> Calibrações
-                                        </Link>
-                                      </DropdownMenuItem>
-                                    )}
-                                    {user?.role === "admin" && (
-                                      <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                          data-testid={`button-merge-event-${ev.id}`}
-                                          onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
-                                          className="gap-2 italic font-bold text-xs cursor-pointer"
-                                        >
-                                          <GitMerge size={12} /> Mesclar
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          data-testid={`button-delete-event-${ev.id}`}
-                                          onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
-                                          className="gap-2 italic font-bold text-xs cursor-pointer text-[#b02f00] focus:text-[#b02f00]"
-                                        >
-                                          <Trash2 size={12} /> Excluir
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-5 grid grid-cols-1 xl:grid-cols-2 gap-5">
-                {filtered.map(ev => {
-                  const score = ev.teamScore ?? ev.averageScore ?? null;
-                  const calibrated = ev.hasCalibration ?? false;
-                  const concluded = ev.status === "closed";
-                  const total = ev.totalCriteria ?? 0;
-                  const evaluated = ev.evaluatedCriteria ?? 0;
-                  const calCount = ev.finalCalibratedCriteria ?? 0;
-                  const fc = ev.fullyCalibrated ?? false;
-                  const evalPct = total > 0 ? Math.round((evaluated / total) * 100) : 0;
-                  const calPct  = total > 0 ? Math.round((calCount / total) * 100) : 0;
-                  const isScoreFinal = concluded && fc;
-                  const finalPubCount = ev.finalCalibratedCriteria ?? 0;
-                  const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
-                  const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
-                  const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
-                  const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
-                    ? `Misto (${finalPubCount}F·${partialOnlyCount}P)`
-                    : finalPubCount > 0 ? "Pub. Final"
-                    : partialOnlyCount > 0 ? "Pub. Parcial"
-                    : calSaved > 0 ? "Rascunho"
-                    : "Avaliador";
-                  const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0
-                    ? "#506600"
-                    : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
-                    : calSaved > 0 ? "#1565c0"
-                    : "#747a60";
-                  const hasEvals = evaluated > 0;
-                  const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
-                    : fc ? "#ccff00"
-                    : evaluated === total && total > 0 ? "#506600"
-                    : evaluated > 0 ? "#ffb300"
-                    : "#506600";
-                  return (
-                    <div key={ev.id} data-testid={`card-event-${ev.id}`} className={`bg-white border-2 border-[#191c1e] border-l-[5px] flex flex-col ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`} style={{ borderLeftColor: statusColor }}>
-                      <div className="p-5 flex-1">
-                        <div className="flex justify-between items-start gap-4 mb-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                              {!ev.criteriaConfirmed && !hasEvals && (
-                                <span className="px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block bg-[#fff0ee] text-[#b02f00]">
-                                  Aguardando RH
-                                </span>
-                              )}
-                              {!ev.resultsConfirmed && (
-                                <span className="px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block bg-[#fff8e0] text-[#a06a00]">
-                                  Elegib. pendente
-                                </span>
-                              )}
-                              {ev.isHistorical && (
-                                <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block">Ciclo Anterior</span>
-                              )}
-                              {concluded && (
-                                <span className="bg-[#506600] text-white px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block">Concluído</span>
-                              )}
-                            </div>
-                            <Link href={`/events/${ev.id}`} className="font-black text-base italic uppercase tracking-tight text-[#191c1e] hover:text-[#506600] transition-colors leading-tight block">{ev.name}</Link>
-                            {ev.clientName && <p className="text-xs font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{ev.clientName}</p>}
-                          </div>
-                          {score != null && (
-                            <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[74px] shrink-0 ${finalPubCount > 0 && partialOnlyCount === 0 ? "bg-[#ccff00]" : finalPubCount > 0 || partialOnlyCount > 0 ? "bg-[#fff8e1]" : "bg-[#f0f0f0]"}`}>
-                              {finalPubCount > 0 && partialOnlyCount > 0 ? (
-                                <>
-                                  <span className="block text-[9px] font-bold italic uppercase leading-none text-[#506600]">{finalPubCount} Final</span>
-                                  <span className="block text-[9px] font-bold italic uppercase leading-none text-[#a06a00]">{partialOnlyCount} Parcial</span>
-                                </>
-                              ) : (
-                                <span className="block text-[9px] uppercase font-bold italic mb-0.5" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
-                              )}
-                              <span className="text-xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold italic text-[#444933] mt-3 pt-3 border-t-2 border-dashed border-[#e0e3e5]">
-                          <span className="flex items-center gap-1.5">
-                            <Calendar size={12} className="text-[#747a60]" />
-                            {ev.startDate === ev.endDate
-                              ? new Date(ev.startDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
-                              : `${new Date(ev.startDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })} – ${new Date(ev.endDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })}`}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <MapPin size={12} className="text-[#747a60]" />
-                            {ev.city ? `${ev.city}${ev.state ? `, ${ev.state}` : ""}` : (ev.location || "Local n/d")}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Users size={12} className="text-[#747a60]" />
-                            {ev.participantCount} participantes
-                          </span>
-                        </div>
-                        {!!ev.unassignedAreaNames && ev.unassignedAreaNames.length > 0 && (
-                          <p className="mt-2 text-[10px] font-bold italic uppercase text-[#b02f00] flex items-start gap-1.5">
-                            <Info size={11} className="shrink-0 mt-0.5" />
-                            Sem avaliador: {ev.unassignedAreaNames.join(", ")}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">
-                        <div className="flex-1 max-w-[240px] space-y-1.5">
-                          {total > 0 && (<>
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] mb-1 font-bold italic uppercase">
-                                <span className="text-[#444933]">Avaliados</span>
-                                <span className={evalPct === 100 ? "text-[#506600]" : "text-[#191c1e]"}>{evaluated}/{total}</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-[#eceef0] border border-[#191c1e] overflow-hidden">
-                                <div className={evalPct === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${evalPct}%` }} />
-                              </div>
-                            </div>
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] mb-1 font-bold italic uppercase">
-                                <span className="text-[#444933]">Calibrações</span>
-                                <span className={fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}>{calCount}/{total}</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-[#eceef0] border border-[#191c1e] overflow-hidden">
-                                <div className={fc ? "h-full bg-[#506600]" : "h-full bg-[#ffb300]"} style={{ width: `${calPct}%` }} />
-                              </div>
-                            </div>
-                          </>)}
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {user && ["admin", "rh"].includes(user.role) && (
-                            <button
-                              data-testid={`button-edit-event-${ev.id}`}
-                              title="Editar evento"
-                              onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
-                              className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                          )}
-                          {user?.role === "admin" && (
-                            <button data-testid={`button-merge-event-${ev.id}`} title="Mesclar" onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }} className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
-                              <GitMerge size={14} />
-                            </button>
-                          )}
-                          {user?.role === "admin" && (
-                            <button
-                              data-testid={`button-delete-event-${ev.id}`}
-                              title="Excluir evento"
-                              onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
-                              className="h-8 px-2.5 flex items-center border-2 border-[#b02f00] bg-white text-[#b02f00] hover:bg-[#fff0ee] transition-all"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                          {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                            <Link href={`/calibrations?eventId=${ev.id}`}>
-                              <button data-testid={`button-calibrate-event-${ev.id}`} title="Calibrações" className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
-                                <SlidersHorizontal size={14} />
-                              </button>
-                            </Link>
-                          )}
-                          <Link href={`/events/${ev.id}`}>
-                            <button data-testid={`button-view-event-${ev.id}`} className="h-8 px-3 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all">
-                              Gerenciar <ChevronRight size={13} className="ml-1" />
-                            </button>
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+            {cycleWeekends.length > 0 && (
+              <div>
+                <p className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] mb-1">Fim de semana</p>
+                <div className="flex flex-wrap gap-1">
+                  {cycleWeekends.map(w => {
+                    const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                    return (
+                      <button
+                        key={w.sat}
+                        type="button"
+                        onClick={() => {
+                          if (active) { setFilterDateFrom(""); setFilterDateTo(""); }
+                          else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); }
+                        }}
+                        className={`px-2 py-1 text-[9px] font-black italic uppercase border-2 transition-colors ${
+                          active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"
+                        }`}
+                      >
+                        {w.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
-          </div>
+            {hasDateFilter && (
+              <button
+                type="button"
+                onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                className="w-full text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left"
+              >
+                × Limpar datas
+              </button>
+            )}
+          </PopoverContent>
+        </Popover>
+      </div>
 
-          {/* Footer count */}
-          {!isLoading && (
-            <div className="bg-white border-t-2 border-[#eceef0] px-5 py-2 flex items-center justify-between shrink-0">
-              <span className="text-[11px] italic text-[#747a60]">
-                {filtered.length === all.length
-                  ? `${all.length} eventos no ciclo`
-                  : `${filtered.length} de ${all.length} eventos`}
-              </span>
-              {cardFilter && (
-                <button onClick={() => setCardFilter(null)} className="text-[10px] font-bold italic uppercase text-[#506600] hover:underline">
-                  Limpar filtro ×
-                </button>
-              )}
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-auto px-5 py-4">
+        {isLoading ? (
+          <div className="space-y-px bg-white border border-[#d0d2ca]">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="h-14 bg-white animate-pulse border-b border-[#eceef0]" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <Calendar size={40} className="mb-4 opacity-20" />
+            <h3 className="text-lg font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
+            <p className="text-[#747a60] italic mt-1 text-sm">Ajuste os filtros ou sincronize via integração.</p>
+            {cardFilter !== null && (
+              <button
+                onClick={() => setCardFilter(null)}
+                className="mt-4 px-4 py-2 text-[10px] font-bold italic uppercase border-2 border-[#191c1e] hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors"
+              >
+                Limpar filtro
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white border border-[#d0d2ca]">
+            {/* Table header */}
+            <div
+              className="grid border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10"
+              style={{ gridTemplateColumns: GRID_COLS }}
+            >
+              {(["name","date","participants","evaluated","calibr","score"] as const).map((col, i) => {
+                const labels: Record<string, string> = {
+                  name: "Evento", date: "Data", participants: "Part.",
+                  evaluated: "Avaliações", calibr: "Calibrações", score: "Nota",
+                };
+                const active = colActive(col);
+                const asc = sortAsc(col);
+                return (
+                  <div
+                    key={col}
+                    onClick={() => handleColSort(col)}
+                    className={`px-3 py-2 text-[9px] font-black italic uppercase tracking-wider cursor-pointer select-none flex items-center gap-1 transition-colors group
+                      ${i === 0 ? "pl-4" : ""}
+                      ${active ? "text-[#ccff00]" : "text-[#ccff00]/50 hover:text-[#ccff00]/80"}`}
+                  >
+                    {labels[col]}
+                    <span className={`inline-flex flex-col leading-none transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}>
+                      <ChevronUp size={7} className={active && asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
+                      <ChevronDown size={7} className={active && !asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="px-3 py-2 text-[9px] font-black italic uppercase tracking-wider text-[#ccff00]/50">Status</div>
+              <div className="px-3 py-2" />
             </div>
-          )}
-        </main>
+
+            {/* Rows */}
+            {filtered.map((ev, i) => {
+              const score = ev.teamScore ?? ev.averageScore ?? null;
+              const concluded = ev.status === "closed";
+              const total = ev.totalCriteria ?? 0;
+              const evaluated = ev.evaluatedCriteria ?? 0;
+              const calCount = ev.calibratedCriteriaCount ?? 0;
+              const fc = ev.fullyCalibrated ?? false;
+              const finalPubCount = ev.finalCalibratedCriteria ?? 0;
+              const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
+              const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
+              const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
+              const isPureHistorical = !!ev.isHistorical && calSaved === 0;
+              const hasEvals = evaluated > 0;
+              const missing = ev.unassignedAreaNames ?? [];
+
+              // Accent bar color
+              const accentColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
+                : fc ? "#506600"
+                : evaluated === total && total > 0 ? "#ccff00"
+                : evaluated > 0 ? "#ffb300"
+                : "#e0e2da";
+
+              // Score label
+              const scoreLabel = isPureHistorical
+                ? "Importado"
+                : finalPubCount > 0 && partialOnlyCount > 0
+                  ? `${finalPubCount}F · ${partialOnlyCount}P`
+                  : finalPubCount > 0 ? "Pub. Final"
+                  : partialOnlyCount > 0 ? "Pub. Parcial"
+                  : calSaved > 0 ? "Rascunho"
+                  : "Avaliador";
+              const scoreLabelColor = isPureHistorical ? "#a06a00"
+                : finalPubCount > 0 && partialOnlyCount === 0 ? "#506600"
+                : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
+                : calSaved > 0 ? "#1565c0"
+                : "#747a60";
+
+              // MiniBar colors
+              const evalColor = !isPureHistorical && evaluated === total && total > 0 ? "#506600" : "#ccff00";
+              const calColor = fc ? "#506600" : calCount > 0 ? "#a06a00" : "#d0d2ca";
+
+              // Date display
+              const dateStr = ev.startDate === ev.endDate
+                ? new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}–${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
+
+              return (
+                <div
+                  key={ev.id}
+                  data-testid={`row-event-${ev.id}`}
+                  className={`grid relative items-center border-b border-[#eceef0] hover:bg-[#f8fdf0] transition-colors group ${i % 2 !== 0 ? "bg-[#fafcf5]" : "bg-white"}`}
+                  style={{ gridTemplateColumns: GRID_COLS }}
+                >
+                  {/* Accent bar */}
+                  <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: accentColor }} />
+
+                  {/* Event name + subtitle */}
+                  <div className="pl-4 pr-3 py-3 min-w-0">
+                    <Link href={`/events/${ev.id}`} className="text-[11px] font-black italic uppercase text-[#191c1e] hover:text-[#506600] leading-tight block truncate transition-colors">
+                      {ev.name}
+                    </Link>
+                    <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
+                      {ev.isHistorical && (
+                        <span className="text-[9px] font-black italic uppercase text-[#a06a00]">Histórico ·</span>
+                      )}
+                      {!ev.criteriaConfirmed && !hasEvals && (
+                        <span className="text-[9px] font-black italic uppercase text-[#b02f00]">Ag. RH ·</span>
+                      )}
+                      {!ev.resultsConfirmed && ev.criteriaConfirmed && (
+                        <span className="text-[9px] font-black italic uppercase text-[#a06a00]">Elegib. pend. ·</span>
+                      )}
+                      <span className="text-[9px] italic text-[#9aa088] truncate">
+                        {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
+                      </span>
+                    </div>
+                    {missing.length > 0 && !hasEvals && (
+                      <p className="text-[9px] font-bold italic uppercase text-[#b02f00] truncate mt-0.5">
+                        Sem aval.: {missing.join(", ")}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Date */}
+                  <div className="px-3 py-3 text-[10px] font-bold italic text-[#444933] whitespace-nowrap">{dateStr}</div>
+
+                  {/* Participants */}
+                  <div className="px-3 py-3 flex items-center gap-1 text-[#747a60]">
+                    <Users size={10} />
+                    <span className="text-[11px] font-black italic text-[#444933]">{ev.participantCount ?? 0}</span>
+                  </div>
+
+                  {/* Avaliações mini bar */}
+                  <div className="px-3 py-3">
+                    {isPureHistorical ? (
+                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
+                    ) : total === 0 ? (
+                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
+                    ) : (
+                      <MiniBar value={evaluated} total={total} color={evalColor} />
+                    )}
+                  </div>
+
+                  {/* Calibrações mini bar */}
+                  <div className="px-3 py-3">
+                    {isPureHistorical ? (
+                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
+                    ) : total === 0 ? (
+                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
+                    ) : (
+                      <MiniBar value={calCount} total={total} color={calColor} />
+                    )}
+                  </div>
+
+                  {/* Score */}
+                  <div className="px-3 py-3 text-center">
+                    {score != null ? (
+                      <div>
+                        <span className={`text-[18px] font-black italic leading-none block ${fc ? "text-[#506600]" : "text-[#191c1e]"}`}>
+                          {score.toFixed(1)}
+                        </span>
+                        <span className="text-[8px] font-bold italic uppercase" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[14px] italic text-[#c4c9ac]">—</span>
+                    )}
+                  </div>
+
+                  {/* Status badge */}
+                  <div className="px-3 py-3">
+                    {!ev.criteriaConfirmed && !hasEvals ? (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff0ee] text-[#b02f00] border-[#f0b0a0]">Ag. RH</span>
+                    ) : fc ? (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#191c1e] text-[#ccff00] border-[#506600]">Pub. Final</span>
+                    ) : partialOnlyCount > 0 ? (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff8e1] text-[#a06a00] border-[#e8c870]">Pub. Parcial</span>
+                    ) : calSaved > 0 ? (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#e8f0fe] text-[#1565c0] border-[#90aee8]">Rascunho</span>
+                    ) : concluded ? (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#f4fce0] text-[#506600] border-[#c4cda8]">Concluído</span>
+                    ) : evaluated === total && total > 0 ? (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#f4fce0] text-[#506600] border-[#c4cda8]">Avaliado</span>
+                    ) : evaluated > 0 ? (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff4e5] text-[#a06a00] border-[#e8b84b]">Em Avaliação</span>
+                    ) : (
+                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#eceef0] text-[#747a60] border-[#d0d2ca]">Aguardando</span>
+                    )}
+                  </div>
+
+                  {/* Action */}
+                  <div className="px-2 py-3 flex items-center justify-center gap-1">
+                    <Link href={`/events/${ev.id}`}>
+                      <button
+                        data-testid={`button-view-event-${ev.id}`}
+                        title="Gerenciar evento"
+                        className="h-7 w-7 bg-[#191c1e] text-[#ccff00] flex items-center justify-center hover:bg-[#506600] transition-colors"
+                      >
+                        <ChevronRight size={12} />
+                      </button>
+                    </Link>
+                    {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="h-7 w-7 flex items-center justify-center border border-[#d0d2ca] bg-white text-[#747a60] hover:bg-[#eceef0] hover:border-[#191c1e] transition-all">
+                            <MoreHorizontal size={11} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] min-w-[160px]">
+                          {user && ["admin", "rh"].includes(user.role) && (
+                            <DropdownMenuItem
+                              data-testid={`button-edit-event-${ev.id}`}
+                              onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
+                              className="gap-2 italic font-bold text-xs cursor-pointer"
+                            >
+                              <Pencil size={12} /> Editar
+                            </DropdownMenuItem>
+                          )}
+                          {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                            <DropdownMenuItem asChild className="gap-2 italic font-bold text-xs cursor-pointer">
+                              <Link href={`/calibrations?eventId=${ev.id}`}>
+                                <SlidersHorizontal size={12} /> Calibrações
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
+                          {user?.role === "admin" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                data-testid={`button-merge-event-${ev.id}`}
+                                onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
+                                className="gap-2 italic font-bold text-xs cursor-pointer"
+                              >
+                                <GitMerge size={12} /> Mesclar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                data-testid={`button-delete-event-${ev.id}`}
+                                onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
+                                className="gap-2 italic font-bold text-xs cursor-pointer text-[#b02f00] focus:text-[#b02f00]"
+                              >
+                                <Trash2 size={12} /> Excluir
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Legend + count */}
+        {!isLoading && filtered.length > 0 && (
+          <div className="flex items-center gap-5 mt-3 px-1 flex-wrap">
+            {[
+              { color: "#506600", label: "Pub. Final" },
+              { color: "#ccff00", label: "Avaliado" },
+              { color: "#ffb300", label: "Em andamento" },
+              { color: "#e0e2da", label: "Aguardando" },
+              { color: "#ff5722", label: "Ag. RH" },
+            ].map(l => (
+              <div key={l.label} className="flex items-center gap-1.5">
+                <div className="w-[3px] h-3 shrink-0" style={{ backgroundColor: l.color }} />
+                <span className="text-[9px] italic text-[#747a60]">{l.label}</span>
+              </div>
+            ))}
+            <span className="ml-auto text-[11px] italic text-[#747a60]">
+              {filtered.length === all.length
+                ? `${all.length} eventos no ciclo`
+                : `${filtered.length} de ${all.length} eventos`}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Merge dialog ── */}
