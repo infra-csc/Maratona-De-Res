@@ -816,16 +816,6 @@ export default function CalibrationsPage() {
                     >
                       <ExternalLink size={12} /> Ver Evento
                     </Link>
-                    {alreadyReleased && canFinalize && (
-                      <button
-                        type="button"
-                        disabled={unreleasing}
-                        onClick={handleUnrelease}
-                        className="shrink-0 flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white text-[#444933] border-2 border-[#191c1e] px-3 py-1 hover:bg-[#191c1e] hover:text-white disabled:opacity-40 transition-colors"
-                      >
-                        <RotateCcw size={12} /> {unreleasing ? "..." : "Tornar Parcial"}
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -1029,9 +1019,9 @@ export default function CalibrationsPage() {
             </div>
           ) : (
             <>
-              {!alreadyReleased && (
-                <div className="flex items-center gap-2 flex-wrap bg-white border-2 border-[#191c1e] px-3 py-2">
-                  {/* Salvar */}
+              <div className="flex items-center gap-2 flex-wrap bg-white border-2 border-[#191c1e] px-3 py-2">
+                  {/* Salvar — só disponível antes de liberar */}
+                  {!alreadyReleased && (
                   <button
                     data-testid="button-save-all-cal"
                     type="button"
@@ -1042,8 +1032,21 @@ export default function CalibrationsPage() {
                   >
                     <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${fillableCount > 0 ? ` (${fillableCount})` : " Todas"}`}
                   </button>
+                  )}
 
-                  {/* Publicar dropdown */}
+                  {/* Tornar Parcial — só quando já liberado */}
+                  {alreadyReleased && canFinalize && (
+                    <button
+                      type="button"
+                      disabled={unreleasing}
+                      onClick={handleUnrelease}
+                      className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#c85000] bg-white text-[#c85000] font-black text-xs italic uppercase hover:bg-[#c85000] hover:text-white disabled:opacity-40 transition-colors"
+                    >
+                      <RotateCcw size={13} /> {unreleasing ? "Revertendo..." : "Tornar Parcial"}
+                    </button>
+                  )}
+
+                  {/* Publicar dropdown — visível sempre que canFinalize (antes e depois de liberar) */}
                   {canFinalize && (
                     <Popover>
                       <PopoverTrigger asChild>
@@ -1127,7 +1130,6 @@ export default function CalibrationsPage() {
                     </div>
                   </div>
                 </div>
-              )}
 
               {/* ── CRITERIA TABLE ── */}
               {filteredActiveCriteria.length === 0 && displayActiveCriteria.length > 0 ? (
