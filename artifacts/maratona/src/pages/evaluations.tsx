@@ -1181,18 +1181,25 @@ export default function EvaluationsPage() {
     <div className="bg-[#f7f9fb] min-h-screen flex flex-col text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
       {/* ── Top bar ── */}
-      <div className="bg-[#191c1e] px-5 py-3 flex items-center justify-between gap-4 shrink-0">
-        <h1 data-testid="text-page-title" className="text-lg italic uppercase tracking-tighter font-black leading-none text-white">
-          Central de <span className="text-[#ccff00]">Avaliações</span>
-        </h1>
+      <div className="bg-[#191c1e] px-5 py-3 flex items-center justify-between gap-4 shrink-0 border-b-2 border-[#ccff00]/20">
+        <div className="flex items-center gap-3">
+          <h1 data-testid="text-page-title" className="text-lg italic uppercase tracking-tighter font-black leading-none text-white">
+            Central de <span className="text-[#ccff00]">Avaliações</span>
+          </h1>
+          {cycle && (
+            <span className="text-[9px] font-black italic uppercase px-2 py-0.5 border border-white/10 text-white/40 hidden sm:inline-block">
+              {cycle.name}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {isManager && (
             <button
               data-testid="button-export-pending"
               onClick={handleExportPending}
-              className="flex items-center gap-1.5 border border-[#ccff00]/40 px-3 py-1.5 text-[11px] font-black italic uppercase text-[#ccff00] hover:border-[#ccff00] transition-colors"
+              className="flex items-center gap-1.5 border-2 border-[#ccff00]/40 px-3 py-1.5 text-[11px] font-black italic uppercase text-[#ccff00] hover:border-[#ccff00] hover:bg-[#ccff00]/10 transition-colors"
             >
-              <Download size={14} /> Exportar Pendentes
+              <Download size={13} /> Exportar Pendentes
             </button>
           )}
         </div>
@@ -1416,9 +1423,10 @@ export default function EvaluationsPage() {
                 </div>
               )}
 
-              <div className="px-3 py-1.5 border-t border-[#eceef0] shrink-0">
-                <p className="text-[9px] italic text-[#747a60] leading-snug">
-                  {isConsultation ? "Modo consulta — acompanhe o andamento sem editar notas." : "Apenas eventos configurados e liberados pelo RH aparecem."}
+              <div className="px-4 py-2.5 border-t-2 border-[#eceef0] shrink-0 bg-[#f7f9fb]">
+                <p className="text-[9px] italic text-[#9aa08a] leading-snug flex items-start gap-1.5">
+                  <Info size={10} className="shrink-0 mt-0.5" />
+                  {isConsultation ? "Modo consulta — visualize o andamento das avaliações sem editar notas." : "Apenas eventos configurados e liberados pelo RH aparecem aqui."}
                 </p>
               </div>
             </>
@@ -1906,9 +1914,16 @@ export default function EvaluationsPage() {
 
               {/* Criteria Column / Evaluation Form */}
               <div className="space-y-4 order-2 lg:order-none">
-                <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight px-1 flex items-center gap-2">
-                  {isConsultation ? (<><ListChecks size={22} /> Status das Avaliações</>) : "Critérios de Avaliação"}
-                </h3>
+                <div className="flex items-center justify-between gap-4 px-1">
+                  <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
+                    {isConsultation ? (<><ListChecks size={20} /> Status das Avaliações</>) : (<><Target size={20} /> Critérios de Avaliação</>)}
+                  </h3>
+                  {isConsultation && filteredAreaGroups.length > 0 && (
+                    <span className="text-[10px] font-black italic uppercase text-[#747a60] border border-[#d0d3d6] px-2 py-0.5 shrink-0">
+                      {filteredAreaGroups.reduce((sum, g) => sum + g.criteria.length, 0)} quesitos
+                    </span>
+                  )}
+                </div>
 
                 {isConsultation ? (
                   filteredAreaGroups.length === 0 ? (
