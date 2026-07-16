@@ -73,7 +73,6 @@ export default function CalibrationsPage() {
   const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
   const [contextOpen, setContextOpen] = useState(false);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
-  const [detailCriterionId, setDetailCriterionId] = useState<number | null>(null);
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
@@ -609,9 +608,6 @@ export default function CalibrationsPage() {
     }
   }
 
-  const detailCriterion = detailCriterionId != null
-    ? (activeCriteria.find(c => c.criterionId === detailCriterionId) ?? null)
-    : null;
 
   return (
     <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1122,8 +1118,7 @@ export default function CalibrationsPage() {
                           <tr
                             key={c.criterionId}
                             data-testid={`row-cal-${c.criterionId}`}
-                            onClick={() => setDetailCriterionId(c.criterionId)}
-                            className="cursor-pointer hover:bg-[#f7ffd1] transition-colors group"
+                            className="transition-colors group"
                           >
                             {/* Critério */}
                             <td className="px-3 py-2.5">
@@ -1131,9 +1126,6 @@ export default function CalibrationsPage() {
                                 <span className="font-black italic uppercase text-[12px] text-[#191c1e] leading-tight">{c.criterionName}</span>
                                 {c.responsibleAreaName && (
                                   <span className="hidden lg:inline text-[9px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#191c1e] px-1">{c.responsibleAreaName}</span>
-                                )}
-                                {areaScores.length > 0 && (
-                                  <ChevronDown size={11} className="text-[#747a60] opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
                                 )}
                               </div>
                               {/* ── Comentário do avaliador (read-only) ── */}
@@ -1401,174 +1393,6 @@ export default function CalibrationsPage() {
 
       </div>
 
-      {/* ── CRITERION DETAIL DIALOG ── */}
-      {detailCriterion && (() => {
-        const c = detailCriterion;
-        const areaScores = getAreaScores(c.criterionId);
-        const avg = getAvgScore(c.criterionId);
-        const cal = getCalibration(c.criterionId);
-        const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
-        const scoreVal = calScores[c.criterionId] ?? (cal ? String(parseFloat(cal.calibratedScore as unknown as string)) : "");
-        const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
-        const isSaving = savingCritId === c.criterionId && createMutation.isPending;
-        const isFinalPublished = !!c.finalPublishedAt;
-        return (
-          <Dialog open={true} onOpenChange={v => { if (!v) setDetailCriterionId(null); }}>
-            <DialogContent className="max-w-2xl rounded-none border-2 border-[#191c1e] p-0 gap-0 shadow-[8px_8px_0px_0px_#ccff00]">
-              <DialogHeader className="bg-[#f2f4f6] border-b-2 border-[#191c1e] px-5 py-3 space-y-0">
-                <DialogTitle className="font-black italic uppercase tracking-tight text-[#191c1e] flex items-center gap-2">
-                  <SlidersHorizontal size={16} className="text-[#506600]" /> {c.criterionName}
-                </DialogTitle>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  {c.responsibleAreaName && (
-                    <span className="text-[10px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#191c1e] px-1.5 py-0.5 flex items-center gap-1"><Building2 size={10} /> {c.responsibleAreaName}</span>
-                  )}
-                  <span className="text-[10px] font-bold italic uppercase text-[#747a60] border border-[#d8dadc] px-1.5 py-0.5">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
-                  {cal ? (
-                    <span className="text-[10px] font-bold italic uppercase bg-[#f2ffd6] text-[#506600] border border-[#506600] px-1.5 py-0.5 flex items-center gap-1"><CheckCircle size={10} /> Calibrado</span>
-                  ) : (
-                    <span className="text-[10px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5">{avg != null ? "Pendente" : "Sem nota da área"}</span>
-                  )}
-                  {canEditWeights && (
-                    <div className="flex items-center gap-1 ml-auto" onClick={e => e.stopPropagation()}>
-                      <span className="text-[10px] font-bold italic uppercase text-[#747a60]">Peso</span>
-                      <input
-                        data-testid={`input-weight-${c.criterionId}`}
-                        type="text" inputMode="decimal"
-                        value={weightEdits[c.criterionId] ?? String(c.weightOverride ?? c.originalWeight ?? 0)}
-                        onChange={e => setWeightEdits(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9.,]/g, "") }))}
-                        className="h-6 w-12 px-1 border-2 border-[#191c1e] text-center text-xs font-black italic focus:outline-none focus:ring-1 focus:ring-[#ccff00]"
-                      />
-                      {weightEdits[c.criterionId] != null && Number(weightEdits[c.criterionId].replace(",", ".")) !== Number(c.weightOverride ?? c.originalWeight ?? 0) && (
-                        <button
-                          data-testid={`button-save-weight-${c.criterionId}`}
-                          type="button"
-                          disabled={savingWeightId === c.criterionId && updateWeightMutation.isPending}
-                          onClick={() => saveWeight(c.criterionId, c.active)}
-                          className="h-6 px-2 bg-[#ccff00] border border-[#191c1e] text-[10px] font-black italic uppercase disabled:opacity-50 hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors"
-                        >
-                          {savingWeightId === c.criterionId && updateWeightMutation.isPending ? "..." : "Salvar"}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </DialogHeader>
-              <div className="p-5 space-y-4 max-h-[68vh] overflow-y-auto">
-                {/* Area scores */}
-                {areaScores.length > 0 ? (
-                  <div>
-                    <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5"><Building2 size={13} /> Notas da Área</p>
-                    <div className="space-y-2">
-                      {areaScores.map((s, i) => (
-                        <div key={i} className="border-2 border-[#191c1e] bg-white">
-                          <div className="flex items-center justify-between gap-2 px-3 py-1.5">
-                            <span className="text-[11px] font-bold italic uppercase text-[#444933]">{s.name}</span>
-                            <span className="text-sm font-black italic text-[#191c1e] bg-[#eceef0] border-l-2 border-[#191c1e] px-2 leading-6 shrink-0">{s.score.toFixed(1)}</span>
-                          </div>
-                          {s.comment && <p className="text-[11px] italic text-[#444933] border-t-2 border-[#eceef0] px-3 py-1.5 whitespace-pre-wrap">{s.comment}</p>}
-                          {s.audioUrl && (
-                            <div className="border-t-2 border-[#eceef0] px-3 py-1.5">
-                              <p className="text-[10px] font-bold uppercase italic text-[#747a60] mb-1">Áudio</p>
-                              <AudioPlayer objectPath={s.audioUrl} />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-baseline gap-2 mt-3">
-                      <span className="text-[11px] font-bold uppercase italic text-[#747a60]">Nota Avaliador</span>
-                      <span className={`text-xl font-black italic ${cal ? "text-[#c4c9ac] line-through" : "text-[#191c1e]"}`}>{avg?.toFixed(2)}</span>
-                      {cal && <><span className="text-sm text-[#747a60]">→</span><span className="text-xl font-black italic text-[#ff5722]">{calVal?.toFixed(2)}</span></>}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm italic text-[#747a60] font-bold uppercase">Nenhuma nota enviada pela área para este critério.</p>
-                )}
-
-                {/* Calibration form */}
-                <div className="border-t-2 border-[#e8eaec] pt-4">
-                  <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-3 flex items-center gap-1.5"><SlidersHorizontal size={13} /> Calibração</p>
-                  <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
-                    <div className="sm:w-28 shrink-0">
-                      <label className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60] block mb-1">Nota (0–10)</label>
-                      <input
-                        data-testid={`input-cal-score-${c.criterionId}`}
-                        type="text" inputMode="numeric"
-                        value={scoreVal}
-                        onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9]/g, "") }))}
-                        placeholder="—"
-                        className="h-11 w-full px-3 border-2 border-[#191c1e] text-lg font-black italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60] block mb-1">Justificativa</label>
-                      <Textarea
-                        data-testid={`input-cal-reason-${c.criterionId}`}
-                        value={reasonVal}
-                        onChange={e => setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }))}
-                        placeholder="Por que a nota original foi alterada?"
-                        rows={3}
-                        className="mt-0 rounded-none border-2 border-[#191c1e] resize-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    {cal && (
-                      <p className="text-xs italic text-[#444933]">
-                        Atual: <strong className="not-italic">{calVal?.toFixed(2)}</strong>{cal.calibratedByName ? ` · por ${cal.calibratedByName}` : ""}
-                      </p>
-                    )}
-                    <button
-                      data-testid={`button-save-cal-${c.criterionId}`}
-                      type="button"
-                      disabled={isSaving || savingAll}
-                      onClick={() => saveCalibration(c.criterionId)}
-                      className={`ml-auto flex items-center gap-2 bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-sm italic uppercase disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
-                    >
-                      <Save size={16} /> {isSaving ? "Salvando..." : cal ? "Atualizar Calibração" : "Salvar Calibração"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Per-criterion publish buttons */}
-                {canFinalize && !alreadyReleased && (
-                  <div className="border-t-2 border-[#e8eaec] pt-3 flex items-center gap-2 flex-wrap">
-                    {isFinalPublished && (
-                      <span data-testid={`badge-criterion-final-${c.criterionId}`} title={`Final publicado em ${formatDateTime(new Date(c.finalPublishedAt!))}`} className="text-[11px] font-bold italic uppercase bg-[#506600] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1 flex items-center gap-1">
-                        <ShieldCheck size={12} /> Final · {formatDateTime(new Date(c.finalPublishedAt!))}
-                      </span>
-                    )}
-                    {c.partialPublishedAt && !isFinalPublished && (
-                      <span data-testid={`badge-criterion-partial-${c.criterionId}`} title={`Parcial em ${formatDateTime(new Date(c.partialPublishedAt))}`} className="text-[11px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border-2 border-[#191c1e] px-2 py-1 flex items-center gap-1">
-                        <Send size={12} /> Parcial · {formatDateTime(new Date(c.partialPublishedAt))}
-                      </span>
-                    )}
-                    <button
-                      data-testid={`button-publish-criterion-partial-${c.criterionId}`}
-                      type="button"
-                      disabled={publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending}
-                      onClick={() => handlePublishCriterionPartial(c.criterionId)}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white text-[#191c1e] border-2 border-[#191c1e] px-3 py-1.5 disabled:opacity-40 hover:bg-[#191c1e] hover:text-white transition-colors"
-                    >
-                      <Send size={12} /> {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "Publicando..." : isFinalPublished ? "Tornar Parcial" : "Publicar Parcial"}
-                    </button>
-                    <button
-                      data-testid={`button-publish-criterion-final-${c.criterionId}`}
-                      type="button"
-                      disabled={publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending}
-                      onClick={() => handlePublishCriterionFinal(c.criterionId)}
-                      className={`inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase border-2 border-[#191c1e] px-3 py-1.5 disabled:opacity-40 transition-all ${isFinalPublished ? "bg-[#506600] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#161e00]" : "bg-[#191c1e] text-[#ccff00] hover:bg-[#506600]"}`}
-                    >
-                      <ShieldCheck size={12} /> {publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending ? "Publicando..." : isFinalPublished ? "Republicar Final" : "Publicar Final"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-        );
-      })()}
 
 
       {/* Modal explicativo de finalização do evento */}
