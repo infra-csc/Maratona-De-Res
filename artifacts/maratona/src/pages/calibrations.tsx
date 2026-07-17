@@ -394,22 +394,6 @@ export default function CalibrationsPage() {
     }
   }
 
-  // Inicializa publishIntents quando o evento muda ou quando os critérios carregam
-  useEffect(() => { setPublishIntents({}); }, [selectedEventId]);
-  useEffect(() => {
-    if (!displayActiveCriteria.length) return;
-    setPublishIntents(prev => {
-      const next = { ...prev };
-      for (const c of displayActiveCriteria) {
-        if (next[c.criterionId] === undefined) {
-          next[c.criterionId] = c.finalPublishedAt ? "final" : "partial";
-        }
-      }
-      return next;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayActiveCriteria.map(c => c.criterionId).join(",")]);
-
   // Publica todos os critérios calibrados de acordo com a intenção definida por critério
   async function handlePublishAll() {
     if (!selectedEventId) return;
@@ -553,6 +537,23 @@ export default function CalibrationsPage() {
   );
   // Lista de exibição: exclui os filhos (suas notas aparecem na linha do pai)
   const displayActiveCriteria = activeCriteria.filter(c => !childCriterionIdSet.has(c.criterionId));
+
+  // Inicializa publishIntents quando o evento muda ou quando os critérios carregam.
+  // DEVE ficar APÓS a declaração de displayActiveCriteria para evitar TDZ em produção.
+  useEffect(() => { setPublishIntents({}); }, [selectedEventId]);
+  useEffect(() => {
+    if (!displayActiveCriteria.length) return;
+    setPublishIntents(prev => {
+      const next = { ...prev };
+      for (const c of displayActiveCriteria) {
+        if (next[c.criterionId] === undefined) {
+          next[c.criterionId] = c.finalPublishedAt ? "final" : "partial";
+        }
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayActiveCriteria.map(c => c.criterionId).join(",")]);
 
   // Todo critério ativo sem calibração conta como pendente — mesmo os que ainda
   // não receberam nota da área (a calibração pode preencher a lacuna).
