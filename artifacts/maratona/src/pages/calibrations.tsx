@@ -1562,25 +1562,6 @@ export default function CalibrationsPage() {
                 )
               )}
 
-              {alreadyReleased && (
-                <div className="bg-[#506600] text-[#ccff00] border-2 border-[#191c1e] px-4 py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle size={14} className="shrink-0" />
-                    <span className="text-sm font-black italic uppercase">
-                      Avaliação Final liberada{feedbackReleasedAtDate ? ` em ${formatDateTime(feedbackReleasedAtDate)}` : ""}
-                    </span>
-                  </div>
-                  <button
-                    data-testid="button-save-all-cal-released"
-                    type="button"
-                    disabled={savingAll || fillableCount === 0}
-                    onClick={saveAllCalibrations}
-                    className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#ccff00] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white hover:border-white transition-colors shrink-0"
-                  >
-                    <Save size={13} /> {savingAll ? "Salvando..." : `Salvar Ajustes${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
-                  </button>
-                </div>
-              )}
             </>
           )}
           </div>{/* end left column */}
