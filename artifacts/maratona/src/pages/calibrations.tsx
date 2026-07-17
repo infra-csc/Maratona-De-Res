@@ -71,6 +71,9 @@ export default function CalibrationsPage() {
   const [publishingFinalCritId, setPublishingFinalCritId] = useState<number | null>(null);
   const [publishingAllFinal, setPublishingAllFinal] = useState(false);
   const [publishingAllPartial, setPublishingAllPartial] = useState(false);
+  // Intenção de publicação por critério: "partial" | "final"
+  const [publishIntents, setPublishIntents] = useState<Record<number, "partial" | "final">>({});
+  const [publishingAll, setPublishingAll] = useState(false);
   const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
   const [contextOpen, setContextOpen] = useState(false);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
@@ -388,6 +391,63 @@ export default function CalibrationsPage() {
       toast({ title: "Erro ao publicar todos como Parcial", description: msg, variant: "destructive" });
     } finally {
       setPublishingAllPartial(false);
+    }
+  }
+
+  // Inicializa publishIntents quando o evento muda ou quando os critérios carregam
+  useEffect(() => { setPublishIntents({}); }, [selectedEventId]);
+  useEffect(() => {
+    if (!displayActiveCriteria.length) return;
+    setPublishIntents(prev => {
+      const next = { ...prev };
+      for (const c of displayActiveCriteria) {
+        if (next[c.criterionId] === undefined) {
+          next[c.criterionId] = c.finalPublishedAt ? "final" : "partial";
+        }
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayActiveCriteria.map(c => c.criterionId).join(",")]);
+
+  // Publica todos os critérios calibrados de acordo com a intenção definida por critério
+  async function handlePublishAll() {
+    if (!selectedEventId) return;
+    const calibrated = displayActiveCriteria.filter(c => getCalibration(c.criterionId) != null);
+    if (calibrated.length === 0) {
+      toast({ title: "Nenhum critério calibrado para publicar", description: "Salve ao menos uma nota calibrada antes de publicar.", variant: "destructive" });
+      return;
+    }
+    setPublishingAll(true);
+    let okFinal = 0, okPartial = 0;
+    const failed: number[] = [];
+    let firstError: string | null = null;
+    for (const c of calibrated) {
+      const intent = publishIntents[c.criterionId] ?? "partial";
+      try {
+        if (intent === "final") {
+          await publishCriterionFinalMutation.mutateAsync({ id: selectedEventId, criterionId: c.criterionId });
+          okFinal++;
+        } else {
+          await publishCriterionPartialMutation.mutateAsync({ id: selectedEventId, criterionId: c.criterionId });
+          okPartial++;
+        }
+      } catch (e) {
+        failed.push(c.criterionId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+      }
+    }
+    setPublishingAll(false);
+    qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
+    qc.invalidateQueries({ queryKey: fbQKey });
+    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    if (failed.length === 0) {
+      const parts: string[] = [];
+      if (okFinal > 0) parts.push(`${okFinal} Final`);
+      if (okPartial > 0) parts.push(`${okPartial} Parcial`);
+      toast({ title: `Publicado — ${parts.join(", ")}` });
+    } else {
+      toast({ title: `${okFinal + okPartial} publicado(s), ${failed.length} com erro`, description: firstError ?? undefined, variant: "destructive" });
     }
   }
 
@@ -1145,66 +1205,30 @@ export default function CalibrationsPage() {
                   </button>
                   )}
 
-                  {/* Publicar dropdown — visível sempre que canFinalize (antes e depois de liberar) */}
+                  {/* Publicar — botão único; status Parcial/Final definido por critério */}
                   {canFinalize && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#191c1e] text-white font-black text-xs italic uppercase hover:bg-[#506600] transition-colors"
-                        >
-                          <Send size={13} /> Publicar <ChevronDown size={11} />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] w-52 shadow-[4px_4px_0px_0px_#191c1e]">
-                        <div className="divide-y divide-[#e8eaec]">
-                          <button
-                            data-testid="button-publish-all-partial"
-                            type="button"
-                            disabled={publishingAllPartial}
-                            onClick={handlePublishAllPartial}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-black italic uppercase text-left hover:bg-[#f2f4f6] disabled:opacity-50 transition-colors"
-                          >
-                            <Flag size={13} className="text-[#3b0900] shrink-0" />
-                            {publishingAllPartial ? "Publicando..." : "Todos como Parcial"}
-                          </button>
-                          <button
-                            data-testid="button-publish-all-final"
-                            type="button"
-                            disabled={publishingAllFinal}
-                            onClick={handlePublishAllFinal}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-black italic uppercase text-left hover:bg-[#f2f4f6] disabled:opacity-50 transition-colors"
-                          >
-                            <ShieldCheck size={13} className="text-[#506600] shrink-0" />
-                            {publishingAllFinal ? "Publicando..." : "Todos como Final"}
-                          </button>
-                          {autoFillableCriteria.length > 0 && (
-                            <button
-                              data-testid="button-autofill-from-evaluator"
-                              type="button"
-                              disabled={savingAutoFill || savingAll}
-                              onClick={autoFillFromEvaluator}
-                              title="Cria calibrações iguais à nota do avaliador para todos os critérios ainda sem calibração"
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-black italic uppercase text-left hover:bg-[#f2f4f6] disabled:opacity-50 transition-colors"
-                            >
-                              <Check size={13} className="text-[#444933] shrink-0" />
-                              {savingAutoFill ? "Preenchendo..." : `Liberar Sem Cal. (${autoFillableCriteria.length})`}
-                            </button>
-                          )}
-                          {readyToFinalize && (
-                            <button
-                              data-testid="button-open-finalize"
-                              type="button"
-                              onClick={() => setFinalizeOpen(true)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-black italic uppercase text-left bg-[#ccff00] text-[#161e00] hover:bg-[#506600] hover:text-[#ccff00] transition-colors"
-                            >
-                              <Flag size={13} className="shrink-0" />
-                              {alreadyClosed ? "Liberar Notas" : "Fechar e Liberar"}
-                            </button>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                    <button
+                      data-testid="button-publish-all"
+                      type="button"
+                      disabled={publishingAll || publishingAllPartial || publishingAllFinal}
+                      onClick={handlePublishAll}
+                      className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#191c1e] text-white font-black text-xs italic uppercase hover:bg-[#506600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
+                    </button>
+                  )}
+                  {/* Liberar Sem Cal. — mantido separado para clareza */}
+                  {autoFillableCriteria.length > 0 && canFinalize && (
+                    <button
+                      data-testid="button-autofill-from-evaluator"
+                      type="button"
+                      disabled={savingAutoFill || savingAll}
+                      onClick={autoFillFromEvaluator}
+                      title="Cria calibrações iguais à nota do avaliador para todos os critérios ainda sem calibração"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#444933] bg-white text-[#444933] font-black text-xs italic uppercase hover:bg-[#f2f4f6] disabled:opacity-50 transition-colors"
+                    >
+                      <Check size={13} /> {savingAutoFill ? "Preenchendo..." : `Liberar Sem Cal. (${autoFillableCriteria.length})`}
+                    </button>
                   )}
 
                   {/* Spacer + progress + filters */}
@@ -1244,10 +1268,7 @@ export default function CalibrationsPage() {
                         <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-16">Peso</th>
                         <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-20" title="Média das notas enviadas pelos avaliadores da área">Avaliador</th>
                         <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-28">Calibrada</th>
-                        <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-24 hidden sm:table-cell">Status</th>
-                        {canFinalize && !alreadyReleased && (
-                          <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-32 hidden md:table-cell" title="Publicação parcial: prévia visível ao colaborador · Publicação final: nota definitiva">Publicação</th>
-                        )}
+                        <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-32 hidden sm:table-cell">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e8eaec]">
@@ -1444,68 +1465,46 @@ export default function CalibrationsPage() {
                                 )}
                               </div>
                             </td>
-                            {/* Status */}
-                            <td className="px-2 py-2.5 text-center hidden sm:table-cell">
-                              {cal ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#f2ffd6] text-[#506600] border border-[#506600] px-1.5 py-0.5">
-                                  <CheckCircle size={10} /> Cal.
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5">
-                                  {avg != null ? "Pendente" : "Sem nota"}
-                                </span>
-                              )}
-                            </td>
-                            {/* Publicação */}
-                            {canFinalize && !alreadyReleased && (
-                              <td className="px-2 pt-2.5 pb-2 hidden md:table-cell align-top" onClick={e => e.stopPropagation()}>
-                                <div className="flex flex-col items-center gap-1">
-                                  {isFinalPublished ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <span
-                                        data-testid={`badge-criterion-final-${c.criterionId}`}
-                                        className="text-[9px] font-bold italic uppercase bg-[#506600] text-[#ccff00] border border-[#506600] px-1.5 py-0.5 flex items-center gap-0.5 whitespace-nowrap"
-                                      >
-                                        <ShieldCheck size={9} /> Final
-                                      </span>
-                                      <span className="text-[8px] italic text-[#747a60] whitespace-nowrap">{formatDateTime(new Date(c.finalPublishedAt!))}</span>
-                                    </div>
-                                  ) : c.partialPublishedAt ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <span
-                                        data-testid={`badge-criterion-partial-${c.criterionId}`}
-                                        className="text-[9px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5 flex items-center gap-0.5 whitespace-nowrap"
-                                      >
-                                        <Send size={9} /> Parcial
-                                      </span>
-                                      <span className="text-[8px] italic text-[#747a60] whitespace-nowrap">{formatDateTime(new Date(c.partialPublishedAt))}</span>
-                                    </div>
-                                  ) : null}
+                            {/* Status + seletor de intenção de publicação */}
+                            <td className="px-2 py-2.5 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
+                              <div className="flex flex-col items-center gap-1">
+                                {/* Calibração status */}
+                                {cal ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold italic uppercase bg-[#f2ffd6] text-[#506600] border border-[#506600] px-1.5 py-0.5">
+                                    <CheckCircle size={9} /> Cal.
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5">
+                                    {avg != null ? "Pendente" : "Sem nota"}
+                                  </span>
+                                )}
+                                {/* Seletor Parcial / Final — apenas para critérios calibrados */}
+                                {cal && canFinalize && !alreadyReleased && (
                                   <div className="flex items-center gap-0.5">
                                     <button
-                                      data-testid={`button-publish-criterion-partial-${c.criterionId}`}
                                       type="button"
-                                      disabled={publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending}
-                                      onClick={() => handlePublishCriterionPartial(c.criterionId)}
-                                      title={isFinalPublished ? "Tornar Parcial" : "Publicar como Parcial"}
-                                      className="h-6 px-1.5 border border-[#191c1e] bg-white text-[9px] font-black italic uppercase text-[#191c1e] disabled:opacity-40 hover:bg-[#191c1e] hover:text-white transition-colors"
+                                      onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "partial" }))}
+                                      className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border transition-colors ${(publishIntents[c.criterionId] ?? "partial") === "partial" ? "bg-[#ffb5a0] text-[#3b0900] border-[#3b0900]" : "bg-white text-[#9aa088] border-[#d8dadc] hover:border-[#747a60]"}`}
                                     >
-                                      {publishingCritId === c.criterionId && publishCriterionPartialMutation.isPending ? "·" : <Flag size={10} />}
+                                      Parcial
                                     </button>
                                     <button
-                                      data-testid={`button-publish-criterion-final-${c.criterionId}`}
                                       type="button"
-                                      disabled={publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending}
-                                      onClick={() => handlePublishCriterionFinal(c.criterionId)}
-                                      title={isFinalPublished ? "Republicar como Final" : "Publicar como Final"}
-                                      className={`h-6 px-1.5 border text-[9px] font-black italic uppercase disabled:opacity-40 transition-colors ${isFinalPublished ? "bg-[#506600] text-[#ccff00] border-[#506600] hover:bg-[#ccff00] hover:text-[#161e00]" : "bg-[#191c1e] text-[#ccff00] border-[#191c1e] hover:bg-[#506600]"}`}
+                                      onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "final" }))}
+                                      className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border transition-colors ${(publishIntents[c.criterionId] ?? "partial") === "final" ? "bg-[#506600] text-[#ccff00] border-[#506600]" : "bg-white text-[#9aa088] border-[#d8dadc] hover:border-[#747a60]"}`}
                                     >
-                                      {publishingFinalCritId === c.criterionId && publishCriterionFinalMutation.isPending ? "·" : <ShieldCheck size={10} />}
+                                      Final
                                     </button>
                                   </div>
-                                </div>
-                              </td>
-                            )}
+                                )}
+                                {/* Publicação atual (informativo) */}
+                                {(isFinalPublished || c.partialPublishedAt) && (
+                                  <span className={`text-[8px] italic whitespace-nowrap ${isFinalPublished ? "text-[#506600]" : "text-[#3b0900]"}`}>
+                                    ↑ {isFinalPublished ? "Final" : "Parcial"} pub.
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
