@@ -1494,7 +1494,7 @@ export default function CalibrationsPage() {
                                   </span>
                                 )}
                                 {/* Seletor Parcial / Final — apenas para critérios calibrados */}
-                                {cal && canFinalize && !alreadyReleased && (
+                                {cal && canFinalize && (
                                   <div className="flex items-center gap-0.5">
                                     <button
                                       type="button"
