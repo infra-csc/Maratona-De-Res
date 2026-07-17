@@ -1191,33 +1191,7 @@ export default function CalibrationsPage() {
           ) : (
             <>
               <div className="flex items-center gap-2 flex-wrap bg-white border-2 border-[#191c1e] px-3 py-2">
-                  {/* Salvar Tudo — calibrações, comentários e pesos */}
-                  {!alreadyReleased && (
-                  <button
-                    data-testid="button-save-all-cal"
-                    type="button"
-                    disabled={savingAll || totalDirtyCount === 0}
-                    onClick={handleSaveAll}
-                    title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
-                    className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors enabled:hover:bg-[#191c1e] enabled:hover:text-[#ccff00]"
-                  >
-                    <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
-                  </button>
-                  )}
-
-                  {/* Publicar — botão único; status Parcial/Final definido por critério */}
-                  {canFinalize && (
-                    <button
-                      data-testid="button-publish-all"
-                      type="button"
-                      disabled={publishingAll || publishingAllPartial || publishingAllFinal}
-                      onClick={handlePublishAll}
-                      className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#191c1e] text-white font-black text-xs italic uppercase hover:bg-[#506600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
-                    </button>
-                  )}
-                  {/* Liberar Sem Cal. — mantido separado para clareza */}
+                  {/* Liberar Sem Cal. — à esquerda */}
                   {autoFillableCriteria.length > 0 && canFinalize && (
                     <button
                       data-testid="button-autofill-from-evaluator"
@@ -1231,26 +1205,62 @@ export default function CalibrationsPage() {
                     </button>
                   )}
 
-                  {/* Spacer + progress + filters */}
-                  <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                    <span className="text-[11px] font-bold italic uppercase text-[#747a60] flex items-center gap-1" title={`${finalPublishedCount} de ${scorableActiveCriteria.length} critérios (peso > 0) publicados como Final`}>
-                      <ShieldCheck size={11} className="text-[#506600]" /> {finalPublishedCount}/{scorableActiveCriteria.length} final
-                    </span>
-                    <div className="flex items-center gap-0.5">
-                      <Filter size={11} className="text-[#747a60] mr-1" />
-                      {([
-                        { value: "all", label: "Todos" },
-                        { value: "uncalibrated", label: "Pendentes" },
-                        { value: "calibrated", label: "Calibrados" },
-                      ] as const).map(opt => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setCriterionFilter(opt.value)}
-                          className={`text-[10px] font-black italic uppercase px-2 py-0.5 border transition-colors ${criterionFilter === opt.value ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-[#f2f4f6] text-[#444933] border-[#d8dadc] hover:border-[#191c1e]"}`}
-                        >{opt.label}</button>
-                      ))}
-                    </div>
+                  {/* Progress + filtros */}
+                  <span className="text-[11px] font-bold italic uppercase text-[#747a60] flex items-center gap-1" title={`${finalPublishedCount} de ${scorableActiveCriteria.length} critérios (peso > 0) publicados como Final`}>
+                    <ShieldCheck size={11} className="text-[#506600]" /> {finalPublishedCount}/{scorableActiveCriteria.length} final
+                  </span>
+                  <div className="flex items-center gap-0.5">
+                    <Filter size={11} className="text-[#747a60] mr-1" />
+                    {([
+                      { value: "all", label: "Todos" },
+                      { value: "uncalibrated", label: "Pendentes" },
+                      { value: "calibrated", label: "Calibrados" },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setCriterionFilter(opt.value)}
+                        className={`text-[10px] font-black italic uppercase px-2 py-0.5 border transition-colors ${criterionFilter === opt.value ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-[#f2f4f6] text-[#444933] border-[#d8dadc] hover:border-[#191c1e]"}`}
+                      >{opt.label}</button>
+                    ))}
+                  </div>
+
+                  {/* Grupo direito: log de publicação + Salvar + Publicar */}
+                  <div className="ml-auto flex items-center gap-2">
+                    {/* Log de publicação */}
+                    {(alreadyReleased || allCriteriaFinalPublished || partialPublishedAtDate) && (
+                      <span className={`text-[10px] font-bold italic flex items-center gap-1 ${alreadyReleased || allCriteriaFinalPublished ? "text-[#506600]" : "text-[#3b0900]"}`}>
+                        {alreadyReleased || allCriteriaFinalPublished ? <ShieldCheck size={11} /> : <Send size={11} />}
+                        {alreadyReleased || allCriteriaFinalPublished
+                          ? `Final ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}`
+                          : `Parcial ${partialPublishedAtDate ? formatDateTime(partialPublishedAtDate) : ""}`}
+                      </span>
+                    )}
+                    {/* Salvar */}
+                    {!alreadyReleased && (
+                      <button
+                        data-testid="button-save-all-cal"
+                        type="button"
+                        disabled={savingAll || totalDirtyCount === 0}
+                        onClick={handleSaveAll}
+                        title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
+                        className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors enabled:hover:bg-[#191c1e] enabled:hover:text-[#ccff00]"
+                      >
+                        <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
+                      </button>
+                    )}
+                    {/* Publicar */}
+                    {canFinalize && (
+                      <button
+                        data-testid="button-publish-all"
+                        type="button"
+                        disabled={publishingAll || publishingAllPartial || publishingAllFinal}
+                        onClick={handlePublishAll}
+                        className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#191c1e] text-white font-black text-xs italic uppercase hover:bg-[#506600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
+                      </button>
+                    )}
                   </div>
                 </div>
 
