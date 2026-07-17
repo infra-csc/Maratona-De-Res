@@ -2251,9 +2251,14 @@ export default function EvaluationsPage() {
                                         <span className="text-[11px] font-bold italic uppercase text-[#d8dadc] bg-[#f2f4f6] border border-[#d8dadc] px-1.5 py-0.5 shrink-0">
                                           Peso {c.weightOverride ?? c.originalWeight ?? 0}
                                         </span>
-                                        {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && (
+                                        {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && !c.eventScoped && (
                                           <span className="text-[9px] font-black italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-1.5 py-0.5 shrink-0">
                                             Não conta na média
+                                          </span>
+                                        )}
+                                        {c.eventScoped && (
+                                          <span className="text-[9px] font-black italic uppercase text-[#506600] bg-[#f7ffd1] border border-[#506600] px-1.5 py-0.5 shrink-0">
+                                            Entra na média
                                           </span>
                                         )}
                                       </button>
@@ -2405,8 +2410,11 @@ export default function EvaluationsPage() {
                               <div>
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="bg-[#e6e8ea] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-black italic uppercase">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
-                                  {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && (
+                                  {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && !c.eventScoped && (
                                     <span className="bg-[#ffdbd1] border-2 border-[#862200] text-[#862200] px-2 py-0.5 text-[11px] font-black italic uppercase">Peso 0 — não conta na média</span>
+                                  )}
+                                  {c.eventScoped && (
+                                    <span className="bg-[#f7ffd1] border-2 border-[#506600] text-[#344300] px-2 py-0.5 text-[11px] font-black italic uppercase">Entra na média do critério pai</span>
                                   )}
                                   {c.responsibleAreaName && (
                                     <span className="bg-[#e6e8ea] text-[#191c1e] border-2 border-[#191c1e] px-2 py-0.5 text-[11px] font-bold italic uppercase flex items-center gap-1">
