@@ -1241,19 +1241,17 @@ export default function CalibrationsPage() {
                           : `Parcial ${partialPublishedAtDate ? formatDateTime(partialPublishedAtDate) : ""}`}
                       </span>
                     )}
-                    {/* Salvar */}
-                    {!alreadyReleased && (
-                      <button
-                        data-testid="button-save-all-cal"
-                        type="button"
-                        disabled={savingAll || totalDirtyCount === 0}
-                        onClick={handleSaveAll}
-                        title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
-                        className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors enabled:hover:bg-[#191c1e] enabled:hover:text-[#ccff00]"
-                      >
-                        <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
-                      </button>
-                    )}
+                    {/* Salvar — sempre visível quando há alterações */}
+                    <button
+                      data-testid="button-save-all-cal"
+                      type="button"
+                      disabled={savingAll || totalDirtyCount === 0}
+                      onClick={handleSaveAll}
+                      title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
+                      className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors enabled:hover:bg-[#191c1e] enabled:hover:text-[#ccff00]"
+                    >
+                      <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
+                    </button>
                     {/* Publicar */}
                     {canFinalize && (
                       <button
