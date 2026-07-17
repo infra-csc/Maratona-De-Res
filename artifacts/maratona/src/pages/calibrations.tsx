@@ -915,93 +915,96 @@ export default function CalibrationsPage() {
 
             {activeCriteria.length > 0 && !alreadyReleased && (
               <div className="sticky top-16 md:top-2 z-20 bg-[#191c1e] text-white border-2 border-[#191c1e] p-4 flex flex-col gap-3 shadow-[6px_6px_0px_0px_#ccff00]">
-                {/* Linha 1: info + botões principais */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <SlidersHorizontal size={20} className="text-[#ccff00] shrink-0" />
-                    <div className="min-w-0">
-                      {readyToFinalize ? (
-                        <>
-                          <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Todas as calibrações salvas</p>
-                          <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
-                            Publique as notas (parcial ou final) para os funcionários quando estiver pronto.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm font-black italic uppercase tracking-tight leading-tight">Salvar todas de uma vez</p>
-                          <p className="text-[11px] font-bold italic uppercase text-white/60 leading-tight">
-                            {fillableCount > 0 ? `${fillableCount} critério(s) com nota preenchida` : "Preencha as notas calibradas (1 a 10) abaixo"}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                    {!readyToFinalize && (
+                {/* Dois grupos com propósitos distintos: AJUSTAR (interno, o
+                    colaborador não vê nada) e PUBLICAR (é o que o colaborador
+                    passa a ver). A confusão da tela era não separar isso. */}
+                <div className="flex flex-col lg:flex-row gap-3">
+                  {/* Grupo 1 — Ajustar (interno) */}
+                  <div className="flex-1 border border-white/25 p-3 flex flex-col gap-2">
+                    <p className="text-[10px] font-black italic uppercase tracking-wider text-white/60 flex items-center gap-1.5">
+                      <SlidersHorizontal size={12} className="text-[#ccff00]" /> 1 · Ajustar notas — interno, colaboradores não veem
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         data-testid="button-save-all-cal"
                         type="button"
                         disabled={savingAll || fillableCount === 0}
                         onClick={saveAllCalibrations}
-                        className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
+                        title={fillableCount === 0 ? "Nenhuma edição pendente — digite notas calibradas abaixo" : `${fillableCount} critério(s) com edição não salva`}
+                        className="bg-[#ccff00] text-[#161e00] border-2 border-[#ccff00] px-4 py-2.5 font-black text-xs italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
                       >
-                        <Save size={16} /> {savingAll ? "Salvando..." : `Salvar Todas${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
+                        <Save size={14} /> {savingAll ? "Salvando..." : `Salvar Ajustes${fillableCount > 0 ? ` (${fillableCount})` : ""}`}
                       </button>
-                    )}
-                    {canFinalize && autoFillableCriteria.length > 0 && (
-                      <button
-                        data-testid="button-autofill-from-evaluator"
-                        type="button"
-                        disabled={savingAutoFill || savingAll}
-                        onClick={autoFillFromEvaluator}
-                        title="Cria calibrações iguais à nota do avaliador para todos os critérios ainda sem calibração"
-                        className="bg-[#e0e3e5] text-[#191c1e] border-2 border-[#e0e3e5] px-4 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-white enabled:hover:border-white"
-                      >
-                        <Check size={16} /> {savingAutoFill ? "Preenchendo..." : `Liberar Sem Calibração (${autoFillableCriteria.length})`}
-                      </button>
-                    )}
-                    {canFinalize && (
-                      <button
-                        data-testid="button-publish-all-partial"
-                        type="button"
-                        disabled={publishingAllPartial}
-                        onClick={handlePublishAllPartial}
-                        className="bg-[#ffb5a0] text-[#3b0900] border-2 border-[#ffb5a0] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
-                      >
-                        <Flag size={16} /> {publishingAllPartial ? "Publicando..." : "Publicar Todos Parcial"}
-                      </button>
-                    )}
-                    {canFinalize && (
-                      <button
-                        data-testid="button-publish-all-final"
-                        type="button"
-                        disabled={publishingAllFinal}
-                        onClick={handlePublishAllFinal}
-                        className="bg-[#506600] text-[#ccff00] border-2 border-[#506600] px-5 py-3 font-black text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:text-[#161e00] enabled:hover:border-[#ccff00]"
-                      >
-                        <ShieldCheck size={16} /> {publishingAllFinal ? "Publicando..." : "Publicar Todos como Final"}
-                      </button>
-                    )}
+                      {canFinalize && autoFillableCriteria.length > 0 && (
+                        <button
+                          data-testid="button-autofill-from-evaluator"
+                          type="button"
+                          disabled={savingAutoFill || savingAll}
+                          onClick={autoFillFromEvaluator}
+                          title="Para os critérios ainda sem calibração, aceita a nota do avaliador como nota calibrada"
+                          className="bg-transparent text-white border-2 border-white/40 px-4 py-2.5 font-black text-xs italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:border-white"
+                        >
+                          <Check size={14} /> {savingAutoFill ? "Preenchendo..." : `Aceitar Nota do Avaliador (${autoFillableCriteria.length})`}
+                        </button>
+                      )}
+                      <span className="text-[10px] italic text-white/50">
+                        {fillableCount > 0 ? `${fillableCount} edição(ões) não salva(s)` : "Nada pendente de salvar"}
+                      </span>
+                    </div>
                   </div>
+                  {/* Grupo 2 — Publicar (visível aos colaboradores) */}
+                  {canFinalize && (
+                    <div className="flex-1 border border-[#ccff00]/40 p-3 flex flex-col gap-2">
+                      <p className="text-[10px] font-black italic uppercase tracking-wider text-white/60 flex items-center gap-1.5">
+                        <Send size={12} className="text-[#ccff00]" /> 2 · Publicar — é isto que o colaborador vê
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          data-testid="button-publish-all-partial"
+                          type="button"
+                          disabled={publishingAllPartial}
+                          onClick={handlePublishAllPartial}
+                          title="Prévia: o colaborador vê as notas como parciais, sujeitas a mudança"
+                          className="bg-[#ffb5a0] text-[#3b0900] border-2 border-[#ffb5a0] px-4 py-2.5 font-black text-xs italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:border-[#ccff00]"
+                        >
+                          <Flag size={14} /> {publishingAllPartial ? "Publicando..." : "Prévia (todos)"}
+                        </button>
+                        <button
+                          data-testid="button-publish-all-final"
+                          type="button"
+                          disabled={publishingAllFinal}
+                          onClick={handlePublishAllFinal}
+                          title="Definitiva: o colaborador vê as notas como finais"
+                          className="bg-[#506600] text-[#ccff00] border-2 border-[#506600] px-4 py-2.5 font-black text-xs italic uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all enabled:hover:bg-[#ccff00] enabled:hover:text-[#161e00] enabled:hover:border-[#ccff00]"
+                        >
+                          <ShieldCheck size={14} /> {publishingAllFinal ? "Publicando..." : "Final (todos)"}
+                        </button>
+                        {readyToFinalize && (
+                          <button
+                            data-testid="button-open-finalize"
+                            type="button"
+                            onClick={() => setFinalizeOpen(true)}
+                            title="Fecha o evento e libera todas as notas de uma vez (fechamento formal)"
+                            className="bg-white text-[#191c1e] border-2 border-white px-4 py-2.5 font-black text-xs italic uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:bg-[#ccff00] hover:border-[#ccff00]"
+                          >
+                            <CheckCircle size={14} /> {alreadyClosed ? "Liberar Notas" : "Fechar e Liberar Tudo"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {/* Linha 2: progresso + filtro */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-white/20">
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-[11px] font-bold italic uppercase text-white/70 flex items-center gap-1.5">
-                      <ShieldCheck size={12} className="text-[#ccff00]" />
-                      {finalPublishedCount}/{activeCriteria.length} critério(s) publicados como Final
+                      <Save size={12} className="text-[#ccff00]" />
+                      {activeCriteria.filter(c => getCalibration(c.criterionId)).length}/{activeCriteria.length} calibrados
                     </span>
-                    {readyToFinalize && canFinalize && (
-                      <button
-                        data-testid="button-open-finalize"
-                        type="button"
-                        onClick={() => setFinalizeOpen(true)}
-                        className="text-[10px] font-black italic uppercase text-white/50 underline decoration-dotted underline-offset-2 hover:text-[#ccff00] transition-colors"
-                      >
-                        {alreadyClosed ? "Liberar Notas (fechamento formal)" : "Fechar Evento e Liberar Notas (fechamento formal)"}
-                      </button>
-                    )}
+                    <span className="text-[11px] font-bold italic uppercase text-white/70 flex items-center gap-1.5">
+                      <ShieldCheck size={12} className="text-[#ccff00]" />
+                      {finalPublishedCount}/{activeCriteria.length} publicados como Final
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Filter size={12} className="text-white/50 shrink-0" />
