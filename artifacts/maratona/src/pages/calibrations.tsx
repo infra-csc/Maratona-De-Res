@@ -1059,19 +1059,16 @@ export default function CalibrationsPage() {
               {(conformity || canManageConformity) && (
                 <div className="px-4 py-3">
                   <p className="text-[11px] font-black italic uppercase text-[#444933] mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
-                  <div className="mb-2 space-y-0.5">
-                    {fullEvent?.conformityEvaluatorName && (
-                      <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Cenografia: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorName}</span></p>
-                    )}
-                    {fullEvent?.conformityEvaluatorFerramentasName && (
-                      <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Ferramentas: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorFerramentasName}</span></p>
-                    )}
-                    {(conformity as unknown as Record<string, unknown>)?.createdByUserName && (
-                      <p className="text-[9px] italic text-[#506600] flex items-center gap-1 border-l-2 border-[#ccff00] pl-1.5">
-                        <Check size={9} /> Respondido por: <span className="font-bold text-[#191c1e] ml-0.5">{String((conformity as unknown as Record<string, unknown>).createdByUserName)}</span>
-                      </p>
-                    )}
-                  </div>
+                  {(fullEvent?.conformityEvaluatorName || fullEvent?.conformityEvaluatorFerramentasName) && (
+                    <div className="mb-2 space-y-0.5">
+                      {fullEvent?.conformityEvaluatorName && (
+                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Cenografia: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorName}</span></p>
+                      )}
+                      {fullEvent?.conformityEvaluatorFerramentasName && (
+                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Ferramentas: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorFerramentasName}</span></p>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-1 mb-2">
                     {([
                       { label: "EPI", key: "epi" as const, commentKey: "epiComment" as const },
@@ -1085,7 +1082,14 @@ export default function CalibrationsPage() {
                       return (
                         <div key={item.key} className={`border ${value === null ? "border-[#d8dadc] bg-[#f2f4f6]" : value ? "border-[#506600] bg-[#f2ffd6]" : "border-[#b02f00] bg-[#ffede9]"}`}>
                           <div className="flex items-center gap-1 px-2 py-1.5">
-                            <span className="text-[10px] font-bold italic uppercase text-[#191c1e] flex-1 truncate">{item.label}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] font-bold italic uppercase text-[#191c1e] truncate block">{item.label}</span>
+                              {value !== null && (conformity as unknown as Record<string, unknown>)?.createdByUserName && (
+                                <span className="text-[8px] italic text-[#506600] flex items-center gap-0.5 mt-0.5">
+                                  <Check size={8} /> {String((conformity as unknown as Record<string, unknown>).createdByUserName)}
+                                </span>
+                              )}
+                            </div>
                             {canManageConformity ? (
                               <div className="flex items-center border border-[#191c1e] overflow-hidden shrink-0">
                                 <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: true }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: true } }); }} className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border-r border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>S</button>
