@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
+import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
@@ -115,6 +115,8 @@ router.get("/my-performance", async (req, res) => {
         defaultWeight: criteriaTable.defaultWeight,
         partialPublishedAt: eventCriteriaTable.partialPublishedAt,
         finalPublishedAt: eventCriteriaTable.finalPublishedAt,
+        eventScoped: criteriaTable.eventScoped,
+        sourceCriterionId: criteriaTable.sourceCriterionId,
       })
       .from(eventCriteriaTable)
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -178,11 +180,17 @@ router.get("/my-performance", async (req, res) => {
       };
     });
 
-    const criteriaForCalc = criteriaDetails.map(cd => ({
-      criterionId: cd.criterionId!,
-      weight: cd.weight,
-      averageScore: cd.scoreUsed,
-      calibratedScore: null,
+    // Mescla critérios duplicados (eventScoped) nos seus pais antes do cálculo.
+    const criteriaForCalc = mergeEventScopedCriteria(criteriaDetails.map(cd => {
+      const row = eventCriteriaRows.find(r => r.criterionId === cd.criterionId);
+      return {
+        criterionId: cd.criterionId!,
+        weight: cd.weight,
+        averageScore: cd.scoreUsed,
+        calibratedScore: null,
+        isEventScoped: row?.eventScoped ?? false,
+        sourceCriterionId: row?.sourceCriterionId ?? null,
+      };
     }));
     const eventScore = calculateEventResult(criteriaForCalc);
     // Sem nota (nenhum critério avaliado ainda) não tem pelotão — evita

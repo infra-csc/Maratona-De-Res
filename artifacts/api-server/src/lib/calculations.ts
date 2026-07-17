@@ -77,6 +77,47 @@ export interface CriterionData {
   calibratedScore: number | null;
 }
 
+export interface CriterionWithDuplicates extends CriterionData {
+  isEventScoped?: boolean | null;
+  sourceCriterionId?: number | null;
+}
+
+/**
+ * Mescla critérios eventScoped (duplicados) nos seus pais para o cálculo de score.
+ * Cada membro contribui com seu scoreUsed (calibratedScore ?? averageScore).
+ * O score efetivo do grupo = média dos scores não-nulos de TODOS os membros.
+ * O grupo entra na média ponderada com o peso do critério PAI.
+ * Critérios sem duplicados passam inalterados.
+ */
+export function mergeEventScopedCriteria(criteria: CriterionWithDuplicates[]): CriterionData[] {
+  const childIds = new Set(
+    criteria.filter(c => c.isEventScoped && c.sourceCriterionId != null).map(c => c.criterionId)
+  );
+  const childrenByParent = new Map<number, CriterionWithDuplicates[]>();
+  for (const c of criteria) {
+    if (c.isEventScoped && c.sourceCriterionId != null) {
+      if (!childrenByParent.has(c.sourceCriterionId)) childrenByParent.set(c.sourceCriterionId, []);
+      childrenByParent.get(c.sourceCriterionId)!.push(c);
+    }
+  }
+  return criteria
+    .filter(c => !childIds.has(c.criterionId))
+    .map(parent => {
+      const children = childrenByParent.get(parent.criterionId) ?? [];
+      if (children.length === 0) {
+        return { criterionId: parent.criterionId, weight: parent.weight, averageScore: parent.averageScore, calibratedScore: parent.calibratedScore };
+      }
+      const members = [parent, ...children];
+      const effectiveScores = members
+        .map(m => (m.calibratedScore != null ? m.calibratedScore : m.averageScore))
+        .filter((s): s is number => s != null);
+      const mergedScore = effectiveScores.length > 0
+        ? Math.round((effectiveScores.reduce((a, b) => a + b, 0) / effectiveScores.length) * 1000) / 1000
+        : null;
+      return { criterionId: parent.criterionId, weight: parent.weight, averageScore: mergedScore, calibratedScore: null };
+    });
+}
+
 /**
  * Calcula o resultado do evento como MÉDIA PONDERADA das notas (escala 0-10),
  * normalizada para 0-100: (Σ(nota_usada × peso) / Σ(peso)) × 10.

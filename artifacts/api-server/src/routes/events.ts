@@ -3,7 +3,7 @@ import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable,
 import { eq, and, sql, inArray, ilike, or } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
-import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
+import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
 import { generateCriterionAssignments } from "./routing.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -31,7 +31,7 @@ router.get("/events", async (req, res) => {
       .from(eventParticipantsTable).leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id)).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
       .from(evaluationsTable).where(inArray(evaluationsTable.eventId, eventIds)),
-    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt, finalPublishedAt: eventCriteriaTable.finalPublishedAt, criterionActive: criteriaTable.active, criterionEventScoped: criteriaTable.eventScoped })
+    db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight, responsibleAreaId: criteriaTable.responsibleAreaId, partialPublishedAt: eventCriteriaTable.partialPublishedAt, finalPublishedAt: eventCriteriaTable.finalPublishedAt, criterionActive: criteriaTable.active, criterionEventScoped: criteriaTable.eventScoped, criterionSourceCriterionId: criteriaTable.sourceCriterionId })
       .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id)).where(inArray(eventCriteriaTable.eventId, eventIds)),
     db.select({ eventId: calibrationsTable.eventId, criterionId: calibrationsTable.criterionId, calibratedScore: calibrationsTable.calibratedScore })
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, eventIds)),
@@ -121,7 +121,12 @@ router.get("/events", async (req, res) => {
 
     const evEvals = evals.filter(e => e.eventId === ev.id);
     const submitted = evEvals.filter(e => e.status === "submitted");
-    const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false && !c.criterionEventScoped);
+    // Critérios pai (não-eventScoped) usados para contadores e filtros.
+    // Critérios eventScoped (duplicados) são incluídos separadamente só para
+    // que seus scores sejam mesclados na nota efetiva do critério pai.
+    const allEventCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false);
+    const activeCriteria = allEventCriteria.filter(c => !c.criterionEventScoped);
+    const eventScopedCriteria = allEventCriteria.filter(c => c.criterionEventScoped);
     const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentRows.filter(a => a.eventId === ev.id));
     const scored = submitted.filter(e => e.score != null);
     const avgRaw = scored.length > 0
@@ -131,12 +136,14 @@ router.get("/events", async (req, res) => {
 
     // Nota do time (mesma lógica de computeEventTeamResult): por critério ativo,
     // média das avaliações submetidas, substituída pela calibração quando existe.
+    // Critérios eventScoped (duplicados) são mesclados no pai: a nota efetiva
+    // do grupo é a média de todos os scoreUsed (pai + filhos).
     // "Avaliado" exige que TODOS os avaliadores designados para a área do
     // critério tenham enviado (não apenas um, quando há mais de um por área).
     const evCals = calibrations.filter(c => c.eventId === ev.id);
     let evaluatedCriteria = 0;
     let hasCalibration = false;
-    const criteriaForCalc = activeCriteria.map((c) => {
+    const criteriaRaw = activeCriteria.map((c) => {
       const weight = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
       const critEvals = submitted.filter(e => e.criterionId === c.criterionId);
       const critScores = critEvals.filter(e => e.score != null).map(e => parseFloat(e.score as unknown as string));
@@ -147,8 +154,20 @@ router.get("/events", async (req, res) => {
       const status = getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea);
       // Apenas critérios com peso > 0 contam como "avaliados" nos contadores.
       if (weight > 0 && (calibratedScore !== null || status.isEvaluated)) evaluatedCriteria++;
-      return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore };
+      return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore, isEventScoped: false, sourceCriterionId: null as number | null };
     });
+    // Adiciona critérios duplicados (eventScoped) para que o merge possa
+    // calcular a média com o critério pai.
+    for (const ch of eventScopedCriteria) {
+      const chEvals = submitted.filter(e => e.criterionId === ch.criterionId);
+      const chScores = chEvals.filter(e => e.score != null).map(e => parseFloat(e.score as unknown as string));
+      const chAvg = chScores.length > 0 ? chScores.reduce((a, b) => a + b, 0) / chScores.length : null;
+      const chCal = evCals.find(x => x.criterionId === ch.criterionId);
+      const chCalibrated = chCal ? parseFloat(chCal.calibratedScore as unknown as string) : null;
+      if (chCalibrated !== null) hasCalibration = true;
+      criteriaRaw.push({ criterionId: ch.criterionId as number, weight: 0, averageScore: chAvg, calibratedScore: chCalibrated, isEventScoped: true, sourceCriterionId: ch.criterionSourceCriterionId as number | null });
+    }
+    const criteriaForCalc = mergeEventScopedCriteria(criteriaRaw);
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
 
     // Critérios com peso > 0 são os únicos que entram nos contadores de calibração.

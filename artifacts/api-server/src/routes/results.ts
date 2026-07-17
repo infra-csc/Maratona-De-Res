@@ -12,7 +12,7 @@ import {
   calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
   calculateTieredBonus, calculateExtraBonusValue, selectExtraEventScores, validateCalculationExample, calculateConformitySubtotal,
   calculateConformityPenalty, calculateFinalEventScore, validateConformityCalculationExample,
-  buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus,
+  buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria,
 } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
@@ -64,6 +64,8 @@ export async function computeEventTeamResult(eventId: number) {
       originalWeight: criteriaTable.defaultWeight,
       weightOverride: eventCriteriaTable.weightOverride,
       displayOrder: criteriaTable.displayOrder,
+      eventScoped: criteriaTable.eventScoped,
+      sourceCriterionId: criteriaTable.sourceCriterionId,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -109,11 +111,18 @@ export async function computeEventTeamResult(eventId: number) {
     };
   });
 
-  const criteriaForCalc = criteriaDetails.map(cd => ({
-    criterionId: cd.criterionId,
-    weight: cd.weight,
-    averageScore: cd.averageScore,
-    calibratedScore: cd.calibratedScore,
+  // Mescla critérios duplicados (eventScoped) nos seus pais antes do cálculo:
+  // cada membro contribui com seu scoreUsed; o grupo usa o peso do critério pai.
+  const criteriaForCalc = mergeEventScopedCriteria(criteriaDetails.map(cd => {
+    const row = activeCriteria.find(r => r.criterionId === cd.criterionId);
+    return {
+      criterionId: cd.criterionId,
+      weight: cd.weight,
+      averageScore: cd.averageScore,
+      calibratedScore: cd.calibratedScore,
+      isEventScoped: row?.eventScoped ?? false,
+      sourceCriterionId: row?.sourceCriterionId ?? null,
+    };
   }));
 
   let eventScore = calculateEventResult(criteriaForCalc);
