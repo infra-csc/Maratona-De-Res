@@ -471,7 +471,10 @@ export default function CalibrationsPage() {
     const allIds = [critId, ...children];
     return (evaluations ?? [])
       .filter(e => allIds.includes(e.criterionId) && e.status === "submitted")
-      .map(e => ({ name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null }));
+      .map(e => {
+        const crit = activeCriteria.find(ac => ac.criterionId === e.criterionId);
+        return { name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId };
+      });
   }
 
   function getAvgScore(critId: number) {
@@ -1308,11 +1311,17 @@ export default function CalibrationsPage() {
                           >
                             {/* Critério */}
                             <td className="px-3 py-2.5">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-black italic uppercase text-[12px] text-[#191c1e] leading-tight">{c.criterionName}</span>
                                 {c.responsibleAreaName && (
                                   <span className="hidden lg:inline text-[9px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#191c1e] px-1">{c.responsibleAreaName}</span>
                                 )}
+                                {(childCriterionIdsMap.get(c.criterionId) ?? []).map(childId => {
+                                  const childCrit = activeCriteria.find(ac => ac.criterionId === childId);
+                                  return childCrit?.responsibleAreaName ? (
+                                    <span key={childId} className="hidden lg:inline text-[9px] font-bold italic uppercase text-[#1a2900] bg-[#ccff00] border border-[#191c1e] px-1">+ {childCrit.responsibleAreaName}</span>
+                                  ) : null;
+                                })}
                               </div>
                               {/* ── Comentário do avaliador (read-only) ── */}
                               {areaScores.filter(s => s.comment).map((s, i) => (
@@ -1320,6 +1329,9 @@ export default function CalibrationsPage() {
                                   <div className="flex items-center gap-1.5 mb-0.5">
                                     <span className="text-[8px] font-black italic uppercase tracking-wider text-[#506600] bg-[#e8f5d0] px-1 py-px">Avaliador</span>
                                     <span className="text-[10px] font-bold italic text-[#444933]">{s.name}</span>
+                                    {s.areaName && (
+                                      <span className="text-[8px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#c4c9ac] px-1 py-px">{s.areaName}</span>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={e => {
