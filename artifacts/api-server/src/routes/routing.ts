@@ -5,7 +5,7 @@ import {
   criterionRoutingTable, criterionRedirectUsersTable,
   eventCriterionAssignmentsTable, criteriaTable, usersTable,
   areasTable, eventsTable, eventCriteriaTable, publicEvalTokensTable,
-  publicEvalTokenCriteriaTable, areaConformityRoutingTable,
+  publicEvalTokenCriteriaTable, areaConformityRoutingTable, evaluationsTable,
 } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -645,21 +645,33 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
     return;
   }
 
-  const assignments = await db.select({
-    criterionId: eventCriterionAssignmentsTable.criterionId,
-    status: eventCriterionAssignmentsTable.status,
-  })
-    .from(eventCriterionAssignmentsTable)
-    .where(and(
-      eq(eventCriterionAssignmentsTable.eventId, eventId),
-      eq(eventCriterionAssignmentsTable.assignedToId, assignedToUserId),
-    ));
-
-  const assignedIds = new Set(assignments.filter(a => a.status !== "submitted").map(a => a.criterionId));
-  const validCriterionIds = (criterionIds as number[]).filter(id => assignedIds.has(id));
+  // Admin bypass: valida apenas que os critérios estão ativos no evento e que
+  // o avaliador ainda não os submeteu. Não exige atribuição via criterion-level
+  // (eventCriterionAssignmentsTable) — o avaliador pode ser atribuído só ao
+  // nível de área (eventAreaAssignmentsTable) e o link admin deve funcionar mesmo assim.
+  const [activeCriteriaInEvent, alreadySubmitted] = await Promise.all([
+    db.select({ criterionId: eventCriteriaTable.criterionId })
+      .from(eventCriteriaTable)
+      .where(and(
+        eq(eventCriteriaTable.eventId, eventId),
+        eq(eventCriteriaTable.active, true),
+        inArray(eventCriteriaTable.criterionId, criterionIds as number[]),
+      )),
+    db.select({ criterionId: evaluationsTable.criterionId })
+      .from(evaluationsTable)
+      .where(and(
+        eq(evaluationsTable.eventId, eventId),
+        eq(evaluationsTable.evaluatorUserId, assignedToUserId),
+        eq(evaluationsTable.status, "submitted"),
+        inArray(evaluationsTable.criterionId, criterionIds as number[]),
+      )),
+  ]);
+  const activeIds = new Set(activeCriteriaInEvent.map(c => c.criterionId));
+  const submittedIds = new Set(alreadySubmitted.map(e => e.criterionId));
+  const validCriterionIds = (criterionIds as number[]).filter(id => activeIds.has(id) && !submittedIds.has(id));
 
   if (validCriterionIds.length === 0) {
-    res.status(400).json({ error: "Nenhum dos critérios está atribuído a este avaliador, ou todos já foram submetidos" });
+    res.status(400).json({ error: "Nenhum critério válido encontrado — verifique se os critérios estão ativos no evento ou se todos já foram submetidos por este avaliador" });
     return;
   }
 
