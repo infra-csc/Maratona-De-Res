@@ -1481,44 +1481,43 @@ export default function CalibrationsPage() {
                               </div>
                             </td>
                             {/* Status + seletor de intenção de publicação */}
-                            <td className="px-2 py-2.5 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
-                              <div className="flex flex-col items-center gap-1">
-                                {/* Calibração status */}
-                                {cal ? (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold italic uppercase bg-[#f2ffd6] text-[#506600] border border-[#506600] px-1.5 py-0.5">
-                                    <CheckCircle size={9} /> Cal.
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5">
-                                    {avg != null ? "Pendente" : "Sem nota"}
-                                  </span>
-                                )}
-                                {/* Seletor Parcial / Final — apenas para critérios calibrados */}
-                                {cal && canFinalize && (
-                                  <div className="flex items-center gap-0.5">
+                            <td className="px-1 py-2 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
+                              {cal && canFinalize ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  {/* Segmented control compacto: Parc. | Final */}
+                                  <div className="flex items-stretch border border-[#191c1e] overflow-hidden w-full max-w-[88px]">
                                     <button
                                       type="button"
                                       onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "partial" }))}
-                                      className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border transition-colors ${(publishIntents[c.criterionId] ?? "partial") === "partial" ? "bg-[#ffb5a0] text-[#3b0900] border-[#3b0900]" : "bg-white text-[#9aa088] border-[#d8dadc] hover:border-[#747a60]"}`}
+                                      className={`flex-1 py-1 text-[8px] font-black italic uppercase transition-colors leading-none ${(publishIntents[c.criterionId] ?? "partial") === "partial" ? "bg-[#3b0900] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >
-                                      Parcial
+                                      Parc.
                                     </button>
+                                    <span className="w-px bg-[#191c1e] shrink-0" />
                                     <button
                                       type="button"
                                       onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "final" }))}
-                                      className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border transition-colors ${(publishIntents[c.criterionId] ?? "partial") === "final" ? "bg-[#506600] text-[#ccff00] border-[#506600]" : "bg-white text-[#9aa088] border-[#d8dadc] hover:border-[#747a60]"}`}
+                                      className={`flex-1 py-1 text-[8px] font-black italic uppercase transition-colors leading-none ${(publishIntents[c.criterionId] ?? "partial") === "final" ? "bg-[#506600] text-[#ccff00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >
                                       Final
                                     </button>
                                   </div>
-                                )}
-                                {/* Publicação atual (informativo) */}
-                                {(isFinalPublished || c.partialPublishedAt) && (
-                                  <span className={`text-[8px] italic whitespace-nowrap ${isFinalPublished ? "text-[#506600]" : "text-[#3b0900]"}`}>
-                                    ↑ {isFinalPublished ? "Final" : "Parcial"} pub.
-                                  </span>
-                                )}
-                              </div>
+                                  {/* Indicador de publicação atual */}
+                                  {(isFinalPublished || c.partialPublishedAt) && (
+                                    <span className={`text-[7px] italic leading-none ${isFinalPublished ? "text-[#506600]" : "text-[#3b0900]"}`}>
+                                      ↑ {isFinalPublished ? "Final" : "Parcial"} pub.
+                                    </span>
+                                  )}
+                                </div>
+                              ) : cal ? (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold italic uppercase bg-[#f2ffd6] text-[#506600] border border-[#506600] px-1.5 py-0.5">
+                                  <CheckCircle size={9} /> Cal.
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5 whitespace-nowrap">
+                                  {avg != null ? "Pendente" : "Sem nota"}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
