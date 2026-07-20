@@ -8,10 +8,12 @@ import {
 import {
   getEventCriterionAssignments, eventCriterionAssignmentsKey,
   usePatchCriterionAssignment, useUsersByArea,
+  useCreateAdminPublicToken, useAllPublicTokens,
+  type PublicToken,
 } from "@/lib/routing-api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock } from "lucide-react";
+import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function fmtDT(v: string | null | undefined): string {
@@ -105,6 +107,12 @@ export function AdminEvaluationsConsole() {
   const [critFilter, setCritFilter] = useState<"all" | "unassigned" | "pending" | "partial" | "done">("all");
   const [openPickerCriterionId, setOpenPickerCriterionId] = useState<number | null>(null);
   const [openConformityPicker, setOpenConformityPicker] = useState<"cenografia" | "ferramentas" | null>(null);
+
+  // --- Link Freelancer dialog ---
+  const [linkDialog, setLinkDialog] = useState<{ criterionId: number; criterionName: string; assignedToId: number; assignedToName: string } | null>(null);
+  const [linkRecipientName, setLinkRecipientName] = useState("");
+  const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const { data: events } = useGetEvents(undefined, { query: { queryKey: getGetEventsQueryKey() } });
   const { data: allUsers } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
@@ -229,6 +237,33 @@ export function AdminEvaluationsConsole() {
       onError: (e: { message?: string }) => toast({ title: "Erro ao confirmar", description: e.message, variant: "destructive" }),
     },
   });
+
+  const createAdminToken = useCreateAdminPublicToken(selected?.id ?? 0);
+  const { data: allTokens, refetch: refetchAllTokens } = useAllPublicTokens(linkDialog != null ? (selected?.id ?? null) : null);
+
+  function openLinkDialog(c: CritRow) {
+    if (!c.assignedToId || !c.assignedToName) return;
+    setLinkDialog({ criterionId: c.criterionId, criterionName: c.criterionName, assignedToId: c.assignedToId, assignedToName: c.assignedToName });
+    setLinkRecipientName("");
+    setGeneratedLinkUrl(null);
+    setLinkCopied(false);
+    refetchAllTokens();
+  }
+
+  function handleGenerateLink() {
+    if (!linkDialog || !selected) return;
+    createAdminToken.mutate(
+      { assignedToUserId: linkDialog.assignedToId, criterionIds: [linkDialog.criterionId], recipientName: linkRecipientName.trim() || undefined },
+      {
+        onSuccess: (data) => {
+          const url = `${window.location.origin}/eval/${data.tokenId}`;
+          setGeneratedLinkUrl(url);
+          refetchAllTokens();
+        },
+        onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+      },
+    );
+  }
 
   function handleAssign(criterionId: number, userId: number) {
     if (!selected) return;
@@ -564,7 +599,17 @@ export function AdminEvaluationsConsole() {
                             )}
                           </div>
                           {canManage && (
-                            <div className="flex items-center gap-2.5 whitespace-nowrap">
+                            <div className="flex items-center gap-2 whitespace-nowrap">
+                              {c.assignedToId != null && (
+                                <button
+                                  type="button"
+                                  onClick={() => openLinkDialog(c)}
+                                  className="border-2 border-[#191c1e] px-2.5 py-1.5 text-[10.5px] font-black italic uppercase bg-white hover:bg-[#f7ffd1] flex items-center gap-1"
+                                  title="Gerar link de avaliação para o freelancer"
+                                >
+                                  <Link2 size={11} /> Link
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
@@ -663,12 +708,22 @@ export function AdminEvaluationsConsole() {
                     <div className="px-3.5 py-3">
                       <span className="text-[9px] font-black italic uppercase px-2.5 py-1 whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                     </div>
-                    <div className="px-3.5 py-3 text-right relative">
+                    <div className="px-3.5 py-3 text-right relative flex items-center justify-end gap-2">
+                      {canManage && c.assignedToId != null && (
+                        <button
+                          type="button"
+                          onClick={() => openLinkDialog(c)}
+                          className="border-2 border-[#191c1e] px-2 py-1.5 text-[10px] font-black italic uppercase bg-white hover:bg-[#f7ffd1] flex items-center gap-1 whitespace-nowrap"
+                          title="Gerar link para freelancer"
+                        >
+                          <Link2 size={10} /> Link
+                        </button>
+                      )}
                       {canManage && (
                         <button
                           type="button"
                           onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
-                          className={cn("border-2 border-[#191c1e] px-2.5 py-1.5 text-[10px] font-black italic uppercase", c.assignedToId == null ? "bg-[#ccff00]" : "bg-white")}
+                          className={cn("border-2 border-[#191c1e] px-2.5 py-1.5 text-[10px] font-black italic uppercase whitespace-nowrap", c.assignedToId == null ? "bg-[#ccff00]" : "bg-white")}
                         >
                           {c.assignedToId == null ? "Atribuir" : "Gerenciar"}
                         </button>
@@ -735,6 +790,118 @@ export function AdminEvaluationsConsole() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Link Freelancer dialog ─────────────────────────────────── */}
+      {linkDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`bg-white border-2 border-[#191c1e] w-full max-w-md ${HARD_SHADOW}`}>
+            {/* header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[#191c1e] bg-[#f7ffd1]">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide">Link Freelancer</p>
+                <h3 className="font-black italic uppercase text-sm truncate">{linkDialog.criterionName}</h3>
+                <p className="text-[10px] italic text-[#747a60] mt-0.5">Avaliador: <span className="font-bold text-[#191c1e]">{linkDialog.assignedToName}</span></p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setLinkDialog(null); setGeneratedLinkUrl(null); }}
+                className="shrink-0 border-2 border-[#191c1e] bg-white p-1.5 hover:bg-[#f2f4f6]"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {/* recipient + generate */}
+              <div>
+                <label className="block text-[10px] font-black italic uppercase text-[#747a60] tracking-wide mb-1.5">
+                  Para quem é o link? <span className="font-normal normal-case">(opcional)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={linkRecipientName}
+                    onChange={e => setLinkRecipientName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") handleGenerateLink(); }}
+                    placeholder="Nome do freelancer"
+                    className="flex-1 border-2 border-[#191c1e] px-3 py-2 text-sm font-bold italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateLink}
+                    disabled={createAdminToken.isPending}
+                    className="border-2 border-[#191c1e] bg-[#ccff00] px-3 py-2 text-[10.5px] font-black italic uppercase flex items-center gap-1.5 hover:bg-[#b8e600] disabled:opacity-50"
+                  >
+                    <Link2 size={12} /> {createAdminToken.isPending ? "Gerando…" : "Gerar Link"}
+                  </button>
+                </div>
+              </div>
+
+              {/* generated URL */}
+              {generatedLinkUrl && (
+                <div className="border-2 border-[#191c1e] bg-[#f7ffd1] p-3 space-y-2">
+                  <p className="text-[10px] font-black italic uppercase text-[#3f5200] tracking-wide">Link gerado — copie e envie</p>
+                  <div className="flex gap-2 items-start">
+                    <input
+                      readOnly
+                      value={generatedLinkUrl}
+                      className="flex-1 border-2 border-[#191c1e] bg-white px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
+                      onFocus={e => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard.writeText(generatedLinkUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                      className="border-2 border-[#191c1e] bg-white px-3 py-1.5 text-[10px] font-black italic uppercase flex items-center gap-1 hover:bg-[#ccff00] shrink-0"
+                    >
+                      {linkCopied ? <><CheckCircle size={11} className="text-[#3f5200]" /> Copiado!</> : <><Copy size={11} /> Copiar</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* history */}
+              {(() => {
+                const relevantTokens: (PublicToken & { tokenType: string })[] = (allTokens ?? []).filter(t =>
+                  t.tokenType === "criteria" && (t.criterionIds ?? []).includes(linkDialog.criterionId),
+                );
+                if (relevantTokens.length === 0) return null;
+                return (
+                  <div>
+                    <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide mb-2">Histórico de links enviados</p>
+                    <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-48 overflow-y-auto">
+                      {relevantTokens.map(t => (
+                        <div key={t.id} className="flex items-start justify-between px-3 py-2.5 gap-3 bg-white">
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-[11px] font-bold italic truncate">
+                              {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
+                            </p>
+                            {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
+                              <p className="text-[10px] italic text-[#747a60] truncate">Para: {t.recipientName}</p>
+                            )}
+                            <p className="text-[10px] italic text-[#9aa08a]">Enviado: {fmtDT(t.createdAt)}</p>
+                            {t.usedAt && (
+                              <p className="text-[10px] font-bold italic text-[#3f5200]">Respondido: {fmtDT(t.usedAt)}</p>
+                            )}
+                          </div>
+                          {t.usedAt ? (
+                            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1 mt-0.5">
+                              <CheckCircle size={10} /> Respondido
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 mt-0.5">
+                              Pendente
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
     </div>
