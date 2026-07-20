@@ -220,7 +220,7 @@ export function usePublicLinkEligibleCriteria(eventId: number | null) {
  *  Sem criterionIds, cobre todos os critérios elegíveis do avaliador no evento. */
 export function useCreatePublicToken(eventId: number) {
   const qc = useQueryClient();
-  return useMutation<{ tokenId: string }, Error, { recipientName: string; criterionIds?: number[] }>({
+  return useMutation<{ tokenId: string }, Error, { recipientName: string; criterionIds?: number[]; includeConformity?: boolean }>({
     mutationFn: (body) =>
       apiFetch<{ tokenId: string }>(
         `/api/events/${eventId}/public-token`,

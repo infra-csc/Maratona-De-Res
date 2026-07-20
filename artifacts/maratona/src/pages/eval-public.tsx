@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { CheckCircle, ClipboardCheck, AlertTriangle, ShieldAlert } from "lucide-react";
 
-type TokenType = "criteria" | "conformity_cenografia" | "conformity_ferramentas";
+type TokenType = "criteria" | "conformity_cenografia" | "conformity_ferramentas" | "criteria_with_conformity";
 
 interface TokenCriterion {
   criterionId: number;
@@ -99,6 +99,7 @@ export default function PublicEvalPage() {
 
   const tokenType = info?.tokenType ?? "criteria";
   const criteria = info?.criteria ?? [];
+  const isCombined = tokenType === "criteria_with_conformity";
 
   // critério pronto = score selecionado (inclui 0) E comentário preenchido
   const allCriteriaScored = criteria.length > 0 && criteria.every((c) => {
@@ -129,20 +130,36 @@ export default function PublicEvalPage() {
 
   async function handleSubmitCriteria() {
     if (!token || !submitterName.trim() || !allCriteriaScored) return;
+    if (isCombined && !cenoCanSubmit) return;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
+      const body: Record<string, unknown> = {
+        submitterName: submitterName.trim(),
+        evaluations: criteria.map((c) => ({
+          criterionId: c.criterionId,
+          score: answers[c.criterionId]?.score ?? 0,
+          comments: answers[c.criterionId]?.comments || undefined,
+        })),
+      };
+      if (isCombined) {
+        Object.assign(body, {
+          epi: cenoAnswers.epi,
+          estaiamentos: cenoAnswers.estaiamentos,
+          conduta: cenoAnswers.conduta,
+          epiComment: cenoAnswers.epiComment || null,
+          estaiamentosComment: cenoAnswers.estaiamentosComment || null,
+          condutaComment: cenoAnswers.condutaComment || null,
+          absencesResponse: true,
+          absencesReport: cenoAnswers.absencesReport,
+          standoutResponse: cenoAnswers.standoutResponse,
+          standoutJustification: cenoAnswers.standoutJustification || null,
+        });
+      }
       const r = await fetch(`/api/public-eval/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          submitterName: submitterName.trim(),
-          evaluations: criteria.map((c) => ({
-            criterionId: c.criterionId,
-            score: answers[c.criterionId]?.score ?? 0,
-            comments: answers[c.criterionId]?.comments || undefined,
-          })),
-        }),
+        body: JSON.stringify(body),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
@@ -246,9 +263,12 @@ export default function PublicEvalPage() {
   const isConformityCenografia = tokenType === "conformity_cenografia";
   const isConformityFerramentas = tokenType === "conformity_ferramentas";
   const isConformity = isConformityCenografia || isConformityFerramentas;
+  const showCriteria = !isConformity;
+  const showCenografiaConformity = isConformityCenografia || isCombined;
   const canSubmit = !isSubmitting && !!submitterName.trim() && (
     isConformityCenografia ? cenoCanSubmit :
     isConformityFerramentas ? ferramentasCanSubmit :
+    isCombined ? (allCriteriaScored && cenoCanSubmit) :
     allCriteriaScored
   );
 
@@ -258,9 +278,9 @@ export default function PublicEvalPage() {
         {/* Header */}
         <div className={`bg-[#191c1e] text-white p-6 ${HARD_SHADOW}`}>
           <div className="flex items-center gap-3 mb-1">
-            {isConformity ? <ShieldAlert size={22} className="text-[#ccff00]" /> : <ClipboardCheck size={22} className="text-[#ccff00]" />}
+            {isConformity ? <ShieldAlert size={22} className="text-[#ccff00]" /> : isCombined ? <ShieldAlert size={22} className="text-[#ccff00]" /> : <ClipboardCheck size={22} className="text-[#ccff00]" />}
             <span className="text-xs font-black italic uppercase tracking-widest text-[#ccff00]">
-              {isConformityCenografia ? "Conformidade — Cenografia" : isConformityFerramentas ? "Conformidade — Ferramentas" : "Avaliação de Desempenho"}
+              {isConformityCenografia ? "Conformidade — Cenografia" : isConformityFerramentas ? "Conformidade — Ferramentas" : isCombined ? "Avaliação + Conformidade" : "Avaliação de Desempenho"}
             </span>
           </div>
           <h1 className="text-2xl font-black italic uppercase tracking-tight">{info.eventName ?? "Evento"}</h1>
@@ -284,7 +304,7 @@ export default function PublicEvalPage() {
         </div>
 
         {/* ── Criteria form (escala 0-10, comentário obrigatório) ───────────── */}
-        {!isConformity && criteria.map((c) => {
+        {showCriteria && criteria.map((c) => {
           const ans = answers[c.criterionId];
           const selectedScore = ans?.score ?? null;
           const comment = ans?.comments ?? "";
@@ -348,7 +368,7 @@ export default function PublicEvalPage() {
         })}
 
         {/* ── Cenografia conformity form ───────────────────────────────────── */}
-        {isConformityCenografia && (() => {
+        {showCenografiaConformity && (() => {
           const items: { key: "epi" | "estaiamentos" | "conduta"; commentKey: "epiComment" | "estaiamentosComment" | "condutaComment"; label: string; question: string }[] = [
             { key: "epi", commentKey: "epiComment", label: "Uso de EPI", question: "Todos usaram EPI na arena?" },
             { key: "estaiamentos", commentKey: "estaiamentosComment", label: "Estaiamentos / Aterramentos", question: "Estaiamento e Aterramento foram feitos de maneira correta?" },
@@ -507,7 +527,7 @@ export default function PublicEvalPage() {
         <button
           type="button"
           disabled={!canSubmit}
-          onClick={isConformity ? handleSubmitConformity : handleSubmitCriteria}
+          onClick={(isConformity && !isCombined) ? handleSubmitConformity : handleSubmitCriteria}
           className={`w-full border-2 border-[#191c1e] py-4 font-black text-base italic uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${canSubmit ? `bg-[#ccff00] text-[#161e00] ${HARD_SHADOW} hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_#191c1e]` : "bg-[#eceef0] text-[#747a60] cursor-not-allowed opacity-70"}`}
         >
           {isSubmitting ? "Enviando..." : "Enviar Respostas"}

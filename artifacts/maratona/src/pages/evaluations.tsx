@@ -515,6 +515,7 @@ export default function EvaluationsPage() {
   const [publicLinkDialogCriteriaIds, setPublicLinkDialogCriteriaIds] = useState<number[] | null>(null);
   const [publicLinkDialogAreaName, setPublicLinkDialogAreaName] = useState<string | null>(null);
   const [publicLinkRecipientName, setPublicLinkRecipientName] = useState("");
+  const [publicLinkIncludeConformity, setPublicLinkIncludeConformity] = useState(false);
   const [generatedPublicUrl, setGeneratedPublicUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   // Conformity public link dialog state (shared for cenografia + ferramentas)
@@ -3343,6 +3344,7 @@ export default function EvaluationsPage() {
             setPublicLinkDialogCriteriaIds(null);
             setPublicLinkDialogAreaName(null);
             setPublicLinkRecipientName("");
+            setPublicLinkIncludeConformity(false);
             setGeneratedPublicUrl(null);
             setLinkCopied(false);
           }
@@ -3384,18 +3386,32 @@ export default function EvaluationsPage() {
                 <p className="text-sm italic text-[#444933]">
                   Gere um link único para que um freelancer responda este formulário. O link expira após o primeiro uso.
                 </p>
-                <div>
-                  <label className="block text-xs font-black italic uppercase mb-2">
-                    Nome de quem vai receber o link
-                    <span className="text-[#ba1a1a] text-[10px] ml-2 bg-[#ffdad6] px-2 py-0.5 border border-[#191c1e]">Obrigatório</span>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-black italic uppercase mb-2">
+                      Nome de quem vai receber o link
+                      <span className="text-[#ba1a1a] text-[10px] ml-2 bg-[#ffdad6] px-2 py-0.5 border border-[#191c1e]">Obrigatório</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={publicLinkRecipientName}
+                      onChange={e => setPublicLinkRecipientName(e.target.value)}
+                      placeholder="Ex: João Freelancer"
+                      className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 text-sm italic font-bold focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                    />
+                  </div>
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={publicLinkIncludeConformity}
+                      onChange={e => setPublicLinkIncludeConformity(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 border-2 border-[#191c1e] accent-[#ccff00] cursor-pointer shrink-0"
+                    />
+                    <span className="text-xs font-bold italic text-[#444933] leading-tight">
+                      Incluir matriz de conformidade no questionário<br />
+                      <span className="font-normal not-italic text-[#747a60]">EPI · Estaiamentos · Conduta · Faltas/Atrasos · Destaque</span>
+                    </span>
                   </label>
-                  <input
-                    type="text"
-                    value={publicLinkRecipientName}
-                    onChange={e => setPublicLinkRecipientName(e.target.value)}
-                    placeholder="Ex: João Freelancer"
-                    className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 text-sm italic font-bold focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
-                  />
                 </div>
               </>
             ) : (
@@ -3459,6 +3475,7 @@ export default function EvaluationsPage() {
                 setPublicLinkDialogCriteriaIds(null);
                 setPublicLinkDialogAreaName(null);
                 setPublicLinkRecipientName("");
+                setPublicLinkIncludeConformity(false);
                 setGeneratedPublicUrl(null);
                 setLinkCopied(false);
               }}
@@ -3473,7 +3490,7 @@ export default function EvaluationsPage() {
                 onClick={() => {
                   if (!publicLinkRecipientName.trim()) return;
                   createPublicToken.mutate(
-                    { recipientName: publicLinkRecipientName.trim(), criterionIds: publicLinkDialogCriteriaIds ?? undefined },
+                    { recipientName: publicLinkRecipientName.trim(), criterionIds: publicLinkDialogCriteriaIds ?? undefined, includeConformity: publicLinkIncludeConformity || undefined },
                     {
                       onSuccess: ({ tokenId }) => {
                         const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");

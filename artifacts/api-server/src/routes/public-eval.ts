@@ -75,7 +75,7 @@ router.get("/public-eval/:token", async (req, res) => {
     return;
   }
 
-  // Default: criteria token
+  // criteria ou criteria_with_conformity — retorna lista de critérios
   const tokenCriteria = await db.select({
     criterionId: publicEvalTokenCriteriaTable.criterionId,
     criterionName: criteriaTable.name,
@@ -87,7 +87,7 @@ router.get("/public-eval/:token", async (req, res) => {
 
   res.json({
     tokenId: token.id,
-    tokenType: "criteria",
+    tokenType,
     isUsed: token.usedAt !== null,
     recipientName: token.recipientName,
     submitterName: token.submitterName,
@@ -104,7 +104,7 @@ router.get("/public-eval/:token", async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post("/public-eval/:token/submit", async (req, res) => {
   const tokenId = req.params.token as string;
-  const { submitterName, evaluations } = req.body ?? {};
+  const { submitterName, evaluations, ...conformityData } = req.body ?? {};
 
   if (!submitterName || typeof submitterName !== "string" || !submitterName.trim()) {
     res.status(400).json({ error: "Nome é obrigatório" });
@@ -162,6 +162,38 @@ router.post("/public-eval/:token/submit", async (req, res) => {
     return;
   }
 
+  const submitTokenType = token.tokenType ?? "criteria";
+  if (submitTokenType !== "criteria" && submitTokenType !== "criteria_with_conformity") {
+    res.status(400).json({ error: "Este link não é para critérios" });
+    return;
+  }
+
+  if (submitTokenType === "criteria_with_conformity") {
+    if (conformityData.epi === undefined || conformityData.estaiamentos === undefined || conformityData.conduta === undefined) {
+      res.status(400).json({ error: "EPI, Estaiamentos e Conduta são obrigatórios" });
+      return;
+    }
+    const naoSemComentario = (
+      [["epi", "epiComment"], ["estaiamentos", "estaiamentosComment"], ["conduta", "condutaComment"]] as [string, string][]
+    ).find(([key, commentKey]) => conformityData[key] === false && !(typeof conformityData[commentKey] === "string" && (conformityData[commentKey] as string).trim()));
+    if (naoSemComentario) {
+      res.status(400).json({ error: "Comentário é obrigatório quando a resposta é Não" });
+      return;
+    }
+    if (!conformityData.absencesReport || typeof conformityData.absencesReport !== "string" || !(conformityData.absencesReport as string).trim()) {
+      res.status(400).json({ error: "Informe faltas/atrasos antes de enviar" });
+      return;
+    }
+    if (conformityData.standoutResponse === undefined || conformityData.standoutResponse === null) {
+      res.status(400).json({ error: "Responda a pergunta de destaque" });
+      return;
+    }
+    if (conformityData.standoutResponse === true && !(typeof conformityData.standoutJustification === "string" && (conformityData.standoutJustification as string).trim())) {
+      res.status(400).json({ error: "Descreva o destaque antes de enviar" });
+      return;
+    }
+  }
+
   const [event] = await db.select({ status: eventsTable.status })
     .from(eventsTable).where(eq(eventsTable.id, token.eventId)).limit(1);
 
@@ -215,6 +247,46 @@ router.post("/public-eval/:token/submit", async (req, res) => {
       eq(eventCriterionAssignmentsTable.eventId, token.eventId),
       inArray(eventCriterionAssignmentsTable.criterionId, criterionIds),
     ));
+
+    // Para criteria_with_conformity, salva também os dados de conformidade (cenografia)
+    if (submitTokenType === "criteria_with_conformity") {
+      const existingConf = await tx.select({ id: eventConformitiesTable.id })
+        .from(eventConformitiesTable)
+        .where(eq(eventConformitiesTable.eventId, token.eventId));
+
+      if (existingConf.length > 0) {
+        await tx.update(eventConformitiesTable).set({
+          epi: conformityData.epi as boolean,
+          estaiamentos: conformityData.estaiamentos as boolean,
+          conduta: conformityData.conduta as boolean,
+          epiComment: (conformityData.epiComment as string) || null,
+          estaiamentosComment: (conformityData.estaiamentosComment as string) || null,
+          condutaComment: (conformityData.condutaComment as string) || null,
+          absencesResponse: true,
+          absencesReport: (conformityData.absencesReport as string) || null,
+          standoutResponse: conformityData.standoutResponse as boolean,
+          standoutJustification: (conformityData.standoutJustification as string) || null,
+          updatedAt: new Date(),
+        }).where(eq(eventConformitiesTable.eventId, token.eventId));
+      } else {
+        await tx.insert(eventConformitiesTable).values({
+          eventId: token.eventId,
+          epi: conformityData.epi as boolean,
+          estaiamentos: conformityData.estaiamentos as boolean,
+          conduta: conformityData.conduta as boolean,
+          epiComment: (conformityData.epiComment as string) || null,
+          estaiamentosComment: (conformityData.estaiamentosComment as string) || null,
+          condutaComment: (conformityData.condutaComment as string) || null,
+          guardaEquipamentos: null,
+          guardaEquipamentosComment: null,
+          absencesResponse: true,
+          absencesReport: (conformityData.absencesReport as string) || null,
+          standoutResponse: conformityData.standoutResponse as boolean,
+          standoutJustification: (conformityData.standoutJustification as string) || null,
+          createdByUserId: token.createdByUserId!,
+        });
+      }
+    }
   });
 
   res.json({ ok: true });

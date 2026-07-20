@@ -574,7 +574,7 @@ router.get("/events/:id/public-link-eligible-criteria", async (req, res) => {
 router.post("/events/:id/public-token", async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const user = req.user!;
-  const { recipientName, criterionIds: requestedCriterionIds } = req.body ?? {};
+  const { recipientName, criterionIds: requestedCriterionIds, includeConformity } = req.body ?? {};
 
   if (!recipientName || typeof recipientName !== "string" || !recipientName.trim()) {
     res.status(400).json({ error: "Nome do destinatário é obrigatório" });
@@ -610,12 +610,14 @@ router.post("/events/:id/public-token", async (req, res) => {
   }
 
   const tokenId = randomUUID();
+  const newTokenType = includeConformity ? "criteria_with_conformity" : "criteria";
   await db.transaction(async (tx) => {
     await tx.insert(publicEvalTokensTable).values({
       id: tokenId,
       eventId,
       createdByUserId: user.userId,
       recipientName: recipientName.trim(),
+      tokenType: newTokenType,
     });
     await tx.insert(publicEvalTokenCriteriaTable).values(
       eligibleCriterionIds.map(criterionId => ({ tokenId, criterionId })),
@@ -623,7 +625,7 @@ router.post("/events/:id/public-token", async (req, res) => {
   });
 
   await audit(user.userId, "create", "public_eval_tokens", tokenId, null, {
-    eventId, criterionIds: eligibleCriterionIds, recipientName: recipientName.trim(),
+    eventId, criterionIds: eligibleCriterionIds, recipientName: recipientName.trim(), tokenType: newTokenType,
   });
   res.json({ tokenId });
 });
@@ -638,7 +640,7 @@ router.post("/events/:id/public-token", async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
-  const { assignedToUserId, criterionIds, recipientName } = req.body ?? {};
+  const { assignedToUserId, criterionIds, recipientName, includeConformity } = req.body ?? {};
 
   if (!assignedToUserId || !Array.isArray(criterionIds) || criterionIds.length === 0) {
     res.status(400).json({ error: "assignedToUserId e criterionIds são obrigatórios" });
@@ -683,12 +685,14 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
     : (evaluatorUser?.name ?? "Avaliador");
 
   const tokenId = randomUUID();
+  const adminTokenType = includeConformity ? "criteria_with_conformity" : "criteria";
   await db.transaction(async (tx) => {
     await tx.insert(publicEvalTokensTable).values({
       id: tokenId,
       eventId,
       createdByUserId: assignedToUserId,
       recipientName: finalRecipientName,
+      tokenType: adminTokenType,
     });
     await tx.insert(publicEvalTokenCriteriaTable).values(
       validCriterionIds.map(criterionId => ({ tokenId, criterionId })),
@@ -696,7 +700,7 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
   });
 
   await audit(req.user!.userId, "create_admin_link", "public_eval_tokens", tokenId, null, {
-    eventId, assignedToUserId, criterionIds: validCriterionIds, recipientName: finalRecipientName,
+    eventId, assignedToUserId, criterionIds: validCriterionIds, recipientName: finalRecipientName, tokenType: adminTokenType,
   });
   res.json({ tokenId });
 });
