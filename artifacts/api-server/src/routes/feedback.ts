@@ -186,8 +186,8 @@ router.post("/events/:id/feedback/release", requireRole("admin", "rh", "diretori
  * Publica um retrato PARCIAL do feedback de UM critério específico (sem
  * exigir conclusão das avaliações desse ou de outros critérios, e sem
  * fechar o evento). Pode ser chamado várias vezes por critério — cada
- * chamada apenas atualiza a data. Bloqueado depois que a avaliação final
- * do evento (release) já foi publicada, pois final é terminal.
+ * chamada apenas atualiza a data. O status por critério (parcial/final)
+ * é independente do release geral do evento.
  */
 router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
@@ -195,10 +195,6 @@ router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("ad
 
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
-  if (event.feedbackReleased) {
-    res.status(400).json({ error: "A avaliação final já foi publicada para este evento e não pode voltar a ser parcial" });
-    return;
-  }
 
   const [link] = await db.select().from(eventCriteriaTable)
     .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId), eq(eventCriteriaTable.active, true)))
