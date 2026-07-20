@@ -3061,7 +3061,9 @@ export default function EvaluationsPage() {
                             {allPublicTokens.map(t => (
                               <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
                                 <div className="min-w-0">
-                                  <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
+                                  <p className="text-xs font-bold italic truncate">
+                                    {t.usedAt ? (t.submitterName ?? t.recipientName ?? "—") : (t.recipientName ?? "—")}
+                                  </p>
                                   <p className="text-[10px] italic text-[#747a60] truncate">
                                     {t.tokenType === "conformity_cenografia" ? "Matriz — Cenografia" : t.tokenType === "conformity_ferramentas" ? "Matriz — Ferramentas" : "Critérios"}
                                     {" · "}por {t.createdByName ?? "—"} · {fmtDT(t.createdAt)}
@@ -3642,7 +3644,9 @@ export default function EvaluationsPage() {
                         {hist.map(t => (
                           <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
                             <div className="min-w-0">
-                              <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
+                              <p className="text-xs font-bold italic truncate">
+                                {t.usedAt ? (t.submitterName ?? t.recipientName ?? "—") : (t.recipientName ?? "—")}
+                              </p>
                               <p className="text-[10px] italic text-[#9aa08a]">
                                 Enviado: {fmtDT(t.createdAt)}
                               </p>
