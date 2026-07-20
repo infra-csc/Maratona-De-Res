@@ -1498,7 +1498,13 @@ export default function CalibrationsPage() {
                                   <div className="flex items-stretch border border-[#191c1e] overflow-hidden w-full max-w-[88px]">
                                     <button
                                       type="button"
-                                      onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "partial" }))}
+                                      disabled={publishingCritId === c.criterionId || publishingFinalCritId === c.criterionId}
+                                      onClick={() => {
+                                        setPublishIntents(prev => ({ ...prev, [c.criterionId]: "partial" }));
+                                        if (isFinalPublished || c.partialPublishedAt) {
+                                          handlePublishCriterionPartial(c.criterionId);
+                                        }
+                                      }}
                                       className={`flex-1 py-1 text-[8px] font-black italic uppercase transition-colors leading-none ${(publishIntents[c.criterionId] ?? "partial") === "partial" ? "bg-[#3b0900] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >
                                       Parc.
@@ -1506,7 +1512,13 @@ export default function CalibrationsPage() {
                                     <span className="w-px bg-[#191c1e] shrink-0" />
                                     <button
                                       type="button"
-                                      onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "final" }))}
+                                      disabled={publishingCritId === c.criterionId || publishingFinalCritId === c.criterionId}
+                                      onClick={() => {
+                                        setPublishIntents(prev => ({ ...prev, [c.criterionId]: "final" }));
+                                        if (isFinalPublished || c.partialPublishedAt) {
+                                          handlePublishCriterionFinal(c.criterionId);
+                                        }
+                                      }}
                                       className={`flex-1 py-1 text-[8px] font-black italic uppercase transition-colors leading-none ${(publishIntents[c.criterionId] ?? "partial") === "final" ? "bg-[#506600] text-[#ccff00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
                                     >
                                       Final
