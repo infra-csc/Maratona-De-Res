@@ -123,7 +123,7 @@ export function AdminEvaluationsConsole() {
   const { data: events } = useGetEvents(undefined, { query: { queryKey: getGetEventsQueryKey() } });
   const { data: allUsers } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
 
-  const configuredEvents = (events ?? []).filter(e => (e.status === "open" || e.status === "closed") && e.criteriaConfirmed);
+  const configuredEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
 
   const criteriaQueries = useQueries({
     queries: configuredEvents.map(ev => ({
