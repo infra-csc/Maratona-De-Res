@@ -36,6 +36,8 @@ export interface Event {
   calibratedCriteriaCount?: number;
   /** Nº de critérios ativos com calibração final publicada. */
   finalCalibratedCriteria?: number;
+  /** Nº de critérios ativos com pelo menos uma publicação parcial. */
+  partialPublishedCount?: number;
   /** @nullable */
   averageScore?: number | null;
   /** @nullable */

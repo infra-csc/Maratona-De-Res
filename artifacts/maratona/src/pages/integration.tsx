@@ -841,7 +841,7 @@ export default function IntegrationPage() {
         </Card>
       )}
 
-      {(isAdmin || user?.role === "rh") && (
+      {(isAdmin || currentUser?.role === "rh") && (
         <Card className="border-none shadow-sm bg-white overflow-hidden">
           <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
             <CardTitle className="text-lg font-bold flex items-center gap-2">

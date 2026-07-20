@@ -492,298 +492,325 @@ export default function EventsPage() {
         </div>
       )}
 
-      {/* ── Content ── */}
-      <div className="flex-1 overflow-auto px-5 py-4">
-        {isLoading ? (
-          <div className="space-y-px bg-white border border-[#d0d2ca]">
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="h-14 bg-white animate-pulse border-b border-[#eceef0]" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Calendar size={40} className="mb-4 opacity-20" />
-            <h3 className="text-lg font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
-            <p className="text-[#747a60] italic mt-1 text-sm">Ajuste os filtros ou sincronize via integração.</p>
-            {cardFilter !== null && (
-              <button
-                onClick={() => setCardFilter(null)}
-                className="mt-4 px-4 py-2 text-[10px] font-bold italic uppercase border-2 border-[#191c1e] hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors"
-              >
-                Limpar filtro
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white border border-[#d0d2ca]">
-            {/* Table header */}
-            <div
-              className="grid border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10"
-              style={{ gridTemplateColumns: GRID_COLS }}
-            >
-              {(["name","date","participants","evaluated","calibr","score"] as const).map((col, i) => {
-                const labels: Record<string, string> = {
-                  name: "Evento", date: "Data", participants: "Part.",
-                  evaluated: "Avaliações", calibr: "Calibrações", score: "Nota",
-                };
-                const active = colActive(col);
-                const asc = sortAsc(col);
-                return (
-                  <div
-                    key={col}
-                    onClick={() => handleColSort(col)}
-                    className={`px-3 py-2 text-[9px] font-black italic uppercase tracking-wider cursor-pointer select-none flex items-center gap-1 transition-colors group
-                      ${i === 0 ? "pl-4" : ""}
-                      ${active ? "text-[#ccff00]" : "text-[#ccff00]/50 hover:text-[#ccff00]/80"}`}
-                  >
-                    {labels[col]}
-                    <span className={`inline-flex flex-col leading-none transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}>
-                      <ChevronUp size={7} className={active && asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
-                      <ChevronDown size={7} className={active && !asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
-                    </span>
-                  </div>
-                );
-              })}
-              <div className="px-3 py-2 text-[9px] font-black italic uppercase tracking-wider text-[#ccff00]/50">Status</div>
-              <div className="px-3 py-2" />
-            </div>
-
-            {/* Rows */}
-            {filtered.map((ev, i) => {
-              const score = ev.teamScore ?? ev.averageScore ?? null;
-              const concluded = ev.status === "closed";
-              const total = ev.totalCriteria ?? 0;
-              const evaluated = ev.evaluatedCriteria ?? 0;
-              const calCount = ev.calibratedCriteriaCount ?? 0;
-              const fc = ev.fullyCalibrated ?? false;
-              const finalPubCount = ev.finalCalibratedCriteria ?? 0;
-              const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
-              const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
-              const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
-              const isPureHistorical = !!ev.isHistorical && calSaved === 0;
-              const hasEvals = evaluated > 0;
-              const missing = ev.unassignedAreaNames ?? [];
-
-              // Accent bar color
-              const accentColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
-                : fc ? "#506600"
-                : evaluated === total && total > 0 ? "#ccff00"
-                : evaluated > 0 ? "#ffb300"
-                : "#e0e2da";
-
-              // Score label
-              const scoreLabel = isPureHistorical
-                ? "Importado"
-                : finalPubCount > 0 && partialOnlyCount > 0
-                  ? `${finalPubCount}F · ${partialOnlyCount}P`
-                  : finalPubCount > 0 ? "Pub. Final"
-                  : partialOnlyCount > 0 ? "Pub. Parcial"
-                  : calSaved > 0 ? "Rascunho"
-                  : "Avaliador";
-              const scoreLabelColor = isPureHistorical ? "#a06a00"
-                : finalPubCount > 0 && partialOnlyCount === 0 ? "#506600"
-                : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
-                : calSaved > 0 ? "#1565c0"
-                : "#747a60";
-
-              // MiniBar colors
-              const evalColor = !isPureHistorical && evaluated === total && total > 0 ? "#506600" : "#ccff00";
-              const calColor = fc ? "#506600" : calCount > 0 ? "#a06a00" : "#d0d2ca";
-
-              // Date display
-              const dateStr = ev.startDate === ev.endDate
-                ? new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-                : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}–${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
-
-              return (
-                <div
-                  key={ev.id}
-                  data-testid={`row-event-${ev.id}`}
-                  className={`grid relative items-center border-b border-[#eceef0] hover:bg-[#f8fdf0] transition-colors group ${i % 2 !== 0 ? "bg-[#fafcf5]" : "bg-white"}`}
-                  style={{ gridTemplateColumns: GRID_COLS }}
-                >
-                  {/* Accent bar */}
-                  <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: accentColor }} />
-
-                  {/* Event name + subtitle */}
-                  <div className="pl-4 pr-3 py-3 min-w-0">
-                    <Link href={`/events/${ev.id}`} className="text-[11px] font-black italic uppercase text-[#191c1e] hover:text-[#506600] leading-tight block truncate transition-colors">
-                      {ev.name}
-                    </Link>
-                    <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
-                      {ev.isHistorical && (
-                        <span className="text-[9px] font-black italic uppercase text-[#a06a00]">Histórico ·</span>
-                      )}
-                      {!ev.criteriaConfirmed && !hasEvals && (
-                        <span className="text-[9px] font-black italic uppercase text-[#b02f00]">Ag. RH ·</span>
-                      )}
-                      {!ev.resultsConfirmed && ev.criteriaConfirmed && (
-                        <span className="text-[9px] font-black italic uppercase text-[#a06a00]">Elegib. pend. ·</span>
-                      )}
-                      <span className="text-[9px] italic text-[#9aa088] truncate">
-                        {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
-                      </span>
-                    </div>
-                    {missing.length > 0 && !hasEvals && (
-                      <p className="text-[9px] font-bold italic uppercase text-[#b02f00] truncate mt-0.5">
-                        Sem aval.: {missing.join(", ")}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Date */}
-                  <div className="px-3 py-3 text-[10px] font-bold italic text-[#444933] whitespace-nowrap">{dateStr}</div>
-
-                  {/* Participants */}
-                  <div className="px-3 py-3 flex items-center gap-1 text-[#747a60]">
-                    <Users size={10} />
-                    <span className="text-[11px] font-black italic text-[#444933]">{ev.participantCount ?? 0}</span>
-                  </div>
-
-                  {/* Avaliações mini bar */}
-                  <div className="px-3 py-3">
-                    {isPureHistorical ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
-                    ) : total === 0 ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
-                    ) : (
-                      <MiniBar value={evaluated} total={total} color={evalColor} />
-                    )}
-                  </div>
-
-                  {/* Calibrações mini bar */}
-                  <div className="px-3 py-3">
-                    {isPureHistorical ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
-                    ) : total === 0 ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
-                    ) : (
-                      <MiniBar value={calCount} total={total} color={calColor} />
-                    )}
-                  </div>
-
-                  {/* Score */}
-                  <div className="px-3 py-3 text-center">
-                    {score != null ? (
-                      <div>
-                        <span className={`text-[18px] font-black italic leading-none block ${fc ? "text-[#506600]" : "text-[#191c1e]"}`}>
-                          {score.toFixed(1)}
-                        </span>
-                        <span className="text-[8px] font-bold italic uppercase" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
-                      </div>
-                    ) : (
-                      <span className="text-[14px] italic text-[#c4c9ac]">—</span>
-                    )}
-                  </div>
-
-                  {/* Status badge */}
-                  <div className="px-3 py-3">
-                    {!ev.criteriaConfirmed && !hasEvals ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff0ee] text-[#b02f00] border-[#f0b0a0]">Ag. RH</span>
-                    ) : fc ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#191c1e] text-[#ccff00] border-[#506600]">Pub. Final</span>
-                    ) : partialOnlyCount > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff8e1] text-[#a06a00] border-[#e8c870]">Pub. Parcial</span>
-                    ) : calSaved > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#e8f0fe] text-[#1565c0] border-[#90aee8]">Rascunho</span>
-                    ) : concluded ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#f4fce0] text-[#506600] border-[#c4cda8]">Concluído</span>
-                    ) : evaluated === total && total > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#f4fce0] text-[#506600] border-[#c4cda8]">Avaliado</span>
-                    ) : evaluated > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff4e5] text-[#a06a00] border-[#e8b84b]">Em Avaliação</span>
-                    ) : (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#eceef0] text-[#747a60] border-[#d0d2ca]">Aguardando</span>
-                    )}
-                  </div>
-
-                  {/* Action */}
-                  <div className="px-2 py-3 flex items-center justify-center gap-1">
-                    <Link href={`/events/${ev.id}`}>
-                      <button
-                        data-testid={`button-view-event-${ev.id}`}
-                        title="Gerenciar evento"
-                        className="h-7 w-7 bg-[#191c1e] text-[#ccff00] flex items-center justify-center hover:bg-[#506600] transition-colors"
-                      >
-                        <ChevronRight size={12} />
-                      </button>
-                    </Link>
-                    {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="h-7 w-7 flex items-center justify-center border border-[#d0d2ca] bg-white text-[#747a60] hover:bg-[#eceef0] hover:border-[#191c1e] transition-all">
-                            <MoreHorizontal size={11} />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] min-w-[160px]">
-                          {user && ["admin", "rh"].includes(user.role) && (
-                            <DropdownMenuItem
-                              data-testid={`button-edit-event-${ev.id}`}
-                              onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
-                              className="gap-2 italic font-bold text-xs cursor-pointer"
-                            >
-                              <Pencil size={12} /> Editar
-                            </DropdownMenuItem>
-                          )}
-                          {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                            <DropdownMenuItem asChild className="gap-2 italic font-bold text-xs cursor-pointer">
-                              <Link href={`/calibrations?eventId=${ev.id}`}>
-                                <SlidersHorizontal size={12} /> Calibrações
+          {/* Content */}
+          <div className="flex-1 overflow-auto">
+            {isLoading ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-12 bg-white border-2 border-[#eceef0] animate-pulse" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <Calendar size={40} className="mb-4 opacity-20" />
+                <h3 className="text-lg font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
+                <p className="text-[#747a60] italic mt-1 text-sm">Ajuste os filtros ou sincronize via integração.</p>
+              </div>
+            ) : viewMode === "table" ? (
+              <div className="bg-white border-b-2 border-[#eceef0] overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[860px]">
+                  <thead>
+                    <tr className="border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10">
+                      {(["name","date","participants","evaluated","calibr","score","status"] as const).map((col, i) => {
+                        const labels: Record<string, string> = { name:"Evento", date:"Período", participants:"Part.", evaluated:"Avaliados", calibr:"Calibr.", score:"Score", status:"Status" };
+                        const centered = ["participants","evaluated","calibr","score"].includes(col);
+                        const active = colActive(col);
+                        const asc = sortAsc(col);
+                        return (
+                          <th
+                            key={col}
+                            onClick={() => handleColSort(col)}
+                            className={`py-3 text-[10px] font-bold uppercase italic cursor-pointer select-none whitespace-nowrap group transition-colors
+                              ${i === 0 ? "px-4" : "px-3"}
+                              ${centered ? "text-center" : ""}
+                              ${active ? "text-[#ccff00]" : "text-[#ccff00]/60 hover:text-[#ccff00]"}`}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {labels[col]}
+                              <span className={`inline-flex flex-col leading-none transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}>
+                                <ChevronUp size={8} className={active && asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
+                                <ChevronDown size={8} className={active && !asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
+                              </span>
+                            </span>
+                          </th>
+                        );
+                      })}
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase italic text-[#ccff00]/60 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-[#eceef0]">
+                    {filtered.map(ev => {
+                      const score = ev.teamScore ?? ev.averageScore ?? null;
+                      const concluded = ev.status === "closed";
+                      const total = ev.totalCriteria ?? 0;
+                      const evaluated = ev.evaluatedCriteria ?? 0;
+                      const calCount = ev.calibratedCriteriaCount ?? 0;
+                      const fc = ev.fullyCalibrated ?? false;
+                      const isScoreFinal = concluded && fc;
+                      const finalPubCount = ev.finalCalibratedCriteria ?? 0;
+                      const partialPubTotal = ev.partialPublishedCount ?? 0;
+                      const calSaved = ev.calibratedCriteriaCount ?? 0;
+                      const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
+                      const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
+                        ? `${finalPubCount}F · ${partialOnlyCount}P`
+                        : finalPubCount > 0 ? "Calibrado Final"
+                        : partialOnlyCount > 0 ? "Calibrado Parcial"
+                        : calSaved > 0 ? "Calibrado"
+                        : "Avaliador";
+                      const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0
+                        ? "text-[#506600]"
+                        : finalPubCount > 0 || partialOnlyCount > 0 ? "text-[#a06a00]"
+                        : calSaved > 0 ? "text-[#b06000]"
+                        : "text-[#747a60]";
+                      const missing = ev.unassignedAreaNames ?? [];
+                      const hasEvals = evaluated > 0;
+                      const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
+                        : fc ? "#ccff00"
+                        : evaluated === total && total > 0 ? "#506600"
+                        : evaluated > 0 ? "#ffb300"
+                        : "#506600";
+                      return (
+                        <tr key={ev.id} data-testid={`row-event-${ev.id}`} className="hover:bg-[#f7f9fb] transition-colors">
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-[3px] h-9 shrink-0 rounded-sm" style={{ backgroundColor: statusColor }} />
+                              <div className="min-w-0">
+                                <Link href={`/events/${ev.id}`} className="font-black italic uppercase text-xs text-[#191c1e] hover:text-[#506600] leading-tight block">{ev.name}</Link>
+                                <p className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">
+                                  {[ev.clientName, ev.city].filter(Boolean).join(" · ") || "—"}
+                                </p>
+                                {missing.length > 0 && !hasEvals && (
+                                  <p className="text-[10px] font-bold italic uppercase text-[#b02f00] truncate" title={`Sem avaliador: ${missing.join(", ")}`}>
+                                    Sem avaliador: {missing.join(", ")}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] whitespace-nowrap">
+                            {new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} — {new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs font-bold italic text-[#444933] text-center">{ev.participantCount ?? 0}</td>
+                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${total > 0 && evaluated === total ? "text-[#506600]" : "text-[#191c1e]"}`}>
+                            {total === 0 ? "—" : `${evaluated}/${total}`}
+                          </td>
+                          <td className={`px-3 py-2.5 text-xs font-black italic text-center ${fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}`}>
+                            {total === 0 ? "—" : `${calCount}/${total}`}
+                          </td>
+                          <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                            {score == null ? (
+                              <span className="text-xs italic text-[#c4c9ac]">—</span>
+                            ) : (
+                              <>
+                                <span className="text-sm font-black italic text-[#191c1e]">{score.toFixed(1)}</span>
+                                <span className={`block text-[9px] font-bold italic uppercase leading-none ${scoreLabelColor}`}>
+                                  {scoreLabel}
+                                </span>
+                              </>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {!ev.criteriaConfirmed && !hasEvals ? (
+                              <span className="text-[10px] font-bold italic uppercase text-[#b02f00]">Aguardando RH</span>
+                            ) : !ev.resultsConfirmed ? (
+                              <span className="text-[10px] font-bold italic uppercase text-[#a06a00]">Elegib. pendente</span>
+                            ) : ev.status === "closed" ? (
+                              <span className="text-[10px] font-bold italic uppercase text-[#506600]">Concluído</span>
+                            ) : (
+                              <span className="text-[10px] font-bold italic uppercase text-[#506600]">OK</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center justify-end gap-1">
+                              {user?.role === "admin" && (
+                                <button
+                                  data-testid={`button-merge-event-${ev.id}`}
+                                  title="Mesclar com evento duplicado"
+                                  onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
+                                  className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all"
+                                >
+                                  <GitMerge size={12} />
+                                </button>
+                              )}
+                              {user?.role === "admin" && (
+                                <button
+                                  data-testid={`button-delete-event-${ev.id}`}
+                                  title="Excluir evento"
+                                  onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
+                                  className="h-7 px-2 flex items-center border-2 border-[#b02f00] bg-white text-[#b02f00] hover:bg-[#fff0ee] transition-all"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                              {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                                <Link href={`/calibrations?eventId=${ev.id}`}>
+                                  <button title="Ir para calibração" className="h-7 px-2 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                                    <SlidersHorizontal size={12} />
+                                  </button>
+                                </Link>
+                              )}
+                              <Link href={`/events/${ev.id}`}>
+                                <button data-testid={`button-view-event-${ev.id}`} className="h-7 px-2.5 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all whitespace-nowrap">
+                                  Gerenciar
+                                </button>
                               </Link>
-                            </DropdownMenuItem>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-5 grid grid-cols-1 xl:grid-cols-2 gap-5">
+                {filtered.map(ev => {
+                  const score = ev.teamScore ?? ev.averageScore ?? null;
+                  const calibrated = ev.hasCalibration ?? false;
+                  const concluded = ev.status === "closed";
+                  const total = ev.totalCriteria ?? 0;
+                  const evaluated = ev.evaluatedCriteria ?? 0;
+                  const calCount = ev.finalCalibratedCriteria ?? 0;
+                  const fc = ev.fullyCalibrated ?? false;
+                  const evalPct = total > 0 ? Math.round((evaluated / total) * 100) : 0;
+                  const calPct  = total > 0 ? Math.round((calCount / total) * 100) : 0;
+                  const isScoreFinal = concluded && fc;
+                  const finalPubCount = ev.finalCalibratedCriteria ?? 0;
+                  const partialPubTotal = ev.partialPublishedCount ?? 0;
+                  const calSaved = ev.calibratedCriteriaCount ?? 0;
+                  const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
+                  const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
+                    ? `${finalPubCount}F · ${partialOnlyCount}P`
+                    : finalPubCount > 0 ? "Calibrado Final"
+                    : partialOnlyCount > 0 ? "Calibrado Parcial"
+                    : calSaved > 0 ? "Calibrado"
+                    : "Avaliador";
+                  const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0
+                    ? "#506600"
+                    : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
+                    : calSaved > 0 ? "#b06000"
+                    : "#747a60";
+                  const hasEvals = evaluated > 0;
+                  const statusColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
+                    : fc ? "#ccff00"
+                    : evaluated === total && total > 0 ? "#506600"
+                    : evaluated > 0 ? "#ffb300"
+                    : "#506600";
+                  return (
+                    <div key={ev.id} data-testid={`card-event-${ev.id}`} className={`bg-white border-2 border-[#191c1e] border-l-[5px] flex flex-col ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`} style={{ borderLeftColor: statusColor }}>
+                      <div className="p-5 flex-1">
+                        <div className="flex justify-between items-start gap-4 mb-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                              {!ev.criteriaConfirmed && !hasEvals && (
+                                <span className="px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block bg-[#fff0ee] text-[#b02f00]">
+                                  Aguardando RH
+                                </span>
+                              )}
+                              {!ev.resultsConfirmed && (
+                                <span className="px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block bg-[#fff8e0] text-[#a06a00]">
+                                  Elegib. pendente
+                                </span>
+                              )}
+                              {ev.isHistorical && (
+                                <span data-testid={`badge-historical-${ev.id}`} className="bg-[#ffb300] text-[#3b2900] px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block">Ciclo Anterior</span>
+                              )}
+                              {concluded && (
+                                <span className="bg-[#506600] text-white px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase inline-block">Concluído</span>
+                              )}
+                            </div>
+                            <Link href={`/events/${ev.id}`} className="font-black text-base italic uppercase tracking-tight text-[#191c1e] hover:text-[#506600] transition-colors leading-tight block">{ev.name}</Link>
+                            {ev.clientName && <p className="text-xs font-bold italic uppercase text-[#747a60] mt-0.5 truncate">{ev.clientName}</p>}
+                          </div>
+                          {score != null && (
+                            <div className={`border-2 border-[#191c1e] p-2 text-center min-w-[74px] shrink-0 ${finalPubCount > 0 && partialOnlyCount === 0 ? "bg-[#ccff00]" : finalPubCount > 0 || partialOnlyCount > 0 ? "bg-[#fff8e1]" : "bg-[#f0f0f0]"}`}>
+                              <span className="block text-[9px] uppercase font-bold italic mb-0.5" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
+                              <span className="text-xl font-black italic text-[#191c1e] leading-none">{score.toFixed(1)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold italic text-[#444933] mt-3 pt-3 border-t-2 border-dashed border-[#e0e3e5]">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar size={12} className="text-[#747a60]" />
+                            {new Date(ev.startDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })} – {new Date(ev.endDate).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <MapPin size={12} className="text-[#747a60]" />
+                            {ev.city ? `${ev.city}${ev.state ? `, ${ev.state}` : ""}` : (ev.location || "Local n/d")}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Users size={12} className="text-[#747a60]" />
+                            {ev.participantCount} participantes
+                          </span>
+                        </div>
+                        {!!ev.unassignedAreaNames && ev.unassignedAreaNames.length > 0 && (
+                          <p className="mt-2 text-[10px] font-bold italic uppercase text-[#b02f00] flex items-start gap-1.5">
+                            <Info size={11} className="shrink-0 mt-0.5" />
+                            Sem avaliador: {ev.unassignedAreaNames.join(", ")}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="bg-[#f2f4f6] px-5 py-3 border-t-2 border-[#191c1e] flex items-center justify-between gap-4">
+                        <div className="flex-1 max-w-[240px] space-y-1.5">
+                          {total > 0 && (<>
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] mb-1 font-bold italic uppercase">
+                                <span className="text-[#444933]">Avaliados</span>
+                                <span className={evalPct === 100 ? "text-[#506600]" : "text-[#191c1e]"}>{evaluated}/{total}</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-[#eceef0] border border-[#191c1e] overflow-hidden">
+                                <div className={evalPct === 100 ? "h-full bg-[#506600]" : "h-full bg-[#ccff00]"} style={{ width: `${evalPct}%` }} />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] mb-1 font-bold italic uppercase">
+                                <span className="text-[#444933]">Calibrações</span>
+                                <span className={fc ? "text-[#506600]" : calCount > 0 ? "text-[#a06a00]" : "text-[#747a60]"}>{calCount}/{total}</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-[#eceef0] border border-[#191c1e] overflow-hidden">
+                                <div className={fc ? "h-full bg-[#506600]" : "h-full bg-[#ffb300]"} style={{ width: `${calPct}%` }} />
+                              </div>
+                            </div>
+                          </>)}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {user?.role === "admin" && (
+                            <button data-testid={`button-merge-event-${ev.id}`} title="Mesclar" onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }} className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                              <GitMerge size={14} />
+                            </button>
                           )}
                           {user?.role === "admin" && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                data-testid={`button-merge-event-${ev.id}`}
-                                onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
-                                className="gap-2 italic font-bold text-xs cursor-pointer"
-                              >
-                                <GitMerge size={12} /> Mesclar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                data-testid={`button-delete-event-${ev.id}`}
-                                onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
-                                className="gap-2 italic font-bold text-xs cursor-pointer text-[#b02f00] focus:text-[#b02f00]"
-                              >
-                                <Trash2 size={12} /> Excluir
-                              </DropdownMenuItem>
-                            </>
+                            <button
+                              data-testid={`button-delete-event-${ev.id}`}
+                              title="Excluir evento"
+                              onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
+                              className="h-8 px-2.5 flex items-center border-2 border-[#b02f00] bg-white text-[#b02f00] hover:bg-[#fff0ee] transition-all"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Legend + count */}
-        {!isLoading && filtered.length > 0 && (
-          <div className="flex items-center gap-5 mt-3 px-1 flex-wrap">
-            {[
-              { color: "#506600", label: "Pub. Final" },
-              { color: "#ccff00", label: "Avaliado" },
-              { color: "#ffb300", label: "Em andamento" },
-              { color: "#e0e2da", label: "Aguardando" },
-              { color: "#ff5722", label: "Ag. RH" },
-            ].map(l => (
-              <div key={l.label} className="flex items-center gap-1.5">
-                <div className="w-[3px] h-3 shrink-0" style={{ backgroundColor: l.color }} />
-                <span className="text-[9px] italic text-[#747a60]">{l.label}</span>
+                          {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                            <Link href={`/calibrations?eventId=${ev.id}`}>
+                              <button data-testid={`button-calibrate-event-${ev.id}`} title="Calibrações" className="h-8 px-2.5 flex items-center border-2 border-[#191c1e] bg-white text-[#444933] hover:bg-[#eceef0] transition-all">
+                                <SlidersHorizontal size={14} />
+                              </button>
+                            </Link>
+                          )}
+                          <Link href={`/events/${ev.id}`}>
+                            <button data-testid={`button-view-event-${ev.id}`} className="h-8 px-3 flex items-center bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] text-[10px] font-bold italic uppercase hover:bg-[#506600] hover:text-white transition-all">
+                              Gerenciar <ChevronRight size={13} className="ml-1" />
+                            </button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-            <span className="ml-auto text-[11px] italic text-[#747a60]">
-              {filtered.length === all.length
-                ? `${all.length} eventos no ciclo`
-                : `${filtered.length} de ${all.length} eventos`}
-            </span>
+            )}
           </div>
-        )}
-      </div>
 
       {/* ── Merge dialog ── */}
       <Dialog open={!!mergeForEvent} onOpenChange={(open) => { if (!open) { setMergeForEvent(null); setMergeTargetId(""); setMergeConflict(null); } }}>
