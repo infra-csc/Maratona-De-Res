@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import {
-  useGetEvents, useGetEvent, useGetUsers, useConfirmEventResults,
+  useGetEvents, useGetEvent, useGetUsers, useConfirmEventResults, useGetCurrentCycle,
   useSetConformityEvaluator, useSetConformityEvaluatorFerramentas,
   getEventCriteria, getEvaluations, getGetEvaluationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey,
 } from "@workspace/api-client-react";
@@ -23,6 +23,23 @@ function fmtDT(v: string | null | undefined): string {
   const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   return `${date} ${time}`;
+}
+
+function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
+  const result: { sat: string; sun: string; label: string }[] = [];
+  const end = new Date(endDate + "T12:00:00");
+  const d = new Date(startDate + "T12:00:00");
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+  while (d <= end) {
+    const sat = d.toISOString().split("T")[0];
+    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
+    const sun = sunD.toISOString().split("T")[0];
+    const label = `${String(d.getDate()).padStart(2,"0")}–${String(sunD.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+    result.push({ sat, sun, label });
+    d.setDate(d.getDate() + 7);
+  }
+  return result;
 }
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
@@ -56,6 +73,8 @@ interface EnrichedEvent {
   city: string | null;
   state: string | null;
   status: string;
+  startDate: string | null;
+  endDate: string | null;
   criteria: CritRow[];
   total: number;
   done: number;
@@ -104,6 +123,8 @@ export function AdminEvaluationsConsole() {
   const [q, setQ] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
   const [evaluatorFilter, setEvaluatorFilter] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
   const [sort, setSort] = useState<"name" | "pct" | "pending">("name");
   const [critFilter, setCritFilter] = useState<"all" | "unassigned" | "pending" | "partial" | "done">("all");
   const [openPickerCriterionId, setOpenPickerCriterionId] = useState<number | null>(null);
@@ -122,6 +143,8 @@ export function AdminEvaluationsConsole() {
 
   const { data: events } = useGetEvents(undefined, { query: { queryKey: getGetEventsQueryKey() } });
   const { data: allUsers } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
+  const { data: cycle } = useGetCurrentCycle();
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
 
   const configuredEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
 
@@ -181,7 +204,8 @@ export function AdminEvaluationsConsole() {
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
       return {
         id: ev.id, name: ev.name, clientName: ev.clientName ?? null, city: ev.city ?? null, state: ev.state ?? null,
-        status: ev.status, criteria: rows, total, done, unassigned, pct,
+        status: ev.status, startDate: ev.startDate ?? null, endDate: ev.endDate ?? null,
+        criteria: rows, total, done, unassigned, pct,
         areaNames: [...new Set(rows.map(r => r.areaName))],
         evaluatorNames: [...new Set(rows.map(r => r.assignedToName).filter((n): n is string => !!n))],
         isDone: total > 0 && done === total,
@@ -197,14 +221,16 @@ export function AdminEvaluationsConsole() {
 
   const areaOptions = [...new Set(enrichedEvents.flatMap(e => e.areaNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const evaluatorOptions = [...new Set(enrichedEvents.flatMap(e => e.evaluatorNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  const hasFilters = !!(q || areaFilter || evaluatorFilter);
+  const hasFilters = !!(q || areaFilter || evaluatorFilter || filterDateFrom || filterDateTo);
 
   const qNorm = q.trim().toLowerCase();
   const queueEvents = baseTab
     .filter(e =>
       (!qNorm || e.name.toLowerCase().includes(qNorm))
       && (!areaFilter || e.areaNames.includes(areaFilter))
-      && (!evaluatorFilter || e.evaluatorNames.includes(evaluatorFilter)),
+      && (!evaluatorFilter || e.evaluatorNames.includes(evaluatorFilter))
+      && (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom)
+      && (!filterDateTo || (e.startDate ?? "") <= filterDateTo),
     )
     .slice()
     .sort((a, b) => {
@@ -487,10 +513,25 @@ export function AdminEvaluationsConsole() {
                   <option value="pct">Ordenar · Menor progresso</option>
                   <option value="pending">Ordenar · Mais pendências</option>
                 </select>
+                {cycleWeekends.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] font-black italic uppercase text-[#747a60]">Fim de semana:</span>
+                    {cycleWeekends.map(w => {
+                      const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                      return (
+                        <button key={w.sat} type="button"
+                          data-testid={`button-filter-weekend-${w.sat}`}
+                          onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
+                          className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border transition-colors ${active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e]"}`}
+                        >{w.label}</button>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-black italic uppercase text-[#747a60]">{queueEvents.length} evento(s)</span>
                   {hasFilters && (
-                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); }} className="border-2 border-[#191c1e] bg-white px-2.5 py-1 text-[9.5px] font-black italic uppercase hover:bg-[#ccff00]">
+                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); setFilterDateFrom(""); setFilterDateTo(""); }} className="border-2 border-[#191c1e] bg-white px-2.5 py-1 text-[9.5px] font-black italic uppercase hover:bg-[#ccff00]">
                       Limpar filtros
                     </button>
                   )}
@@ -923,7 +964,8 @@ export function AdminEvaluationsConsole() {
               {/* history */}
               {(() => {
                 const relevantTokens: (PublicToken & { tokenType: string })[] = (allTokens ?? []).filter(t =>
-                  t.tokenType === "criteria" && (t.criterionIds ?? []).includes(linkDialog.criterionId),
+                  (t.tokenType === "criteria" || t.tokenType === "criteria_with_conformity")
+                  && (t.criterionIds ?? []).some(id => linkDialog.criterionIds.includes(id)),
                 );
                 if (relevantTokens.length === 0) return null;
                 return (

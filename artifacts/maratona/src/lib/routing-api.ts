@@ -296,7 +296,7 @@ export function useFerramentasPublicTokens(eventId: number | null) {
 
 /** Admin/RH: todos os links públicos gerados para o evento, de qualquer avaliador/formulário. */
 export function useAllPublicTokens(eventId: number | null) {
-  return useQuery<(PublicToken & { tokenType: "criteria" | "conformity_cenografia" | "conformity_ferramentas" })[]>({
+  return useQuery<(PublicToken & { tokenType: "criteria" | "criteria_with_conformity" | "conformity_cenografia" | "conformity_ferramentas" })[]>({
     queryKey: ["all-public-tokens", eventId ?? 0],
     queryFn: () => apiFetch(`/api/events/${eventId}/public-tokens/all`),
     enabled: eventId != null,
