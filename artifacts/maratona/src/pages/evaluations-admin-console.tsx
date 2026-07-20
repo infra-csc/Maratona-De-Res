@@ -11,8 +11,16 @@ import {
 } from "@/lib/routing-api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users } from "lucide-react";
+import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function fmtDT(v: string | null | undefined): string {
+  if (!v) return "—";
+  const d = new Date(v);
+  const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return `${date} ${time}`;
+}
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const CENOGRAFIA_AREA_ID = 13;
@@ -35,6 +43,7 @@ interface CritRow {
   assignedToId: number | null;
   assignedToName: string | null;
   state: CritState;
+  submittedAt: string | null;
 }
 
 interface EnrichedEvent {
@@ -149,6 +158,7 @@ export function AdminEvaluationsConsole() {
           areaId: c.responsibleAreaId ?? null,
           areaName: c.responsibleAreaName ?? "Sem área",
           assignedToId, assignedToName, state,
+          submittedAt: evalRow?.submittedAt ?? null,
         };
       });
       const total = rows.length;
@@ -547,6 +557,11 @@ export function AdminEvaluationsConsole() {
                             ) : (
                               <span className="font-black italic uppercase text-[11px] text-[#ba1a1a]">Nenhum avaliador atribuído</span>
                             )}
+                            {c.submittedAt && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold italic text-[#3f5200]">
+                                <Clock size={10} /> {fmtDT(c.submittedAt)}
+                              </span>
+                            )}
                           </div>
                           {canManage && (
                             <div className="flex items-center gap-2.5 whitespace-nowrap">
@@ -624,7 +639,7 @@ export function AdminEvaluationsConsole() {
             </p>
             <div className={`border-2 border-[#191c1e] bg-white overflow-hidden overflow-x-auto ${HARD_SHADOW}`}>
               <div className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] bg-[#191c1e] text-white min-w-[820px]">
-                {["Critério", "Área", "Avaliador", "Enviado", "Status", "Ação"].map((h, i) => (
+                {["Critério", "Área", "Avaliador", "Enviado em", "Status", "Ação"].map((h, i) => (
                   <div key={h} className={cn("px-3.5 py-2.5 text-[10px] font-black italic uppercase tracking-wide", i === 5 && "text-right")}>{h}</div>
                 ))}
               </div>
@@ -638,7 +653,13 @@ export function AdminEvaluationsConsole() {
                     <div className="px-3.5 py-3 font-black italic uppercase text-[13px]">{c.criterionName}</div>
                     <div className="px-3.5 py-3 font-bold italic uppercase text-[11px] text-[#747a60]">{c.areaName}</div>
                     <div className="px-3.5 py-3 font-semibold italic text-xs" style={{ color: c.assignedToId == null ? "#ba1a1a" : "#191c1e" }}>{c.assignedToName ?? "Sem avaliador"}</div>
-                    <div className="px-3.5 py-3 font-black italic text-[13px]">{c.assignedToId == null ? "—" : c.state === "done" ? "1/1" : "0/1"}</div>
+                    <div className="px-3.5 py-3 font-bold italic text-[11px] text-[#444933]">
+                      {c.submittedAt ? (
+                        <span className="flex items-center gap-1 text-[#3f5200]"><Clock size={10} /> {fmtDT(c.submittedAt)}</span>
+                      ) : (
+                        <span className="text-[#747a60]">—</span>
+                      )}
+                    </div>
                     <div className="px-3.5 py-3">
                       <span className="text-[9px] font-black italic uppercase px-2.5 py-1 whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                     </div>

@@ -225,7 +225,7 @@ function EvaluatorEventCard({
               d.submitted ? (
                 <p key={i} className="text-[11px] italic text-[#506600] flex items-start gap-1">
                   <CheckCircle size={11} className="mt-0.5 shrink-0" />
-                  <span><span className="font-bold uppercase">{d.name}</span> — <span className="font-bold">{d.assignee ?? "?"}</span>{d.submittedAt ? ` · ${new Date(d.submittedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}</span>
+                  <span><span className="font-bold uppercase">{d.name}</span> — <span className="font-bold">{d.assignee ?? "?"}</span>{d.submittedAt ? ` · ${fmtDT(d.submittedAt)}` : ""}</span>
                 </p>
               ) : (
                 <p key={i} className="text-[11px] italic text-[#747a60] flex items-start gap-1">
@@ -254,24 +254,41 @@ function EvaluatorEventCard({
 // de conformidade, o avaliador titular deixa de ver o formulário interativo
 // (evita sobrescrever a resposta do freelancer) e passa a ver só este
 // histórico de envios — respondido ou não, e quando.
+function fmtDT(v: string | null | undefined): string {
+  if (!v) return "—";
+  const d = new Date(v);
+  const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return `${date} ${time}`;
+}
+
 function ConformityLinkHistory({ history }: { history: PublicToken[] }) {
   return (
     <div className="bg-white border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] overflow-hidden">
       {history.map(t => (
-        <div key={t.id} className="flex items-center justify-between px-4 py-3 gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-bold italic truncate">{t.recipientName ?? "—"}</p>
-            <p className="text-[10px] italic text-[#747a60]">
-              Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
-              {t.usedAt ? ` · Respondido ${new Date(t.usedAt).toLocaleDateString("pt-BR")}` : ""}
+        <div key={t.id} className="flex items-start justify-between px-4 py-3 gap-3">
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-sm font-bold italic truncate">
+              {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
             </p>
+            {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
+              <p className="text-[10px] italic text-[#747a60] truncate">Para: {t.recipientName}</p>
+            )}
+            <p className="text-[10px] italic text-[#9aa08a]">
+              Enviado: {fmtDT(t.createdAt)}
+            </p>
+            {t.usedAt && (
+              <p className="text-[10px] font-bold italic text-[#3f5200]">
+                Respondido: {fmtDT(t.usedAt)}
+              </p>
+            )}
           </div>
           {t.usedAt ? (
-            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
+            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1 mt-0.5">
               <CheckCircle size={10} /> Respondido
             </span>
           ) : (
-            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
+            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 mt-0.5">
               Pendente
             </span>
           )}
@@ -3027,12 +3044,17 @@ export default function EvaluationsPage() {
                                   <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
                                   <p className="text-[10px] italic text-[#747a60] truncate">
                                     {t.tokenType === "conformity_cenografia" ? "Matriz — Cenografia" : t.tokenType === "conformity_ferramentas" ? "Matriz — Ferramentas" : "Critérios"}
-                                    {" · "}enviado por {t.createdByName ?? "—"} em {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
+                                    {" · "}por {t.createdByName ?? "—"} · {fmtDT(t.createdAt)}
                                   </p>
+                                  {t.usedAt && (
+                                    <p className="text-[10px] font-bold italic text-[#3f5200] truncate">
+                                      Respondido: {fmtDT(t.usedAt)}
+                                    </p>
+                                  )}
                                 </div>
                                 {t.usedAt ? (
                                   <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
-                                    <CheckCircle size={10} /> Respondido
+                                    <CheckCircle size={10} /> Ok
                                   </span>
                                 ) : (
                                   <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
@@ -3453,16 +3475,21 @@ export default function EvaluationsPage() {
                         {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
                           <p className="text-[10px] italic text-[#747a60] truncate">Para: {t.recipientName}</p>
                         )}
-                        <p className="text-[10px] italic text-[#747a60]">
-                          Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
+                        <p className="text-[10px] italic text-[#9aa08a]">
+                          Enviado: {fmtDT(t.createdAt)}
                         </p>
+                        {t.usedAt && (
+                          <p className="text-[10px] font-bold italic text-[#3f5200]">
+                            Respondido: {fmtDT(t.usedAt)}
+                          </p>
+                        )}
                       </div>
                       {t.usedAt ? (
-                        <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
+                        <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1 mt-0.5">
                           <CheckCircle size={10} /> Respondido
                         </span>
                       ) : (
-                        <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
+                        <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 mt-0.5">
                           Pendente
                         </span>
                       )}
@@ -3544,7 +3571,7 @@ export default function EvaluationsPage() {
                       <CheckCircle size={16} className="text-[#506600] shrink-0 mt-0.5" />
                       <p className="text-xs font-bold italic text-[#506600]">
                         Formulário já respondido por <span className="uppercase">{answered.submitterName ?? answered.recipientName ?? "freelancer"}</span>
-                        {answered.usedAt ? ` em ${new Date(answered.usedAt).toLocaleDateString("pt-BR")}` : ""}. Não é possível gerar outro link.
+                        {answered.usedAt ? ` em ${fmtDT(answered.usedAt)}` : ""}. Não é possível gerar outro link.
                       </p>
                     </div>
                   ) : shownUrl ? (
@@ -3596,10 +3623,14 @@ export default function EvaluationsPage() {
                           <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
                             <div className="min-w-0">
                               <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
-                              <p className="text-[10px] italic text-[#747a60]">
-                                Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
-                                {t.usedAt ? ` · Respondido ${new Date(t.usedAt).toLocaleDateString("pt-BR")}` : ""}
+                              <p className="text-[10px] italic text-[#9aa08a]">
+                                Enviado: {fmtDT(t.createdAt)}
                               </p>
+                              {t.usedAt && (
+                                <p className="text-[10px] font-bold italic text-[#3f5200]">
+                                  Respondido: {fmtDT(t.usedAt)}
+                                </p>
+                              )}
                             </div>
                             {t.usedAt ? (
                               <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
