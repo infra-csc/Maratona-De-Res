@@ -151,12 +151,12 @@ export default function ComoFuncionaPage() {
               <InfoRow label="Nota do Evento" value="Média ponderada dos critérios avaliados (cada critério tem um peso). Escala de 0 a 10, convertida para 0 a 100." />
               <InfoRow label="Matriz de Conformidade" value="Checklist de itens obrigatórios. Cada item marcado como 'Não' desconta 10 pontos da nota daquele evento." />
               <InfoRow label="Média do Ciclo" value="Média simples de todos os eventos com nota confirmada que contam para a sua pontuação." highlight />
-              <InfoRow label="Penalidades" value="Descontam pontos da sua média final (ex.: faltas, advertências). O desconto pode reduzir sua nota até o mínimo de 0." />
-              <InfoRow label="Méritos" value="Somam pontos à sua média final, podendo aumentar até o máximo de 100." />
-              <InfoRow label="Nota Final" value="= Média do Ciclo − Penalidades + Méritos (limitada entre 0 e 100)." highlight />
+              <InfoRow label="Penalidades" value="Descontam pontos do total acumulado de notas antes de calcular a média final (ex.: faltas, advertências). O desconto pode reduzir sua nota até o mínimo de 0." />
+              <InfoRow label="Méritos" value="Somam pontos ao total acumulado de notas antes de calcular a média final, podendo aumentar até o máximo de 100." />
+              <InfoRow label="Nota Final" value="= (Soma das notas dos eventos − Penalidades + Méritos) ÷ Nº de eventos (limitada entre 0 e 100)." highlight />
             </div>
             <div className="mt-4 p-4 bg-[#f2f4f6] border-l-4 border-[#506600] italic text-sm text-[#444933] leading-relaxed">
-              <strong>Exemplo:</strong> Se sua média do ciclo for 78 pontos, você tem 5 pontos de penalidade e 2 de mérito, sua nota final será: 78 − 5 + 2 = <strong>75 pontos</strong>.
+              <strong>Exemplo:</strong> 5 eventos com média 78 (soma total = 390), 5 pontos de penalidade e 2 de mérito: (390 − 5 + 2) ÷ 5 = <strong>77,4 pontos</strong>.
             </div>
           </Section>
         )}

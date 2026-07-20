@@ -214,8 +214,23 @@ export function calculateAbsencePenalty(totalAbsences: number, penaltyPerAbsence
   return totalAbsences * penaltyPerAbsence;
 }
 
-export function calculateQuarterFinalResult(grossAverage: number, absencePenalty: number): number {
-  return Math.min(100, Math.max(0, Math.round((grossAverage - absencePenalty) * 100) / 100));
+/**
+ * Nota Final do ciclo.
+ *
+ * Fórmula: (soma total das notas − líquido de penalidades) ÷ nº de eventos, travado entre 0 e 100.
+ *   = grossAverage − netPenalty / eventCount
+ *
+ * O desconto é distribuído pelo número de eventos para que uma penalidade de, por exemplo,
+ * 50 pontos em 5 eventos reduza a média em 10 pts (não em 50).
+ *
+ * @param grossAverage   Média bruta (Σscores / N)
+ * @param netPenalty     penaltyPoints − meritPoints (pode ser negativo se méritos > penalidades)
+ * @param eventCount     Número de eventos confirmados/pontuados (N); se 0 retorna 0.
+ */
+export function calculateQuarterFinalResult(grossAverage: number, netPenalty: number, eventCount: number): number {
+  if (eventCount <= 0) return 0;
+  const adjusted = grossAverage - netPenalty / eventCount;
+  return Math.min(100, Math.max(0, Math.round(adjusted * 100) / 100));
 }
 
 export interface PlatoonRuleData {

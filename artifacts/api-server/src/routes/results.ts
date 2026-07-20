@@ -334,8 +334,9 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
     const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
     const absencePenalty = penaltyPoints;
-    // Méritos somam, penalidades subtraem; resultado final fica travado entre 0 e 100.
-    const finalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints);
+    // Méritos somam, penalidades subtraem do TOTAL (soma) dos eventos, depois divide pelo nº de eventos.
+    // finalResult = (scoreSum − netPenalty) / N = grossAverage − netPenalty / N  (travado entre 0 e 100).
+    const finalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, eventScores.length);
     const platoon = getPlatoonByScore(finalResult, platoonRules);
 
     const [cycleElig] = await db.select().from(employeeCycleEligibilityTable)

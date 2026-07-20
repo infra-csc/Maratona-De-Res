@@ -317,7 +317,7 @@ router.get("/my-performance", async (req, res) => {
     // subtraem, resultado travado entre 0 e 100 — projeção precisa refletir
     // os ajustes ao vivo, senão o colaborador vê uma nota/pelotão/bônus que
     // não bate com o que será oficializado no fechamento.
-    const projectedFinalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints);
+    const projectedFinalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, scoredEvents.length);
     const proj = getPlatoonByScore(projectedFinalResult, platoonRulesMapped);
     currentPlatoon = proj?.name ?? null;
     const scoredEventsWithDate = scoredEvents

@@ -259,7 +259,7 @@ router.get("/ranking-detail", async (req, res) => {
   // O snapshot (quarterResult.finalResult) pode estar desatualizado se uma penalidade
   // foi lançada depois do fechamento sem um novo recompute.
   const liveFinalResult = grossAverage !== null
-    ? calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints)
+    ? calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, scored.length)
     : (quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : null);
 
   res.json({
