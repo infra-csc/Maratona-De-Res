@@ -4,6 +4,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
+import { recomputeCycleResults } from "./results.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -78,6 +79,7 @@ router.post("/absences", requireRole("admin", "rh", "diretoria"), async (req, re
     registeredByUserId: req.user!.userId,
   }).returning();
   await audit(req.user!.userId, "create", "absences", absence.id, null, absence);
+  await recomputeCycleResults(cycle.id, req.user!.userId);
   res.status(201).json(absence);
 });
 
@@ -114,6 +116,8 @@ router.patch("/absences/:id", requireRole("admin", "rh", "diretoria"), async (re
   if (Object.keys(update).length === 0) { res.json(existing[0]); return; }
   const [updated] = await db.update(absencesTable).set(update).where(eq(absencesTable.id, id)).returning();
   await audit(req.user!.userId, "update", "absences", id, existing[0], updated);
+  const patchCycle = await getCurrentCycle();
+  if (patchCycle) await recomputeCycleResults(patchCycle.id, req.user!.userId);
   res.json(updated);
 });
 
@@ -122,6 +126,8 @@ router.delete("/absences/:id", requireRole("admin", "rh", "diretoria"), async (r
   const [existing] = await db.select().from(absencesTable).where(eq(absencesTable.id, id)).limit(1);
   await db.delete(absencesTable).where(eq(absencesTable.id, id));
   await audit(req.user!.userId, "delete", "absences", id, existing);
+  const deleteCycle = await getCurrentCycle();
+  if (deleteCycle) await recomputeCycleResults(deleteCycle.id, req.user!.userId);
   res.status(204).end();
 });
 

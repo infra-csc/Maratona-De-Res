@@ -5,7 +5,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, ilike, exists } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { getPlatoonByScore } from "../lib/calculations.js";
+import { getPlatoonByScore, calculateQuarterFinalResult } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { computeEventTeamResult } from "./results.js";
@@ -254,6 +254,14 @@ router.get("/ranking-detail", async (req, res) => {
   const scored = events.filter(e => e.status === "closed" && e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
   const grossAverage = scored.length > 0 ? Math.round((scored.reduce((s, e) => s + e.eventScore, 0) / scored.length) * 100) / 100 : null;
 
+  // Nota Final sempre calculada ao vivo (grossAverage live − penaltyPoints live + meritPoints live)
+  // para refletir penalidades adicionadas após o último fechamento/recompute.
+  // O snapshot (quarterResult.finalResult) pode estar desatualizado se uma penalidade
+  // foi lançada depois do fechamento sem um novo recompute.
+  const liveFinalResult = grossAverage !== null
+    ? calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints)
+    : (quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : null);
+
   res.json({
     employee: {
       id: employee.id,
@@ -263,7 +271,7 @@ router.get("/ranking-detail", async (req, res) => {
     },
     cycle: { id: cycle.id, name: cycle.name },
     summary: {
-      finalResult: quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : null,
+      finalResult: liveFinalResult,
       grossAverage,
       penaltyPoints,
       meritPoints,
