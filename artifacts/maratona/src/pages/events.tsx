@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Trash2, Pencil, MoreHorizontal } from "lucide-react";
+import { Search, Calendar, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Trash2, Pencil, MoreHorizontal, MapPin, Info } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -64,6 +64,7 @@ export default function EventsPage() {
   const [mergeConflict, setMergeConflict] = useState<{ evaluations: number; calibrations: number; conformities: number; results: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [editingEvent, setEditingEvent] = useState<{ id: number; name: string; startDate: string; endDate: string; clientName?: string | null; city?: string | null; state?: string | null; location?: string | null } | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -257,6 +258,8 @@ export default function EventsPage() {
   }, [cycle?.startDate]);
 
   const GRID_COLS = "1fr 90px 56px 130px 130px 80px 120px 72px";
+  const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
+  const HARD_SHADOW_HOVER = "hover:shadow-[6px_6px_0px_0px_#191c1e] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all";
 
   const chipFilters = [
     { key: null,          label: "Todos" },

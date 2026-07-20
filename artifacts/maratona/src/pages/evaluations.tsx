@@ -1891,7 +1891,7 @@ export default function EvaluationsPage() {
                                 <div className={cn("w-3 h-3 border-2 shrink-0 flex items-center justify-center", active ? "bg-[#191c1e] border-[#191c1e]" : "border-[#aaa] bg-white")}>
                                   {active && <Check size={8} className="text-[#ccff00]" strokeWidth={3} />}
                                 </div>
-                                {c.shortName ?? c.name}
+                                {c.criterionName}
                               </button>
                             );
                           })}
