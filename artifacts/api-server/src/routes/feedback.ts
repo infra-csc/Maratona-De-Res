@@ -28,12 +28,17 @@ async function buildEventFeedback(eventId: number) {
       displayOrder: criteriaTable.displayOrder,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
+      eventScoped: criteriaTable.eventScoped,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
 
-  const activeCriteria = eventCriteriaRows.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  // Critérios eventScoped (duplicados) são mesclados no pai pelo mergeEventScopedCriteria;
+  // não entram no cálculo de isComplete nem na publicação de feedback como linhas independentes.
+  const activeCriteria = eventCriteriaRows
+    .filter(c => !c.eventScoped)
+    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
   const allEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
   const allCalibrations = await db.select().from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
   const areaAssignments = await db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
@@ -256,8 +261,12 @@ router.post("/events/:id/criteria/publish-partial-all", requireRole("admin", "rh
     return;
   }
 
-  const criteriaLinks = await db.select().from(eventCriteriaTable)
+  const allLinks = await db
+    .select({ id: eventCriteriaTable.id, eventScoped: criteriaTable.eventScoped })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
+  const criteriaLinks = allLinks.filter(c => !c.eventScoped);
 
   const now = new Date();
   for (const link of criteriaLinks) {
@@ -280,8 +289,12 @@ router.post("/events/:id/criteria/publish-final-all", requireRole("admin", "rh",
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
 
-  const criteriaLinks = await db.select().from(eventCriteriaTable)
+  const allFinalLinks = await db
+    .select({ id: eventCriteriaTable.id, partialPublishedAt: eventCriteriaTable.partialPublishedAt, eventScoped: criteriaTable.eventScoped })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
+  const criteriaLinks = allFinalLinks.filter(c => !c.eventScoped);
 
   const now = new Date();
   for (const link of criteriaLinks) {
