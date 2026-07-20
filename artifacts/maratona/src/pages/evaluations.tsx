@@ -16,6 +16,7 @@ import { cn, formatEventSubtitle } from "@/lib/utils";
 import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, type PublicToken } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { AdminEvaluationsConsole } from "./evaluations-admin-console";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -1212,6 +1213,19 @@ export default function EvaluationsPage() {
     0: "Crítico, não atendeu ao básico",
     10: "Perfeição, atendeu completamente e sem erros",
   };
+
+  // Redesign: admin/rh/diretoria ganham uma central dedicada de atribuição
+  // (progresso + quem-falta-avaliar + atribuição de avaliadores), separada do
+  // fluxo de lançamento de nota do avaliador que segue abaixo.
+  if (isConsultation) {
+    return (
+      <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <div className="p-6 md:p-10">
+          <AdminEvaluationsConsole />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#f7f9fb] min-h-screen flex flex-col text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
