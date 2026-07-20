@@ -306,7 +306,7 @@ export function useAllPublicTokens(eventId: number | null) {
 /** Admin/RH/Diretoria: gera link público para o questionário de um avaliador designado (bypassa allowPublicLink). */
 export function useCreateAdminPublicToken(eventId: number) {
   const qc = useQueryClient();
-  return useMutation<{ tokenId: string }, Error, { assignedToUserId: number; criterionIds: number[]; recipientName?: string }>({
+  return useMutation<{ tokenId: string }, Error, { assignedToUserId: number; criterionIds: number[]; recipientName?: string; includeConformity?: boolean }>({
     mutationFn: (data) => apiFetch<{ tokenId: string }>(`/api/events/${eventId}/admin-public-token`, {
       method: "POST",
       body: JSON.stringify(data),

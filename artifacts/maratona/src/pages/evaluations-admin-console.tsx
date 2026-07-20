@@ -9,6 +9,7 @@ import {
   getEventCriterionAssignments, eventCriterionAssignmentsKey,
   usePatchCriterionAssignment, useUsersByArea,
   useCreateAdminPublicToken, useAllPublicTokens,
+  useCreateConformityPublicToken, useCreateFerramentasPublicToken,
   type PublicToken,
 } from "@/lib/routing-api";
 import { useToast } from "@/hooks/use-toast";
@@ -108,11 +109,16 @@ export function AdminEvaluationsConsole() {
   const [openPickerCriterionId, setOpenPickerCriterionId] = useState<number | null>(null);
   const [openConformityPicker, setOpenConformityPicker] = useState<"cenografia" | "ferramentas" | null>(null);
 
-  // --- Link Freelancer dialog ---
-  const [linkDialog, setLinkDialog] = useState<{ criterionId: number; criterionName: string; assignedToId: number; assignedToName: string } | null>(null);
+  // --- Link Freelancer dialog (critério) ---
+  const [linkDialog, setLinkDialog] = useState<{ criterionId: number; criterionName: string; assignedToId: number; assignedToName: string; includeConformity: boolean } | null>(null);
   const [linkRecipientName, setLinkRecipientName] = useState("");
   const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // --- Link dialog para Matriz de Conformidade ---
+  const [conformityLinkDialog, setConformityLinkDialog] = useState<{ key: "cenografia" | "ferramentas"; label: string; evaluatorId: number | null; evaluatorName: string | null } | null>(null);
+  const [conformityLinkRecipientName, setConformityLinkRecipientName] = useState("");
+  const [conformityLinkUrl, setConformityLinkUrl] = useState<string | null>(null);
+  const [conformityLinkCopied, setConformityLinkCopied] = useState(false);
 
   const { data: events } = useGetEvents(undefined, { query: { queryKey: getGetEventsQueryKey() } });
   const { data: allUsers } = useGetUsers({ query: { queryKey: ["users"] as unknown[] } });
@@ -240,10 +246,13 @@ export function AdminEvaluationsConsole() {
 
   const createAdminToken = useCreateAdminPublicToken(selected?.id ?? 0);
   const { data: allTokens, refetch: refetchAllTokens } = useAllPublicTokens(linkDialog != null ? (selected?.id ?? null) : null);
+  const createConformityToken = useCreateConformityPublicToken(selected?.id ?? 0);
+  const createFerramentasToken = useCreateFerramentasPublicToken(selected?.id ?? 0);
 
   function openLinkDialog(c: CritRow) {
     if (!c.assignedToId || !c.assignedToName) return;
-    setLinkDialog({ criterionId: c.criterionId, criterionName: c.criterionName, assignedToId: c.assignedToId, assignedToName: c.assignedToName });
+    const includeConformity = c.areaId === CENOGRAFIA_AREA_ID;
+    setLinkDialog({ criterionId: c.criterionId, criterionName: c.criterionName, assignedToId: c.assignedToId, assignedToName: c.assignedToName, includeConformity });
     setLinkRecipientName("");
     setGeneratedLinkUrl(null);
     setLinkCopied(false);
@@ -253,12 +262,29 @@ export function AdminEvaluationsConsole() {
   function handleGenerateLink() {
     if (!linkDialog || !selected) return;
     createAdminToken.mutate(
-      { assignedToUserId: linkDialog.assignedToId, criterionIds: [linkDialog.criterionId], recipientName: linkRecipientName.trim() || undefined },
+      { assignedToUserId: linkDialog.assignedToId, criterionIds: [linkDialog.criterionId], recipientName: linkRecipientName.trim() || undefined, includeConformity: linkDialog.includeConformity },
       {
         onSuccess: (data) => {
           const url = `${window.location.origin}/eval/${data.tokenId}`;
           setGeneratedLinkUrl(url);
           refetchAllTokens();
+        },
+        onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+      },
+    );
+  }
+
+  function handleGenerateConformityLink() {
+    if (!conformityLinkDialog || !selected) return;
+    const recipientName = conformityLinkRecipientName.trim();
+    if (!recipientName) { toast({ title: "Informe o nome do destinatário", variant: "destructive" }); return; }
+    const mut = conformityLinkDialog.key === "cenografia" ? createConformityToken : createFerramentasToken;
+    mut.mutate(
+      { recipientName },
+      {
+        onSuccess: (data) => {
+          const url = `${window.location.origin}/eval/${data.tokenId}`;
+          setConformityLinkUrl(url);
         },
         onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
       },
@@ -647,8 +673,18 @@ export function AdminEvaluationsConsole() {
                             <div className="font-black italic uppercase text-sm">{cf.name}</div>
                             <div className="text-[9.5px] font-bold italic uppercase text-[#747a60] mt-0.5">{cf.scope} · {cf.evaluatorName ?? "Sem avaliador"}</div>
                           </div>
-                          <div className="flex items-center gap-2.5 whitespace-nowrap">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
                             <span className="text-[9px] font-black italic uppercase px-2.5 py-1" style={{ background: cfg.bg, color: cfg.color }}>{cf.filled}/{cf.total}</span>
+                            {canManage && cf.evaluatorId != null && (
+                              <button
+                                type="button"
+                                onClick={() => { setConformityLinkDialog({ key: cf.key, label: cf.name, evaluatorId: cf.evaluatorId, evaluatorName: cf.evaluatorName }); setConformityLinkRecipientName(""); setConformityLinkUrl(null); setConformityLinkCopied(false); }}
+                                className="border-2 border-[#191c1e] bg-white px-2.5 py-1.5 text-[10.5px] font-black italic uppercase hover:bg-[#f7ffd1] flex items-center gap-1"
+                                title="Gerar link de conformidade para freelancer"
+                              >
+                                <Link2 size={11} /> Link
+                              </button>
+                            )}
                             {canManage && (
                               <button type="button" onClick={() => setOpenConformityPicker(pickerOpen ? null : cf.key)} className="border-2 border-[#191c1e] bg-white px-3 py-1.5 text-[10.5px] font-black italic uppercase hover:bg-[#ccff00]">
                                 {cf.evaluatorId == null ? "Atribuir" : "Trocar"}
@@ -814,6 +850,13 @@ export function AdminEvaluationsConsole() {
             </div>
 
             <div className="px-5 py-4 space-y-4">
+              {/* nota de conformidade bundled */}
+              {linkDialog?.includeConformity && (
+                <div className="border-2 border-[#ccff00] bg-[#f7ffd1] px-3 py-2 text-[10px] italic text-[#3f5200] flex items-start gap-2">
+                  <CheckCircle size={13} className="shrink-0 mt-0.5 text-[#506600]" />
+                  <span>Este link incluirá o critério <strong>e</strong> a Matriz de Conformidade de Cenografia no mesmo questionário.</span>
+                </div>
+              )}
               {/* recipient + generate */}
               <div>
                 <label className="block text-[10px] font-black italic uppercase text-[#747a60] tracking-wide mb-1.5">
@@ -900,6 +943,83 @@ export function AdminEvaluationsConsole() {
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Conformity Link dialog ─────────────────────────────────── */}
+      {conformityLinkDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`bg-white border-2 border-[#191c1e] w-full max-w-md ${HARD_SHADOW}`}>
+            <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[#191c1e] bg-[#f7ffd1]">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide">Link Freelancer · Conformidade</p>
+                <h3 className="font-black italic uppercase text-sm truncate">{conformityLinkDialog.label}</h3>
+                {conformityLinkDialog.evaluatorName && (
+                  <p className="text-[10px] italic text-[#747a60] mt-0.5">Avaliador: <span className="font-bold text-[#191c1e]">{conformityLinkDialog.evaluatorName}</span></p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setConformityLinkDialog(null)}
+                className="shrink-0 ml-3 text-[#747a60] hover:text-[#191c1e]"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {!conformityLinkUrl ? (
+                <div>
+                  <label className="block text-[10px] font-black italic uppercase text-[#747a60] tracking-wide mb-1.5">
+                    Para quem é o link?
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={conformityLinkRecipientName}
+                      onChange={e => setConformityLinkRecipientName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") handleGenerateConformityLink(); }}
+                      placeholder="Nome do freelancer"
+                      className="flex-1 border-2 border-[#191c1e] px-3 py-2 text-sm font-bold italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGenerateConformityLink}
+                      disabled={createConformityToken.isPending || createFerramentasToken.isPending}
+                      className="border-2 border-[#191c1e] bg-[#ccff00] px-3 py-2 text-[10.5px] font-black italic uppercase flex items-center gap-1.5 hover:bg-[#b8e600] disabled:opacity-50"
+                    >
+                      <Link2 size={12} /> Gerar Link
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-2 border-[#191c1e] bg-[#f7ffd1] p-3 space-y-2">
+                  <p className="text-[10px] font-black italic uppercase text-[#3f5200] tracking-wide">Link gerado — copie e envie</p>
+                  <div className="flex gap-2 items-start">
+                    <input
+                      readOnly
+                      value={conformityLinkUrl}
+                      className="flex-1 border-2 border-[#191c1e] bg-white px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
+                      onFocus={e => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard.writeText(conformityLinkUrl); setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2000); }}
+                      className="shrink-0 border-2 border-[#191c1e] bg-white px-2.5 py-2 hover:bg-[#ccff00] flex items-center gap-1 text-[10px] font-black italic uppercase"
+                    >
+                      {conformityLinkCopied ? <><CheckCircle size={12} className="text-green-600" /> Copiado</> : <><Copy size={12} /> Copiar</>}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setConformityLinkUrl(null); setConformityLinkRecipientName(""); }}
+                    className="text-[9.5px] font-bold italic uppercase text-[#747a60] underline hover:text-[#191c1e]"
+                  >
+                    Gerar outro link
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
