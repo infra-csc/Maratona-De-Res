@@ -14,6 +14,7 @@ interface TokenInfo {
   tokenId: string;
   tokenType: TokenType;
   isUsed: boolean;
+  usedAt: string | null;
   recipientName: string | null;
   submitterName: string | null;
   eventName: string | null;
@@ -237,12 +238,28 @@ export default function PublicEvalPage() {
   }
 
   if (info.isUsed) {
+    const usedDate = info.usedAt ? new Date(info.usedAt) : null;
+    const usedDateStr = usedDate
+      ? usedDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+      : null;
+    const usedTimeStr = usedDate
+      ? usedDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+      : null;
     return (
       <div className="min-h-screen bg-[#f2f4f6] flex items-center justify-center p-6">
         <div className={`bg-white border-2 border-[#191c1e] max-w-md w-full p-8 text-center ${HARD_SHADOW}`}>
           <CheckCircle size={40} className="mx-auto mb-4 text-[#506600]" />
           <h1 className="text-2xl font-black italic uppercase tracking-tight mb-2">Link Já Utilizado</h1>
-          <p className="text-sm italic text-[#444933]">Este link já foi respondido por <strong>{info.submitterName ?? "alguém"}</strong>. Obrigado!</p>
+          <p className="text-sm italic text-[#444933] mb-3">
+            Este formulário já foi preenchido por{" "}
+            <strong>{info.submitterName ?? "alguém"}</strong>.
+          </p>
+          {usedDateStr && usedTimeStr && (
+            <p className="text-xs font-bold italic uppercase text-[#747a60] bg-[#f2f4f6] border border-[#d8dadc] px-4 py-2 inline-block">
+              {usedDateStr} às {usedTimeStr}
+            </p>
+          )}
+          <p className="text-xs italic text-[#9aa088] mt-4">Caso precise de ajuda, entre em contato com o responsável pelo evento.</p>
         </div>
       </div>
     );
