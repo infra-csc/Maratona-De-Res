@@ -2011,26 +2011,6 @@ export default function EvaluationsPage() {
                                       {selectedEventDetail?.conformityEvaluatorName ?? <span className="text-[#9aa088]">Sem avaliador atribuído</span>}
                                     </span>
                                   </div>
-                                  {(() => {
-                                    const pending = (conformityPublicTokenHistory ?? []).find(t => !t.usedAt);
-                                    const answered = (conformityPublicTokenHistory ?? []).find(t => t.usedAt);
-                                    const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                                    if (pending) return (
-                                      <button type="button"
-                                        onClick={() => { navigator.clipboard.writeText(`${base}/eval/${pending.id}`); toast({ title: "Link copiado!", description: `Para: ${pending.recipientName ?? "freelancer"}` }); }}
-                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-[#f7ffd1] hover:bg-[#eeff99] text-[11px] font-black uppercase shrink-0 w-fit"
-                                      ><Copy size={11} /> Copiar link</button>
-                                    );
-                                    if (answered) return (
-                                      <span className="text-[10px] font-bold italic text-[#506600] flex items-center gap-1"><CheckCircle size={10} /> Respondido</span>
-                                    );
-                                    return (
-                                      <button type="button"
-                                        onClick={() => { setConformityPublicLinkType("cenografia"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchConformityTokenHistory(); }}
-                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] text-[11px] font-black uppercase shrink-0 w-fit"
-                                      ><Link2 size={11} /> Link Freelancer</button>
-                                    );
-                                  })()}
                                   {setConformityPickerOpen && (
                                     <div className="border-2 border-[#191c1e] bg-[#f9fafb] max-h-44 overflow-y-auto">
                                       <button
