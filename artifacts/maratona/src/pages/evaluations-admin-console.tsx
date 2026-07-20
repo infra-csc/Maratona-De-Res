@@ -681,7 +681,7 @@ export function AdminEvaluationsConsole() {
                           </div>
                           <div className="flex items-center gap-2 whitespace-nowrap">
                             <span className="text-[9px] font-black italic uppercase px-2.5 py-1" style={{ background: cfg.bg, color: cfg.color }}>{cf.filled}/{cf.total}</span>
-                            {canManage && cf.evaluatorId != null && (
+                            {canManage && (
                               <button
                                 type="button"
                                 onClick={() => { setConformityLinkDialog({ key: cf.key, label: cf.name, evaluatorId: cf.evaluatorId, evaluatorName: cf.evaluatorName }); setConformityLinkRecipientName(""); setConformityLinkUrl(null); setConformityLinkCopied(false); }}
