@@ -20,5 +20,8 @@ export type RankingDetailSummary = {
   /** @nullable */
   bonusValue?: number | null;
   eventsCount: number;
+  /** @nullable */
+  scoreSum?: number | null;
+  confirmedEventCount?: number;
   isQuarterClosed: boolean;
 };

@@ -4751,6 +4751,10 @@ components:
               type: ["number", "null"]
             eventsCount:
               type: integer
+            scoreSum:
+              type: ["number", "null"]
+            confirmedEventCount:
+              type: integer
             isQuarterClosed:
               type: boolean
         events:

@@ -375,6 +375,11 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                     <p className="text-3xl font-black italic leading-none mt-1 text-[#506600]">
                       {detail.summary.grossAverage != null ? detail.summary.grossAverage.toFixed(1) : "—"}
                     </p>
+                    {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
+                      <p className="text-[10px] font-bold italic text-[#747a60] mt-1">
+                        Soma: {detail.summary.scoreSum.toFixed(1)} ÷ {detail.summary.confirmedEventCount} provas
+                      </p>
+                    )}
                   </div>
                   <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
                     <AlertTriangle size={18} className="text-[#ff5722] shrink-0" />
@@ -565,6 +570,11 @@ function EmployeeDetailSheet({
                   <p className="text-3xl font-black italic leading-none mt-1 text-[#506600]">
                     {detail.summary.grossAverage != null ? detail.summary.grossAverage.toFixed(1) : "—"}
                   </p>
+                  {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
+                    <p className="text-[10px] font-bold italic text-[#747a60] mt-1">
+                      Soma: {detail.summary.scoreSum.toFixed(1)} ÷ {detail.summary.confirmedEventCount} provas
+                    </p>
+                  )}
                 </div>
                 <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
                   <AlertTriangle size={18} className="text-[#ff5722] shrink-0" />

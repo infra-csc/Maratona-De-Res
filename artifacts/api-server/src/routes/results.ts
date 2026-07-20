@@ -177,8 +177,11 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   // employee_event_results por completo no rebuild, senão eventos que
   // ficaram desconfirmados deixariam linhas antigas "fantasma" para trás.
   const allCycleEventIdsUnfiltered = cycleEvents.map(e => e.id);
-  const closedEvents = confirmedCycleEvents.filter(e => e.status === "closed");
-  const closedEventIds = new Set(closedEvents.map(e => e.id));
+  // Eventos confirmados (resultsConfirmed=true) contam para nota independente
+  // de status — alguns eventos são confirmados enquanto ainda estão "open" porque
+  // o responsável confirmou os resultados sem fechar formalmente o evento.
+  const scoringEvents = confirmedCycleEvents;
+  const scoringEventIds = new Set(scoringEvents.map(e => e.id));
   const platoonRules = await loadPlatoonRules();
   const minEvents = await getMinEventsForEligibility();
   const warnings: string[] = [];
@@ -193,7 +196,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   // FASE DE LEITURA — calcula tudo antes de escrever, para gravar dentro de uma
   // única transação (rebuild atômico: nunca deixa o ciclo vazio em caso de erro).
 
-  // 1. Nota do TIME de cada evento fechado + linhas por evento.
+  // 1. Nota do TIME de cada evento confirmado + linhas por evento.
   //    Eventos históricos (isHistorical=true) já trazem a nota final PRONTA
   //    (calibrada), importada de fora — pulamos computeEventTeamResult (que
   //    exigiria critérios/avaliações que esses eventos não têm) e usamos
@@ -202,7 +205,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   const eventScoreById = new Map<number, number>();
   const eventDateById = new Map<number, string>();
   const eventResultInserts: (typeof employeeEventResultsTable.$inferInsert)[] = [];
-  for (const ev of closedEvents) {
+  for (const ev of scoringEvents) {
     const eventParticipantsRaw = await db.select({
       employeeId: eventParticipantsTable.employeeId,
       functionName: eventParticipantsTable.functionName,
@@ -309,11 +312,11 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
 
     const participatedCount = eventSet.size;
 
-    // Eventos COM NOTA (score > 0) dentre os fechados que o colaborador participou.
+    // Eventos COM NOTA (score > 0) dentre os confirmados que o colaborador participou.
     const eventScores: number[] = [];
     const scoredEventsWithDate: { score: number; date: string }[] = [];
     for (const eventId of eventSet) {
-      if (!closedEventIds.has(eventId)) continue;
+      if (!scoringEventIds.has(eventId)) continue;
       const s = eventScoreById.get(eventId);
       if (s !== undefined && s > 0) {
         eventScores.push(s);

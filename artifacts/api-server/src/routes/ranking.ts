@@ -247,12 +247,13 @@ router.get("/ranking-detail", async (req, res) => {
   const penaltyPoints = penalties.reduce((s, p) => s + p.total, 0);
   const meritPoints = merits.reduce((s, m) => s + m.total, 0);
   // Média bruta ALINHADA ao snapshot oficial (recomputeCycleResults):
-  // só eventos FECHADOS, com nota (> 0) e que contam para nota (não freela
-  // nem função informativa tipo "Sup Ceno *") entram na base — igual ao
-  // eventsCount/grossAverage da consolidação. Eventos abertos ou que não
-  // contam para nota aparecem na lista como histórico, mas não entram na média.
-  const scored = events.filter(e => e.status === "closed" && e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
-  const grossAverage = scored.length > 0 ? Math.round((scored.reduce((s, e) => s + e.eventScore, 0) / scored.length) * 100) / 100 : null;
+  // eventos confirmados (resultsConfirmed=true) com nota > 0 que contam para
+  // nota (não freela nem "Sup Ceno *") entram na base — independente de status.
+  // Alguns eventos ficam "open" mas são confirmados pelo responsável antes do
+  // fechamento formal; o flag resultsConfirmed é o gate definitivo.
+  const scored = events.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
+  const scoreSum = Math.round(scored.reduce((s, e) => s + e.eventScore, 0) * 100) / 100;
+  const grossAverage = scored.length > 0 ? Math.round(scoreSum / scored.length * 100) / 100 : null;
 
   // Nota Final sempre calculada ao vivo (grossAverage live − penaltyPoints live + meritPoints live)
   // para refletir penalidades adicionadas após o último fechamento/recompute.
@@ -279,6 +280,8 @@ router.get("/ranking-detail", async (req, res) => {
       platoonColor: quarterResult?.platoonColor ?? null,
       bonusValue: isManager && quarterResult ? parseFloat(quarterResult.bonusValue as unknown as string) : null,
       eventsCount: events.length,
+      scoreSum: grossAverage !== null ? scoreSum : null,
+      confirmedEventCount: scored.length,
       isQuarterClosed: !!quarterResult,
     },
     events,

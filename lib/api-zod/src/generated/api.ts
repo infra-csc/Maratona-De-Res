@@ -3532,6 +3532,8 @@ export const GetRankingDetailResponse = zod.object({
   "platoonColor": zod.string().nullish(),
   "bonusValue": zod.number().nullish(),
   "eventsCount": zod.number(),
+  "scoreSum": zod.number().nullish(),
+  "confirmedEventCount": zod.number().optional(),
   "isQuarterClosed": zod.boolean()
 }),
   "events": zod.array(zod.object({
