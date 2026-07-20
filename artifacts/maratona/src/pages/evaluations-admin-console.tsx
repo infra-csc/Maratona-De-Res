@@ -110,7 +110,7 @@ export function AdminEvaluationsConsole() {
   const [openConformityPicker, setOpenConformityPicker] = useState<"cenografia" | "ferramentas" | null>(null);
 
   // --- Link Freelancer dialog (critério) ---
-  const [linkDialog, setLinkDialog] = useState<{ criterionId: number; criterionName: string; assignedToId: number; assignedToName: string; includeConformity: boolean } | null>(null);
+  const [linkDialog, setLinkDialog] = useState<{ criterionIds: number[]; criterionNames: string[]; assignedToId: number; assignedToName: string; includeConformity: boolean } | null>(null);
   const [linkRecipientName, setLinkRecipientName] = useState("");
   const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -251,8 +251,14 @@ export function AdminEvaluationsConsole() {
 
   function openLinkDialog(c: CritRow) {
     if (!c.assignedToId || !c.assignedToName) return;
+    // Bundle all criteria from the same area+evaluator into a single questionnaire
+    const siblings = (selected?.criteria ?? []).filter(
+      r => r.areaId === c.areaId && r.assignedToId === c.assignedToId,
+    );
+    const criterionIds = siblings.length > 1 ? siblings.map(r => r.criterionId) : [c.criterionId];
+    const criterionNames = siblings.length > 1 ? siblings.map(r => r.criterionName) : [c.criterionName];
     const includeConformity = c.areaId === CENOGRAFIA_AREA_ID;
-    setLinkDialog({ criterionId: c.criterionId, criterionName: c.criterionName, assignedToId: c.assignedToId, assignedToName: c.assignedToName, includeConformity });
+    setLinkDialog({ criterionIds, criterionNames, assignedToId: c.assignedToId, assignedToName: c.assignedToName, includeConformity });
     setLinkRecipientName("");
     setGeneratedLinkUrl(null);
     setLinkCopied(false);
@@ -262,7 +268,7 @@ export function AdminEvaluationsConsole() {
   function handleGenerateLink() {
     if (!linkDialog || !selected) return;
     createAdminToken.mutate(
-      { assignedToUserId: linkDialog.assignedToId, criterionIds: [linkDialog.criterionId], recipientName: linkRecipientName.trim() || undefined, includeConformity: linkDialog.includeConformity },
+      { assignedToUserId: linkDialog.assignedToId, criterionIds: linkDialog.criterionIds, recipientName: linkRecipientName.trim() || undefined, includeConformity: linkDialog.includeConformity },
       {
         onSuccess: (data) => {
           const url = `${window.location.origin}/eval/${data.tokenId}`;
@@ -836,8 +842,18 @@ export function AdminEvaluationsConsole() {
             {/* header */}
             <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[#191c1e] bg-[#f7ffd1]">
               <div className="min-w-0">
-                <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide">Link Freelancer</p>
-                <h3 className="font-black italic uppercase text-sm truncate">{linkDialog.criterionName}</h3>
+                <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide">
+                  Link Freelancer{linkDialog.criterionIds.length > 1 ? ` · ${linkDialog.criterionIds.length} critérios` : ""}
+                </p>
+                {linkDialog.criterionNames.length === 1 ? (
+                  <h3 className="font-black italic uppercase text-sm truncate">{linkDialog.criterionNames[0]}</h3>
+                ) : (
+                  <ul className="mt-0.5 space-y-0.5">
+                    {linkDialog.criterionNames.map((n, i) => (
+                      <li key={i} className="font-black italic uppercase text-[12.5px] truncate leading-tight">{n}</li>
+                    ))}
+                  </ul>
+                )}
                 <p className="text-[10px] italic text-[#747a60] mt-0.5">Avaliador: <span className="font-bold text-[#191c1e]">{linkDialog.assignedToName}</span></p>
               </div>
               <button
