@@ -86,7 +86,7 @@ export default function PublicEvalPage() {
       })
       .then((data) => {
         setInfo(data);
-        setSubmitterName(data.recipientName ?? "");
+        setSubmitterName("");
         setAnswers(
           Object.fromEntries(
             // score: null = ainda não selecionado (0 é nota válida)

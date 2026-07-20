@@ -3447,7 +3447,12 @@ export default function EvaluationsPage() {
                   {(publicTokenHistory ?? []).map(t => (
                     <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
                       <div className="min-w-0">
-                        <p className="text-xs font-bold italic truncate">{t.recipientName ?? "—"}</p>
+                        <p className="text-xs font-bold italic truncate">
+                          {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
+                        </p>
+                        {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
+                          <p className="text-[10px] italic text-[#747a60] truncate">Para: {t.recipientName}</p>
+                        )}
                         <p className="text-[10px] italic text-[#747a60]">
                           Enviado {new Date(t.createdAt ?? "").toLocaleDateString("pt-BR")}
                         </p>
