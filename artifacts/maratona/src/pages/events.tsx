@@ -422,8 +422,8 @@ export default function EventsPage() {
                       const fc = ev.fullyCalibrated ?? false;
                       const isScoreFinal = concluded && fc;
                       const finalPubCount = ev.finalCalibratedCriteria ?? 0;
-                      const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
-                      const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
+                      const partialPubTotal = ev.partialPublishedCount ?? 0;
+                      const calSaved = ev.calibratedCriteriaCount ?? 0;
                       const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
                       const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
                         ? `${finalPubCount}F · ${partialOnlyCount}P`
@@ -550,8 +550,8 @@ export default function EventsPage() {
                   const calPct  = total > 0 ? Math.round((calCount / total) * 100) : 0;
                   const isScoreFinal = concluded && fc;
                   const finalPubCount = ev.finalCalibratedCriteria ?? 0;
-                  const partialPubTotal = (ev as Record<string, unknown>).partialPublishedCount as number ?? 0;
-                  const calSaved = (ev as Record<string, unknown>).calibratedCriteriaCount as number ?? 0;
+                  const partialPubTotal = ev.partialPublishedCount ?? 0;
+                  const calSaved = ev.calibratedCriteriaCount ?? 0;
                   const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
                   const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
                     ? `${finalPubCount}F · ${partialOnlyCount}P`

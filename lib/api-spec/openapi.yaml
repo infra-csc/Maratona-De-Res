@@ -3114,6 +3114,9 @@ components:
         finalCalibratedCriteria:
           type: integer
           description: Nº de critérios ativos com calibração final publicada.
+        partialPublishedCount:
+          type: integer
+          description: Nº de critérios ativos com pelo menos uma publicação parcial.
         averageScore:
           type: ["number", "null"]
         teamScore:
