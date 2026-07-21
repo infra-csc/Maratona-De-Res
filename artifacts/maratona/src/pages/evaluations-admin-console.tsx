@@ -799,7 +799,7 @@ export function AdminEvaluationsConsole() {
                     key={ev.id}
                     type="button"
                     onClick={() => setSelectedEventId(ev.id)}
-                    className="block w-full text-left rounded-lg px-3 py-2.5 relative overflow-hidden"
+                    className="block w-full text-left rounded-lg px-3 py-2.5 relative"
                     style={{ border: "1px solid var(--border)", backgroundColor: isSel ? "var(--secondary)" : "var(--card)" }}
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: cfg.accent }} />

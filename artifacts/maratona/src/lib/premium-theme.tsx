@@ -60,6 +60,14 @@ export function PremiumThemeProvider({ children }: { children: React.ReactNode }
     localStorage.setItem(STORAGE_KEY, isDark ? "1" : "0");
   }, [isDark]);
 
+  useEffect(() => {
+    const tokens = isDark ? darkTokens : lightTokens;
+    const el = document.documentElement;
+    Object.entries(tokens).forEach(([k, v]) => {
+      el.style.setProperty(k, v as string);
+    });
+  }, [isDark]);
+
   return (
     <Ctx.Provider value={{ isDark, toggle: () => setIsDark(v => !v) }}>
       {children}
