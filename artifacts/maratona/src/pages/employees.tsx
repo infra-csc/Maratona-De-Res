@@ -55,7 +55,7 @@ function initials(name: string) {
 }
 
 export default function EmployeesPage() {
-  const { user, impersonate } = useAuth();
+  const { user, impersonate, token } = useAuth();
   const { toast } = useToast();
   const [previewingId, setPreviewingId] = useState<number | null>(null);
 
@@ -65,20 +65,19 @@ export default function EmployeesPage() {
     try {
       const res = await fetch("/api/auth/impersonate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ userId: emp.linkedUserId }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
-      const { token, user: impUser } = await res.json() as { token: string; user: import("@workspace/api-client-react").User };
-      impersonate(token, impUser);
+      const { token: newToken, user: impUser } = await res.json() as { token: string; user: import("@workspace/api-client-react").User };
+      impersonate(newToken, impUser);
       const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
       window.location.assign(`${base}/`);
     } catch (e) {
       toast({ title: "Não foi possível visualizar como este colaborador", description: (e as Error).message, variant: "destructive" });
       setPreviewingId(null);
     }
-  }, [impersonate, toast]);
+  }, [impersonate, toast, token]);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"true" | "false">("true");
