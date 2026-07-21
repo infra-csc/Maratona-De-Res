@@ -98,22 +98,43 @@ router.get("/ranking", async (req, res) => {
  * só é retornado para gestores (admin/rh/diretoria).
  */
 router.get("/ranking-detail", async (req, res) => {
+  try {
   const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const employeeId = parseInt(req.query.employeeId as string);
   if (!employeeId) { res.status(400).json({ error: "employeeId obrigatório" }); return; }
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(404).json({ error: "Nenhum ciclo ativo" }); return; }
 
-  const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+  const [[employee], [quarterResult], platoonRules, participations] = await Promise.all([
+    db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1),
+    db.select().from(quarterlyResultsTable)
+      .where(and(
+        eq(quarterlyResultsTable.employeeId, employeeId),
+        eq(quarterlyResultsTable.cycleId, cycle.id),
+      )).limit(1),
+    db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder),
+    db.select({
+        eventId: eventParticipantsTable.eventId,
+        eventName: eventsTable.name,
+        eventCity: eventsTable.city,
+        eventState: eventsTable.state,
+        eventStatus: eventsTable.status,
+        startDate: eventsTable.startDate,
+        isHistorical: eventsTable.isHistorical,
+        importedScore: eventsTable.importedScore,
+        functionName: eventParticipantsTable.functionName,
+        resultsConfirmed: eventsTable.resultsConfirmed,
+      })
+      .from(eventParticipantsTable)
+      .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
+      .where(and(
+        eq(eventParticipantsTable.employeeId, employeeId),
+        eq(eventsTable.cycleId, cycle.id),
+      )),
+  ]);
+
   if (!employee) { res.status(404).json({ error: "Colaborador não encontrado" }); return; }
 
-  const [quarterResult] = await db.select().from(quarterlyResultsTable)
-    .where(and(
-      eq(quarterlyResultsTable.employeeId, employeeId),
-      eq(quarterlyResultsTable.cycleId, cycle.id),
-    )).limit(1);
-
-  const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
   const platoonRulesMapped = platoonRules.map(r => ({
     name: r.name, color: r.color,
     minScore: parseFloat(r.minScore as unknown as string),
@@ -122,45 +143,28 @@ router.get("/ranking-detail", async (req, res) => {
     bonusValue: parseFloat(r.bonusValue as unknown as string),
   }));
 
-  const participations = await db
-    .select({
-      eventId: eventParticipantsTable.eventId,
-      eventName: eventsTable.name,
-      eventCity: eventsTable.city,
-      eventState: eventsTable.state,
-      eventStatus: eventsTable.status,
-      startDate: eventsTable.startDate,
-      isHistorical: eventsTable.isHistorical,
-      importedScore: eventsTable.importedScore,
-      functionName: eventParticipantsTable.functionName,
-      resultsConfirmed: eventsTable.resultsConfirmed,
-    })
-    .from(eventParticipantsTable)
-    .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
-    .where(and(
-      eq(eventParticipantsTable.employeeId, employeeId),
-      eq(eventsTable.cycleId, cycle.id),
-    ));
+  const validParticipations = participations.filter(p => p.eventId);
 
-  const events = [];
-  for (const p of participations) {
-    if (!p.eventId) continue;
-    // Freela/função informativa (ex.: "Sup Ceno *"): participação aparece no
-    // histórico do colaborador mas não conta para nota — mesma regra do
-    // fechamento (recomputeCycleResults, ver lib/participation.ts).
+  // Rodar computeEventTeamResult em PARALELO para todos os eventos não-históricos
+  // (antes era sequencial — N×5 queries em série travava o pool de conexões).
+  const nonHistoricalIds = validParticipations
+    .filter(p => !p.isHistorical)
+    .map(p => p.eventId!);
+  const teamResultsArr = await Promise.all(nonHistoricalIds.map(id => computeEventTeamResult(id)));
+  const teamResultMap = new Map(nonHistoricalIds.map((id, i) => [id, teamResultsArr[i]]));
+
+  const events = validParticipations.map(p => {
     const countsForScore = participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName, employeeFunction: employee.functionName });
     const noScoreReason: string | null = countsForScore ? null
       : isInformationalFunction(p.functionName) ? "sup_ceno"
       : employee.employmentType === "freela" ? "freela"
       : "outro";
 
-    // Evento histórico: nota já vem pronta (importedScore) de fora, sem
-    // critérios/avaliações — não passar pelo cálculo por quesitos.
     if (p.isHistorical) {
       const historicalScore = p.importedScore != null ? parseFloat(p.importedScore as unknown as string) : 0;
       const platoon = getPlatoonByScore(historicalScore, platoonRulesMapped);
-      events.push({
-        eventId: p.eventId,
+      return {
+        eventId: p.eventId!,
         eventName: p.eventName ?? "",
         city: p.eventCity ?? null,
         state: p.eventState ?? null,
@@ -176,21 +180,14 @@ router.get("/ranking-detail", async (req, res) => {
         noScoreReason,
         participationFunction: p.functionName ?? null,
         resultsConfirmed: p.resultsConfirmed ?? false,
-      });
-      continue;
+      };
     }
 
-    // Cálculo CANÔNICO — o mesmo usado pelo fechamento do ciclo
-    // (recomputeCycleResults): média por critério com calibração
-    // substituindo, completude por área designada e penalidade da Matriz
-    // de Conformidade aplicada (conformityScore). Garante que o drawer
-    // mostre exatamente os mesmos números do ranking/consolidação.
-    const teamResult = await computeEventTeamResult(p.eventId);
+    const teamResult = teamResultMap.get(p.eventId!)!;
     const eventScore = teamResult.conformityScore;
     const platoon = getPlatoonByScore(eventScore, platoonRulesMapped);
-
-    events.push({
-      eventId: p.eventId,
+    return {
+      eventId: p.eventId!,
       eventName: p.eventName ?? "",
       city: p.eventCity ?? null,
       state: p.eventState ?? null,
@@ -206,8 +203,8 @@ router.get("/ranking-detail", async (req, res) => {
       noScoreReason,
       participationFunction: p.functionName ?? null,
       resultsConfirmed: p.resultsConfirmed ?? false,
-    });
-  }
+    };
+  });
   events.sort((a, b) => b.eventScore - a.eventScore);
 
   const absenceRows = await db
@@ -288,6 +285,10 @@ router.get("/ranking-detail", async (req, res) => {
     penalties,
     merits,
   });
+  } catch (err) {
+    console.error("[ranking-detail] erro:", err);
+    res.status(500).json({ error: "Erro ao carregar detalhamento" });
+  }
 });
 
 export default router;
