@@ -601,89 +601,94 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
 });
 
 router.get("/results/quarterly", async (req, res) => {
-  const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
-  const { employeeId, platoon } = req.query;
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json([]); return; }
+  try {
+    const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
+    const { employeeId, platoon } = req.query;
+    const cycle = await getCurrentCycle();
+    if (!cycle) { res.json([]); return; }
 
-  const query = db
-    .select({
-      id: quarterlyResultsTable.id,
-      employeeId: quarterlyResultsTable.employeeId,
-      employeeName: employeesTable.name,
-      cycleId: quarterlyResultsTable.cycleId,
-      eventsCount: quarterlyResultsTable.eventsCount,
-      participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
-      scoreSum: quarterlyResultsTable.scoreSum,
-      grossAverage: quarterlyResultsTable.grossAverage,
-      totalAbsences: quarterlyResultsTable.totalAbsences,
-      absencePenalty: quarterlyResultsTable.absencePenalty,
-      meritPoints: quarterlyResultsTable.meritPoints,
-      finalResult: quarterlyResultsTable.finalResult,
-      platoon: quarterlyResultsTable.platoon,
-      platoonColor: quarterlyResultsTable.platoonColor,
-      bonusValue: quarterlyResultsTable.bonusValue,
-      extraBonusValue: quarterlyResultsTable.extraBonusValue,
-      eligible: quarterlyResultsTable.eligible,
-      eligibilityReason: quarterlyResultsTable.eligibilityReason,
-      bonusStatus: quarterlyResultsTable.bonusStatus,
-      paymentMethod: quarterlyResultsTable.paymentMethod,
-      paymentDueDate: quarterlyResultsTable.paymentDueDate,
-      paidAt: quarterlyResultsTable.paidAt,
-      paymentNotes: quarterlyResultsTable.paymentNotes,
-    })
-    .from(quarterlyResultsTable)
-    .innerJoin(employeesTable, and(eq(quarterlyResultsTable.employeeId, employeesTable.id), eq(employeesTable.active, true)))
-    .where(and(
-      eq(quarterlyResultsTable.cycleId, cycle.id),
-      eq(employeesTable.employmentType, "casa"),
-      exists(
-        db.select({ one: sql`1` })
-          .from(eventParticipantsTable)
-          .innerJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
-          .where(and(
-            eq(eventParticipantsTable.employeeId, employeesTable.id),
-            eq(eventsTable.cycleId, cycle.id),
-            ilike(eventParticipantsTable.functionName, "cenotecnic%"),
-          )),
-      ),
-    ));
+    const query = db
+      .select({
+        id: quarterlyResultsTable.id,
+        employeeId: quarterlyResultsTable.employeeId,
+        employeeName: employeesTable.name,
+        cycleId: quarterlyResultsTable.cycleId,
+        eventsCount: quarterlyResultsTable.eventsCount,
+        participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
+        scoreSum: quarterlyResultsTable.scoreSum,
+        grossAverage: quarterlyResultsTable.grossAverage,
+        totalAbsences: quarterlyResultsTable.totalAbsences,
+        absencePenalty: quarterlyResultsTable.absencePenalty,
+        meritPoints: quarterlyResultsTable.meritPoints,
+        finalResult: quarterlyResultsTable.finalResult,
+        platoon: quarterlyResultsTable.platoon,
+        platoonColor: quarterlyResultsTable.platoonColor,
+        bonusValue: quarterlyResultsTable.bonusValue,
+        extraBonusValue: quarterlyResultsTable.extraBonusValue,
+        eligible: quarterlyResultsTable.eligible,
+        eligibilityReason: quarterlyResultsTable.eligibilityReason,
+        bonusStatus: quarterlyResultsTable.bonusStatus,
+        paymentMethod: quarterlyResultsTable.paymentMethod,
+        paymentDueDate: quarterlyResultsTable.paymentDueDate,
+        paidAt: quarterlyResultsTable.paidAt,
+        paymentNotes: quarterlyResultsTable.paymentNotes,
+      })
+      .from(quarterlyResultsTable)
+      .innerJoin(employeesTable, and(eq(quarterlyResultsTable.employeeId, employeesTable.id), eq(employeesTable.active, true)))
+      .where(and(
+        eq(quarterlyResultsTable.cycleId, cycle.id),
+        eq(employeesTable.employmentType, "casa"),
+        exists(
+          db.select({ one: sql`1` })
+            .from(eventParticipantsTable)
+            .innerJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
+            .where(and(
+              eq(eventParticipantsTable.employeeId, employeesTable.id),
+              eq(eventsTable.cycleId, cycle.id),
+              ilike(eventParticipantsTable.functionName, "cenotecnic%"),
+            )),
+        ),
+      ));
 
-  const [results, platoonRuleRows] = await Promise.all([
-    query,
-    db.select().from(platoonRulesTable),
-  ]);
+    const [results, platoonRuleRows] = await Promise.all([
+      query,
+      db.select().from(platoonRulesTable),
+    ]);
 
-  const platoonByName = new Map(platoonRuleRows.map(p => [p.name, {
-    minScore: parseFloat(p.minScore as unknown as string),
-    maxScore: parseFloat(p.maxScore as unknown as string),
-  }]));
+    const platoonByName = new Map(platoonRuleRows.map(p => [p.name, {
+      minScore: parseFloat(p.minScore as unknown as string),
+      maxScore: parseFloat(p.maxScore as unknown as string),
+    }]));
 
-  const filtered = results
-    .filter(r => !employeeId || r.employeeId === parseInt(employeeId as string))
-    .filter(r => !platoon || r.platoon === platoon);
+    const filtered = results
+      .filter(r => !employeeId || r.employeeId === parseInt(employeeId as string))
+      .filter(r => !platoon || r.platoon === platoon);
 
-  res.json(filtered.map(r => {
-    const pRule = r.platoon ? platoonByName.get(r.platoon) : undefined;
-    return {
-      ...r,
-      scoreSum: parseFloat(r.scoreSum),
-      grossAverage: parseFloat(r.grossAverage),
-      absencePenalty: parseFloat(r.absencePenalty),
-      meritPoints: parseFloat(r.meritPoints),
-      finalResult: parseFloat(r.finalResult),
-      platoonMinScore: pRule?.minScore ?? null,
-      platoonMaxScore: pRule?.maxScore ?? null,
-      bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
-      extraBonusValue: isManager ? parseFloat(r.extraBonusValue) : 0,
-      bonusStatus: isManager ? r.bonusStatus : null,
-      paymentMethod: isManager ? r.paymentMethod : null,
-      paymentDueDate: isManager ? r.paymentDueDate : null,
-      paidAt: isManager ? r.paidAt : null,
-      paymentNotes: isManager ? r.paymentNotes : null,
-      eventBreakdown: [],
-    };
-  }));
+    res.json(filtered.map(r => {
+      const pRule = r.platoon ? platoonByName.get(r.platoon) : undefined;
+      return {
+        ...r,
+        scoreSum: parseFloat(r.scoreSum),
+        grossAverage: parseFloat(r.grossAverage),
+        absencePenalty: parseFloat(r.absencePenalty),
+        meritPoints: parseFloat(r.meritPoints),
+        finalResult: parseFloat(r.finalResult),
+        platoonMinScore: pRule?.minScore ?? null,
+        platoonMaxScore: pRule?.maxScore ?? null,
+        bonusValue: isManager ? parseFloat(r.bonusValue) : 0,
+        extraBonusValue: isManager ? parseFloat(r.extraBonusValue) : 0,
+        bonusStatus: isManager ? r.bonusStatus : null,
+        paymentMethod: isManager ? r.paymentMethod : null,
+        paymentDueDate: isManager ? r.paymentDueDate : null,
+        paidAt: isManager ? r.paidAt : null,
+        paymentNotes: isManager ? r.paymentNotes : null,
+        eventBreakdown: [],
+      };
+    }));
+  } catch (err) {
+    console.error("[results/quarterly]", err);
+    res.status(500).json({ error: "Erro ao carregar resultados consolidados" });
+  }
 });
 
 router.post("/results/quarterly/close", requireRole("admin", "rh", "diretoria"), async (req, res) => {
