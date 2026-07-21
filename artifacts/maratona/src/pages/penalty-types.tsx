@@ -21,9 +21,10 @@ import { useForm } from "react-hook-form";
 import { Plus, Trash2, Pencil, AlertTriangle, Award, Settings2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+const GOOD = "#9ab000";
+const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 interface TypeFormData {
   slug: string;
@@ -152,28 +153,29 @@ export default function PenaltyTypesPage() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-8">
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
+      <div className="p-6 md:p-10 space-y-7">
         {/* Header */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className={`w-16 h-16 bg-[#191c1e] border-2 border-[#191c1e] flex items-center justify-center shrink-0 ${HARD_SHADOW}`}>
-              <Settings2 size={32} className="text-[#ccff00]" />
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
+              <Settings2 size={24} style={{ color: "var(--primary-foreground)" }} />
             </div>
             <div>
-              <h1 className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-                Tipos de <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Lançamento</span>
+              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>
+                Tipos de Lançamento
               </h1>
-              <p className="text-base text-[#444933] italic mt-2">Configure os tipos de penalidade e mérito e seus valores em pontos.</p>
+              <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>Configure os tipos de penalidade e mérito e seus valores em pontos.</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {isAdmin && (
               <button
                 onClick={() => seedMutation.mutate()}
                 disabled={seedMutation.isPending}
                 title="Insere os 6 tipos padrão (falta, atraso, conformidade, rei do galpão, estrela, colega top) que ainda não existem"
-                className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-colors hover:opacity-80"
+                style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
               >
                 <RefreshCw size={14} className={seedMutation.isPending ? "animate-spin" : ""} /> Restaurar Padrões
               </button>
@@ -181,7 +183,8 @@ export default function PenaltyTypesPage() {
             {canEdit && (
               <button
                 onClick={openCreate}
-                className={`bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                className="h-10 px-4 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 transition-opacity hover:opacity-90"
+                style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 <Plus size={16} /> Novo Tipo
               </button>
@@ -190,39 +193,39 @@ export default function PenaltyTypesPage() {
         </section>
 
         {isLoading ? (
-          <div className="text-center py-20 text-[#747a60] italic uppercase font-bold">Carregando tipos...</div>
+          <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando tipos...</div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-5">
             {/* Penalidades */}
-            <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-              <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-                <AlertTriangle size={18} className="text-[#ff5722]" />
-                <span className="font-black uppercase tracking-tight">Penalidades (−)</span>
-                <span className="ml-auto text-xs text-[#ccff00]/60">{penaltyTypes.length} tipo{penaltyTypes.length !== 1 ? "s" : ""}</span>
+            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
+                <AlertTriangle size={16} style={{ color: WARNING }} />
+                <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED }}>Penalidades (−)</span>
+                <span className="ml-auto text-xs" style={{ color: "var(--muted-foreground)" }}>{penaltyTypes.length} tipo{penaltyTypes.length !== 1 ? "s" : ""}</span>
               </div>
-              <div className="divide-y-2 divide-[#eceef0]">
-                {penaltyTypes.map(t => (
-                  <TypeRow key={t.id} type={t} canEdit={!!canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} />
+              <div>
+                {penaltyTypes.map((t, i) => (
+                  <TypeRow key={t.id} type={t} canEdit={!!canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
                 ))}
                 {penaltyTypes.length === 0 && (
-                  <p className="text-center py-10 italic uppercase font-bold text-[#747a60] text-sm">Nenhuma penalidade cadastrada.</p>
+                  <p className="text-center py-10 font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhuma penalidade cadastrada.</p>
                 )}
               </div>
             </div>
 
             {/* Méritos */}
-            <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-              <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-                <Award size={18} className="text-[#ccff00]" />
-                <span className="font-black uppercase tracking-tight">Méritos (+)</span>
-                <span className="ml-auto text-xs text-[#ccff00]/60">{meritTypes.length} tipo{meritTypes.length !== 1 ? "s" : ""}</span>
+            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
+                <Award size={16} style={{ color: "var(--accent)" }} />
+                <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED }}>Méritos (+)</span>
+                <span className="ml-auto text-xs" style={{ color: "var(--muted-foreground)" }}>{meritTypes.length} tipo{meritTypes.length !== 1 ? "s" : ""}</span>
               </div>
-              <div className="divide-y-2 divide-[#eceef0]">
-                {meritTypes.map(t => (
-                  <TypeRow key={t.id} type={t} canEdit={!!canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} />
+              <div>
+                {meritTypes.map((t, i) => (
+                  <TypeRow key={t.id} type={t} canEdit={!!canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
                 ))}
                 {meritTypes.length === 0 && (
-                  <p className="text-center py-10 italic uppercase font-bold text-[#747a60] text-sm">Nenhum mérito cadastrado.</p>
+                  <p className="text-center py-10 font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum mérito cadastrado.</p>
                 )}
               </div>
             </div>
@@ -230,11 +233,11 @@ export default function PenaltyTypesPage() {
         )}
 
         {/* Info box */}
-        <div className="bg-[#f0f7e6] border-2 border-[#84cc16] px-6 py-4 text-sm font-bold italic text-[#444933] flex items-start gap-3">
-          <Award size={18} className="text-[#84cc16] shrink-0 mt-0.5" />
+        <div className="rounded-xl px-5 py-4 text-sm font-semibold flex items-start gap-3" style={{ backgroundColor: "rgba(154,176,0,0.10)", border: "1px solid rgba(154,176,0,0.3)" }}>
+          <Award size={18} className="shrink-0 mt-0.5" style={{ color: GOOD }} />
           <div>
-            <strong className="uppercase">Como funciona:</strong> Os tipos cadastrados aqui aparecem automaticamente no modal de "Novo Lançamento". 
-            Tipos marcados com <strong>📍 Exige Evento</strong> obrigam a seleção de um evento específico ao registrar. 
+            <strong className="uppercase">Como funciona:</strong> Os tipos cadastrados aqui aparecem automaticamente no modal de "Novo Lançamento".
+            Tipos marcados com <strong>📍 Exige Evento</strong> obrigam a seleção de um evento específico ao registrar.
             Tipos inativos ficam ocultos no modal mas seus registros históricos são preservados.
           </div>
         </div>
@@ -242,64 +245,61 @@ export default function PenaltyTypesPage() {
 
       {/* Create / Edit modal */}
       <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) setEditingType(null); }}>
-        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2 text-[#191c1e]">
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
               <Settings2 size={22} /> {editingType ? "Editar Tipo" : "Novo Tipo"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5 col-span-2">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome <span className="text-[#ba1a1a]">*</span></Label>
-                <Input {...register("label", { required: true })} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: WARNING }}>*</span></Label>
+                <Input {...register("label", { required: true })} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-lg" style={fieldStyle} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Slug <span className="text-[#ba1a1a]">*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Slug <span style={{ color: WARNING }}>*</span></Label>
                 <Input
                   {...register("slug", { required: !editingType })}
                   placeholder="ex: atraso"
-                  className="h-11 rounded-none border-2 border-[#191c1e] font-mono text-sm"
+                  className="h-11 rounded-lg font-mono text-sm"
+                  style={fieldStyle}
                   disabled={!!editingType}
                 />
-                {editingType && <p className="text-[11px] text-[#747a60] italic">Slug não pode ser alterado.</p>}
+                {editingType && <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Slug não pode ser alterado.</p>}
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Pontos <span className="text-[#ba1a1a]">*</span></Label>
-                <Input type="number" min="0" {...register("points", { valueAsNumber: true, required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pontos <span style={{ color: WARNING }}>*</span></Label>
+                <Input type="number" min="0" {...register("points", { valueAsNumber: true, required: true })} className="h-11 rounded-lg" style={fieldStyle} />
               </div>
             </div>
 
             {editingType && Number(watch("points")) !== editingType.points && (
-              <div className="space-y-2 border-2 border-[#191c1e] bg-[#fff8e1] px-4 py-3">
-                <p className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Aplicar mudança de pontos a partir de:</p>
+              <div className="space-y-2 rounded-lg px-4 py-3" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: "1px solid rgba(232,162,61,0.3)" }}>
+                <p className="font-bold uppercase text-xs tracking-wider">Aplicar mudança de pontos a partir de:</p>
                 <div className="space-y-2">
                   <button
                     type="button"
                     onClick={() => setApplyScope("future")}
-                    className={cn(
-                      "w-full text-left px-3 py-2 border-2 border-[#191c1e] flex items-start gap-2",
-                      applyScope === "future" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white hover:bg-[#eceef0]",
-                    )}
+                    className="w-full text-left px-3 py-2 rounded-lg flex items-start gap-2 transition-colors"
+                    style={applyScope === "future" ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
                   >
-                    <span className={cn("mt-0.5 h-3 w-3 rounded-full border-2 shrink-0", applyScope === "future" ? "bg-[#ccff00] border-[#ccff00]" : "border-[#191c1e]")} />
+                    <span className="mt-0.5 h-3 w-3 rounded-full border-2 shrink-0" style={{ backgroundColor: applyScope === "future" ? "var(--primary-foreground)" : "transparent", borderColor: "currentColor" }} />
                     <span>
-                      <span className="block font-black italic uppercase text-xs">Só a partir de agora</span>
-                      <span className="block text-[11px] italic opacity-80">Lançamentos já feitos neste ciclo mantêm o valor antigo. Só os novos usam o valor atualizado.</span>
+                      <span className="block font-black uppercase text-xs">Só a partir de agora</span>
+                      <span className="block text-[11px] opacity-80">Lançamentos já feitos neste ciclo mantêm o valor antigo. Só os novos usam o valor atualizado.</span>
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setApplyScope("cycle")}
-                    className={cn(
-                      "w-full text-left px-3 py-2 border-2 border-[#191c1e] flex items-start gap-2",
-                      applyScope === "cycle" ? "bg-[#191c1e] text-[#ccff00]" : "bg-white hover:bg-[#eceef0]",
-                    )}
+                    className="w-full text-left px-3 py-2 rounded-lg flex items-start gap-2 transition-colors"
+                    style={applyScope === "cycle" ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
                   >
-                    <span className={cn("mt-0.5 h-3 w-3 rounded-full border-2 shrink-0", applyScope === "cycle" ? "bg-[#ccff00] border-[#ccff00]" : "border-[#191c1e]")} />
+                    <span className="mt-0.5 h-3 w-3 rounded-full border-2 shrink-0" style={{ backgroundColor: applyScope === "cycle" ? "var(--primary-foreground)" : "transparent", borderColor: "currentColor" }} />
                     <span>
-                      <span className="block font-black italic uppercase text-xs">Todo o ciclo atual</span>
-                      <span className="block text-[11px] italic opacity-80">Atualiza também os lançamentos já registrados deste tipo no ciclo em andamento, e recalcula os resultados.</span>
+                      <span className="block font-black uppercase text-xs">Todo o ciclo atual</span>
+                      <span className="block text-[11px] opacity-80">Atualiza também os lançamentos já registrados deste tipo no ciclo em andamento, e recalcula os resultados.</span>
                     </span>
                   </button>
                 </div>
@@ -307,9 +307,9 @@ export default function PenaltyTypesPage() {
             )}
 
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo <span className="text-[#ba1a1a]">*</span></Label>
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo <span style={{ color: WARNING }}>*</span></Label>
               <Select value={watchedKind} onValueChange={v => setValue("kind", v as "penalty" | "merit")} disabled={!!editingType}>
-                <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
+                <SelectTrigger className="h-11 rounded-lg" style={fieldStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -317,52 +317,48 @@ export default function PenaltyTypesPage() {
                   <SelectItem value="merit">Mérito (+)</SelectItem>
                 </SelectContent>
               </Select>
-              {editingType && <p className="text-[11px] text-[#747a60] italic">Tipo não pode ser alterado.</p>}
+              {editingType && <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Tipo não pode ser alterado.</p>}
             </div>
 
-            <div className="flex items-center justify-between py-2 border-t border-[#eceef0]">
+            <div className="flex items-center justify-between py-2" style={{ borderTop: "1px solid var(--border)" }}>
               <div>
-                <p className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">📍 Exige evento vinculado</p>
-                <p className="text-[11px] text-[#747a60] italic">Obriga seleção de evento ao lançar.</p>
+                <p className="font-bold uppercase text-xs tracking-wider">📍 Exige evento vinculado</p>
+                <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Obriga seleção de evento ao lançar.</p>
               </div>
-              <Switch
-                checked={watchedRequiresEvent}
-                onCheckedChange={v => setValue("requiresEvent", v)}
-              />
+              <Switch checked={watchedRequiresEvent} onCheckedChange={v => setValue("requiresEvent", v)} />
             </div>
 
-            <div className="flex items-center justify-between py-2 border-t border-[#eceef0]">
+            <div className="flex items-center justify-between py-2" style={{ borderTop: "1px solid var(--border)" }}>
               <div>
-                <p className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Ativo</p>
-                <p className="text-[11px] text-[#747a60] italic">Aparece no modal de novo lançamento.</p>
+                <p className="font-bold uppercase text-xs tracking-wider">Ativo</p>
+                <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Aparece no modal de novo lançamento.</p>
               </div>
-              <Switch
-                checked={watchedActive}
-                onCheckedChange={v => setValue("active", v)}
-              />
+              <Switch checked={watchedActive} onCheckedChange={v => setValue("active", v)} />
             </div>
 
             {/* Preview */}
-            <div className={cn(
-              "flex items-center justify-between px-4 py-3 border-2 border-[#191c1e] font-black italic uppercase tracking-tight",
-              watchedKind === "merit" ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#191c1e] text-[#ccff00]",
-            )}>
+            <div
+              className="flex items-center justify-between px-4 py-3 rounded-lg font-black uppercase tracking-tight"
+              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+            >
               <span className="text-xs">Preview:</span>
-              <span className="text-xl leading-none">{watchedKind === "merit" ? "+" : "-"}{watch("points") || 0} pts por lançamento</span>
+              <span className="text-xl leading-none" style={{ fontFamily: CONDENSED }}>{watchedKind === "merit" ? "+" : "-"}{watch("points") || 0} pts por lançamento</span>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#eceef0]">
+            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
               <button
                 type="button"
                 onClick={() => { setOpen(false); setEditingType(null); }}
-                className="border-2 border-[#191c1e] bg-white px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider hover:bg-[#eceef0] transition-colors"
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-colors hover:opacity-80"
+                style={{ border: "1px solid var(--border)" }}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className={`bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider disabled:opacity-50 transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 {isPending ? "Salvando..." : (editingType ? "Salvar Alterações" : "Criar Tipo")}
               </button>
@@ -373,20 +369,21 @@ export default function PenaltyTypesPage() {
 
       {/* Delete confirmation */}
       <AlertDialog open={deleteTargetId !== null} onOpenChange={v => { if (!v) setDeleteTargetId(null); }}>
-        <AlertDialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl italic uppercase font-black text-[#191c1e] flex items-center gap-2">
+            <AlertDialogTitle className="text-xl font-black uppercase flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
               <Trash2 size={20} /> Remover tipo
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#444933] font-bold italic">
+            <AlertDialogDescription className="font-bold" style={{ color: "var(--muted-foreground)" }}>
               O tipo será removido. Registros históricos que usam este tipo <strong>não serão afetados</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteTargetId && deleteMutation.mutate({ id: deleteTargetId })}
-              className="rounded-none bg-[#ba1a1a] text-white border-2 border-[#191c1e] font-bold italic uppercase text-xs hover:bg-[#93000a]"
+              className="rounded-lg font-bold uppercase text-xs"
+              style={{ backgroundColor: WARNING, color: "#fff" }}
             >
               Sim, remover
             </AlertDialogAction>
@@ -397,48 +394,48 @@ export default function PenaltyTypesPage() {
   );
 }
 
-function TypeRow({ type, canEdit, onEdit, onDelete }: {
+function TypeRow({ type, canEdit, onEdit, onDelete, isFirst }: {
   type: PenaltyType;
   canEdit: boolean;
   onEdit: (t: PenaltyType) => void;
   onDelete: (id: number) => void;
+  isFirst: boolean;
 }) {
   const isMerit = type.kind === "merit";
   return (
-    <div className={cn(
-      "px-6 py-4 flex items-center gap-4 group transition-colors",
-      !type.active && "opacity-50 bg-[#f9fafb]",
-      isMerit ? "border-l-4 border-l-[#84cc16]" : "border-l-4 border-l-[#ff5722]",
-    )}>
+    <div
+      className="px-5 py-3.5 flex items-center gap-4 group transition-colors relative"
+      style={{ opacity: type.active ? 1 : 0.5, borderTop: isFirst ? "none" : "1px solid var(--border)" }}
+    >
+      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: isMerit ? GOOD : WARNING }} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-black italic uppercase text-sm text-[#191c1e]">{type.label}</span>
+          <span className="font-black uppercase text-sm">{type.label}</span>
           {!type.active && (
-            <span className="text-[10px] font-bold uppercase italic border border-[#747a60] text-[#747a60] px-1.5 py-0.5">Inativo</span>
+            <span className="text-[10px] font-bold uppercase rounded px-1.5 py-0.5" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Inativo</span>
           )}
           {type.requiresEvent && (
-            <span className="text-[10px] font-bold uppercase italic text-[#747a60]">📍 Evento</span>
+            <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>📍 Evento</span>
           )}
         </div>
-        <div className="text-xs text-[#747a60] font-mono mt-0.5">{type.slug}</div>
+        <div className="text-xs font-mono mt-0.5" style={{ color: "var(--muted-foreground)" }}>{type.slug}</div>
       </div>
-      <div className={cn(
-        "font-black text-lg italic shrink-0",
-        isMerit ? "text-[#506600]" : "text-[#ba1a1a]",
-      )}>
+      <div className="font-black text-lg shrink-0" style={{ fontFamily: CONDENSED, color: isMerit ? GOOD : WARNING }}>
         {isMerit ? "+" : "-"}{type.points} pts
       </div>
       {canEdit && (
         <div className="flex items-center gap-1 shrink-0">
           <button
-            className="p-2 border-2 border-transparent text-[#747a60] hover:border-[#191c1e] hover:text-[#191c1e] hover:bg-[#eceef0] transition-all"
+            className="p-2 rounded-lg transition-colors hover:opacity-80"
+            style={{ color: "var(--muted-foreground)" }}
             onClick={() => onEdit(type)}
             title="Editar"
           >
             <Pencil size={14} />
           </button>
           <button
-            className="p-2 border-2 border-transparent text-[#747a60] hover:border-[#191c1e] hover:text-[#ba1a1a] hover:bg-[#ffdad6] transition-all"
+            className="p-2 rounded-lg transition-colors hover:opacity-80"
+            style={{ color: WARNING }}
             onClick={() => onDelete(type.id)}
             title="Remover"
           >

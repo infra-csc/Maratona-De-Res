@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, useMergeUser, getGetUsersQueryKey } from "@workspace/api-client-react";
 import type { UserInput, User, MergeUserResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -13,16 +12,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye, Pencil, LineChart, GitMerge, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
 
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+const GOOD = "#9ab000";
+const AMBER = "#e8a23d";
+const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
-const ROLES = [
-  { value: "admin", label: "Administrador", chip: "bg-[#191c1e] text-[#ccff00]" },
-  { value: "rh", label: "RH", chip: "bg-[#ccff00] text-[#161e00]" },
-  { value: "avaliador", label: "Avaliador", chip: "bg-[#e0e3e5] text-[#191c1e]" },
-  { value: "diretoria", label: "Diretoria", chip: "bg-[#ff5722] text-white" },
-  { value: "visualizador", label: "Visualizador", chip: "bg-[#f2f4f6] text-[#444933]" },
+const ROLES: { value: string; label: string; bg: string; fg: string }[] = [
+  { value: "admin", label: "Administrador", bg: "var(--primary)", fg: "var(--primary-foreground)" },
+  { value: "rh", label: "RH", bg: "rgba(154,176,0,0.14)", fg: GOOD },
+  { value: "avaliador", label: "Avaliador", bg: "var(--secondary)", fg: "var(--muted-foreground)" },
+  { value: "diretoria", label: "Diretoria", bg: "rgba(229,72,77,0.12)", fg: WARNING },
+  { value: "visualizador", label: "Visualizador", bg: "rgba(232,162,61,0.14)", fg: AMBER },
 ];
 
 function initials(name: string) {
@@ -129,7 +130,7 @@ export default function UsersPage() {
   });
 
   function getRoleInfo(role: string) {
-    return ROLES.find(r => r.value === role) ?? { label: role, chip: "bg-[#f2f4f6] text-[#444933]" };
+    return ROLES.find(r => r.value === role) ?? { label: role, bg: "var(--secondary)", fg: "var(--muted-foreground)" };
   }
 
   async function runEmailMigration(dryRun: boolean) {
@@ -179,62 +180,63 @@ export default function UsersPage() {
   const pct = (n: number) => (stats.total > 0 ? Math.round((n / stats.total) * 100) : 0);
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-10">
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
+      <div className="p-6 md:p-10 space-y-7">
         {/* Page header */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
           <div>
-            <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none flex items-center gap-3">
-              <ShieldCheck size={40} className="text-[#506600]" /> Acessos &amp;{" "}
-              <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Permissões</span>
+            <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none flex items-center gap-2.5" style={{ fontFamily: CONDENSED }}>
+              <ShieldCheck size={26} style={{ color: "var(--accent)" }} /> Acessos &amp; Permissões
             </h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-xl">Controle quem pode acessar a plataforma e o que podem fazer.</p>
+            <p className="text-sm mt-1.5 max-w-xl" style={{ color: "var(--muted-foreground)" }}>Controle quem pode acessar a plataforma e o que podem fazer.</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
             {isAdmin && (
               <>
                 <button
                   onClick={() => { setEmailMigOpen(true); setEmailMigPreview(null); }}
-                  className={`border-2 border-[#191c1e] px-5 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 whitespace-nowrap bg-white text-[#191c1e] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                  className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 whitespace-nowrap transition-colors hover:opacity-80"
+                  style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
                 >
-                  <Mail size={18} /> Migrar Emails
+                  <Mail size={16} /> Migrar Emails
                 </button>
                 <Dialog open={emailMigOpen} onOpenChange={o => { setEmailMigOpen(o); if (!o) setEmailMigPreview(null); }}>
-                  <DialogContent className="max-w-2xl rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+                  <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
                     <DialogHeader>
-                      <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Migrar Emails Office 365</DialogTitle>
+                      <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Migrar Emails Office 365</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 pt-2">
-                      <p className="text-sm text-[#444933]">Atualiza os emails dos avaliadores identificados no Office 365. Clique em <em>Prévia</em> para ver o que será alterado antes de confirmar.</p>
+                      <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Atualiza os emails dos avaliadores identificados no Office 365. Clique em <em>Prévia</em> para ver o que será alterado antes de confirmar.</p>
                       {!emailMigPreview && (
                         <button
                           onClick={() => runEmailMigration(true)}
                           disabled={emailMigLoading}
-                          className={`border-2 border-[#191c1e] px-6 py-3 font-bold text-sm italic uppercase tracking-wider bg-white ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                          className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide disabled:opacity-50 transition-colors hover:opacity-80"
+                          style={{ border: "1px solid var(--border)" }}
                         >
                           {emailMigLoading ? "Carregando..." : "Ver Prévia"}
                         </button>
                       )}
                       {emailMigPreview && (
                         <div className="space-y-3">
-                          <div className="flex gap-4 text-xs font-bold uppercase tracking-wider">
-                            <span className="text-green-700">{emailMigPreview.filter(p => p.status === "will_update").length} para atualizar</span>
-                            <span className="text-[#444933]">{emailMigPreview.filter(p => p.status === "no_change").length} sem mudança</span>
+                          <div className="flex gap-4 text-xs font-bold uppercase tracking-wide">
+                            <span style={{ color: GOOD }}>{emailMigPreview.filter(p => p.status === "will_update").length} para atualizar</span>
+                            <span style={{ color: "var(--muted-foreground)" }}>{emailMigPreview.filter(p => p.status === "no_change").length} sem mudança</span>
                             {emailMigPreview.filter(p => p.status === "not_found").length > 0 && (
-                              <span className="text-red-600">{emailMigPreview.filter(p => p.status === "not_found").length} não encontrado</span>
+                              <span style={{ color: WARNING }}>{emailMigPreview.filter(p => p.status === "not_found").length} não encontrado</span>
                             )}
                           </div>
-                          <div className="max-h-72 overflow-y-auto border-2 border-[#191c1e] divide-y divide-[#e0e3e5]">
-                            {emailMigPreview.filter(p => p.status === "will_update").map(p => (
-                              <div key={p.id} className="px-3 py-2 bg-green-50 text-xs">
+                          <div className="max-h-72 overflow-y-auto rounded-lg" style={{ border: "1px solid var(--border)" }}>
+                            {emailMigPreview.filter(p => p.status === "will_update").map((p, i) => (
+                              <div key={p.id} className="px-3 py-2 text-xs" style={{ backgroundColor: "rgba(154,176,0,0.08)", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
                                 <span className="font-bold">{p.name}</span>
-                                <div className="text-[#747a60] line-through">{p.emailFrom ?? <em>sem email</em>}</div>
-                                <div className="text-green-700 font-mono">{p.emailTo}</div>
+                                <div className="line-through" style={{ color: "var(--muted-foreground)" }}>{p.emailFrom ?? <em>sem email</em>}</div>
+                                <div className="font-mono" style={{ color: GOOD }}>{p.emailTo}</div>
                               </div>
                             ))}
-                            {emailMigPreview.filter(p => p.status === "no_change").map(p => (
-                              <div key={p.id} className="px-3 py-2 text-xs text-[#747a60]">
+                            {emailMigPreview.filter(p => p.status === "no_change").map((p, i) => (
+                              <div key={p.id} className="px-3 py-2 text-xs" style={{ color: "var(--muted-foreground)", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
                                 <span className="font-bold">{p.name}</span> — já atualizado
                               </div>
                             ))}
@@ -243,13 +245,15 @@ export default function UsersPage() {
                             <button
                               onClick={() => runEmailMigration(false)}
                               disabled={emailMigLoading || emailMigPreview.filter(p => p.status === "will_update").length === 0}
-                              className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-3 font-bold text-sm italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                              className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide disabled:opacity-50 transition-opacity hover:opacity-90"
+                              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                             >
                               {emailMigLoading ? "Aplicando..." : "Confirmar e Aplicar"}
                             </button>
                             <button
                               onClick={() => { setEmailMigOpen(false); setEmailMigPreview(null); }}
-                              className="border-2 border-[#191c1e] px-6 py-3 font-bold text-sm italic uppercase tracking-wider bg-white"
+                              className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide transition-colors hover:opacity-80"
+                              style={{ border: "1px solid var(--border)" }}
                             >
                               Cancelar
                             </button>
@@ -265,171 +269,164 @@ export default function UsersPage() {
               <button
                 data-testid="button-merge-mode"
                 onClick={() => { setMergeMode(v => !v); setSelectedIds(new Set()); setCanonicalId(null); }}
-                className={`border-2 border-[#191c1e] px-5 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 whitespace-nowrap ${HARD_SHADOW} ${HARD_SHADOW_HOVER} ${mergeMode ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#191c1e]"}`}
+                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 whitespace-nowrap transition-colors hover:opacity-85"
+                style={mergeMode ? { backgroundColor: WARNING, color: "#fff" } : { border: "1px solid var(--border)" }}
               >
-                <GitMerge size={18} /> {mergeMode ? "Cancelar Mescla" : "Mesclar Avaliadores"}
+                <GitMerge size={16} /> {mergeMode ? "Cancelar Mescla" : "Mesclar Avaliadores"}
               </button>
             )}
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <button
-                data-testid="button-create-user"
-                className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 whitespace-nowrap ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-              >
-                <Plus size={18} /> Novo Usuário
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-              <DialogHeader>
-                <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Adicionar Acesso</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
-                <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
-                  <div className="relative">
-                    <UserCircle size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-                    <Input data-testid="input-user-name" {...register("name", { required: true })} placeholder="Nome do usuário" className="pl-10 h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">E-mail Corporativo <span className="text-[#ba1a1a]">*</span></Label>
-                  <div className="relative">
-                    <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-                    <Input data-testid="input-user-email" type="email" {...register("email", { required: true })} placeholder="email@cenografica.com.br" className="pl-10 h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Senha Inicial <span className="text-[#ba1a1a]">*</span></Label>
-                  <div className="relative">
-                    <KeyRound size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-                    <Input data-testid="input-user-password" type="password" {...register("password", { required: true })} placeholder="••••••••" className="pl-10 h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <button
+                  data-testid="button-create-user"
+                  className="h-10 px-4 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                >
+                  <Plus size={16} /> Novo Usuário
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Adicionar Acesso</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
                   <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nível de Permissão <span className="text-[#ba1a1a]">*</span></Label>
-                    <Select defaultValue="avaliador" onValueChange={v => setValue("role", v)}>
-                      <SelectTrigger data-testid="select-user-role" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
-                        <SelectValue />
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
+                    <div className="relative">
+                      <UserCircle size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+                      <Input data-testid="input-user-name" {...register("name", { required: true })} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: WARNING }}>*</span></Label>
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+                      <Input data-testid="input-user-email" type="email" {...register("email", { required: true })} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Senha Inicial <span style={{ color: WARNING }}>*</span></Label>
+                    <div className="relative">
+                      <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+                      <Input data-testid="input-user-password" type="password" {...register("password", { required: true })} placeholder="••••••••" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível de Permissão <span style={{ color: WARNING }}>*</span></Label>
+                      <Select defaultValue="avaliador" onValueChange={v => setValue("role", v)}>
+                        <SelectTrigger data-testid="select-user-role" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLES.map(r => (
+                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Área Responsável (Opcional)</Label>
+                      <Select onValueChange={v => setValue("areaId", Number(v))}>
+                        <SelectTrigger data-testid="select-user-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(areas ?? []).map(a => (
+                            <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Vincular a Colaborador (Opcional)</Label>
+                    <Select onValueChange={v => setValue("employeeId", v === "__none" ? null : Number(v))}>
+                      <SelectTrigger data-testid="select-user-employee" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
+                        <SelectValue placeholder="Nenhum" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ROLES.map(r => (
-                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                        <SelectItem value="__none">Nenhum</SelectItem>
+                        {sortedEmployees.map(e => (
+                          <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Necessário para o usuário ver a página "Meu Desempenho" com os próprios resultados.</p>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Área Responsável (Opcional)</Label>
-                    <Select onValueChange={v => setValue("areaId", Number(v))}>
-                      <SelectTrigger data-testid="select-user-area" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(areas ?? []).map(a => (
-                          <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                    <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
+                    <button
+                      data-testid="button-submit-user"
+                      type="submit"
+                      disabled={createMutation.isPending}
+                      className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                    >
+                      {createMutation.isPending ? "Criando..." : "Criar Usuário"}
+                    </button>
                   </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Vincular a Colaborador (Opcional)</Label>
-                  <Select onValueChange={v => setValue("employeeId", v === "__none" ? null : Number(v))}>
-                    <SelectTrigger data-testid="select-user-employee" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
-                      <SelectValue placeholder="Nenhum" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none">Nenhum</SelectItem>
-                      {sortedEmployees.map(e => (
-                        <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-[#747a60] italic">Necessário para o usuário ver a página "Meu Desempenho" com os próprios resultados.</p>
-                </div>
-                <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                  <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
-                  <button
-                    data-testid="button-submit-user"
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
-                  >
-                    {createMutation.isPending ? "Criando..." : "Criar Usuário"}
-                  </button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </section>
 
         {/* Stats bar */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Total de Usuários */}
-          <div className="bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
-              <Users size={120} strokeWidth={1.5} />
-            </div>
-            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Total de Usuários</span>
-            <p data-testid="stat-total" className="text-[40px] leading-none italic font-black mt-2">{stats.total}</p>
-            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#191c1e]" style={{ width: "100%" }} /></div>
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Total de Usuários</span>
+            <p data-testid="stat-total" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>{stats.total}</p>
+            <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: "100%", backgroundColor: "var(--foreground)" }} /></div>
           </div>
-          {/* Ativos Agora */}
-          <div className={`bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group ${HARD_SHADOW}`}>
-            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
-              <Zap size={120} strokeWidth={1.5} />
-            </div>
-            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Ativos Agora</span>
-            <p data-testid="stat-ativos" className="text-[40px] leading-none italic font-black mt-2 text-[#506600]">{stats.ativos}</p>
-            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#ccff00]" style={{ width: `${pct(stats.ativos)}%` }} /></div>
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Ativos Agora</span>
+            <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{stats.ativos}</p>
+            <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.ativos)}%`, backgroundColor: "var(--primary)" }} /></div>
           </div>
-          {/* Nível Admin */}
-          <div className="bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
-              <ShieldCheck size={120} strokeWidth={1.5} />
-            </div>
-            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Nível Admin</span>
-            <p data-testid="stat-admins" className="text-[40px] leading-none italic font-black mt-2 text-[#b02f00]">{stats.admins}</p>
-            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#ff5722]" style={{ width: `${pct(stats.admins)}%` }} /></div>
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível Admin</span>
+            <p data-testid="stat-admins" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: WARNING }}>{stats.admins}</p>
+            <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.admins)}%`, backgroundColor: WARNING }} /></div>
           </div>
         </section>
 
         {/* Table */}
         {isLoading ? (
-          <div className="text-center py-20 italic uppercase font-bold text-[#747a60]">Carregando usuários...</div>
+          <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando usuários...</div>
         ) : (
-          <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex justify-between items-center italic">
-              <h3 className="text-xs font-bold uppercase tracking-widest">Grade de Acessos</h3>
+          <PremiumCard className="overflow-hidden">
+            <div className="px-5 py-3 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)" }}>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Grade de Acessos</h3>
               {mergeMode ? (
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#ccff00] animate-pulse">
+                <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--accent)" }}>
                   Modo Mescla — selecione avaliadores duplicados
                 </span>
-              ) : <Filter size={18} />}
+              ) : <Filter size={16} style={{ color: "var(--muted-foreground)" }} />}
             </div>
             {mergeMode && (
-              <div className="bg-[#fffde7] border-b-2 border-[#191c1e] px-6 py-3 text-xs font-bold italic text-[#444933]">
+              <div className="px-5 py-3 text-xs font-semibold" style={{ backgroundColor: "rgba(232,162,61,0.10)", borderBottom: "1px solid var(--border)" }}>
                 Selecione todos os usuários duplicados e o <strong>canônico</strong> (conta que será mantida). Avaliações e calibrações serão transferidas para o canônico e os duplicados serão desativados.
               </div>
             )}
-            <div className="px-6 py-3 border-b-2 border-[#eceef0] bg-[#f9fafb]">
+            <div className="px-5 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
               <div className="relative max-w-sm">
-                <Users size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aa088]" />
+                <Users size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
                 <input
                   type="text"
                   data-testid="input-search-users"
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   placeholder="Buscar por nome, CPF ou e-mail..."
-                  className="w-full pl-9 pr-8 py-2 border-2 border-[#191c1e] text-sm italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                  className="w-full pl-8 pr-8 py-2 rounded-lg text-sm outline-none"
+                  style={fieldStyle}
                 />
                 {userSearch && (
                   <button
                     type="button"
                     onClick={() => setUserSearch("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 transition-colors hover:opacity-70"
+                    style={{ color: "var(--muted-foreground)" }}
                     aria-label="Limpar busca"
                   >
                     <X size={14} />
@@ -437,23 +434,23 @@ export default function UsersPage() {
                 )}
               </div>
               {userSearch && (
-                <p className="text-[11px] italic text-[#747a60] mt-1">{sortedUsers.length} resultado(s)</p>
+                <p className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>{sortedUsers.length} resultado(s)</p>
               )}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                    {mergeMode && <th className="px-4 py-4 w-10" />}
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Usuário</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Perfil</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Área</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Status</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-right">Ações</th>
+                  <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
+                    {mergeMode && <th className="px-4 py-3 w-10" />}
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Usuário</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Perfil</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Área</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-right" style={{ color: "var(--muted-foreground)" }}>Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y-2 divide-[#eceef0]">
-                  {sortedUsers.map(u => {
+                <tbody>
+                  {sortedUsers.map((u, i) => {
                     const roleInfo = getRoleInfo(u.role);
                     const isAvaliador = u.role === "avaliador";
                     const isSelected = selectedIds.has(u.id);
@@ -462,7 +459,12 @@ export default function UsersPage() {
                       <tr
                         key={u.id}
                         data-testid={`row-user-${u.id}`}
-                        className={`transition-all group ${mergeMode && isAvaliador ? "cursor-pointer" : ""} ${isCanonical ? "bg-[#f0ffe0] hover:bg-[#e8ffcc]" : isSelected ? "bg-[#fffde7] hover:bg-[#fff9c4]" : "hover:bg-[#f2f4f6] hover:translate-x-1"}`}
+                        className="transition-colors group"
+                        style={{
+                          borderTop: i > 0 ? "1px solid var(--border)" : "none",
+                          cursor: mergeMode && isAvaliador ? "pointer" : "default",
+                          backgroundColor: isCanonical ? "rgba(154,176,0,0.12)" : isSelected ? "rgba(232,162,61,0.10)" : "transparent",
+                        }}
                         onClick={mergeMode && isAvaliador ? () => {
                           setSelectedIds(prev => {
                             const next = new Set(prev);
@@ -477,11 +479,11 @@ export default function UsersPage() {
                         } : undefined}
                       >
                         {mergeMode && (
-                          <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                          <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
                             {isAvaliador ? (
                               <input
                                 type="checkbox"
-                                className="w-4 h-4 border-2 border-[#191c1e] cursor-pointer accent-[#ccff00]"
+                                className="w-4 h-4 cursor-pointer"
                                 checked={isSelected}
                                 onChange={() => {
                                   setSelectedIds(prev => {
@@ -496,62 +498,59 @@ export default function UsersPage() {
                                   });
                                 }}
                               />
-                            ) : <span className="text-[#c4c9ac]">—</span>}
+                            ) : <span style={{ color: "var(--muted-foreground)" }}>—</span>}
                           </td>
                         )}
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-4">
-                            {isCanonical && <span className="text-[10px] bg-[#ccff00] border border-[#191c1e] px-2 py-0.5 font-black italic uppercase shrink-0">Canônico</span>}
-                            <div className="w-11 h-11 border-2 border-[#191c1e] skew-x-[-4deg] bg-[#e0e3e5] flex items-center justify-center shrink-0">
-                              <span className="skew-x-[4deg] text-sm font-black italic">{initials(u.name)}</span>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            {isCanonical && <span className="text-[10px] rounded px-1.5 py-0.5 font-black uppercase shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Canônico</span>}
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--secondary)" }}>
+                              <span className="text-sm font-black">{initials(u.name)}</span>
                             </div>
                             <div>
-                              <p className="font-bold italic text-[#191c1e]">{u.name}</p>
-                              {u.email && <p className="text-xs text-[#747a60] mt-0.5">{u.email}</p>}
+                              <p className="font-bold">{u.name}</p>
+                              {u.email && <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{u.email}</p>}
                               {u.cpfLogin && (
-                                <p className="text-xs text-[#747a60] mt-0.5">CPF: {u.cpfLogin}</p>
+                                <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>CPF: {u.cpfLogin}</p>
                               )}
                               {u.employeeName && (
-                                <p className="text-[11px] text-[#506600] font-bold italic uppercase mt-0.5">↳ {u.employeeName}</p>
+                                <p className="text-[11px] font-bold uppercase mt-0.5" style={{ color: "var(--accent)" }}>↳ {u.employeeName}</p>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`${roleInfo.chip} px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block`}>
-                            <span className="inline-block skew-x-[8deg]">{roleInfo.label}</span>
+                        <td className="px-5 py-3.5">
+                          <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase inline-block" style={{ backgroundColor: roleInfo.bg, color: roleInfo.fg }}>
+                            {roleInfo.label}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-5 py-3.5">
                           {u.areaName ? (
-                            <span className="flex items-center gap-2 text-[#444933] font-bold italic uppercase text-xs bg-[#eceef0] border-2 border-[#191c1e] px-2 py-1 w-max">
+                            <span className="flex items-center gap-2 font-bold uppercase text-xs rounded-lg px-2 py-1 w-max" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
                               <Building2 size={12} /> {u.areaName}
                             </span>
-                          ) : <span className="text-[#c4c9ac]">—</span>}
+                          ) : <span style={{ color: "var(--muted-foreground)" }}>—</span>}
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-5 py-3.5 text-center">
                           <div className="flex flex-col items-center gap-1">
                             {u.active ? (
-                              <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
-                                <span className="inline-block skew-x-[8deg]">Ativo</span>
-                              </span>
+                              <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Ativo</span>
                             ) : (
-                              <span className="bg-[#d8dadc] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block opacity-70">
-                                <span className="inline-block skew-x-[8deg]">Inativo</span>
-                              </span>
+                              <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativo</span>
                             )}
                             {u.mustChangePassword && (
-                              <span className="text-[10px] text-[#ba1a1a] font-bold italic uppercase">Troca de senha pendente</span>
+                              <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Troca de senha pendente</span>
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
                             {mergeMode && isAvaliador && isSelected && (
                               <button
                                 onClick={e => { e.stopPropagation(); setCanonicalId(u.id); }}
                                 title={isCanonical ? "Conta canônica selecionada" : "Definir como conta canônica (mantida)"}
-                                className={`px-3 py-1.5 border-2 border-[#191c1e] text-[11px] font-bold italic uppercase transition-all ${isCanonical ? "bg-[#ccff00] text-[#191c1e]" : "bg-white hover:bg-[#ccff00]"}`}
+                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-85"
+                                style={isCanonical ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
                               >
                                 {isCanonical ? "✓ Canônico" : "Definir Canônico"}
                               </button>
@@ -565,7 +564,8 @@ export default function UsersPage() {
                                 }}
                                 disabled={impersonateMutation.isPending}
                                 title={`Ver perfil de desempenho de ${u.employeeName}`}
-                                className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ccff00] transition-all disabled:opacity-50"
+                                className="p-2 rounded-lg transition-colors disabled:opacity-50 hover:opacity-80"
+                                style={{ border: "1px solid var(--border)" }}
                               >
                                 <LineChart size={14} />
                               </button>
@@ -579,7 +579,8 @@ export default function UsersPage() {
                                 }}
                                 disabled={impersonateMutation.isPending}
                                 title="Visualizar como este usuário (modo dev)"
-                                className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ccff00] transition-all disabled:opacity-50"
+                                className="p-2 rounded-lg transition-colors disabled:opacity-50 hover:opacity-80"
+                                style={{ border: "1px solid var(--border)" }}
                               >
                                 <Eye size={14} />
                               </button>
@@ -588,7 +589,8 @@ export default function UsersPage() {
                               data-testid={`button-edit-user-${u.id}`}
                               onClick={() => setEditUser(u)}
                               title="Editar usuário"
-                              className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#eceef0] transition-all"
+                              className="p-2 rounded-lg transition-colors hover:opacity-80"
+                              style={{ border: "1px solid var(--border)" }}
                             >
                               <Pencil size={14} />
                             </button>}
@@ -596,7 +598,8 @@ export default function UsersPage() {
                               data-testid={`button-reset-pw-${u.id}`}
                               onClick={() => { setNewPassword(""); setResetOpen(u.id); }}
                               title="Redefinir senha"
-                              className="p-2 border-2 border-[#191c1e] bg-white hover:bg-[#ff5722] hover:text-white transition-all"
+                              className="p-2 rounded-lg transition-colors hover:opacity-80"
+                              style={{ border: "1px solid var(--border)" }}
                             >
                               <KeyRound size={14} />
                             </button>}
@@ -606,22 +609,24 @@ export default function UsersPage() {
                                   <button
                                     data-testid={`button-delete-user-${u.id}`}
                                     title="Remover acesso"
-                                    className="p-2 border-2 border-[#191c1e] bg-white text-[#ba1a1a] hover:bg-[#ba1a1a] hover:text-white transition-all"
+                                    className="p-2 rounded-lg transition-colors hover:opacity-80"
+                                    style={{ border: "1px solid var(--border)", color: WARNING }}
                                   >
                                     <Trash2 size={14} />
                                   </button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+                                <AlertDialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-xl italic uppercase font-black tracking-tight">Remover acesso?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      O usuário <strong>{u.name}</strong> perderá o acesso imediatamente. Esta ação não afeta o histórico de avaliações já feitas.
+                                    <AlertDialogTitle className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Remover acesso?</AlertDialogTitle>
+                                    <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
+                                      O usuário <strong style={{ color: "var(--foreground)" }}>{u.name}</strong> perderá o acesso imediatamente. Esta ação não afeta o histórico de avaliações já feitas.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+                                    <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
                                     <AlertDialogAction
-                                      className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white hover:bg-[#ba1a1a]/90 italic uppercase font-bold"
+                                      className="rounded-lg font-bold uppercase text-xs"
+                                      style={{ backgroundColor: WARNING, color: "#fff" }}
                                       onClick={() => deleteMutation.mutate({ id: u.id })}
                                     >
                                       Remover Acesso
@@ -636,23 +641,23 @@ export default function UsersPage() {
                     );
                   })}
                   {sortedUsers.length === 0 && (
-                    <tr><td colSpan={mergeMode ? 6 : 5} className="text-center py-16 italic uppercase font-bold text-[#747a60]">{userSearch ? "Nenhum usuário encontrado." : "Nenhum usuário cadastrado."}</td></tr>
+                    <tr><td colSpan={mergeMode ? 6 : 5} className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{userSearch ? "Nenhum usuário encontrado." : "Nenhum usuário cadastrado."}</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="px-6 py-4 border-t-2 border-[#eceef0] flex justify-between items-center">
-              <span className="text-xs font-bold italic uppercase text-[#747a60]">Mostrando {sortedUsers.length} de {stats.total} usuários</span>
+            <div className="px-5 py-3.5" style={{ borderTop: "1px solid var(--border)" }}>
+              <span className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Mostrando {sortedUsers.length} de {stats.total} usuários</span>
             </div>
-          </section>
+          </PremiumCard>
         )}
       </div>
 
       {/* Merge action bar */}
       {mergeMode && selectedIds.size >= 2 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#191c1e] text-white border-2 border-[#ccff00] shadow-[6px_6px_0px_0px_#ccff00] px-6 py-4 flex items-center gap-6 min-w-[500px]">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-4 flex items-center gap-6 min-w-[500px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--primary)" }}>
           <div className="flex-1">
-            <p className="text-xs font-bold italic uppercase tracking-wider text-[#ccff00]">Mescla de Avaliadores</p>
+            <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--accent)" }}>Mescla de Avaliadores</p>
             <p className="text-sm font-bold mt-0.5">
               {selectedIds.size} selecionados
               {canonicalId ? ` — canônico: ${sortedUsers.find(u => u.id === canonicalId)?.name ?? canonicalId}` : " — defina o canônico nas ações"}
@@ -662,28 +667,30 @@ export default function UsersPage() {
             <AlertDialogTrigger asChild>
               <button
                 disabled={!canonicalId || mergeMutation.isPending}
-                className="bg-[#ccff00] text-[#191c1e] border-2 border-[#ccff00] px-5 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-40"
+                className="px-4 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-40 transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 <GitMerge size={16} /> Mesclar Agora
               </button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+            <AlertDialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
               <AlertDialogHeader>
-                <AlertDialogTitle className="text-xl italic uppercase font-black tracking-tight">Confirmar Mescla?</AlertDialogTitle>
-                <AlertDialogDescription className="space-y-2">
-                  <span className="block">O usuário canônico <strong>{sortedUsers.find(u => u.id === canonicalId)?.name}</strong> receberá todas as avaliações e calibrações dos {selectedIds.size - 1} usuário(s) duplicado(s):</span>
+                <AlertDialogTitle className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Confirmar Mescla?</AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2" style={{ color: "var(--muted-foreground)" }}>
+                  <span className="block">O usuário canônico <strong style={{ color: "var(--foreground)" }}>{sortedUsers.find(u => u.id === canonicalId)?.name}</strong> receberá todas as avaliações e calibrações dos {selectedIds.size - 1} usuário(s) duplicado(s):</span>
                   <ul className="list-disc pl-4 text-xs">
                     {[...selectedIds].filter(id => id !== canonicalId).map(id => (
                       <li key={id}>{sortedUsers.find(u => u.id === id)?.name ?? id}</li>
                     ))}
                   </ul>
-                  <span className="block text-[#ba1a1a] font-bold">Os duplicados serão desativados. Esta ação não pode ser desfeita.</span>
+                  <span className="block font-bold" style={{ color: WARNING }}>Os duplicados serão desativados. Esta ação não pode ser desfeita.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
-                  className="rounded-none border-2 border-[#191c1e] bg-[#506600] text-white hover:bg-[#506600]/90 italic uppercase font-bold"
+                  className="rounded-lg font-bold uppercase text-xs"
+                  style={{ backgroundColor: GOOD, color: "#fff" }}
                   onClick={() => {
                     if (!canonicalId) return;
                     const dups = [...selectedIds].filter(id => id !== canonicalId);
@@ -697,7 +704,7 @@ export default function UsersPage() {
           </AlertDialog>
           <button
             onClick={() => { setMergeMode(false); setSelectedIds(new Set()); setCanonicalId(null); }}
-            className="p-2 hover:bg-white/10 transition-all"
+            className="p-2 rounded-lg transition-colors hover:opacity-70"
             title="Cancelar"
           >
             <X size={18} />
@@ -707,40 +714,36 @@ export default function UsersPage() {
 
       {/* Merge result dialog */}
       <Dialog open={mergeResult !== null} onOpenChange={v => !v && setMergeResult(null)}>
-        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
-              <GitMerge size={22} className="text-[#506600]" /> Mescla Concluída
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+              <GitMerge size={22} style={{ color: "var(--accent)" }} /> Mescla Concluída
             </DialogTitle>
           </DialogHeader>
           {mergeResult && (
             <div className="pt-4 space-y-4">
-              <div className="bg-[#f0ffe0] border-2 border-[#506600] p-4 space-y-1">
-                <p className="text-sm font-bold italic text-[#191c1e]">
+              <div className="rounded-lg p-4" style={{ backgroundColor: "rgba(154,176,0,0.10)", border: `1px solid ${GOOD}` }}>
+                <p className="text-sm font-bold">
                   {mergeResult.merged.length} usuário(s) mesclado(s) no canônico
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-center">
-                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
-                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedEvaluations ?? 0}</p>
-                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Avaliações transferidas</p>
-                </div>
-                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
-                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedCalibrations ?? 0}</p>
-                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Calibrações transferidas</p>
-                </div>
-                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
-                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedAssignments ?? 0}</p>
-                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Atribuições transferidas</p>
-                </div>
-                <div className="bg-[#eceef0] border-2 border-[#191c1e] p-3">
-                  <p className="text-2xl font-black italic text-[#506600]">{mergeResult.movedConformities ?? 0}</p>
-                  <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-1">Conformidades transferidas</p>
-                </div>
+                {[
+                  { val: mergeResult.movedEvaluations ?? 0, label: "Avaliações transferidas" },
+                  { val: mergeResult.movedCalibrations ?? 0, label: "Calibrações transferidas" },
+                  { val: mergeResult.movedAssignments ?? 0, label: "Atribuições transferidas" },
+                  { val: mergeResult.movedConformities ?? 0, label: "Conformidades transferidas" },
+                ].map((s, i) => (
+                  <div key={i} className="rounded-lg p-3" style={{ backgroundColor: "var(--secondary)" }}>
+                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{s.val}</p>
+                    <p className="text-[11px] font-bold uppercase mt-1" style={{ color: "var(--muted-foreground)" }}>{s.label}</p>
+                  </div>
+                ))}
               </div>
               <button
                 onClick={() => setMergeResult(null)}
-                className="w-full bg-[#ccff00] border-2 border-[#191c1e] px-5 py-3 font-bold text-sm italic uppercase tracking-wider"
+                className="w-full h-11 rounded-lg font-bold text-sm uppercase tracking-wide transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 Fechar
               </button>
@@ -750,32 +753,34 @@ export default function UsersPage() {
       </Dialog>
 
       <Dialog open={resetOpen !== null} onOpenChange={v => { if (!v) { setResetOpen(null); setNewPassword(""); } }}>
-        <DialogContent className="max-w-sm rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-sm rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Redefinir Senha</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Redefinir Senha</DialogTitle>
           </DialogHeader>
           <div className="space-y-5 pt-4">
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nova Senha Segura</Label>
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nova Senha Segura</Label>
               <Input
                 data-testid="input-new-password"
                 type="password"
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres..."
-                className="h-11 rounded-none border-2 border-[#191c1e]"
+                className="h-11 rounded-lg"
+                style={fieldStyle}
               />
               {newPassword.length > 0 && newPassword.length < 6 && (
-                <p className="text-[11px] font-bold italic text-[#862200]">A senha precisa ter pelo menos 6 caracteres.</p>
+                <p className="text-[11px] font-bold" style={{ color: WARNING }}>A senha precisa ter pelo menos 6 caracteres.</p>
               )}
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-              <Button variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setResetOpen(null); setNewPassword(""); }}>Cancelar</Button>
+            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+              <button onClick={() => { setResetOpen(null); setNewPassword(""); }} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
               <button
                 data-testid="button-confirm-reset-pw"
                 disabled={newPassword.length < 6 || resetPwMutation.isPending}
                 onClick={() => resetOpen && resetPwMutation.mutate({ id: resetOpen, data: { newPassword } })}
-                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 Atualizar Senha
               </button>
@@ -785,9 +790,9 @@ export default function UsersPage() {
       </Dialog>
 
       <Dialog open={editUser !== null} onOpenChange={v => !v && setEditUser(null)}>
-        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Editar Usuário</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Editar Usuário</DialogTitle>
           </DialogHeader>
           {editUser && (
             <EditUserForm
@@ -848,24 +853,24 @@ function EditUserForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-4">
       <div className="space-y-1.5">
-        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
+        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
         <div className="relative">
-          <UserCircle size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-          <Input data-testid="input-edit-user-name" {...register("name", { required: true })} placeholder="Nome do usuário" className="pl-10 h-11 rounded-none border-2 border-[#191c1e]" />
+          <UserCircle size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+          <Input data-testid="input-edit-user-name" {...register("name", { required: true })} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">E-mail Corporativo <span className="text-[#ba1a1a]">*</span></Label>
+        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: WARNING }}>*</span></Label>
         <div className="relative">
-          <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-          <Input data-testid="input-edit-user-email" type="email" {...register("email", { required: true })} placeholder="email@cenografica.com.br" className="pl-10 h-11 rounded-none border-2 border-[#191c1e]" />
+          <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+          <Input data-testid="input-edit-user-email" type="email" {...register("email", { required: true })} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nível de Permissão <span className="text-[#ba1a1a]">*</span></Label>
+          <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível de Permissão <span style={{ color: WARNING }}>*</span></Label>
           <Select defaultValue={user.role} onValueChange={v => setValue("role", v)} disabled={isSelf}>
-            <SelectTrigger data-testid="select-edit-user-role" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+            <SelectTrigger data-testid="select-edit-user-role" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -874,12 +879,12 @@ function EditUserForm({
               ))}
             </SelectContent>
           </Select>
-          {isSelf && <p className="text-[11px] text-[#747a60] italic">Você não pode alterar seu próprio nível de permissão.</p>}
+          {isSelf && <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Você não pode alterar seu próprio nível de permissão.</p>}
         </div>
         <div className="space-y-1.5">
-          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Área Responsável (Opcional)</Label>
+          <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Área Responsável (Opcional)</Label>
           <Select defaultValue={user.areaId != null ? String(user.areaId) : "__none"} onValueChange={v => setValue("areaId", v === "__none" ? null : Number(v))}>
-            <SelectTrigger data-testid="select-edit-user-area" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+            <SelectTrigger data-testid="select-edit-user-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
               <SelectValue placeholder="Selecione..." />
             </SelectTrigger>
             <SelectContent>
@@ -892,9 +897,9 @@ function EditUserForm({
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Vincular a Colaborador (Opcional)</Label>
+        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Vincular a Colaborador (Opcional)</Label>
         <Select defaultValue={user.employeeId != null ? String(user.employeeId) : "__none"} onValueChange={v => setValue("employeeId", v === "__none" ? null : Number(v))}>
-          <SelectTrigger data-testid="select-edit-user-employee" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs focus:ring-0">
+          <SelectTrigger data-testid="select-edit-user-employee" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
             <SelectValue placeholder="Nenhum" />
           </SelectTrigger>
           <SelectContent>
@@ -904,12 +909,12 @@ function EditUserForm({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-[11px] text-[#747a60] italic">Necessário para o usuário ver a página "Meu Desempenho" com os próprios resultados.</p>
+        <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Necessário para o usuário ver a página "Meu Desempenho" com os próprios resultados.</p>
       </div>
-      <div className="flex items-center justify-between border-2 border-[#191c1e] px-4 py-3 bg-[#f7f9fb]">
+      <div className="flex items-center justify-between rounded-lg px-4 py-3" style={{ backgroundColor: "var(--secondary)" }}>
         <div>
-          <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Acesso Ativo</Label>
-          <p className="text-[11px] text-[#747a60] italic">{active ? "Usuário pode acessar a plataforma normalmente." : "Usuário fica bloqueado, sem excluir seu histórico."}</p>
+          <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Acesso Ativo</Label>
+          <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{active ? "Usuário pode acessar a plataforma normalmente." : "Usuário fica bloqueado, sem excluir seu histórico."}</p>
         </div>
         <Switch
           data-testid="switch-edit-user-active"
@@ -918,13 +923,14 @@ function EditUserForm({
           onCheckedChange={v => setValue("active", v)}
         />
       </div>
-      <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-        <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={onCancel}>Cancelar</Button>
+      <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+        <button type="button" onClick={onCancel} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
         <button
           data-testid="button-submit-edit-user"
           type="submit"
           disabled={isPending}
-          className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+          className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
+          style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
         >
           {isPending ? "Salvando..." : "Salvar Alterações"}
         </button>

@@ -9,9 +9,8 @@ import {
   getGetEmployeesQueryKey,
   getGetCollaboratorsWithoutAccessQueryKey,
 } from "@workspace/api-client-react";
-import type { EmployeeInput, Employee, GeneratedCredential, BulkGenerateAccessResult, MergeEmployeeResult } from "@workspace/api-client-react";
+import type { EmployeeInput, GeneratedCredential, BulkGenerateAccessResult, MergeEmployeeResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -20,6 +19,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
+
+const GOOD = "#9ab000";
+const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 function downloadCredentialsCsv(created: GeneratedCredential[]) {
   const header = "Nome,CPF (login),Senha";
@@ -44,9 +47,6 @@ type EmployeeWithCycle = import("@workspace/api-client-react").Employee & {
   cycleEligible: boolean | null;
   participatedEventsCount: number | null;
 };
-
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
 
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
@@ -193,89 +193,93 @@ export default function EmployeesPage() {
   const pct = (n: number) => (stats.total > 0 ? Math.round((n / stats.total) * 100) : 0);
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-10">
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
+      <div className="p-6 md:p-10 space-y-7">
         {/* Page header */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
           <div>
-            <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">Colaboradores</h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2">Gestão do time e elegibilidade da Maratona</p>
+            <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>Colaboradores</h1>
+            <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>Gestão do time e elegibilidade da Maratona</p>
           </div>
           {canEdit && (
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-2.5">
               <button
                 onClick={() => { setMergeMode(v => !v); setSelectedIds(new Set()); setCanonicalId(null); }}
-                className={`border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 transition-all ${mergeMode ? "bg-[#ff5722] text-white" : "bg-white hover:bg-[#eceef0]"}`}
+                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-85"
+                style={mergeMode ? { backgroundColor: WARNING, color: "#fff" } : { border: "1px solid var(--border)" }}
               >
-                {mergeMode ? <><X size={18} /> Cancelar Mesclagem</> : <><GitMerge size={18} /> Mesclar Duplicatas</>}
+                {mergeMode ? <><X size={16} /> Cancelar Mesclagem</> : <><GitMerge size={16} /> Mesclar Duplicatas</>}
               </button>
               <button
                 data-testid="button-bulk-generate-access"
                 onClick={() => { setBulkOpen(true); setBulkResult(null); }}
-                className="bg-white border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#eceef0] transition-all"
+                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+                style={{ border: "1px solid var(--border)" }}
               >
-                <KeyRound size={18} /> Gerar Acessos em Massa
+                <KeyRound size={16} /> Gerar Acessos em Massa
               </button>
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                   <button
                     data-testid="button-create-employee"
-                    className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-4 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                    className="h-10 px-4 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                   >
-                    <Plus size={18} /> Novo Colaborador
+                    <Plus size={16} /> Novo Colaborador
                   </button>
                 </DialogTrigger>
-              <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Colaborador</DialogTitle>
-                </DialogHeader>
-                <form
-                  onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, department: "Geral", functionName: "Colaborador" } }))}
-                  className="space-y-5 pt-4"
-                >
-                  <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
-                    <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">CPF</Label>
-                    <Input data-testid="input-employee-document" {...register("document")} placeholder="000.000.000-00" className="h-11 rounded-none border-2 border-[#191c1e]" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+                <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Colaborador</DialogTitle>
+                  </DialogHeader>
+                  <form
+                    onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, department: "Geral", functionName: "Colaborador" } }))}
+                    className="space-y-5 pt-4"
+                  >
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">E-mail</Label>
-                      <Input data-testid="input-employee-email" type="email" {...register("email")} placeholder="email@exemplo.com" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
+                      <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Telefone</Label>
-                      <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>CPF</Label>
+                      <Input data-testid="input-employee-document" {...register("document")} placeholder="000.000.000-00" className="h-11 rounded-lg" style={fieldStyle} />
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo de Contratação</Label>
-                    <Select defaultValue="casa" value={watchedEmploymentType} onValueChange={v => setValue("employmentType", v as EmploymentType)}>
-                      <SelectTrigger data-testid="select-employment-type" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
-                        <SelectValue placeholder="Selecione o tipo..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="casa">Casa</SelectItem>
-                        <SelectItem value="freela">Freela</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                    <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
-                    <button
-                      data-testid="button-submit-employee"
-                      type="submit"
-                      disabled={createMutation.isPending}
-                      className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
-                    >
-                      {createMutation.isPending ? "Criando..." : "Criar Colaborador"}
-                    </button>
-                  </div>
-                </form>
-              </DialogContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail</Label>
+                        <Input data-testid="input-employee-email" type="email" {...register("email")} placeholder="email@exemplo.com" className="h-11 rounded-lg" style={fieldStyle} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Telefone</Label>
+                        <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-lg" style={fieldStyle} />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo de Contratação</Label>
+                      <Select defaultValue="casa" value={watchedEmploymentType} onValueChange={v => setValue("employmentType", v as EmploymentType)}>
+                        <SelectTrigger data-testid="select-employment-type" className="h-11 rounded-lg" style={fieldStyle}>
+                          <SelectValue placeholder="Selecione o tipo..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="casa">Casa</SelectItem>
+                          <SelectItem value="freela">Freela</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                      <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
+                      <button
+                        data-testid="button-submit-employee"
+                        type="submit"
+                        disabled={createMutation.isPending}
+                        className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                      >
+                        {createMutation.isPending ? "Criando..." : "Criar Colaborador"}
+                      </button>
+                    </div>
+                  </form>
+                </DialogContent>
               </Dialog>
             </div>
           )}
@@ -283,9 +287,9 @@ export default function EmployeesPage() {
 
         {/* Edit dialog */}
         <Dialog open={!!editingEmployee} onOpenChange={o => { if (!o) setEditingEmployee(null); }}>
-          <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+          <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
             <DialogHeader>
-              <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Editar Colaborador</DialogTitle>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Editar Colaborador</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={handleEditSubmit(d => {
@@ -295,20 +299,17 @@ export default function EmployeesPage() {
               className="space-y-5 pt-4"
             >
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome Completo <span className="text-[#ba1a1a]">*</span></Label>
-                <Input data-testid="input-edit-employee-name" {...registerEdit("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
+                <Input data-testid="input-edit-employee-name" {...registerEdit("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">CPF</Label>
-                <Input data-testid="input-edit-employee-document" {...registerEdit("document")} placeholder="000.000.000-00" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>CPF</Label>
+                <Input data-testid="input-edit-employee-document" {...registerEdit("document")} placeholder="000.000.000-00" className="h-11 rounded-lg" style={fieldStyle} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função</Label>
-                <Select
-                  value={watchedEditFunctionName}
-                  onValueChange={v => setValueEdit("functionName", v)}
-                >
-                  <SelectTrigger data-testid="select-edit-employee-func" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Função</Label>
+                <Select value={watchedEditFunctionName} onValueChange={v => setValueEdit("functionName", v)}>
+                  <SelectTrigger data-testid="select-edit-employee-func" className="h-11 rounded-lg" style={fieldStyle}>
                     <SelectValue placeholder="Selecione a função..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -319,21 +320,18 @@ export default function EmployeesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">E-mail</Label>
-                  <Input data-testid="input-edit-employee-email" type="email" {...registerEdit("email")} placeholder="email@exemplo.com" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                  <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail</Label>
+                  <Input data-testid="input-edit-employee-email" type="email" {...registerEdit("email")} placeholder="email@exemplo.com" className="h-11 rounded-lg" style={fieldStyle} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Telefone</Label>
-                  <Input data-testid="input-edit-employee-phone" {...registerEdit("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                  <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Telefone</Label>
+                  <Input data-testid="input-edit-employee-phone" {...registerEdit("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-lg" style={fieldStyle} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Tipo de Contratação</Label>
-                <Select
-                  value={watchedEditEmploymentType}
-                  onValueChange={v => setValueEdit("employmentType", v as EmploymentType)}
-                >
-                  <SelectTrigger data-testid="select-edit-employment-type" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo de Contratação</Label>
+                <Select value={watchedEditEmploymentType} onValueChange={v => setValueEdit("employmentType", v as EmploymentType)}>
+                  <SelectTrigger data-testid="select-edit-employment-type" className="h-11 rounded-lg" style={fieldStyle}>
                     <SelectValue placeholder="Selecione o tipo..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -342,13 +340,14 @@ export default function EmployeesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setEditingEmployee(null)}>Cancelar</Button>
+              <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                <button type="button" onClick={() => setEditingEmployee(null)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
                 <button
                   data-testid="button-submit-edit-employee"
                   type="submit"
                   disabled={updateMutation.isPending}
-                  className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                  className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                 >
                   {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
                 </button>
@@ -358,99 +357,96 @@ export default function EmployeesPage() {
         </Dialog>
 
         {/* KPIs */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Total */}
-          <div className="bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
-              <Users size={120} strokeWidth={1.5} />
-            </div>
-            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Total de Registros</span>
-            <p data-testid="stat-total" className="text-[40px] leading-none italic font-black mt-2">{stats.total}</p>
-            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#191c1e]" style={{ width: "100%" }} /></div>
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Total de Registros</span>
+            <p data-testid="stat-total" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>{stats.total}</p>
+            <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: "100%", backgroundColor: "var(--foreground)" }} /></div>
           </div>
-          {/* Ativos */}
-          <div className={`bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group ${HARD_SHADOW}`}>
-            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
-              <Zap size={120} strokeWidth={1.5} />
-            </div>
-            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Ativos</span>
-            <p data-testid="stat-ativos" className="text-[40px] leading-none italic font-black mt-2 text-[#506600]">{stats.ativos}</p>
-            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#ccff00]" style={{ width: `${pct(stats.ativos)}%` }} /></div>
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Ativos</span>
+            <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{stats.ativos}</p>
+            <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.ativos)}%`, backgroundColor: "var(--primary)" }} /></div>
           </div>
-          {/* Elegíveis */}
-          <div className="bg-white border-2 border-[#191c1e] p-6 relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 opacity-[0.07] group-hover:opacity-15 transition-opacity">
-              <Building2 size={120} strokeWidth={1.5} />
-            </div>
-            <span className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Elegíveis para Bônus</span>
-            <p data-testid="stat-elegiveis" className="text-[40px] leading-none italic font-black mt-2 text-[#b02f00]">{stats.elegiveis}</p>
-            <div className="w-full h-1.5 bg-[#eceef0] mt-4"><div className="h-full bg-[#ff5722]" style={{ width: `${pct(stats.elegiveis)}%` }} /></div>
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Elegíveis para Bônus</span>
+            <p data-testid="stat-elegiveis" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: GOOD }}>{stats.elegiveis}</p>
+            <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.elegiveis)}%`, backgroundColor: GOOD }} /></div>
           </div>
         </section>
 
         {/* Search + filter */}
-        <section className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+        <section className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
           <div className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-            <Input
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+            <input
               data-testid="input-search-employees"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
+              className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
+              style={fieldStyle}
               placeholder="Buscar por nome, função ou departamento..."
             />
           </div>
-          <div className="flex border-2 border-[#191c1e] bg-white">
-            {(["true", "false"] as const).map(v => (
-              <button
-                key={v}
-                data-testid={`filter-active-${v}`}
-                onClick={() => setFilterActive(v)}
-                className={`px-5 py-2.5 text-xs font-bold italic uppercase tracking-wider transition-all ${filterActive === v ? "bg-[#191c1e] text-[#ccff00]" : "text-[#444933] hover:bg-[#eceef0]"}`}
-              >
-                {v === "true" ? "Ativos" : "Inativos"}
-              </button>
-            ))}
+          <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+            {(["true", "false"] as const).map(v => {
+              const active = filterActive === v;
+              return (
+                <button
+                  key={v}
+                  data-testid={`filter-active-${v}`}
+                  onClick={() => setFilterActive(v)}
+                  className="px-4 py-2 text-xs font-bold uppercase tracking-wide transition-colors"
+                  style={{ fontFamily: CONDENSED, backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
+                >
+                  {v === "true" ? "Ativos" : "Inativos"}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex border-2 border-[#191c1e] bg-white">
-            {(["all", "casa", "freela"] as const).map(v => (
-              <button
-                key={v}
-                data-testid={`filter-type-${v}`}
-                onClick={() => setFilterType(v)}
-                className={`px-5 py-2.5 text-xs font-bold italic uppercase tracking-wider transition-all ${filterType === v ? "bg-[#191c1e] text-[#ccff00]" : "text-[#444933] hover:bg-[#eceef0]"}`}
-              >
-                {v === "all" ? "Todos os Tipos" : employmentTypeLabel(v)}
-              </button>
-            ))}
+          <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+            {(["all", "casa", "freela"] as const).map(v => {
+              const active = filterType === v;
+              return (
+                <button
+                  key={v}
+                  data-testid={`filter-type-${v}`}
+                  onClick={() => setFilterType(v)}
+                  className="px-4 py-2 text-xs font-bold uppercase tracking-wide transition-colors"
+                  style={{ fontFamily: CONDENSED, backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
+                >
+                  {v === "all" ? "Todos os Tipos" : employmentTypeLabel(v)}
+                </button>
+              );
+            })}
           </div>
         </section>
 
         {/* Table */}
         {isLoading ? (
-          <div className="text-center py-20 italic uppercase font-bold text-[#747a60]">Carregando colaboradores...</div>
+          <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando colaboradores...</div>
         ) : (
-          <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex justify-between items-center italic">
-              <h3 className="text-xs font-bold uppercase tracking-widest">Grid de Colaboradores</h3>
-              <Filter size={18} />
+          <PremiumCard className="overflow-hidden">
+            <div className="px-5 py-3 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)" }}>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Grid de Colaboradores</h3>
+              <Filter size={16} style={{ color: "var(--muted-foreground)" }} />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                    {mergeMode && <th className="px-4 py-4 text-xs font-bold uppercase italic text-[#444933] text-center w-10">✓</th>}
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Atleta / Colaborador</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Departamento</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Cargo</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Tipo</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Status</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Elegibilidade</th>
-                    {canEdit && !mergeMode && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Ações</th>}
+                  <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
+                    {mergeMode && <th className="px-4 py-3 text-[10px] font-bold uppercase text-center w-10" style={{ color: "var(--muted-foreground)" }}>✓</th>}
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Atleta / Colaborador</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Departamento</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cargo</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
+                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
+                    {canEdit && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y-2 divide-[#eceef0]">
-                  {filtered.map(emp => {
+                <tbody>
+                  {filtered.map((emp, i) => {
                     const isSelected = selectedIds.has(emp.id);
                     const isCanonical = canonicalId === emp.id;
                     return (
@@ -465,83 +461,84 @@ export default function EmployeesPage() {
                           return next;
                         });
                       } : undefined}
-                      className={`transition-all ${mergeMode ? "cursor-pointer " + (isSelected ? "bg-[#eeffc0]" : "hover:bg-[#f2f4f6]") : "hover:bg-[#f2f4f6] hover:translate-x-1"} group`}
+                      className="transition-colors group"
+                      style={{
+                        borderTop: i > 0 ? "1px solid var(--border)" : "none",
+                        cursor: mergeMode ? "pointer" : "default",
+                        backgroundColor: mergeMode && isSelected ? "rgba(154,176,0,0.10)" : "transparent",
+                      }}
                     >
                       {mergeMode && (
-                        <td className="px-4 py-4 text-center">
-                          <div className={`w-5 h-5 border-2 border-[#191c1e] inline-flex items-center justify-center ${isSelected ? "bg-[#506600]" : "bg-white"}`}>
+                        <td className="px-4 py-3.5 text-center">
+                          <div className="w-5 h-5 rounded inline-flex items-center justify-center" style={{ border: "1px solid var(--border)", backgroundColor: isSelected ? GOOD : "transparent" }}>
                             {isSelected && <span className="text-white text-[10px] font-black">✓</span>}
                           </div>
                         </td>
                       )}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-11 h-11 border-2 border-[#191c1e] skew-x-[-4deg] flex items-center justify-center shrink-0 ${isCanonical ? "bg-[#ccff00]" : "bg-[#e0e3e5]"}`}>
-                            <span className="skew-x-[4deg] text-sm font-black italic">{initials(emp.name)}</span>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isCanonical ? "var(--primary)" : "var(--secondary)" }}>
+                            <span className="text-sm font-black" style={{ color: isCanonical ? "var(--primary-foreground)" : "var(--foreground)" }}>{initials(emp.name)}</span>
                           </div>
                           <div>
-                            <p className="font-bold italic text-[#191c1e]">{emp.name}</p>
-                            {isCanonical && <span className="text-[10px] font-black italic uppercase text-[#506600] bg-[#ccff00] px-1">CANÔNICO</span>}
-                            {emp.email && <p className="text-xs text-[#747a60] mt-0.5">{emp.email}</p>}
+                            <p className="font-bold">{emp.name}</p>
+                            {isCanonical && <span className="text-[10px] font-black uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>CANÔNICO</span>}
+                            {emp.email && <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{emp.email}</p>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-bold italic uppercase text-sm">{emp.department}</td>
-                      <td className="px-6 py-4 text-[#444933]">{emp.functionName}</td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block ${emp.employmentType === "freela" ? "bg-[#e0e3e5] text-[#444933]" : "bg-white text-[#191c1e]"}`}>
-                          <span className="inline-block skew-x-[8deg]">{employmentTypeLabel(emp.employmentType)}</span>
+                      <td className="px-5 py-3.5 font-bold uppercase text-sm">{emp.department}</td>
+                      <td className="px-5 py-3.5" style={{ color: "var(--muted-foreground)" }}>{emp.functionName}</td>
+                      <td className="px-5 py-3.5 text-center">
+                        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: emp.employmentType === "freela" ? "var(--secondary)" : "transparent", border: "1px solid var(--border)" }}>
+                          {employmentTypeLabel(emp.employmentType)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-5 py-3.5 text-center">
                         {emp.active ? (
-                          <span className="bg-[#ccff00] text-[#161e00] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block">
-                            <span className="inline-block skew-x-[8deg]">Ativo</span>
-                          </span>
+                          <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Ativo</span>
                         ) : (
-                          <span className="bg-[#d8dadc] text-[#444933] px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block opacity-70">
-                            <span className="inline-block skew-x-[8deg]">Inativo</span>
-                          </span>
+                          <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativo</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col items-center justify-center gap-0.5 font-bold italic uppercase text-sm">
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-col items-center justify-center gap-0.5 font-bold uppercase text-sm">
                           {(() => {
                             const status = getEligibilityStatus(emp);
                             if (status === "freela") return (
-                              <span className="flex items-center gap-1.5 text-[#888] opacity-60">— Não pontua</span>
+                              <span className="flex items-center gap-1.5 opacity-60" style={{ color: "var(--muted-foreground)" }}>— Não pontua</span>
                             );
                             if (status === "eligible") return (
                               <>
-                                <span className="flex items-center gap-1.5 text-[#506600]"><CheckCircle2 size={16} /> Elegível</span>
+                                <span className="flex items-center gap-1.5" style={{ color: GOOD }}><CheckCircle2 size={16} /> Elegível</span>
                                 {emp.participatedEventsCount !== null && (
-                                  <span className="text-[10px] font-normal normal-case opacity-60 not-italic">{emp.participatedEventsCount} eventos</span>
+                                  <span className="text-[10px] font-normal normal-case opacity-60" style={{ color: "var(--muted-foreground)" }}>{emp.participatedEventsCount} eventos</span>
                                 )}
                               </>
                             );
                             if (status === "not_eligible") return (
                               <>
-                                <span className="flex items-center gap-1.5 text-[#747a60] opacity-70"><XCircle size={16} /> Não Elegível</span>
+                                <span className="flex items-center gap-1.5 opacity-70" style={{ color: "var(--muted-foreground)" }}><XCircle size={16} /> Não Elegível</span>
                                 {emp.participatedEventsCount !== null && (
-                                  <span className="text-[10px] font-normal normal-case opacity-60 not-italic">{emp.participatedEventsCount} eventos</span>
+                                  <span className="text-[10px] font-normal normal-case opacity-60" style={{ color: "var(--muted-foreground)" }}>{emp.participatedEventsCount} eventos</span>
                                 )}
                               </>
                             );
-                            // pending: no cycle data yet
                             return (
-                              <span className="flex items-center gap-1.5 text-[#888] opacity-60">— Sem dados</span>
+                              <span className="flex items-center gap-1.5 opacity-60" style={{ color: "var(--muted-foreground)" }}>— Sem dados</span>
                             );
                           })()}
                         </div>
                       </td>
                       {canEdit && !mergeMode && (
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-5 py-3.5 text-center">
                           <button
                             data-testid={`button-edit-employee-${emp.id}`}
                             onClick={() => setEditingEmployee(emp)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase hover:bg-[#eceef0] transition-all"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase transition-colors hover:opacity-80"
+                            style={{ border: "1px solid var(--border)" }}
                           >
-                            <Pencil size={14} /> Editar
+                            <Pencil size={13} /> Editar
                           </button>
                         </td>
                       )}
@@ -549,23 +546,23 @@ export default function EmployeesPage() {
                     );
                   })}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={(canEdit && !mergeMode) ? 7 : mergeMode ? 7 : 6} className="text-center py-16 italic uppercase font-bold text-[#747a60]">Nenhum colaborador encontrado com os filtros atuais.</td></tr>
+                    <tr><td colSpan={(canEdit && !mergeMode) ? 7 : mergeMode ? 7 : 6} className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador encontrado com os filtros atuais.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="px-6 py-4 border-t-2 border-[#eceef0] flex justify-between items-center">
-              <span className="text-xs font-bold italic uppercase text-[#747a60]">Mostrando {filtered.length} de {stats.total} colaboradores</span>
+            <div className="px-5 py-3.5" style={{ borderTop: "1px solid var(--border)" }}>
+              <span className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Mostrando {filtered.length} de {stats.total} colaboradores</span>
             </div>
-          </section>
+          </PremiumCard>
         )}
 
         {/* Merge action bar */}
         {mergeMode && selectedIds.size >= 2 && (
-          <section className="sticky bottom-4 bg-[#191c1e] border-2 border-[#ccff00] p-4 flex flex-col md:flex-row items-start md:items-center gap-4 shadow-[6px_6px_0px_0px_#ccff00]">
+          <section className="sticky bottom-4 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4" style={{ backgroundColor: "var(--card)", border: `1px solid var(--primary)` }}>
             <div className="flex-1">
-              <p className="text-[#ccff00] font-black italic uppercase text-sm">{selectedIds.size} colaboradores selecionados</p>
-              <p className="text-[#747a60] text-xs italic mt-0.5">Selecione qual é o CANÔNICO (o que permanece):</p>
+              <p className="font-black uppercase text-sm">{selectedIds.size} colaboradores selecionados</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>Selecione qual é o CANÔNICO (o que permanece):</p>
               <div className="flex flex-wrap gap-2 mt-2">
                 {Array.from(selectedIds).map(id => {
                   const emp = (employees ?? []).find(e => e.id === id);
@@ -574,7 +571,8 @@ export default function EmployeesPage() {
                     <button
                       key={id}
                       onClick={e => { e.stopPropagation(); setCanonicalId(id); }}
-                      className={`px-3 py-1.5 border-2 font-bold text-[11px] italic uppercase transition-all ${canonicalId === id ? "border-[#ccff00] bg-[#ccff00] text-[#161e00]" : "border-[#747a60] text-white hover:border-[#ccff00]"}`}
+                      className="px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase transition-colors"
+                      style={canonicalId === id ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
                     >
                       {emp.name}
                     </button>
@@ -589,7 +587,8 @@ export default function EmployeesPage() {
                 const dupIds = Array.from(selectedIds).filter(id => id !== canonicalId);
                 mergeMutation.mutate({ id: canonicalId, data: { duplicateIds: dupIds } });
               }}
-              className="bg-[#ccff00] border-2 border-[#ccff00] px-6 py-3 font-black text-sm italic uppercase text-[#161e00] flex items-center gap-2 disabled:opacity-40 shrink-0"
+              className="px-5 py-3 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-40 shrink-0 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
             >
               <GitMerge size={16} />
               {mergeMutation.isPending ? "Mesclando..." : `Mesclar → Manter "${(employees ?? []).find(e => e.id === canonicalId)?.name ?? "?"}"`}
@@ -600,58 +599,63 @@ export default function EmployeesPage() {
 
       {/* Bulk generate access dialog */}
       <Dialog open={bulkOpen} onOpenChange={v => { setBulkOpen(v); if (!v) setBulkResult(null); }}>
-        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Gerar Acessos em Massa</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Gerar Acessos em Massa</DialogTitle>
           </DialogHeader>
           <div className="space-y-5 pt-2">
             {isBulkPreviewLoading ? (
-              <p className="text-sm italic text-[#747a60]">Carregando prévia...</p>
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Carregando prévia...</p>
             ) : !bulkResult ? (
               <>
                 <div className="flex gap-2">
-                  {(["casa", "freela", "all"] as const).map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setBulkTypeFilter(t)}
-                      className={`px-4 py-2 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase transition-all ${bulkTypeFilter === t ? "bg-[#191c1e] text-[#ccff00]" : "bg-white hover:bg-[#eceef0]"}`}
-                    >
-                      {t === "all" ? "Todos" : t.toUpperCase()}
-                    </button>
-                  ))}
+                  {(["casa", "freela", "all"] as const).map(t => {
+                    const active = bulkTypeFilter === t;
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setBulkTypeFilter(t)}
+                        className="px-4 py-2 rounded-lg font-bold text-[11px] uppercase transition-colors"
+                        style={active ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
+                      >
+                        {t === "all" ? "Todos" : t.toUpperCase()}
+                      </button>
+                    );
+                  })}
                 </div>
-                <p className="text-sm text-[#444933] italic">
+                <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
                   Serão criados logins por CPF para colaboradores {bulkTypeFilter === "all" ? "ativos" : `tipo ${bulkTypeFilter.toUpperCase()}`} sem acesso à plataforma. A senha inicial será gerada automaticamente e exibida apenas uma vez, junto com o arquivo CSV para download.
                 </p>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 text-center">
-                    <p className="text-3xl italic font-black">{bulkPreview?.eligibleCount ?? 0}</p>
-                    <p className="text-[11px] font-bold italic uppercase text-[#444933]">Prontos para gerar acesso</p>
+                  <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "var(--secondary)" }}>
+                    <p className="text-3xl font-black" style={{ fontFamily: CONDENSED }}>{bulkPreview?.eligibleCount ?? 0}</p>
+                    <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Prontos para gerar acesso</p>
                   </div>
-                  <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 text-center">
-                    <p className="text-3xl italic font-black text-[#ba1a1a]">{bulkPreview?.missingCpfCount ?? 0}</p>
-                    <p className="text-[11px] font-bold italic uppercase text-[#444933]">Sem CPF cadastrado</p>
+                  <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "var(--secondary)" }}>
+                    <p className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: WARNING }}>{bulkPreview?.missingCpfCount ?? 0}</p>
+                    <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF cadastrado</p>
                   </div>
                 </div>
                 {bulkPreview && bulkPreview.missingCpf.length > 0 && (
-                  <div className="border-2 border-[#191c1e] max-h-40 overflow-y-auto">
-                    <div className="bg-[#ba1a1a] text-white px-3 py-1.5 flex items-center gap-2 text-[11px] font-bold italic uppercase">
+                  <div className="rounded-lg max-h-40 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
+                    <div className="px-3 py-1.5 flex items-center gap-2 text-[11px] font-bold uppercase" style={{ backgroundColor: WARNING, color: "#fff" }}>
                       <AlertTriangle size={14} /> Precisam de CPF cadastrado
                     </div>
-                    <ul className="divide-y-2 divide-[#eceef0]">
-                      {bulkPreview.missingCpf.map(m => (
-                        <li key={m.id} className="px-3 py-2 text-sm italic">{m.name}</li>
+                    <ul>
+                      {bulkPreview.missingCpf.map((m, i) => (
+                        <li key={m.id} className="px-3 py-2 text-sm" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>{m.name}</li>
                       ))}
                     </ul>
                   </div>
                 )}
-                <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                  <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+                <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                  <button type="button" onClick={() => setBulkOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
                   <button
                     data-testid="button-confirm-bulk-generate"
                     disabled={!bulkPreview || bulkPreview.eligibleCount === 0 || bulkGenerateMutation.isPending}
                     onClick={() => bulkGenerateMutation.mutate({ data: { dryRun: false, ...(bulkTypeFilter !== "all" ? { employmentType: bulkTypeFilter } : {}) } })}
-                    className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                    className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                   >
                     {bulkGenerateMutation.isPending ? "Gerando..." : `Gerar ${bulkPreview?.eligibleCount ?? 0} Acessos`}
                   </button>
@@ -659,29 +663,30 @@ export default function EmployeesPage() {
               </>
             ) : (
               <>
-                <p className="text-sm text-[#444933] italic">
-                  <strong>{bulkResult.createdCount}</strong> acesso(s) gerado(s) com sucesso. Baixe o arquivo CSV agora — as senhas não poderão ser visualizadas novamente.
+                <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                  <strong style={{ color: "var(--foreground)" }}>{bulkResult.createdCount}</strong> acesso(s) gerado(s) com sucesso. Baixe o arquivo CSV agora — as senhas não poderão ser visualizadas novamente.
                 </p>
                 {bulkResult.conflicts.length > 0 && (
-                  <p className="text-xs text-[#ba1a1a] italic">{bulkResult.conflicts.length} colaborador(es) já possuíam acesso e foram ignorados.</p>
+                  <p className="text-xs" style={{ color: WARNING }}>{bulkResult.conflicts.length} colaborador(es) já possuíam acesso e foram ignorados.</p>
                 )}
                 <button
                   data-testid="button-download-credentials-csv"
                   onClick={() => downloadCredentialsCsv(bulkResult.created)}
                   disabled={bulkResult.created.length === 0}
-                  className="w-full h-12 bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] font-black italic uppercase text-[13px] tracking-tight flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full h-12 rounded-lg font-black uppercase text-[13px] tracking-tight flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                 >
                   <Download size={16} /> Baixar CSV com Credenciais
                 </button>
-                <div className="flex justify-end pt-4 border-t-2 border-[#e0e3e5]">
-                  <Button
+                <div className="flex justify-end pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                  <button
                     type="button"
-                    variant="outline"
-                    className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold"
                     onClick={() => { setBulkOpen(false); setBulkResult(null); refetchBulkPreview(); }}
+                    className="h-10 px-4 rounded-lg font-bold uppercase text-xs transition-colors hover:opacity-80"
+                    style={{ border: "1px solid var(--border)" }}
                   >
                     Fechar
-                  </Button>
+                  </button>
                 </div>
               </>
             )}
@@ -691,21 +696,21 @@ export default function EmployeesPage() {
 
       {/* Merge result dialog */}
       <Dialog open={!!mergeResult} onOpenChange={v => { if (!v) setMergeResult(null); }}>
-        <DialogContent className="max-w-sm rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-sm rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2"><GitMerge size={20} /> Mesclagem Concluída</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}><GitMerge size={20} /> Mesclagem Concluída</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 space-y-2 text-sm italic">
+            <div className="rounded-lg p-4 space-y-2 text-sm" style={{ backgroundColor: "var(--secondary)" }}>
               <p><span className="font-black">{mergeResult?.merged.length ?? 0}</span> duplicata(s) removida(s)</p>
               <p><span className="font-black">{mergeResult?.movedParticipations ?? 0}</span> participações transferidas</p>
               {(mergeResult?.movedAbsences ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedAbsences}</span> penalidades/méritos transferidos</p>}
               {(mergeResult?.movedEvaluatorEvals ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedEvaluatorEvals}</span> avaliações de avaliador transferidas</p>}
-              {(mergeResult?.removedUsers ?? 0) > 0 && <p className="text-[#cc3300]"><span className="font-black">{mergeResult?.removedUsers}</span> conta(s) de usuário desativada(s)</p>}
+              {(mergeResult?.removedUsers ?? 0) > 0 && <p style={{ color: WARNING }}><span className="font-black">{mergeResult?.removedUsers}</span> conta(s) de usuário desativada(s)</p>}
             </div>
-            <p className="text-xs text-[#747a60] italic">Agora você pode usar "Gerar Acessos em Massa" para criar as credenciais dos colaboradores mesclados.</p>
-            <div className="flex justify-end pt-2 border-t-2 border-[#e0e3e5]">
-              <button onClick={() => setMergeResult(null)} className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase">Fechar</button>
+            <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Agora você pode usar "Gerar Acessos em Massa" para criar as credenciais dos colaboradores mesclados.</p>
+            <div className="flex justify-end pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+              <button onClick={() => setMergeResult(null)} className="h-10 px-4 rounded-lg font-bold text-sm uppercase transition-opacity hover:opacity-90" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Fechar</button>
             </div>
           </div>
         </DialogContent>
@@ -713,27 +718,28 @@ export default function EmployeesPage() {
 
       {/* Newly generated single-employee access */}
       <Dialog open={!!newAccess} onOpenChange={v => { if (!v) setNewAccess(null); }}>
-        <DialogContent className="max-w-sm rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-sm rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Acesso Gerado</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Acesso Gerado</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <p className="text-sm text-[#444933] italic">Anote ou compartilhe estas credenciais agora — a senha não será exibida novamente.</p>
-            <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 space-y-2">
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Anote ou compartilhe estas credenciais agora — a senha não será exibida novamente.</p>
+            <div className="rounded-lg p-4 space-y-2" style={{ backgroundColor: "var(--secondary)" }}>
               <div>
-                <p className="text-[11px] font-bold italic uppercase text-[#747a60]">Login (CPF)</p>
-                <p className="text-lg font-black italic" data-testid="text-new-access-cpf">{newAccess?.cpfLogin}</p>
+                <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Login (CPF)</p>
+                <p className="text-lg font-black" data-testid="text-new-access-cpf">{newAccess?.cpfLogin}</p>
               </div>
               <div>
-                <p className="text-[11px] font-bold italic uppercase text-[#747a60]">Senha Inicial</p>
-                <p className="text-lg font-black italic" data-testid="text-new-access-password">{newAccess?.password}</p>
+                <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Senha Inicial</p>
+                <p className="text-lg font-black" data-testid="text-new-access-password">{newAccess?.password}</p>
               </div>
             </div>
-            <div className="flex justify-end pt-4 border-t-2 border-[#e0e3e5]">
+            <div className="flex justify-end pt-4" style={{ borderTop: "1px solid var(--border)" }}>
               <button
                 data-testid="button-close-new-access"
                 onClick={() => setNewAccess(null)}
-                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase"
+                className="h-10 px-4 rounded-lg font-bold text-sm uppercase transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 Entendi
               </button>
