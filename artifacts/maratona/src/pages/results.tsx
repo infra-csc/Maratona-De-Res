@@ -451,11 +451,6 @@ function EmployeeDetailSheet({
                             {(ev.city || ev.state) && (
                               <span className="inline-flex items-center gap-1"><MapPin size={10} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
                             )}
-                            {ev.isHistorical ? (
-                              <span className="uppercase">Histórico</span>
-                            ) : (
-                              <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
-                            )}
                             {!ev.countsForScore && (
                               <span
                                 data-testid={`detail-event-no-score-${ev.eventId}`}
