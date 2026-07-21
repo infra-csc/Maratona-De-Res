@@ -183,6 +183,9 @@ export default function EventsPage() {
     !!e.criteriaConfirmed &&
     (e.evaluationProgress ?? 0) > 0 &&
     (e.calibratedCriteriaCount ?? 0) === 0;
+  // Publicado parcialmente: tem critério(s) com prévia publicada, mas nem tudo já virou Final.
+  const hasPartialPublication = (e: typeof all[0]) =>
+    Math.max(0, (e.partialPublishedCount ?? 0) - (e.finalCalibratedCriteria ?? 0)) > 0;
 
   const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
   const cyclePeriod = cycle ? formatCyclePeriod(cycle.startDate, cycle.endDate) : null;
@@ -227,7 +230,8 @@ export default function EventsPage() {
       || (cardFilter === "inEval"     && isInEvaluation(ev))
       || (cardFilter === "concluded"  && ev.status === "closed")
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
-      || (cardFilter === "fullyEval"  && (ev.totalCriteria ?? 0) > 0 && (ev.calibratedCriteriaCount ?? 0) >= (ev.totalCriteria ?? 0));
+      || (cardFilter === "fullyEval"  && !!ev.fullyCalibrated)
+      || (cardFilter === "partialPub" && hasPartialPublication(ev));
     return matchSearch && matchDate && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
@@ -267,6 +271,7 @@ export default function EventsPage() {
     { key: "pendingRH",   label: "Aguardando RH" },
     { key: "concluded",   label: "Concluídos" },
     { key: "fullyEval",   label: "Pub. Final" },
+    { key: "partialPub",  label: "Pub. Parcial" },
     { key: "pendingCal",  label: "Falta Cal." },
   ];
 
