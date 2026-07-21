@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { db, eventsTable, evaluationsTable, absencesTable, quarterlyResultsTable, employeesTable, platoonRulesTable, eventParticipantsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { db, eventsTable, evaluationsTable, absencesTable, quarterlyResultsTable, employeesTable, platoonRulesTable, eventCriteriaTable, criteriaTable, eventAreaAssignmentsTable, cyclesTable } from "@workspace/db";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { getCurrentCycle } from "../lib/cycle.js";
-import { calculateTieredBonus } from "../lib/calculations.js";
+import { calculateTieredBonus, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -29,6 +29,8 @@ router.get("/dashboard/summary", async (req, res) => {
   const allEvals = await db.select({
     id: evaluationsTable.id,
     eventId: evaluationsTable.eventId,
+    criterionId: evaluationsTable.criterionId,
+    evaluatorUserId: evaluationsTable.evaluatorUserId,
     status: evaluationsTable.status,
   }).from(evaluationsTable).where(
     sql`${evaluationsTable.eventId} IN (SELECT id FROM events WHERE cycle_id = ${cycle.id})`
@@ -86,18 +88,35 @@ router.get("/dashboard/summary", async (req, res) => {
   }
   const eventsInCalibration = confirmedEvts.length;
 
+  // "Pendente" = critério ativo cujos avaliadores designados para a área
+  // ainda não enviaram TODOS a nota (mesma regra de getCriterionEvaluationStatus
+  // usada em GET /events) — não o nº de participantes do evento, que não tem
+  // relação com quantas avaliações faltam.
   const openEvents = events.filter(e => e.status === "open");
-  const eventsWithPendencies: { eventId: number; eventName: string; pendingCount: number }[] = [];
-  for (const ev of openEvents.slice(0, 5)) {
-    const evEvals = allEvals.filter(e => e.eventId === ev.id);
-    const pending = evEvals.filter(e => e.status === "draft").length;
-    const participantCount = await db.select({ count: sql<number>`count(*)` })
-      .from(eventParticipantsTable)
-      .where(eq(eventParticipantsTable.eventId, ev.id));
-    const pCount = Number(participantCount[0]?.count ?? 0);
-    const totalExpected = pCount;
-    const pendingFinal = totalExpected > 0 ? totalExpected - evEvals.filter(e => e.status === "submitted").length : pending;
-    eventsWithPendencies.push({ eventId: ev.id, eventName: ev.name, pendingCount: Math.max(0, pendingFinal) });
+  let eventsWithPendencies: { eventId: number; eventName: string; pendingCount: number }[] = [];
+  if (openEvents.length > 0) {
+    const openEventIds = openEvents.map(e => e.id);
+    const [eventCriteriaRows, areaAssignmentRows] = await Promise.all([
+      db.select({ eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active, responsibleAreaId: criteriaTable.responsibleAreaId })
+        .from(eventCriteriaTable).leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+        .where(inArray(eventCriteriaTable.eventId, openEventIds)),
+      db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
+        .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, openEventIds)),
+    ]);
+
+    eventsWithPendencies = openEvents.map(ev => {
+      const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active);
+      const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentRows.filter(a => a.eventId === ev.id));
+      const submitted = allEvals.filter(e => e.eventId === ev.id && e.status === "submitted");
+      const evaluatedCount = activeCriteria.filter(c => {
+        const critEvals = submitted.filter(e => e.criterionId === c.criterionId);
+        return getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea).isEvaluated;
+      }).length;
+      return { eventId: ev.id, eventName: ev.name, pendingCount: Math.max(0, activeCriteria.length - evaluatedCount) };
+    })
+      .filter(e => e.pendingCount > 0)
+      .sort((a, b) => b.pendingCount - a.pendingCount)
+      .slice(0, 5);
   }
 
   const atRiskResults = await db
@@ -187,17 +206,28 @@ router.get("/dashboard/top-employees", async (req, res) => {
   })));
 });
 
+// Evolução real entre ciclos (não só o atual) — mostra até os últimos 8 ciclos
+// que já têm algum resultado apurado, do mais antigo para o mais recente.
 router.get("/dashboard/quarterly-evolution", async (_req, res) => {
-  const cycle = await getCurrentCycle();
-  if (!cycle) { res.json([]); return; }
+  const cycles = await db.select().from(cyclesTable).orderBy(desc(cyclesTable.id)).limit(8);
+  if (cycles.length === 0) { res.json([]); return; }
 
-  const results = await db.select({ finalResult: quarterlyResultsTable.finalResult })
+  const cycleIds = cycles.map(c => c.id);
+  const allResults = await db.select({ cycleId: quarterlyResultsTable.cycleId, finalResult: quarterlyResultsTable.finalResult })
     .from(quarterlyResultsTable)
-    .where(eq(quarterlyResultsTable.cycleId, cycle.id));
-  const average = results.length > 0
-    ? results.reduce((s, r) => s + parseFloat(r.finalResult), 0) / results.length
-    : null;
-  res.json([{ cycleId: cycle.id, label: cycle.name, average }]);
+    .where(inArray(quarterlyResultsTable.cycleId, cycleIds));
+
+  const points = cycles
+    .map(c => {
+      const results = allResults.filter(r => r.cycleId === c.id);
+      if (results.length === 0) return null;
+      const average = results.reduce((s, r) => s + parseFloat(r.finalResult), 0) / results.length;
+      return { cycleId: c.id, label: c.name, average };
+    })
+    .filter((p): p is { cycleId: number; label: string; average: number } => p !== null)
+    .reverse(); // mais antigo primeiro
+
+  res.json(points);
 });
 
 export default router;

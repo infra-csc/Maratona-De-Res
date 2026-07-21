@@ -1,6 +1,7 @@
-import { useGetDashboardSummary, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, useGetCurrentCycle, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, useGetDashboardPlatoonDistribution, useGetCurrentCycle, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { CheckCircle2, Trophy, DollarSign, History, AlertTriangle, Clock, ChevronRight, CalendarRange } from "lucide-react";
+import { CheckCircle2, Trophy, DollarSign, History, AlertTriangle, Clock, ChevronRight, CalendarRange, Shapes } from "lucide-react";
+import { Link } from "wouter";
 import { formatCyclePeriod } from "@/components/cycle-badge";
 import { PremiumCard, CONDENSED, WARNING } from "@/lib/premium-theme";
 
@@ -10,6 +11,7 @@ export default function DashboardPage() {
   });
   const { data: topEmployees } = useGetDashboardTopEmployees();
   const { data: evolution } = useGetDashboardQuarterlyEvolution();
+  const { data: platoons } = useGetDashboardPlatoonDistribution();
   const { data: cycle } = useGetCurrentCycle();
 
   const fmt = (v: number) => `${v.toFixed(1)}/100`;
@@ -136,40 +138,78 @@ export default function DashboardPage() {
         </PremiumCard>
       )}
 
-      {/* 3. Top Performance */}
-      <PremiumCard className="overflow-hidden flex flex-col">
-        <div className="p-6 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-          <h3 className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Top Performance</h3>
-          <History size={20} style={{ color: "var(--muted-foreground)" }} />
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr>
-                <th className="p-4 text-xs font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>Pos</th>
-                <th className="p-4 text-xs font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>Colaborador</th>
-                <th className="p-4 text-xs font-bold uppercase text-right" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>Nota</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(!topEmployees || topEmployees.length === 0) && (
-                <tr><td colSpan={3} className="p-6 text-sm font-semibold text-center" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado consolidado.</td></tr>
-              )}
-              {topEmployees?.slice(0, 6).map((emp, i) => (
-                <tr key={emp.employeeId} className="transition-colors hover:opacity-80" style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td className="p-4 text-lg font-black w-12" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{String(i + 1).padStart(2, "0")}</td>
-                  <td className="p-4 text-base font-bold">{emp.employeeName}</td>
-                  <td className="p-4 text-right text-lg font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{fmt(emp.finalResult)}</td>
+      {/* 3. Top Performance + Distribuição de Pelotões */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5 items-start">
+        <PremiumCard className="overflow-hidden flex flex-col">
+          <div className="p-6 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+            <h3 className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Top Performance</h3>
+            <History size={20} style={{ color: "var(--muted-foreground)" }} />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr>
+                  <th className="p-4 text-xs font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>Pos</th>
+                  <th className="p-4 text-xs font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>Colaborador</th>
+                  <th className="p-4 text-xs font-bold uppercase text-right" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>Nota</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </PremiumCard>
+              </thead>
+              <tbody>
+                {(!topEmployees || topEmployees.length === 0) && (
+                  <tr><td colSpan={3} className="p-6 text-sm font-semibold text-center" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado consolidado.</td></tr>
+                )}
+                {topEmployees?.slice(0, 6).map((emp, i) => (
+                  <tr key={emp.employeeId} className="transition-colors hover:opacity-80" style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td className="p-4 text-lg font-black w-12" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{String(i + 1).padStart(2, "0")}</td>
+                    <td className="p-4 text-base font-bold">{emp.employeeName}</td>
+                    <td className="p-4 text-right text-lg font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{fmt(emp.finalResult)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </PremiumCard>
 
-      {/* 4. Alerts */}
-      {((summary?.atRiskEmployees && summary.atRiskEmployees.length > 0) || (summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0)) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <PremiumCard className="p-6">
+          <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-1" style={{ fontFamily: CONDENSED }}>
+            <Shapes size={16} style={{ color: "var(--accent)" }} /> Distribuição de Pelotões
+          </h3>
+          <p className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>Colaboradores com resultado apurado neste ciclo</p>
+          {!platoons || platoons.length === 0 ? (
+            <p className="text-sm font-semibold text-center py-6" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado apurado ainda.</p>
+          ) : (
+            <>
+              <div className="w-full h-3 rounded-full overflow-hidden flex mb-4" style={{ backgroundColor: "var(--secondary)" }}>
+                {platoons.map(p => (
+                  <div key={p.platoonName} style={{ width: `${p.percentage}%`, backgroundColor: p.color }} title={p.platoonName} />
+                ))}
+              </div>
+              <div className="space-y-2.5">
+                {platoons.map(p => (
+                  <div key={p.platoonName} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                      <span className="text-sm font-semibold truncate">{p.platoonName}</span>
+                    </div>
+                    <span className="text-sm font-bold shrink-0" style={{ color: "var(--muted-foreground)" }}>
+                      {p.count} <span className="opacity-60">({p.percentage.toFixed(0)}%)</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </PremiumCard>
+      </div>
+
+      {/* 4. Alerts — quando só um dos dois tem conteúdo, evita o card sobrar
+          sozinho numa grade de 2 colunas com metade da tela vazia. */}
+      {(() => {
+        const hasRisk = !!summary?.atRiskEmployees && summary.atRiskEmployees.length > 0;
+        const hasPendencies = !!summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0;
+        if (!hasRisk && !hasPendencies) return null;
+        return (
+        <div className={hasRisk && hasPendencies ? "grid grid-cols-1 lg:grid-cols-2 gap-5" : "grid grid-cols-1 max-w-xl"}>
           {summary?.atRiskEmployees && summary.atRiskEmployees.length > 0 && (
             <PremiumCard className="p-6" style={{ borderColor: WARNING }}>
               <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-4" style={{ fontFamily: CONDENSED, color: WARNING }}>
@@ -193,16 +233,17 @@ export default function DashboardPage() {
               </h3>
               <div className="space-y-2">
                 {summary.eventsWithPendencies.slice(0, 5).map(ev => (
-                  <div key={ev.eventId} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: "var(--secondary)" }}>
+                  <Link key={ev.eventId} href={`/events/${ev.eventId}`} className="flex items-center justify-between p-3 rounded-lg transition-colors hover:opacity-80" style={{ backgroundColor: "var(--secondary)" }}>
                     <span className="text-sm font-semibold flex-1 pr-2">{ev.eventName}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{ev.pendingCount} pend. <ChevronRight size={12} /></span>
-                  </div>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1 shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{ev.pendingCount} pend. <ChevronRight size={12} /></span>
+                  </Link>
                 ))}
               </div>
             </PremiumCard>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
