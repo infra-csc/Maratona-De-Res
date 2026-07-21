@@ -734,44 +734,52 @@ export default function EventsPage() {
                     {user && ["admin", "rh", "diretoria"].includes(user.role) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
-                            <MoreHorizontal size={12} />
+                          <button
+                            className="h-7 w-7 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
+                            style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)", color: "var(--foreground)" }}
+                          >
+                            <MoreHorizontal size={13} />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl min-w-[160px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                        <DropdownMenuContent
+                          align="end"
+                          sideOffset={6}
+                          className="p-1.5 min-w-[170px] rounded-lg shadow-lg"
+                          style={{ backgroundColor: "var(--card)", border: "2px solid var(--border)", color: "var(--foreground)", zIndex: 9999 }}
+                        >
                           {user && ["admin", "rh"].includes(user.role) && (
                             <DropdownMenuItem
                               data-testid={`button-edit-event-${ev.id}`}
                               onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
-                              className="gap-2 font-bold text-xs cursor-pointer"
+                              className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]"
                             >
-                              <Pencil size={12} /> Editar
+                              <Pencil size={13} /> Editar
                             </DropdownMenuItem>
                           )}
                           {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                            <DropdownMenuItem asChild className="gap-2 font-bold text-xs cursor-pointer">
+                            <DropdownMenuItem asChild className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]">
                               <Link href={`/calibrations?eventId=${ev.id}`}>
-                                <SlidersHorizontal size={12} /> Calibrações
+                                <SlidersHorizontal size={13} /> Calibrações
                               </Link>
                             </DropdownMenuItem>
                           )}
                           {user?.role === "admin" && (
                             <>
-                              <DropdownMenuSeparator />
+                              <DropdownMenuSeparator style={{ backgroundColor: "var(--border)", margin: "4px 0" }} />
                               <DropdownMenuItem
                                 data-testid={`button-merge-event-${ev.id}`}
                                 onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
-                                className="gap-2 font-bold text-xs cursor-pointer"
+                                className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]"
                               >
-                                <GitMerge size={12} /> Mesclar
+                                <GitMerge size={13} /> Mesclar
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 data-testid={`button-delete-event-${ev.id}`}
                                 onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
-                                className="gap-2 font-bold text-xs cursor-pointer"
+                                className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2"
                                 style={{ color: WARNING }}
                               >
-                                <Trash2 size={12} /> Excluir
+                                <Trash2 size={13} /> Excluir
                               </DropdownMenuItem>
                             </>
                           )}
