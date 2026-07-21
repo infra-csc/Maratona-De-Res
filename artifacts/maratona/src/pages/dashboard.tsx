@@ -1,9 +1,26 @@
-import { useGetDashboardSummary, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, useGetDashboardPlatoonDistribution, useGetCurrentCycle, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, useGetDashboardPlatoonDistribution, useGetCurrentCycle, useGetEvents, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { CheckCircle2, Trophy, DollarSign, History, AlertTriangle, Clock, ChevronRight, CalendarRange, Shapes } from "lucide-react";
+import { CheckCircle2, Trophy, DollarSign, History, AlertTriangle, ChevronRight, CalendarRange, Shapes, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { formatCyclePeriod } from "@/components/cycle-badge";
 import { PremiumCard, CONDENSED, WARNING } from "@/lib/premium-theme";
+
+function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
+  const result: { sat: string; sun: string; label: string }[] = [];
+  const end = new Date(endDate + "T12:00:00");
+  const d = new Date(startDate + "T12:00:00");
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+  while (d <= end) {
+    const sat = d.toISOString().split("T")[0];
+    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
+    const sun = sunD.toISOString().split("T")[0];
+    const label = `${String(d.getDate()).padStart(2, "0")}–${String(sunD.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+    result.push({ sat, sun, label });
+    d.setDate(d.getDate() + 7);
+  }
+  return result;
+}
 
 export default function DashboardPage() {
   const { data: summary } = useGetDashboardSummary({
@@ -13,12 +30,28 @@ export default function DashboardPage() {
   const { data: evolution } = useGetDashboardQuarterlyEvolution();
   const { data: platoons } = useGetDashboardPlatoonDistribution();
   const { data: cycle } = useGetCurrentCycle();
+  const { data: events } = useGetEvents();
 
   const fmt = (v: number) => `${v.toFixed(1)}/100`;
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
   const submitted = summary?.submittedEvaluations ?? 0;
   const pending = summary?.pendingEvaluations ?? 0;
+
+  // Próximos fins de semana com eventos
+  const today = new Date().toISOString().split("T")[0];
+  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
+  const upcomingWeekends = cycleWeekends
+    .filter(w => w.sun >= today)
+    .slice(0, 8)
+    .map(w => ({
+      ...w,
+      events: (events ?? []).filter(
+        ev => ev.status !== "closed" && ev.startDate <= w.sun && (ev.endDate ?? ev.startDate) >= w.sat
+      ),
+    }))
+    .filter(w => w.events.length > 0)
+    .slice(0, 5);
   // submitted + pending = total de eventos com alguma avaliação; o percentual
   // reflete eventos com todas as avaliações concluídas vs total com avaliações.
   const progress = submitted + pending > 0 ? Math.round((submitted / (submitted + pending)) * 100) : 0;
@@ -185,63 +218,78 @@ export default function DashboardPage() {
                 ))}
               </div>
               <div className="space-y-2.5">
-                {platoons.map(p => (
-                  <div key={p.platoonName} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                      <span className="text-sm font-semibold truncate">{p.platoonName}</span>
+                {platoons.map(p => {
+                  const label = p.platoonName === "Sem Faixa" ? "Sem Faixa" : p.platoonName.replace(/^Pelot[aã]o\s*/i, "");
+                  return (
+                    <div key={p.platoonName} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                        <span className="text-sm font-semibold truncate">{label}</span>
+                      </div>
+                      <span className="text-sm font-bold shrink-0" style={{ color: "var(--muted-foreground)" }}>
+                        {p.count} <span className="opacity-60">({p.percentage.toFixed(0)}%)</span>
+                      </span>
                     </div>
-                    <span className="text-sm font-bold shrink-0" style={{ color: "var(--muted-foreground)" }}>
-                      {p.count} <span className="opacity-60">({p.percentage.toFixed(0)}%)</span>
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
         </PremiumCard>
       </div>
 
-      {/* 4. Alerts — quando só um dos dois tem conteúdo, evita o card sobrar
-          sozinho numa grade de 2 colunas com metade da tela vazia. */}
+      {/* 4. Zona de Risco + Próximos Fins de Semana */}
       {(() => {
         const hasRisk = !!summary?.atRiskEmployees && summary.atRiskEmployees.length > 0;
-        const hasPendencies = !!summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0;
-        if (!hasRisk && !hasPendencies) return null;
+        const hasUpcoming = upcomingWeekends.length > 0;
+        if (!hasRisk && !hasUpcoming) return null;
         return (
-        <div className={hasRisk && hasPendencies ? "grid grid-cols-1 lg:grid-cols-2 gap-5" : "grid grid-cols-1 max-w-xl"}>
-          {summary?.atRiskEmployees && summary.atRiskEmployees.length > 0 && (
-            <PremiumCard className="p-6" style={{ borderColor: WARNING }}>
-              <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-4" style={{ fontFamily: CONDENSED, color: WARNING }}>
-                <AlertTriangle size={16} /> Zona de Risco
-              </h3>
-              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                {summary.atRiskEmployees.map(emp => (
-                  <div key={emp.employeeId} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: "rgba(229,72,77,0.08)" }}>
-                    <span className="text-sm font-semibold break-words flex-1 pr-2">{emp.employeeName}</span>
-                    <span className="text-sm font-black text-white px-2 py-0.5 rounded" style={{ backgroundColor: WARNING }}>{fmt(emp.currentScore ?? 0)}</span>
-                  </div>
-                ))}
-              </div>
-            </PremiumCard>
-          )}
+          <div className={hasRisk && hasUpcoming ? "grid grid-cols-1 lg:grid-cols-2 gap-5" : "grid grid-cols-1 max-w-xl"}>
+            {hasRisk && (
+              <PremiumCard className="p-6" style={{ borderColor: WARNING }}>
+                <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-4" style={{ fontFamily: CONDENSED, color: WARNING }}>
+                  <AlertTriangle size={16} /> Zona de Risco
+                </h3>
+                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                  {summary!.atRiskEmployees!.map(emp => (
+                    <div key={emp.employeeId} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: "rgba(229,72,77,0.08)" }}>
+                      <span className="text-sm font-semibold break-words flex-1 pr-2">{emp.employeeName}</span>
+                      <span className="text-sm font-black text-white px-2 py-0.5 rounded" style={{ backgroundColor: WARNING }}>{fmt(emp.currentScore ?? 0)}</span>
+                    </div>
+                  ))}
+                </div>
+              </PremiumCard>
+            )}
 
-          {summary?.eventsWithPendencies && summary.eventsWithPendencies.length > 0 && (
-            <PremiumCard className="p-6">
-              <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-4" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
-                <Clock size={16} /> Eventos Pendentes
-              </h3>
-              <div className="space-y-2">
-                {summary.eventsWithPendencies.slice(0, 5).map(ev => (
-                  <Link key={ev.eventId} href={`/events/${ev.eventId}`} className="flex items-center justify-between p-3 rounded-lg transition-colors hover:opacity-80" style={{ backgroundColor: "var(--secondary)" }}>
-                    <span className="text-sm font-semibold flex-1 pr-2">{ev.eventName}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1 shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{ev.pendingCount} pend. <ChevronRight size={12} /></span>
-                  </Link>
-                ))}
-              </div>
-            </PremiumCard>
-          )}
-        </div>
+            {hasUpcoming && (
+              <PremiumCard className="overflow-hidden">
+                <div className="p-5 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                  <Calendar size={15} style={{ color: "var(--accent)" }} />
+                  <h3 className="text-sm font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Próximos Fins de Semana</h3>
+                </div>
+                <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                  {upcomingWeekends.map(w => (
+                    <div key={w.sat} className="px-5 py-3">
+                      <p className="text-[11px] font-black uppercase tracking-wider mb-2" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+                        {w.label}
+                      </p>
+                      <div className="space-y-1">
+                        {w.events.map(ev => (
+                          <Link key={ev.id} href={`/events/${ev.id}`} className="flex items-center justify-between gap-2 py-1 hover:opacity-70 transition-opacity">
+                            <span className="text-sm font-semibold truncate flex-1">{ev.name}</span>
+                            {ev.city && (
+                              <span className="text-[11px] font-medium shrink-0" style={{ color: "var(--muted-foreground)" }}>{ev.city}</span>
+                            )}
+                            <ChevronRight size={13} style={{ color: "var(--muted-foreground)", flexShrink: 0 }} />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PremiumCard>
+            )}
+          </div>
         );
       })()}
     </div>
