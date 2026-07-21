@@ -321,4 +321,64 @@ router.get("/employees/:id/history", async (req, res) => {
   })));
 });
 
+// POST /employees/:id/generate-pin — gera PIN de 4 dígitos para colaborador casa
+router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
+  if (!emp) { res.status(404).json({ error: "Colaborador não encontrado" }); return; }
+  if (emp.employmentType !== "casa") {
+    res.status(400).json({ error: "Geração de PIN disponível apenas para colaboradores casa" });
+    return;
+  }
+
+  const cpfDigits = emp.document ? normalizeCpf(emp.document) : "";
+  if (!isValidCpfLength(cpfDigits)) {
+    res.status(400).json({ error: "Colaborador sem CPF válido — não é possível criar acesso" });
+    return;
+  }
+
+  const pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+  const passwordHash = await bcrypt.hash(pin, 12);
+
+  let userId: number;
+  let userCreated = false;
+
+  const [byEmpId] = await db.select({ id: usersTable.id })
+    .from(usersTable).where(eq(usersTable.employeeId, id)).limit(1);
+
+  if (byEmpId) {
+    userId = byEmpId.id;
+    await db.update(usersTable)
+      .set({ passwordHash, mustChangePassword: false })
+      .where(eq(usersTable.id, userId));
+  } else {
+    const [byCpf] = await db.select({ id: usersTable.id })
+      .from(usersTable).where(eq(usersTable.cpfLogin, cpfDigits)).limit(1);
+    if (byCpf) {
+      userId = byCpf.id;
+      await db.update(usersTable)
+        .set({ passwordHash, mustChangePassword: false, employeeId: id })
+        .where(eq(usersTable.id, userId));
+    } else {
+      const [newUser] = await db.insert(usersTable).values({
+        name: emp.name,
+        email: null,
+        cpfLogin: cpfDigits,
+        passwordHash,
+        role: "visualizador",
+        employeeId: id,
+        active: true,
+        mustChangePassword: false,
+      }).returning({ id: usersTable.id });
+      userId = newUser.id;
+      userCreated = true;
+    }
+  }
+
+  await audit(req.user!.userId, "generate_pin", "users", userId, null, { employeeId: id });
+  res.json({ pin, cpfLogin: cpfDigits, userCreated });
+});
+
 export default router;

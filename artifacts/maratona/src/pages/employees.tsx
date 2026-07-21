@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
 
@@ -88,6 +88,29 @@ export default function EmployeesPage() {
   const [bulkResult, setBulkResult] = useState<BulkGenerateAccessResult | null>(null);
   const [bulkTypeFilter, setBulkTypeFilter] = useState<"casa" | "freela" | "all">("casa");
   const [newAccess, setNewAccess] = useState<{ cpfLogin: string; password: string } | null>(null);
+
+  const [pinDialog, setPinDialog] = useState<{ empName: string; pin: string; cpfLogin: string; created: boolean } | null>(null);
+  const [generatingPinId, setGeneratingPinId] = useState<number | null>(null);
+  const [pinCopied, setPinCopied] = useState(false);
+
+  const handleGeneratePin = useCallback(async (emp: EmployeeWithCycle) => {
+    setGeneratingPinId(emp.id);
+    try {
+      const res = await fetch(`/api/employees/${emp.id}/generate-pin`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+      const data = await res.json() as { pin: string; cpfLogin: string; userCreated: boolean };
+      setPinDialog({ empName: emp.name, pin: data.pin, cpfLogin: data.cpfLogin, created: data.userCreated });
+      setPinCopied(false);
+      qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
+    } catch (e) {
+      toast({ title: "Erro ao gerar PIN", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setGeneratingPinId(null);
+    }
+  }, [token, toast, qc]);
 
   const [mergeMode, setMergeMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -570,7 +593,7 @@ export default function EmployeesPage() {
                       {canEdit && !mergeMode && (
                         <td className="px-5 py-3.5 text-center">
                           {emp.hasAccess ? (
-                            <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex flex-col items-center gap-1">
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: GOOD }}>
                                 <Wifi size={11} /> Com acesso
                               </span>
@@ -578,12 +601,42 @@ export default function EmployeesPage() {
                                 title={`Visualizar app como ${emp.name}`}
                                 disabled={previewingId === emp.id}
                                 onClick={() => handlePreviewAs(emp)}
-                                className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
                                 style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                               >
                                 {previewingId === emp.id
                                   ? <><Eye size={11} className="animate-pulse" /> Abrindo…</>
                                   : <><Eye size={11} /> Ver visão</>}
+                              </button>
+                              {emp.employmentType === "casa" && (
+                                <button
+                                  title={`Gerar novo PIN para ${emp.name}`}
+                                  disabled={generatingPinId === emp.id}
+                                  onClick={() => handleGeneratePin(emp)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                  style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
+                                >
+                                  {generatingPinId === emp.id
+                                    ? <><Hash size={11} className="animate-spin" /> Gerando…</>
+                                    : <><Hash size={11} /> Gerar PIN</>}
+                                </button>
+                              )}
+                            </div>
+                          ) : emp.employmentType === "casa" ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
+                                <WifiOff size={11} /> Sem acesso
+                              </span>
+                              <button
+                                title={`Criar acesso com PIN para ${emp.name}`}
+                                disabled={generatingPinId === emp.id}
+                                onClick={() => handleGeneratePin(emp)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                style={{ backgroundColor: "var(--accent)", color: "#000" }}
+                              >
+                                {generatingPinId === emp.id
+                                  ? <><Hash size={11} className="animate-spin" /> Gerando…</>
+                                  : <><Hash size={11} /> Gerar PIN</>}
                               </button>
                             </div>
                           ) : (
@@ -883,6 +936,61 @@ export default function EmployeesPage() {
                 style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 Entendi
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* PIN gerado dialog */}
+      <Dialog open={!!pinDialog} onOpenChange={v => { if (!v) setPinDialog(null); }}>
+        <DialogContent className="max-w-sm rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
+              {pinDialog?.created ? "Acesso Criado" : "Novo PIN Gerado"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              {pinDialog?.created
+                ? "Acesso criado com sucesso. Anote as credenciais abaixo — o PIN não será exibido novamente."
+                : `PIN redefinido para ${pinDialog?.empName}. Anote — o PIN não será exibido novamente.`}
+            </p>
+
+            <div className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--border)" }}>
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Login (CPF)</p>
+                <p className="text-base font-black tracking-widest">{pinDialog?.cpfLogin}</p>
+              </div>
+              <div className="px-4 py-4" style={{ backgroundColor: "var(--primary)" }}>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--primary-foreground)", opacity: 0.65, fontFamily: CONDENSED }}>Senha (PIN)</p>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-5xl font-black tracking-[0.25em]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>
+                    {pinDialog?.pin}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (!pinDialog) return;
+                      navigator.clipboard.writeText(pinDialog.pin);
+                      setPinCopied(true);
+                      setTimeout(() => setPinCopied(false), 2000);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-80"
+                    style={{ backgroundColor: "rgba(0,0,0,0.25)", color: "var(--primary-foreground)" }}
+                  >
+                    {pinCopied ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+              <button
+                onClick={() => setPinDialog(null)}
+                className="h-10 px-5 rounded-lg font-bold text-sm uppercase transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}
+              >
+                Fechar
               </button>
             </div>
           </div>
