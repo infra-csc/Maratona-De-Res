@@ -199,7 +199,7 @@ export function AdminEvaluationsConsole() {
           : undefined;
         let state: CritState;
         if (assignedToId == null) state = "unassigned";
-        else if (evalRow?.status === "submitted") state = "done";
+        else if (evalRow?.status === "submitted" || c.partialPublishedAt != null || c.finalPublishedAt != null) state = "done";
         else if (evalRow?.status === "draft") state = "partial";
         else state = "pending";
         return {
