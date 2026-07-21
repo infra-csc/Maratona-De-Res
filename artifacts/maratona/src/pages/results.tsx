@@ -364,105 +364,116 @@ function EmployeeDetailSheet({
 
   return (
     <Sheet open={!!employeeId} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-0" style={{ backgroundColor: "var(--background)", borderLeft: "1px solid var(--border)" }}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-[520px] overflow-y-auto p-0 rounded-none"
+        style={{ backgroundColor: "var(--background)", borderLeft: "2px solid var(--border)" }}
+      >
         {detailLoading || !detail ? (
           <div className="p-10 text-center font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando detalhamento...</div>
         ) : (
           <div>
-            <SheetHeader className="p-6 space-y-3 text-left" style={{ backgroundColor: "var(--secondary)" }}>
-              <SheetTitle className="text-2xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>
-                {detail.employee.name}
-              </SheetTitle>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase">
-                {detail.employee.functionName && (
-                  <span className="rounded px-2 py-0.5" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}>{detail.employee.functionName}</span>
-                )}
-                <span style={{ color: "var(--muted-foreground)" }}>{detail.cycle.name}</span>
+            {/* Header brutalist */}
+            <SheetHeader className="p-0 text-left" style={{ borderBottom: "2px solid var(--border)" }}>
+              <div className="px-6 pt-6 pb-4" style={{ backgroundColor: "var(--secondary)" }}>
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                  {detail.employee.functionName && (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--accent)", color: "#191c1e" }}>{detail.employee.functionName}</span>
+                  )}
+                  <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{detail.cycle.name}</span>
+                </div>
+                <SheetTitle className="text-2xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+                  {detail.employee.name}
+                </SheetTitle>
               </div>
             </SheetHeader>
 
-            <div className="p-6 space-y-7">
-              <section className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl p-4" style={{ backgroundColor: "var(--primary)" }}>
-                  <span className="text-[10px] font-bold uppercase block" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}>Nota Final</span>
-                  <p className="text-3xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-final-result">
+            <div className="p-5 space-y-6">
+              {/* Stats grid — brutalist */}
+              <section className="grid grid-cols-2 gap-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
+                <div className="p-4" style={{ backgroundColor: "var(--primary)", borderRight: "2px solid var(--border)" }}>
+                  <span className="text-[9px] font-black uppercase tracking-wider block" style={{ color: "var(--primary-foreground)", opacity: 0.7 }}>Nota Final</span>
+                  <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-final-result">
                     {detail.summary.finalResult != null ? detail.summary.finalResult.toFixed(1) : "—"}
                   </p>
                 </div>
-                <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  <span className="text-[10px] font-bold uppercase block" style={{ color: "var(--muted-foreground)" }}>Média Bruta</span>
-                  <p className="text-3xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+                <div className="p-4" style={{ backgroundColor: "var(--card)" }}>
+                  <span className="text-[9px] font-black uppercase tracking-wider block" style={{ color: "var(--muted-foreground)" }}>Média Bruta</span>
+                  <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
                     {detail.summary.grossAverage != null ? detail.summary.grossAverage.toFixed(1) : "—"}
                   </p>
                   {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
-                    <p className="text-[10px] font-bold mt-1" style={{ color: "var(--muted-foreground)" }}>
+                    <p className="text-[10px] font-bold mt-1.5" style={{ color: "var(--muted-foreground)" }}>
                       Soma: {detail.summary.scoreSum.toFixed(1)} ÷ {detail.summary.confirmedEventCount} provas
                     </p>
                   )}
                 </div>
-                <div className="rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  <AlertTriangle size={18} className="shrink-0" style={{ color: WARNING }} />
+                <div className="p-3 flex items-center gap-2" style={{ borderTop: "2px solid var(--border)", borderRight: "2px solid var(--border)", backgroundColor: "var(--card)" }}>
+                  <AlertTriangle size={16} className="shrink-0" style={{ color: WARNING }} />
                   <div>
-                    <span className="text-[10px] font-bold uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Penalidades</span>
-                    <p className="text-lg font-black leading-none" style={{ fontFamily: CONDENSED, color: WARNING }}>-{detail.summary.penaltyPoints}</p>
+                    <span className="text-[9px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Penalidades</span>
+                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: WARNING }}>-{detail.summary.penaltyPoints}</p>
                   </div>
                 </div>
-                <div className="rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  <Award size={18} className="shrink-0" style={{ color: GOOD }} />
+                <div className="p-3 flex items-center gap-2" style={{ borderTop: "2px solid var(--border)", backgroundColor: "var(--card)" }}>
+                  <Award size={16} className="shrink-0" style={{ color: GOOD }} />
                   <div>
-                    <span className="text-[10px] font-bold uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Méritos</span>
-                    <p className="text-lg font-black leading-none" style={{ fontFamily: CONDENSED, color: GOOD }}>+{detail.summary.meritPoints}</p>
+                    <span className="text-[9px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Méritos</span>
+                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: GOOD }}>+{detail.summary.meritPoints}</p>
                   </div>
                 </div>
               </section>
 
               {!detail.summary.isQuarterClosed && (
-                <div className="rounded-lg px-4 py-3 text-xs font-bold uppercase" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER }}>
-                  Ciclo ainda não fechado — valores parciais.
+                <div className="px-4 py-3 text-xs font-black uppercase" style={{ border: "2px solid " + AMBER, color: AMBER, backgroundColor: "rgba(232,162,61,0.08)" }}>
+                  ⚠ Ciclo ainda não fechado — valores parciais.
                 </div>
               )}
 
-              <section className="space-y-3">
-                <h4 className="text-sm font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-                  <Trophy size={16} /> Desempenho nas Provas
+              <section className="space-y-2.5">
+                <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+                  <Trophy size={14} /> Desempenho nas Provas
                 </h4>
                 {detail.events.filter(ev => ev.resultsConfirmed).length === 0 ? (
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum evento confirmado no ciclo.</p>
+                  <p className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum evento confirmado no ciclo.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {detail.events.filter(ev => ev.resultsConfirmed).map(ev => (
-                      <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("rounded-lg p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
+                    {detail.events.filter(ev => ev.resultsConfirmed).map((ev, idx) => (
+                      <div
+                        key={ev.eventId}
+                        data-testid={`detail-event-${ev.eventId}`}
+                        className={cn("flex items-center gap-3 px-3 py-2.5", !ev.countsForScore && "opacity-60")}
+                        style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}
+                      >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-bold uppercase text-sm">{ev.eventName}</p>
+                          <p className="font-bold uppercase text-[12px] leading-tight">{ev.eventName}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                            {(ev.city || ev.state) && (
+                              <span className="inline-flex items-center gap-1"><MapPin size={10} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
+                            )}
+                            {ev.isHistorical ? (
+                              <span className="uppercase">Histórico</span>
+                            ) : (
+                              <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
+                            )}
                             {!ev.countsForScore && (
                               <span
                                 data-testid={`detail-event-no-score-${ev.eventId}`}
-                                className="px-1.5 py-0.5 rounded font-bold text-[9px] uppercase inline-block shrink-0"
-                                style={{ border: "1px solid " + AMBER, backgroundColor: "rgba(232,162,61,0.12)", color: AMBER }}
+                                className="px-1.5 py-0.5 font-bold text-[9px] uppercase shrink-0"
+                                style={{ border: "1px solid " + AMBER, color: AMBER }}
                                 title={(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : (ev as { noScoreReason?: string }).noScoreReason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}
                               >
                                 {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
-                                  ? `Sup Ceno — não conta p/ nota`
+                                  ? "Sup Ceno"
                                   : (ev as { noScoreReason?: string }).noScoreReason === "freela"
-                                  ? "Freela — não conta p/ nota"
-                                  : "Não conta p/ nota"}
+                                  ? "Freela"
+                                  : "Não conta"}
                               </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-                            {(ev.city || ev.state) && (
-                              <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
-                            )}
-                            {ev.isHistorical ? (
-                              <span className="uppercase">Evento histórico</span>
-                            ) : (
-                              <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
                             )}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="block text-[9px] uppercase font-bold leading-none mb-1" style={{ color: "var(--muted-foreground)" }}>Nota Time</span>
+                          <span className="block text-[9px] uppercase font-bold leading-none mb-0.5" style={{ color: "var(--muted-foreground)" }}>Nota Time</span>
                           <p className="text-xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{ev.eventScore.toFixed(1)}</p>
                         </div>
                       </div>
@@ -471,60 +482,56 @@ function EmployeeDetailSheet({
                 )}
               </section>
 
-              <section className="space-y-3">
-                <h4 className="text-sm font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: WARNING }}>
-                  <AlertTriangle size={16} /> Penalidades
-                </h4>
-                {detail.penalties.length === 0 ? (
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Sem penalidades no ciclo.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {detail.penalties.map(p => (
-                      <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              {detail.penalties.length > 0 && (
+                <section className="space-y-2.5">
+                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: WARNING }}>
+                    <AlertTriangle size={14} /> Penalidades
+                  </h4>
+                  <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
+                    {detail.penalties.map((p, idx) => (
+                      <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="flex items-center gap-3 px-3 py-2.5" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold uppercase text-sm">{p.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                          <p className="font-bold uppercase text-[12px]">{p.label}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             <span>{new Date(p.date).toLocaleDateString("pt-BR")}</span>
                             {p.eventName && <span>· {p.eventName}</span>}
-                            {p.quantity > 1 && <span>· {p.quantity}x</span>}
+                            {p.quantity > 1 && <span>· {p.quantity}×</span>}
                           </div>
                         </div>
-                        <span className="font-black px-3 py-1 rounded-lg text-xs shrink-0" style={{ backgroundColor: WARNING, color: "#fff" }}>-{p.total}</span>
+                        <span className="font-black px-2.5 py-1 text-xs shrink-0" style={{ backgroundColor: WARNING, color: "#fff" }}>-{p.total}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </section>
+                </section>
+              )}
 
-              <section className="space-y-3">
-                <h4 className="text-sm font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: GOOD }}>
-                  <Award size={16} /> Méritos
-                </h4>
-                {detail.merits.length === 0 ? (
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Sem méritos no ciclo.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {detail.merits.map(m => (
-                      <div key={m.id} data-testid={`detail-merit-${m.id}`} className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              {detail.merits.length > 0 && (
+                <section className="space-y-2.5">
+                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: GOOD }}>
+                    <Award size={14} /> Méritos
+                  </h4>
+                  <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
+                    {detail.merits.map((m, idx) => (
+                      <div key={m.id} data-testid={`detail-merit-${m.id}`} className="flex items-center gap-3 px-3 py-2.5" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold uppercase text-sm">{m.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                          <p className="font-bold uppercase text-[12px]">{m.label}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             <span>{new Date(m.date).toLocaleDateString("pt-BR")}</span>
                             {m.eventName && <span>· {m.eventName}</span>}
-                            {m.quantity > 1 && <span>· {m.quantity}x</span>}
+                            {m.quantity > 1 && <span>· {m.quantity}×</span>}
                           </div>
                         </div>
-                        <span className="font-black px-3 py-1 rounded-lg text-xs shrink-0" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>+{m.total}</span>
+                        <span className="font-black px-2.5 py-1 text-xs shrink-0" style={{ border: "2px solid " + GOOD, color: GOOD }}>+{m.total}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </section>
+                </section>
+              )}
 
               {detail.summary.bonusValue != null && detail.summary.bonusValue > 0 && (
-                <section className="rounded-xl p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)" }}>
-                  <span className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--primary-foreground)" }}>Bônus do Ciclo</span>
-                  <span className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{fmtBRL(detail.summary.bonusValue)}</span>
+                <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)", border: "2px solid var(--primary)" }}>
+                  <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus do Ciclo</span>
+                  <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{fmtBRL(detail.summary.bonusValue)}</span>
                 </section>
               )}
             </div>

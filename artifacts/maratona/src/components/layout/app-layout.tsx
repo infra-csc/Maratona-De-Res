@@ -32,7 +32,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main className="flex-1 h-full overflow-y-auto overflow-x-hidden relative flex flex-col">
+      <main className="flex-1 h-full overflow-y-auto relative flex flex-col">
         {/* Barra superior mobile */}
         <div
           className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 shrink-0 transition-colors duration-300"
