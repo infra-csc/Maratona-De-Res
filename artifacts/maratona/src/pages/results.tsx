@@ -69,16 +69,27 @@ const fmtBRLShort = (v: number) => v.toLocaleString("pt-BR", { style: "currency"
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
+/** Preto ou branco conforme a luminância do fundo — faixas são cores livres cadastradas em Regras do Sistema, muitas claras/pastel. */
+function contrastingTextColor(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "#fff";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#111111" : "#ffffff";
+}
+
 function FaixaBadge({ minScore, maxScore, color }: { minScore?: number | null; maxScore?: number | null; color?: string | null }) {
   if (minScore == null && maxScore == null) return <span style={{ color: "var(--muted-foreground)" }} className="font-bold">—</span>;
   const bg = color ?? "var(--secondary)";
+  const fg = color ? contrastingTextColor(color) : "var(--muted-foreground)";
   const label = minScore != null && maxScore != null
     ? `${minScore}–${maxScore}`
     : minScore != null ? `≥ ${minScore}` : `≤ ${maxScore}`;
   return (
     <span
       className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-      style={{ backgroundColor: bg, color: "#fff", mixBlendMode: "normal" }}
+      style={{ backgroundColor: bg, color: fg }}
     >
       {label}
     </span>
@@ -809,11 +820,12 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
   const eligibilityPct = filteredRows.length > 0 ? Math.round((eligibleCount / filteredRows.length) * 100) : 0;
   const sortedRows = useSort(filteredRows, sortKey, sortDir);
 
-  const payHeaderCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center") => (
+  const payHeaderCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center", title?: string) => (
     <div
       className={cn("px-4 py-3 text-[10px] font-bold uppercase cursor-pointer select-none transition-colors hover:opacity-70", align === "center" && "text-center")}
       style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}
       onClick={() => handleSort(key)}
+      title={title}
     >
       <span className="inline-flex items-center gap-1">
         {label}
@@ -983,8 +995,8 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                   {payHeaderCell("Nota Final", "finalResult")}
                   {payHeaderCell("Faixa", "platoon")}
                   {payHeaderCell("Elegibilidade", "eligible")}
-                  {payHeaderCell("Bônus", "bonusValue")}
-                  {payHeaderCell("Bônus Extra", "extraBonusValue")}
+                  {payHeaderCell("Bônus", "bonusValue", "center", "Valor total do bônus, já incluindo a parcela extra")}
+                  {payHeaderCell("Bônus Extra", "extraBonusValue", "center", "Parcela do Bônus referente a eventos extras — já está incluída no total da coluna Bônus, não some as duas")}
                   {payHeaderCell("Status do Pagamento", "bonusStatus")}
                   {canManage && <div className="px-4 py-3 text-[10px] font-bold uppercase text-center" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Ação</div>}
                 </div>
@@ -1035,7 +1047,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                           <span className="font-bold" style={{ color: "var(--muted-foreground)" }}>R$ 0,00</span>
                         )}
                       </div>
-                      <div className="px-4 py-3.5 text-center">
+                      <div className="px-4 py-3.5 text-center" title="Já incluído no total da coluna Bônus">
                         {(r.extraBonusValue ?? 0) > 0 ? (
                           <span className="font-black px-2.5 py-1 rounded-lg" style={{ backgroundColor: "var(--secondary)" }}>{fmtBRL(r.extraBonusValue ?? 0)}</span>
                         ) : (
