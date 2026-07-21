@@ -138,7 +138,7 @@ export default function DashboardPage() {
         </PremiumCard>
       )}
 
-      {/* 3. Top Performance + Distribuição de Pelotões */}
+      {/* 3. Top Performance + Distribuição por Faixa */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5 items-start">
         <PremiumCard className="overflow-hidden flex flex-col">
           <div className="p-6 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
@@ -172,9 +172,9 @@ export default function DashboardPage() {
 
         <PremiumCard className="p-6">
           <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-1" style={{ fontFamily: CONDENSED }}>
-            <Shapes size={16} style={{ color: "var(--accent)" }} /> Distribuição de Pelotões
+            <Shapes size={16} style={{ color: "var(--accent)" }} /> Distribuição por Faixa
           </h3>
-          <p className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>Colaboradores com resultado apurado neste ciclo</p>
+          <p className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>Colaboradores com resultado apurado neste ciclo, por faixa de bônus</p>
           {!platoons || platoons.length === 0 ? (
             <p className="text-sm font-semibold text-center py-6" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado apurado ainda.</p>
           ) : (

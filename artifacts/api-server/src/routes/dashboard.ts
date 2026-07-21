@@ -156,7 +156,7 @@ router.get("/dashboard/platoon-distribution", async (_req, res) => {
 
   const platoonMap = new Map<string, { name: string; color: string; count: number }>();
   for (const r of results) {
-    const key = r.platoon ?? "Sem Pelotão";
+    const key = r.platoon ?? "Sem Faixa";
     if (!platoonMap.has(key)) {
       platoonMap.set(key, { name: key, color: r.platoonColor ?? "#94a3b8", count: 0 });
     }
