@@ -568,8 +568,8 @@ export function AdminEvaluationsConsole() {
                     style={{ border: "1px solid var(--border)", backgroundColor: isSel ? "var(--secondary)" : "var(--card)" }}
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: cfg.accent }} />
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold uppercase text-[13.5px] leading-tight">{ev.name}</span>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-bold uppercase text-[13.5px] leading-tight min-w-0 break-words">{ev.name}</span>
                       <span className="font-black text-xs shrink-0" style={{ fontFamily: CONDENSED, color: cfg.accent }}>{ev.pct}%</span>
                     </div>
                     <div className="flex items-center gap-1.5 my-1.5">
