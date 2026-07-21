@@ -135,7 +135,7 @@ function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: numb
 function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("eligible");
+  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const qKey = getGetRankingQueryKey({ search: search || undefined });
@@ -252,6 +252,14 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                 <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Classificação Geral</h3>
               </div>
               <div>
+                {filteredRanking.length === 0 && allResults.length > 0 && filterEligible === "eligible" && (
+                  <div className="px-5 py-8 text-center">
+                    <p className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador elegível ainda</p>
+                    <p className="text-xs mt-1.5" style={{ color: "var(--muted-foreground)" }}>
+                      São necessários pelo menos 8 eventos no ciclo. Use <strong>Todos</strong> para ver o ranking parcial.
+                    </p>
+                  </div>
+                )}
                 {filteredRanking.map((entry) => {
                   const actualRank = entry.position;
                   const scorePct = Math.max(0, Math.min(100, entry.finalResult));
