@@ -772,7 +772,14 @@ export default function EvaluationsPage() {
         return { event: ev, total, submitted, done: allWorkDone, relevant: total > 0 || isConformityEval || isFerramentasEval2 || delegated.length > 0 };
       }).filter(s => s.relevant)
     : [];
-  const todoEvents = evaluatorEventStats.filter(s => !s.done).map(s => s.event);
+  // Eventos com qualquer publicação (parcial ou final) mas onde o avaliador
+  // ainda não concluiu — ficam numa seção própria "Publicado" e NÃO aparecem
+  // mais em "A Fazer" para não pressionar o avaliador após a publicação.
+  const publishedNotDoneEvents = evaluatorEventStats.filter(
+    s => !s.done && ((s.event as { partialPublishedAt?: string | null; feedbackReleased?: boolean }).partialPublishedAt || (s.event as { feedbackReleased?: boolean }).feedbackReleased),
+  ).map(s => s.event);
+  const publishedNotDoneIds = new Set(publishedNotDoneEvents.map(e => e.id));
+  const todoEvents = evaluatorEventStats.filter(s => !s.done && !publishedNotDoneIds.has(s.event.id)).map(s => s.event);
   const doneEvents = evaluatorEventStats.filter(s => s.done).map(s => s.event);
 
   // Consultation mode: when a manager picks an Avaliador WITHOUT picking an
@@ -1519,6 +1526,31 @@ export default function EvaluationsPage() {
                               </div>
                               <span className="text-[9px] font-black italic text-[#9aa08a] shrink-0 tabular-nums">{stats?.submitted ?? 0}/{stats?.total ?? 0}</span>
                             </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                  {publishedNotDoneEvents.length > 0 && (
+                    <>
+                      <div className="px-4 pt-4 pb-1.5 flex items-center justify-between">
+                        <span className="text-[9px] font-black italic uppercase tracking-widest text-[#006a80] flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-[#00b8d9]" /> Publicado
+                        </span>
+                        <span className="text-[9px] font-black italic text-[#9aa08a]">{publishedNotDoneEvents.length}</span>
+                      </div>
+                      {publishedNotDoneEvents.map(ev => {
+                        const isFinal = (ev as { feedbackReleased?: boolean }).feedbackReleased;
+                        const active = selectedEventId === ev.id;
+                        return (
+                          <button key={ev.id} type="button" data-testid={`evaluator-event-published-${ev.id}`}
+                            onClick={() => { setActiveEvalTab("todo"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
+                            className={cn("w-full text-left px-4 py-3 border-l-4 border-l-[#00b8d9] border-b border-[#eceef0] flex flex-col gap-1.5 transition-colors", active ? "bg-[#e6f8fc]" : "opacity-80 hover:opacity-100 hover:bg-[#e6f8fc]")}
+                          >
+                            <span className="text-[11px] font-black italic uppercase leading-snug truncate text-[#004a5a]">{ev.name}</span>
+                            <span className="text-[9px] font-black italic uppercase text-[#006a80] flex items-center gap-1">
+                              {isFinal ? <><CheckCircle size={9} /> Feedback final publicado</> : <><Send size={9} /> Publicação parcial</>}
+                            </span>
                           </button>
                         );
                       })}

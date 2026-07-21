@@ -621,13 +621,19 @@ export function AdminEvaluationsConsole() {
 
   // ---- KPIs ----
   const pendingEvaluatorNames = useMemo(() => {
-    const map = new Map<number, { name: string; assigned: number; submitted: number }>();
+    const map = new Map<number, { name: string; assigned: number; submitted: number; pendingEvents: { id: number; name: string }[] }>();
     for (const ev of enrichedEvents) {
       for (const c of ev.criteria) {
         if (c.assignedToId == null || !c.assignedToName) continue;
-        const cur = map.get(c.assignedToId) ?? { name: c.assignedToName, assigned: 0, submitted: 0 };
+        const cur = map.get(c.assignedToId) ?? { name: c.assignedToName, assigned: 0, submitted: 0, pendingEvents: [] };
         cur.assigned++;
-        if (c.state === "done") cur.submitted++;
+        if (c.state === "done") {
+          cur.submitted++;
+        } else {
+          if (!cur.pendingEvents.some(e => e.id === ev.id)) {
+            cur.pendingEvents.push({ id: ev.id, name: ev.name });
+          }
+        }
         map.set(c.assignedToId, cur);
       }
     }
@@ -652,7 +658,7 @@ export function AdminEvaluationsConsole() {
           pending: { label: "Pendente", bg: "rgba(232,162,61,0.14)", color: AMBER, accent: AMBER },
           late: { label: "Atrasado", bg: "rgba(229,72,77,0.12)", color: WARNING, accent: WARNING },
         }[st];
-        return { id: u.id, name: u.name, area: u.areaName ?? "—", assigned: stats.assigned, submitted: stats.submitted, pct, ...cfg };
+        return { id: u.id, name: u.name, area: u.areaName ?? "—", assigned: stats.assigned, submitted: stats.submitted, pct, pendingEvents: stats.pendingEvents, ...cfg };
       })
       .filter((v): v is NonNullable<typeof v> => v != null)
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -1597,6 +1603,27 @@ export function AdminEvaluationsConsole() {
                   <div className="h-[6px] rounded-full overflow-hidden mb-3.5" style={{ backgroundColor: "var(--secondary)" }}>
                     <div className="h-full rounded-full" style={{ width: `${av.pct}%`, background: av.accent }} />
                   </div>
+                  {/* Eventos pendentes */}
+                  {av.pendingEvents.length > 0 && (
+                    <div className="mb-3 space-y-1">
+                      <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>
+                        {av.pendingEvents.length === 1 ? "Falta responder:" : `Faltam ${av.pendingEvents.length} eventos:`}
+                      </p>
+                      <div className="space-y-0.5 max-h-[88px] overflow-y-auto pr-0.5">
+                        {av.pendingEvents.map(ev => (
+                          <button
+                            key={ev.id}
+                            type="button"
+                            onClick={() => { setSelectedEventId(ev.id); setView("assign"); }}
+                            className="w-full text-left text-[10px] font-bold px-2 py-1 rounded-md transition-colors hover:opacity-80 truncate"
+                            style={{ backgroundColor: "var(--secondary)", color: av.color, border: `1px solid ${av.accent}22` }}
+                          >
+                            {ev.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
