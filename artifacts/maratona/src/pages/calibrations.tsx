@@ -1395,33 +1395,43 @@ export default function CalibrationsPage() {
                                   ) : null;
                                 })}
                               </div>
-                              {/* ── Comentário do avaliador (read-only) ── */}
-                              {areaScores.filter(s => s.comment).map((s, i) => (
+                              {/* ── Avaliadores: nota individual + comentário ── */}
+                              {areaScores.map((s, i) => (
                                 <div key={i} className="mt-2 pt-1.5" style={{ borderTop: "1px dashed var(--border)" }}>
-                                  <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="text-[8px] font-black uppercase tracking-wider rounded px-1 py-px" style={{ color: GOOD, backgroundColor: "rgba(154,176,0,0.12)" }}>Avaliador</span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[8px] font-black uppercase tracking-wider px-1 py-px" style={{ color: GOOD, backgroundColor: "rgba(154,176,0,0.12)" }}>Avaliador</span>
                                     <span className="text-[10px] font-bold">{s.name}</span>
                                     {s.areaName && (
-                                      <span className="text-[8px] font-bold uppercase rounded px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{s.areaName}</span>
+                                      <span className="text-[8px] font-bold uppercase px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{s.areaName}</span>
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        setCalReasons(prev => ({ ...prev, [c.criterionId]: s.comment }));
-                                        setTimeout(() => {
-                                          const el = document.querySelector(`[data-testid="input-cal-reason-inline-${c.criterionId}"]`) as HTMLTextAreaElement | null;
-                                          if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
-                                        }, 0);
-                                      }}
-                                      title="Copiar para justificativa da calibração"
-                                      className="ml-auto h-4 w-4 flex items-center justify-center transition-colors shrink-0 rounded hover:opacity-70"
-                                      style={{ color: GOOD }}
+                                    {/* Nota individual do avaliador/área */}
+                                    <span
+                                      className="font-black text-[11px] px-2 py-px ml-1"
+                                      style={{ backgroundColor: "var(--primary)", color: "#191c1e", fontFamily: CONDENSED }}
+                                      title={`Nota de ${s.name}${s.areaName ? ` (${s.areaName})` : ""}`}
                                     >
-                                      <Copy size={9} />
-                                    </button>
+                                      {s.score.toFixed(1)}
+                                    </span>
+                                    {s.comment && (
+                                      <button
+                                        type="button"
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          setCalReasons(prev => ({ ...prev, [c.criterionId]: s.comment }));
+                                          setTimeout(() => {
+                                            const el = document.querySelector(`[data-testid="input-cal-reason-inline-${c.criterionId}"]`) as HTMLTextAreaElement | null;
+                                            if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
+                                          }, 0);
+                                        }}
+                                        title="Copiar para justificativa da calibração"
+                                        className="ml-auto h-4 w-4 flex items-center justify-center shrink-0 hover:opacity-70"
+                                        style={{ color: GOOD }}
+                                      >
+                                        <Copy size={9} />
+                                      </button>
+                                    )}
                                   </div>
-                                  <p className="text-[11px] leading-snug line-clamp-3">{s.comment}</p>
+                                  {s.comment && <p className="text-[11px] leading-snug line-clamp-3 mt-0.5">{s.comment}</p>}
                                 </div>
                               ))}
                               {/* ── Justificativa da calibração (editável) ── */}
@@ -1531,6 +1541,21 @@ export default function CalibrationsPage() {
                             </td>
                             {/* Nota Avaliador */}
                             <td className="px-2 py-2.5 text-center">
+                              {/* Quando há múltiplos avaliadores, mostra breakdown por área */}
+                              {areaScores.length > 1 && (
+                                <div className="flex items-center justify-center gap-1 mb-0.5 flex-wrap">
+                                  {areaScores.map((s, si) => (
+                                    <span
+                                      key={si}
+                                      className="text-[9px] font-black px-1 py-px leading-none"
+                                      style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)", fontFamily: CONDENSED }}
+                                      title={`${s.name}${s.areaName ? ` · ${s.areaName}` : ""}: ${s.score.toFixed(1)}`}
+                                    >
+                                      {s.score.toFixed(1)}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               <span className="text-sm font-black" style={{ color: calVal != null ? "var(--muted-foreground)" : "var(--foreground)", textDecoration: calVal != null ? "line-through" : "none" }}>
                                 {avg != null ? avg.toFixed(2) : <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>—</span>}
                               </span>
