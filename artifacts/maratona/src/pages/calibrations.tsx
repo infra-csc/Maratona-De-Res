@@ -851,32 +851,38 @@ export default function CalibrationsPage() {
                 role="combobox"
                 data-testid="select-event"
                 disabled={calibratableEvents.length === 0}
-                className="w-full h-9 px-3 rounded-lg flex items-center justify-between gap-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={fieldStyle}
+                className="w-full h-9 px-3 flex items-center justify-between gap-2 text-left transition-opacity hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed rounded-none"
+                style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)", color: "var(--foreground)" }}
               >
                 {pickedEvent ? (
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="font-bold uppercase text-[11px] truncate">{pickedEvent.name}</span>
-                    {formatEventSubtitle(pickedEvent) && <span className="text-[10px] truncate hidden md:inline" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(pickedEvent)}</span>}
+                    <span className="font-black uppercase text-[11px] truncate" style={{ fontFamily: CONDENSED }}>{pickedEvent.name}</span>
+                    {formatEventSubtitle(pickedEvent) && (
+                      <span className="text-[10px] font-bold truncate hidden md:inline" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(pickedEvent)}</span>
+                    )}
                   </span>
                 ) : (
-                  <span className="font-bold uppercase text-[10px]" style={{ color: "var(--muted-foreground)" }}>
+                  <span className="font-black uppercase text-[10px] tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
                     {calibratableEvents.length === 0 ? "Nenhum evento no ciclo" : "Selecionar evento..."}
                   </span>
                 )}
                 <ChevronsUpDown size={13} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="p-0 rounded-xl w-[min(92vw,540px)]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-              <Command>
-                {/* Status filters */}
-                <div className="flex flex-wrap gap-1 p-2" style={{ borderBottom: "1px solid var(--border)" }}>
+            <PopoverContent
+              align="start"
+              className="p-0 rounded-none w-[min(96vw,560px)]"
+              style={{ backgroundColor: "var(--background)", border: "2px solid var(--border)", color: "var(--foreground)", boxShadow: "4px 4px 0 var(--border)" }}
+            >
+              <Command className="[&_[cmdk-input-wrapper]]:border-b-0 [&_[cmdk-input-wrapper]]:px-3 [&_[cmdk-input-wrapper]]:py-2 [&_[cmdk-input]]:h-9 [&_[cmdk-item]]:rounded-none [&_[cmdk-item]]:px-0 [&_[cmdk-group]]:px-0">
+                {/* Status filter tabs */}
+                <div className="flex gap-0" style={{ borderBottom: "2px solid var(--border)" }}>
                   {([
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Aguardando" },
-                    { value: "inProgress", label: "Em avaliação" },
+                    { value: "inProgress", label: "Em Avaliação" },
                     { value: "done", label: "Fechado" },
-                  ] as const).map(opt => {
+                  ] as const).map((opt, i) => {
                     const active = eventStatusFilter === opt.value;
                     return (
                       <button
@@ -884,48 +890,94 @@ export default function CalibrationsPage() {
                         type="button"
                         data-testid={`button-filter-status-${opt.value}`}
                         onClick={() => setEventStatusFilter(opt.value)}
-                        className="px-2 py-0.5 rounded font-bold uppercase text-[10px] transition-colors"
-                        style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)", border: active ? "1px solid var(--primary)" : "1px solid var(--border)" }}
+                        className="flex-1 py-2.5 font-black uppercase text-[10px] tracking-widest transition-colors"
+                        style={{
+                          fontFamily: CONDENSED,
+                          backgroundColor: active ? "var(--primary)" : "transparent",
+                          color: active ? "#191c1e" : "var(--muted-foreground)",
+                          borderRight: i < 3 ? "2px solid var(--border)" : undefined,
+                        }}
                       >{opt.label}</button>
                     );
                   })}
                 </div>
-                {/* Date filters */}
-                <div className="flex items-center gap-1.5 px-2 py-1.5 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
-                  {cycleWeekends.map(w => {
-                    const active = filterDateFrom === w.sat && filterDateTo === w.sun;
-                    return (
-                      <button key={w.sat} type="button"
-                        onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                        className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-colors"
-                        style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)", border: active ? "1px solid var(--primary)" : "1px solid var(--border)" }}
-                      >{w.label}</button>
-                    );
-                  })}
-                  {(filterDateFrom || filterDateTo) && (
-                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[10px] hover:opacity-70" style={{ color: "var(--muted-foreground)" }}>× limpar</button>
-                  )}
+
+                {/* Date weekend chips */}
+                {cycleWeekends.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-3 py-2 flex-wrap" style={{ borderBottom: "2px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                    {cycleWeekends.map(w => {
+                      const active = filterDateFrom === w.sat && filterDateTo === w.sun;
+                      return (
+                        <button key={w.sat} type="button"
+                          onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
+                          className="px-2 py-1 font-black uppercase text-[9px] tracking-wide transition-colors"
+                          style={{
+                            fontFamily: CONDENSED,
+                            backgroundColor: active ? "var(--primary)" : "transparent",
+                            color: active ? "#191c1e" : "var(--muted-foreground)",
+                            border: active ? "1.5px solid var(--primary)" : "1.5px solid var(--border)",
+                          }}
+                        >{w.label}</button>
+                      );
+                    })}
+                    {(filterDateFrom || filterDateTo) && (
+                      <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                        className="text-[9px] font-black uppercase ml-1 hover:opacity-70"
+                        style={{ color: "var(--muted-foreground)" }}
+                      >× Limpar</button>
+                    )}
+                  </div>
+                )}
+
+                {/* Search */}
+                <div style={{ borderBottom: "2px solid var(--border)" }}>
+                  <CommandInput
+                    data-testid="input-event-search"
+                    placeholder="Buscar evento ou cliente..."
+                    className="font-bold uppercase text-[11px] placeholder:text-[11px] placeholder:font-bold placeholder:uppercase"
+                  />
                 </div>
-                <CommandInput data-testid="input-event-search" placeholder="Buscar evento ou cliente..." />
-                <CommandList className="max-h-[300px]">
-                  <CommandEmpty className="py-4 text-center text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum evento encontrado.</CommandEmpty>
-                  <CommandGroup>
-                    {filteredCalibratableEvents.map(ev => {
+
+                {/* Event list */}
+                <CommandList className="max-h-[320px] overflow-y-auto">
+                  <CommandEmpty className="py-6 text-center font-black uppercase text-[11px] tracking-widest" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>
+                    Nenhum evento encontrado.
+                  </CommandEmpty>
+                  <CommandGroup className="p-0">
+                    {filteredCalibratableEvents.map((ev, idx) => {
                       const chip = calibrationEventChip(ev);
+                      const isSelected = selectedEventId === ev.id;
                       return (
                         <CommandItem
                           key={ev.id}
                           value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
                           data-testid={`option-event-${ev.id}`}
                           onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); }}
-                          className="cursor-pointer py-2 gap-2 items-start"
+                          className="cursor-pointer rounded-none px-3 py-2.5 flex items-center gap-3 aria-selected:bg-transparent hover:opacity-90 transition-opacity"
+                          style={{
+                            borderTop: idx > 0 ? "1px solid var(--border)" : undefined,
+                            backgroundColor: isSelected ? "var(--secondary)" : "transparent",
+                          }}
                         >
-                          <Check size={14} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
+                          <div
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: isSelected ? "var(--accent)" : "transparent", border: isSelected ? undefined : "1px solid var(--border)" }}
+                          />
                           <span className="flex flex-col min-w-0 flex-1">
-                            <span className="font-black uppercase text-xs leading-tight whitespace-normal">{ev.name}</span>
-                            {formatEventSubtitle(ev) && <span className="text-[10px] font-bold uppercase whitespace-normal" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(ev)}</span>}
+                            <span className="font-black uppercase text-[12px] leading-tight whitespace-normal" style={{ fontFamily: CONDENSED }}>{ev.name}</span>
+                            {formatEventSubtitle(ev) && (
+                              <span className="text-[10px] font-bold uppercase mt-0.5 whitespace-normal" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(ev)}</span>
+                            )}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full font-bold text-[10px] uppercase shrink-0" style={{ backgroundColor: chip.bg, color: chip.fg }}>{chip.label}</span>
+                          <span
+                            className="font-black text-[9px] uppercase tracking-widest shrink-0 px-2 py-1"
+                            style={{
+                              fontFamily: CONDENSED,
+                              border: `1.5px solid ${chip.fg}`,
+                              color: chip.fg,
+                              backgroundColor: chip.bg,
+                            }}
+                          >{chip.label}</span>
                         </CommandItem>
                       );
                     })}
