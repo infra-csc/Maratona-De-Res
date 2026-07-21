@@ -396,6 +396,15 @@ function EmployeeDetailSheet({
                   <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-final-result">
                     {detail.summary.finalResult != null ? detail.summary.finalResult.toFixed(1) : "—"}
                   </p>
+                  {detail.summary.finalResult != null && detail.summary.grossAverage != null &&
+                   (detail.summary.penaltyPoints > 0 || detail.summary.meritPoints > 0) && (
+                    <p className="text-[10px] font-bold mt-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.6 }}>
+                      {detail.summary.grossAverage.toFixed(1)}
+                      {detail.summary.penaltyPoints > 0 && <> − {detail.summary.penaltyPoints}</>}
+                      {detail.summary.meritPoints > 0 && <> + {detail.summary.meritPoints}</>}
+                      {" "}= {detail.summary.finalResult.toFixed(1)}
+                    </p>
+                  )}
                 </div>
                 <div className="p-4" style={{ backgroundColor: "var(--card)" }}>
                   <span className="text-[9px] font-black uppercase tracking-wider block" style={{ color: "var(--muted-foreground)" }}>Média Bruta</span>
