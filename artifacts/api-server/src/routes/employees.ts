@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
-import { eq, and, inArray, ne } from "drizzle-orm";
+import { eq, and, inArray, ne, notInArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -257,6 +257,32 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
 
   await audit(req.user!.userId, "merge", "employees", canonicalId, { duplicateIds: dupIds }, { movedParticipations, movedAbsences, movedEvals, movedReviews, movedEvaluatorEvals });
   res.json({ canonicalId, merged: dupIds, movedParticipations, movedAbsences, movedEvals, movedReviews, movedEvaluatorEvals, removedUsers });
+});
+
+/**
+ * Redefine tipos em massa: IDs em casaIds → "casa", todos os demais ativos → "freela".
+ * Após a atualização recalcula o ciclo corrente.
+ */
+router.post("/employees/bulk-employment-reset", requireRole("admin", "rh"), async (req, res) => {
+  const { casaIds } = req.body as { casaIds: number[] };
+  if (!Array.isArray(casaIds) || casaIds.some(id => typeof id !== "number")) {
+    res.status(400).json({ error: "casaIds deve ser array de números" });
+    return;
+  }
+  await db.transaction(async tx => {
+    if (casaIds.length > 0) {
+      await tx.update(employeesTable).set({ employmentType: "casa" }).where(inArray(employeesTable.id, casaIds));
+      await tx.update(employeesTable).set({ employmentType: "freela" }).where(
+        and(notInArray(employeesTable.id, casaIds), eq(employeesTable.active, true)),
+      );
+    } else {
+      await tx.update(employeesTable).set({ employmentType: "freela" }).where(eq(employeesTable.active, true));
+    }
+  });
+  const cycle = await getCurrentCycle();
+  if (cycle) await recomputeCycleResults(cycle.id, req.user!.userId);
+  await audit(req.user!.userId, "bulk-employment-reset", "employees", null, { casaIds });
+  res.json({ ok: true, casaCount: casaIds.length });
 });
 
 router.get("/employees/:id/history", async (req, res) => {

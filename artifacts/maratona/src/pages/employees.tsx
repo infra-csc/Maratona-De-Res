@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
 
@@ -68,6 +68,11 @@ export default function EmployeesPage() {
 
   const [mergeMode, setMergeMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [resetTypeOpen, setResetTypeOpen] = useState(false);
+  const [resetTypePending, setResetTypePending] = useState(false);
+
+  // IDs dos colaboradores "casa" do Galpão Casa (Marceneiros + Montadores)
+  const GALP_CASA_IDS = [179,192,161,196,146,133,200,219,182,189,169,185,154,139,183,175,147,166,150,177,143,208];
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
 
@@ -217,6 +222,14 @@ export default function EmployeesPage() {
                 style={{ border: "1px solid var(--border)" }}
               >
                 <KeyRound size={16} /> Gerar Acessos em Massa
+              </button>
+              <button
+                onClick={() => setResetTypeOpen(true)}
+                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+                style={{ border: "1px solid var(--border)" }}
+                title="Define quais colaboradores contam no ranking (Casa vs Freela)"
+              >
+                <RefreshCw size={15} /> Redefinir Tipos
               </button>
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
@@ -690,6 +703,84 @@ export default function EmployeesPage() {
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Redefinir Tipos em Massa (Galpão Casa) */}
+      <Dialog open={resetTypeOpen} onOpenChange={v => { if (!resetTypePending) setResetTypeOpen(v); }}>
+        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}><RefreshCw size={18} /> Redefinir Tipos — Galpão Casa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="rounded-lg p-3.5 text-sm space-y-1.5" style={{ backgroundColor: "rgba(229,72,77,0.08)", border: "1px solid rgba(229,72,77,0.25)" }}>
+              <p className="font-black text-[11px] uppercase" style={{ color: WARNING }}>⚠ Ação irreversível</p>
+              <p style={{ color: "var(--foreground)" }}>Os <strong>22 colaboradores do Galpão Casa</strong> (abaixo) permanecerão como <strong>Casa</strong>. <strong>Todos os demais ativos</strong> serão marcados como <strong>Freela</strong> e deixarão de contar no ranking.</p>
+            </div>
+            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+              <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
+                <Lock size={10} /> Marceneiros
+              </div>
+              {[
+                "Alonso Lucas Trindade","Adriano Silva de Araújo","Bruno da Silva Cordeiro",
+                "Everton de Jesus Marinho","Gabriel Nascimento Menezes","Iago Dias Temoteo",
+                "José Marcio da Silva Menino","João Jorge da Silva Menino","José Renato Albuquerque de Souza",
+                "Matheus da Silva Cordeiro","Luan Miguel Marques","Willians Silva de Jesus",
+              ].map((n, i) => (
+                <div key={n} className="px-3 py-1.5 text-xs font-semibold" style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>{n}</div>
+              ))}
+              <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", borderTop: "1px solid var(--border)" }}>
+                <Lock size={10} /> Montadores
+              </div>
+              {[
+                "Caue Sousa Lima","Douglas Ferreira dos Reis","Erick Ramos da Silva",
+                "Jamerson Rodrigues da Silva","João Marcos Nascimento Leite","Kaio Gabriel Ferreira Barbosa",
+                "Lyrick Andrade Alves da Silva","Ulisses Damazio Fernandes","Vinicius da Silva",
+                "Edgard Jose Soares Mariano",
+              ].map((n, i) => (
+                <div key={n} className="px-3 py-1.5 text-xs font-semibold" style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>{n}</div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+              <button
+                type="button"
+                disabled={resetTypePending}
+                onClick={() => setResetTypeOpen(false)}
+                className="h-10 px-4 rounded-lg font-bold uppercase text-xs"
+                style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={resetTypePending}
+                onClick={async () => {
+                  setResetTypePending(true);
+                  try {
+                    const res = await fetch("/api/employees/bulk-employment-reset", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({ casaIds: GALP_CASA_IDS }),
+                    });
+                    if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+                    await qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
+                    toast({ title: "Tipos atualizados", description: "22 colaboradores Casa confirmados. Demais marcados como Freela. Ranking recalculado." });
+                    setResetTypeOpen(false);
+                  } catch (e) {
+                    toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
+                  } finally {
+                    setResetTypePending(false);
+                  }
+                }}
+                className="h-10 px-5 rounded-lg font-black text-xs uppercase flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: WARNING, color: "#fff" }}
+              >
+                <RefreshCw size={14} className={resetTypePending ? "animate-spin" : ""} />
+                {resetTypePending ? "Atualizando..." : "Confirmar e Aplicar"}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
