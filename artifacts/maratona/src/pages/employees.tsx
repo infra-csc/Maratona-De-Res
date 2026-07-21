@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   useGetEmployees,
   useCreateEmployee,
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
 
@@ -46,6 +46,8 @@ const employmentTypeLabel = (t?: string) => (t === "freela" ? "Freela" : "Casa")
 type EmployeeWithCycle = import("@workspace/api-client-react").Employee & {
   cycleEligible: boolean | null;
   participatedEventsCount: number | null;
+  linkedUserId: number | null;
+  hasAccess: boolean;
 };
 
 function initials(name: string) {
@@ -53,8 +55,30 @@ function initials(name: string) {
 }
 
 export default function EmployeesPage() {
-  const { user } = useAuth();
+  const { user, impersonate } = useAuth();
   const { toast } = useToast();
+  const [previewingId, setPreviewingId] = useState<number | null>(null);
+
+  const handlePreviewAs = useCallback(async (emp: EmployeeWithCycle) => {
+    if (!emp.linkedUserId) return;
+    setPreviewingId(emp.id);
+    try {
+      const res = await fetch("/api/auth/impersonate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId: emp.linkedUserId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+      const { token, user: impUser } = await res.json() as { token: string; user: import("@workspace/api-client-react").User };
+      impersonate(token, impUser);
+      const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+      window.location.assign(`${base}/`);
+    } catch (e) {
+      toast({ title: "Não foi possível visualizar como este colaborador", description: (e as Error).message, variant: "destructive" });
+      setPreviewingId(null);
+    }
+  }, [impersonate, toast]);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"true" | "false">("true");
@@ -455,6 +479,7 @@ export default function EmployeesPage() {
                     <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
                     <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
                     <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
+                    {canEdit && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Acesso</th>}
                     {canEdit && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
                   </tr>
                 </thead>
@@ -543,6 +568,32 @@ export default function EmployeesPage() {
                           })()}
                         </div>
                       </td>
+                      {canEdit && !mergeMode && (
+                        <td className="px-5 py-3.5 text-center">
+                          {emp.hasAccess ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: GOOD }}>
+                                <Wifi size={11} /> Com acesso
+                              </span>
+                              <button
+                                title={`Visualizar app como ${emp.name}`}
+                                disabled={previewingId === emp.id}
+                                onClick={() => handlePreviewAs(emp)}
+                                className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                              >
+                                {previewingId === emp.id
+                                  ? <><Eye size={11} className="animate-pulse" /> Abrindo…</>
+                                  : <><Eye size={11} /> Ver visão</>}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
+                              <WifiOff size={11} /> Sem acesso
+                            </span>
+                          )}
+                        </td>
+                      )}
                       {canEdit && !mergeMode && (
                         <td className="px-5 py-3.5 text-center">
                           <button

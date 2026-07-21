@@ -41,11 +41,24 @@ router.get("/employees", async (req, res) => {
     }
   }
 
-  res.json(employees.map(e => ({
-    ...e,
-    cycleEligible: cycleResults[e.id]?.cycleEligible ?? null,
-    participatedEventsCount: cycleResults[e.id]?.participatedEventsCount ?? null,
-  })));
+  // Map linked user accounts so the UI can offer "view as employee" and show access status
+  const empIds = employees.map(e => e.id);
+  const linkedUsers = empIds.length > 0
+    ? await db.select({ id: usersTable.id, employeeId: usersTable.employeeId, active: usersTable.active })
+        .from(usersTable).where(inArray(usersTable.employeeId, empIds))
+    : [];
+  const linkedByEmpId = new Map(linkedUsers.map(u => [u.employeeId!, u]));
+
+  res.json(employees.map(e => {
+    const linked = e.id != null ? linkedByEmpId.get(e.id) : undefined;
+    return {
+      ...e,
+      cycleEligible: cycleResults[e.id]?.cycleEligible ?? null,
+      participatedEventsCount: cycleResults[e.id]?.participatedEventsCount ?? null,
+      linkedUserId: linked?.id ?? null,
+      hasAccess: linked != null && linked.active,
+    };
+  }));
 });
 
 router.get("/employees/:id", async (req, res) => {
