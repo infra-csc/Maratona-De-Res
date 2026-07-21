@@ -871,12 +871,20 @@ export default function CalibrationsPage() {
             </PopoverTrigger>
             <PopoverContent
               align="start"
-              className="p-0 rounded-none w-[min(96vw,560px)]"
-              style={{ backgroundColor: "var(--background)", border: "2px solid var(--border)", color: "var(--foreground)", boxShadow: "4px 4px 0 var(--border)" }}
+              className="p-0 rounded-none w-[min(96vw,580px)]"
+              style={{
+                backgroundColor: "#0f0f0f",
+                border: "2px solid rgba(255,255,255,0.14)",
+                color: "#f0ede8",
+                boxShadow: "6px 6px 0 #ccff00",
+              }}
             >
-              <Command className="[&_[cmdk-input-wrapper]]:border-b-0 [&_[cmdk-input-wrapper]]:px-3 [&_[cmdk-input-wrapper]]:py-2 [&_[cmdk-input]]:h-9 [&_[cmdk-item]]:rounded-none [&_[cmdk-item]]:px-0 [&_[cmdk-group]]:px-0">
-                {/* Status filter tabs */}
-                <div className="flex gap-0" style={{ borderBottom: "2px solid var(--border)" }}>
+              <Command
+                className="[&_[cmdk-input-wrapper]]:border-b-0 [&_[cmdk-input-wrapper]]:px-0 [&_[cmdk-input-wrapper]]:py-0 [&_[cmdk-item]]:rounded-none [&_[cmdk-item]]:px-0 [&_[cmdk-group]]:px-0"
+                style={{ backgroundColor: "#0f0f0f", color: "#f0ede8" }}
+              >
+                {/* ── Status filter tabs ── */}
+                <div className="flex" style={{ borderBottom: "2px solid rgba(255,255,255,0.10)" }}>
                   {([
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Aguardando" },
@@ -890,60 +898,64 @@ export default function CalibrationsPage() {
                         type="button"
                         data-testid={`button-filter-status-${opt.value}`}
                         onClick={() => setEventStatusFilter(opt.value)}
-                        className="flex-1 py-2.5 font-black uppercase text-[10px] tracking-widest transition-colors"
+                        className="flex-1 py-3 font-black uppercase text-[10px] tracking-widest transition-all"
                         style={{
                           fontFamily: CONDENSED,
-                          backgroundColor: active ? "var(--primary)" : "transparent",
-                          color: active ? "#191c1e" : "var(--muted-foreground)",
-                          borderRight: i < 3 ? "2px solid var(--border)" : undefined,
+                          backgroundColor: active ? "#ccff00" : "transparent",
+                          color: active ? "#0f0f0f" : "rgba(255,255,255,0.35)",
+                          borderRight: i < 3 ? "1px solid rgba(255,255,255,0.10)" : undefined,
                         }}
                       >{opt.label}</button>
                     );
                   })}
                 </div>
 
-                {/* Date weekend chips */}
+                {/* ── Date weekend chips ── */}
                 {cycleWeekends.length > 0 && (
-                  <div className="flex items-center gap-1.5 px-3 py-2 flex-wrap" style={{ borderBottom: "2px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                  <div className="flex items-center gap-1.5 px-3 py-2.5 flex-wrap" style={{ borderBottom: "1px solid rgba(255,255,255,0.10)", backgroundColor: "#161616" }}>
                     {cycleWeekends.map(w => {
                       const active = filterDateFrom === w.sat && filterDateTo === w.sun;
                       return (
                         <button key={w.sat} type="button"
                           onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                          className="px-2 py-1 font-black uppercase text-[9px] tracking-wide transition-colors"
+                          className="px-2 py-1 font-black uppercase text-[9px] tracking-wide transition-all"
                           style={{
                             fontFamily: CONDENSED,
-                            backgroundColor: active ? "var(--primary)" : "transparent",
-                            color: active ? "#191c1e" : "var(--muted-foreground)",
-                            border: active ? "1.5px solid var(--primary)" : "1.5px solid var(--border)",
+                            backgroundColor: active ? "#ccff00" : "transparent",
+                            color: active ? "#0f0f0f" : "rgba(255,255,255,0.45)",
+                            border: active ? "1.5px solid #ccff00" : "1.5px solid rgba(255,255,255,0.18)",
                           }}
                         >{w.label}</button>
                       );
                     })}
                     {(filterDateFrom || filterDateTo) && (
                       <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-                        className="text-[9px] font-black uppercase ml-1 hover:opacity-70"
-                        style={{ color: "var(--muted-foreground)" }}
+                        className="text-[9px] font-black uppercase ml-auto hover:opacity-70"
+                        style={{ color: "rgba(255,255,255,0.35)" }}
                       >× Limpar</button>
                     )}
                   </div>
                 )}
 
-                {/* Search */}
-                <div style={{ borderBottom: "2px solid var(--border)" }}>
+                {/* ── Search ── */}
+                <div className="flex items-center gap-2 px-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.10)", backgroundColor: "#0f0f0f" }}>
+                  <span style={{ color: "rgba(255,255,255,0.30)" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  </span>
                   <CommandInput
                     data-testid="input-event-search"
                     placeholder="Buscar evento ou cliente..."
-                    className="font-bold uppercase text-[11px] placeholder:text-[11px] placeholder:font-bold placeholder:uppercase"
+                    className="flex-1 h-10 bg-transparent border-none outline-none font-bold uppercase text-[11px] placeholder:text-[11px] placeholder:font-bold placeholder:uppercase [&_input]:bg-transparent"
+                    style={{ color: "#f0ede8" }}
                   />
                 </div>
 
-                {/* Event list */}
-                <CommandList className="max-h-[320px] overflow-y-auto">
-                  <CommandEmpty className="py-6 text-center font-black uppercase text-[11px] tracking-widest" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>
+                {/* ── Event list ── */}
+                <CommandList className="max-h-[300px] overflow-y-auto" style={{ backgroundColor: "#0f0f0f" }}>
+                  <CommandEmpty className="py-8 text-center font-black uppercase text-[11px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)", fontFamily: CONDENSED }}>
                     Nenhum evento encontrado.
                   </CommandEmpty>
-                  <CommandGroup className="p-0">
+                  <CommandGroup className="p-0" style={{ backgroundColor: "#0f0f0f" }}>
                     {filteredCalibratableEvents.map((ev, idx) => {
                       const chip = calibrationEventChip(ev);
                       const isSelected = selectedEventId === ev.id;
@@ -953,31 +965,40 @@ export default function CalibrationsPage() {
                           value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
                           data-testid={`option-event-${ev.id}`}
                           onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); }}
-                          className="cursor-pointer rounded-none px-3 py-2.5 flex items-center gap-3 aria-selected:bg-transparent hover:opacity-90 transition-opacity"
+                          className="cursor-pointer rounded-none flex items-center gap-0 aria-selected:bg-transparent"
                           style={{
-                            borderTop: idx > 0 ? "1px solid var(--border)" : undefined,
-                            backgroundColor: isSelected ? "var(--secondary)" : "transparent",
+                            borderTop: idx > 0 ? "1px solid rgba(255,255,255,0.07)" : undefined,
+                            backgroundColor: isSelected ? "#1a1a1a" : "transparent",
                           }}
                         >
+                          {/* Selected indicator bar */}
                           <div
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: isSelected ? "var(--accent)" : "transparent", border: isSelected ? undefined : "1px solid var(--border)" }}
+                            className="self-stretch w-1 shrink-0"
+                            style={{ backgroundColor: isSelected ? "#ccff00" : "transparent" }}
                           />
-                          <span className="flex flex-col min-w-0 flex-1">
-                            <span className="font-black uppercase text-[12px] leading-tight whitespace-normal" style={{ fontFamily: CONDENSED }}>{ev.name}</span>
-                            {formatEventSubtitle(ev) && (
-                              <span className="text-[10px] font-bold uppercase mt-0.5 whitespace-normal" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(ev)}</span>
-                            )}
-                          </span>
-                          <span
-                            className="font-black text-[9px] uppercase tracking-widest shrink-0 px-2 py-1"
-                            style={{
-                              fontFamily: CONDENSED,
-                              border: `1.5px solid ${chip.fg}`,
-                              color: chip.fg,
-                              backgroundColor: chip.bg,
-                            }}
-                          >{chip.label}</span>
+                          <div className="flex items-center gap-3 px-3 py-3 flex-1 min-w-0">
+                            <span className="flex flex-col min-w-0 flex-1">
+                              <span
+                                className="font-black uppercase text-[12px] leading-tight whitespace-normal"
+                                style={{ fontFamily: CONDENSED, color: isSelected ? "#ccff00" : "#f0ede8" }}
+                              >{ev.name}</span>
+                              {formatEventSubtitle(ev) && (
+                                <span
+                                  className="text-[10px] font-bold uppercase mt-0.5 whitespace-normal"
+                                  style={{ color: "rgba(255,255,255,0.40)" }}
+                                >{formatEventSubtitle(ev)}</span>
+                              )}
+                            </span>
+                            <span
+                              className="font-black text-[9px] uppercase tracking-widest shrink-0 px-2 py-1"
+                              style={{
+                                fontFamily: CONDENSED,
+                                border: `1.5px solid ${chip.fg}`,
+                                color: chip.fg,
+                                backgroundColor: chip.bg,
+                              }}
+                            >{chip.label}</span>
+                          </div>
                         </CommandItem>
                       );
                     })}
