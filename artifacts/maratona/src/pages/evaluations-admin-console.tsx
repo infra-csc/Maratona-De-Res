@@ -70,6 +70,8 @@ interface CritRow {
   areaName: string;
   assignedToId: number | null;
   assignedToName: string | null;
+  /** Nome que a pessoa digitou no formulário — pode diferir do atribuído (ex: freelancer via link) */
+  formSubmitterName: string | null;
   state: CritState;
   submittedAt: string | null;
 }
@@ -205,7 +207,9 @@ export function AdminEvaluationsConsole() {
           criterionName: c.criterionName,
           areaId: c.responsibleAreaId ?? null,
           areaName: c.responsibleAreaName ?? "Sem área",
-          assignedToId, assignedToName, state,
+          assignedToId, assignedToName,
+          formSubmitterName: evalRow?.evaluatorName ?? null,
+          state,
           submittedAt: evalRow?.submittedAt ?? null,
         };
       });
@@ -917,10 +921,17 @@ export function AdminEvaluationsConsole() {
                         <div className="flex items-center justify-between gap-2.5 mt-2.5 flex-wrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {c.assignedToId != null ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.state === "done" ? GOOD : "var(--border)" }} />
-                                {c.assignedToName}
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                                  <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.state === "done" ? GOOD : "var(--border)" }} />
+                                  {c.assignedToName}
+                                </span>
+                                {c.formSubmitterName && c.formSubmitterName !== c.assignedToName && (
+                                  <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5" style={{ color: "var(--muted-foreground)" }}>
+                                    <UserCheck size={9} /> Preenchido por: <span style={{ color: "var(--foreground)" }}>{c.formSubmitterName}</span>
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <span className="font-bold uppercase text-[11px]" style={{ color: WARNING }}>Nenhum avaliador atribuído</span>
                             )}
@@ -943,18 +954,28 @@ export function AdminEvaluationsConsole() {
                                   <Link2 size={11} /> Link
                                 </button>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
-                                className="rounded-lg px-3 py-1.5 text-[10.5px] font-bold uppercase transition-opacity hover:opacity-80"
-                                style={{
-                                  border: c.assignedToId == null ? "1px solid var(--primary)" : "1px solid var(--border)",
-                                  backgroundColor: c.assignedToId == null ? "var(--primary)" : "transparent",
-                                  color: c.assignedToId == null ? "var(--primary-foreground)" : "var(--foreground)",
-                                }}
-                              >
-                                {c.assignedToId == null ? "Atribuir" : "Gerenciar"}
-                              </button>
+                              {c.state === "done" ? (
+                                <span
+                                  className="rounded-lg px-3 py-1.5 text-[10.5px] font-bold uppercase flex items-center gap-1"
+                                  style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)", opacity: 0.6 }}
+                                  title="Resposta enviada — reatribuição bloqueada"
+                                >
+                                  <Lock size={10} /> Bloqueado
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
+                                  className="rounded-lg px-3 py-1.5 text-[10.5px] font-bold uppercase transition-opacity hover:opacity-80"
+                                  style={{
+                                    border: c.assignedToId == null ? "1px solid var(--primary)" : "1px solid var(--border)",
+                                    backgroundColor: c.assignedToId == null ? "var(--primary)" : "transparent",
+                                    color: c.assignedToId == null ? "var(--primary-foreground)" : "var(--foreground)",
+                                  }}
+                                >
+                                  {c.assignedToId == null ? "Atribuir" : "Gerenciar"}
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1523,7 +1544,14 @@ export function AdminEvaluationsConsole() {
                   <div key={c.criterionId} className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] items-center min-w-[820px]" style={{ borderTop: "1px solid var(--border)", backgroundColor: c.assignedToId == null ? "rgba(229,72,77,0.05)" : "transparent" }}>
                     <div className="px-3.5 py-3 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED }}>{c.criterionName}</div>
                     <div className="px-3.5 py-3 font-bold uppercase text-[11px]" style={{ color: "var(--muted-foreground)" }}>{c.areaName}</div>
-                    <div className="px-3.5 py-3 font-semibold text-xs" style={{ color: c.assignedToId == null ? WARNING : "var(--foreground)" }}>{c.assignedToName ?? "Sem avaliador"}</div>
+                    <div className="px-3.5 py-3">
+                      <div className="font-semibold text-xs" style={{ color: c.assignedToId == null ? WARNING : "var(--foreground)" }}>{c.assignedToName ?? "Sem avaliador"}</div>
+                      {c.formSubmitterName && c.formSubmitterName !== c.assignedToName && (
+                        <div className="flex items-center gap-1 mt-0.5 text-[9px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                          <UserCheck size={8} /> {c.formSubmitterName}
+                        </div>
+                      )}
+                    </div>
                     <div className="px-3.5 py-3 font-bold text-[11px]" style={{ color: "var(--muted-foreground)" }}>
                       {c.submittedAt ? (
                         <span className="flex items-center gap-1" style={{ color: GOOD }}><Clock size={10} /> {fmtDT(c.submittedAt)}</span>
@@ -1547,18 +1575,28 @@ export function AdminEvaluationsConsole() {
                         </button>
                       )}
                       {canManage && (
-                        <button
-                          type="button"
-                          onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
-                          className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase whitespace-nowrap transition-opacity hover:opacity-80"
-                          style={{
-                            border: c.assignedToId == null ? "1px solid var(--primary)" : "1px solid var(--border)",
-                            backgroundColor: c.assignedToId == null ? "var(--primary)" : "transparent",
-                            color: c.assignedToId == null ? "var(--primary-foreground)" : "var(--foreground)",
-                          }}
-                        >
-                          {c.assignedToId == null ? "Atribuir" : "Gerenciar"}
-                        </button>
+                        c.state === "done" ? (
+                          <span
+                            className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1 whitespace-nowrap"
+                            style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)", opacity: 0.55 }}
+                            title="Resposta enviada — reatribuição bloqueada"
+                          >
+                            <Lock size={9} /> Bloqueado
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
+                            className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase whitespace-nowrap transition-opacity hover:opacity-80"
+                            style={{
+                              border: c.assignedToId == null ? "1px solid var(--primary)" : "1px solid var(--border)",
+                              backgroundColor: c.assignedToId == null ? "var(--primary)" : "transparent",
+                              color: c.assignedToId == null ? "var(--primary-foreground)" : "var(--foreground)",
+                            }}
+                          >
+                            {c.assignedToId == null ? "Atribuir" : "Gerenciar"}
+                          </button>
+                        )
                       )}
                       {pickerOpen && c.areaId != null && (
                         <div className="absolute right-3.5 top-full mt-1 z-10 w-64 rounded-xl p-2.5 text-left" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
