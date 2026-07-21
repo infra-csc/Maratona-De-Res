@@ -17,6 +17,7 @@ import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriter
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AdminEvaluationsConsole } from "./evaluations-admin-console";
+import { BODY } from "@/lib/premium-theme";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
@@ -1201,7 +1202,7 @@ export default function EvaluationsPage() {
   // fluxo de lançamento de nota do avaliador que segue abaixo.
   if (isConsultation) {
     return (
-      <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
         <div className="p-6 md:p-10">
           <AdminEvaluationsConsole />
         </div>

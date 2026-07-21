@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CONDENSED, WARNING } from "@/lib/premium-theme";
 
 function fmtDT(v: string | null | undefined): string {
   if (!v) return "—";
@@ -42,17 +43,18 @@ function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
   return result;
 }
 
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const CENOGRAFIA_AREA_ID = 13;
 const FERRAMENTAS_AREA_ID = 16;
+const AMBER = "#e8a23d";
+const GOOD = "#9ab000";
 
 type CritState = "unassigned" | "pending" | "partial" | "done";
 
 const STATE_CFG: Record<CritState, { label: string; bg: string; color: string; accent: string }> = {
-  done: { label: "Completo", bg: "#ecffb0", color: "#3f5200", accent: "#506600" },
-  partial: { label: "Parcial", bg: "#ffdbd1", color: "#862200", accent: "#f28b6a" },
-  pending: { label: "Aguardando", bg: "#eef0f2", color: "#747a60", accent: "#c8cbd0" },
-  unassigned: { label: "Sem avaliador", bg: "#ffe0e0", color: "#ba1a1a", accent: "#ba1a1a" },
+  done: { label: "Completo", bg: "rgba(154,176,0,0.14)", color: GOOD, accent: GOOD },
+  partial: { label: "Parcial", bg: "rgba(232,162,61,0.14)", color: AMBER, accent: AMBER },
+  pending: { label: "Aguardando", bg: "var(--secondary)", color: "var(--muted-foreground)", accent: "var(--border)" },
+  unassigned: { label: "Sem avaliador", bg: "rgba(229,72,77,0.12)", color: WARNING, accent: WARNING },
 };
 
 interface CritRow {
@@ -89,12 +91,14 @@ function initials(name: string) {
   return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
+const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
+
 /** Picker inline de avaliadores de uma área — usado para atribuir critérios e a matriz de conformidade. */
 function InlinePicker({ areaId, excludeId, onPick }: { areaId: number; excludeId?: number | null; onPick: (userId: number, name: string) => void }) {
   const { data: users, isLoading } = useUsersByArea(areaId);
   const candidates = (users ?? []).filter(u => u.id !== excludeId);
-  if (isLoading) return <p className="text-[10px] italic text-[#747a60]">Carregando avaliadores...</p>;
-  if (candidates.length === 0) return <p className="text-[10px] italic text-[#747a60]">Nenhum avaliador ativo nesta área.</p>;
+  if (isLoading) return <p className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Carregando avaliadores...</p>;
+  if (candidates.length === 0) return <p className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador ativo nesta área.</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {candidates.map(u => (
@@ -102,7 +106,8 @@ function InlinePicker({ areaId, excludeId, onPick }: { areaId: number; excludeId
           key={u.id}
           type="button"
           onClick={() => onPick(u.id, u.name)}
-          className="border-2 border-[#191c1e] bg-white px-2.5 py-1.5 text-[11px] font-bold italic hover:bg-[#ccff00] transition-colors"
+          className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors hover:opacity-80"
+          style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}
         >
           + {u.name}
         </button>
@@ -409,9 +414,9 @@ export function AdminEvaluationsConsole() {
         else if (stats.submitted === 0) st = "late";
         else st = "pending";
         const cfg = {
-          ok: { label: "Em dia", bg: "#ecffb0", color: "#3f5200", accent: "#506600", bar: "#a8e000" },
-          pending: { label: "Pendente", bg: "#ffdbd1", color: "#862200", accent: "#f28b6a", bar: "#f28b6a" },
-          late: { label: "Atrasado", bg: "#ffe0e0", color: "#ba1a1a", accent: "#ba1a1a", bar: "#ba1a1a" },
+          ok: { label: "Em dia", bg: "rgba(154,176,0,0.14)", color: GOOD, accent: GOOD },
+          pending: { label: "Pendente", bg: "rgba(232,162,61,0.14)", color: AMBER, accent: AMBER },
+          late: { label: "Atrasado", bg: "rgba(229,72,77,0.12)", color: WARNING, accent: WARNING },
         }[st];
         return { id: u.id, name: u.name, area: u.areaName ?? "—", assigned: stats.assigned, submitted: stats.submitted, pct, ...cfg };
       })
@@ -424,10 +429,10 @@ export function AdminEvaluationsConsole() {
       {/* Header: título + switcher de abas */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black italic uppercase tracking-tight">Central de Avaliações</h1>
-          <p className="text-[11px] font-bold italic uppercase text-[#747a60] mt-0.5">Acompanhe o progresso e atribua avaliadores</p>
+          <h1 className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Central de Avaliações</h1>
+          <p className="text-[11px] font-bold uppercase tracking-wide mt-0.5" style={{ color: "var(--muted-foreground)" }}>Acompanhe o progresso e atribua avaliadores</p>
         </div>
-        <div className="flex border-2 border-[#191c1e] shrink-0">
+        <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
           {([
             { key: "assign", label: "Atribuição", Icon: ClipboardCheck },
             { key: "table", label: "Tabela", Icon: Table2 },
@@ -438,10 +443,15 @@ export function AdminEvaluationsConsole() {
               type="button"
               onClick={() => setView(v.key)}
               className={cn(
-                "px-3.5 py-2 text-[11px] font-black italic uppercase flex items-center gap-1.5 transition-colors",
-                idx < 2 && "border-r-2 border-[#191c1e]",
-                view === v.key ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#191c1e] hover:bg-[#f2f4f6]",
+                "px-3.5 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors",
+                idx < 2 && "border-r",
               )}
+              style={{
+                fontFamily: CONDENSED,
+                borderColor: "var(--border)",
+                backgroundColor: view === v.key ? "var(--primary)" : "transparent",
+                color: view === v.key ? "var(--primary-foreground)" : "var(--muted-foreground)",
+              }}
             >
               <v.Icon size={13} /> {v.label}
             </button>
@@ -451,87 +461,89 @@ export function AdminEvaluationsConsole() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-        <div className="bg-white border-2 border-[#191c1e] p-3.5 shadow-[3px_3px_0px_0px_#191c1e]">
-          <div className="text-3xl font-black italic leading-none">{todoEvents.length}</div>
-          <div className="text-[10px] font-bold italic uppercase text-[#747a60] mt-1">Eventos abertos</div>
+        <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED }}>{todoEvents.length}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Eventos abertos</div>
         </div>
-        <div className="bg-white border-2 border-[#191c1e] p-3.5 shadow-[3px_3px_0px_0px_#191c1e]">
-          <div className="text-3xl font-black italic leading-none text-[#506600]">{selected ? `${selected.pct}%` : "—"}</div>
-          <div className="text-[10px] font-bold italic uppercase text-[#747a60] mt-1">Concluído no evento</div>
+        <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{selected ? `${selected.pct}%` : "—"}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Concluído no evento</div>
         </div>
-        <div className="bg-white border-2 border-[#191c1e] p-3.5 shadow-[3px_3px_0px_0px_#191c1e]">
-          <div className="text-3xl font-black italic leading-none text-[#862200]">{pendingEvaluatorsCount}</div>
-          <div className="text-[10px] font-bold italic uppercase text-[#747a60] mt-1">Avaliadores pendentes</div>
+        <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: AMBER }}>{pendingEvaluatorsCount}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Avaliadores pendentes</div>
         </div>
-        <div className="bg-white border-2 border-[#191c1e] p-3.5 shadow-[3px_3px_0px_0px_#191c1e]">
-          <div className={cn("text-3xl font-black italic leading-none", (selected?.unassigned ?? 0) > 0 ? "text-[#ba1a1a]" : "text-[#191c1e]")}>{selected?.unassigned ?? 0}</div>
-          <div className="text-[10px] font-bold italic uppercase text-[#747a60] mt-1">Critérios sem avaliador</div>
+        <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: (selected?.unassigned ?? 0) > 0 ? WARNING : "var(--foreground)" }}>{selected?.unassigned ?? 0}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Critérios sem avaliador</div>
         </div>
       </div>
 
       {enrichedEvents.length === 0 ? (
-        <div className="text-center py-20 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">
+        <div className="text-center py-20 rounded-xl font-bold uppercase" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
           Nenhum evento liberado para avaliação no momento.
         </div>
       ) : view === "assign" ? (
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
           {/* Coluna esquerda — fila de eventos */}
-          <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
+          <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="p-3.5 pb-0">
-              <p className="text-[11px] font-black italic uppercase tracking-wide text-[#747a60] mb-2.5">Eventos do ciclo</p>
-              <div className="flex border-2 border-[#191c1e]">
-                <button type="button" onClick={() => setTab("todo")} className={cn("flex-1 border-r-2 border-[#191c1e] py-2 text-[10.5px] font-black italic uppercase", tab === "todo" ? "bg-[#ccff00]" : "bg-white")}>
+              <p className="text-[11px] font-bold uppercase tracking-wide mb-2.5" style={{ color: "var(--muted-foreground)" }}>Eventos do ciclo</p>
+              <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                <button type="button" onClick={() => setTab("todo")} className="flex-1 py-2 text-[10.5px] font-bold uppercase" style={{ fontFamily: CONDENSED, borderRight: "1px solid var(--border)", backgroundColor: tab === "todo" ? "var(--primary)" : "transparent", color: tab === "todo" ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>
                   Em aberto · {todoEvents.length}
                 </button>
-                <button type="button" onClick={() => setTab("done")} className={cn("flex-1 py-2 text-[10.5px] font-black italic uppercase", tab === "done" ? "bg-[#ccff00]" : "bg-white")}>
+                <button type="button" onClick={() => setTab("done")} className="flex-1 py-2 text-[10.5px] font-bold uppercase" style={{ fontFamily: CONDENSED, backgroundColor: tab === "done" ? "var(--primary)" : "transparent", color: tab === "done" ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>
                   Concluídos · {doneEvents.length}
                 </button>
               </div>
 
-              <div className="mt-2.5 flex flex-col gap-2 pb-3 border-b-2 border-[#191c1e]">
-                <div className="flex items-center gap-1.5 border-2 border-[#191c1e] px-2.5 py-1.5">
-                  <Search size={14} className="text-[#747a60] shrink-0" />
+              <div className="mt-2.5 flex flex-col gap-2 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={fieldStyle}>
+                  <Search size={14} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
                   <input
                     value={q}
                     onChange={e => setQ(e.target.value)}
                     placeholder="Buscar evento..."
-                    className="border-0 outline-none flex-1 min-w-0 text-xs font-semibold italic bg-transparent"
+                    className="border-0 outline-none flex-1 min-w-0 text-xs font-semibold bg-transparent"
+                    style={{ color: "var(--foreground)" }}
                   />
                 </div>
                 <div className="flex gap-2">
-                  <select value={areaFilter} onChange={e => setAreaFilter(e.target.value)} className="flex-1 min-w-0 border-2 border-[#191c1e] bg-white px-2 py-1.5 text-[10px] font-black italic uppercase">
+                  <select value={areaFilter} onChange={e => setAreaFilter(e.target.value)} className="flex-1 min-w-0 rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase" style={fieldStyle}>
                     <option value="">Todas as áreas</option>
                     {areaOptions.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
-                  <select value={evaluatorFilter} onChange={e => setEvaluatorFilter(e.target.value)} className="flex-1 min-w-0 border-2 border-[#191c1e] bg-white px-2 py-1.5 text-[10px] font-black italic uppercase">
+                  <select value={evaluatorFilter} onChange={e => setEvaluatorFilter(e.target.value)} className="flex-1 min-w-0 rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase" style={fieldStyle}>
                     <option value="">Todos avaliadores</option>
                     {evaluatorOptions.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
-                <select value={sort} onChange={e => setSort(e.target.value as typeof sort)} className="border-2 border-[#191c1e] bg-white px-2 py-1.5 text-[10px] font-black italic uppercase">
+                <select value={sort} onChange={e => setSort(e.target.value as typeof sort)} className="rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase" style={fieldStyle}>
                   <option value="name">Ordenar · Nome</option>
                   <option value="pct">Ordenar · Menor progresso</option>
                   <option value="pending">Ordenar · Mais pendências</option>
                 </select>
                 {cycleWeekends.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] font-black italic uppercase text-[#747a60]">Fim de semana:</span>
+                    <span className="text-[9px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Fim de semana:</span>
                     {cycleWeekends.map(w => {
                       const active = filterDateFrom === w.sat && filterDateTo === w.sun;
                       return (
                         <button key={w.sat} type="button"
                           data-testid={`button-filter-weekend-${w.sat}`}
                           onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                          className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border transition-colors ${active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e]"}`}
+                          className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-colors"
+                          style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)", border: active ? "1px solid var(--primary)" : "1px solid var(--border)" }}
                         >{w.label}</button>
                       );
                     })}
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-black italic uppercase text-[#747a60]">{queueEvents.length} evento(s)</span>
+                  <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{queueEvents.length} evento(s)</span>
                   {hasFilters && (
-                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); setFilterDateFrom(""); setFilterDateTo(""); }} className="border-2 border-[#191c1e] bg-white px-2.5 py-1 text-[9.5px] font-black italic uppercase hover:bg-[#ccff00]">
+                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); setFilterDateFrom(""); setFilterDateTo(""); }} className="rounded-lg px-2.5 py-1 text-[9.5px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
                       Limpar filtros
                     </button>
                   )}
@@ -540,7 +552,7 @@ export function AdminEvaluationsConsole() {
             </div>
             <div className="p-3 flex flex-col gap-2.5 max-h-[600px] overflow-y-auto">
               {queueEvents.length === 0 ? (
-                <div className="border-2 border-dashed border-[#c8cbd0] bg-[#fafbfc] py-5 px-3.5 text-center text-[11px] font-bold italic uppercase text-[#747a60]">
+                <div className="rounded-lg py-5 px-3.5 text-center text-[11px] font-bold uppercase" style={{ border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
                   Nenhum evento encontrado
                 </div>
               ) : queueEvents.map(ev => {
@@ -552,22 +564,23 @@ export function AdminEvaluationsConsole() {
                     key={ev.id}
                     type="button"
                     onClick={() => setSelectedEventId(ev.id)}
-                    style={{ borderLeftColor: cfg.accent }}
-                    className={cn("block w-full text-left border-2 border-[#191c1e] border-l-[5px] px-3 py-2.5", isSel ? "bg-[#f7ffd1]" : "bg-white")}
+                    className="block w-full text-left rounded-lg px-3 py-2.5 relative overflow-hidden"
+                    style={{ border: "1px solid var(--border)", backgroundColor: isSel ? "var(--secondary)" : "var(--card)" }}
                   >
+                    <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: cfg.accent }} />
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-black italic uppercase text-[13.5px] leading-tight">{ev.name}</span>
-                      <span className="font-black italic text-xs shrink-0" style={{ color: cfg.accent }}>{ev.pct}%</span>
+                      <span className="font-bold uppercase text-[13.5px] leading-tight">{ev.name}</span>
+                      <span className="font-black text-xs shrink-0" style={{ fontFamily: CONDENSED, color: cfg.accent }}>{ev.pct}%</span>
                     </div>
                     <div className="flex items-center gap-1.5 my-1.5">
-                      <MapPin size={11} className="text-[#747a60] shrink-0" />
-                      <span className="text-[10px] font-bold italic uppercase text-[#747a60] truncate">{[ev.city, ev.clientName].filter(Boolean).join(" · ") || "—"}</span>
+                      <MapPin size={11} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
+                      <span className="text-[10px] font-bold uppercase truncate" style={{ color: "var(--muted-foreground)" }}>{[ev.city, ev.clientName].filter(Boolean).join(" · ") || "—"}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-[#eceef0] border border-[#c8cbd0] overflow-hidden">
-                        <div className="h-full" style={{ width: `${ev.pct}%`, background: cfg.accent }} />
+                      <div className="flex-1 h-[5px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${ev.pct}%`, background: cfg.accent }} />
                       </div>
-                      <span className="text-[10px] font-black italic text-[#444933] shrink-0">{ev.done}/{ev.total}</span>
+                      <span className="text-[10px] font-bold shrink-0" style={{ color: "var(--muted-foreground)" }}>{ev.done}/{ev.total}</span>
                     </div>
                   </button>
                 );
@@ -577,44 +590,47 @@ export function AdminEvaluationsConsole() {
 
           {/* Coluna direita — matriz de atribuição do evento selecionado */}
           {selected && (
-            <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
-              <div className="px-[18px] py-4 border-b-2 border-[#191c1e]">
+            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <div className="px-[18px] py-4" style={{ borderBottom: "1px solid var(--border)" }}>
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[9px] font-black italic uppercase px-2 py-0.5" style={{ background: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].bg, color: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].color }}>
+                      <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].bg, color: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].color }}>
                         {selected.isDone ? "Concluído" : selected.done > 0 ? "Em andamento" : "A fazer"}
                       </span>
-                      <span className="text-[10px] font-bold italic uppercase text-[#747a60]">{[selected.clientName, selected.city].filter(Boolean).join(" · ") || "—"}</span>
+                      <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{[selected.clientName, selected.city].filter(Boolean).join(" · ") || "—"}</span>
                     </div>
-                    <h2 className="text-xl font-black italic uppercase tracking-tight mt-1.5">{selected.name}</h2>
+                    <h2 className="text-xl font-black uppercase tracking-tight mt-1.5" style={{ fontFamily: CONDENSED }}>{selected.name}</h2>
                   </div>
                   {canManage && (
                     <button
                       type="button"
                       disabled={!selected.isDone || confirmResults.isPending}
                       onClick={() => confirmResults.mutate({ id: selected.id })}
-                      className={cn(
-                        "shrink-0 flex items-center gap-2 border-2 px-[18px] py-[11px] text-xs font-black italic uppercase tracking-wide transition-all",
-                        selected.isDone ? `bg-[#ccff00] text-[#161e00] border-[#191c1e] ${HARD_SHADOW}` : "bg-[#eef0f2] text-[#9aa0a6] border-[#c8cbd0] cursor-not-allowed",
-                      )}
+                      className="shrink-0 flex items-center gap-2 rounded-lg px-[18px] py-[11px] text-xs font-black uppercase tracking-wide transition-opacity disabled:cursor-not-allowed"
+                      style={{
+                        fontFamily: CONDENSED,
+                        backgroundColor: selected.isDone ? "var(--primary)" : "var(--secondary)",
+                        color: selected.isDone ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                        border: selected.isDone ? "1px solid var(--primary)" : "1px solid var(--border)",
+                      }}
                     >
                       <CheckCircle2 size={15} /> {confirmResults.isPending ? "Confirmando..." : "Confirmar Resultados"}
                     </button>
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-3.5">
-                  <div className="flex-1 h-2.5 bg-[#eceef0] border-2 border-[#191c1e] overflow-hidden">
-                    <div className="h-full bg-[#a8e000]" style={{ width: `${selected.pct}%` }} />
+                  <div className="flex-1 h-[7px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${selected.pct}%`, backgroundColor: "var(--accent)" }} />
                   </div>
-                  <span className="text-[13px] font-black italic">{selected.pct}%</span>
-                  <span className="text-[10.5px] font-bold italic uppercase text-[#747a60] whitespace-nowrap">{selected.done} de {selected.total} critérios completos</span>
+                  <span className="text-[13px] font-black" style={{ fontFamily: CONDENSED }}>{selected.pct}%</span>
+                  <span className="text-[10.5px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>{selected.done} de {selected.total} critérios completos</span>
                 </div>
               </div>
 
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2.5 mb-3 flex-wrap">
-                  <p className="text-[10px] font-black italic uppercase tracking-wide text-[#747a60]">Critérios por área</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Critérios por área</p>
                   <div className="flex gap-1.5 flex-wrap">
                     {([
                       { key: "all", label: "Todos" },
@@ -622,51 +638,53 @@ export function AdminEvaluationsConsole() {
                       { key: "pending", label: "Aguardando" },
                       { key: "partial", label: "Parcial" },
                       { key: "done", label: "Completo" },
-                    ] as const).map(p => (
-                      <button
-                        key={p.key}
-                        type="button"
-                        onClick={() => setCritFilter(p.key)}
-                        className={cn(
-                          "border-2 border-[#191c1e] px-2.5 py-1 text-[9.5px] font-black italic uppercase",
-                          critFilter === p.key ? "bg-[#191c1e] text-[#ccff00]" : "bg-white text-[#191c1e]",
-                        )}
-                      >
-                        {p.label} · {critPillCounts[p.key]}
-                      </button>
-                    ))}
+                    ] as const).map(p => {
+                      const active = critFilter === p.key;
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => setCritFilter(p.key)}
+                          className="rounded-lg px-2.5 py-1 text-[9.5px] font-bold uppercase transition-colors"
+                          style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)", border: active ? "1px solid var(--primary)" : "1px solid var(--border)" }}
+                        >
+                          {p.label} · {critPillCounts[p.key]}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2.5">
                   {filteredCriteria.length === 0 ? (
-                    <div className="border-2 border-dashed border-[#c8cbd0] bg-[#fafbfc] py-4 px-3.5 text-center text-[11px] font-bold italic uppercase text-[#747a60]">
+                    <div className="rounded-lg py-4 px-3.5 text-center text-[11px] font-bold uppercase" style={{ border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
                       Nenhum critério neste filtro
                     </div>
                   ) : filteredCriteria.map(c => {
                     const cfg = STATE_CFG[c.state];
                     const pickerOpen = openPickerCriterionId === c.criterionId;
                     return (
-                      <div key={c.criterionId} className="border-2 border-[#191c1e] border-l-[5px] bg-white px-3.5 py-3" style={{ borderLeftColor: cfg.accent }}>
+                      <div key={c.criterionId} className="rounded-lg px-3.5 py-3 relative overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                        <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: cfg.accent }} />
                         <div className="flex items-center justify-between gap-2.5">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[9px] font-bold italic uppercase text-[#747a60] border-[1.5px] border-[#c8cbd0] px-1.5 py-0.5 whitespace-nowrap">{c.areaName}</span>
-                            <span className="font-black italic uppercase text-[14.5px] tracking-tight truncate">{c.criterionName}</span>
+                            <span className="text-[9px] font-bold uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{c.areaName}</span>
+                            <span className="font-black uppercase text-[14.5px] tracking-tight truncate" style={{ fontFamily: CONDENSED }}>{c.criterionName}</span>
                           </div>
-                          <span className="whitespace-nowrap text-[9px] font-black italic uppercase px-2.5 py-1" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                          <span className="whitespace-nowrap text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2.5 mt-2.5 flex-wrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {c.assignedToId != null ? (
-                              <span className="inline-flex items-center gap-1.5 border-2 border-[#191c1e] bg-[#f7f9fb] px-2.5 py-1 text-[11.5px] font-bold italic">
-                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.state === "done" ? "#a8e000" : "#c8cbd0" }} />
+                              <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.state === "done" ? GOOD : "var(--border)" }} />
                                 {c.assignedToName}
                               </span>
                             ) : (
-                              <span className="font-black italic uppercase text-[11px] text-[#ba1a1a]">Nenhum avaliador atribuído</span>
+                              <span className="font-bold uppercase text-[11px]" style={{ color: WARNING }}>Nenhum avaliador atribuído</span>
                             )}
                             {c.submittedAt && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold italic text-[#3f5200]">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: GOOD }}>
                                 <Clock size={10} /> {fmtDT(c.submittedAt)}
                               </span>
                             )}
@@ -677,7 +695,8 @@ export function AdminEvaluationsConsole() {
                                 <button
                                   type="button"
                                   onClick={() => openLinkDialog(c)}
-                                  className="border-2 border-[#191c1e] px-2.5 py-1.5 text-[10.5px] font-black italic uppercase bg-white hover:bg-[#f7ffd1] flex items-center gap-1"
+                                  className="rounded-lg px-2.5 py-1.5 text-[10.5px] font-bold uppercase flex items-center gap-1 transition-colors hover:opacity-80"
+                                  style={{ border: "1px solid var(--border)" }}
                                   title="Gerar link de avaliação para o freelancer"
                                 >
                                   <Link2 size={11} /> Link
@@ -686,10 +705,12 @@ export function AdminEvaluationsConsole() {
                               <button
                                 type="button"
                                 onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
-                                className={cn(
-                                  "border-2 border-[#191c1e] px-3 py-1.5 text-[10.5px] font-black italic uppercase",
-                                  c.assignedToId == null ? "bg-[#ccff00] text-[#191c1e]" : "bg-white text-[#191c1e]",
-                                )}
+                                className="rounded-lg px-3 py-1.5 text-[10.5px] font-bold uppercase transition-opacity hover:opacity-80"
+                                style={{
+                                  border: c.assignedToId == null ? "1px solid var(--primary)" : "1px solid var(--border)",
+                                  backgroundColor: c.assignedToId == null ? "var(--primary)" : "transparent",
+                                  color: c.assignedToId == null ? "var(--primary-foreground)" : "var(--foreground)",
+                                }}
                               >
                                 {c.assignedToId == null ? "Atribuir" : "Gerenciar"}
                               </button>
@@ -697,8 +718,8 @@ export function AdminEvaluationsConsole() {
                           )}
                         </div>
                         {pickerOpen && c.areaId != null && (
-                          <div className="mt-2.5 border-t-2 border-dashed border-[#dde0e3] pt-2.5">
-                            <p className="text-[9.5px] font-black italic uppercase text-[#747a60] tracking-wide mb-2">Avaliadores disponíveis · {c.areaName}</p>
+                          <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px dashed var(--border)" }}>
+                            <p className="text-[9.5px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--muted-foreground)" }}>Avaliadores disponíveis · {c.areaName}</p>
                             <InlinePicker areaId={c.areaId} excludeId={c.assignedToId} onPick={(uid) => handleAssign(c.criterionId, uid)} />
                           </div>
                         )}
@@ -707,40 +728,42 @@ export function AdminEvaluationsConsole() {
                   })}
                 </div>
 
-                <p className="text-[10px] font-black italic uppercase tracking-wide text-[#747a60] mt-[18px] mb-2.5">Matriz de conformidade</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide mt-[18px] mb-2.5" style={{ color: "var(--muted-foreground)" }}>Matriz de conformidade</p>
                 <div className="flex flex-col gap-2.5">
                   {conformityRows.map(cf => {
                     const complete = cf.total > 0 && cf.filled === cf.total;
                     const cfg = cf.evaluatorId == null ? STATE_CFG.unassigned : complete ? STATE_CFG.done : STATE_CFG.partial;
                     const pickerOpen = openConformityPicker === cf.key;
                     return (
-                      <div key={cf.key} className="border-2 border-[#191c1e] border-l-[5px] bg-white px-3.5 py-3" style={{ borderLeftColor: cfg.accent }}>
+                      <div key={cf.key} className="rounded-lg px-3.5 py-3 relative overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                        <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: cfg.accent }} />
                         <div className="flex items-center justify-between gap-2.5">
                           <div>
-                            <div className="font-black italic uppercase text-sm">{cf.name}</div>
-                            <div className="text-[9.5px] font-bold italic uppercase text-[#747a60] mt-0.5">{cf.scope} · {cf.evaluatorName ?? "Sem avaliador"}</div>
+                            <div className="font-black uppercase text-sm" style={{ fontFamily: CONDENSED }}>{cf.name}</div>
+                            <div className="text-[9.5px] font-bold uppercase mt-0.5" style={{ color: "var(--muted-foreground)" }}>{cf.scope} · {cf.evaluatorName ?? "Sem avaliador"}</div>
                           </div>
                           <div className="flex items-center gap-2 whitespace-nowrap">
-                            <span className="text-[9px] font-black italic uppercase px-2.5 py-1" style={{ background: cfg.bg, color: cfg.color }}>{cf.filled}/{cf.total}</span>
+                            <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{cf.filled}/{cf.total}</span>
                             {canManage && (
                               <button
                                 type="button"
                                 onClick={() => { setConformityLinkDialog({ key: cf.key, label: cf.name, evaluatorId: cf.evaluatorId, evaluatorName: cf.evaluatorName }); setConformityLinkRecipientName(""); setConformityLinkUrl(null); setConformityLinkCopied(false); }}
-                                className="border-2 border-[#191c1e] bg-white px-2.5 py-1.5 text-[10.5px] font-black italic uppercase hover:bg-[#f7ffd1] flex items-center gap-1"
+                                className="rounded-lg px-2.5 py-1.5 text-[10.5px] font-bold uppercase flex items-center gap-1 transition-colors hover:opacity-80"
+                                style={{ border: "1px solid var(--border)" }}
                                 title="Gerar link de conformidade para freelancer"
                               >
                                 <Link2 size={11} /> Link
                               </button>
                             )}
                             {canManage && (
-                              <button type="button" onClick={() => setOpenConformityPicker(pickerOpen ? null : cf.key)} className="border-2 border-[#191c1e] bg-white px-3 py-1.5 text-[10.5px] font-black italic uppercase hover:bg-[#ccff00]">
+                              <button type="button" onClick={() => setOpenConformityPicker(pickerOpen ? null : cf.key)} className="rounded-lg px-3 py-1.5 text-[10.5px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
                                 {cf.evaluatorId == null ? "Atribuir" : "Trocar"}
                               </button>
                             )}
                           </div>
                         </div>
                         {pickerOpen && (
-                          <div className="mt-2.5 border-t-2 border-dashed border-[#dde0e3] pt-2.5">
+                          <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px dashed var(--border)" }}>
                             <InlinePicker
                               areaId={cf.areaId}
                               excludeId={cf.evaluatorId}
@@ -762,41 +785,42 @@ export function AdminEvaluationsConsole() {
       ) : view === "table" ? (
         selected && (
           <div>
-            <p className="text-[11px] font-bold italic uppercase text-[#747a60] mb-3">
+            <p className="text-[11px] font-bold uppercase mb-3" style={{ color: "var(--muted-foreground)" }}>
               Acompanhamento — {selected.name} · {selected.done} de {selected.total} critérios completos
             </p>
-            <div className={`border-2 border-[#191c1e] bg-white overflow-hidden overflow-x-auto ${HARD_SHADOW}`}>
-              <div className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] bg-[#191c1e] text-white min-w-[820px]">
+            <div className="rounded-xl overflow-hidden overflow-x-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <div className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] min-w-[820px]" style={{ backgroundColor: "var(--secondary)" }}>
                 {["Critério", "Área", "Avaliador", "Enviado em", "Status", "Ação"].map((h, i) => (
-                  <div key={h} className={cn("px-3.5 py-2.5 text-[10px] font-black italic uppercase tracking-wide", i === 5 && "text-right")}>{h}</div>
+                  <div key={h} className={cn("px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wide", i === 5 && "text-right")} style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{h}</div>
                 ))}
               </div>
               {selected.criteria.length === 0 ? (
-                <div className="p-6 text-center text-xs font-bold italic uppercase text-[#747a60]">Nenhum critério ativo neste evento.</div>
+                <div className="p-6 text-center text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum critério ativo neste evento.</div>
               ) : selected.criteria.map(c => {
                 const cfg = STATE_CFG[c.state];
                 const pickerOpen = openPickerCriterionId === c.criterionId;
                 return (
-                  <div key={c.criterionId} className={cn("grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] border-t-2 border-[#eceef0] items-center min-w-[820px]", c.assignedToId == null && "bg-[#fff6f6]")}>
-                    <div className="px-3.5 py-3 font-black italic uppercase text-[13px]">{c.criterionName}</div>
-                    <div className="px-3.5 py-3 font-bold italic uppercase text-[11px] text-[#747a60]">{c.areaName}</div>
-                    <div className="px-3.5 py-3 font-semibold italic text-xs" style={{ color: c.assignedToId == null ? "#ba1a1a" : "#191c1e" }}>{c.assignedToName ?? "Sem avaliador"}</div>
-                    <div className="px-3.5 py-3 font-bold italic text-[11px] text-[#444933]">
+                  <div key={c.criterionId} className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] items-center min-w-[820px]" style={{ borderTop: "1px solid var(--border)", backgroundColor: c.assignedToId == null ? "rgba(229,72,77,0.05)" : "transparent" }}>
+                    <div className="px-3.5 py-3 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED }}>{c.criterionName}</div>
+                    <div className="px-3.5 py-3 font-bold uppercase text-[11px]" style={{ color: "var(--muted-foreground)" }}>{c.areaName}</div>
+                    <div className="px-3.5 py-3 font-semibold text-xs" style={{ color: c.assignedToId == null ? WARNING : "var(--foreground)" }}>{c.assignedToName ?? "Sem avaliador"}</div>
+                    <div className="px-3.5 py-3 font-bold text-[11px]" style={{ color: "var(--muted-foreground)" }}>
                       {c.submittedAt ? (
-                        <span className="flex items-center gap-1 text-[#3f5200]"><Clock size={10} /> {fmtDT(c.submittedAt)}</span>
+                        <span className="flex items-center gap-1" style={{ color: GOOD }}><Clock size={10} /> {fmtDT(c.submittedAt)}</span>
                       ) : (
-                        <span className="text-[#747a60]">—</span>
+                        <span>—</span>
                       )}
                     </div>
                     <div className="px-3.5 py-3">
-                      <span className="text-[9px] font-black italic uppercase px-2.5 py-1 whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                      <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                     </div>
                     <div className="px-3.5 py-3 text-right relative flex items-center justify-end gap-2">
                       {canManage && c.assignedToId != null && (
                         <button
                           type="button"
                           onClick={() => openLinkDialog(c)}
-                          className="border-2 border-[#191c1e] px-2 py-1.5 text-[10px] font-black italic uppercase bg-white hover:bg-[#f7ffd1] flex items-center gap-1 whitespace-nowrap"
+                          className="rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1 whitespace-nowrap transition-colors hover:opacity-80"
+                          style={{ border: "1px solid var(--border)" }}
                           title="Gerar link para freelancer"
                         >
                           <Link2 size={10} /> Link
@@ -806,13 +830,18 @@ export function AdminEvaluationsConsole() {
                         <button
                           type="button"
                           onClick={() => setOpenPickerCriterionId(pickerOpen ? null : c.criterionId)}
-                          className={cn("border-2 border-[#191c1e] px-2.5 py-1.5 text-[10px] font-black italic uppercase whitespace-nowrap", c.assignedToId == null ? "bg-[#ccff00]" : "bg-white")}
+                          className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase whitespace-nowrap transition-opacity hover:opacity-80"
+                          style={{
+                            border: c.assignedToId == null ? "1px solid var(--primary)" : "1px solid var(--border)",
+                            backgroundColor: c.assignedToId == null ? "var(--primary)" : "transparent",
+                            color: c.assignedToId == null ? "var(--primary-foreground)" : "var(--foreground)",
+                          }}
                         >
                           {c.assignedToId == null ? "Atribuir" : "Gerenciar"}
                         </button>
                       )}
                       {pickerOpen && c.areaId != null && (
-                        <div className="absolute right-3.5 top-full mt-1 z-10 w-64 border-2 border-[#191c1e] bg-white p-2.5 shadow-[4px_4px_0px_0px_#191c1e] text-left">
+                        <div className="absolute right-3.5 top-full mt-1 z-10 w-64 rounded-xl p-2.5 text-left" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                           <InlinePicker areaId={c.areaId} excludeId={c.assignedToId} onPick={(uid) => handleAssign(c.criterionId, uid)} />
                         </div>
                       )}
@@ -821,50 +850,53 @@ export function AdminEvaluationsConsole() {
                 );
               })}
             </div>
-            <p className="text-[11.5px] italic text-[#747a60] mt-3">
-              Clique em <b className="text-[#191c1e] not-italic">Atribuir</b> numa linha sem avaliador para escolher quem responde. Troque o evento na aba Atribuição.
+            <p className="text-[11.5px] mt-3" style={{ color: "var(--muted-foreground)" }}>
+              Clique em <b style={{ color: "var(--foreground)" }}>Atribuir</b> numa linha sem avaliador para escolher quem responde. Troque o evento na aba Atribuição.
             </p>
           </div>
         )
       ) : (
         <div>
-          <p className="text-[11px] font-bold italic uppercase text-[#747a60] mb-3.5">Quem está em dia e quem precisa de cobrança neste ciclo</p>
+          <p className="text-[11px] font-bold uppercase mb-3.5" style={{ color: "var(--muted-foreground)" }}>Quem está em dia e quem precisa de cobrança neste ciclo</p>
           {evaluatorCards.length === 0 ? (
-            <div className="text-center py-16 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">
+            <div className="text-center py-16 rounded-xl font-bold uppercase" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
               Nenhum avaliador com critérios atribuídos neste ciclo.
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {evaluatorCards.map(av => (
-                <div key={av.id} className={`bg-white border-2 border-[#191c1e] border-l-[5px] p-4 ${HARD_SHADOW}`} style={{ borderLeftColor: av.accent }}>
+                <div key={av.id} className="rounded-xl p-4 relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: av.accent }} />
                   <div className="flex items-center gap-2.5 mb-3.5">
-                    <span className="w-10 h-10 border-2 border-[#191c1e] bg-[#ccff00] inline-flex items-center justify-center shrink-0 -skew-x-[8deg]">
-                      <span className="font-black italic text-[13px] text-[#161e00] skew-x-[8deg]">{initials(av.name)}</span>
+                    <span className="w-10 h-10 rounded-lg inline-flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--primary)" }}>
+                      <span className="font-black text-[13px]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{initials(av.name)}</span>
                     </span>
                     <div className="min-w-0">
-                      <div className="font-black italic uppercase text-[14.5px] leading-tight truncate">{av.name}</div>
-                      <div className="text-[9.5px] font-bold italic uppercase text-[#747a60] mt-0.5">{av.area}</div>
+                      <div className="font-black uppercase text-[14.5px] leading-tight truncate" style={{ fontFamily: CONDENSED }}>{av.name}</div>
+                      <div className="text-[9.5px] font-bold uppercase mt-0.5" style={{ color: "var(--muted-foreground)" }}>{av.area}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[9px] font-black italic uppercase px-2.5 py-1" style={{ background: av.bg, color: av.color }}>{av.label}</span>
-                    <span className="font-black italic text-xs" style={{ color: av.color }}>{av.submitted}/{av.assigned}</span>
+                    <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: av.bg, color: av.color }}>{av.label}</span>
+                    <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: av.color }}>{av.submitted}/{av.assigned}</span>
                   </div>
-                  <div className="h-2.5 bg-[#eceef0] border border-[#c8cbd0] overflow-hidden mb-3.5">
-                    <div className="h-full" style={{ width: `${av.pct}%`, background: av.bar }} />
+                  <div className="h-[6px] rounded-full overflow-hidden mb-3.5" style={{ backgroundColor: "var(--secondary)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${av.pct}%`, background: av.accent }} />
                   </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => toast({ title: `${av.assigned - av.submitted} pendência(s)`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${av.assigned} critério(s) atribuído(s).` })}
-                      className="flex-1 border-2 border-[#191c1e] bg-white py-2 text-[10px] font-black italic uppercase hover:bg-[#ccff00] transition-colors"
+                      className="flex-1 rounded-lg py-2 text-[10px] font-bold uppercase transition-colors hover:opacity-80"
+                      style={{ border: "1px solid var(--border)" }}
                     >
                       Cobrar
                     </button>
                     <button
                       type="button"
                       onClick={() => { setEvaluatorFilter(av.name); setView("assign"); }}
-                      className="flex-1 border-2 border-[#191c1e] bg-white py-2 text-[10px] font-black italic uppercase hover:bg-[#ccff00] transition-colors"
+                      className="flex-1 rounded-lg py-2 text-[10px] font-bold uppercase transition-colors hover:opacity-80"
+                      style={{ border: "1px solid var(--border)" }}
                     >
                       Reatribuir
                     </button>
@@ -879,28 +911,29 @@ export function AdminEvaluationsConsole() {
       {/* ── Link Freelancer dialog ─────────────────────────────────── */}
       {linkDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className={`bg-white border-2 border-[#191c1e] w-full max-w-md ${HARD_SHADOW}`}>
+          <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             {/* header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[#191c1e] bg-[#f7ffd1]">
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
               <div className="min-w-0">
-                <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide">
+                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>
                   Link Freelancer{linkDialog.criterionIds.length > 1 ? ` · ${linkDialog.criterionIds.length} critérios` : ""}
                 </p>
                 {linkDialog.criterionNames.length === 1 ? (
-                  <h3 className="font-black italic uppercase text-sm truncate">{linkDialog.criterionNames[0]}</h3>
+                  <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{linkDialog.criterionNames[0]}</h3>
                 ) : (
                   <ul className="mt-0.5 space-y-0.5">
                     {linkDialog.criterionNames.map((n, i) => (
-                      <li key={i} className="font-black italic uppercase text-[12.5px] truncate leading-tight">{n}</li>
+                      <li key={i} className="font-black uppercase text-[12.5px] truncate leading-tight" style={{ fontFamily: CONDENSED }}>{n}</li>
                     ))}
                   </ul>
                 )}
-                <p className="text-[10px] italic text-[#747a60] mt-0.5">Avaliador: <span className="font-bold text-[#191c1e]">{linkDialog.assignedToName}</span></p>
+                <p className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Avaliador: <span className="font-bold" style={{ color: "var(--foreground)" }}>{linkDialog.assignedToName}</span></p>
               </div>
               <button
                 type="button"
                 onClick={() => { setLinkDialog(null); setGeneratedLinkUrl(null); }}
-                className="shrink-0 border-2 border-[#191c1e] bg-white p-1.5 hover:bg-[#f2f4f6]"
+                className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80"
+                style={{ border: "1px solid var(--border)" }}
               >
                 <X size={14} />
               </button>
@@ -909,14 +942,14 @@ export function AdminEvaluationsConsole() {
             <div className="px-5 py-4 space-y-4">
               {/* nota de conformidade bundled */}
               {linkDialog?.includeConformity && (
-                <div className="border-2 border-[#ccff00] bg-[#f7ffd1] px-3 py-2 text-[10px] italic text-[#3f5200] flex items-start gap-2">
-                  <CheckCircle size={13} className="shrink-0 mt-0.5 text-[#506600]" />
+                <div className="rounded-lg px-3 py-2 text-[10px] flex items-start gap-2" style={{ border: "1px solid var(--primary)", backgroundColor: "var(--secondary)" }}>
+                  <CheckCircle size={13} className="shrink-0 mt-0.5" style={{ color: GOOD }} />
                   <span>Este link incluirá o critério <strong>e</strong> a Matriz de Conformidade de Cenografia no mesmo questionário.</span>
                 </div>
               )}
               {/* recipient + generate */}
               <div>
-                <label className="block text-[10px] font-black italic uppercase text-[#747a60] tracking-wide mb-1.5">
+                <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>
                   Para quem é o link? <span className="font-normal normal-case">(opcional)</span>
                 </label>
                 <div className="flex gap-2">
@@ -926,13 +959,15 @@ export function AdminEvaluationsConsole() {
                     onChange={e => setLinkRecipientName(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") handleGenerateLink(); }}
                     placeholder="Nome do freelancer"
-                    className="flex-1 border-2 border-[#191c1e] px-3 py-2 text-sm font-bold italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                    className="flex-1 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
+                    style={fieldStyle}
                   />
                   <button
                     type="button"
                     onClick={handleGenerateLink}
                     disabled={createAdminToken.isPending}
-                    className="border-2 border-[#191c1e] bg-[#ccff00] px-3 py-2 text-[10.5px] font-black italic uppercase flex items-center gap-1.5 hover:bg-[#b8e600] disabled:opacity-50"
+                    className="rounded-lg px-3 py-2 text-[10.5px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                   >
                     <Link2 size={12} /> {createAdminToken.isPending ? "Gerando…" : "Gerar Link"}
                   </button>
@@ -941,21 +976,23 @@ export function AdminEvaluationsConsole() {
 
               {/* generated URL */}
               {generatedLinkUrl && (
-                <div className="border-2 border-[#191c1e] bg-[#f7ffd1] p-3 space-y-2">
-                  <p className="text-[10px] font-black italic uppercase text-[#3f5200] tracking-wide">Link gerado — copie e envie</p>
+                <div className="rounded-lg p-3 space-y-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: GOOD }}>Link gerado — copie e envie</p>
                   <div className="flex gap-2 items-start">
                     <input
                       readOnly
                       value={generatedLinkUrl}
-                      className="flex-1 border-2 border-[#191c1e] bg-white px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
+                      className="flex-1 rounded-lg px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
+                      style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}
                       onFocus={e => e.target.select()}
                     />
                     <button
                       type="button"
                       onClick={() => { navigator.clipboard.writeText(generatedLinkUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
-                      className="border-2 border-[#191c1e] bg-white px-3 py-1.5 text-[10px] font-black italic uppercase flex items-center gap-1 hover:bg-[#ccff00] shrink-0"
+                      className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1 shrink-0 transition-colors hover:opacity-80"
+                      style={{ border: "1px solid var(--border)" }}
                     >
-                      {linkCopied ? <><CheckCircle size={11} className="text-[#3f5200]" /> Copiado!</> : <><Copy size={11} /> Copiar</>}
+                      {linkCopied ? <><CheckCircle size={11} style={{ color: GOOD }} /> Copiado!</> : <><Copy size={11} /> Copiar</>}
                     </button>
                   </div>
                 </div>
@@ -970,28 +1007,28 @@ export function AdminEvaluationsConsole() {
                 if (relevantTokens.length === 0) return null;
                 return (
                   <div>
-                    <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide mb-2">Histórico de links enviados</p>
-                    <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-48 overflow-y-auto">
-                      {relevantTokens.map(t => (
-                        <div key={t.id} className="flex items-start justify-between px-3 py-2.5 gap-3 bg-white">
+                    <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--muted-foreground)" }}>Histórico de links enviados</p>
+                    <div className="rounded-lg max-h-48 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
+                      {relevantTokens.map((t, i) => (
+                        <div key={t.id} className="flex items-start justify-between px-3 py-2.5 gap-3" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
                           <div className="min-w-0 space-y-0.5">
-                            <p className="text-[11px] font-bold italic truncate">
+                            <p className="text-[11px] font-bold truncate">
                               {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
                             </p>
                             {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
-                              <p className="text-[10px] italic text-[#747a60] truncate">Para: {t.recipientName}</p>
+                              <p className="text-[10px] truncate" style={{ color: "var(--muted-foreground)" }}>Para: {t.recipientName}</p>
                             )}
-                            <p className="text-[10px] italic text-[#9aa08a]">Enviado: {fmtDT(t.createdAt)}</p>
+                            <p className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Enviado: {fmtDT(t.createdAt)}</p>
                             {t.usedAt && (
-                              <p className="text-[10px] font-bold italic text-[#3f5200]">Respondido: {fmtDT(t.usedAt)}</p>
+                              <p className="text-[10px] font-bold" style={{ color: GOOD }}>Respondido: {fmtDT(t.usedAt)}</p>
                             )}
                           </div>
                           {t.usedAt ? (
-                            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1 mt-0.5">
+                            <span className="shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 mt-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>
                               <CheckCircle size={10} /> Respondido
                             </span>
                           ) : (
-                            <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 mt-0.5">
+                            <span className="shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full mt-0.5" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
                               Pendente
                             </span>
                           )}
@@ -1009,19 +1046,20 @@ export function AdminEvaluationsConsole() {
       {/* ── Conformity Link dialog ─────────────────────────────────── */}
       {conformityLinkDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className={`bg-white border-2 border-[#191c1e] w-full max-w-md ${HARD_SHADOW}`}>
-            <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[#191c1e] bg-[#f7ffd1]">
+          <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
               <div className="min-w-0">
-                <p className="text-[10px] font-black italic uppercase text-[#747a60] tracking-wide">Link Freelancer · Conformidade</p>
-                <h3 className="font-black italic uppercase text-sm truncate">{conformityLinkDialog.label}</h3>
+                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Link Freelancer · Conformidade</p>
+                <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{conformityLinkDialog.label}</h3>
                 {conformityLinkDialog.evaluatorName && (
-                  <p className="text-[10px] italic text-[#747a60] mt-0.5">Avaliador: <span className="font-bold text-[#191c1e]">{conformityLinkDialog.evaluatorName}</span></p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Avaliador: <span className="font-bold" style={{ color: "var(--foreground)" }}>{conformityLinkDialog.evaluatorName}</span></p>
                 )}
               </div>
               <button
                 type="button"
                 onClick={() => setConformityLinkDialog(null)}
-                className="shrink-0 ml-3 text-[#747a60] hover:text-[#191c1e]"
+                className="shrink-0 ml-3 transition-colors hover:opacity-70"
+                style={{ color: "var(--muted-foreground)" }}
               >
                 <X size={14} />
               </button>
@@ -1029,7 +1067,7 @@ export function AdminEvaluationsConsole() {
             <div className="px-5 py-4 space-y-4">
               {!conformityLinkUrl ? (
                 <div>
-                  <label className="block text-[10px] font-black italic uppercase text-[#747a60] tracking-wide mb-1.5">
+                  <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>
                     Para quem é o link?
                   </label>
                   <div className="flex gap-2">
@@ -1039,40 +1077,45 @@ export function AdminEvaluationsConsole() {
                       onChange={e => setConformityLinkRecipientName(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") handleGenerateConformityLink(); }}
                       placeholder="Nome do freelancer"
-                      className="flex-1 border-2 border-[#191c1e] px-3 py-2 text-sm font-bold italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
+                      className="flex-1 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
+                      style={fieldStyle}
                     />
                     <button
                       type="button"
                       onClick={handleGenerateConformityLink}
                       disabled={createConformityToken.isPending || createFerramentasToken.isPending}
-                      className="border-2 border-[#191c1e] bg-[#ccff00] px-3 py-2 text-[10.5px] font-black italic uppercase flex items-center gap-1.5 hover:bg-[#b8e600] disabled:opacity-50"
+                      className="rounded-lg px-3 py-2 text-[10.5px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50 transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                     >
                       <Link2 size={12} /> Gerar Link
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="border-2 border-[#191c1e] bg-[#f7ffd1] p-3 space-y-2">
-                  <p className="text-[10px] font-black italic uppercase text-[#3f5200] tracking-wide">Link gerado — copie e envie</p>
+                <div className="rounded-lg p-3 space-y-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: GOOD }}>Link gerado — copie e envie</p>
                   <div className="flex gap-2 items-start">
                     <input
                       readOnly
                       value={conformityLinkUrl}
-                      className="flex-1 border-2 border-[#191c1e] bg-white px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
+                      className="flex-1 rounded-lg px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
+                      style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}
                       onFocus={e => e.target.select()}
                     />
                     <button
                       type="button"
                       onClick={() => { navigator.clipboard.writeText(conformityLinkUrl); setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2000); }}
-                      className="shrink-0 border-2 border-[#191c1e] bg-white px-2.5 py-2 hover:bg-[#ccff00] flex items-center gap-1 text-[10px] font-black italic uppercase"
+                      className="shrink-0 rounded-lg px-2.5 py-2 flex items-center gap-1 text-[10px] font-bold uppercase transition-colors hover:opacity-80"
+                      style={{ border: "1px solid var(--border)" }}
                     >
-                      {conformityLinkCopied ? <><CheckCircle size={12} className="text-green-600" /> Copiado</> : <><Copy size={12} /> Copiar</>}
+                      {conformityLinkCopied ? <><CheckCircle size={12} style={{ color: GOOD }} /> Copiado</> : <><Copy size={12} /> Copiar</>}
                     </button>
                   </div>
                   <button
                     type="button"
                     onClick={() => { setConformityLinkUrl(null); setConformityLinkRecipientName(""); }}
-                    className="text-[9.5px] font-bold italic uppercase text-[#747a60] underline hover:text-[#191c1e]"
+                    className="text-[9.5px] font-bold uppercase underline transition-colors hover:opacity-70"
+                    style={{ color: "var(--muted-foreground)" }}
                   >
                     Gerar outro link
                   </button>

@@ -25,17 +25,18 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+const AMBER = "#e8a23d";
+const GOOD = "#9ab000";
 
-const BONUS_STATUS_LABELS: Record<string, { label: string; class: string }> = {
-  projected: { label: "Projetado", class: "bg-[#eceef0] text-[#444933]" },
-  approved: { label: "Aprovado", class: "bg-[#191c1e] text-[#ccff00]" },
-  scheduled: { label: "Agendado", class: "bg-[#ffb5a0] text-[#3b0900]" },
-  paid: { label: "Pago", class: "bg-[#ccff00] text-[#161e00]" },
-  blocked: { label: "Bloqueado", class: "bg-[#ff5722] text-white" },
-  not_eligible: { label: "Não elegível", class: "bg-[#eceef0] text-[#747a60]" },
+const BONUS_STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
+  projected: { label: "Projetado", bg: "var(--secondary)", color: "var(--muted-foreground)" },
+  approved: { label: "Aprovado", bg: "rgba(154,176,0,0.14)", color: GOOD },
+  scheduled: { label: "Agendado", bg: "rgba(232,162,61,0.14)", color: AMBER },
+  paid: { label: "Pago", bg: "var(--primary)", color: "var(--primary-foreground)" },
+  blocked: { label: "Bloqueado", bg: "rgba(229,72,77,0.12)", color: WARNING },
+  not_eligible: { label: "Não elegível", bg: "var(--secondary)", color: "var(--muted-foreground)" },
 };
 const BONUS_STATUS_OPTIONS = ["projected", "approved", "scheduled", "paid", "blocked", "not_eligible"];
 
@@ -54,8 +55,8 @@ function useSort<T extends Record<string, any>>(items: T[], key: keyof T | null,
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ArrowUpDown size={12} className="text-[#747a60] opacity-50" />;
-  return dir === "asc" ? <ArrowUp size={12} className="text-[#191c1e]" /> : <ArrowDown size={12} className="text-[#191c1e]" />;
+  if (!active) return <ArrowUpDown size={12} style={{ color: "var(--muted-foreground)", opacity: 0.5 }} />;
+  return dir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
 }
 
 function initials(name: string) {
@@ -66,20 +67,20 @@ const fmtScore = (v: number) => v.toFixed(1);
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtBRLShort = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
+
 function FaixaBadge({ minScore, maxScore, color }: { minScore?: number | null; maxScore?: number | null; color?: string | null }) {
-  if (minScore == null && maxScore == null) return <span className="text-[#c4c9ac] font-bold italic">—</span>;
-  const bg = color ?? "#eceef0";
-  const isDark = bg === "#191c1e" || bg.toLowerCase() === "#000000";
-  const fgClass = isDark ? "text-[#ccff00]" : "text-[#191c1e]";
+  if (minScore == null && maxScore == null) return <span style={{ color: "var(--muted-foreground)" }} className="font-bold">—</span>;
+  const bg = color ?? "var(--secondary)";
   const label = minScore != null && maxScore != null
     ? `${minScore}–${maxScore}`
     : minScore != null ? `≥ ${minScore}` : `≤ ${maxScore}`;
   return (
     <span
-      className={`inline-block text-[10px] font-black italic uppercase px-2 py-0.5 border-2 border-[#191c1e] skew-x-[-6deg] ${fgClass}`}
-      style={{ backgroundColor: bg }}
+      className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+      style={{ backgroundColor: bg, color: "#fff", mixBlendMode: "normal" }}
     >
-      <span className="inline-block skew-x-[6deg]">{label}</span>
+      {label}
     </span>
   );
 }
@@ -88,50 +89,34 @@ function FaixaBadge({ minScore, maxScore, color }: { minScore?: number | null; m
 /* RANKING TAB                                                         */
 /* ------------------------------------------------------------------ */
 
-const PODIUM_THEME: Record<number, { bg: string; accent: string; label: string }> = {
-  1: { bg: "bg-[#ccff00]", accent: "text-[#191c1e]", label: "Ouro" },
-  2: { bg: "bg-white", accent: "text-[#506600]", label: "Prata" },
-  3: { bg: "bg-white", accent: "text-[#506600]", label: "Bronze" },
-};
-
 function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: number; onClick: () => void; clickable: boolean }) {
-  const theme = PODIUM_THEME[rank];
   const isLeader = rank === 1;
+  const medalLabel = rank === 1 ? "Ouro" : rank === 2 ? "Prata" : "Bronze";
+  const rankColor = isLeader ? "var(--accent)" : "var(--muted-foreground)";
   return (
     <button
       type="button"
       onClick={clickable ? onClick : undefined}
       data-testid={`podium-card-${entry.employeeId}`}
-      className={cn(
-        "w-full text-left border-[#191c1e] flex items-center gap-4 p-4 border-2",
-        theme.bg,
-        isLeader && `border-4 ${HARD_SHADOW}`,
-        clickable && HARD_SHADOW_HOVER,
-        clickable && "cursor-pointer",
-      )}
+      className={cn("w-full text-left rounded-xl flex items-center gap-3 p-3.5", clickable && "cursor-pointer transition-opacity hover:opacity-90")}
+      style={{
+        backgroundColor: isLeader ? "var(--primary)" : "var(--card)",
+        border: isLeader ? "1px solid var(--primary)" : "1px solid var(--border)",
+      }}
     >
-      <div className={cn("font-black italic shrink-0 leading-none", isLeader ? "text-4xl text-[#191c1e]" : "text-3xl text-[#747a60]")}>
+      <span className="font-black shrink-0 leading-none" style={{ fontFamily: CONDENSED, fontSize: isLeader ? 26 : 22, color: isLeader ? "var(--primary-foreground)" : rankColor }}>
         #{rank}
-      </div>
-      <div className="relative shrink-0">
-        <div className={cn("border-2 border-[#191c1e] bg-[#e0e3e5] flex items-center justify-center skew-x-[-6deg] overflow-hidden", isLeader ? "w-16 h-16" : "w-14 h-14")}>
-          <span className="skew-x-[6deg] font-black italic text-lg">{initials(entry.employeeName)}</span>
-        </div>
-        {isLeader && (
-          <div className="absolute -top-2 -right-2 bg-[#191c1e] text-[#ccff00] w-6 h-6 flex items-center justify-center border-2 border-[#ccff00] skew-x-[-8deg]">
-            <Crown size={12} className="skew-x-[8deg]" />
-          </div>
-        )}
+      </span>
+      <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isLeader ? "var(--primary-foreground)" : "var(--secondary)" }}>
+        <span className="font-black text-[13px]" style={{ fontFamily: CONDENSED, color: isLeader ? "var(--primary)" : "var(--foreground)" }}>{initials(entry.employeeName)}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm italic uppercase font-black tracking-tight break-words" data-testid={`text-podium-name-${entry.employeeId}`}>{entry.employeeName}</h3>
+        <p className="text-[13px] font-bold uppercase truncate" data-testid={`text-podium-name-${entry.employeeId}`} style={{ color: isLeader ? "var(--primary-foreground)" : "var(--foreground)" }}>{entry.employeeName}</p>
+        <span className="text-[9px] font-bold uppercase" style={{ color: isLeader ? "var(--primary-foreground)" : "var(--muted-foreground)", opacity: isLeader ? 0.75 : 1 }}>{medalLabel}</span>
       </div>
-      <div className="text-right shrink-0">
-        <span className="block text-[9px] uppercase font-bold italic text-[#747a60] leading-none mb-1">{theme.label}</span>
-        <p className={cn("italic font-black leading-none", isLeader ? "text-2xl text-[#191c1e]" : `text-xl ${theme.accent}`)} data-testid={`text-podium-result-${entry.employeeId}`}>
-          {entry.finalResult.toFixed(1)}
-        </p>
-      </div>
+      <span className="font-black text-xl shrink-0" style={{ fontFamily: CONDENSED, color: isLeader ? "var(--primary-foreground)" : rankColor }} data-testid={`text-podium-result-${entry.employeeId}`}>
+        {entry.finalResult.toFixed(1)}
+      </span>
     </button>
   );
 }
@@ -144,11 +129,6 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 
   const qKey = getGetRankingQueryKey({ search: search || undefined });
   const { data: ranking, isLoading } = useGetRanking({ search: search || undefined }, { query: { queryKey: qKey } });
-
-  const detailParams = { employeeId: selectedId ?? 0 };
-  const { data: detail, isLoading: detailLoading } = useGetRankingDetail(detailParams, {
-    query: { queryKey: getGetRankingDetailQueryKey(detailParams), enabled: !!selectedId && canViewDetail },
-  });
 
   async function handleExport() {
     try {
@@ -173,12 +153,14 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 
   const top3 = filteredRanking.slice(0, 3);
   const activeRunners = filteredRanking.length;
-  // Só entram na média colaboradores com pelo menos 1 evento pontuado no ciclo
-  // (eventsCount > 0) — mesmo critério do "Média do Ciclo" no Dashboard. Quem
-  // ainda não tem nota (0 eventos fechados/pontuados) tem finalResult=0 "por
-  // enquanto" e distorceria a média para baixo mesmo sem ninguém ter ido mal.
   const scoredRanking = filteredRanking.filter(r => r.eventsCount > 0);
   const avgResult = scoredRanking.length > 0 ? scoredRanking.reduce((acc, r) => acc + r.finalResult, 0) / scoredRanking.length : 0;
+
+  const eligFilters = [
+    { key: "all" as const, label: "Todos" },
+    { key: "eligible" as const, label: "Elegíveis" },
+    { key: "ineligible" as const, label: "Não Elegíveis" },
+  ];
 
   function openDetail(id: number) {
     if (!canViewDetail) return;
@@ -186,84 +168,81 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   }
 
   return (
-    <div className="space-y-8">
-      <section className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6">
+      <section className="flex items-center gap-3 flex-wrap">
         {ranking && ranking.length > 0 && (
-          <div className="flex gap-4">
-            <div className={`bg-[#ccff00] border-2 border-[#191c1e] p-4 skew-x-[-6deg] ${HARD_SHADOW}`}>
-              <div className="skew-x-[6deg]">
-                <span className="text-[11px] font-bold uppercase italic tracking-wider block flex items-center gap-1.5"><Trophy size={12} /> Nota Média</span>
-                <span className="text-2xl md:text-3xl italic font-black block mt-1" data-testid="stat-avg-result">{avgResult.toFixed(1)}</span>
-              </div>
+          <>
+            <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--primary)" }}>
+              <span className="text-[10px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}><Trophy size={12} /> Nota Média</span>
+              <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="stat-avg-result">{avgResult.toFixed(1)}</span>
             </div>
-            <div className="bg-white border-2 border-[#191c1e] p-4 skew-x-[-6deg]">
-              <div className="skew-x-[6deg]">
-                <span className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] block flex items-center gap-1.5"><Users size={12} /> Competidores</span>
-                <span className="text-2xl md:text-3xl italic font-black block mt-1" data-testid="stat-active-runners">{activeRunners}</span>
-              </div>
+            <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <span className="text-[10px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}><Users size={12} /> Competidores</span>
+              <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED }} data-testid="stat-active-runners">{activeRunners}</span>
             </div>
-          </div>
+          </>
         )}
         <button
           data-testid="button-export-ranking"
-          className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-2.5 font-bold text-sm italic uppercase tracking-wider flex items-center gap-2 justify-center md:ml-auto ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+          className="rounded-lg px-5 py-3 font-bold text-xs uppercase tracking-wide flex items-center gap-2 ml-auto transition-opacity hover:opacity-90"
+          style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
           onClick={handleExport}
         >
-          <Download size={16} /> Exportar
+          <Download size={15} /> Exportar
         </button>
       </section>
 
       {isLoading ? (
-        <div className="text-center py-24 italic uppercase font-bold text-[#747a60]">Carregando ranking...</div>
+        <div className="text-center py-24 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando ranking...</div>
       ) : !ranking || ranking.length === 0 ? (
-        <div className="text-center py-20 bg-white border-2 border-[#191c1e]">
-          <Trophy size={64} className="mx-auto mb-6 text-[#e0e3e5]" strokeWidth={1.5} />
-          <h3 className="text-2xl italic uppercase font-black tracking-tight mb-2">Ranking Indisponível</h3>
-          <p className="text-[#444933] italic font-medium">Nenhum resultado consolidado para o ciclo atual.</p>
-          <p className="text-sm mt-1 text-[#747a60] italic">Feche o ciclo na aba "Bônus & Pagamentos" para gerar o ranking oficial.</p>
+        <div className="text-center py-20 rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+          <Trophy size={56} className="mx-auto mb-6 opacity-20" strokeWidth={1.5} />
+          <h3 className="text-2xl font-black uppercase tracking-tight mb-2" style={{ fontFamily: CONDENSED }}>Ranking Indisponível</h3>
+          <p style={{ color: "var(--muted-foreground)" }}>Nenhum resultado consolidado para o ciclo atual.</p>
+          <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>Feche o ciclo na aba "Bônus & Pagamentos" para gerar o ranking oficial.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          <div className="lg:col-span-2 space-y-5">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative max-w-md flex-1">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-                <Input
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
+          <div className="space-y-3.5">
+            <div className="flex gap-2 flex-wrap">
+              <div className="flex-1 min-w-[220px] flex items-center gap-2 rounded-lg px-3.5 py-2.5" style={fieldStyle}>
+                <Search size={15} style={{ color: "var(--muted-foreground)" }} />
+                <input
                   data-testid="input-search-ranking"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
+                  className="bg-transparent outline-none text-sm w-full"
+                  style={{ color: "var(--foreground)" }}
                   placeholder="Buscar colaborador no ranking..."
                 />
               </div>
-              <div className="flex gap-3">
-                <div className="w-48">
-                  <Select value={filterEligible} onValueChange={(v) => setFilterEligible(v as any)}>
-                    <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
-                      <SelectValue placeholder="Elegibilidade" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="eligible">Elegíveis</SelectItem>
-                      <SelectItem value="ineligible">Não elegíveis</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              {eligFilters.map(f => {
+                const active = filterEligible === f.key;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilterEligible(f.key)}
+                    className="h-[42px] px-3.5 rounded-lg text-[11px] font-bold uppercase transition-colors"
+                    style={{
+                      fontFamily: CONDENSED,
+                      backgroundColor: active ? "var(--primary)" : "transparent",
+                      color: active ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                      border: active ? "1px solid var(--primary)" : "1px solid var(--border)",
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
             </div>
 
-            <section className="bg-white border-2 border-[#191c1e]">
-              <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-3 italic">
-                <span className="w-3 h-6 bg-[#ccff00] inline-block skew-x-[-12deg]" />
-                <h3 className="text-xs font-bold uppercase tracking-widest">Classificação Geral</h3>
+            <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <div className="px-5 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Classificação Geral</h3>
               </div>
-              <div className="divide-y-2 divide-[#eceef0]">
+              <div>
                 {filteredRanking.map((entry) => {
                   const actualRank = entry.position;
-                  // Barra em escala absoluta (Nota Final já é 0–100) — mostra
-                  // o aproveitamento real da pessoa, não uma comparação com o
-                  // 1º colocado do filtro atual (que gerava 100% "cheio" para
-                  // vários empatados e confundia quem via o gráfico).
                   const scorePct = Math.max(0, Math.min(100, entry.finalResult));
                   return (
                     <button
@@ -272,55 +251,54 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                       data-testid={`card-ranking-${entry.employeeId}`}
                       onClick={() => openDetail(entry.employeeId)}
                       className={cn(
-                        "w-full text-left flex flex-col sm:flex-row sm:items-center gap-4 px-5 md:px-6 py-4 transition-all group",
-                        canViewDetail ? "hover:bg-[#f2f4f6] hover:translate-x-1 cursor-pointer" : "cursor-default",
+                        "w-full text-left flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3.5 transition-colors group",
+                        canViewDetail ? "cursor-pointer hover:opacity-90" : "cursor-default",
                       )}
+                      style={{ borderTop: "1px solid var(--border)" }}
                     >
-                      <div className={cn("w-14 h-14 border-2 border-[#191c1e] bg-[#eceef0] flex flex-col items-center justify-center skew-x-[-6deg] shrink-0 transition-colors", canViewDetail && "group-hover:bg-[#ccff00]")}>
-                        <span className="skew-x-[6deg] text-[9px] font-bold uppercase italic text-[#747a60] leading-none">Pos</span>
-                        <span className="skew-x-[6deg] text-xl font-black italic leading-none mt-0.5">{String(actualRank).padStart(2, "0")}</span>
+                      <div className="w-11 h-11 rounded-lg flex flex-col items-center justify-center shrink-0" style={{ backgroundColor: "var(--secondary)" }}>
+                        <span className="text-[8px] font-bold uppercase leading-none" style={{ color: "var(--muted-foreground)" }}>Pos</span>
+                        <span className="text-base font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED }}>{String(actualRank).padStart(2, "0")}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-black italic uppercase text-base md:text-lg break-words" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                          <span className="text-[11px] font-bold uppercase italic text-[#444933] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">
-                            <span className="inline-block skew-x-[8deg]">{entry.eventsCount} eventos</span>
+                        <p className="font-bold uppercase text-sm truncate" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
+                            {entry.eventsCount} eventos
                           </span>
                           {entry.eligible === false && (
-                            <span className="text-[11px] font-bold uppercase italic text-white bg-[#ba1a1a] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">Inelegível</span>
+                            <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>
+                              Inelegível
                             </span>
                           )}
                           {entry.absences > 0 && (
-                            <span className="text-[11px] font-bold uppercase italic text-white bg-[#ba1a1a] border-2 border-[#191c1e] px-2 py-0.5 skew-x-[-8deg] inline-block">
-                              <span className="inline-block skew-x-[8deg]">{entry.absences} penalidades</span>
+                            <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>
+                              {entry.absences} penalidades
                             </span>
                           )}
                           <FaixaBadge minScore={entry.platoonMinScore} maxScore={entry.platoonMaxScore} color={entry.platoonColor} />
                         </div>
                       </div>
-                      <div className="hidden md:flex items-center gap-3 w-40 shrink-0">
-                        <div className="flex-1 h-2.5 bg-[#eceef0] border border-[#191c1e]">
-                          <div className="h-full bg-[#ccff00]" style={{ width: `${scorePct}%` }} />
+                      <div className="hidden md:flex items-center gap-2 w-36 shrink-0">
+                        <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
+                          <div className="h-full rounded-full" style={{ width: `${scorePct}%`, backgroundColor: "var(--accent)" }} />
                         </div>
-                        <span className="text-[11px] font-bold italic w-14 text-right whitespace-nowrap">{fmtScore(entry.finalResult)}/100</span>
+                        <span className="text-[11px] font-bold w-14 text-right whitespace-nowrap">{fmtScore(entry.finalResult)}/100</span>
                       </div>
-                      <div className="flex items-center gap-4 shrink-0 sm:pl-4 sm:w-[17rem] sm:justify-end">
+                      <div className="flex items-center gap-3 shrink-0 sm:pl-3 sm:w-[15rem] sm:justify-end">
                         <div className="text-right">
-                          <span className="block text-[9px] uppercase font-bold italic text-[#747a60] leading-none mb-1">Nota Final</span>
-                          <p className="font-black italic text-2xl text-[#506600] leading-none" data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</p>
+                          <span className="block text-[9px] uppercase font-bold leading-none mb-1" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
+                          <p className="font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }} data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</p>
                         </div>
-                        <div className="text-right hidden sm:block w-28 shrink-0">
+                        <div className="text-right hidden sm:block w-24 shrink-0">
                           {entry.bonusValue > 0 && (
-                            <div className="bg-[#ccff00] border-2 border-[#191c1e] px-3 py-1.5 skew-x-[-6deg]">
-                              <div className="skew-x-[6deg]">
-                                <span className="block text-[9px] uppercase font-bold italic text-[#161e00] leading-none mb-1">Bônus</span>
-                                <p className="font-black italic text-base text-[#191c1e] leading-none">{fmtBRLShort(entry.bonusValue)}</p>
-                              </div>
+                            <div className="rounded-lg px-2.5 py-1.5" style={{ backgroundColor: "var(--primary)" }}>
+                              <span className="block text-[8px] uppercase font-bold leading-none mb-1" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus</span>
+                              <p className="font-black text-sm leading-none" style={{ color: "var(--primary-foreground)" }}>{fmtBRLShort(entry.bonusValue)}</p>
                             </div>
                           )}
                         </div>
-                        {canViewDetail && <ChevronRight size={18} className="text-[#747a60] group-hover:text-[#191c1e] transition-colors shrink-0" />}
+                        {canViewDetail && <ChevronRight size={16} style={{ color: "var(--muted-foreground)" }} className="shrink-0" />}
                       </div>
                     </button>
                   );
@@ -329,198 +307,25 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
             </section>
           </div>
 
-          <aside className="lg:col-span-1 lg:sticky lg:top-6 space-y-4">
-            <div className="bg-[#191c1e] text-[#ccff00] px-5 py-3 flex items-center gap-2 italic border-2 border-[#191c1e]">
-              <Trophy size={16} />
-              <h3 className="text-xs font-bold uppercase tracking-widest">Pódio da Maratona</h3>
+          <aside className="space-y-2.5">
+            <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <Trophy size={15} style={{ color: "var(--accent)" }} />
+              <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Pódio da Maratona</h3>
             </div>
             {top3[0] && <PodiumRow entry={top3[0]} rank={1} clickable={canViewDetail} onClick={() => openDetail(top3[0].employeeId)} />}
             {top3[1] && <PodiumRow entry={top3[1]} rank={2} clickable={canViewDetail} onClick={() => openDetail(top3[1].employeeId)} />}
             {top3[2] && <PodiumRow entry={top3[2]} rank={3} clickable={canViewDetail} onClick={() => openDetail(top3[2].employeeId)} />}
             {canViewDetail && (
-              <p className="text-[11px] italic text-[#747a60] font-medium px-1">Clique em um colaborador para ver o detalhamento de provas, penalidades e méritos.</p>
+              <p className="text-[11px] px-1" style={{ color: "var(--muted-foreground)" }}>Clique em um colaborador para ver o detalhamento de provas, penalidades e méritos.</p>
             )}
           </aside>
         </div>
       )}
 
-      <Sheet open={!!selectedId} onOpenChange={(o) => { if (!o) setSelectedId(null); }}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto rounded-none border-l-4 border-[#191c1e] bg-[#f7f9fb] p-0">
-          {detailLoading || !detail ? (
-            <div className="p-10 text-center italic uppercase font-bold text-[#747a60]">Carregando detalhamento...</div>
-          ) : (
-            <div>
-              <SheetHeader className="bg-[#191c1e] text-white p-6 space-y-3 text-left">
-                <SheetTitle className="text-white text-2xl italic uppercase font-black tracking-tight leading-none">
-                  {detail.employee.name}
-                </SheetTitle>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase italic">
-                  {detail.employee.functionName && (
-                    <span className="border-2 border-[#ccff00] text-[#ccff00] px-2 py-0.5">{detail.employee.functionName}</span>
-                  )}
-                  <span className="text-[#9da3a8]">{detail.cycle.name}</span>
-                </div>
-              </SheetHeader>
-
-              <div className="p-6 space-y-8">
-                <section className="grid grid-cols-2 gap-3">
-                  <div className={`bg-[#ccff00] border-2 border-[#191c1e] p-4 ${HARD_SHADOW}`}>
-                    <span className="text-[10px] font-bold uppercase italic text-[#161e00] block">Nota Final</span>
-                    <p className="text-3xl font-black italic leading-none mt-1" data-testid="detail-final-result">
-                      {detail.summary.finalResult != null ? detail.summary.finalResult.toFixed(1) : "—"}
-                    </p>
-                  </div>
-                  <div className="bg-white border-2 border-[#191c1e] p-4">
-                    <span className="text-[10px] font-bold uppercase italic text-[#747a60] block">Média Bruta</span>
-                    <p className="text-3xl font-black italic leading-none mt-1 text-[#506600]">
-                      {detail.summary.grossAverage != null ? detail.summary.grossAverage.toFixed(1) : "—"}
-                    </p>
-                    {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
-                      <p className="text-[10px] font-bold italic text-[#747a60] mt-1">
-                        Soma: {detail.summary.scoreSum.toFixed(1)} ÷ {detail.summary.confirmedEventCount} provas
-                      </p>
-                    )}
-                  </div>
-                  <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
-                    <AlertTriangle size={18} className="text-[#ff5722] shrink-0" />
-                    <div>
-                      <span className="text-[10px] font-bold uppercase italic text-[#747a60] block leading-none">Penalidades</span>
-                      <p className="text-lg font-black italic leading-none text-[#ff5722]">-{detail.summary.penaltyPoints}</p>
-                    </div>
-                  </div>
-                  <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
-                    <Award size={18} className="text-[#506600] shrink-0" />
-                    <div>
-                      <span className="text-[10px] font-bold uppercase italic text-[#747a60] block leading-none">Méritos</span>
-                      <p className="text-lg font-black italic leading-none text-[#506600]">+{detail.summary.meritPoints}</p>
-                    </div>
-                  </div>
-                </section>
-
-                {!detail.summary.isQuarterClosed && (
-                  <div className="bg-[#fff3cd] border-2 border-[#191c1e] px-4 py-3 text-xs font-bold italic uppercase text-[#664d03]">
-                    Ciclo ainda não fechado — valores parciais.
-                  </div>
-                )}
-
-                <section className="space-y-3">
-                  <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2">
-                    <Trophy size={16} /> Desempenho nas Provas
-                  </h4>
-                  {detail.events.filter(ev => ev.resultsConfirmed).length === 0 ? (
-                    <p className="text-sm italic text-[#747a60] font-medium">Nenhum evento confirmado no ciclo.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {detail.events.filter(ev => ev.resultsConfirmed).map(ev => (
-                        <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")}>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
-                              {!ev.countsForScore && (
-                                <span
-                                  data-testid={`detail-event-no-score-${ev.eventId}`}
-                                  className="px-1.5 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
-                                  title={(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : (ev as { noScoreReason?: string }).noScoreReason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}
-                                >
-                                  <span className="inline-block skew-x-[8deg]">
-                                    {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
-                                      ? `Sup Ceno — não conta p/ nota`
-                                      : (ev as { noScoreReason?: string }).noScoreReason === "freela"
-                                      ? "Freela — não conta p/ nota"
-                                      : "Não conta p/ nota"}
-                                  </span>
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold italic text-[#747a60]">
-                              {(ev.city || ev.state) && (
-                                <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
-                              )}
-                              {ev.isHistorical ? (
-                                <span className="uppercase">Evento histórico</span>
-                              ) : (
-                                <span className="uppercase">{ev.evaluatedCriteria}/{ev.totalCriteria} quesitos</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span className="block text-[9px] uppercase font-bold italic text-[#747a60] leading-none mb-1">Nota Time</span>
-                            <p className="text-xl font-black italic leading-none text-[#506600]">{ev.eventScore.toFixed(1)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section className="space-y-3">
-                  <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2 text-[#ff5722]">
-                    <AlertTriangle size={16} /> Penalidades
-                  </h4>
-                  {detail.penalties.length === 0 ? (
-                    <p className="text-sm italic text-[#747a60] font-medium">Sem penalidades no ciclo.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {detail.penalties.map(p => (
-                        <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-black italic uppercase text-sm">{p.label}</p>
-                            <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
-                              <span>{new Date(p.date).toLocaleDateString("pt-BR")}</span>
-                              {p.eventName && <span>· {p.eventName}</span>}
-                              {p.quantity > 1 && <span>· {p.quantity}x</span>}
-                            </div>
-                          </div>
-                          <span className="bg-[#ff5722] text-white font-black px-3 py-1 border-2 border-[#191c1e] text-xs shrink-0">-{p.total}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section className="space-y-3">
-                  <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2 text-[#506600]">
-                    <Award size={16} /> Méritos
-                  </h4>
-                  {detail.merits.length === 0 ? (
-                    <p className="text-sm italic text-[#747a60] font-medium">Sem méritos no ciclo.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {detail.merits.map(m => (
-                        <div key={m.id} data-testid={`detail-merit-${m.id}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-black italic uppercase text-sm">{m.label}</p>
-                            <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
-                              <span>{new Date(m.date).toLocaleDateString("pt-BR")}</span>
-                              {m.eventName && <span>· {m.eventName}</span>}
-                              {m.quantity > 1 && <span>· {m.quantity}x</span>}
-                            </div>
-                          </div>
-                          <span className="bg-[#ccff00] text-[#191c1e] font-black px-3 py-1 border-2 border-[#191c1e] text-xs shrink-0">+{m.total}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                {detail.summary.bonusValue != null && detail.summary.bonusValue > 0 && (
-                  <section className={`bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between ${HARD_SHADOW}`}>
-                    <span className="text-xs font-black uppercase italic tracking-wider">Bônus do Ciclo</span>
-                    <span className="text-2xl font-black italic">{fmtBRL(detail.summary.bonusValue)}</span>
-                  </section>
-                )}
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} />
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* CONSOLIDAÇÃO TAB                                                    */
-/* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
 /* SHARED DETAIL SHEET COMPONENT                                       */
@@ -540,94 +345,93 @@ function EmployeeDetailSheet({
 
   return (
     <Sheet open={!!employeeId} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto rounded-none border-l-4 border-[#191c1e] bg-[#f7f9fb] p-0">
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-0" style={{ backgroundColor: "var(--background)", borderLeft: "1px solid var(--border)" }}>
         {detailLoading || !detail ? (
-          <div className="p-10 text-center italic uppercase font-bold text-[#747a60]">Carregando detalhamento...</div>
+          <div className="p-10 text-center font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando detalhamento...</div>
         ) : (
           <div>
-            <SheetHeader className="bg-[#191c1e] text-white p-6 space-y-3 text-left">
-              <SheetTitle className="text-white text-2xl italic uppercase font-black tracking-tight leading-none">
+            <SheetHeader className="p-6 space-y-3 text-left" style={{ backgroundColor: "var(--secondary)" }}>
+              <SheetTitle className="text-2xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>
                 {detail.employee.name}
               </SheetTitle>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase italic">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase">
                 {detail.employee.functionName && (
-                  <span className="border-2 border-[#ccff00] text-[#ccff00] px-2 py-0.5">{detail.employee.functionName}</span>
+                  <span className="rounded px-2 py-0.5" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}>{detail.employee.functionName}</span>
                 )}
-                <span className="text-[#9da3a8]">{detail.cycle.name}</span>
+                <span style={{ color: "var(--muted-foreground)" }}>{detail.cycle.name}</span>
               </div>
             </SheetHeader>
 
-            <div className="p-6 space-y-8">
+            <div className="p-6 space-y-7">
               <section className="grid grid-cols-2 gap-3">
-                <div className={`bg-[#ccff00] border-2 border-[#191c1e] p-4 ${HARD_SHADOW}`}>
-                  <span className="text-[10px] font-bold uppercase italic text-[#161e00] block">Nota Final</span>
-                  <p className="text-3xl font-black italic leading-none mt-1" data-testid="detail-final-result">
+                <div className="rounded-xl p-4" style={{ backgroundColor: "var(--primary)" }}>
+                  <span className="text-[10px] font-bold uppercase block" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}>Nota Final</span>
+                  <p className="text-3xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-final-result">
                     {detail.summary.finalResult != null ? detail.summary.finalResult.toFixed(1) : "—"}
                   </p>
                 </div>
-                <div className="bg-white border-2 border-[#191c1e] p-4">
-                  <span className="text-[10px] font-bold uppercase italic text-[#747a60] block">Média Bruta</span>
-                  <p className="text-3xl font-black italic leading-none mt-1 text-[#506600]">
+                <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <span className="text-[10px] font-bold uppercase block" style={{ color: "var(--muted-foreground)" }}>Média Bruta</span>
+                  <p className="text-3xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
                     {detail.summary.grossAverage != null ? detail.summary.grossAverage.toFixed(1) : "—"}
                   </p>
                   {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
-                    <p className="text-[10px] font-bold italic text-[#747a60] mt-1">
+                    <p className="text-[10px] font-bold mt-1" style={{ color: "var(--muted-foreground)" }}>
                       Soma: {detail.summary.scoreSum.toFixed(1)} ÷ {detail.summary.confirmedEventCount} provas
                     </p>
                   )}
                 </div>
-                <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
-                  <AlertTriangle size={18} className="text-[#ff5722] shrink-0" />
+                <div className="rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <AlertTriangle size={18} className="shrink-0" style={{ color: WARNING }} />
                   <div>
-                    <span className="text-[10px] font-bold uppercase italic text-[#747a60] block leading-none">Penalidades</span>
-                    <p className="text-lg font-black italic leading-none text-[#ff5722]">-{detail.summary.penaltyPoints}</p>
+                    <span className="text-[10px] font-bold uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Penalidades</span>
+                    <p className="text-lg font-black leading-none" style={{ fontFamily: CONDENSED, color: WARNING }}>-{detail.summary.penaltyPoints}</p>
                   </div>
                 </div>
-                <div className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-2">
-                  <Award size={18} className="text-[#506600] shrink-0" />
+                <div className="rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <Award size={18} className="shrink-0" style={{ color: GOOD }} />
                   <div>
-                    <span className="text-[10px] font-bold uppercase italic text-[#747a60] block leading-none">Méritos</span>
-                    <p className="text-lg font-black italic leading-none text-[#506600]">+{detail.summary.meritPoints}</p>
+                    <span className="text-[10px] font-bold uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Méritos</span>
+                    <p className="text-lg font-black leading-none" style={{ fontFamily: CONDENSED, color: GOOD }}>+{detail.summary.meritPoints}</p>
                   </div>
                 </div>
               </section>
 
               {!detail.summary.isQuarterClosed && (
-                <div className="bg-[#fff3cd] border-2 border-[#191c1e] px-4 py-3 text-xs font-bold italic uppercase text-[#664d03]">
+                <div className="rounded-lg px-4 py-3 text-xs font-bold uppercase" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER }}>
                   Ciclo ainda não fechado — valores parciais.
                 </div>
               )}
 
               <section className="space-y-3">
-                <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2">
+                <h4 className="text-sm font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
                   <Trophy size={16} /> Desempenho nas Provas
                 </h4>
                 {detail.events.filter(ev => ev.resultsConfirmed).length === 0 ? (
-                  <p className="text-sm italic text-[#747a60] font-medium">Nenhum evento confirmado no ciclo.</p>
+                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum evento confirmado no ciclo.</p>
                 ) : (
                   <div className="space-y-2">
                     {detail.events.filter(ev => ev.resultsConfirmed).map(ev => (
-                      <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")}>
+                      <div key={ev.eventId} data-testid={`detail-event-${ev.eventId}`} className={cn("rounded-lg p-3 flex items-center gap-3", !ev.countsForScore && "opacity-70")} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-black italic uppercase text-sm">{ev.eventName}</p>
+                            <p className="font-bold uppercase text-sm">{ev.eventName}</p>
                             {!ev.countsForScore && (
                               <span
                                 data-testid={`detail-event-no-score-${ev.eventId}`}
-                                className="px-1.5 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200] font-bold text-[9px] italic uppercase skew-x-[-8deg] inline-block shrink-0"
+                                className="px-1.5 py-0.5 rounded font-bold text-[9px] uppercase inline-block shrink-0"
+                                style={{ border: "1px solid " + AMBER, backgroundColor: "rgba(232,162,61,0.12)", color: AMBER }}
                                 title={(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : (ev as { noScoreReason?: string }).noScoreReason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}
                               >
-                                <span className="inline-block skew-x-[8deg]">
-                                  {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
-                                    ? `Sup Ceno — não conta p/ nota`
-                                    : (ev as { noScoreReason?: string }).noScoreReason === "freela"
-                                    ? "Freela — não conta p/ nota"
-                                    : "Não conta p/ nota"}
-                                </span>
+                                {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
+                                  ? `Sup Ceno — não conta p/ nota`
+                                  : (ev as { noScoreReason?: string }).noScoreReason === "freela"
+                                  ? "Freela — não conta p/ nota"
+                                  : "Não conta p/ nota"}
                               </span>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold italic text-[#747a60]">
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             {(ev.city || ev.state) && (
                               <span className="inline-flex items-center gap-1"><MapPin size={11} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
                             )}
@@ -639,8 +443,8 @@ function EmployeeDetailSheet({
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="block text-[9px] uppercase font-bold italic text-[#747a60] leading-none mb-1">Nota Time</span>
-                          <p className="text-xl font-black italic leading-none text-[#506600]">{ev.eventScore.toFixed(1)}</p>
+                          <span className="block text-[9px] uppercase font-bold leading-none mb-1" style={{ color: "var(--muted-foreground)" }}>Nota Time</span>
+                          <p className="text-xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{ev.eventScore.toFixed(1)}</p>
                         </div>
                       </div>
                     ))}
@@ -649,24 +453,24 @@ function EmployeeDetailSheet({
               </section>
 
               <section className="space-y-3">
-                <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2 text-[#ff5722]">
+                <h4 className="text-sm font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: WARNING }}>
                   <AlertTriangle size={16} /> Penalidades
                 </h4>
                 {detail.penalties.length === 0 ? (
-                  <p className="text-sm italic text-[#747a60] font-medium">Sem penalidades no ciclo.</p>
+                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Sem penalidades no ciclo.</p>
                 ) : (
                   <div className="space-y-2">
                     {detail.penalties.map(p => (
-                      <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
+                      <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                         <div className="flex-1 min-w-0">
-                          <p className="font-black italic uppercase text-sm">{p.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
+                          <p className="font-bold uppercase text-sm">{p.label}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             <span>{new Date(p.date).toLocaleDateString("pt-BR")}</span>
                             {p.eventName && <span>· {p.eventName}</span>}
                             {p.quantity > 1 && <span>· {p.quantity}x</span>}
                           </div>
                         </div>
-                        <span className="bg-[#ff5722] text-white font-black px-3 py-1 border-2 border-[#191c1e] text-xs shrink-0">-{p.total}</span>
+                        <span className="font-black px-3 py-1 rounded-lg text-xs shrink-0" style={{ backgroundColor: WARNING, color: "#fff" }}>-{p.total}</span>
                       </div>
                     ))}
                   </div>
@@ -674,24 +478,24 @@ function EmployeeDetailSheet({
               </section>
 
               <section className="space-y-3">
-                <h4 className="text-sm font-black italic uppercase tracking-tight flex items-center gap-2 text-[#506600]">
+                <h4 className="text-sm font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: GOOD }}>
                   <Award size={16} /> Méritos
                 </h4>
                 {detail.merits.length === 0 ? (
-                  <p className="text-sm italic text-[#747a60] font-medium">Sem méritos no ciclo.</p>
+                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Sem méritos no ciclo.</p>
                 ) : (
                   <div className="space-y-2">
                     {detail.merits.map(m => (
-                      <div key={m.id} data-testid={`detail-merit-${m.id}`} className="bg-white border-2 border-[#191c1e] p-3 flex items-center gap-3">
+                      <div key={m.id} data-testid={`detail-merit-${m.id}`} className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                         <div className="flex-1 min-w-0">
-                          <p className="font-black italic uppercase text-sm">{m.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold italic text-[#747a60]">
+                          <p className="font-bold uppercase text-sm">{m.label}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             <span>{new Date(m.date).toLocaleDateString("pt-BR")}</span>
                             {m.eventName && <span>· {m.eventName}</span>}
                             {m.quantity > 1 && <span>· {m.quantity}x</span>}
                           </div>
                         </div>
-                        <span className="bg-[#ccff00] text-[#191c1e] font-black px-3 py-1 border-2 border-[#191c1e] text-xs shrink-0">+{m.total}</span>
+                        <span className="font-black px-3 py-1 rounded-lg text-xs shrink-0" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>+{m.total}</span>
                       </div>
                     ))}
                   </div>
@@ -699,9 +503,9 @@ function EmployeeDetailSheet({
               </section>
 
               {detail.summary.bonusValue != null && detail.summary.bonusValue > 0 && (
-                <section className={`bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between ${HARD_SHADOW}`}>
-                  <span className="text-xs font-black uppercase italic tracking-wider">Bônus do Ciclo</span>
-                  <span className="text-2xl font-black italic">{fmtBRL(detail.summary.bonusValue)}</span>
+                <section className="rounded-xl p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)" }}>
+                  <span className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--primary-foreground)" }}>Bônus do Ciclo</span>
+                  <span className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{fmtBRL(detail.summary.bonusValue)}</span>
                 </section>
               )}
             </div>
@@ -757,28 +561,27 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
   }
 
   const headerCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center") => (
-    <th
-      className={cn(
-        "px-5 py-4 text-xs font-bold uppercase italic text-[#444933] cursor-pointer select-none hover:bg-[#e0e3e5] transition-colors",
-        align === "center" && "text-center"
-      )}
+    <div
+      className={cn("px-4 py-3 text-[10px] font-bold uppercase cursor-pointer select-none transition-colors hover:opacity-70", align === "center" && "text-center")}
+      style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}
       onClick={() => handleSort(key)}
     >
       <span className="inline-flex items-center gap-1">
         {label}
         <SortIcon active={sortKey === key} dir={sortDir} />
       </span>
-    </th>
+    </div>
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {isManager && (
         <div className="flex justify-end">
           <button
             data-testid="button-export-consolidation"
             onClick={handleExport}
-            className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+            className="rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+            style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
           >
             <Download size={15} /> Exportar
           </button>
@@ -786,36 +589,34 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
       )}
 
       {isLoading ? (
-        <div className="text-center py-20 text-[#747a60] italic uppercase font-bold">Carregando consolidação...</div>
+        <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando consolidação...</div>
       ) : rows.length === 0 ? (
-        <div className="text-center py-24 bg-white border-2 border-dashed border-[#191c1e]">
-          <Table2 size={48} className="mx-auto mb-4 opacity-20" />
-          <h3 className="text-xl font-black italic uppercase tracking-tight text-[#191c1e] mb-1">Nenhum dado consolidado</h3>
-          <p className="text-[#747a60] italic max-w-md mx-auto">Não há resultados gerados para o ciclo atual.</p>
+        <div className="text-center py-24 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
+          <Table2 size={44} className="mx-auto mb-4 opacity-20" />
+          <h3 className="text-xl font-black uppercase tracking-tight mb-1" style={{ fontFamily: CONDENSED }}>Nenhum dado consolidado</h3>
+          <p className="max-w-md mx-auto" style={{ color: "var(--muted-foreground)" }}>Não há resultados gerados para o ciclo atual.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative max-w-md flex-1">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-              <Input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
-                placeholder="Buscar colaborador..."
-              />
-            </div>
+        <div className="space-y-3.5">
+          <div className="relative max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
+              style={fieldStyle}
+              placeholder="Buscar colaborador..."
+            />
           </div>
 
-          <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-              <Table2 size={18} />
-              <span className="font-black uppercase tracking-tight">Planilha de Consolidação</span>
+          <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
+              <Table2 size={16} style={{ color: "var(--accent)" }} />
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Planilha de Consolidação</span>
             </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+            <div className="overflow-x-auto">
+              <div className="min-w-[820px]">
+                <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_1fr_1fr]" style={{ backgroundColor: "var(--secondary)" }}>
                   {headerCell("Colaborador", "employeeName", "left")}
                   {headerCell("Soma das Notas", "scoreSum")}
                   {headerCell("Eventos c/ Nota", "eventsCount")}
@@ -823,63 +624,63 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                   {headerCell("Penalidades / Méritos", "absencePenalty")}
                   {headerCell("Média (Nota Final)", "finalResult")}
                   {headerCell("Faixa", "platoon")}
-                </tr>
-              </thead>
-              <tbody className="divide-y-2 divide-[#eceef0]">
+                </div>
                 {sortedRows.map((r) => {
                   const penalty = r.absencePenalty ?? 0;
                   const merit = r.meritPoints ?? 0;
                   const net = Math.round((merit - penalty) * 10) / 10;
                   return (
-                    <tr
+                    <div
                       key={r.employeeId}
                       data-testid={`row-consolidation-${r.employeeId}`}
-                      className="hover:bg-[#f2f4f6] transition-all cursor-pointer"
+                      className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center transition-colors cursor-pointer hover:opacity-90"
+                      style={{ borderTop: "1px solid var(--border)" }}
                       onClick={() => setSelectedId(r.employeeId)}
                     >
-                      <td className="px-5 py-4">
-                        <div className="font-black italic uppercase text-sm text-[#191c1e]">{r.employeeName}</div>
-                      </td>
-                      <td className="px-5 py-4 text-center font-black italic text-[#506600]">{fmtScore(r.scoreSum ?? 0)}</td>
-                      <td className="px-5 py-4 text-center">
-                        <span className="text-[11px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-0.5">{r.eventsCount ?? 0}</span>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <span className={cn(
-                          "text-[11px] font-bold italic uppercase border-2 border-[#191c1e] px-2 py-0.5",
-                          (r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0)
-                            ? "text-white bg-[#ff8c00]"
-                            : "text-[#161e00] bg-[#ccff00]"
-                        )} title={(r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? "Participou em mais eventos do que os que entraram na nota" : undefined}>
+                      <div className="px-4 py-3.5">
+                        <div className="font-bold uppercase text-sm">{r.employeeName}</div>
+                      </div>
+                      <div className="px-4 py-3.5 text-center font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{fmtScore(r.scoreSum ?? 0)}</div>
+                      <div className="px-4 py-3.5 text-center">
+                        <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>{r.eventsCount ?? 0}</span>
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
+                        <span
+                          className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor: (r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? "rgba(232,162,61,0.14)" : "var(--primary)",
+                            color: (r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? AMBER : "var(--primary-foreground)",
+                          }}
+                          title={(r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? "Participou em mais eventos do que os que entraram na nota" : undefined}
+                        >
                           {r.participatedEventsCount ?? 0}
                         </span>
-                      </td>
-                      <td className="px-5 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         {net < 0 ? (
-                          <span className="text-xs font-black italic text-white bg-[#ff5722] border-2 border-[#191c1e] px-2 py-0.5">-{Math.abs(net)}</span>
+                          <span className="text-xs font-black px-2 py-0.5 rounded" style={{ backgroundColor: WARNING, color: "#fff" }}>-{Math.abs(net)}</span>
                         ) : net > 0 ? (
-                          <span className="text-xs font-black italic text-[#161e00] bg-[#ccff00] border-2 border-[#191c1e] px-2 py-0.5">+{net}</span>
+                          <span className="text-xs font-black px-2 py-0.5 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>+{net}</span>
                         ) : (
-                          <span className="text-[#c4c9ac] font-bold italic">—</span>
+                          <span className="font-bold" style={{ color: "var(--muted-foreground)" }}>—</span>
                         )}
-                      </td>
-                      <td className="px-5 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         <div className="inline-flex items-baseline gap-1">
-                          <span className="font-black italic text-2xl text-[#191c1e] leading-none">{fmtScore(r.finalResult)}</span>
-                          <span className="text-[10px] font-bold italic text-[#747a60] uppercase">/100</span>
+                          <span className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{fmtScore(r.finalResult)}</span>
+                          <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>/100</span>
                         </div>
-                      </td>
-                      <td className="px-5 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         <FaixaBadge minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       <EmployeeDetailSheet employeeId={selectedId} onClose={() => setSelectedId(null)} />
@@ -1009,27 +810,26 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
   const sortedRows = useSort(filteredRows, sortKey, sortDir);
 
   const payHeaderCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center") => (
-    <th
-      className={cn(
-        "px-6 py-4 text-xs font-bold uppercase italic text-[#444933] cursor-pointer select-none hover:bg-[#e0e3e5] transition-colors",
-        align === "center" && "text-center"
-      )}
+    <div
+      className={cn("px-4 py-3 text-[10px] font-bold uppercase cursor-pointer select-none transition-colors hover:opacity-70", align === "center" && "text-center")}
+      style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}
       onClick={() => handleSort(key)}
     >
       <span className="inline-flex items-center gap-1">
         {label}
         <SortIcon active={sortKey === key} dir={sortDir} />
       </span>
-    </th>
+    </div>
   );
 
   return (
-    <div className="space-y-8">
-      <section className="flex gap-3 items-center flex-wrap justify-end">
+    <div className="space-y-6">
+      <section className="flex gap-2.5 items-center flex-wrap justify-end">
         <button
           data-testid="button-export-results"
           onClick={handleExport}
-          className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+          className="rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+          style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
         >
           <Download size={15} /> Exportar
         </button>
@@ -1040,7 +840,8 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
             onClick={() => recomputeMutation.mutate()}
             disabled={recomputeMutation.isPending}
             title="Recalcula os resultados do ciclo atual agora, sem fechar o ciclo (ex.: após alterar o cargo de um colaborador)"
-            className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+            className="rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-colors hover:opacity-80"
+            style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
           >
             <RefreshCw size={15} className={recomputeMutation.isPending ? "animate-spin" : ""} /> {recomputeMutation.isPending ? "Recalculando..." : "Recalcular Ciclo"}
           </button>
@@ -1051,55 +852,59 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
             <AlertDialogTrigger asChild>
               <button
                 data-testid="button-close-quarter"
-                className={`bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                className="rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-opacity hover:opacity-90"
+                style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 <LockKeyhole size={15} /> Fechar Ciclo
               </button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+            <AlertDialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
               <AlertDialogHeader>
-                <div className="w-12 h-12 bg-[#ccff00] border-2 border-[#191c1e] flex items-center justify-center mb-4">
-                  <LockKeyhole size={24} className="text-[#161e00]" />
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center mb-4" style={{ backgroundColor: "var(--primary)" }}>
+                  <LockKeyhole size={22} style={{ color: "var(--primary-foreground)" }} />
                 </div>
-                <AlertDialogTitle className="text-2xl italic uppercase font-black tracking-tight">Consolidar Resultados do Ciclo?</AlertDialogTitle>
-                <AlertDialogDescription className="text-sm leading-relaxed text-[#444933] italic">
+                <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Consolidar Resultados do Ciclo?</AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
                   O fechamento irá congelar as notas, calcular as faixas de bônus e gerar a projeção de premiação baseada nos eventos já finalizados.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="space-y-4 py-4 bg-[#f7f9fb] p-4 border-2 border-[#191c1e] mt-2">
+              <div className="space-y-4 py-4 px-4 rounded-lg mt-2" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
                 <div className="flex items-start gap-3">
                   <Checkbox
                     id="force-close"
                     data-testid="checkbox-force-close"
                     checked={forceClose}
                     onCheckedChange={(c) => setForceClose(c === true)}
-                    className="mt-0.5 rounded-none border-2 border-[#ff5722] data-[state=checked]:bg-[#ff5722] data-[state=checked]:border-[#ff5722]"
+                    className="mt-0.5"
+                    style={{ borderColor: WARNING }}
                   />
-                  <Label htmlFor="force-close" className="text-sm font-bold italic leading-snug cursor-pointer text-[#444933]">
+                  <Label htmlFor="force-close" className="text-sm font-bold leading-snug cursor-pointer" style={{ color: "var(--foreground)" }}>
                     Existem eventos pendentes. Forçar o fechamento ignorando esses eventos?
                   </Label>
                 </div>
                 {forceClose && (
                   <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2">
-                    <Label htmlFor="force-reason" className="text-xs font-black italic uppercase tracking-wider text-[#b02f00]">Justificativa Obrigatória</Label>
+                    <Label htmlFor="force-reason" className="text-xs font-black uppercase tracking-wide" style={{ color: WARNING }}>Justificativa Obrigatória</Label>
                     <Textarea
                       id="force-reason"
                       data-testid="input-force-reason"
                       value={forceReason}
                       onChange={(e) => setForceReason(e.target.value)}
                       placeholder="Por que o ciclo deve ser fechado agora?"
-                      className="bg-white rounded-none border-2 border-[#191c1e] focus-visible:ring-0"
+                      className="rounded-lg"
+                      style={fieldStyle}
                       rows={3}
                     />
                   </div>
                 )}
               </div>
               <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider">Cancelar</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs tracking-wide" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleCloseCycle}
                   disabled={closeMutation.isPending || (forceClose && !forceReason.trim())}
-                  className="rounded-none border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] hover:bg-[#abd600] font-bold italic uppercase text-xs tracking-wider"
+                  className="rounded-lg font-bold uppercase text-xs tracking-wide"
+                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                 >
                   {closeMutation.isPending ? "Processando..." : "Confirmar Fechamento"}
                 </AlertDialogAction>
@@ -1110,76 +915,69 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
       </section>
 
       {rows.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className={`bg-white border-2 border-[#191c1e] p-6 ${HARD_SHADOW}`}>
-            <div className="flex items-center gap-2 text-[#747a60]">
-              <Wallet2 size={16} />
-              <p className="font-bold uppercase text-xs italic tracking-wider">Total em Bônus</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
+              <Wallet2 size={15} />
+              <p className="font-bold uppercase text-xs tracking-wide">Total em Bônus</p>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black italic mt-2 text-[#191c1e]">{fmtBRL(totalBonus)}</h3>
+            <h3 className="text-3xl font-black mt-2" style={{ fontFamily: CONDENSED }}>{fmtBRL(totalBonus)}</h3>
           </div>
-          <div className={`bg-white border-2 border-[#191c1e] p-6 ${HARD_SHADOW}`}>
-            <div className="flex items-center gap-2 text-[#747a60]">
-              <CheckCircle2 size={16} />
-              <p className="font-bold uppercase text-xs italic tracking-wider">Elegibilidade</p>
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
+              <CheckCircle2 size={15} />
+              <p className="font-bold uppercase text-xs tracking-wide">Elegibilidade</p>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black italic mt-2 text-[#191c1e]">{eligibilityPct}%</h3>
-            <span className="inline-block mt-3 bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] px-2 py-1 border-2 border-[#191c1e]">{eligibleCount} de {rows.length}</span>
+            <h3 className="text-3xl font-black mt-2" style={{ fontFamily: CONDENSED }}>{eligibilityPct}%</h3>
+            <span className="inline-block mt-2.5 font-black uppercase text-[10px] px-2 py-1 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{eligibleCount} de {rows.length}</span>
           </div>
-          <div className={`bg-white border-2 border-[#191c1e] p-6 ${HARD_SHADOW}`}>
-            <div className="flex items-center gap-2 text-[#747a60]">
-              <Users size={16} />
-              <p className="font-bold uppercase text-xs italic tracking-wider">Colaboradores</p>
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
+              <Users size={15} />
+              <p className="font-bold uppercase text-xs tracking-wide">Colaboradores</p>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black italic mt-2 text-[#191c1e]">{rows.length}</h3>
+            <h3 className="text-3xl font-black mt-2" style={{ fontFamily: CONDENSED }}>{rows.length}</h3>
           </div>
         </div>
       )}
 
       {isLoading ? (
-        <div className="text-center py-20 text-[#747a60] italic uppercase font-bold">Carregando resultados...</div>
+        <div className="text-center py-20 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando resultados...</div>
       ) : rows.length === 0 ? (
-        <div className="text-center py-24 bg-white border-2 border-dashed border-[#191c1e]">
-          <Wallet2 size={48} className="mx-auto mb-4 opacity-20" />
-          <h3 className="text-xl font-black italic uppercase tracking-tight text-[#191c1e] mb-1">Nenhum resultado consolidado</h3>
-          <p className="text-[#747a60] italic max-w-md mx-auto">Não há dados gerados para o ciclo atual.</p>
-          {canManage && <p className="text-sm mt-2 text-[#444933] italic">Clique em "Fechar Ciclo" para gerar os resultados oficiais.</p>}
+        <div className="text-center py-24 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
+          <Wallet2 size={44} className="mx-auto mb-4 opacity-20" />
+          <h3 className="text-xl font-black uppercase tracking-tight mb-1" style={{ fontFamily: CONDENSED }}>Nenhum resultado consolidado</h3>
+          <p className="max-w-md mx-auto" style={{ color: "var(--muted-foreground)" }}>Não há dados gerados para o ciclo atual.</p>
+          {canManage && <p className="text-sm mt-2" style={{ color: "var(--muted-foreground)" }}>Clique em "Fechar Ciclo" para gerar os resultados oficiais.</p>}
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="space-y-3.5">
+          <div className="flex flex-col sm:flex-row gap-2.5">
             <div className="relative max-w-md flex-1">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-              <Input
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+              <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="pl-10 h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus-visible:ring-0"
+                className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
+                style={fieldStyle}
                 placeholder="Buscar colaborador..."
               />
             </div>
-            <div className="w-48">
-              <Select value={filterEligible} onValueChange={(v) => setFilterEligible(v as any)}>
-                <SelectTrigger className="h-12 rounded-none border-2 border-[#191c1e] bg-white italic font-medium focus:ring-0">
-                  <SelectValue placeholder="Elegibilidade" />
-                </SelectTrigger>
-                <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="eligible">Elegíveis</SelectItem>
-                  <SelectItem value="ineligible">Não elegíveis</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <select value={filterEligible} onChange={e => setFilterEligible(e.target.value as any)} className="h-11 rounded-lg px-3 text-sm font-bold" style={fieldStyle}>
+              <option value="all">Todos</option>
+              <option value="eligible">Elegíveis</option>
+              <option value="ineligible">Não elegíveis</option>
+            </select>
           </div>
 
-          <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-              <Wallet size={18} />
-              <span className="font-black uppercase tracking-tight">Bônus & Pagamentos</span>
+          <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
+              <Wallet size={16} style={{ color: "var(--accent)" }} />
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Bônus & Pagamentos</span>
             </div>
             <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
+              <div className={cn("min-w-[900px]", canManage && "min-w-[980px]")}>
+                <div className="grid items-center" style={{ backgroundColor: "var(--secondary)", gridTemplateColumns: canManage ? "1.6fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.7fr" : "1.6fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr" }}>
                   {payHeaderCell("Colaborador", "employeeName", "left")}
                   {payHeaderCell("Atividade", "eventsCount")}
                   {payHeaderCell("Nota Final", "finalResult")}
@@ -1188,108 +986,107 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                   {payHeaderCell("Bônus", "bonusValue")}
                   {payHeaderCell("Bônus Extra", "extraBonusValue")}
                   {payHeaderCell("Status do Pagamento", "bonusStatus")}
-                  {canManage && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Ação</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y-2 divide-[#eceef0]">
+                  {canManage && <div className="px-4 py-3 text-[10px] font-bold uppercase text-center" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Ação</div>}
+                </div>
                 {sortedRows.map((r) => {
-                  const statusInfo = r.bonusStatus ? (BONUS_STATUS_LABELS[r.bonusStatus] ?? { label: r.bonusStatus, class: "bg-[#eceef0] text-[#444933]" }) : null;
+                  const statusInfo = r.bonusStatus ? (BONUS_STATUS_LABELS[r.bonusStatus] ?? { label: r.bonusStatus, bg: "var(--secondary)", color: "var(--muted-foreground)" }) : null;
                   return (
-                    <tr
+                    <div
                       key={r.employeeId}
                       data-testid={`row-result-${r.employeeId}`}
-                      className="hover:bg-[#f2f4f6] transition-all cursor-pointer group"
+                      className="grid items-center transition-colors cursor-pointer group hover:opacity-90"
+                      style={{ borderTop: "1px solid var(--border)", gridTemplateColumns: canManage ? "1.6fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.7fr" : "1.6fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr" }}
                       onClick={() => setSelectedId(r.employeeId)}
                     >
-                      <td className="px-6 py-4">
-                        <div className="font-black italic uppercase text-sm text-[#191c1e]">{r.employeeName}</div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                      <div className="px-4 py-3.5">
+                        <div className="font-bold uppercase text-sm">{r.employeeName}</div>
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border-2 border-[#191c1e] px-2 py-0.5">{r.eventsCount ?? 0} c/ nota</span>
-                          <span className="text-[10px] font-bold italic uppercase text-[#161e00] bg-[#ccff00] border-2 border-[#191c1e] px-2 py-0.5">{r.participatedEventsCount ?? 0} participados</span>
-                          {(r.totalAbsences ?? 0) > 0 && <span className="text-[10px] font-bold italic uppercase text-white bg-[#ff5722] border-2 border-[#191c1e] px-2 py-0.5">{r.totalAbsences} penalidades</span>}
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>{r.eventsCount ?? 0} c/ nota</span>
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{r.participatedEventsCount ?? 0} participados</span>
+                          {(r.totalAbsences ?? 0) > 0 && <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>{r.totalAbsences} penalidades</span>}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         <div className="inline-flex items-baseline gap-1">
-                          <span className="font-black italic text-2xl text-[#191c1e] leading-none">{fmtScore(r.finalResult)}</span>
-                          <span className="text-[10px] font-bold italic text-[#747a60] uppercase">/100</span>
+                          <span className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{fmtScore(r.finalResult)}</span>
+                          <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>/100</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         <FaixaBadge minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         {r.eligible === false ? (
-                          <span className="inline-block text-[10px] uppercase font-black italic bg-[#ff5722] text-white border-2 border-[#191c1e] px-2 py-1 cursor-help" title={r.eligibilityReason ?? undefined}>
+                          <span className="inline-block text-[10px] uppercase font-black px-2 py-1 rounded-full cursor-help" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }} title={r.eligibilityReason ?? undefined}>
                             Não Elegível
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black italic bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>
                             <CheckCircle2 size={10} /> Elegível
                           </span>
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         {r.bonusValue > 0 ? (
-                          <span className="font-black italic text-[#161e00] bg-[#ccff00] px-3 py-1 border-2 border-[#191c1e]">{fmtBRL(r.bonusValue)}</span>
+                          <span className="font-black px-2.5 py-1 rounded-lg" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{fmtBRL(r.bonusValue)}</span>
                         ) : (
-                          <span className="text-[#c4c9ac] font-bold italic">R$ 0,00</span>
+                          <span className="font-bold" style={{ color: "var(--muted-foreground)" }}>R$ 0,00</span>
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         {(r.extraBonusValue ?? 0) > 0 ? (
-                          <span className="font-black italic text-[#191c1e] bg-[#eceef0] px-3 py-1 border-2 border-[#191c1e]">{fmtBRL(r.extraBonusValue ?? 0)}</span>
+                          <span className="font-black px-2.5 py-1 rounded-lg" style={{ backgroundColor: "var(--secondary)" }}>{fmtBRL(r.extraBonusValue ?? 0)}</span>
                         ) : (
-                          <span className="text-[#c4c9ac] font-bold italic">R$ 0,00</span>
+                          <span className="font-bold" style={{ color: "var(--muted-foreground)" }}>R$ 0,00</span>
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
+                      </div>
+                      <div className="px-4 py-3.5 text-center">
                         {statusInfo ? (
-                          <span className={`text-[10px] uppercase font-black italic px-2.5 py-1 border-2 border-[#191c1e] ${statusInfo.class}`}>{statusInfo.label}</span>
+                          <span className="text-[10px] uppercase font-black px-2.5 py-1 rounded-full" style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}>{statusInfo.label}</span>
                         ) : (
-                          <span className="text-[#c4c9ac]">—</span>
+                          <span style={{ color: "var(--muted-foreground)" }}>—</span>
                         )}
-                      </td>
+                      </div>
                       {canManage && (
-                        <td className="px-6 py-4 text-center">
+                        <div className="px-4 py-3.5 text-center">
                           {r.id != null && (
                             <button
                               data-testid={`button-payment-${r.employeeId}`}
-                              className="p-2 border-2 border-transparent text-[#747a60] hover:border-[#191c1e] hover:text-[#161e00] hover:bg-[#ccff00] transition-all"
+                              className="p-2 rounded-lg transition-colors hover:opacity-80"
+                              style={{ color: "var(--muted-foreground)", border: "1px solid transparent" }}
                               onClick={(e) => { e.stopPropagation(); openPayment(r); }}
                             >
-                              <Wallet size={16} />
+                              <Wallet size={15} />
                             </button>
                           )}
-                        </td>
+                        </div>
                       )}
-                    </tr>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       <Dialog open={!!payTarget} onOpenChange={o => !o && setPayTarget(null)}>
-        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Gestão de Pagamento</DialogTitle>
-            <p className="text-sm font-bold italic uppercase text-[#747a60] mt-1">{payTarget?.employeeName}</p>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Gestão de Pagamento</DialogTitle>
+            <p className="text-sm font-bold uppercase mt-1" style={{ color: "var(--muted-foreground)" }}>{payTarget?.employeeName}</p>
           </DialogHeader>
-          <div className="bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between mb-2 mt-4">
-            <span className="text-xs font-black italic uppercase tracking-wider text-[#161e00]">Valor do Bônus</span>
-            <span className="text-2xl font-black italic text-[#161e00]">{payTarget ? fmtBRL(payTarget.bonusValue) : "R$ 0,00"}</span>
+          <div className="rounded-lg p-4 flex items-center justify-between mb-2 mt-4" style={{ backgroundColor: "var(--primary)" }}>
+            <span className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--primary-foreground)" }}>Valor do Bônus</span>
+            <span className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{payTarget ? fmtBRL(payTarget.bonusValue) : "R$ 0,00"}</span>
           </div>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Status do Bônus</Label>
+              <Label className="font-bold uppercase text-xs tracking-wide" style={{ color: "var(--muted-foreground)" }}>Status do Bônus</Label>
               <Select value={payForm.bonusStatus} onValueChange={v => setPayForm(f => ({ ...f, bonusStatus: v }))}>
-                <SelectTrigger data-testid="select-bonus-status" className="h-11 rounded-none border-2 border-[#191c1e] font-bold italic focus:ring-0">
+                <SelectTrigger data-testid="select-bonus-status" className="h-11 rounded-lg font-bold" style={fieldStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1300,32 +1097,35 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Método de Pagamento</Label>
+              <Label className="font-bold uppercase text-xs tracking-wide" style={{ color: "var(--muted-foreground)" }}>Método de Pagamento</Label>
               <Input
                 data-testid="input-payment-method"
                 value={payForm.paymentMethod}
                 onChange={e => setPayForm(f => ({ ...f, paymentMethod: e.target.value }))}
-                className="h-11 rounded-none border-2 border-[#191c1e]"
+                className="h-11 rounded-lg"
+                style={fieldStyle}
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Observações (Opcional)</Label>
+              <Label className="font-bold uppercase text-xs tracking-wide" style={{ color: "var(--muted-foreground)" }}>Observações (Opcional)</Label>
               <Textarea
                 data-testid="input-payment-notes"
                 value={payForm.paymentNotes}
                 onChange={e => setPayForm(f => ({ ...f, paymentNotes: e.target.value }))}
                 placeholder="Detalhes adicionais sobre o pagamento..."
-                className="resize-none rounded-none border-2 border-[#191c1e]"
+                className="resize-none rounded-lg"
+                style={fieldStyle}
                 rows={3}
               />
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#eceef0] mt-2">
-              <button onClick={() => setPayTarget(null)} className="border-2 border-[#191c1e] bg-white px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider hover:bg-[#eceef0] transition-colors">Cancelar</button>
+            <div className="flex justify-end gap-3 pt-4 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
+              <button onClick={() => setPayTarget(null)} className="rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wide transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
               <button
                 data-testid="button-save-payment"
                 onClick={savePayment}
                 disabled={paymentMutation.isPending}
-                className="border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider hover:bg-[#abd600] transition-colors disabled:opacity-50"
+                className="rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 {paymentMutation.isPending ? "Salvando..." : "Salvar"}
               </button>
@@ -1350,29 +1150,44 @@ export default function ResultsPage() {
   const [tab, setTab] = useState("ranking");
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-8">
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-8 border-[#ccff00] pl-6 py-1">
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
+      <div className="p-6 md:p-10 space-y-7">
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
           <div>
-            <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-              Resultados <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">do Ciclo</span>
+            <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>
+              Resultados &amp; Ranking
             </h1>
-            <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-2xl">Ranking, consolidação de notas e pagamentos de bônus do ciclo atual.</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Classificação geral do ciclo</p>
           </div>
           <CycleBadge />
         </section>
 
-        <Tabs value={tab} onValueChange={setTab} className="space-y-8">
-          <TabsList className="bg-white border-2 border-[#191c1e] rounded-none p-1 h-auto flex-wrap gap-1">
-            <TabsTrigger value="ranking" data-testid="tab-ranking" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
-              <ListOrdered size={15} /> Ranking
+        <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+          <TabsList className="rounded-lg p-1 h-auto flex-wrap gap-1 w-fit" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <TabsTrigger
+              value="ranking"
+              data-testid="tab-ranking"
+              className="rounded-md font-bold uppercase text-xs tracking-wide px-4 py-2 flex items-center gap-2 shadow-none data-[state=active]:shadow-none"
+              style={{ fontFamily: CONDENSED, backgroundColor: tab === "ranking" ? "var(--primary)" : "transparent", color: tab === "ranking" ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
+            >
+              <ListOrdered size={14} /> Ranking
             </TabsTrigger>
-            <TabsTrigger value="consolidacao" data-testid="tab-consolidacao" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
-              <Table2 size={15} /> Consolidação
+            <TabsTrigger
+              value="consolidacao"
+              data-testid="tab-consolidacao"
+              className="rounded-md font-bold uppercase text-xs tracking-wide px-4 py-2 flex items-center gap-2 shadow-none data-[state=active]:shadow-none"
+              style={{ fontFamily: CONDENSED, backgroundColor: tab === "consolidacao" ? "var(--primary)" : "transparent", color: tab === "consolidacao" ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
+            >
+              <Table2 size={14} /> Consolidação
             </TabsTrigger>
             {isManager && (
-              <TabsTrigger value="bonus" data-testid="tab-bonus" className="rounded-none data-[state=active]:bg-[#ccff00] data-[state=active]:text-[#161e00] data-[state=active]:shadow-none font-black italic uppercase text-xs tracking-wider px-4 py-2 flex items-center gap-2">
-                <Wallet size={15} /> Bônus &amp; Pagamentos
+              <TabsTrigger
+                value="bonus"
+                data-testid="tab-bonus"
+                className="rounded-md font-bold uppercase text-xs tracking-wide px-4 py-2 flex items-center gap-2 shadow-none data-[state=active]:shadow-none"
+                style={{ fontFamily: CONDENSED, backgroundColor: tab === "bonus" ? "var(--primary)" : "transparent", color: tab === "bonus" ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
+              >
+                <Wallet size={14} /> Bônus &amp; Pagamentos
               </TabsTrigger>
             )}
           </TabsList>

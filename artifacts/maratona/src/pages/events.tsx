@@ -5,16 +5,16 @@ import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Calendar, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Trash2, Pencil, MoreHorizontal } from "lucide-react";
+import { Search, Calendar, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Trash2, Pencil, MoreHorizontal, CalendarRange } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
-import { CycleBadge } from "@/components/cycle-badge";
+import { formatCyclePeriod } from "@/components/cycle-badge";
+import { PremiumCard, CONDENSED, WARNING } from "@/lib/premium-theme";
 import { cn } from "@/lib/utils";
 
 function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
@@ -37,14 +37,16 @@ function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
 function MiniBar({ value, total, color }: { value: number; total: number; color: string }) {
   const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
   return (
-    <div className="flex flex-col gap-0.5 w-full">
-      <div className="h-1 bg-[#e8eae0] w-full overflow-hidden">
-        <div className="h-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+    <div className="flex flex-col gap-1 w-full">
+      <div className="h-[5px] rounded-full w-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
-      <span className="text-[9px] font-black italic" style={{ color }}>{value}/{total}</span>
+      <span className="text-[10px] font-bold" style={{ color }}>{value}/{total}</span>
     </div>
   );
 }
+
+const inputStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 export default function EventsPage() {
   const { user } = useAuth();
@@ -183,6 +185,7 @@ export default function EventsPage() {
     (e.calibratedCriteriaCount ?? 0) === 0;
 
   const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
+  const cyclePeriod = cycle ? formatCyclePeriod(cycle.startDate, cycle.endDate) : null;
 
   const colSortPairs: Record<string, string> = {
     nameAsc: "nameDesc", nameDesc: "nameAsc",
@@ -268,36 +271,42 @@ export default function EventsPage() {
   ];
 
   return (
-    <div className="min-h-full flex flex-col text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="min-h-full flex flex-col">
 
-      {/* ── Dark header ── */}
-      <div className="bg-[#191c1e] border-b-4 border-[#ccff00] px-5 py-3 flex items-center gap-4 shrink-0 flex-wrap">
+      {/* ── Header ── */}
+      <div className="px-6 py-4 flex items-center gap-5 shrink-0 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="shrink-0">
-          <span className="text-[9px] font-black italic uppercase text-[#747a60] tracking-wider block">Gerenciar</span>
-          <h1 data-testid="text-page-title" className="text-[15px] font-black italic uppercase text-white leading-tight">Eventos do Ciclo</h1>
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] block" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Gerenciar</span>
+          <h1 data-testid="text-page-title" className="font-black uppercase text-2xl tracking-tight leading-none mt-0.5" style={{ fontFamily: CONDENSED }}>Eventos do Ciclo</h1>
         </div>
 
-        <div className="shrink-0">
-          <CycleBadge />
-        </div>
+        {cycle && (
+          <div className="shrink-0 flex items-center gap-2 rounded-lg px-3.5 py-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+            <CalendarRange size={16} className="shrink-0" style={{ color: "var(--accent)" }} />
+            <span className="flex flex-col leading-tight">
+              <span className="font-black uppercase text-xs" style={{ fontFamily: CONDENSED }}>{cycle.name}</span>
+              <span className="text-[10px] font-semibold" style={{ color: "var(--muted-foreground)" }}>{cyclePeriod ?? "Período não definido"}</span>
+            </span>
+          </div>
+        )}
 
         {/* Quick stats */}
-        <div className="flex items-center border-l border-[#333] pl-4 gap-0">
+        <div className="flex items-stretch shrink-0 pl-5" style={{ borderLeft: "1px solid var(--border)" }}>
           {[
-            { val: all.length,                                                label: "Eventos",    color: "text-white" },
-            { val: all.filter(e => e.status === "open").length,               label: "Abertos",    color: "text-[#ccff00]" },
-            { val: all.filter(e => e.status === "closed").length,             label: "Concluídos", color: "text-[#9aa088]" },
-            { val: all.filter(e => e.fullyCalibrated).length,                 label: "Pub. Final", color: "text-[#768f00]" },
+            { val: all.length,                                    label: "Eventos",    color: "var(--foreground)" },
+            { val: all.filter(e => e.status === "open").length,    label: "Abertos",    color: "var(--accent)" },
+            { val: all.filter(e => e.status === "closed").length,  label: "Concluídos", color: "var(--muted-foreground)" },
+            { val: all.filter(e => e.fullyCalibrated).length,      label: "Pub. Final", color: "#9ab000" },
           ].map((s, i) => (
-            <div key={i} className="px-3 py-1 border-r border-[#333] last:border-0">
-              <span className={`block text-[17px] font-black italic leading-none ${s.color}`}>{s.val}</span>
-              <span className="text-[8px] font-bold italic uppercase text-[#747a60]">{s.label}</span>
+            <div key={i} className="px-4 text-center" style={{ borderRight: i < 3 ? "1px solid var(--border)" : "none" }}>
+              <span className="block font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: s.color }}>{s.val}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>{s.label}</span>
             </div>
           ))}
         </div>
 
         {/* Action buttons */}
-        <div className="ml-auto flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex items-center gap-2.5 shrink-0">
           {user?.role === "admin" && (
             <button
               onClick={() => {
@@ -305,7 +314,8 @@ export default function EventsPage() {
                 normalizeDatesMutation.mutate();
               }}
               disabled={normalizeDatesMutation.isPending}
-              className="h-8 px-3 border border-[#333] text-[9px] font-bold italic uppercase text-[#9aa088] hover:border-[#ccff00] hover:text-[#ccff00] transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              className="h-9 px-3.5 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors disabled:opacity-50 hover:opacity-80"
+              style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
             >
               {normalizeDatesMutation.isPending ? "..." : "Unificar Datas"}
             </button>
@@ -315,55 +325,57 @@ export default function EventsPage() {
               <DialogTrigger asChild>
                 <button
                   data-testid="button-create-event"
-                  className="h-8 px-3 bg-[#ccff00] text-[#161e00] text-[9px] font-black italic uppercase flex items-center gap-1.5 hover:bg-[#b8e800] transition-colors"
+                  className="h-9 px-4 rounded-lg text-[11px] font-black uppercase tracking-wide flex items-center gap-1.5 transition-opacity hover:opacity-90"
+                  style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                 >
-                  <Plus size={10} /> Novo Evento
+                  <Plus size={13} /> Novo Evento
                 </button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+              <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
                 <DialogHeader>
-                  <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Novo Evento</DialogTitle>
+                  <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Evento</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
                   <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome do Evento <span className="text-[#ba1a1a]">*</span></Label>
-                    <Input data-testid="input-event-name" {...register("name", { required: true })} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: WARNING }}>*</span></Label>
+                    <Input data-testid="input-event-name" {...register("name", { required: true })} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-lg" style={inputStyle} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cliente</Label>
-                    <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Cliente</Label>
+                    <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-lg" style={inputStyle} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Início <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Início <span style={{ color: WARNING }}>*</span></Label>
+                      <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Fim <span className="text-[#ba1a1a]">*</span></Label>
-                      <Input data-testid="input-event-end" type="date" {...register("endDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Fim <span style={{ color: WARNING }}>*</span></Label>
+                      <Input data-testid="input-event-end" type="date" {...register("endDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cidade</Label>
-                      <Input data-testid="input-event-city" {...register("city")} placeholder="Ex: São Paulo" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Cidade</Label>
+                      <Input data-testid="input-event-city" {...register("city")} placeholder="Ex: São Paulo" className="h-11 rounded-lg" style={inputStyle} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">UF</Label>
-                      <Input data-testid="input-event-state" {...register("state")} placeholder="Ex: SP" maxLength={2} className="h-11 rounded-none border-2 border-[#191c1e] uppercase" />
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>UF</Label>
+                      <Input data-testid="input-event-state" {...register("state")} placeholder="Ex: SP" maxLength={2} className="h-11 rounded-lg uppercase" style={inputStyle} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Local</Label>
-                    <Input data-testid="input-event-location" {...register("location")} placeholder="Ex: Pavilhão de Exposições" className="h-11 rounded-none border-2 border-[#191c1e]" />
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Local</Label>
+                    <Input data-testid="input-event-location" {...register("location")} placeholder="Ex: Pavilhão de Exposições" className="h-11 rounded-lg" style={inputStyle} />
                   </div>
-                  <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-                    <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+                  <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                    <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
                     <button
                       data-testid="button-submit-event"
                       type="submit"
                       disabled={createMutation.isPending}
-                      className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                      className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50"
+                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                     >
                       {createMutation.isPending ? "Criando..." : "Criar Evento"}
                     </button>
@@ -376,73 +388,84 @@ export default function EventsPage() {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="bg-white border-b border-[#e0e2da] px-5 py-2 flex items-center gap-2 shrink-0 flex-wrap">
+      <div className="px-6 py-3 flex items-center gap-2 shrink-0 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
         {/* Search */}
-        <div className="flex items-center gap-1.5 border border-[#d0d2ca] px-2.5 py-1.5 w-64 shrink-0">
-          <Search size={10} className="text-[#9aa088] shrink-0" />
+        <div className="flex items-center gap-2 rounded-lg px-3 py-2 w-72 shrink-0" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+          <Search size={13} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
           <input
             data-testid="input-search-events"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar evento, cliente ou cidade…"
-            className="text-[10px] italic text-[#191c1e] bg-transparent outline-none w-full placeholder:text-[#b0b8a0]"
+            className="text-xs bg-transparent outline-none w-full"
+            style={{ color: "var(--foreground)" }}
           />
         </div>
 
         {/* Status chip filters */}
-        {chipFilters.map((f) => (
-          <button
-            key={String(f.key)}
-            onClick={() => setCardFilter(f.key)}
-            className={`h-7 px-2.5 text-[9px] font-bold italic uppercase border transition-colors shrink-0 ${
-              cardFilter === f.key
-                ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]"
-                : "bg-white text-[#747a60] border-[#d0d2ca] hover:border-[#191c1e] hover:text-[#191c1e]"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+        {chipFilters.map((f) => {
+          const active = cardFilter === f.key;
+          return (
+            <button
+              key={String(f.key)}
+              onClick={() => setCardFilter(f.key)}
+              className="h-8 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors shrink-0"
+              style={{
+                fontFamily: CONDENSED,
+                backgroundColor: active ? "var(--primary)" : "transparent",
+                color: active ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                border: active ? "1px solid var(--primary)" : "1px solid var(--border)",
+              }}
+            >
+              {f.label}
+            </button>
+          );
+        })}
 
         {/* Date filter popover */}
         <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
           <PopoverTrigger asChild>
             <button
-              className={`ml-auto h-7 px-3 border text-[9px] font-bold italic uppercase flex items-center gap-1.5 transition-colors shrink-0 ${
-                hasDateFilter
-                  ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]"
-                  : "border-[#d0d2ca] text-[#747a60] hover:border-[#191c1e] hover:text-[#191c1e]"
-              }`}
+              className="ml-auto h-8 px-3.5 rounded-lg text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 transition-colors shrink-0"
+              style={{
+                fontFamily: CONDENSED,
+                backgroundColor: hasDateFilter ? "var(--primary)" : "transparent",
+                color: hasDateFilter ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                border: hasDateFilter ? "1px solid var(--primary)" : "1px solid var(--border)",
+              }}
             >
-              <SlidersHorizontal size={10} />
+              <SlidersHorizontal size={12} />
               {hasDateFilter ? "Datas ●" : "Filtrar Datas"}
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-64 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] p-4 space-y-3">
-            <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60]">Filtrar por data</p>
+          <PopoverContent align="end" className="w-64 rounded-xl p-4 space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Filtrar por data</p>
             <div>
-              <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">De</label>
+              <label className="text-[10px] font-bold uppercase tracking-wide block mb-1" style={{ color: "var(--muted-foreground)" }}>De</label>
               <input
                 type="date"
                 value={filterDateFrom}
                 onChange={e => setFilterDateFrom(e.target.value)}
-                className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
+                className="w-full h-9 px-2 text-xs rounded-lg font-bold focus:outline-none"
+                style={inputStyle}
               />
             </div>
             <div>
-              <label className="text-[9px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-1">Até</label>
+              <label className="text-[10px] font-bold uppercase tracking-wide block mb-1" style={{ color: "var(--muted-foreground)" }}>Até</label>
               <input
                 type="date"
                 value={filterDateTo}
                 onChange={e => setFilterDateTo(e.target.value)}
-                className="w-full h-8 px-2 text-xs border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white"
+                className="w-full h-9 px-2 text-xs rounded-lg font-bold focus:outline-none"
+                style={inputStyle}
               />
             </div>
             {hasDateFilter && (
               <button
                 type="button"
                 onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-                className="w-full text-[10px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00] text-left"
+                className="w-full text-[11px] font-bold uppercase text-left hover:opacity-70"
+                style={{ color: "var(--muted-foreground)" }}
               >
                 × Limpar datas
               </button>
@@ -453,12 +476,12 @@ export default function EventsPage() {
 
       {/* ── Weekend chips row ── */}
       {cycleWeekends.length > 0 && (
-        <div className="bg-[#f4f6ee] border-b-2 border-[#191c1e] px-5 py-1.5 flex items-center gap-3 shrink-0">
-          <span className="text-[9px] font-black italic uppercase tracking-widest text-[#506600] shrink-0 flex items-center gap-1.5">
-            <Calendar size={10} />
+        <div className="px-6 py-2.5 flex items-center gap-3 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+          <span className="text-[10px] font-black uppercase tracking-widest shrink-0 flex items-center gap-1.5" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+            <Calendar size={12} />
             Fim de Semana
           </span>
-          <div ref={weekendRowRef} className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <div ref={weekendRowRef} className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {cycleWeekends.map(w => {
               const active = filterDateFrom === w.sat && filterDateTo === w.sun;
               return (
@@ -469,11 +492,13 @@ export default function EventsPage() {
                     if (active) { setFilterDateFrom(""); setFilterDateTo(""); }
                     else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); }
                   }}
-                  className={`px-2.5 py-1 text-[9px] font-black italic uppercase whitespace-nowrap border-2 transition-colors shrink-0 ${
-                    active
-                      ? "bg-[#ccff00] text-[#161e00] border-[#191c1e]"
-                      : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]"
-                  }`}
+                  className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-colors shrink-0"
+                  style={{
+                    fontFamily: CONDENSED,
+                    backgroundColor: active ? "var(--primary)" : "var(--card)",
+                    color: active ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                    border: active ? "1px solid var(--primary)" : "1px solid var(--border)",
+                  }}
                 >
                   {w.label}
                 </button>
@@ -484,7 +509,8 @@ export default function EventsPage() {
             <button
               type="button"
               onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-              className="ml-auto text-[9px] font-bold italic uppercase text-[#9aa088] hover:text-[#b02f00] shrink-0"
+              className="ml-auto text-[10px] font-bold uppercase shrink-0 hover:opacity-70"
+              style={{ color: "var(--muted-foreground)" }}
             >
               × limpar
             </button>
@@ -493,33 +519,34 @@ export default function EventsPage() {
       )}
 
       {/* ── Content ── */}
-      <div className="flex-1 overflow-auto px-5 py-4">
+      <div className="flex-1 overflow-auto px-6 py-5">
         {isLoading ? (
-          <div className="space-y-px bg-white border border-[#d0d2ca]">
+          <div className="space-y-1">
             {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="h-14 bg-white animate-pulse border-b border-[#eceef0]" />
+              <div key={i} className="h-14 rounded-lg animate-pulse" style={{ backgroundColor: "var(--secondary)" }} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Calendar size={40} className="mb-4 opacity-20" />
-            <h3 className="text-lg font-black italic uppercase tracking-tight text-[#191c1e]">Nenhum evento encontrado</h3>
-            <p className="text-[#747a60] italic mt-1 text-sm">Ajuste os filtros ou sincronize via integração.</p>
+            <h3 className="text-lg font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Nenhum evento encontrado</h3>
+            <p className="italic mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>Ajuste os filtros ou sincronize via integração.</p>
             {cardFilter !== null && (
               <button
                 onClick={() => setCardFilter(null)}
-                className="mt-4 px-4 py-2 text-[10px] font-bold italic uppercase border-2 border-[#191c1e] hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors"
+                className="mt-4 px-4 py-2 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80"
+                style={{ border: "1px solid var(--border)" }}
               >
                 Limpar filtro
               </button>
             )}
           </div>
         ) : (
-          <div className="bg-white border border-[#d0d2ca]">
+          <PremiumCard className="overflow-hidden">
             {/* Table header */}
             <div
-              className="grid border-b-2 border-[#191c1e] bg-[#191c1e] sticky top-0 z-10"
-              style={{ gridTemplateColumns: GRID_COLS }}
+              className="grid sticky top-0 z-10"
+              style={{ gridTemplateColumns: GRID_COLS, backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}
             >
               {(["name","date","participants","evaluated","calibr","score"] as const).map((col, i) => {
                 const labels: Record<string, string> = {
@@ -532,24 +559,23 @@ export default function EventsPage() {
                   <div
                     key={col}
                     onClick={() => handleColSort(col)}
-                    className={`px-3 py-2 text-[9px] font-black italic uppercase tracking-wider cursor-pointer select-none flex items-center gap-1 transition-colors group
-                      ${i === 0 ? "pl-4" : ""}
-                      ${active ? "text-[#ccff00]" : "text-[#ccff00]/50 hover:text-[#ccff00]/80"}`}
+                    className={cn("px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none flex items-center gap-1 transition-colors group", i === 0 && "pl-4")}
+                    style={{ fontFamily: CONDENSED, color: active ? "var(--accent)" : "var(--muted-foreground)" }}
                   >
                     {labels[col]}
-                    <span className={`inline-flex flex-col leading-none transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}>
-                      <ChevronUp size={7} className={active && asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
-                      <ChevronDown size={7} className={active && !asc ? "text-[#ccff00]" : "text-[#ccff00]/50"} />
+                    <span className={cn("inline-flex flex-col leading-none transition-opacity", active ? "opacity-100" : "opacity-0 group-hover:opacity-40")}>
+                      <ChevronUp size={8} />
+                      <ChevronDown size={8} style={{ marginTop: -2 }} />
                     </span>
                   </div>
                 );
               })}
-              <div className="px-3 py-2 text-[9px] font-black italic uppercase tracking-wider text-[#ccff00]/50">Status</div>
-              <div className="px-3 py-2" />
+              <div className="px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Status</div>
+              <div className="px-3 py-2.5" />
             </div>
 
             {/* Rows */}
-            {filtered.map((ev, i) => {
+            {filtered.map((ev) => {
               const score = ev.teamScore ?? ev.averageScore ?? null;
               const concluded = ev.status === "closed";
               const total = ev.totalCriteria ?? 0;
@@ -565,11 +591,11 @@ export default function EventsPage() {
               const missing = ev.unassignedAreaNames ?? [];
 
               // Accent bar color
-              const accentColor = !ev.criteriaConfirmed && !hasEvals ? "#ff5722"
-                : fc ? "#506600"
-                : evaluated === total && total > 0 ? "#ccff00"
-                : evaluated > 0 ? "#ffb300"
-                : "#e0e2da";
+              const accentColor = !ev.criteriaConfirmed && !hasEvals ? WARNING
+                : fc ? "#9ab000"
+                : evaluated === total && total > 0 ? "var(--accent)"
+                : evaluated > 0 ? "#e8a23d"
+                : "var(--border)";
 
               // Score label
               const scoreLabel = isPureHistorical
@@ -580,153 +606,150 @@ export default function EventsPage() {
                   : partialOnlyCount > 0 ? "Pub. Parcial"
                   : calSaved > 0 ? "Rascunho"
                   : "Avaliador";
-              const scoreLabelColor = isPureHistorical ? "#a06a00"
-                : finalPubCount > 0 && partialOnlyCount === 0 ? "#506600"
-                : finalPubCount > 0 || partialOnlyCount > 0 ? "#a06a00"
-                : calSaved > 0 ? "#1565c0"
-                : "#747a60";
+              const scoreLabelColor = isPureHistorical ? "#e8a23d"
+                : finalPubCount > 0 && partialOnlyCount === 0 ? "#9ab000"
+                : finalPubCount > 0 || partialOnlyCount > 0 ? "#e8a23d"
+                : calSaved > 0 ? "#5b8def"
+                : "var(--muted-foreground)";
 
               // MiniBar colors
-              const evalColor = !isPureHistorical && evaluated === total && total > 0 ? "#506600" : "#ccff00";
-              const calColor = fc ? "#506600" : calCount > 0 ? "#a06a00" : "#d0d2ca";
+              const evalColor = !isPureHistorical && evaluated === total && total > 0 ? "#9ab000" : "var(--accent)";
+              const calColor = fc ? "#9ab000" : calCount > 0 ? "#e8a23d" : "var(--border)";
 
               // Date display
               const dateStr = ev.startDate === ev.endDate
                 ? new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
                 : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}–${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
 
+              const badge = !ev.criteriaConfirmed && !hasEvals
+                ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
+                : fc
+                  ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
+                  : partialOnlyCount > 0
+                    ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Pub. Parcial" }
+                    : calSaved > 0
+                      ? { bg: "rgba(91,141,239,0.14)", fg: "#5b8def", label: "Rascunho" }
+                      : concluded
+                        ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Concluído" }
+                        : evaluated === total && total > 0
+                          ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Avaliado" }
+                          : evaluated > 0
+                            ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Em Avaliação" }
+                            : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando" };
+
               return (
                 <div
                   key={ev.id}
                   data-testid={`row-event-${ev.id}`}
-                  className={`grid relative items-center border-b border-[#eceef0] hover:bg-[#f8fdf0] transition-colors group ${i % 2 !== 0 ? "bg-[#fafcf5]" : "bg-white"}`}
-                  style={{ gridTemplateColumns: GRID_COLS }}
+                  className="grid relative items-center transition-colors group hover:opacity-95"
+                  style={{ gridTemplateColumns: GRID_COLS, borderBottom: "1px solid var(--border)" }}
                 >
                   {/* Accent bar */}
                   <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: accentColor }} />
 
                   {/* Event name + subtitle */}
                   <div className="pl-4 pr-3 py-3 min-w-0">
-                    <Link href={`/events/${ev.id}`} className="text-[11px] font-black italic uppercase text-[#191c1e] hover:text-[#506600] leading-tight block truncate transition-colors">
+                    <Link href={`/events/${ev.id}`} className="text-[13px] font-bold uppercase leading-tight block truncate transition-colors hover:opacity-70">
                       {ev.name}
                     </Link>
                     <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
                       {ev.isHistorical && (
-                        <span className="text-[9px] font-black italic uppercase text-[#a06a00]">Histórico ·</span>
+                        <span className="text-[10px] font-bold uppercase" style={{ color: "#e8a23d" }}>Histórico ·</span>
                       )}
                       {!ev.criteriaConfirmed && !hasEvals && (
-                        <span className="text-[9px] font-black italic uppercase text-[#b02f00]">Ag. RH ·</span>
+                        <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Ag. RH ·</span>
                       )}
                       {!ev.resultsConfirmed && ev.criteriaConfirmed && (
-                        <span className="text-[9px] font-black italic uppercase text-[#a06a00]">Elegib. pend. ·</span>
+                        <span className="text-[10px] font-bold uppercase" style={{ color: "#e8a23d" }}>Elegib. pend. ·</span>
                       )}
-                      <span className="text-[9px] italic text-[#9aa088] truncate">
+                      <span className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>
                         {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
                       </span>
                     </div>
                     {missing.length > 0 && !hasEvals && (
-                      <p className="text-[9px] font-bold italic uppercase text-[#b02f00] truncate mt-0.5">
+                      <p className="text-[10px] font-bold uppercase truncate mt-0.5" style={{ color: WARNING }}>
                         Sem aval.: {missing.join(", ")}
                       </p>
                     )}
                   </div>
 
                   {/* Date */}
-                  <div className="px-3 py-3 text-[10px] font-bold italic text-[#444933] whitespace-nowrap">{dateStr}</div>
+                  <div className="px-3.5 py-3 text-xs font-semibold whitespace-nowrap">{dateStr}</div>
 
                   {/* Participants */}
-                  <div className="px-3 py-3 flex items-center gap-1 text-[#747a60]">
-                    <Users size={10} />
-                    <span className="text-[11px] font-black italic text-[#444933]">{ev.participantCount ?? 0}</span>
+                  <div className="px-3.5 py-3 flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}>
+                    <Users size={12} />
+                    <span className="text-[12px] font-bold">{ev.participantCount ?? 0}</span>
                   </div>
 
                   {/* Avaliações mini bar */}
-                  <div className="px-3 py-3">
-                    {isPureHistorical ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
-                    ) : total === 0 ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
+                  <div className="px-3.5 py-3">
+                    {isPureHistorical || total === 0 ? (
+                      <span className="text-[11px] italic opacity-40">—</span>
                     ) : (
                       <MiniBar value={evaluated} total={total} color={evalColor} />
                     )}
                   </div>
 
                   {/* Calibrações mini bar */}
-                  <div className="px-3 py-3">
-                    {isPureHistorical ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
-                    ) : total === 0 ? (
-                      <span className="text-[10px] italic text-[#c4c9ac]">—</span>
+                  <div className="px-3.5 py-3">
+                    {isPureHistorical || total === 0 ? (
+                      <span className="text-[11px] italic opacity-40">—</span>
                     ) : (
                       <MiniBar value={calCount} total={total} color={calColor} />
                     )}
                   </div>
 
                   {/* Score */}
-                  <div className="px-3 py-3 text-center">
+                  <div className="px-3.5 py-3 text-center">
                     {score != null ? (
                       <div>
-                        <span className={`text-[18px] font-black italic leading-none block ${fc ? "text-[#506600]" : "text-[#191c1e]"}`}>
+                        <span className="font-black text-lg leading-none block" style={{ fontFamily: CONDENSED, color: fc ? "#9ab000" : "var(--foreground)" }}>
                           {score.toFixed(1)}
                         </span>
-                        <span className="text-[8px] font-bold italic uppercase" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
+                        <span className="text-[9px] font-bold uppercase" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
                       </div>
                     ) : (
-                      <span className="text-[14px] italic text-[#c4c9ac]">—</span>
+                      <span className="text-sm italic opacity-40">—</span>
                     )}
                   </div>
 
                   {/* Status badge */}
-                  <div className="px-3 py-3">
-                    {!ev.criteriaConfirmed && !hasEvals ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff0ee] text-[#b02f00] border-[#f0b0a0]">Ag. RH</span>
-                    ) : fc ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#191c1e] text-[#ccff00] border-[#506600]">Pub. Final</span>
-                    ) : partialOnlyCount > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff8e1] text-[#a06a00] border-[#e8c870]">Pub. Parcial</span>
-                    ) : calSaved > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#e8f0fe] text-[#1565c0] border-[#90aee8]">Rascunho</span>
-                    ) : concluded ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#f4fce0] text-[#506600] border-[#c4cda8]">Concluído</span>
-                    ) : evaluated === total && total > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#f4fce0] text-[#506600] border-[#c4cda8]">Avaliado</span>
-                    ) : evaluated > 0 ? (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#fff4e5] text-[#a06a00] border-[#e8b84b]">Em Avaliação</span>
-                    ) : (
-                      <span className="text-[8px] font-black italic uppercase px-1.5 py-0.5 border bg-[#eceef0] text-[#747a60] border-[#d0d2ca]">Aguardando</span>
-                    )}
+                  <div className="px-3.5 py-3">
+                    <span className="text-[9px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
                   </div>
 
                   {/* Action */}
-                  <div className="px-2 py-3 flex items-center justify-center gap-1">
+                  <div className="px-2.5 py-3 flex items-center justify-center gap-1.5">
                     <Link href={`/events/${ev.id}`}>
                       <button
                         data-testid={`button-view-event-${ev.id}`}
                         title="Gerenciar evento"
-                        className="h-7 w-7 bg-[#191c1e] text-[#ccff00] flex items-center justify-center hover:bg-[#506600] transition-colors"
+                        className="h-7 w-7 rounded-lg flex items-center justify-center transition-opacity hover:opacity-80"
+                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                       >
-                        <ChevronRight size={12} />
+                        <ChevronRight size={13} />
                       </button>
                     </Link>
                     {user && ["admin", "rh", "diretoria"].includes(user.role) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="h-7 w-7 flex items-center justify-center border border-[#d0d2ca] bg-white text-[#747a60] hover:bg-[#eceef0] hover:border-[#191c1e] transition-all">
-                            <MoreHorizontal size={11} />
+                          <button className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
+                            <MoreHorizontal size={12} />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] min-w-[160px]">
+                        <DropdownMenuContent align="end" className="rounded-xl min-w-[160px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
                           {user && ["admin", "rh"].includes(user.role) && (
                             <DropdownMenuItem
                               data-testid={`button-edit-event-${ev.id}`}
                               onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
-                              className="gap-2 italic font-bold text-xs cursor-pointer"
+                              className="gap-2 font-bold text-xs cursor-pointer"
                             >
                               <Pencil size={12} /> Editar
                             </DropdownMenuItem>
                           )}
                           {user && ["admin", "rh", "diretoria"].includes(user.role) && (
-                            <DropdownMenuItem asChild className="gap-2 italic font-bold text-xs cursor-pointer">
+                            <DropdownMenuItem asChild className="gap-2 font-bold text-xs cursor-pointer">
                               <Link href={`/calibrations?eventId=${ev.id}`}>
                                 <SlidersHorizontal size={12} /> Calibrações
                               </Link>
@@ -738,14 +761,15 @@ export default function EventsPage() {
                               <DropdownMenuItem
                                 data-testid={`button-merge-event-${ev.id}`}
                                 onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
-                                className="gap-2 italic font-bold text-xs cursor-pointer"
+                                className="gap-2 font-bold text-xs cursor-pointer"
                               >
                                 <GitMerge size={12} /> Mesclar
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 data-testid={`button-delete-event-${ev.id}`}
                                 onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
-                                className="gap-2 italic font-bold text-xs cursor-pointer text-[#b02f00] focus:text-[#b02f00]"
+                                className="gap-2 font-bold text-xs cursor-pointer"
+                                style={{ color: WARNING }}
                               >
                                 <Trash2 size={12} /> Excluir
                               </DropdownMenuItem>
@@ -758,25 +782,25 @@ export default function EventsPage() {
                 </div>
               );
             })}
-          </div>
+          </PremiumCard>
         )}
 
         {/* Legend + count */}
         {!isLoading && filtered.length > 0 && (
-          <div className="flex items-center gap-5 mt-3 px-1 flex-wrap">
+          <div className="flex items-center gap-5 mt-4 px-1 flex-wrap">
             {[
-              { color: "#506600", label: "Pub. Final" },
-              { color: "#ccff00", label: "Avaliado" },
-              { color: "#ffb300", label: "Em andamento" },
-              { color: "#e0e2da", label: "Aguardando" },
-              { color: "#ff5722", label: "Ag. RH" },
+              { color: "#9ab000", label: "Pub. Final" },
+              { color: "var(--accent)", label: "Avaliado" },
+              { color: "#e8a23d", label: "Em andamento" },
+              { color: "var(--border)", label: "Aguardando" },
+              { color: WARNING, label: "Ag. RH" },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-1.5">
-                <div className="w-[3px] h-3 shrink-0" style={{ backgroundColor: l.color }} />
-                <span className="text-[9px] italic text-[#747a60]">{l.label}</span>
+                <div className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+                <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{l.label}</span>
               </div>
             ))}
-            <span className="ml-auto text-[11px] italic text-[#747a60]">
+            <span className="ml-auto text-[11px]" style={{ color: "var(--muted-foreground)" }}>
               {filtered.length === all.length
                 ? `${all.length} eventos no ciclo`
                 : `${filtered.length} de ${all.length} eventos`}
@@ -787,16 +811,16 @@ export default function EventsPage() {
 
       {/* ── Merge dialog ── */}
       <Dialog open={!!mergeForEvent} onOpenChange={(open) => { if (!open) { setMergeForEvent(null); setMergeTargetId(""); setMergeConflict(null); } }}>
-        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Mesclar Evento Duplicado</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Mesclar Evento Duplicado</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <p className="text-sm italic text-[#444933]">
-              Este evento (<strong>{mergeForEvent?.name}</strong>) será <strong>mantido</strong>. Escolha o evento duplicado abaixo — os dados vazios serão preenchidos, os participantes migrados e o duplicado <strong>excluído</strong>.
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              Este evento (<strong style={{ color: "var(--foreground)" }}>{mergeForEvent?.name}</strong>) será <strong style={{ color: "var(--foreground)" }}>mantido</strong>. Escolha o evento duplicado abaixo — os dados vazios serão preenchidos, os participantes migrados e o duplicado <strong style={{ color: "var(--foreground)" }}>excluído</strong>.
             </p>
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Evento duplicado a remover</Label>
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Evento duplicado a remover</Label>
               {(() => {
                 const mergeCandidates = (events ?? [])
                   .filter(e => e.id !== mergeForEvent?.id)
@@ -811,23 +835,24 @@ export default function EventsPage() {
                         role="combobox"
                         aria-expanded={mergeTargetPickerOpen}
                         data-testid="select-merge-target"
-                        className="w-full h-11 px-3 flex items-center justify-between gap-3 text-left border-2 border-[#191c1e] bg-white hover:bg-[#f7f9fb] transition-all"
+                        className="w-full h-11 px-3 rounded-lg flex items-center justify-between gap-3 text-left transition-colors"
+                        style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}
                       >
                         {selectedMergeTarget ? (
-                          <span className="truncate text-sm font-bold italic uppercase text-[#191c1e]">
+                          <span className="truncate text-sm font-bold uppercase">
                             {selectedMergeTarget.name} — {new Date(selectedMergeTarget.startDate).toLocaleDateString('pt-BR')}{selectedMergeTarget.isHistorical ? " (histórico)" : ""}
                           </span>
                         ) : (
-                          <span className="font-bold italic uppercase text-xs tracking-wider text-[#747a60] truncate">Selecione o evento duplicado...</span>
+                          <span className="font-bold uppercase text-xs tracking-wider truncate" style={{ color: "var(--muted-foreground)" }}>Selecione o evento duplicado...</span>
                         )}
-                        <ChevronsUpDown size={16} className="shrink-0 text-[#191c1e]" />
+                        <ChevronsUpDown size={16} className="shrink-0" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
-                      <Command className="rounded-none" filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
-                        <CommandInput data-testid="input-merge-target-search" placeholder="Buscar por nome do evento..." className="italic" />
+                    <PopoverContent align="start" className="p-0 rounded-xl w-[var(--radix-popover-trigger-width)]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                      <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+                        <CommandInput data-testid="input-merge-target-search" placeholder="Buscar por nome do evento..." />
                         <CommandList className="max-h-[320px]">
-                          <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+                          <CommandEmpty className="py-6 text-center text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum evento encontrado.</CommandEmpty>
                           <CommandGroup>
                             {mergeCandidates.map(e => (
                               <CommandItem
@@ -835,12 +860,12 @@ export default function EventsPage() {
                                 value={`${e.name} ${e.city ?? ""} ${e.state ?? ""}`}
                                 data-testid={`option-merge-target-${e.id}`}
                                 onSelect={() => { setMergeTargetId(String(e.id)); setMergeTargetPickerOpen(false); setMergeConflict(null); }}
-                                className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2.5 gap-3 items-start"
+                                className="cursor-pointer py-2.5 gap-3 items-start"
                               >
                                 <Check size={16} className={cn("mt-0.5 shrink-0", mergeTargetId === String(e.id) ? "opacity-100" : "opacity-0")} />
                                 <span className="flex flex-col min-w-0">
-                                  <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{e.name}</span>
-                                  <span className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-normal">
+                                  <span className="font-black uppercase text-sm leading-tight whitespace-normal">{e.name}</span>
+                                  <span className="text-[11px] font-bold uppercase whitespace-normal" style={{ color: "var(--muted-foreground)" }}>
                                     {new Date(e.startDate).toLocaleDateString('pt-BR')}{e.isHistorical ? " · histórico" : ""}
                                   </span>
                                 </span>
@@ -856,23 +881,21 @@ export default function EventsPage() {
             </div>
 
             {mergeConflict && (
-              <div data-testid="alert-merge-conflict" className="border-2 border-[#191c1e] bg-[#fff3cd] p-3 text-sm italic text-[#5c4400] space-y-1">
+              <div data-testid="alert-merge-conflict" className="rounded-lg p-3 text-sm space-y-1" style={{ backgroundColor: "rgba(232,162,61,0.12)", border: "1px solid #e8a23d", color: "#e8a23d" }}>
                 <p className="font-bold uppercase">O duplicado já tem dado gravado:</p>
                 <p>{mergeConflict.evaluations} avaliação(ões), {mergeConflict.calibrations} calibração(ões), {mergeConflict.conformities} conformidade(s) e {mergeConflict.results} resultado(s).</p>
                 <p>Esses dados serão descartados. Confirma a mesclagem?</p>
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-              <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => { setMergeForEvent(null); setMergeTargetId(""); setMergeConflict(null); }}>Cancelar</Button>
+            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+              <button type="button" onClick={() => { setMergeForEvent(null); setMergeTargetId(""); setMergeConflict(null); }} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
               <button
                 data-testid="button-confirm-merge"
                 type="button"
                 disabled={!mergeTargetId || mergeMutation.isPending}
-                className={cn(
-                  "border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50",
-                  mergeConflict ? "bg-[#ff5722] text-white" : "bg-[#ccff00]",
-                )}
+                className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50"
+                style={{ backgroundColor: mergeConflict ? WARNING : "var(--primary)", color: mergeConflict ? "#fff" : "var(--primary-foreground)" }}
                 onClick={() => {
                   if (!mergeForEvent || !mergeTargetId) return;
                   mergeMutation.mutate({ id: mergeForEvent.id, data: { mergeEventId: parseInt(mergeTargetId), force: !!mergeConflict } });
@@ -887,25 +910,27 @@ export default function EventsPage() {
 
       {/* ── Delete confirmation dialog ── */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight text-[#b02f00]">Excluir Evento</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED, color: WARNING }}>Excluir Evento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <p className="text-sm italic text-[#444933]">
-              Tem certeza que deseja excluir <strong>{deleteTarget?.name}</strong>? Todos os participantes, avaliações, calibrações e resultados vinculados serão <strong>permanentemente removidos</strong>. Essa ação não pode ser desfeita.
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              Tem certeza que deseja excluir <strong style={{ color: "var(--foreground)" }}>{deleteTarget?.name}</strong>? Todos os participantes, avaliações, calibrações e resultados vinculados serão <strong style={{ color: "var(--foreground)" }}>permanentemente removidos</strong>. Essa ação não pode ser desfeita.
             </p>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="h-9 px-4 border-2 border-[#191c1e] bg-white text-[#191c1e] text-xs font-bold italic uppercase hover:bg-[#eceef0] transition-all"
+                className="h-10 px-4 rounded-lg text-xs font-bold uppercase transition-opacity hover:opacity-80"
+                style={{ border: "1px solid var(--border)" }}
               >
                 Cancelar
               </button>
               <button
                 disabled={deleteMutation.isPending}
                 onClick={() => { if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id }); }}
-                className="h-9 px-4 border-2 border-[#b02f00] bg-[#b02f00] text-white text-xs font-bold italic uppercase hover:bg-[#8a2000] disabled:opacity-50 transition-all flex items-center gap-1.5"
+                className="h-10 px-4 rounded-lg text-white text-xs font-bold uppercase disabled:opacity-50 transition-opacity hover:opacity-90 flex items-center gap-1.5"
+                style={{ backgroundColor: WARNING }}
               >
                 <Trash2 size={13} />
                 {deleteMutation.isPending ? "Excluindo..." : "Excluir Definitivamente"}
@@ -917,50 +942,51 @@ export default function EventsPage() {
 
       {/* ── Edit event dialog ── */}
       <Dialog open={!!editingEvent} onOpenChange={(open) => { if (!open) setEditingEvent(null); }}>
-        <DialogContent className="max-w-lg rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight">Editar Evento</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Editar Evento</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitEdit(d => { if (editingEvent) editMutation.mutate({ id: editingEvent.id, data: d }); })} className="space-y-5 pt-4">
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Nome do Evento <span className="text-[#ba1a1a]">*</span></Label>
-              <Input data-testid="input-edit-event-name" {...registerEdit("name", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: WARNING }}>*</span></Label>
+              <Input data-testid="input-edit-event-name" {...registerEdit("name", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
             </div>
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cliente</Label>
-              <Input data-testid="input-edit-event-client" {...registerEdit("clientName")} className="h-11 rounded-none border-2 border-[#191c1e]" />
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Cliente</Label>
+              <Input data-testid="input-edit-event-client" {...registerEdit("clientName")} className="h-11 rounded-lg" style={inputStyle} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Início <span className="text-[#ba1a1a]">*</span></Label>
-                <Input data-testid="input-edit-event-start" type="date" {...registerEdit("startDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Início <span style={{ color: WARNING }}>*</span></Label>
+                <Input data-testid="input-edit-event-start" type="date" {...registerEdit("startDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Fim <span className="text-[#ba1a1a]">*</span></Label>
-                <Input data-testid="input-edit-event-end" type="date" {...registerEdit("endDate", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Fim <span style={{ color: WARNING }}>*</span></Label>
+                <Input data-testid="input-edit-event-end" type="date" {...registerEdit("endDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Cidade</Label>
-                <Input data-testid="input-edit-event-city" {...registerEdit("city")} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Cidade</Label>
+                <Input data-testid="input-edit-event-city" {...registerEdit("city")} className="h-11 rounded-lg" style={inputStyle} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">UF</Label>
-                <Input data-testid="input-edit-event-state" {...registerEdit("state")} maxLength={2} className="h-11 rounded-none border-2 border-[#191c1e] uppercase" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>UF</Label>
+                <Input data-testid="input-edit-event-state" {...registerEdit("state")} maxLength={2} className="h-11 rounded-lg uppercase" style={inputStyle} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Local</Label>
-              <Input data-testid="input-edit-event-location" {...registerEdit("location")} className="h-11 rounded-none border-2 border-[#191c1e]" />
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Local</Label>
+              <Input data-testid="input-edit-event-location" {...registerEdit("location")} className="h-11 rounded-lg" style={inputStyle} />
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#e0e3e5]">
-              <Button type="button" variant="outline" className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold" onClick={() => setEditingEvent(null)}>Cancelar</Button>
+            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+              <button type="button" onClick={() => setEditingEvent(null)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
               <button
                 data-testid="button-submit-edit-event"
                 type="submit"
                 disabled={editMutation.isPending}
-                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2 font-bold text-sm italic uppercase disabled:opacity-50"
+                className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 {editMutation.isPending ? "Salvando..." : "Salvar Alterações"}
               </button>
