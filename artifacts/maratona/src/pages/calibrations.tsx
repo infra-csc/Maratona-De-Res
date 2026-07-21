@@ -2,24 +2,20 @@ import { useState, useEffect, useRef } from "react";
 import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useSetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AudioPlayer } from "@/components/audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, CalendarDays, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, Shield, X, MessageSquare, User, ClipboardList, Users, Calendar, Copy } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Calendar, Copy } from "lucide-react";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { cn, formatEventSubtitle } from "@/lib/utils";
+import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
+const GOOD = "#9ab000";
+const AMBER = "#e8a23d";
 
-// Badge do seletor de eventos: eventos históricos sempre "Fechado"; demais mostram
-// o estado real da publicação de feedback (final > parcial), nunca o status
-// bruto do evento — sem publicação nenhuma, continua "Em Avaliação" mesmo fechado.
 function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
   if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
   const result: { sat: string; sun: string; label: string }[] = [];
@@ -37,16 +33,21 @@ function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
   return result;
 }
 
-function calibrationEventChip(ev: { isHistorical?: boolean; feedbackReleased?: boolean; partialPublishedAt?: string | null }): { label: string; cls: string } {
-  if (ev.isHistorical) return { label: "Fechado", cls: "bg-[#d8dadc] text-[#444933]" };
-  if (ev.feedbackReleased) return { label: "Avaliação Final", cls: "bg-[#191c1e] text-[#ccff00]" };
-  if (ev.partialPublishedAt) return { label: "Avaliação Parcial", cls: "bg-[#ffb5a0] text-[#3b0900]" };
-  return { label: "Em Avaliação", cls: "bg-[#ccff00] text-[#161e00]" };
+// Badge do seletor de eventos: eventos históricos sempre "Fechado"; demais mostram
+// o estado real da publicação de feedback (final > parcial), nunca o status
+// bruto do evento — sem publicação nenhuma, continua "Em Avaliação" mesmo fechado.
+function calibrationEventChip(ev: { isHistorical?: boolean; feedbackReleased?: boolean; partialPublishedAt?: string | null }): { label: string; bg: string; fg: string } {
+  if (ev.isHistorical) return { label: "Fechado", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
+  if (ev.feedbackReleased) return { label: "Avaliação Final", bg: "var(--primary)", fg: "var(--primary-foreground)" };
+  if (ev.partialPublishedAt) return { label: "Avaliação Parcial", bg: "rgba(232,162,61,0.14)", fg: AMBER };
+  return { label: "Em Avaliação", bg: "rgba(154,176,0,0.14)", fg: GOOD };
 }
 
 function formatDateTime(d: Date): string {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
+
+const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 export default function CalibrationsPage() {
   const { toast } = useToast();
@@ -831,14 +832,15 @@ export default function CalibrationsPage() {
     }
   }
 
+  const currentPubBadge = pickedEvent ? calibrationEventChip(pickedEvent) : null;
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
 
       {/* ── COMPACT STICKY HEADER ── */}
-      <div className="sticky top-0 z-30 bg-[#191c1e] text-white px-3 py-2 flex items-center gap-2 border-b-2 border-[#ccff00]">
-        <Target size={14} className="text-[#ccff00] shrink-0" />
-        <span className="font-black italic uppercase text-[12px] tracking-tight shrink-0 hidden sm:inline">Calibrações</span>
+      <div className="sticky top-0 z-30 px-3 py-2.5 flex items-center gap-2.5" style={{ backgroundColor: "var(--card)", borderBottom: "1px solid var(--border)" }}>
+        <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ border: "2px solid var(--accent)" }} />
+        <span className="font-black uppercase text-[13px] tracking-tight shrink-0 hidden sm:inline" style={{ fontFamily: CONDENSED }}>Calibrações</span>
 
         {/* Event picker inline */}
         <div className="flex-1 min-w-0">
@@ -849,75 +851,84 @@ export default function CalibrationsPage() {
                 role="combobox"
                 data-testid="select-event"
                 disabled={calibratableEvents.length === 0}
-                className="w-full h-8 px-3 flex items-center justify-between gap-2 text-left bg-white/10 border border-white/20 hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-9 px-3 rounded-lg flex items-center justify-between gap-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={fieldStyle}
               >
                 {pickedEvent ? (
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="font-bold italic uppercase text-[11px] text-white truncate">{pickedEvent.name}</span>
-                    {formatEventSubtitle(pickedEvent) && <span className="text-[10px] italic text-white/50 truncate hidden md:inline">{formatEventSubtitle(pickedEvent)}</span>}
+                    <span className="font-bold uppercase text-[11px] truncate">{pickedEvent.name}</span>
+                    {formatEventSubtitle(pickedEvent) && <span className="text-[10px] truncate hidden md:inline" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(pickedEvent)}</span>}
                   </span>
                 ) : (
-                  <span className="font-bold italic uppercase text-[10px] text-white/50">
+                  <span className="font-bold uppercase text-[10px]" style={{ color: "var(--muted-foreground)" }}>
                     {calibratableEvents.length === 0 ? "Nenhum evento no ciclo" : "Selecionar evento..."}
                   </span>
                 )}
-                <ChevronsUpDown size={13} className="shrink-0 text-white/40" />
+                <ChevronsUpDown size={13} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[min(92vw,540px)]">
-              <Command className="rounded-none">
+            <PopoverContent align="start" className="p-0 rounded-xl w-[min(92vw,540px)]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+              <Command>
                 {/* Status filters */}
-                <div className="flex flex-wrap gap-1 p-2 border-b border-[#d8dadc]">
+                <div className="flex flex-wrap gap-1 p-2" style={{ borderBottom: "1px solid var(--border)" }}>
                   {([
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Aguardando" },
                     { value: "inProgress", label: "Em avaliação" },
                     { value: "done", label: "Fechado" },
-                  ] as const).map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      data-testid={`button-filter-status-${opt.value}`}
-                      onClick={() => setEventStatusFilter(opt.value)}
-                      className={cn("px-2 py-0.5 border font-bold italic uppercase text-[10px] transition-colors", eventStatusFilter === opt.value ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" : "bg-white text-[#444933] border-[#d8dadc] hover:border-[#191c1e]")}
-                    >{opt.label}</button>
-                  ))}
+                  ] as const).map(opt => {
+                    const active = eventStatusFilter === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        data-testid={`button-filter-status-${opt.value}`}
+                        onClick={() => setEventStatusFilter(opt.value)}
+                        className="px-2 py-0.5 rounded font-bold uppercase text-[10px] transition-colors"
+                        style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)", border: active ? "1px solid var(--primary)" : "1px solid var(--border)" }}
+                      >{opt.label}</button>
+                    );
+                  })}
                 </div>
                 {/* Date filters */}
-                <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[#d8dadc] flex-wrap">
+                <div className="flex items-center gap-1.5 px-2 py-1.5 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
                   {cycleWeekends.map(w => {
                     const active = filterDateFrom === w.sat && filterDateTo === w.sun;
                     return (
                       <button key={w.sat} type="button"
                         onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                        className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border transition-colors ${active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e]"}`}
+                        className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-colors"
+                        style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)", border: active ? "1px solid var(--primary)" : "1px solid var(--border)" }}
                       >{w.label}</button>
                     );
                   })}
                   {(filterDateFrom || filterDateTo) && (
-                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[10px] italic text-[#747a60] hover:text-[#b02f00]">× limpar</button>
+                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[10px] hover:opacity-70" style={{ color: "var(--muted-foreground)" }}>× limpar</button>
                   )}
                 </div>
-                <CommandInput data-testid="input-event-search" placeholder="Buscar evento ou cliente..." className="italic" />
+                <CommandInput data-testid="input-event-search" placeholder="Buscar evento ou cliente..." />
                 <CommandList className="max-h-[300px]">
-                  <CommandEmpty className="py-4 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+                  <CommandEmpty className="py-4 text-center text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum evento encontrado.</CommandEmpty>
                   <CommandGroup>
-                    {filteredCalibratableEvents.map(ev => (
-                      <CommandItem
-                        key={ev.id}
-                        value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
-                        data-testid={`option-event-${ev.id}`}
-                        onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); }}
-                        className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2 items-start"
-                      >
-                        <Check size={14} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
-                        <span className="flex flex-col min-w-0 flex-1">
-                          <span className="font-black italic uppercase text-xs leading-tight whitespace-normal">{ev.name}</span>
-                          {formatEventSubtitle(ev) && <span className="text-[10px] font-bold italic uppercase text-[#747a60] whitespace-normal">{formatEventSubtitle(ev)}</span>}
-                        </span>
-                        <span className={`px-2 py-0.5 border border-[#191c1e] font-bold text-[10px] italic uppercase shrink-0 ${calibrationEventChip(ev).cls}`}>{calibrationEventChip(ev).label}</span>
-                      </CommandItem>
-                    ))}
+                    {filteredCalibratableEvents.map(ev => {
+                      const chip = calibrationEventChip(ev);
+                      return (
+                        <CommandItem
+                          key={ev.id}
+                          value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
+                          data-testid={`option-event-${ev.id}`}
+                          onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); }}
+                          className="cursor-pointer py-2 gap-2 items-start"
+                        >
+                          <Check size={14} className={cn("mt-0.5 shrink-0", selectedEventId === ev.id ? "opacity-100" : "opacity-0")} />
+                          <span className="flex flex-col min-w-0 flex-1">
+                            <span className="font-black uppercase text-xs leading-tight whitespace-normal">{ev.name}</span>
+                            {formatEventSubtitle(ev) && <span className="text-[10px] font-bold uppercase whitespace-normal" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(ev)}</span>}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full font-bold text-[10px] uppercase shrink-0" style={{ backgroundColor: chip.bg, color: chip.fg }}>{chip.label}</span>
+                        </CommandItem>
+                      );
+                    })}
                   </CommandGroup>
                 </CommandList>
               </Command>
@@ -926,12 +937,12 @@ export default function CalibrationsPage() {
         </div>
 
         {/* Publication status badge */}
-        {pickedEvent && (
-          <span className={cn("shrink-0 px-2 py-0.5 font-bold text-[10px] italic uppercase hidden sm:inline border",
-            (alreadyReleased || allCriteriaFinalPublished) ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" :
-            partialPublishedAtDate ? "bg-[#ffb5a0] text-[#3b0900] border-[#ffb5a0]" :
-            "bg-white/10 text-white/60 border-white/20"
-          )}
+        {pickedEvent && currentPubBadge && (
+          <span className="shrink-0 px-2.5 py-1 rounded-full font-bold text-[10px] uppercase hidden sm:inline"
+            style={{
+              backgroundColor: (alreadyReleased || allCriteriaFinalPublished) ? "var(--primary)" : partialPublishedAtDate ? "rgba(232,162,61,0.14)" : "var(--secondary)",
+              color: (alreadyReleased || allCriteriaFinalPublished) ? "var(--primary-foreground)" : partialPublishedAtDate ? AMBER : "var(--muted-foreground)",
+            }}
             title={(alreadyReleased || allCriteriaFinalPublished) ? `Final liberado em ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}` : partialPublishedAtDate ? `Parcial publicado em ${formatDateTime(partialPublishedAtDate)}` : "Notas não publicadas"}
           >
             {(alreadyReleased || allCriteriaFinalPublished) ? "Final" : partialPublishedAtDate ? "Parcial" : "Não pub."}
@@ -942,23 +953,23 @@ export default function CalibrationsPage() {
         {pendingCount > 0 && (
           <span
             title={`${pendingCount} critério(s) sem calibração`}
-            className="shrink-0 bg-[#ccff00] text-[#161e00] font-black text-[11px] italic uppercase px-2 py-0.5 flex items-center gap-1"
+            className="shrink-0 font-black text-[11px] uppercase px-2.5 py-1 rounded-full flex items-center gap-1"
+            style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
           >
             <SlidersHorizontal size={11} /> {pendingCount}
           </span>
         )}
-
       </div>
 
       <div className="p-4">
         {/* ── PLACEHOLDER: nenhum evento selecionado ── */}
         {!selectedEventId && (
-          <div className="flex flex-col items-center justify-center py-24 text-center bg-white border-2 border-dashed border-[#191c1e]">
-            <div className="w-16 h-16 border-2 border-[#191c1e] skew-x-[-4deg] bg-[#eceef0] flex items-center justify-center mb-5">
-              <span className="skew-x-[4deg]"><Target className="text-[#747a60]" size={32} /></span>
+          <div className="flex flex-col items-center justify-center py-24 text-center rounded-xl" style={{ border: "1px dashed var(--border)" }}>
+            <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-5" style={{ backgroundColor: "var(--secondary)" }}>
+              <Target style={{ color: "var(--muted-foreground)" }} size={32} />
             </div>
-            <h2 data-testid="text-page-title" className="text-xl font-black italic uppercase tracking-tight mb-1 text-[#191c1e]">Área de Calibração</h2>
-            <p className="text-[#747a60] italic text-sm max-w-sm">Use o seletor no topo para escolher um evento e calibrar os critérios.</p>
+            <h2 data-testid="text-page-title" className="text-xl font-black uppercase tracking-tight mb-1" style={{ fontFamily: CONDENSED }}>Área de Calibração</h2>
+            <p className="text-sm max-w-sm" style={{ color: "var(--muted-foreground)" }}>Use o seletor no topo para escolher um evento e calibrar os critérios.</p>
           </div>
         )}
 
@@ -966,226 +977,227 @@ export default function CalibrationsPage() {
         <div className="flex flex-col lg:flex-row gap-4 items-start">
 
           {/* ── RIGHT SIDEBAR: Context always visible ── */}
-          <aside className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-4 self-start lg:order-2 bg-white border-2 border-[#191c1e] divide-y-2 divide-[#e8eaec] max-h-[50vh] lg:max-h-[calc(100vh-80px)] overflow-y-auto">
+          <aside className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-16 self-start lg:order-2 rounded-xl max-h-[50vh] lg:max-h-[calc(100vh-90px)] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
 
-              {/* Event summary bar */}
-              {pickedEvent && (
-                <div className="flex items-center justify-between gap-3 px-4 py-2.5 flex-wrap">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <h3 className="font-black italic uppercase tracking-tight text-[#191c1e] text-sm truncate">{pickedEvent.name}</h3>
-                    <span className="text-[11px] font-bold italic uppercase text-[#747a60] truncate hidden sm:inline">{pickedEvent.clientName}</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    {feedback && (
-                      <span className="border-2 border-[#191c1e] px-3 py-1 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase italic text-[#747a60]">Nota Final</span>
-                        <span className="text-lg font-black italic text-[#506600] leading-none">{feedback.eventScore.toFixed(1)}<span className="text-xs text-[#747a60]">/100</span></span>
-                      </span>
-                    )}
-                    <Link
-                      href={`/events/${selectedEventId}`}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-black italic uppercase bg-white text-[#444933] border-2 border-[#191c1e] px-3 py-1 hover:bg-[#191c1e] hover:text-white transition-colors shrink-0"
-                    >
-                      <ExternalLink size={12} /> Ver Evento
-                    </Link>
-                  </div>
+            {/* Event summary bar */}
+            {pickedEvent && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <h3 className="font-black uppercase tracking-tight text-sm truncate" style={{ fontFamily: CONDENSED }}>{pickedEvent.name}</h3>
+                  <span className="text-[11px] font-bold uppercase truncate hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{pickedEvent.clientName}</span>
                 </div>
-              )}
-
-              {/* Review requests */}
-              {eventReviewRequests.length > 0 && (
-                <div className="px-4 py-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Flag size={13} className="text-[#3b0900] shrink-0" />
-                    <span className="text-[11px] font-black italic uppercase text-[#3b0900]">
-                      Revisão Sinalizada {pendingEventReviewRequests.length > 0 && `— ${pendingEventReviewRequests.length} pendente${pendingEventReviewRequests.length === 1 ? "" : "s"}`}
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {feedback && (
+                    <span className="rounded-lg px-3 py-1.5 flex items-center gap-1.5" style={{ border: "1px solid var(--border)" }}>
+                      <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
+                      <span className="text-lg font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{feedback.eventScore.toFixed(1)}<span className="text-xs" style={{ color: "var(--muted-foreground)" }}>/100</span></span>
                     </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {eventReviewRequests.map(r => (
-                      <div key={r.id} className={`flex items-start gap-2 text-xs px-3 py-2 ${r.status === "pending" ? "bg-[#ffb5a0] border border-[#862200]" : "bg-[#f2f4f6] border border-[#d8dadc]"}`}>
-                        <div className="min-w-0 flex-1">
-                          <span className="font-bold italic uppercase text-[#191c1e]">{r.employeeName}</span>
-                          {r.comment && <p className="italic text-[#444933] mt-0.5">"{r.comment}"</p>}
-                          {r.status === "resolved" && r.resolutionNotes && <p className="text-[10px] font-bold italic uppercase text-[#747a60] mt-0.5">Resposta: {r.resolutionNotes}</p>}
-                        </div>
-                        <span className={`px-1.5 py-0.5 border font-bold text-[9px] italic uppercase shrink-0 ${r.status === "pending" ? "bg-[#862200] text-white border-[#862200]" : "bg-[#e0e3e5] text-[#444933] border-[#d8dadc]"}`}>
-                          {r.status === "pending" ? "Pendente" : "Resolvido"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Team */}
-              {fullEvent?.participants && fullEvent.participants.length > 0 && (() => {
-                const relevantParticipants = fullEvent.participants!.filter(p => p.confirmed !== false && p.countsForScore !== false);
-                return (
-                  <div className="px-4 py-3">
-                    <button type="button" onClick={() => setTeamPanelOpen(o => !o)} className="flex items-center gap-2 w-full text-left mb-2">
-                      <Users size={13} className="text-[#444933] shrink-0" />
-                      <span className="text-[11px] font-black italic uppercase text-[#444933]">Equipe Alocada <span className="text-[#747a60]">({relevantParticipants.length})</span></span>
-                      {teamPanelOpen ? <ChevronUp size={12} className="ml-auto text-[#747a60]" /> : <ChevronDown size={12} className="ml-auto text-[#747a60]" />}
-                    </button>
-                    {teamPanelOpen && (
-                      relevantParticipants.length === 0 ? (
-                        <p className="text-xs italic text-[#747a60]">Nenhum colaborador ativo alocado.</p>
-                      ) : (
-                        <div className="space-y-1">
-                          {relevantParticipants.map(p => {
-                            const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
-                            return (
-                              <div key={p.id} className="flex items-center gap-2 bg-[#f2f4f6] border border-[#d8dadc] px-2 py-1.5">
-                                <div className="w-7 h-7 bg-[#191c1e] flex items-center justify-center font-black italic text-[10px] text-[#ccff00] shrink-0">
-                                  {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-black italic uppercase text-[10px] text-[#191c1e] leading-tight truncate">{p.employeeName}</p>
-                                  <p className="text-[9px] font-bold italic uppercase text-[#747a60] truncate">{p.functionName}</p>
-                                </div>
-                                {realizadasCount != null && (
-                                  <span className="text-[9px] font-bold italic uppercase text-[#506600] shrink-0 flex items-center gap-0.5 bg-[#f0ffe0] border border-[#c4cda8] px-1.5 py-0.5">
-                                    <Calendar size={9} /> {realizadasCount}d
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Conformidade — editável para gestores */}
-              {(conformity || canManageConformity) && (
-                <div className="px-4 py-3">
-                  <p className="text-[11px] font-black italic uppercase text-[#444933] mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
-                  {(fullEvent?.conformityEvaluatorName || fullEvent?.conformityEvaluatorFerramentasName) && (
-                    <div className="mb-2 space-y-0.5">
-                      {fullEvent?.conformityEvaluatorName && (
-                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Cenografia: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorName}</span></p>
-                      )}
-                      {fullEvent?.conformityEvaluatorFerramentasName && (
-                        <p className="text-[9px] italic text-[#747a60] flex items-center gap-1"><User size={9} /> Responsável Ferramentas: <span className="font-bold text-[#191c1e] ml-0.5">{fullEvent.conformityEvaluatorFerramentasName}</span></p>
-                      )}
-                    </div>
                   )}
-                  <div className="space-y-1 mb-2">
-                    {([
-                      { label: "EPI", key: "epi" as const, commentKey: "epiComment" as const },
-                      { label: "Estaiamento", key: "estaiamentos" as const, commentKey: "estaiamentosComment" as const },
-                      { label: "Conduta", key: "conduta" as const, commentKey: "condutaComment" as const },
-                      { label: "Guarda Equip.", key: "guardaEquipamentos" as const, commentKey: "guardaEquipamentosComment" as const },
-                    ]).map(item => {
-                      const value = conformityForm[item.key];
-                      const comment = conformityForm[item.commentKey];
-                      const isExpanded = conformityExpandedComments.has(item.key);
-                      return (
-                        <div key={item.key} className={`border ${value === null ? "border-[#d8dadc] bg-[#f2f4f6]" : value ? "border-[#506600] bg-[#f2ffd6]" : "border-[#b02f00] bg-[#ffede9]"}`}>
-                          <div className="flex items-center gap-1 px-2 py-1.5">
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[10px] font-bold italic uppercase text-[#191c1e] truncate block">{item.label}</span>
-                              {value !== null && !!(conformity as unknown as Record<string, unknown>)?.createdByUserName && (
-                                <span className="text-[8px] italic text-[#506600] flex items-center gap-0.5 mt-0.5">
-                                  <Check size={8} /> {String((conformity as unknown as Record<string, unknown>).createdByUserName) as string}
+                  <Link
+                    href={`/events/${selectedEventId}`}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase rounded-lg px-3 py-1.5 transition-colors hover:opacity-80 shrink-0"
+                    style={{ border: "1px solid var(--border)" }}
+                  >
+                    <ExternalLink size={12} /> Ver Evento
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Review requests */}
+            {eventReviewRequests.length > 0 && (
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Flag size={13} className="shrink-0" style={{ color: WARNING }} />
+                  <span className="text-[11px] font-black uppercase" style={{ color: WARNING }}>
+                    Revisão Sinalizada {pendingEventReviewRequests.length > 0 && `— ${pendingEventReviewRequests.length} pendente${pendingEventReviewRequests.length === 1 ? "" : "s"}`}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {eventReviewRequests.map(r => (
+                    <div key={r.id} className="flex items-start gap-2 text-xs px-3 py-2 rounded-lg" style={{ backgroundColor: r.status === "pending" ? "rgba(229,72,77,0.10)" : "var(--secondary)", border: r.status === "pending" ? `1px solid ${WARNING}` : "1px solid var(--border)" }}>
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold uppercase">{r.employeeName}</span>
+                        {r.comment && <p className="mt-0.5" style={{ color: "var(--foreground)" }}>"{r.comment}"</p>}
+                        {r.status === "resolved" && r.resolutionNotes && <p className="text-[10px] font-bold uppercase mt-0.5" style={{ color: "var(--muted-foreground)" }}>Resposta: {r.resolutionNotes}</p>}
+                      </div>
+                      <span className="px-1.5 py-0.5 rounded font-bold text-[9px] uppercase shrink-0" style={{ backgroundColor: r.status === "pending" ? WARNING : "var(--secondary)", color: r.status === "pending" ? "#fff" : "var(--muted-foreground)" }}>
+                        {r.status === "pending" ? "Pendente" : "Resolvido"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Team */}
+            {fullEvent?.participants && fullEvent.participants.length > 0 && (() => {
+              const relevantParticipants = fullEvent.participants!.filter(p => p.confirmed !== false && p.countsForScore !== false);
+              return (
+                <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                  <button type="button" onClick={() => setTeamPanelOpen(o => !o)} className="flex items-center gap-2 w-full text-left mb-2">
+                    <Users size={13} className="shrink-0" />
+                    <span className="text-[11px] font-black uppercase">Equipe Alocada <span style={{ color: "var(--muted-foreground)" }}>({relevantParticipants.length})</span></span>
+                    {teamPanelOpen ? <ChevronUp size={12} className="ml-auto" style={{ color: "var(--muted-foreground)" }} /> : <ChevronDown size={12} className="ml-auto" style={{ color: "var(--muted-foreground)" }} />}
+                  </button>
+                  {teamPanelOpen && (
+                    relevantParticipants.length === 0 ? (
+                      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador ativo alocado.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {relevantParticipants.map(p => {
+                          const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
+                          return (
+                            <div key={p.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--secondary)" }}>
+                              <div className="w-7 h-7 rounded-md flex items-center justify-center font-black text-[10px] shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                                {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-black uppercase text-[10px] leading-tight truncate">{p.employeeName}</p>
+                                <p className="text-[9px] font-bold uppercase truncate" style={{ color: "var(--muted-foreground)" }}>{p.functionName}</p>
+                              </div>
+                              {realizadasCount != null && (
+                                <span className="text-[9px] font-bold uppercase shrink-0 flex items-center gap-0.5 rounded px-1.5 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>
+                                  <Calendar size={9} /> {realizadasCount}d
                                 </span>
                               )}
                             </div>
-                            {canManageConformity ? (
-                              <div className="flex items-center border border-[#191c1e] overflow-hidden shrink-0">
-                                <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: true }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: true } }); }} className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border-r border-[#191c1e] transition-all ${value === true ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>S</button>
-                                <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: false }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: false } }); }} className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase border-r border-[#191c1e] transition-all ${value === false ? "bg-[#862200] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>N</button>
-                                <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: null }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: null } }); }} className={`px-1.5 py-0.5 text-[9px] font-black italic uppercase transition-all ${value === null ? "bg-[#f5e97a] text-[#4a3c00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>?</button>
-                              </div>
-                            ) : (
-                              <span className={`text-[9px] font-black italic uppercase px-1.5 py-0.5 border shrink-0 ${value === null ? "bg-[#d8dadc] text-[#444933] border-[#d8dadc]" : value ? "bg-[#ccff00] text-[#161e00] border-[#ccff00]" : "bg-[#ff5722] text-white border-[#ff5722]"}`}>
-                                {value === null ? "—" : value ? "OK" : "Não"}
+                          );
+                        })}
+                      </div>
+                    )
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Conformidade — editável para gestores */}
+            {(conformity || canManageConformity) && (
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                <p className="text-[11px] font-black uppercase mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
+                {(fullEvent?.conformityEvaluatorName || fullEvent?.conformityEvaluatorFerramentasName) && (
+                  <div className="mb-2 space-y-0.5">
+                    {fullEvent?.conformityEvaluatorName && (
+                      <p className="text-[9px] flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}><User size={9} /> Responsável Cenografia: <span className="font-bold ml-0.5" style={{ color: "var(--foreground)" }}>{fullEvent.conformityEvaluatorName}</span></p>
+                    )}
+                    {fullEvent?.conformityEvaluatorFerramentasName && (
+                      <p className="text-[9px] flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}><User size={9} /> Responsável Ferramentas: <span className="font-bold ml-0.5" style={{ color: "var(--foreground)" }}>{fullEvent.conformityEvaluatorFerramentasName}</span></p>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-1 mb-2">
+                  {([
+                    { label: "EPI", key: "epi" as const, commentKey: "epiComment" as const },
+                    { label: "Estaiamento", key: "estaiamentos" as const, commentKey: "estaiamentosComment" as const },
+                    { label: "Conduta", key: "conduta" as const, commentKey: "condutaComment" as const },
+                    { label: "Guarda Equip.", key: "guardaEquipamentos" as const, commentKey: "guardaEquipamentosComment" as const },
+                  ]).map(item => {
+                    const value = conformityForm[item.key];
+                    const comment = conformityForm[item.commentKey];
+                    const isExpanded = conformityExpandedComments.has(item.key);
+                    return (
+                      <div key={item.key} className="rounded-lg overflow-hidden" style={{ border: value === null ? "1px solid var(--border)" : value ? `1px solid ${GOOD}` : `1px solid ${WARNING}`, backgroundColor: value === null ? "var(--secondary)" : value ? "rgba(154,176,0,0.10)" : "rgba(229,72,77,0.08)" }}>
+                        <div className="flex items-center gap-1 px-2 py-1.5">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[10px] font-bold uppercase truncate block">{item.label}</span>
+                            {value !== null && !!(conformity as unknown as Record<string, unknown>)?.createdByUserName && (
+                              <span className="text-[8px] flex items-center gap-0.5 mt-0.5" style={{ color: GOOD }}>
+                                <Check size={8} /> {String((conformity as unknown as Record<string, unknown>).createdByUserName) as string}
                               </span>
                             )}
-                            {canManageConformity && (
-                              <button type="button" title={comment ? "Ver/editar comentário" : "Adicionar comentário"} onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); if (next.has(item.key)) next.delete(item.key); else next.add(item.key); return next; })} className={`p-0.5 border transition-all ml-0.5 ${comment ? "border-[#191c1e] bg-[#ccff00] text-[#191c1e]" : "border-[#d8dadc] text-[#747a60] bg-white hover:bg-[#f0f2e8]"}`}>
-                                <MessageSquare size={9} />
-                              </button>
-                            )}
                           </div>
-                          {isExpanded && canManageConformity && (
-                            <div className="px-2 pb-2 space-y-1">
-                              <Textarea value={comment} onChange={e => setConformityForm(f => ({ ...f, [item.commentKey]: e.target.value }))} placeholder="Observação..." className="text-[10px] rounded-none bg-white resize-none min-h-[48px] border border-[#d4c98a] p-1.5" />
-                              <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { [item.commentKey]: comment || null } })} className="px-2 py-0.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors">
-                                Salvar
-                              </button>
+                          {canManageConformity ? (
+                            <div className="flex items-center rounded overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
+                              <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: true }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: true } }); }} className="px-1.5 py-0.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === true ? "var(--primary)" : "transparent", color: value === true ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>S</button>
+                              <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: false }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: false } }); }} className="px-1.5 py-0.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === false ? WARNING : "transparent", color: value === false ? "#fff" : "var(--muted-foreground)" }}>N</button>
+                              <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: null }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: null } }); }} className="px-1.5 py-0.5 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: value === null ? "rgba(232,162,61,0.24)" : "transparent", color: value === null ? AMBER : "var(--muted-foreground)" }}>?</button>
                             </div>
+                          ) : (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: value === null ? "var(--secondary)" : value ? "var(--primary)" : WARNING, color: value === null ? "var(--muted-foreground)" : value ? "var(--primary-foreground)" : "#fff" }}>
+                              {value === null ? "—" : value ? "OK" : "Não"}
+                            </span>
                           )}
-                          {!isExpanded && comment && (
-                            <p className="px-2 pb-1 text-[9px] text-[#444933] italic line-clamp-1 cursor-pointer" onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); next.add(item.key); return next; })}>💬 {comment}</p>
+                          {canManageConformity && (
+                            <button type="button" title={comment ? "Ver/editar comentário" : "Adicionar comentário"} onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); if (next.has(item.key)) next.delete(item.key); else next.add(item.key); return next; })} className="p-0.5 rounded transition-all ml-0.5" style={{ border: comment ? "1px solid var(--primary)" : "1px solid var(--border)", backgroundColor: comment ? "var(--primary)" : "transparent", color: comment ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>
+                              <MessageSquare size={9} />
+                            </button>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {/* Faltas/Atrasos */}
-                    <div className={`border px-2 py-1.5 ${conformityForm.absencesReport ? "border-[#b02f00] bg-[#fff4e5]" : "border-[#d8dadc] bg-[#f2f4f6]"}`}>
-                      <p className="text-[9px] font-bold uppercase italic text-[#747a60] mb-1 flex items-center gap-1"><User size={9} /> Faltas/Atrasos</p>
-                      {canManageConformity ? (
-                        <div className="flex gap-1">
-                          <Textarea value={conformityForm.absencesReport} onChange={e => setConformityForm(f => ({ ...f, absencesReport: e.target.value }))} placeholder="Sem registro" className="text-[10px] rounded-none bg-white resize-none min-h-[36px] border border-[#d8dadc] p-1 flex-1" />
-                          <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { absencesReport: conformityForm.absencesReport || null } })} className="px-1.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors shrink-0 self-start">
-                            <Save size={9} />
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="text-[10px] italic text-[#191c1e] leading-snug">{conformityForm.absencesReport || <span className="text-[#9aa088]">Sem registro</span>}</p>
-                      )}
-                    </div>
-                    {/* Destaque */}
-                    <div className={`border px-2 py-1.5 ${conformityForm.standoutResponse === true ? "border-[#506600] bg-[#f7ffe0]" : "border-[#d8dadc] bg-[#f2f4f6]"}`}>
-                      <p className="text-[9px] font-bold uppercase italic text-[#506600] mb-1 flex items-center gap-1"><Trophy size={9} /> Destaque</p>
-                      {canManageConformity ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center border border-[#191c1e] overflow-hidden">
-                            <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: false } }); }} className={`flex-1 px-2 py-0.5 text-[9px] font-black italic uppercase border-r border-[#191c1e] transition-all ${conformityForm.standoutResponse === false ? "bg-[#ccff00] text-[#161e00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>Não</button>
-                            <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: true })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: true } }); }} className={`flex-1 px-2 py-0.5 text-[9px] font-black italic uppercase transition-all ${conformityForm.standoutResponse === true ? "bg-[#506600] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}>Sim</button>
+                        {isExpanded && canManageConformity && (
+                          <div className="px-2 pb-2 space-y-1">
+                            <Textarea value={comment} onChange={e => setConformityForm(f => ({ ...f, [item.commentKey]: e.target.value }))} placeholder="Observação..." className="text-[10px] resize-none min-h-[48px] p-1.5 rounded" style={fieldStyle} />
+                            <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { [item.commentKey]: comment || null } })} className="px-2 py-0.5 rounded font-black uppercase text-[9px] disabled:opacity-50 transition-colors hover:opacity-90" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                              Salvar
+                            </button>
                           </div>
-                          {conformityForm.standoutResponse === true && (
-                            <div className="flex gap-1">
-                              <Textarea value={conformityForm.standoutJustification} onChange={e => setConformityForm(f => ({ ...f, standoutJustification: e.target.value }))} placeholder="Justificativa do destaque..." className="text-[10px] rounded-none bg-white resize-none min-h-[36px] border border-[#d8dadc] p-1 flex-1" />
-                              <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { standoutJustification: conformityForm.standoutJustification || null } })} className="px-1.5 border border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-[9px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors shrink-0 self-start">
-                                <Save size={9} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-[10px] italic text-[#191c1e] leading-snug">
-                          {conformityForm.standoutResponse === null ? <span className="text-[#9aa088]">Pendente</span> : conformityForm.standoutResponse ? (conformityForm.standoutJustification || "Sim") : "Não"}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Event Comments */}
-              {eventComments && eventComments.length > 0 && (
-                <div className="px-4 py-3">
-                  <p className="text-[11px] font-black italic uppercase text-[#444933] mb-2 flex items-center gap-1.5"><MessageSquare size={13} /> Comentários <span className="text-[#747a60]">({eventComments.length})</span></p>
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                    {eventComments.map((c, i) => (
-                      <div key={i} className="text-[11px] bg-[#f2f4f6] border border-[#d8dadc] px-3 py-2">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-bold italic uppercase text-[#191c1e] text-[10px]">{(c as { authorName?: string }).authorName ?? "Admin"}</span>
-                          <span className="italic text-[#9aa088] text-[10px]">{c.createdAt ? formatDateTime(new Date(c.createdAt)) : ""}</span>
-                        </div>
-                        <p className="italic text-[#191c1e] leading-snug whitespace-pre-wrap">{c.message}</p>
+                        )}
+                        {!isExpanded && comment && (
+                          <p className="px-2 pb-1 text-[9px] line-clamp-1 cursor-pointer" style={{ color: "var(--muted-foreground)" }} onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); next.add(item.key); return next; })}>💬 {comment}</p>
+                        )}
                       </div>
-                    ))}
+                    );
+                  })}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {/* Faltas/Atrasos */}
+                  <div className="rounded-lg px-2 py-1.5" style={{ border: conformityForm.absencesReport ? `1px solid ${AMBER}` : "1px solid var(--border)", backgroundColor: conformityForm.absencesReport ? "rgba(232,162,61,0.10)" : "var(--secondary)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1 flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}><User size={9} /> Faltas/Atrasos</p>
+                    {canManageConformity ? (
+                      <div className="flex gap-1">
+                        <Textarea value={conformityForm.absencesReport} onChange={e => setConformityForm(f => ({ ...f, absencesReport: e.target.value }))} placeholder="Sem registro" className="text-[10px] resize-none min-h-[36px] p-1 flex-1 rounded" style={fieldStyle} />
+                        <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { absencesReport: conformityForm.absencesReport || null } })} className="px-1.5 rounded font-black text-[9px] disabled:opacity-50 transition-colors hover:opacity-90 shrink-0 self-start" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                          <Save size={9} />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] leading-snug">{conformityForm.absencesReport || <span style={{ color: "var(--muted-foreground)" }}>Sem registro</span>}</p>
+                    )}
+                  </div>
+                  {/* Destaque */}
+                  <div className="rounded-lg px-2 py-1.5" style={{ border: conformityForm.standoutResponse === true ? `1px solid ${GOOD}` : "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === true ? "rgba(154,176,0,0.10)" : "var(--secondary)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1 flex items-center gap-1" style={{ color: GOOD }}><Trophy size={9} /> Destaque</p>
+                    {canManageConformity ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center rounded overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                          <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: false } }); }} className="flex-1 px-2 py-0.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === false ? "var(--primary)" : "transparent", color: conformityForm.standoutResponse === false ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Não</button>
+                          <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: true })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: true } }); }} className="flex-1 px-2 py-0.5 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: conformityForm.standoutResponse === true ? GOOD : "transparent", color: conformityForm.standoutResponse === true ? "#fff" : "var(--muted-foreground)" }}>Sim</button>
+                        </div>
+                        {conformityForm.standoutResponse === true && (
+                          <div className="flex gap-1">
+                            <Textarea value={conformityForm.standoutJustification} onChange={e => setConformityForm(f => ({ ...f, standoutJustification: e.target.value }))} placeholder="Justificativa do destaque..." className="text-[10px] resize-none min-h-[36px] p-1 flex-1 rounded" style={fieldStyle} />
+                            <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { standoutJustification: conformityForm.standoutJustification || null } })} className="px-1.5 rounded font-black text-[9px] disabled:opacity-50 transition-colors hover:opacity-90 shrink-0 self-start" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                              <Save size={9} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] leading-snug">
+                        {conformityForm.standoutResponse === null ? <span style={{ color: "var(--muted-foreground)" }}>Pendente</span> : conformityForm.standoutResponse ? (conformityForm.standoutJustification || "Sim") : "Não"}
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* Event Comments */}
+            {eventComments && eventComments.length > 0 && (
+              <div className="px-4 py-3">
+                <p className="text-[11px] font-black uppercase mb-2 flex items-center gap-1.5"><MessageSquare size={13} /> Comentários <span style={{ color: "var(--muted-foreground)" }}>({eventComments.length})</span></p>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {eventComments.map((c, i) => (
+                    <div key={i} className="text-[11px] rounded-lg px-3 py-2" style={{ backgroundColor: "var(--secondary)" }}>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-bold uppercase text-[10px]">{(c as { authorName?: string }).authorName ?? "Admin"}</span>
+                        <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{c.createdAt ? formatDateTime(new Date(c.createdAt)) : ""}</span>
+                      </div>
+                      <p className="leading-snug whitespace-pre-wrap">{c.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </aside>
 
           {/* ── LEFT COLUMN: Calibrations table ── */}
@@ -1193,12 +1205,12 @@ export default function CalibrationsPage() {
 
             {/* ── COMPACT ACTION BAR ── */}
           {displayActiveCriteria.length === 0 ? (
-            <div className="bg-white border-2 border-[#191c1e] text-center py-10 italic uppercase font-bold text-[#747a60] text-sm">
+            <div className="rounded-xl text-center py-10 font-bold uppercase text-sm" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
               Nenhum critério ativo para este evento.
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2 flex-wrap bg-white border-2 border-[#191c1e] px-3 py-2">
+              <div className="flex items-center gap-2 flex-wrap rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                   {/* Liberar Sem Cal. — à esquerda */}
                   {autoFillableCriteria.length > 0 && canFinalize && (
                     <button
@@ -1207,37 +1219,42 @@ export default function CalibrationsPage() {
                       disabled={savingAutoFill || savingAll}
                       onClick={autoFillFromEvaluator}
                       title="Cria calibrações iguais à nota do avaliador para todos os critérios ainda sem calibração"
-                      className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#444933] bg-white text-[#444933] font-black text-xs italic uppercase hover:bg-[#f2f4f6] disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs uppercase disabled:opacity-50 transition-colors hover:opacity-80"
+                      style={{ border: "1px solid var(--border)" }}
                     >
                       <Check size={13} /> {savingAutoFill ? "Preenchendo..." : `Liberar Sem Cal. (${autoFillableCriteria.length})`}
                     </button>
                   )}
 
                   {/* Progress + filtros */}
-                  <span className="text-[11px] font-bold italic uppercase text-[#747a60] flex items-center gap-1" title={`${finalPublishedCount} de ${scorableActiveCriteria.length} critérios (peso > 0) publicados como Final`}>
-                    <ShieldCheck size={11} className="text-[#506600]" /> {finalPublishedCount}/{scorableActiveCriteria.length} final
+                  <span className="text-[11px] font-bold uppercase flex items-center gap-1" style={{ color: "var(--muted-foreground)" }} title={`${finalPublishedCount} de ${scorableActiveCriteria.length} critérios (peso > 0) publicados como Final`}>
+                    <ShieldCheck size={11} style={{ color: GOOD }} /> {finalPublishedCount}/{scorableActiveCriteria.length} final
                   </span>
-                  <div className="flex items-center gap-0.5">
-                    <Filter size={11} className="text-[#747a60] mr-1" />
+                  <div className="flex items-center gap-1">
+                    <Filter size={11} className="mr-0.5" style={{ color: "var(--muted-foreground)" }} />
                     {([
                       { value: "all", label: "Todos" },
                       { value: "uncalibrated", label: "Pendentes" },
                       { value: "calibrated", label: "Calibrados" },
-                    ] as const).map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setCriterionFilter(opt.value)}
-                        className={`text-[10px] font-black italic uppercase px-2 py-0.5 border transition-colors ${criterionFilter === opt.value ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-[#f2f4f6] text-[#444933] border-[#d8dadc] hover:border-[#191c1e]"}`}
-                      >{opt.label}</button>
-                    ))}
+                    ] as const).map(opt => {
+                      const active = criterionFilter === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setCriterionFilter(opt.value)}
+                          className="text-[10px] font-black uppercase px-2 py-1 rounded transition-colors"
+                          style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
+                        >{opt.label}</button>
+                      );
+                    })}
                   </div>
 
                   {/* Grupo direito: log de publicação + Salvar + Publicar */}
                   <div className="ml-auto flex items-center gap-2">
                     {/* Log de publicação */}
                     {(alreadyReleased || allCriteriaFinalPublished || partialPublishedAtDate) && (
-                      <span className={`text-[10px] font-bold italic flex items-center gap-1 ${alreadyReleased || allCriteriaFinalPublished ? "text-[#506600]" : "text-[#3b0900]"}`}>
+                      <span className="text-[10px] font-bold flex items-center gap-1" style={{ color: alreadyReleased || allCriteriaFinalPublished ? GOOD : AMBER }}>
                         {alreadyReleased || allCriteriaFinalPublished ? <ShieldCheck size={11} /> : <Send size={11} />}
                         {alreadyReleased || allCriteriaFinalPublished
                           ? `Final ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}`
@@ -1251,7 +1268,8 @@ export default function CalibrationsPage() {
                       disabled={savingAll || totalDirtyCount === 0}
                       onClick={handleSaveAll}
                       title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
-                      className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors enabled:hover:bg-[#191c1e] enabled:hover:text-[#ccff00]"
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                     >
                       <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
                     </button>
@@ -1262,7 +1280,8 @@ export default function CalibrationsPage() {
                         type="button"
                         disabled={publishingAll || publishingAllPartial || publishingAllFinal}
                         onClick={handlePublishAll}
-                        className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#191c1e] bg-[#191c1e] text-white font-black text-xs italic uppercase hover:bg-[#506600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-colors hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ border: "1px solid var(--border)" }}
                       >
                         <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
                       </button>
@@ -1272,22 +1291,22 @@ export default function CalibrationsPage() {
 
               {/* ── CRITERIA TABLE ── */}
               {filteredActiveCriteria.length === 0 && displayActiveCriteria.length > 0 ? (
-                <div className="bg-[#d8dadc] border-2 border-[#191c1e] px-5 py-4 text-center">
-                  <p className="text-sm italic font-bold uppercase text-[#444933]">Nenhum critério para o filtro selecionado.</p>
+                <div className="rounded-xl px-5 py-4 text-center" style={{ backgroundColor: "var(--secondary)" }}>
+                  <p className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum critério para o filtro selecionado.</p>
                 </div>
               ) : (
-                <div className="bg-white border-2 border-[#191c1e] overflow-x-auto">
+                <div className="rounded-xl overflow-x-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                   <table className="w-full text-sm border-collapse min-w-[520px]">
                     <thead>
-                      <tr className="bg-[#f2f4f6] border-b-2 border-[#191c1e]">
-                        <th className="text-left px-3 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider">Critério</th>
-                        <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-16">Peso</th>
-                        <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-20" title="Média das notas enviadas pelos avaliadores da área">Avaliador</th>
-                        <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-28">Calibrada</th>
-                        <th className="text-center px-2 py-2 text-[10px] font-black italic uppercase text-[#444933] tracking-wider w-32 hidden sm:table-cell">Status</th>
+                      <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
+                        <th className="text-left px-3 py-2.5 text-[10px] font-black uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Critério</th>
+                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-16" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Peso</th>
+                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-20" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} title="Média das notas enviadas pelos avaliadores da área">Avaliador</th>
+                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-28" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Calibrada</th>
+                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-32 hidden sm:table-cell" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#e8eaec]">
+                    <tbody>
                       {filteredActiveCriteria.map(c => {
                         const areaScores = getAreaScores(c.criterionId);
                         const avg = getAvgScore(c.criterionId);
@@ -1308,29 +1327,30 @@ export default function CalibrationsPage() {
                             key={c.criterionId}
                             data-testid={`row-cal-${c.criterionId}`}
                             className="transition-colors group"
+                            style={{ borderTop: "1px solid var(--border)" }}
                           >
                             {/* Critério */}
                             <td className="px-3 py-2.5">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-black italic uppercase text-[12px] text-[#191c1e] leading-tight">{c.criterionName}</span>
+                                <span className="font-black uppercase text-[12px] leading-tight" style={{ fontFamily: CONDENSED }}>{c.criterionName}</span>
                                 {c.responsibleAreaName && (
-                                  <span className="hidden lg:inline text-[9px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#191c1e] px-1">{c.responsibleAreaName}</span>
+                                  <span className="hidden lg:inline text-[9px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{c.responsibleAreaName}</span>
                                 )}
                                 {(childCriterionIdsMap.get(c.criterionId) ?? []).map(childId => {
                                   const childCrit = activeCriteria.find(ac => ac.criterionId === childId);
                                   return childCrit?.responsibleAreaName ? (
-                                    <span key={childId} className="hidden lg:inline text-[9px] font-bold italic uppercase text-[#1a2900] bg-[#ccff00] border border-[#191c1e] px-1">+ {childCrit.responsibleAreaName}</span>
+                                    <span key={childId} className="hidden lg:inline text-[9px] font-bold uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>+ {childCrit.responsibleAreaName}</span>
                                   ) : null;
                                 })}
                               </div>
                               {/* ── Comentário do avaliador (read-only) ── */}
                               {areaScores.filter(s => s.comment).map((s, i) => (
-                                <div key={i} className="mt-2 pt-1.5 border-t border-dashed border-[#c4cda8]">
+                                <div key={i} className="mt-2 pt-1.5" style={{ borderTop: "1px dashed var(--border)" }}>
                                   <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="text-[8px] font-black italic uppercase tracking-wider text-[#506600] bg-[#e8f5d0] px-1 py-px">Avaliador</span>
-                                    <span className="text-[10px] font-bold italic text-[#444933]">{s.name}</span>
+                                    <span className="text-[8px] font-black uppercase tracking-wider rounded px-1 py-px" style={{ color: GOOD, backgroundColor: "rgba(154,176,0,0.12)" }}>Avaliador</span>
+                                    <span className="text-[10px] font-bold">{s.name}</span>
                                     {s.areaName && (
-                                      <span className="text-[8px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#c4c9ac] px-1 py-px">{s.areaName}</span>
+                                      <span className="text-[8px] font-bold uppercase rounded px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{s.areaName}</span>
                                     )}
                                     <button
                                       type="button"
@@ -1343,30 +1363,31 @@ export default function CalibrationsPage() {
                                         }, 0);
                                       }}
                                       title="Copiar para justificativa da calibração"
-                                      className="ml-auto h-4 w-4 flex items-center justify-center text-[#506600] hover:text-[#191c1e] hover:bg-[#ccff00] transition-colors shrink-0"
+                                      className="ml-auto h-4 w-4 flex items-center justify-center transition-colors shrink-0 rounded hover:opacity-70"
+                                      style={{ color: GOOD }}
                                     >
                                       <Copy size={9} />
                                     </button>
                                   </div>
-                                  <p className="text-[11px] text-[#191c1e] leading-snug line-clamp-3">{s.comment}</p>
+                                  <p className="text-[11px] leading-snug line-clamp-3">{s.comment}</p>
                                 </div>
                               ))}
                               {/* ── Justificativa da calibração (editável) ── */}
-                              <div onClick={e => e.stopPropagation()} className="mt-2 pt-1.5 border-t border-dashed border-[#d0d2ca]">
+                              <div onClick={e => e.stopPropagation()} className="mt-2 pt-1.5" style={{ borderTop: "1px dashed var(--border)" }}>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                  <span className="text-[8px] font-black italic uppercase tracking-wider text-[#747a60] bg-[#eceef0] px-1 py-px">Calibração</span>
+                                  <span className="text-[8px] font-black uppercase tracking-wider rounded px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)" }}>Calibração</span>
                                   {cal?.calibratedByName && (
-                                    <span className="text-[10px] font-bold italic text-[#747a60]">{cal.calibratedByName}</span>
+                                    <span className="text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>{cal.calibratedByName}</span>
                                   )}
                                   {/* ── Indicador de salvo ── */}
                                   {savedReasonIds.has(c.criterionId) && !reasonChanged && (
-                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black italic uppercase text-[#3a7a00]">
+                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black uppercase" style={{ color: GOOD }}>
                                       <Check size={9} /> Salvo
                                     </span>
                                   )}
                                   {/* ── Indicador de não salvo ── */}
                                   {reasonChanged && (
-                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black italic uppercase text-[#c85000]">
+                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black uppercase" style={{ color: AMBER }}>
                                       <AlertCircle size={9} /> Não salvo
                                     </span>
                                   )}
@@ -1392,12 +1413,12 @@ export default function CalibrationsPage() {
                                     }
                                   }}
                                   placeholder="Escreva a justificativa e clique fora para salvar…"
-                                  className={cn(
-                                    "w-full px-2 py-1.5 text-[11px] italic border focus:outline-none focus:ring-2 focus:ring-[#ccff00] placeholder:text-[#b0b8a0] resize-none leading-snug overflow-hidden transition-colors",
-                                    reasonChanged ? "border-[#c85000] bg-[#fff8f5]" :
-                                    reasonVal ? "border-[#c4cda8] bg-[#f8fdf0]" :
-                                    "border-[#d8dace] bg-[#fafafa]"
-                                  )}
+                                  className="w-full px-2 py-1.5 text-[11px] rounded resize-none leading-snug overflow-hidden transition-colors focus:outline-none"
+                                  style={{
+                                    border: reasonChanged ? `1px solid ${AMBER}` : "1px solid var(--border)",
+                                    backgroundColor: reasonChanged ? "rgba(232,162,61,0.08)" : reasonVal ? "rgba(154,176,0,0.06)" : "var(--secondary)",
+                                    color: "var(--foreground)",
+                                  }}
                                 />
                                 {/* Ação manual quando não há calibração ainda ou usuário quer salvar explicitamente */}
                                 {reasonChanged && (
@@ -1411,12 +1432,13 @@ export default function CalibrationsPage() {
                                           saveCalibration(c.criterionId);
                                           setSavedReasonIds(prev => new Set(prev).add(c.criterionId));
                                         }}
-                                        className="px-2.5 py-1 border-2 border-[#191c1e] bg-[#ccff00] text-[#161e00] font-black italic uppercase text-[10px] hover:bg-[#b8e600] disabled:opacity-50 transition-colors flex items-center gap-1"
+                                        className="px-2.5 py-1 rounded font-black uppercase text-[10px] disabled:opacity-50 transition-opacity hover:opacity-90 flex items-center gap-1"
+                                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                                       >
                                         <Save size={10} /> Salvar justificativa
                                       </button>
                                     ) : (
-                                      <p className="text-[10px] italic text-[#9aa088] flex items-center gap-1">
+                                      <p className="text-[10px] flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}>
                                         <AlertCircle size={10} /> Salve a nota calibrada primeiro para gravar a justificativa.
                                       </p>
                                     )}
@@ -1434,7 +1456,8 @@ export default function CalibrationsPage() {
                                     inputMode="decimal"
                                     value={weightEdits[c.criterionId] ?? String(peso)}
                                     onChange={e => setWeightEdits(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9.,]/g, "") }))}
-                                    className="h-6 w-10 px-1 border-2 border-[#191c1e] text-center text-xs font-black italic bg-white focus:outline-none focus:ring-1 focus:ring-[#ccff00]"
+                                    className="h-6 w-10 px-1 rounded text-center text-xs font-black focus:outline-none"
+                                    style={fieldStyle}
                                   />
                                   {weightEdits[c.criterionId] != null && Number(weightEdits[c.criterionId].replace(",", ".")) !== Number(peso) && (
                                     <button
@@ -1443,20 +1466,21 @@ export default function CalibrationsPage() {
                                       disabled={savingWeightId === c.criterionId && updateWeightMutation.isPending}
                                       onClick={() => saveWeight(c.criterionId, c.active)}
                                       title="Salvar peso"
-                                      className="h-6 w-6 bg-[#ccff00] border border-[#191c1e] flex items-center justify-center disabled:opacity-50 hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors"
+                                      className="h-6 w-6 rounded flex items-center justify-center disabled:opacity-50 transition-opacity hover:opacity-90"
+                                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                                     >
                                       {savingWeightId === c.criterionId && updateWeightMutation.isPending ? "·" : <Check size={10} />}
                                     </button>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-xs font-black italic text-[#191c1e]">{peso}</span>
+                                <span className="text-xs font-black">{peso}</span>
                               )}
                             </td>
                             {/* Nota Avaliador */}
                             <td className="px-2 py-2.5 text-center">
-                              <span className={cn("text-sm font-black italic", calVal != null ? "text-[#c4c9ac] line-through" : "text-[#191c1e]")}>
-                                {avg != null ? avg.toFixed(2) : <span className="text-[#c4c9ac] text-xs not-italic">—</span>}
+                              <span className="text-sm font-black" style={{ color: calVal != null ? "var(--muted-foreground)" : "var(--foreground)", textDecoration: calVal != null ? "line-through" : "none" }}>
+                                {avg != null ? avg.toFixed(2) : <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>—</span>}
                               </span>
                             </td>
                             {/* Nota Calibrada inline */}
@@ -1469,12 +1493,12 @@ export default function CalibrationsPage() {
                                   value={scoreVal}
                                   onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9]/g, "") }))}
                                   placeholder="—"
-                                  className={cn(
-                                    "h-7 w-12 px-1 border-2 text-center text-sm font-black italic focus:outline-none focus:ring-2 focus:ring-[#ccff00]",
-                                    changedFromSaved ? "border-[#ff5722] bg-[#fff3f0]" :
-                                    calVal != null ? "border-[#506600] bg-[#f2ffd6]" :
-                                    "border-[#191c1e] bg-white"
-                                  )}
+                                  className="h-7 w-12 px-1 rounded text-center text-sm font-black focus:outline-none"
+                                  style={{
+                                    border: changedFromSaved ? `2px solid ${WARNING}` : calVal != null ? `2px solid ${GOOD}` : "2px solid var(--border)",
+                                    backgroundColor: changedFromSaved ? "rgba(229,72,77,0.08)" : calVal != null ? "rgba(154,176,0,0.10)" : "var(--secondary)",
+                                    color: "var(--foreground)",
+                                  }}
                                 />
                                 {changedFromSaved && (
                                   <button
@@ -1483,7 +1507,8 @@ export default function CalibrationsPage() {
                                     disabled={isSaving || savingAll}
                                     onClick={() => saveCalibration(c.criterionId)}
                                     title="Salvar calibração"
-                                    className="h-7 w-7 bg-[#ccff00] border-2 border-[#191c1e] flex items-center justify-center disabled:opacity-50 hover:bg-[#191c1e] hover:text-[#ccff00] transition-colors"
+                                    className="h-7 w-7 rounded flex items-center justify-center disabled:opacity-50 transition-opacity hover:opacity-90"
+                                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                                   >
                                     {isSaving ? "·" : <Save size={11} />}
                                   </button>
@@ -1495,36 +1520,38 @@ export default function CalibrationsPage() {
                               {cal && canFinalize ? (
                                 <div className="flex flex-col items-center gap-0.5">
                                   {/* Segmented control compacto: Parc. | Final */}
-                                  <div className="flex items-stretch border border-[#191c1e] overflow-hidden w-full max-w-[88px]">
+                                  <div className="flex items-stretch rounded overflow-hidden w-full max-w-[88px]" style={{ border: "1px solid var(--border)" }}>
                                     <button
                                       type="button"
                                       onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "partial" }))}
-                                      className={`flex-1 py-1 text-[8px] font-black italic uppercase transition-colors leading-none ${(publishIntents[c.criterionId] ?? "partial") === "partial" ? "bg-[#3b0900] text-white" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                      className="flex-1 py-1 text-[8px] font-black uppercase transition-colors leading-none"
+                                      style={{ backgroundColor: (publishIntents[c.criterionId] ?? "partial") === "partial" ? AMBER : "transparent", color: (publishIntents[c.criterionId] ?? "partial") === "partial" ? "#fff" : "var(--muted-foreground)" }}
                                     >
                                       Parc.
                                     </button>
-                                    <span className="w-px bg-[#191c1e] shrink-0" />
+                                    <span className="w-px shrink-0" style={{ backgroundColor: "var(--border)" }} />
                                     <button
                                       type="button"
                                       onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "final" }))}
-                                      className={`flex-1 py-1 text-[8px] font-black italic uppercase transition-colors leading-none ${(publishIntents[c.criterionId] ?? "partial") === "final" ? "bg-[#506600] text-[#ccff00]" : "bg-white text-[#9aa088] hover:bg-[#f5f5f5]"}`}
+                                      className="flex-1 py-1 text-[8px] font-black uppercase transition-colors leading-none"
+                                      style={{ backgroundColor: (publishIntents[c.criterionId] ?? "partial") === "final" ? GOOD : "transparent", color: (publishIntents[c.criterionId] ?? "partial") === "final" ? "#fff" : "var(--muted-foreground)" }}
                                     >
                                       Final
                                     </button>
                                   </div>
                                   {/* Indicador de publicação atual */}
                                   {(isFinalPublished || c.partialPublishedAt) && (
-                                    <span className={`text-[7px] italic leading-none ${isFinalPublished ? "text-[#506600]" : "text-[#3b0900]"}`}>
+                                    <span className="text-[7px] leading-none" style={{ color: isFinalPublished ? GOOD : AMBER }}>
                                       ↑ {isFinalPublished ? "Final" : "Parcial"} pub.
                                     </span>
                                   )}
                                 </div>
                               ) : cal ? (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold italic uppercase bg-[#f2ffd6] text-[#506600] border border-[#506600] px-1.5 py-0.5">
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD, border: `1px solid ${GOOD}` }}>
                                   <CheckCircle size={9} /> Cal.
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold italic uppercase bg-[#ffb5a0] text-[#3b0900] border border-[#3b0900] px-1.5 py-0.5 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER, border: `1px solid ${AMBER}` }}>
                                   {avg != null ? "Pendente" : "Sem nota"}
                                 </span>
                               )}
@@ -1540,36 +1567,37 @@ export default function CalibrationsPage() {
               {/* ── FINALIZATION STATUS (single compact bar) ── */}
               {scoredCriteria.length > 0 && !alreadyReleased && (
                 readyToFinalize ? (
-                  <div className="bg-[#191c1e] text-white border-2 border-[#191c1e] px-4 py-2.5 flex items-center justify-between gap-3 shadow-[4px_4px_0px_0px_#ccff00]">
+                  <div className="rounded-xl px-4 py-3 flex items-center justify-between gap-3" style={{ backgroundColor: "var(--primary)" }}>
                     <div className="flex items-center gap-2">
-                      <CheckCircle size={14} className="text-[#ccff00] shrink-0" />
-                      <span className="text-sm font-black italic uppercase">Todas as calibrações salvas — pronto para publicar</span>
+                      <CheckCircle size={14} className="shrink-0" style={{ color: "var(--primary-foreground)" }} />
+                      <span className="text-sm font-black uppercase" style={{ color: "var(--primary-foreground)" }}>Todas as calibrações salvas — pronto para publicar</span>
                     </div>
                     {canFinalize && (
                       <button
                         data-testid="button-open-finalize"
                         type="button"
                         onClick={() => setFinalizeOpen(true)}
-                        className="flex items-center gap-1.5 px-4 py-1.5 border-2 border-[#ccff00] bg-[#ccff00] text-[#161e00] font-black text-xs italic uppercase hover:bg-white hover:border-white transition-colors shrink-0"
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-opacity hover:opacity-90 shrink-0"
+                        style={{ backgroundColor: "var(--primary-foreground)", color: "var(--primary)" }}
                       >
                         <Send size={13} /> {alreadyClosed ? "Liberar Notas" : "Fechar e Liberar"}
                       </button>
                     )}
                   </div>
                 ) : allCalibrated && !evaluationsComplete ? (
-                  <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-[#191c1e] text-[#444933]">
-                    <AlertTriangle size={14} className="shrink-0 text-[#ff5722]" />
-                    <p className="text-xs font-bold italic uppercase">Calibrações concluídas, mas há avaliações pendentes.</p>
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                    <AlertTriangle size={14} className="shrink-0" style={{ color: WARNING }} />
+                    <p className="text-xs font-bold uppercase">Calibrações concluídas, mas há avaliações pendentes.</p>
                   </div>
                 ) : allCalibrated && !canFinalize ? (
-                  <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-dashed border-[#191c1e] text-[#444933]">
-                    <Lock size={14} className="shrink-0 text-[#747a60]" />
-                    <p className="text-xs font-bold italic uppercase">Calibrações concluídas. O fechamento é feito pela diretoria ou RH.</p>
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
+                    <Lock size={14} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
+                    <p className="text-xs font-bold uppercase">Calibrações concluídas. O fechamento é feito pela diretoria ou RH.</p>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-dashed border-[#191c1e] text-[#444933]">
-                    <Info size={14} className="shrink-0 text-[#747a60]" />
-                    <p className="text-xs font-bold italic uppercase" title="Calibre os critérios com nota da área para habilitar o fechamento do evento">Calibre todos os critérios para liberar o fechamento.</p>
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
+                    <Info size={14} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
+                    <p className="text-xs font-bold uppercase" title="Calibre os critérios com nota da área para habilitar o fechamento do evento">Calibre todos os critérios para liberar o fechamento.</p>
                   </div>
                 )
               )}
@@ -1582,59 +1610,56 @@ export default function CalibrationsPage() {
 
       </div>
 
-
-
       {/* Modal explicativo de finalização do evento */}
       <Dialog open={finalizeOpen} onOpenChange={(o) => { if (!finalizing) setFinalizeOpen(o); }}>
-        <DialogContent className="max-w-3xl rounded-none border-2 border-[#191c1e] p-0 gap-0 shadow-[8px_8px_0px_0px_#ccff00]">
-          <DialogHeader className="bg-[#191c1e] text-white p-5 space-y-1 text-left">
-            <DialogTitle className="text-xl font-black italic uppercase tracking-tight flex items-center gap-2">
-              <Flag size={20} className="text-[#ccff00]" /> Finalizar Evento
+        <DialogContent className="max-w-3xl rounded-xl p-0 gap-0" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader className="p-5 space-y-1 text-left" style={{ backgroundColor: "var(--secondary)" }}>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+              <Flag size={20} style={{ color: "var(--accent)" }} /> Finalizar Evento
             </DialogTitle>
-            <p className="text-xs font-bold italic uppercase text-white/60">{pickedEvent?.name}</p>
+            <p className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{pickedEvent?.name}</p>
           </DialogHeader>
 
           <div className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">
             {/* Resumo: como foi o evento */}
             <div className="flex items-stretch gap-3">
-              <div className="flex-1 border-2 border-[#191c1e] p-4 flex flex-col justify-center">
-                <span className="text-[10px] font-bold uppercase italic tracking-wider text-[#747a60]">Nota Final da Equipe</span>
-                <span className="text-3xl font-black italic text-[#506600] leading-none mt-1">
-                  {feedback ? feedback.eventScore.toFixed(1) : "—"}<span className="text-sm text-[#747a60]">/100</span>
+              <div className="flex-1 rounded-xl p-4 flex flex-col justify-center" style={{ border: "1px solid var(--border)" }}>
+                <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Nota Final da Equipe</span>
+                <span className="text-3xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+                  {feedback ? feedback.eventScore.toFixed(1) : "—"}<span className="text-sm" style={{ color: "var(--muted-foreground)" }}>/100</span>
                 </span>
               </div>
             </div>
 
             {scoredCriteria.length > 0 && (
               <div>
-                <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><SlidersHorizontal size={13} className="text-[#506600]" /> Notas Finais por Critério</p>
-                <div className="border-2 border-[#191c1e] divide-y-2 divide-[#191c1e]">
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><SlidersHorizontal size={13} style={{ color: GOOD }} /> Notas Finais por Critério</p>
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
                   {scoredCriteria.map((c, i) => {
                     const avg = getAvgScore(c.criterionId);
                     const cal = getCalibration(c.criterionId);
                     const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
-                    const finalVal = calVal ?? avg;
                     const peso = c.weightOverride ?? c.originalWeight ?? 0;
                     const scores = getAreaScores(c.criterionId);
                     return (
-                      <div key={c.criterionId} className={`px-3 py-2 ${i % 2 ? "bg-[#f7f9fb]" : "bg-white"}`} data-testid={`finalize-criterion-${c.criterionId}`}>
+                      <div key={c.criterionId} className="px-3 py-2.5" data-testid={`finalize-criterion-${c.criterionId}`} style={{ backgroundColor: i % 2 ? "var(--secondary)" : "transparent", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-xs font-black italic uppercase text-[#191c1e] truncate">{c.criterionName}</span>
-                            <span className="text-[9px] font-bold italic uppercase text-[#747a60] border border-[#c4c9ac] px-1 shrink-0">Peso {peso}</span>
+                            <span className="text-xs font-black uppercase truncate">{c.criterionName}</span>
+                            <span className="text-[9px] font-bold uppercase rounded px-1 shrink-0" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>Peso {peso}</span>
                             {Number(peso) === 0 && (
-                              <span className="text-[9px] font-black italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-1 shrink-0">Não conta</span>
+                              <span className="text-[9px] font-black uppercase rounded px-1 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>Não conta</span>
                             )}
                             {c.responsibleAreaName && (
-                              <span className="inline-flex items-center gap-1 text-[9px] font-bold italic uppercase text-[#444933] bg-[#eceef0] border border-[#191c1e] px-1 shrink-0"><Building2 size={10} /> {c.responsibleAreaName}</span>
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase rounded px-1 shrink-0" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}><Building2 size={10} /> {c.responsibleAreaName}</span>
                             )}
                           </div>
-                          <span className="flex items-center gap-1.5 justify-end text-xs font-black italic shrink-0">
-                            <span className={calVal != null ? "text-[#c4c9ac] line-through" : "text-[#444933]"}>{avg != null ? avg.toFixed(2) : "—"}</span>
+                          <span className="flex items-center gap-1.5 justify-end text-xs font-black shrink-0">
+                            <span style={{ color: calVal != null ? "var(--muted-foreground)" : "var(--foreground)", textDecoration: calVal != null ? "line-through" : "none" }}>{avg != null ? avg.toFixed(2) : "—"}</span>
                             {calVal != null && (
                               <>
-                                <span className="text-[#747a60]">→</span>
-                                <span className="text-[#a06a00]">{calVal.toFixed(2)}</span>
+                                <span style={{ color: "var(--muted-foreground)" }}>→</span>
+                                <span style={{ color: "var(--accent)" }}>{calVal.toFixed(2)}</span>
                               </>
                             )}
                           </span>
@@ -1642,8 +1667,8 @@ export default function CalibrationsPage() {
                         {scores.length > 0 && (
                           <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1.5">
                             {scores.map((s, j) => (
-                              <span key={j} className="inline-flex items-center gap-1 text-[10px] italic text-[#444933]">
-                                {s.name}<strong className="not-italic text-[#191c1e] bg-[#eceef0] border border-[#c4c9ac] px-1 leading-tight">{s.score.toFixed(1)}</strong>
+                              <span key={j} className="inline-flex items-center gap-1 text-[10px]" style={{ color: "var(--muted-foreground)" }}>
+                                {s.name}<strong className="rounded px-1 leading-tight" style={{ color: "var(--foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{s.score.toFixed(1)}</strong>
                               </span>
                             ))}
                           </div>
@@ -1652,35 +1677,36 @@ export default function CalibrationsPage() {
                     );
                   })}
                 </div>
-                <p className="text-[10px] italic text-[#747a60] mt-1.5">Original = média da área · Calibrada = ajuste do gestor · Final = nota usada (calibrada quando houver, senão a média).</p>
+                <p className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Original = média da área · Calibrada = ajuste do gestor · Final = nota usada (calibrada quando houver, senão a média).</p>
               </div>
             )}
 
             {feedback && feedback.attentionPoints && feedback.attentionPoints.length > 0 && (
               <div>
-                <p className="text-[11px] font-bold uppercase italic tracking-wider text-[#444933] mb-1.5 flex items-center gap-1.5"><AlertTriangle size={13} className="text-[#ff5722]" /> Pontos de Atenção</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><AlertTriangle size={13} style={{ color: WARNING }} /> Pontos de Atenção</p>
                 <ul className="space-y-1">
                   {feedback.attentionPoints.map((a, i) => (
-                    <li key={i} className="text-sm italic text-[#191c1e] border-l-4 border-[#ff5722] pl-2.5 py-0.5">{a}</li>
+                    <li key={i} className="text-sm pl-2.5 py-0.5" style={{ borderLeft: `4px solid ${WARNING}` }}>{a}</li>
                   ))}
                 </ul>
               </div>
             )}
 
-            <div className="bg-[#fff8e1] border-2 border-[#191c1e] p-3 flex items-start gap-2">
-              <Lock size={15} className="text-[#b02f00] shrink-0 mt-0.5" />
-              <p className="text-xs italic font-bold text-[#444933] leading-snug">
+            <div className="rounded-lg p-3 flex items-start gap-2" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: "1px solid " + AMBER }}>
+              <Lock size={15} className="shrink-0 mt-0.5" style={{ color: AMBER }} />
+              <p className="text-xs font-bold leading-snug">
                 Ao finalizar, o evento será <strong>fechado</strong> e estas notas ficarão <strong>visíveis para os funcionários</strong>. Essa ação encerra a calibração do evento.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 p-5 border-t-2 border-[#191c1e] bg-[#f7f9fb]">
+          <div className="flex items-center justify-end gap-3 p-5" style={{ borderTop: "1px solid var(--border)" }}>
             <button
               type="button"
               disabled={finalizing}
               onClick={() => setFinalizeOpen(false)}
-              className="px-5 py-2.5 border-2 border-[#191c1e] bg-white font-bold text-sm italic uppercase tracking-wider disabled:opacity-50 transition-all enabled:hover:bg-[#eceef0]"
+              className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide disabled:opacity-50 transition-colors hover:opacity-80"
+              style={{ border: "1px solid var(--border)" }}
             >
               Cancelar
             </button>
@@ -1689,7 +1715,8 @@ export default function CalibrationsPage() {
               type="button"
               disabled={finalizing}
               onClick={handleFinalize}
-              className={`bg-[#ccff00] border-2 border-[#191c1e] px-6 py-2.5 font-black text-sm italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 ${HARD_SHADOW} transition-all enabled:hover:shadow-[2px_2px_0px_0px_#191c1e] enabled:hover:translate-x-[2px] enabled:hover:translate-y-[2px]`}
+              className="px-6 py-2.5 rounded-lg font-black text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
             >
               <Send size={16} /> {finalizing ? "Finalizando..." : alreadyClosed ? "Liberar Notas" : "Finalizar e Liberar"}
             </button>

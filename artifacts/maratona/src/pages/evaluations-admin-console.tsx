@@ -1,22 +1,28 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import {
-  useGetEvents, useGetEvent, useGetUsers, useConfirmEventResults, useGetCurrentCycle,
+  useGetEvents, useGetEvent, useGetUsers, useGetAreas, useConfirmEventResults, useGetCurrentCycle,
   useSetConformityEvaluator, useSetConformityEvaluatorFerramentas,
+  useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria,
+  useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useUpdateEventAssignments,
   getEventCriteria, getEvaluations, getGetEvaluationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey,
 } from "@workspace/api-client-react";
 import {
   getEventCriterionAssignments, eventCriterionAssignmentsKey,
-  usePatchCriterionAssignment, useUsersByArea,
+  usePatchCriterionAssignment, useUsersByArea, useAllCriterionRoutings,
   useCreateAdminPublicToken, useAllPublicTokens,
   useCreateConformityPublicToken, useCreateFerramentasPublicToken,
   type PublicToken,
 } from "@/lib/routing-api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle } from "lucide-react";
+import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CONDENSED, WARNING } from "@/lib/premium-theme";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 function fmtDT(v: string | null | undefined): string {
   if (!v) return "—";
@@ -122,7 +128,7 @@ export function AdminEvaluationsConsole() {
   const qc = useQueryClient();
   const canManage = !!user && ["admin", "rh"].includes(user.role);
 
-  const [view, setView] = useState<"assign" | "table" | "people">("assign");
+  const [view, setView] = useState<"assign" | "table" | "people" | "criterios">("assign");
   const [tab, setTab] = useState<"todo" | "done">("todo");
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [q, setQ] = useState("");
@@ -261,6 +267,234 @@ export function AdminEvaluationsConsole() {
       onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
     },
   });
+
+  // ---- Gestão de Critérios (ativar/peso/duplicar/renomear/excluir) + atribuição de avaliador por ÁREA ----
+  const [config, setConfig] = useState<{ id: number; criterionId: number; active: boolean; weight: number; name: string; eventScoped: boolean }[]>([]);
+  const [showInactiveCriteria, setShowInactiveCriteria] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState<Record<number, string>>({});
+  const [assignments, setAssignments] = useState<Record<number, number[]>>({});
+  const [primaryEvaluator, setPrimaryEvaluator] = useState<Record<number, number | null>>({});
+  const [redirectExpanded, setRedirectExpanded] = useState<Record<number, boolean>>({});
+  const [redirectSearch, setRedirectSearch] = useState<Record<number, string>>({});
+  const [duplicateDialog, setDuplicateDialog] = useState<{ criterionId: number; baseName: string } | null>(null);
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicateAreaId, setDuplicateAreaId] = useState("");
+
+  const { data: areasList } = useGetAreas({ query: { enabled: canManage, queryKey: ["areas"] as unknown[] } });
+  const { data: allRoutings } = useAllCriterionRoutings();
+  const evaluatorsAll = (allUsers ?? []).filter(u => u.role === "avaliador" && u.active);
+  const evaluatorsForArea = (areaId: number) => evaluatorsAll.filter(u => u.areaId === areaId);
+  const selectedIdx = configuredEvents.findIndex(e => e.id === selected?.id);
+  const selectedEvaluations = selectedIdx >= 0 ? (evalQueries[selectedIdx]?.data ?? []) : [];
+
+  useEffect(() => {
+    if (selectedDetail?.criteria) {
+      setConfig(selectedDetail.criteria.map(c => ({
+        id: c.id,
+        criterionId: c.criterionId,
+        active: c.active,
+        weight: c.weightOverride ?? c.originalWeight ?? 0,
+        name: c.criterionName ?? `Critério ${c.criterionId}`,
+        eventScoped: c.eventScoped ?? false,
+      })));
+    }
+  }, [selectedDetail?.criteria]);
+
+  useEffect(() => {
+    if (selectedDetail?.areaAssignments) {
+      const map: Record<number, number[]> = {};
+      const primMap: Record<number, number | null> = {};
+      for (const a of selectedDetail.areaAssignments) {
+        if (!map[a.areaId]) { map[a.areaId] = []; primMap[a.areaId] = null; }
+        map[a.areaId].push(a.evaluatorUserId);
+      }
+      for (const [areaId, ids] of Object.entries(map)) {
+        primMap[Number(areaId)] = ids[0] ?? null;
+        map[Number(areaId)] = ids.slice(1);
+      }
+      if (allRoutings) {
+        const routingByCriterionId = new Map(allRoutings.map(r => [r.criterionId, r]));
+        const areaIdsWithCriteria = new Set(
+          (selectedDetail.criteria ?? []).filter(c => c.active && c.responsibleAreaId != null).map(c => c.responsibleAreaId as number),
+        );
+        for (const areaId of areaIdsWithCriteria) {
+          if (primMap[areaId] != null) continue;
+          const criterionInArea = (selectedDetail.criteria ?? []).find(c => c.active && c.responsibleAreaId === areaId);
+          const suggested = criterionInArea ? routingByCriterionId.get(criterionInArea.criterionId)?.defaultEvaluatorId : null;
+          if (suggested != null) primMap[areaId] = suggested;
+        }
+      }
+      setAssignments(map);
+      setPrimaryEvaluator(primMap);
+    }
+  }, [selectedDetail?.areaAssignments, selectedDetail?.criteria, allRoutings]);
+
+  const updateCriteria = useUpdateEventCriteria({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) });
+        qc.invalidateQueries({ queryKey: ["event-criteria", selected!.id] });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        if (data.warnings && data.warnings.length > 0) toast({ title: "Pesos salvos", description: data.warnings.join(" "), variant: "destructive" });
+        else toast({ title: "Pesos salvos" });
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+    },
+  });
+  const confirmCriteriaMutation = useConfirmEventCriteria({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); qc.invalidateQueries({ queryKey: getGetEventsQueryKey() }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    },
+  });
+  const resyncCriteria = useResyncEventCriteria({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) });
+        qc.invalidateQueries({ queryKey: ["event-criteria", selected!.id] });
+        const removed = data.removedStale ?? 0;
+        const added = data.addedNew ?? 0;
+        const reactivated = (data as { reactivated?: number }).reactivated ?? 0;
+        if (removed === 0 && added === 0 && reactivated === 0) {
+          toast({ title: "Já está sincronizado", description: "Este evento já usa somente os critérios ativos." });
+        } else {
+          const parts: string[] = [];
+          if (added > 0) parts.push(`${added} adicionado(s)`);
+          if (reactivated > 0) parts.push(`${reactivated} reativado(s)`);
+          if (removed > 0) parts.push(`${removed} desativado(s)`);
+          toast({ title: "Critérios sincronizados", description: parts.join(", ") + "." });
+        }
+      },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao sincronizar", description: e.message, variant: "destructive" }),
+    },
+  });
+  const duplicateCriterion = useDuplicateEventCriterion({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Quesito duplicado" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao duplicar", description: e.message, variant: "destructive" }),
+    },
+  });
+  const deleteCriterion = useDeleteEventCriterion({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Quesito excluído" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" }),
+    },
+  });
+  const renameCriterion = useUpdateCriterion({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Nome atualizado" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao renomear", description: e.message, variant: "destructive" }),
+    },
+  });
+  const updateAssignments = useUpdateEventAssignments({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Avaliadores atribuídos" }); },
+      onError: (e: { message?: string }) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
+    },
+  });
+
+  const critMeta = new Map((selectedDetail?.criteria ?? []).map(c => [c.criterionId, c]));
+  const activeCriteriaCount = (selectedDetail?.criteria ?? []).filter(c => c.active).length;
+  const targetWeightSum = (selectedDetail?.criteria ?? []).reduce((s, c) => s + (Number(c.originalWeight) || 0), 0);
+  const criteriaConfirmed = selectedDetail?.criteriaConfirmed ?? false;
+  const hasEvaluations = selectedDetail?.hasEvaluations ?? false;
+  const editLocked = criteriaConfirmed || hasEvaluations;
+  const weightsDirty = config.some(item => {
+    const meta = critMeta.get(item.criterionId);
+    const original = meta ? (meta.weightOverride ?? meta.originalWeight ?? 0) : item.weight;
+    return item.active !== meta?.active || Number(item.weight) !== Number(original);
+  });
+  const setCriterionActive = (criterionId: number, active: boolean) =>
+    setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, active } : c)));
+  const criterionHasEvals = (criterionId: number) =>
+    selectedEvaluations.some(e => e.criterionId === criterionId && e.status === "submitted");
+  const setCriterionWeight = (criterionId: number, weight: number) =>
+    setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, weight } : c)));
+  const handleSaveCriteria = () =>
+    updateCriteria.mutate({ id: selected!.id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
+  const handleConfirmCriteria = (value: boolean) => confirmCriteriaMutation.mutate({ id: selected!.id, data: { confirmed: value } });
+  const computeSequentialName = (baseName: string): string => {
+    const root = baseName.replace(/\s*\(\d+\)$/, "");
+    const existing = (selectedDetail?.criteria ?? []).map(c => c.criterionName ?? "");
+    const nums = existing.map(n => {
+      const m = n.match(new RegExp(`^${root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\((\\d+)\\)$`));
+      return m ? parseInt(m[1]) : null;
+    }).filter((n): n is number => n !== null);
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 2;
+    return `${root} (${next})`;
+  };
+  const handleDuplicate = (criterionId: number, baseName: string) => {
+    const suggested = computeSequentialName(baseName);
+    setDuplicateName(suggested);
+    setDuplicateAreaId("");
+    setDuplicateDialog({ criterionId, baseName });
+  };
+  const handleConfirmDuplicate = () => {
+    if (!duplicateDialog || !selected) return;
+    const selectedArea = areasList?.find(a => a.id.toString() === duplicateAreaId);
+    duplicateCriterion.mutate({
+      id: selected.id,
+      data: {
+        sourceCriterionId: duplicateDialog.criterionId,
+        name: duplicateName.trim() || computeSequentialName(duplicateDialog.baseName),
+        ...(selectedArea ? { responsibleAreaId: selectedArea.id, responsibleAreaLabel: selectedArea.name } : {}),
+      },
+    }, { onSuccess: () => setDuplicateDialog(null) });
+  };
+  const handleRename = (criterionId: number) => {
+    const name = (editingName[criterionId] ?? "").trim();
+    if (!name) return;
+    renameCriterion.mutate({ id: criterionId, data: { name } });
+    setEditingName(prev => { const n = { ...prev }; delete n[criterionId]; return n; });
+  };
+  const assignAreas = Array.from(
+    new Map(
+      (selectedDetail?.criteria ?? [])
+        .filter(c => c.active && c.responsibleAreaId != null)
+        .map(c => [c.responsibleAreaId as number, c.responsibleAreaName ?? `Área ${c.responsibleAreaId}`] as [number, string])
+    ).entries()
+  ).map(([areaId, areaName]) => ({ areaId, areaName }));
+  const buildOrderedEvaluatorIds = (areaId: number): number[] => {
+    const primary = primaryEvaluator[areaId];
+    const backups = (assignments[areaId] ?? []).filter(uid => uid !== primary);
+    return primary != null ? [primary, ...backups] : backups;
+  };
+  const allAssigned = assignAreas.every(a => primaryEvaluator[a.areaId] != null);
+  const areOrderedEqual = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+  const assignmentsDirty = assignAreas.some(a => {
+    const ordered = buildOrderedEvaluatorIds(a.areaId);
+    const current = (selectedDetail?.areaAssignments ?? []).filter(x => x.areaId === a.areaId).map(x => x.evaluatorUserId);
+    return !areOrderedEqual(ordered, current);
+  });
+  const toggleBackupEvaluator = (areaId: number, userId: number, checked: boolean) =>
+    setAssignments(prev => {
+      const current = (prev[areaId] ?? []).filter(uid => uid !== primaryEvaluator[areaId]);
+      const next = checked ? [...current, userId] : current.filter(v => v !== userId);
+      return { ...prev, [areaId]: next };
+    });
+  const buildAssignmentsPayload = () => assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserIds: buildOrderedEvaluatorIds(a.areaId) }));
+  const handleSaveAssignments = () =>
+    updateAssignments.mutate({ id: selected!.id, data: { assignments: buildAssignmentsPayload() } });
+  const handleSaveAllCriteria = () => {
+    handleSaveCriteria();
+    if (assignmentsDirty) handleSaveAssignments();
+  };
+  const handleConfirmAndRelease = async () => {
+    if (!selected) return;
+    try {
+      await updateCriteria.mutateAsync({ id: selected.id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
+      if (assignmentsDirty) {
+        await updateAssignments.mutateAsync({ id: selected.id, data: { assignments: buildAssignmentsPayload() } });
+      }
+      await confirmCriteriaMutation.mutateAsync({ id: selected.id, data: { confirmed: true } });
+    } catch {
+      // erros já exibidos via toasts de onError de cada mutation
+    }
+  };
+  const confirmBusy = updateCriteria.isPending || updateAssignments.isPending || confirmCriteriaMutation.isPending;
+  const fmtW = (v: number) => v.toFixed(1);
   const confirmResults = useConfirmEventResults({
     mutation: {
       onSuccess: (data) => {
@@ -435,6 +669,7 @@ export function AdminEvaluationsConsole() {
         <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
           {([
             { key: "assign", label: "Atribuição", Icon: ClipboardCheck },
+            { key: "criterios", label: "Critérios", Icon: SlidersHorizontal },
             { key: "table", label: "Tabela", Icon: Table2 },
             { key: "people", label: "Avaliadores", Icon: Users },
           ] as const).map((v, idx) => (
@@ -444,7 +679,7 @@ export function AdminEvaluationsConsole() {
               onClick={() => setView(v.key)}
               className={cn(
                 "px-3.5 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors",
-                idx < 2 && "border-r",
+                idx < 3 && "border-r",
               )}
               style={{
                 fontFamily: CONDENSED,
@@ -782,6 +1017,485 @@ export function AdminEvaluationsConsole() {
             </div>
           )}
         </div>
+      ) : view === "criterios" ? (
+        selected && selectedDetail && (
+          <div className="space-y-4">
+            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <div className="px-5 py-3 flex flex-wrap items-center justify-between gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal size={16} style={{ color: "var(--accent)" }} />
+                  <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Critérios, Pesos e Avaliadores — {selected.name}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {assignAreas.map(a => {
+                    const assigned = primaryEvaluator[a.areaId] != null;
+                    return (
+                      <span key={a.areaId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase" style={{ backgroundColor: assigned ? "rgba(154,176,0,0.14)" : "rgba(229,72,77,0.12)", color: assigned ? GOOD : WARNING }}>
+                        {assigned ? <UserCheck size={10} /> : <AlertCircle size={10} />} {a.areaName}
+                      </span>
+                    );
+                  })}
+                  {criteriaConfirmed ? (
+                    <span data-testid="badge-criteria-confirmed" className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-black uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                      <Lock size={12} /> Liberado
+                    </span>
+                  ) : (
+                    <span data-testid="badge-criteria-pending" className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-black uppercase" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>
+                      <AlertCircle size={12} /> Não Liberado
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="flex items-start gap-3 rounded-lg px-4 py-3" style={{ backgroundColor: "var(--secondary)" }}>
+                  <Info size={16} className="shrink-0 mt-0.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-xs">
+                    <strong>Fluxo:</strong> Defina o peso de cada critério e atribua um avaliador principal para cada área. Depois clique em <strong>Confirmar e Liberar Avaliação</strong> para que as áreas comecem a avaliar. Após liberado, os pesos continuam editáveis mas a estrutura fica bloqueada.
+                  </p>
+                </div>
+
+                {!criteriaConfirmed && (
+                  <div className="flex items-start gap-3 rounded-lg px-5 py-4" style={{ border: `1px solid ${allAssigned ? GOOD : AMBER}`, backgroundColor: allAssigned ? "rgba(154,176,0,0.08)" : "rgba(232,162,61,0.08)" }}>
+                    {allAssigned ? <Unlock size={18} className="shrink-0 mt-0.5" style={{ color: GOOD }} /> : <Lock size={18} className="shrink-0 mt-0.5" style={{ color: AMBER }} />}
+                    <div>
+                      <p className="text-xs font-black uppercase">
+                        {allAssigned ? "Tudo pronto — clique em Confirmar e Liberar Avaliação abaixo" : "Pode liberar parcialmente"}
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                        {!allAssigned
+                          ? `Ainda sem avaliador: ${assignAreas.filter(a => primaryEvaluator[a.areaId] == null).map(a => a.areaName).join(", ")}. Pode liberar mesmo assim — atribua quando a informação chegar.`
+                          : "Use o botão abaixo para liberar as avaliações para as áreas."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {hasEvaluations && (
+                  <div data-testid="notice-criteria-locked" className="flex items-center gap-2 rounded-lg px-4 py-3 text-xs font-bold uppercase" style={{ backgroundColor: "rgba(232,162,61,0.10)", color: AMBER }}>
+                    <Lock size={14} className="shrink-0" /> Este evento já possui avaliações. Critérios e avaliadores estão bloqueados, mas os pesos continuam editáveis — ao salvar, o resultado é recalculado.
+                  </div>
+                )}
+
+                <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase">Critério</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase">Área</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase text-center">Peso</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase">Avaliador</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const firstCriterionPerArea: Map<number, number> = new Map();
+                        for (const item of config.filter(i => i.active || showInactiveCriteria)) {
+                          const aId = critMeta.get(item.criterionId)?.responsibleAreaId;
+                          if (aId != null && !firstCriterionPerArea.has(aId)) firstCriterionPerArea.set(aId, item.criterionId);
+                        }
+                        return config.filter(item => item.active || showInactiveCriteria).map(item => {
+                          const meta = critMeta.get(item.criterionId);
+                          const isEditingName = editingName[item.criterionId] !== undefined;
+                          const areaId = meta?.responsibleAreaId ?? null;
+                          const areaEvaluators = areaId != null ? [...evaluatorsForArea(areaId)].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")) : [];
+                          const isFirstForArea = areaId != null && firstCriterionPerArea.get(areaId) === item.criterionId;
+                          return (
+                            <tr key={item.criterionId} data-testid={`row-event-criterion-${item.criterionId}`} className="align-top" style={{ borderTop: "1px solid var(--border)", opacity: item.active ? 1 : 0.6 }}>
+                              <td className="px-4 py-3 min-w-[180px]">
+                                {isEditingName ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Input
+                                      data-testid={`input-event-criterion-name-${item.criterionId}`}
+                                      value={editingName[item.criterionId]}
+                                      autoFocus
+                                      onChange={e => setEditingName(prev => ({ ...prev, [item.criterionId]: e.target.value }))}
+                                      onKeyDown={e => { if (e.key === "Enter") handleRename(item.criterionId); if (e.key === "Escape") setEditingName(prev => { const n = { ...prev }; delete n[item.criterionId]; return n; }); }}
+                                      className="h-9 rounded-lg font-black text-sm"
+                                      style={fieldStyle}
+                                    />
+                                    <button type="button" data-testid={`button-save-name-${item.criterionId}`} onClick={() => handleRename(item.criterionId)} title="Salvar nome" className="h-9 w-9 flex items-center justify-center rounded-lg transition-opacity hover:opacity-90" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                                      <Check size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-black uppercase text-sm">{meta?.criterionName ?? item.name}</span>
+                                    {item.eventScoped && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Duplicado</span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{meta?.responsibleAreaName ?? "—"}</span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Input
+                                  data-testid={`input-event-criterion-weight-${item.criterionId}`}
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={item.active ? item.weight : 0}
+                                  disabled={!item.active}
+                                  onChange={e => setCriterionWeight(item.criterionId, Number(e.target.value))}
+                                  className="w-20 h-10 rounded-lg text-center font-black disabled:opacity-50 inline-block"
+                                  style={fieldStyle}
+                                />
+                              </td>
+                              <td className="px-4 py-3 min-w-[220px]">
+                                {!item.active || areaId == null ? (
+                                  <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>—</span>
+                                ) : areaEvaluators.length === 0 ? (
+                                  <p className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Nenhum avaliador vinculado a esta área</p>
+                                ) : !isFirstForArea ? (
+                                  (() => {
+                                    const primary = primaryEvaluator[areaId] ?? null;
+                                    const primaryName = areaEvaluators.find(u => u.id === primary)?.name;
+                                    return (
+                                      <div className="space-y-1">
+                                        <p className="text-[9px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Avaliador Principal *</p>
+                                        {primaryName ? (
+                                          <span className="text-xs font-black">{primaryName}</span>
+                                        ) : (
+                                          <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Sem avaliador principal</span>
+                                        )}
+                                        <p className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>Definido pela área acima</p>
+                                      </div>
+                                    );
+                                  })()
+                                ) : (() => {
+                                  const primary = primaryEvaluator[areaId] ?? null;
+                                  const backups = (assignments[areaId] ?? []).filter(uid => uid !== primary);
+                                  const backupEvaluators = areaEvaluators.filter(u => u.id !== primary);
+                                  const searchVal = redirectSearch[areaId] ?? "";
+                                  const filteredBackups = backupEvaluators.filter(u => u.name.toLowerCase().includes(searchVal.toLowerCase()));
+                                  const expanded = redirectExpanded[areaId] ?? false;
+                                  const selectedBackupCount = backupEvaluators.filter(u => backups.includes(u.id)).length;
+                                  return (
+                                    <div className="space-y-2" data-testid={`select-assignment-${item.criterionId}`}>
+                                      <div>
+                                        <p className="text-[9px] font-black uppercase mb-1" style={{ color: "var(--muted-foreground)" }}>Avaliador Principal *</p>
+                                        <Select
+                                          disabled={hasEvaluations && primary != null && areaEvaluators.some(u => u.id === primary)}
+                                          value={primary?.toString() ?? ""}
+                                          onValueChange={val => setPrimaryEvaluator(prev => ({ ...prev, [areaId]: val ? Number(val) : null }))}
+                                        >
+                                          <SelectTrigger data-testid={`select-primary-evaluator-${item.criterionId}`} className="h-8 rounded-lg text-xs font-bold disabled:opacity-50 w-full" style={fieldStyle}>
+                                            <SelectValue placeholder="Selecionar..." />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {areaEvaluators.map(u => (
+                                              <SelectItem key={u.id} value={u.id.toString()} className="text-xs font-bold">{u.name}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        {!primary && (
+                                          <p className="mt-0.5 text-[10px] font-bold uppercase" style={{ color: WARNING }}>Sem avaliador principal</p>
+                                        )}
+                                      </div>
+                                      {backupEvaluators.length > 0 && (
+                                        <div>
+                                          <button type="button" onClick={() => setRedirectExpanded(prev => ({ ...prev, [areaId]: !expanded }))} className="flex items-center gap-1 text-[9px] font-black uppercase transition-colors hover:opacity-70" style={{ color: "var(--muted-foreground)" }}>
+                                            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                                            Pode redirecionar para
+                                            {selectedBackupCount > 0 && (
+                                              <span className="rounded px-1 py-px text-[8px] font-black" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{selectedBackupCount}</span>
+                                            )}
+                                          </button>
+                                          {expanded && (
+                                            <div className="mt-1.5 rounded-lg p-2 space-y-1.5" style={{ border: "1px solid var(--border)" }}>
+                                              {backupEvaluators.length > 4 && (
+                                                <div className="flex items-center gap-1 rounded px-2 py-1" style={{ border: "1px solid var(--border)" }}>
+                                                  <Search size={10} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
+                                                  <input
+                                                    type="text"
+                                                    value={searchVal}
+                                                    onChange={e => setRedirectSearch(prev => ({ ...prev, [areaId]: e.target.value }))}
+                                                    placeholder="Buscar..."
+                                                    className="flex-1 text-[11px] font-bold outline-none bg-transparent"
+                                                  />
+                                                </div>
+                                              )}
+                                              {filteredBackups.map(u => {
+                                                const checked = backups.includes(u.id);
+                                                return (
+                                                  <label key={u.id} className="flex items-center gap-2 text-[11px] font-bold cursor-pointer">
+                                                    <input
+                                                      type="checkbox"
+                                                      data-testid={`checkbox-evaluator-${item.criterionId}-${u.id}`}
+                                                      checked={checked}
+                                                      disabled={hasEvaluations}
+                                                      onChange={e => toggleBackupEvaluator(areaId, u.id, e.target.checked)}
+                                                      className="h-3.5 w-3.5 disabled:opacity-50 shrink-0"
+                                                    />
+                                                    {u.name}
+                                                  </label>
+                                                );
+                                              })}
+                                              {filteredBackups.length === 0 && (
+                                                <p className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Nenhum resultado.</p>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2 justify-end">
+                                  {!editLocked && item.eventScoped && !isEditingName && (
+                                    <button type="button" data-testid={`button-rename-event-criterion-${item.criterionId}`} onClick={() => setEditingName(prev => ({ ...prev, [item.criterionId]: item.name }))} title="Renomear cópia" className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+                                      Renomear
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    data-testid={`button-duplicate-event-criterion-${item.criterionId}`}
+                                    disabled={editLocked || duplicateCriterion.isPending}
+                                    onClick={() => handleDuplicate(item.criterionId, item.name)}
+                                    title="Duplicar quesito"
+                                    className="h-9 w-9 flex items-center justify-center rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
+                                    style={{ border: "1px solid var(--border)" }}
+                                  >
+                                    <Copy size={16} />
+                                  </button>
+                                  {item.eventScoped ? (
+                                    <button
+                                      type="button"
+                                      data-testid={`button-delete-event-criterion-${item.criterionId}`}
+                                      disabled={editLocked || deleteCriterion.isPending}
+                                      onClick={() => setPendingDelete(item.id)}
+                                      title="Excluir cópia"
+                                      className="h-9 w-9 flex items-center justify-center rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
+                                      style={{ border: "1px solid var(--border)", color: WARNING }}
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  ) : item.active ? (
+                                    <button
+                                      type="button"
+                                      data-testid={`button-remove-event-criterion-${item.criterionId}`}
+                                      disabled={editLocked && criterionHasEvals(item.criterionId)}
+                                      onClick={() => setPendingRemoval(item.criterionId)}
+                                      title={editLocked && !criterionHasEvals(item.criterionId) ? "Desativar critério sem avaliações" : "Remover critério"}
+                                      className="h-9 w-9 flex items-center justify-center rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
+                                      style={{ border: "1px solid var(--border)", color: WARNING }}
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      data-testid={`button-restore-event-criterion-${item.criterionId}`}
+                                      disabled={editLocked}
+                                      onClick={() => setCriterionActive(item.criterionId, true)}
+                                      className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[11px] font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
+                                      style={{ border: "1px solid var(--border)" }}
+                                    >
+                                      <RotateCcw size={14} /> Reativar
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                      {config.filter(item => item.active || showInactiveCriteria).length === 0 && (
+                        <tr><td colSpan={5} className="p-6 text-center font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum critério vinculado a este evento.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {config.some(item => !item.active) && (
+                  <button type="button" onClick={() => setShowInactiveCriteria(v => !v)} className="mt-1 flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-70" style={{ color: "var(--muted-foreground)" }}>
+                    <RotateCcw size={12} />
+                    {showInactiveCriteria ? "Ocultar critérios inativos" : `Mostrar critérios inativos (${config.filter(c => !c.active).length})`}
+                  </button>
+                )}
+
+                {config.some(item => item.active && (critMeta.get(item.criterionId)?.responsibleAreaId != null) && evaluatorsForArea(critMeta.get(item.criterionId)!.responsibleAreaId!).length === 0) && (
+                  <p className="text-xs font-bold uppercase" style={{ color: WARNING }}>Há áreas sem nenhum avaliador vinculado. Cadastre avaliadores nessas áreas (em Usuários) para poder atribuí-los.</p>
+                )}
+
+                <Dialog open={duplicateDialog !== null} onOpenChange={o => { if (!o) setDuplicateDialog(null); }}>
+                  <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                    <DialogHeader>
+                      <DialogTitle className="uppercase font-black tracking-tight text-lg" style={{ fontFamily: CONDENSED }}>Duplicar Quesito</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Nome do novo quesito</label>
+                        <Input value={duplicateName} onChange={e => setDuplicateName(e.target.value)} className="rounded-lg font-black text-sm h-10" style={fieldStyle} autoFocus />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>
+                          Área responsável <span className="font-normal normal-case" style={{ color: "var(--muted-foreground)" }}>(opcional — padrão: mesma área de origem)</span>
+                        </label>
+                        <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
+                          <SelectTrigger className="rounded-lg font-bold text-sm h-10" style={fieldStyle}>
+                            <SelectValue placeholder="Manter área original..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(areasList ?? []).map(a => (
+                              <SelectItem key={a.id} value={a.id.toString()} className="font-bold">{a.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {duplicateAreaId && (
+                        <p className="text-[10px] font-bold" style={{ color: GOOD }}>
+                          O novo quesito será vinculado à área selecionada. Os avaliadores da nova área aparecerão para atribuição.
+                        </p>
+                      )}
+                    </div>
+                    <DialogFooter className="gap-2">
+                      <button type="button" onClick={() => setDuplicateDialog(null)} className="px-4 py-2 rounded-lg font-bold uppercase text-xs transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
+                      <button
+                        type="button"
+                        disabled={duplicateCriterion.isPending || !duplicateName.trim()}
+                        onClick={handleConfirmDuplicate}
+                        className="px-4 py-2 rounded-lg font-black uppercase text-xs disabled:opacity-40 transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                      >
+                        <Copy size={13} className="inline mr-1.5" />
+                        {duplicateCriterion.isPending ? "Duplicando..." : "Duplicar"}
+                      </button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <AlertDialog open={pendingDelete !== null} onOpenChange={o => { if (!o) setPendingDelete(null); }}>
+                  <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="uppercase font-black tracking-tight">Excluir cópia?</AlertDialogTitle>
+                      <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
+                        Esta cópia será <strong>removida permanentemente</strong> deste evento.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-delete-criterion" className="rounded-lg uppercase font-bold" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        data-testid="button-confirm-delete-criterion"
+                        onClick={() => { if (pendingDelete !== null && selected) deleteCriterion.mutate({ id: selected.id, eventCriterionId: pendingDelete }); setPendingDelete(null); }}
+                        className="rounded-lg uppercase font-bold"
+                        style={{ backgroundColor: WARNING, color: "#fff" }}
+                      >
+                        <Trash2 size={16} className="mr-1.5" /> Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog open={pendingRemoval !== null} onOpenChange={o => { if (!o) setPendingRemoval(null); }}>
+                  <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="uppercase font-black tracking-tight">Remover critério?</AlertDialogTitle>
+                      <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
+                        O critério <strong>{critMeta.get(pendingRemoval ?? -1)?.criterionName ?? ""}</strong> deixará de ser avaliado neste evento. Você precisará redistribuir o peso dele entre os critérios restantes para que a soma volte a ser <strong>{fmtW(targetWeightSum)}</strong> antes de salvar ou confirmar.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-remove-criterion" className="rounded-lg uppercase font-bold" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        data-testid="button-confirm-remove-criterion"
+                        onClick={() => { if (pendingRemoval !== null) { setCriterionActive(pendingRemoval, false); setPendingRemoval(null); } }}
+                        className="rounded-lg uppercase font-bold"
+                        style={{ backgroundColor: WARNING, color: "#fff" }}
+                      >
+                        <Trash2 size={16} className="mr-1.5" /> Remover
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+                  {hasEvaluations && (
+                    <span data-testid="text-criteria-locked" className="flex items-center gap-2 text-xs font-bold uppercase rounded-lg px-4 py-3" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
+                      <Lock size={14} /> Critérios bloqueados — pesos continuam editáveis
+                    </span>
+                  )}
+                  {!criteriaConfirmed ? (
+                    <>
+                      {!hasEvaluations && (
+                        <button
+                          data-testid="button-resync-criteria"
+                          onClick={() => resyncCriteria.mutate({ id: selected.id })}
+                          disabled={resyncCriteria.isPending}
+                          title="Remove critérios que não fazem mais parte do catálogo ativo e adiciona os que faltam"
+                          className="rounded-lg px-5 py-3 font-bold text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-colors hover:opacity-80"
+                          style={{ border: "1px solid var(--border)" }}
+                        >
+                          <RefreshCw size={16} /> {resyncCriteria.isPending ? "Sincronizando..." : "Sincronizar Critérios Ativos"}
+                        </button>
+                      )}
+                      <button
+                        data-testid="button-save-criteria"
+                        onClick={handleSaveAllCriteria}
+                        disabled={updateCriteria.isPending || updateAssignments.isPending}
+                        className="rounded-lg px-5 py-3 font-bold text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-colors hover:opacity-80"
+                        style={{ border: "1px solid var(--border)" }}
+                      >
+                        <Save size={16} /> {(updateCriteria.isPending || updateAssignments.isPending) ? "Salvando..." : "Salvar"}
+                      </button>
+                      <button
+                        data-testid="button-confirm-criteria"
+                        onClick={handleConfirmAndRelease}
+                        disabled={confirmBusy}
+                        title={(!hasEvaluations && !allAssigned) ? "Algumas áreas ainda não têm avaliador — pode liberar mesmo assim e atribuir depois" : undefined}
+                        className="rounded-lg px-5 py-3 font-black text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                      >
+                        <CheckCircle2 size={16} /> {confirmBusy ? "Confirmando..." : "Confirmar e Liberar Avaliação"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {assignmentsDirty && (
+                        <button
+                          data-testid="button-save-assignments"
+                          onClick={handleSaveAssignments}
+                          disabled={updateAssignments.isPending}
+                          className="rounded-lg px-5 py-3 font-black text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                        >
+                          <Save size={16} /> {updateAssignments.isPending ? "Salvando..." : "Salvar Avaliadores"}
+                        </button>
+                      )}
+                      {weightsDirty && (
+                        <button
+                          data-testid="button-save-weights"
+                          onClick={handleSaveCriteria}
+                          disabled={updateCriteria.isPending}
+                          className="rounded-lg px-5 py-3 font-black text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                        >
+                          <Save size={16} /> {updateCriteria.isPending ? "Salvando..." : "Salvar Pesos"}
+                        </button>
+                      )}
+                      {!hasEvaluations && (
+                        <button
+                          data-testid="button-reopen-criteria"
+                          onClick={() => handleConfirmCriteria(false)}
+                          disabled={confirmCriteriaMutation.isPending}
+                          className="rounded-lg px-5 py-3 font-bold text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: WARNING, color: "#fff" }}
+                        >
+                          <Unlock size={16} /> Reabrir Edição dos Critérios
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       ) : view === "table" ? (
         selected && (
           <div>
