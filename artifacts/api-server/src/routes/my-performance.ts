@@ -332,6 +332,8 @@ router.get("/my-performance", async (req, res) => {
 
   const minEventsForEligibility = await getMinEventsForEligibility();
   const scoredEvents = eventSummaries.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
+  // Média bruta ao vivo — usada apenas quando não há snapshot de quarterly_results
+  // (ou seja, para a projeção de ciclos ainda sem nenhum resultado calculado).
   const grossAverage = scoredEvents.length > 0
     ? scoredEvents.reduce((s, e) => s + e.eventScore, 0) / scoredEvents.length
     : null;
@@ -369,6 +371,17 @@ router.get("/my-performance", async (req, res) => {
     finalResult = projectedFinalResult;
   }
 
+  // Quando existe snapshot, a média bruta e a contagem de eventos oficial
+  // vêm do quarterly_results (calculados no momento do fechamento do evento),
+  // não do recálculo ao vivo — evita discrepância entre "Média do Ciclo" e
+  // "Média dos Eventos" na tela do colaborador.
+  const responseGrossAverage = quarterResult
+    ? parseFloat(quarterResult.grossAverage as unknown as string)
+    : grossAverage;
+  const responseEventsCount = quarterResult
+    ? quarterResult.eventsCount
+    : scoredEvents.length;
+
   res.json({
     employee: {
       id: employee.id,
@@ -380,7 +393,7 @@ router.get("/my-performance", async (req, res) => {
     },
     cycle: { id: cycle.id, name: cycle.name },
     summary: {
-      grossAverage,
+      grossAverage: responseGrossAverage,
       currentPlatoon,
       projectedBonus: currentBonus,
       bonusStatus,
@@ -389,6 +402,7 @@ router.get("/my-performance", async (req, res) => {
       closedEvents,
       openEvents,
       confirmedEvents: scoredEvents.length,
+      scoredEventsCount: responseEventsCount,
       minEventsForEligibility,
       totalAbsences,
       penaltyPoints: Math.round(penaltyPoints * 100) / 100,
@@ -397,6 +411,7 @@ router.get("/my-performance", async (req, res) => {
       finalResult,
       absencePenalty: quarterResult ? parseFloat(quarterResult.absencePenalty as unknown as string) : null,
       paymentMethod: quarterResult ? quarterResult.paymentMethod : "Caju Saldo Livre",
+      hasQuarterSnapshot: !!quarterResult,
     },
     adjustments,
     events: eventSummaries,

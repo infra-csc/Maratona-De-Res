@@ -842,14 +842,33 @@ export default function MyPerformancePage() {
               const scoredEvts = (data.events ?? [])
                 .filter(ev => ev.resultsConfirmed && ev.countsForScore && ev.eventScore > 0)
                 .sort((a, b) => a.startDate.localeCompare(b.startDate));
-              if (scoredEvts.length === 0) return null;
-              const total = scoredEvts.reduce((s, e) => s + e.eventScore, 0);
-              const avg = total / scoredEvts.length;
+              // Usa o grossAverage do snapshot quando disponível (já vem do API
+              // com o valor oficial); fallback para o cálculo ao vivo.
+              const officialAvg = summary.grossAverage ?? null;
+              const officialCount = summary.scoredEventsCount ?? scoredEvts.length;
+              if (scoredEvts.length === 0 && officialAvg === null) return null;
+              const liveTotal = scoredEvts.reduce((s, e) => s + e.eventScore, 0);
+              const liveAvg = scoredEvts.length > 0 ? liveTotal / scoredEvts.length : null;
+              // Exibe o footer com "Soma ÷ Qtd = Média" apenas quando o cálculo
+              // ao vivo é consistente com o snapshot (mesma qtd de eventos e avg
+              // com diferença ≤ 0,1). Quando há divergência (ex.: evento
+              // confirmado/desconfirmado depois do snapshot), mostra a média
+              // oficial diretamente para não exibir uma conta que não fecha.
+              const liveConsistent = liveAvg !== null
+                && officialAvg !== null
+                && scoredEvts.length === officialCount
+                && Math.abs(liveAvg - officialAvg) < 0.11;
+              const displayAvg = officialAvg ?? liveAvg ?? 0;
+              const headerCount = officialCount;
               return (
                 <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                   <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Detalhamento da Média ({scoredEvts.length} evento{scoredEvts.length !== 1 ? "s" : ""})</p>
-                    <p className="text-[10px] font-black text-muted-foreground">Soma ÷ Qtd = Média</p>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                      Detalhamento da Média ({headerCount} evento{headerCount !== 1 ? "s" : ""})
+                    </p>
+                    <p className="text-[10px] font-black text-muted-foreground">
+                      {liveConsistent ? "Soma ÷ Qtd = Média" : "Média oficial do ciclo"}
+                    </p>
                   </div>
                   <div className="divide-y" style={{ borderColor: "var(--border)" }}>
                     {scoredEvts.map((ev, i) => (
@@ -875,12 +894,18 @@ export default function MyPerformancePage() {
                     ))}
                   </div>
                   <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "var(--muted)", borderTop: "1px solid var(--border)" }}>
-                    <div className="text-[10px] font-black uppercase text-muted-foreground">
-                      Soma: {total.toFixed(1)} ÷ {scoredEvts.length} eventos
-                    </div>
+                    {liveConsistent ? (
+                      <div className="text-[10px] font-black uppercase text-muted-foreground">
+                        Soma: {liveTotal.toFixed(1)} ÷ {scoredEvts.length} eventos
+                      </div>
+                    ) : (
+                      <div className="text-[10px] font-black uppercase text-muted-foreground">
+                        {headerCount} evento{headerCount !== 1 ? "s" : ""} computado{headerCount !== 1 ? "s" : ""}
+                      </div>
+                    )}
                     <div className="flex items-baseline gap-1" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                       <span className="text-[11px] font-bold text-muted-foreground">=</span>
-                      <span className="font-black text-[20px] leading-none" style={{ color: scoreColor(avg) }}>{avg.toFixed(1)}</span>
+                      <span className="font-black text-[20px] leading-none" style={{ color: scoreColor(displayAvg) }}>{displayAvg.toFixed(1)}</span>
                       <span className="text-[10px] text-muted-foreground">/100</span>
                     </div>
                   </div>
