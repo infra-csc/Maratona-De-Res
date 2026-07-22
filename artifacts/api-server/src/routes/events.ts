@@ -176,8 +176,10 @@ router.get("/events", async (req, res) => {
     const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
 
     // Critérios com peso > 0 são os únicos que entram nos contadores de calibração.
+    // Usa scorableCount (por evento, pós-merge) e NÃO globalScorable, para que
+    // eventos com critério eventScoped (duplicado) mostrem 5 e não 6 no denominador.
     const scorableCount = criteriaForCalc.filter(c => c.weight > 0).length;
-    const progress = globalScorable > 0 ? evaluatedCriteria / globalScorable : 0;
+    const progress = scorableCount > 0 ? evaluatedCriteria / scorableCount : 0;
 
     // Calibrações salvas (score preenchido, independente de publicação de feedback).
     const calibratedCriteriaCount = criteriaForCalc.filter(c => c.weight > 0 && c.calibratedScore !== null).length;
@@ -188,7 +190,7 @@ router.get("/events", async (req, res) => {
       const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
       return w > 0 && c.finalPublishedAt != null;
     }).length;
-    const fullyCalibrated = globalScorable > 0 && finalCalibratedCriteria === globalScorable;
+    const fullyCalibrated = scorableCount > 0 && finalCalibratedCriteria === scorableCount;
 
     // Rollup do evento = mais recente publicação parcial entre os critérios
     // ativos (a granularidade real agora é por critério, ver /events/:id/criteria).
@@ -210,7 +212,7 @@ router.get("/events", async (req, res) => {
       return w > 0 && c.partialPublishedAt != null;
     }).length;
     const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: globalScorable, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };
   });
   res.json(enriched);
 });
