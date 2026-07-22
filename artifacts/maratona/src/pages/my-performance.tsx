@@ -634,7 +634,10 @@ export default function MyPerformancePage() {
       ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
       (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
       (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase());
-    const allFinal = ev.feedbackReleased || (ev.criteriaDetails.length > 0 && ev.criteriaDetails.every(c => !!c.finalPublishedAt));
+    // "Avaliado" = todos os critérios com nota também têm publicação final
+    // (mesma lógica do allScoredAreFinal no EventCard)
+    const scoredCriteria = ev.criteriaDetails.filter(c => Number(c.weight) > 0 && c.scoreUsed !== null);
+    const allFinal = scoredCriteria.length > 0 && scoredCriteria.every(c => !!c.finalPublishedAt);
     const matchesStatus = statusFilter === "all"
       || (statusFilter === "avaliado" && allFinal)
       || (statusFilter === "em_avaliacao" && !allFinal);
