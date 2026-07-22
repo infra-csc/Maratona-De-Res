@@ -117,6 +117,22 @@ function reviewStatusInfo(status: string | undefined | null) {
   }
 }
 
+function scoreColor(score: number | null): string {
+  if (score === null) return "var(--muted-foreground)";
+  if (score >= 90) return "#22c55e";
+  if (score >= 80) return "#ccff00";
+  if (score >= 60) return "#f59e0b";
+  return "#ef4444";
+}
+
+function scoreLabel(score: number | null): string {
+  if (score === null) return "";
+  if (score >= 90) return "Excelente";
+  if (score >= 80) return "Muito bom";
+  if (score >= 60) return "Regular";
+  return "Abaixo da meta";
+}
+
 function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null): string {
   if (!isQuarterClosed) return "Valor parcial — projeção do ciclo em andamento";
   switch (bonusStatus) {
@@ -180,12 +196,12 @@ function CriterionReviewRequest({ event, criterion }: { event: EventSummary; cri
           {statusInfo ? statusInfo.label : "Sinalizar Revisão"}
         </button>
       </DialogTrigger>
-      <DialogContent onClick={(e) => e.stopPropagation()} className="bg-white border-2 border-[#191c1e]">
+      <DialogContent onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <DialogHeader>
-          <DialogTitle className="italic uppercase font-black flex items-center gap-2 text-[#191c1e]">
+          <DialogTitle className="uppercase font-black flex items-center gap-2 text-foreground">
             <Flag size={16} className="text-[#862200]" /> Sinalizar Revisão do Critério
           </DialogTitle>
-          <DialogDescription className="italic text-[#444933]">
+          <DialogDescription className="text-muted-foreground">
             <span className="font-bold">{criterion.criterionName}</span> · {event.eventName}
           </DialogDescription>
         </DialogHeader>
@@ -201,13 +217,13 @@ function CriterionReviewRequest({ event, criterion }: { event: EventSummary; cri
               </span>
               <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(criterion.reviewRequest!.createdAt)}</span>
             </div>
-            <p className="text-sm text-[#444933] italic">"{criterion.reviewRequest!.comment}"</p>
+            <p className="text-sm text-muted-foreground italic">"{criterion.reviewRequest!.comment}"</p>
             {isResolved && criterion.reviewRequest!.resolutionNotes && (
               <p className="text-sm text-[#506600] font-bold">Resposta: {criterion.reviewRequest!.resolutionNotes}</p>
             )}
             <button
               onClick={() => { setComment(""); setResubmitting(true); }}
-              className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e] underline"
+              className="text-[11px] font-bold uppercase italic text-muted-foreground hover:text-foreground underline"
             >
               Sinalizar novamente
             </button>
@@ -216,12 +232,13 @@ function CriterionReviewRequest({ event, criterion }: { event: EventSummary; cri
 
         {showForm && (
           <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase italic text-[#747a60]">Descreva o motivo da revisão</p>
+            <p className="text-[10px] font-black uppercase text-muted-foreground">Descreva o motivo da revisão</p>
             <Textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder={`Ex: acredito que minha nota em "${criterion.criterionName}" não reflete minha atuação no evento...`}
-              className="bg-white text-sm"
+              className="text-sm text-foreground"
+              style={{ backgroundColor: "var(--background)", border: "1px solid var(--border)" }}
               rows={4}
               autoFocus
             />
@@ -313,12 +330,12 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
           <Flag size={12} /> {statusInfo ? statusInfo.label : "Sinalizar Revisão"}
         </button>
       </DialogTrigger>
-      <DialogContent onClick={(e) => e.stopPropagation()} className="bg-white border-2 border-[#191c1e]">
+      <DialogContent onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <DialogHeader>
-          <DialogTitle className="italic uppercase font-black flex items-center gap-2 text-[#191c1e]">
+          <DialogTitle className="uppercase font-black flex items-center gap-2 text-foreground">
             <Flag size={16} className="text-[#862200]" /> Sinalizar Revisão
           </DialogTitle>
-          <DialogDescription className="italic text-[#444933]">{event.eventName}</DialogDescription>
+          <DialogDescription className="text-muted-foreground">{event.eventName}</DialogDescription>
         </DialogHeader>
 
         {hasRequest && !showForm && (
@@ -332,14 +349,14 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
               </span>
               <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(event.reviewRequest!.createdAt)}</span>
             </div>
-            <p className="text-sm text-[#444933] italic">"{event.reviewRequest!.comment}"</p>
+            <p className="text-sm text-muted-foreground italic">"{event.reviewRequest!.comment}"</p>
             {isResolved && event.reviewRequest!.resolutionNotes && (
               <p className="text-sm text-[#506600] font-bold">Resposta: {event.reviewRequest!.resolutionNotes}</p>
             )}
             <button
               data-testid="button-review-request-again"
               onClick={() => { setComment(""); setResubmitting(true); }}
-              className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e] underline"
+              className="text-[11px] font-bold uppercase italic text-muted-foreground hover:text-foreground underline"
             >
               Sinalizar novamente
             </button>
@@ -348,12 +365,13 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
 
         {showForm && (
           <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase italic text-[#747a60]">Descreva o motivo da revisão</p>
+            <p className="text-[10px] font-black uppercase text-muted-foreground">Descreva o motivo da revisão</p>
             <Textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Ex: acredito que a nota do critério X não reflete minha participação..."
-              className="bg-white text-sm"
+              className="text-sm text-foreground"
+              style={{ backgroundColor: "var(--background)", border: "1px solid var(--border)" }}
               rows={4}
               autoFocus
             />
@@ -464,14 +482,13 @@ function EventCard({ event }: { event: EventSummary }) {
             <div className="flex flex-col items-end gap-1.5">
               <div className="text-right">
                 <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-0.5">Nota</span>
-                <span className={cn(
-                  "font-black text-[19px] leading-none",
-                  event.countsForScore && !event.resultsConfirmed ? "text-muted-foreground" : ""
-                )} style={event.countsForScore && event.resultsConfirmed ? { color: "var(--accent)" } : {}}>
+                <span className="font-black text-[19px] leading-none" style={{ color: scoreColor(event.eventScore) }}>
                   {event.eventScore.toFixed(1)}
                 </span>
-                {event.countsForScore && !event.resultsConfirmed && (
-                  <span className="block text-[8px] uppercase font-bold text-[#a15c00] mt-0.5 whitespace-nowrap">Não confirmada</span>
+                {event.projectedPlatoon && (
+                  <span className="block text-[8px] uppercase font-black mt-0.5 whitespace-nowrap" style={{ color: scoreColor(event.eventScore) }}>
+                    {event.projectedPlatoon}
+                  </span>
                 )}
               </div>
               {(() => {
@@ -531,7 +548,7 @@ function EventCard({ event }: { event: EventSummary }) {
                     {c.scoreUsed !== null ? (
                       <>
                         <div className="flex items-end gap-1">
-                          <span className="font-black text-2xl leading-none" style={{ color: "var(--accent)" }}>{c.scoreUsed.toFixed(1)}</span>
+                          <span className="font-black text-2xl leading-none" style={{ color: scoreColor(c.scoreUsed * 10) }}>{c.scoreUsed.toFixed(1)}</span>
                           <span className="text-xs font-bold text-muted-foreground pb-1">/10</span>
                         </div>
                         <CriterionReviewRequest event={event} criterion={c} />
@@ -541,6 +558,11 @@ function EventCard({ event }: { event: EventSummary }) {
                     )}
                   </div>
                 </div>
+                {c.scoreUsed !== null && (
+                  <div className="h-[4px] rounded-full overflow-hidden mb-3" style={{ backgroundColor: "var(--muted)" }}>
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(c.scoreUsed / 10) * 100}%`, backgroundColor: scoreColor(c.scoreUsed * 10) }} />
+                  </div>
+                )}
 
                 {c.publicComments.length > 0 && (
                   <div className="mt-4 space-y-2 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
@@ -671,19 +693,29 @@ export default function MyPerformancePage() {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Média do Ciclo</span>
                 {result !== null ? (
                   <>
-                    <div className="mt-1.5" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      <span className="font-black text-[34px] leading-none text-foreground">{result.toFixed(1)}</span>
+                    <div className="mt-1.5 flex items-baseline gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      <span className="font-black text-[34px] leading-none" style={{ color: scoreColor(result) }}>{result.toFixed(1)}</span>
                       <span className="text-[15px] text-muted-foreground">/100</span>
                     </div>
-                    <p className="mt-1 text-[10px] font-bold uppercase text-muted-foreground">
-                      {summary.isQuarterClosed ? "Resultado oficial" : "Projeção parcial"}
-                    </p>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                        {summary.isQuarterClosed ? "Resultado oficial" : "Projeção parcial"}
+                      </p>
+                      {summary.currentPlatoon && (
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: scoreColor(result), color: result >= 60 ? "#161e00" : "#fff" }}>
+                          {summary.currentPlatoon}
+                        </span>
+                      )}
+                      {result !== null && (
+                        <span className="text-[9px] font-bold text-muted-foreground">{scoreLabel(result)}</span>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <div className="text-lg text-muted-foreground mt-4">—</div>
                 )}
                 <div className="mt-3 h-[5px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${result ?? 0}%`, backgroundColor: "var(--foreground)" }} />
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${result ?? 0}%`, backgroundColor: scoreColor(result) }} />
                 </div>
               </div>
 
@@ -703,9 +735,6 @@ export default function MyPerformancePage() {
                 ) : (
                   <div className="mt-1.5 font-black text-[34px] leading-none text-[#747a60]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</div>
                 )}
-                <div className="mt-3 h-[5px] rounded-full overflow-hidden bg-black/15">
-                  <div className="h-full rounded-full" style={{ width: "0%" }} />
-                </div>
               </div>
 
               {/* Eventos Confirmados */}
@@ -743,6 +772,20 @@ export default function MyPerformancePage() {
                 </div>
               ) : (
                 <>
+                  {(() => {
+                    const pen = data.adjustments.filter(a => a.kind === "penalty").reduce((s, a) => s + a.totalPoints, 0);
+                    const mer = data.adjustments.filter(a => a.kind === "merit").reduce((s, a) => s + a.totalPoints, 0);
+                    const net = mer - pen;
+                    return (
+                      <div className="flex items-center gap-3 flex-wrap mb-3">
+                        {mer > 0 && <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-[#ccff00] text-[#161e00]">+{mer} pts méritos</span>}
+                        {pen > 0 && <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-[#862200]/15 text-[#862200]">−{pen} pts penalidades</span>}
+                        <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full text-foreground" style={{ backgroundColor: "var(--muted)" }}>
+                          Líquido: {net >= 0 ? `+${net}` : net} pts
+                        </span>
+                      </div>
+                    );
+                  })()}
                   <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                     {data.adjustments.map((adj, idx) => (
                       <div key={adj.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={idx > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
@@ -816,13 +859,41 @@ export default function MyPerformancePage() {
                 </div>
               </div>
 
-              {filteredEvents.length === 0 ? (
-                <div className="rounded-xl py-16 text-center text-[13px] text-muted-foreground" style={{ border: "1px dashed var(--border)" }}>
-                  {eventFilter
-                    ? `Nenhum evento encontrado para "${eventFilter}".`
-                    : `Nenhum evento registrado no ciclo ${data.cycle.name}.`}
-                </div>
-              ) : (
+              {filteredEvents.length === 0 ? (() => {
+                const confirmedCount = (data.events ?? []).filter(ev => ev.resultsConfirmed).length;
+                const totalCount = (data.events ?? []).length;
+                let icon = "🔍";
+                let title = "Nenhum evento encontrado";
+                let detail = "";
+                if (eventFilter) {
+                  title = `Sem resultados para "${eventFilter}"`;
+                  detail = "Tente um nome diferente ou limpe a busca.";
+                  icon = "🔍";
+                } else if (statusFilter === "avaliado") {
+                  title = "Nenhum evento totalmente avaliado";
+                  detail = confirmedCount > 0 ? "Há eventos com resultados confirmados, mas as notas por quesito ainda estão sendo finalizadas." : "As avaliações estão em andamento neste ciclo.";
+                  icon = "⏳";
+                } else if (statusFilter === "em_avaliacao") {
+                  title = "Todos os eventos já foram avaliados";
+                  detail = "Todos os seus eventos confirmados têm notas finalizadas. ";
+                  icon = "✅";
+                } else if (confirmedCount === 0 && totalCount > 0) {
+                  title = "Resultados ainda não confirmados";
+                  detail = `Você tem ${totalCount} evento(s) no ciclo, mas nenhum resultado foi confirmado pelo RH ainda. As notas aparecerão aqui após a confirmação.`;
+                  icon = "🕐";
+                } else if (totalCount === 0) {
+                  title = "Nenhum evento no ciclo";
+                  detail = `Você ainda não tem eventos registrados no ciclo ${data.cycle.name}.`;
+                  icon = "📋";
+                }
+                return (
+                  <div className="rounded-xl py-16 text-center space-y-2" style={{ border: "1px dashed var(--border)" }}>
+                    <div className="text-3xl mb-1">{icon}</div>
+                    <p className="font-black text-[14px] uppercase text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{title}</p>
+                    {detail && <p className="text-[12px] text-muted-foreground max-w-xs mx-auto">{detail}</p>}
+                  </div>
+                );
+              })() : (
                 <div>
                   {filteredEvents.map(ev => <EventCard key={ev.eventId} event={ev} />)}
                 </div>
