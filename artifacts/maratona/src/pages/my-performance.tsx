@@ -862,7 +862,7 @@ export default function MyPerformancePage() {
                             <div className="flex-1 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--border)" }}>
                               <div className="h-full rounded-full" style={{ width: `${ev.eventScore}%`, backgroundColor: scoreColor(ev.eventScore) }} />
                             </div>
-                            <span className="text-[15px] font-black shrink-0 w-[42px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(ev.eventScore) === "#ccff00" ? "var(--foreground)" : scoreColor(ev.eventScore) }}>
+                            <span className="text-[15px] font-black shrink-0 w-[42px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(ev.eventScore) === "#ccff00" ? "#7a9200" : scoreColor(ev.eventScore) }}>
                               {ev.eventScore.toFixed(1)}
                             </span>
                           </div>
