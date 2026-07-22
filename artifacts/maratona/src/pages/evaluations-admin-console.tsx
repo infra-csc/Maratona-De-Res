@@ -466,6 +466,7 @@ export function AdminEvaluationsConsole() {
         body: JSON.stringify({ sourceCriterionId: Number(swapSourceId) }),
       });
       qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected.id) });
+      qc.invalidateQueries({ queryKey: ["event-criteria", selected.id] });
       toast({ title: "Origem corrigida com sucesso" });
       setSwapDialog(null);
       setSwapSourceId("");
