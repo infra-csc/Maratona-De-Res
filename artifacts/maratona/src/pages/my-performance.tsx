@@ -719,7 +719,7 @@ export default function MyPerformancePage() {
                       <span className="text-[15px] text-muted-foreground">de {target} p/ elegibilidade</span>
                     </div>
                     <p className={cn("mt-1 text-[10px] font-bold uppercase", atingiu ? "text-[#506600]" : "text-[#862200]")}>
-                      {atingiu ? "Elegível ao bônus" : `Faltam ${faltam} evento${faltam !== 1 ? "s" : ""} para o bônus`}
+                      {atingiu ? "Elegível ao bônus" : `Faltam ${faltam} evento${faltam !== 1 ? "s" : ""} para elegibilidade`}
                     </p>
                     <div className="mt-3 h-[5px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
                       <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (confirmed / target) * 100)}%`, backgroundColor: atingiu ? "#ccff00" : "var(--foreground)" }} />
