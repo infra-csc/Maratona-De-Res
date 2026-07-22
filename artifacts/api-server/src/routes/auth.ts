@@ -42,7 +42,26 @@ async function buildAuthResponse(user: typeof usersTable.$inferSelect) {
 }
 
 router.post("/auth/login", async (req, res) => {
-  const { identifier, password } = req.body as { identifier?: string; password?: string };
+  const { identifier, password, pin } = req.body as { identifier?: string; password?: string; pin?: string };
+
+  // PIN-only path for casa employees (lookup by stored pinValue)
+  if (pin && /^\d{4}$/.test(pin)) {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.pinValue, pin)).limit(1);
+    if (!user || !user.active) {
+      res.status(401).json({ error: "Senha inválida" });
+      return;
+    }
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      res.status(429).json({ error: `Conta bloqueada. Tente em ${minutesLeft} min.` });
+      return;
+    }
+    await db.update(usersTable).set({ failedLoginAttempts: 0, lockedUntil: null }).where(eq(usersTable.id, user.id));
+    await audit(user.id, "login_pin", "users", user.id);
+    res.json(await buildAuthResponse(user));
+    return;
+  }
+
   if (!identifier || !password) {
     res.status(400).json({ error: "CPF/e-mail e senha obrigatórios" });
     return;

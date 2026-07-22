@@ -15,6 +15,7 @@ export const usersTable = pgTable("users", {
   employeeId: integer("employee_id").references(() => employeesTable.id),
   active: boolean("active").notNull().default(true),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  pinValue: text("pin_value").unique(),
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

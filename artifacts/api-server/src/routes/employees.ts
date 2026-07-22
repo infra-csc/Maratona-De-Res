@@ -331,6 +331,9 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
   const results: { name: string; cpfLogin: string; pin: string }[] = [];
   const skipped: { name: string; reason: string }[] = [];
 
+  // Collect existing pinValues to guarantee uniqueness within this batch
+  const usedPins = new Set<string>();
+
   for (const emp of casaEmployees) {
     const cpfDigits = emp.document ? normalizeCpf(emp.document) : "";
     if (!isValidCpfLength(cpfDigits)) {
@@ -338,7 +341,15 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
       continue;
     }
 
-    const pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+    // Generate unique PIN
+    let pin: string;
+    let attempts = 0;
+    do {
+      pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+      attempts++;
+    } while (usedPins.has(pin) && attempts < 100);
+    usedPins.add(pin);
+
     const passwordHash = await bcrypt.hash(pin, 12);
 
     const [byEmpId] = await db.select({ id: usersTable.id })
@@ -346,14 +357,14 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
 
     if (byEmpId) {
       await db.update(usersTable)
-        .set({ passwordHash, mustChangePassword: false })
+        .set({ passwordHash, pinValue: pin, mustChangePassword: false })
         .where(eq(usersTable.id, byEmpId.id));
     } else {
       const [byCpf] = await db.select({ id: usersTable.id })
         .from(usersTable).where(eq(usersTable.cpfLogin, cpfDigits)).limit(1);
       if (byCpf) {
         await db.update(usersTable)
-          .set({ passwordHash, mustChangePassword: false, employeeId: emp.id })
+          .set({ passwordHash, pinValue: pin, mustChangePassword: false, employeeId: emp.id })
           .where(eq(usersTable.id, byCpf.id));
       } else {
         await db.insert(usersTable).values({
@@ -361,6 +372,7 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
           email: null,
           cpfLogin: cpfDigits,
           passwordHash,
+          pinValue: pin,
           role: "visualizador",
           employeeId: emp.id,
           active: true,
@@ -394,8 +406,15 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
     return;
   }
 
-  const pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
-  const passwordHash = await bcrypt.hash(pin, 12);
+  // Generate unique PIN (not already used by another user)
+  let pin: string;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+    const [existing] = await db.select({ id: usersTable.id }).from(usersTable)
+      .where(and(eq(usersTable.pinValue, pin!), ne(usersTable.employeeId, id))).limit(1);
+    if (!existing) break;
+  }
+  const passwordHash = await bcrypt.hash(pin!, 12);
 
   let userId: number;
   let userCreated = false;
@@ -406,7 +425,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
   if (byEmpId) {
     userId = byEmpId.id;
     await db.update(usersTable)
-      .set({ passwordHash, mustChangePassword: false })
+      .set({ passwordHash, pinValue: pin!, mustChangePassword: false })
       .where(eq(usersTable.id, userId));
   } else {
     const [byCpf] = await db.select({ id: usersTable.id })
@@ -414,7 +433,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
     if (byCpf) {
       userId = byCpf.id;
       await db.update(usersTable)
-        .set({ passwordHash, mustChangePassword: false, employeeId: id })
+        .set({ passwordHash, pinValue: pin!, mustChangePassword: false, employeeId: id })
         .where(eq(usersTable.id, userId));
     } else {
       const [newUser] = await db.insert(usersTable).values({
@@ -422,6 +441,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
         email: null,
         cpfLogin: cpfDigits,
         passwordHash,
+        pinValue: pin!,
         role: "visualizador",
         employeeId: id,
         active: true,
