@@ -396,6 +396,8 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
 
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
+  // Apenas critérios calibrados (finalPublishedAt) e com peso > 0
+  const visibleCriteria = event.criteriaDetails.filter(c => !!c.finalPublishedAt && Number(c.weight) > 0);
   // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
   const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
   const publishLabel = event.feedbackReleased
@@ -452,7 +454,7 @@ function EventCard({ event }: { event: EventSummary }) {
                 <span className="flex items-center gap-1"><MapPin size={11} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
               )}
               {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
-              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {event.evaluatedCriteria}/{event.totalCriteria}</span>
+              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.filter(c => c.evaluated).length}/{visibleCriteria.length}</span>
             </div>
           </div>
         </div>
@@ -491,15 +493,12 @@ function EventCard({ event }: { event: EventSummary }) {
         <div className="p-5 md:p-6 space-y-4" style={{ borderTop: "1px solid var(--border)", backgroundColor: "var(--muted)" }}>
           <h4 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-2">Detalhamento dos Critérios</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {event.criteriaDetails.map(c => (
+            {visibleCriteria.map(c => (
               <div key={c.criterionId} className="p-4 rounded-xl relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                 <div className="flex justify-between items-start gap-4 mb-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-[9px] font-bold uppercase text-muted-foreground px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Peso {c.weight}</span>
-                      {Number(c.weight) === 0 && (
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#862200]/10 text-[#862200]">Não conta na média</span>
-                      )}
                       {c.evaluated && (
                         <span className="text-[9px] font-bold uppercase text-[#506600] flex items-center gap-1">
                           <CheckCircle2 size={11}/> Avaliado
@@ -605,6 +604,7 @@ export default function MyPerformancePage() {
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
   const filteredEvents = (data?.events ?? []).filter(ev => {
+    if (!ev.resultsConfirmed) return false;
     const matchesText = !eventFilter ||
       ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
       (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
