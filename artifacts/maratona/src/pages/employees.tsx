@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check, Link } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
 
@@ -115,7 +115,7 @@ export default function EmployeesPage() {
   const [pinDialog, setPinDialog] = useState<{ empName: string; pin: string; cpfLogin: string; created: boolean } | null>(null);
   const [generatingPinId, setGeneratingPinId] = useState<number | null>(null);
   const [pinCopied, setPinCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [bulkLinkCopied, setBulkLinkCopied] = useState(false);
 
   type BulkPinEntry = { name: string; cpfLogin: string; pin: string };
   type BulkPinSkip = { name: string; reason: string };
@@ -664,7 +664,7 @@ export default function EmployeesPage() {
                                   ? <><Eye size={11} className="animate-pulse" /> Abrindo…</>
                                   : <><Eye size={11} /> Ver visão</>}
                               </button>
-                              {emp.employmentType === "casa" && (<>
+                              {emp.employmentType === "casa" && (
                                 <button
                                   title={`Gerar novo PIN para ${emp.name}`}
                                   disabled={generatingPinId === emp.id}
@@ -676,8 +676,7 @@ export default function EmployeesPage() {
                                     ? <><Hash size={11} className="animate-spin" /> Gerando…</>
                                     : <><Hash size={11} /> Gerar PIN</>}
                                 </button>
-                                <CopyLinkButton link={APP_LINK} />
-                              </>)}
+                              )}
                             </div>
                           ) : emp.employmentType === "casa" ? (
                             <div className="flex flex-col items-center gap-1">
@@ -1066,6 +1065,23 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
+              {/* Shared access link */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                <Link size={12} style={{ color: "var(--muted-foreground)", flexShrink: 0 }} />
+                <span className="text-xs font-mono flex-1 truncate" style={{ color: "var(--muted-foreground)" }}>{APP_LINK}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(APP_LINK);
+                    setBulkLinkCopied(true);
+                    setTimeout(() => setBulkLinkCopied(false), 2000);
+                  }}
+                  className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded font-black text-[10px] uppercase transition-all hover:opacity-80"
+                  style={{ border: "1px solid var(--border)", color: "var(--foreground)", cursor: "pointer" }}
+                >
+                  {bulkLinkCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Link</>}
+                </button>
+              </div>
+
               {/* Actions */}
               <div className="flex justify-between items-center gap-2 pt-1" style={{ borderTop: "1px solid var(--border)" }}>
                 <div className="flex gap-2">
@@ -1157,23 +1173,6 @@ export default function EmployeesPage() {
                     style={{ backgroundColor: "rgba(0,0,0,0.25)", color: "var(--primary-foreground)" }}
                   >
                     {pinCopied ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
-                  </button>
-                </div>
-              </div>
-              <div className="px-4 py-3" style={{ backgroundColor: "var(--secondary)" }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-1.5" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Link de Acesso</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono flex-1 truncate" style={{ color: "var(--foreground)" }}>{APP_LINK}</span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(APP_LINK);
-                      setLinkCopied(true);
-                      setTimeout(() => setLinkCopied(false), 2000);
-                    }}
-                    className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-80"
-                    style={{ border: "1px solid var(--border)", color: "var(--foreground)" }}
-                  >
-                    {linkCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
                   </button>
                 </div>
               </div>
