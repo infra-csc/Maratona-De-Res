@@ -54,13 +54,14 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
 }
 
-const APP_LINK = (() => {
+function getPersonalLink(cpfLogin: string) {
   const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-  return `${window.location.origin}${base}/meu-desempenho`;
-})();
+  return `${window.location.origin}${base}/login?u=${cpfLogin}`;
+}
 
-function CopyLinkButton({ link }: { link: string }) {
+function CopyLinkButton({ cpfLogin }: { cpfLogin: string }) {
   const [copied, setCopied] = useState(false);
+  const link = getPersonalLink(cpfLogin);
   return (
     <button
       title="Copiar link de acesso"
@@ -122,7 +123,6 @@ export default function EmployeesPage() {
   const [bulkPinOpen, setBulkPinOpen] = useState(false);
   const [bulkPinLoading, setBulkPinLoading] = useState(false);
   const [bulkPinResult, setBulkPinResult] = useState<{ results: BulkPinEntry[]; skipped: BulkPinSkip[] } | null>(null);
-  const [bulkLinkCopied, setBulkLinkCopied] = useState(false);
 
   const handleBulkGeneratePins = useCallback(async () => {
     setBulkPinLoading(true);
@@ -677,7 +677,7 @@ export default function EmployeesPage() {
                                     ? <><Hash size={11} className="animate-spin" /> Gerando…</>
                                     : <><Hash size={11} /> Gerar PIN</>}
                                 </button>
-                                <CopyLinkButton link={APP_LINK} />
+                                <CopyLinkButton cpfLogin={emp.document?.replace(/\D/g, "") ?? ""} />
                               </>)}
                             </div>
                           ) : emp.employmentType === "casa" ? (
@@ -1016,10 +1016,6 @@ export default function EmployeesPage() {
                   Gera um PIN de 4 dígitos novo para <strong>todos</strong> os colaboradores casa ativos com CPF cadastrado.
                   PINs anteriores serão substituídos imediatamente.
                 </p>
-                <div className="rounded-lg px-4 py-3 text-sm" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                  <span className="font-bold">Link de acesso (único para todos): </span>
-                  <span className="font-mono text-xs break-all">{APP_LINK}</span>
-                </div>
                 <div className="flex justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
                   <button onClick={() => setBulkPinOpen(false)} className="h-10 px-4 rounded-lg font-bold text-sm uppercase" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
                   <button
@@ -1034,21 +1030,6 @@ export default function EmployeesPage() {
               </div>
             ) : (
               <>
-                {/* Link único */}
-                <div className="rounded-lg px-4 py-3 flex items-center gap-3 flex-shrink-0" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Link de Acesso (igual para todos)</p>
-                    <p className="text-xs font-mono truncate">{APP_LINK}</p>
-                  </div>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(APP_LINK); setBulkLinkCopied(true); setTimeout(() => setBulkLinkCopied(false), 2000); }}
-                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-[11px] uppercase"
-                    style={{ border: "1px solid var(--border)" }}
-                  >
-                    {bulkLinkCopied ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar link</>}
-                  </button>
-                </div>
-
                 {/* Stats */}
                 <div className="flex gap-3 flex-shrink-0">
                   <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
@@ -1069,17 +1050,19 @@ export default function EmployeesPage() {
                     <thead className="sticky top-0 z-10" style={{ backgroundColor: "var(--secondary)" }}>
                       <tr>
                         <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Nome</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Login (CPF)</th>
                         <th className="px-4 py-2.5 text-center text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>PIN</th>
+                        <th className="px-4 py-2.5 text-right text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Link</th>
                       </tr>
                     </thead>
                     <tbody>
                       {bulkPinResult.results.map((r, i) => (
                         <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "var(--secondary)" }}>
                           <td className="px-4 py-2.5 font-medium text-sm">{r.name}</td>
-                          <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--muted-foreground)" }}>{r.cpfLogin}</td>
                           <td className="px-4 py-2.5 text-center">
                             <span className="text-xl font-black tracking-[0.2em]" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{r.pin}</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <CopyLinkButton cpfLogin={r.cpfLogin} />
                           </td>
                         </tr>
                       ))}
@@ -1091,7 +1074,7 @@ export default function EmployeesPage() {
                 <div className="flex justify-between items-center gap-2 flex-shrink-0 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
                   <button
                     onClick={() => {
-                      const lines = [`Link: ${APP_LINK}`, "", "Nome | CPF Login | PIN", ...bulkPinResult.results.map(r => `${r.name} | ${r.cpfLogin} | ${r.pin}`)];
+                      const lines = ["Nome | PIN | Link de Acesso", ...bulkPinResult.results.map(r => `${r.name} | ${r.pin} | ${getPersonalLink(r.cpfLogin)}`)];
                       navigator.clipboard.writeText(lines.join("\n"));
                       toast({ title: "Lista copiada!", description: `${bulkPinResult.results.length} colaboradores` });
                     }}
@@ -1162,10 +1145,10 @@ export default function EmployeesPage() {
               <div className="px-4 py-3" style={{ backgroundColor: "var(--secondary)" }}>
                 <p className="text-[10px] font-black uppercase tracking-widest mb-1.5" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Link de Acesso</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono flex-1 truncate" style={{ color: "var(--foreground)" }}>{APP_LINK}</span>
+                  <span className="text-xs font-mono flex-1 truncate" style={{ color: "var(--foreground)" }}>{pinDialog ? getPersonalLink(pinDialog.cpfLogin) : ""}</span>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(APP_LINK);
+                      if (pinDialog) navigator.clipboard.writeText(getPersonalLink(pinDialog.cpfLogin));
                       setLinkCopied(true);
                       setTimeout(() => setLinkCopied(false), 2000);
                     }}
