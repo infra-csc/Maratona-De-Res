@@ -13,6 +13,9 @@ export const customFetch = async <T>(url: string, options?: RequestInit): Promis
   }
   const response = await fetch(url, { ...options, headers });
   if (!response.ok) {
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    }
     const error = await response.json().catch(() => ({ message: response.statusText }));
     throw { status: response.status, message: error.error ?? error.message ?? "Erro desconhecido" };
   }

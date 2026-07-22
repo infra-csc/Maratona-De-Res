@@ -5,12 +5,17 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Trophy, ArrowRight } from "lucide-react";
 
+function isCpfLike(val: string) {
+  return val.replace(/\D/g, "").length >= 11;
+}
+
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [, setLocation] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();
+  const isPin = isCpfLike(identifier);
 
   const loginMutation = useLogin({
     mutation: {
@@ -78,21 +83,26 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label htmlFor="password" className="text-[13px] font-black italic text-[#191c1e] uppercase tracking-tight">
-                    Senha
-                  </label>
-                </div>
+                <label htmlFor="password" className="text-[13px] font-black italic text-[#191c1e] uppercase tracking-tight">
+                  {isPin ? "PIN (4 dígitos)" : "Senha"}
+                </label>
                 <input
                   id="password"
                   data-testid="input-password"
                   type="password"
+                  inputMode={isPin ? "numeric" : undefined}
+                  maxLength={isPin ? 4 : undefined}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={isPin ? "••••" : "••••••••"}
                   required
                   className="w-full h-12 px-4 border-2 border-[#191c1e] bg-white text-[#191c1e] text-sm font-bold italic placeholder:text-[#747a60] placeholder:font-bold placeholder:italic focus:outline-none focus:ring-2 focus:ring-[#ccff00] focus:ring-offset-2 focus:ring-offset-[#f7f9fb]"
                 />
+                {isPin && (
+                  <p className="text-[11px] italic text-[#747a60] font-bold">
+                    Digite seu CPF acima e o PIN de 4 dígitos recebido do RH.
+                  </p>
+                )}
               </div>
 
               <button

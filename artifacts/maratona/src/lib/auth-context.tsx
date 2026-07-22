@@ -27,23 +27,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const savedToken = localStorage.getItem(TOKEN_KEY);
-      const savedUser = localStorage.getItem(USER_KEY);
-      const savedRealUser = localStorage.getItem(REAL_USER_KEY);
-      if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-      }
-      if (savedRealUser) setRealUser(JSON.parse(savedRealUser));
-    } catch {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-      localStorage.removeItem(REAL_TOKEN_KEY);
-      localStorage.removeItem(REAL_USER_KEY);
-    } finally {
+    const savedToken = localStorage.getItem(TOKEN_KEY);
+    const savedUser = localStorage.getItem(USER_KEY);
+    const savedRealUser = localStorage.getItem(REAL_USER_KEY);
+
+    if (!savedToken || !savedUser) {
       setIsLoading(false);
+      return;
     }
+
+    // Verify token is still valid with the server
+    const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "/api";
+    fetch(`${apiBase}/auth/me`, {
+      headers: { "Authorization": `Bearer ${savedToken}` },
+    })
+      .then(r => {
+        if (r.ok) {
+          try {
+            setToken(savedToken);
+            setUser(JSON.parse(savedUser));
+            if (savedRealUser) setRealUser(JSON.parse(savedRealUser));
+          } catch {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+          }
+        } else {
+          // Token expired or invalid — clear everything
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(REAL_TOKEN_KEY);
+          localStorage.removeItem(REAL_USER_KEY);
+        }
+      })
+      .catch(() => {
+        // Network error — trust localStorage so app works offline/briefly
+        try {
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
+          if (savedRealUser) setRealUser(JSON.parse(savedRealUser));
+        } catch { /* ignore */ }
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const login = useCallback((newToken: string, newUser: User) => {
@@ -65,6 +89,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(REAL_TOKEN_KEY);
     localStorage.removeItem(REAL_USER_KEY);
   }, []);
+
+  // Global 401 handler — any API call that returns 401 triggers logout
+  useEffect(() => {
+    const handle = () => logout();
+    window.addEventListener("auth:unauthorized", handle);
+    return () => window.removeEventListener("auth:unauthorized", handle);
+  }, [logout]);
 
   const impersonate = useCallback((newToken: string, newUser: User) => {
     // Preserve the real (admin) session the first time we enter dev mode.
