@@ -3,7 +3,9 @@ import { useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { Trophy, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+
+const CONDENSED = "'Barlow Condensed', 'Barlow', sans-serif";
 
 function isCpfLike(val: string) {
   return val.replace(/\D/g, "").length >= 11;
@@ -15,7 +17,7 @@ export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();
-  const isPin = isCpfLike(identifier);
+  const isCpf = isCpfLike(identifier);
 
   const loginMutation = useLogin({
     mutation: {
@@ -24,7 +26,7 @@ export default function LoginPage() {
         setLocation(data.user.mustChangePassword ? "/trocar-senha" : "/");
       },
       onError: (err: { message?: string }) => {
-        toast({ title: "Acesso Negado", description: err?.message ?? "Credenciais inválidas", variant: "destructive" });
+        toast({ title: "Acesso negado", description: err?.message ?? "Credenciais inválidas", variant: "destructive" });
       },
     },
   });
@@ -35,39 +37,70 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center px-6 relative overflow-hidden">
-      {/* Decorative strip */}
-      <div className="absolute top-0 left-0 w-full h-3 bg-[#191c1e]" />
-      <div className="absolute bottom-0 left-0 w-full h-3 bg-[#191c1e]" />
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ backgroundColor: "#191c1e" }}
+    >
+      <div className="w-full max-w-[400px]">
 
-      <div className="w-full max-w-[420px] relative z-10">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 border-2 border-[#191c1e] bg-[#ccff00] flex items-center justify-center mx-auto mb-4 -skew-x-6">
-            <Trophy size={28} className="text-[#161e00] skew-x-6" />
+        {/* Branding */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-1">
+            <div
+              className="w-10 h-10 flex items-center justify-center font-black text-sm -skew-x-6 flex-shrink-0"
+              style={{ backgroundColor: "#ccff00", color: "#161e00", fontFamily: CONDENSED }}
+            >
+              <span className="skew-x-6">CE</span>
+            </div>
+            <div>
+              <p
+                className="text-2xl font-black uppercase leading-none tracking-tight"
+                style={{ fontFamily: CONDENSED, color: "#ccff00" }}
+              >
+                Maratona
+              </p>
+              <p
+                className="text-2xl font-black uppercase leading-none tracking-tight"
+                style={{ fontFamily: CONDENSED, color: "rgba(204,255,0,0.5)" }}
+              >
+                de Resultados
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl italic font-black text-[#191c1e] uppercase tracking-tighter leading-tight">Maratona de</h1>
-          <h1 className="text-2xl italic font-black text-[#506600] uppercase tracking-tighter leading-tight">Resultados</h1>
         </div>
 
         {/* Card */}
-        <div className="bg-white border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e]">
-          {/* Header */}
-          <div className="bg-[#f2f4f6] px-6 py-4 border-b-2 border-[#191c1e] flex items-center justify-between">
-            <div>
-              <p className="text-sm font-black italic text-[#191c1e] uppercase tracking-tight">Acesso Corporativo</p>
-              <p className="text-[11px] font-bold italic text-[#747a60] uppercase tracking-wider">Cenográfica Eventos</p>
-            </div>
-            <div className="w-8 h-8 border-2 border-[#191c1e] bg-[#ccff00] flex items-center justify-center -skew-x-6">
-              <span className="text-[10px] font-black italic text-[#161e00] skew-x-6">CE</span>
-            </div>
+        <div
+          className="rounded-none"
+          style={{
+            backgroundColor: "#22262a",
+            border: "2px solid #ccff00",
+          }}
+        >
+          {/* Card header */}
+          <div
+            className="px-6 py-3"
+            style={{ borderBottom: "1px solid rgba(204,255,0,0.2)", backgroundColor: "rgba(204,255,0,0.05)" }}
+          >
+            <p
+              className="text-xs font-black uppercase tracking-widest"
+              style={{ fontFamily: CONDENSED, color: "rgba(204,255,0,0.6)" }}
+            >
+              Acesso à plataforma
+            </p>
           </div>
 
           {/* Form */}
-          <div className="p-6">
+          <div className="px-6 py-6 space-y-5">
             <form onSubmit={handleSubmit} className="space-y-5">
+
+              {/* CPF / E-mail */}
               <div className="space-y-1.5">
-                <label htmlFor="identifier" className="text-[13px] font-black italic text-[#191c1e] uppercase tracking-tight">
+                <label
+                  htmlFor="identifier"
+                  className="text-[11px] font-black uppercase tracking-widest block"
+                  style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.5)" }}
+                >
                   CPF ou E-mail
                 </label>
                 <input
@@ -76,55 +109,83 @@ export default function LoginPage() {
                   type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="000.000.000-00 ou nome@cenografica.com.br"
+                  placeholder="00000000000 ou nome@empresa.com"
                   required
                   autoFocus
-                  className="w-full h-12 px-4 border-2 border-[#191c1e] bg-white text-[#191c1e] text-sm font-bold italic placeholder:text-[#747a60] placeholder:font-bold placeholder:italic focus:outline-none focus:ring-2 focus:ring-[#ccff00] focus:ring-offset-2 focus:ring-offset-[#f7f9fb]"
+                  className="w-full h-12 px-4 text-sm font-bold focus:outline-none"
+                  style={{
+                    backgroundColor: "#191c1e",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "#fff",
+                    fontFamily: CONDENSED,
+                    letterSpacing: "0.02em",
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "#ccff00")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)")}
                 />
               </div>
+
+              {/* Senha */}
               <div className="space-y-1.5">
-                <label htmlFor="password" className="text-[13px] font-black italic text-[#191c1e] uppercase tracking-tight">
-                  {isPin ? "PIN (4 dígitos)" : "Senha"}
+                <label
+                  htmlFor="password"
+                  className="text-[11px] font-black uppercase tracking-widest block"
+                  style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.5)" }}
+                >
+                  Senha
                 </label>
                 <input
                   id="password"
                   data-testid="input-password"
                   type="password"
-                  inputMode={isPin ? "numeric" : undefined}
-                  maxLength={isPin ? 4 : undefined}
+                  inputMode={isCpf ? "numeric" : undefined}
+                  maxLength={isCpf ? 4 : undefined}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isPin ? "••••" : "••••••••"}
+                  placeholder={isCpf ? "••••" : "••••••••"}
                   required
-                  className="w-full h-12 px-4 border-2 border-[#191c1e] bg-white text-[#191c1e] text-sm font-bold italic placeholder:text-[#747a60] placeholder:font-bold placeholder:italic focus:outline-none focus:ring-2 focus:ring-[#ccff00] focus:ring-offset-2 focus:ring-offset-[#f7f9fb]"
+                  className="w-full h-12 px-4 text-sm font-bold focus:outline-none"
+                  style={{
+                    backgroundColor: "#191c1e",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "#fff",
+                    fontFamily: CONDENSED,
+                    letterSpacing: isCpf ? "0.4em" : "0.1em",
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "#ccff00")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)")}
                 />
-                {isPin && (
-                  <p className="text-[11px] italic text-[#747a60] font-bold">
-                    Digite seu CPF acima e o PIN de 4 dígitos recebido do RH.
-                  </p>
-                )}
               </div>
 
+              {/* Submit */}
               <button
                 data-testid="button-submit-login"
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full h-12 mt-4 bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] font-black italic uppercase text-[13px] tracking-tight shadow-[3px_3px_0px_0px_#191c1e] hover:shadow-[1px_1px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-12 font-black uppercase text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                style={{
+                  fontFamily: CONDENSED,
+                  letterSpacing: "0.08em",
+                  backgroundColor: "#ccff00",
+                  color: "#161e00",
+                  border: "2px solid #ccff00",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#b8e600"; e.currentTarget.style.borderColor = "#b8e600"; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#ccff00"; e.currentTarget.style.borderColor = "#ccff00"; }}
               >
-                {loginMutation.isPending ? "Autenticando..." : (
-                  <>
-                    Acessar Plataforma
-                    <ArrowRight size={16} className="shrink-0" />
-                  </>
-                )}
+                {loginMutation.isPending
+                  ? "Autenticando…"
+                  : <><span>Acessar</span><ArrowRight size={16} /></>}
               </button>
             </form>
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-[10px] font-bold italic text-[#747a60] uppercase tracking-widest mt-6">
-          Sistema Exclusivo • Uso Restrito
+        <p
+          className="text-center text-[10px] font-bold uppercase tracking-widest mt-6"
+          style={{ color: "rgba(255,255,255,0.2)" }}
+        >
+          Sistema exclusivo • Uso restrito
         </p>
       </div>
     </div>
