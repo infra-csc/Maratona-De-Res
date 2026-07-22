@@ -565,7 +565,7 @@ export default function MyPerformancePage() {
   const { user } = useAuth();
   const { data: currentCycle } = useGetCurrentCycle();
   const [eventFilter, setEventFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "closed" | "open">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "avaliado" | "em_avaliacao">("all");
 
   const { data, isLoading, error } = useQuery<PerformanceData>({
     queryKey: ["my-performance"],
@@ -609,7 +609,10 @@ export default function MyPerformancePage() {
       ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
       (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
       (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase());
-    const matchesStatus = statusFilter === "all" || ev.status === statusFilter;
+    const allFinal = ev.feedbackReleased || (ev.criteriaDetails.length > 0 && ev.criteriaDetails.every(c => !!c.finalPublishedAt));
+    const matchesStatus = statusFilter === "all"
+      || (statusFilter === "avaliado" && allFinal)
+      || (statusFilter === "em_avaliacao" && !allFinal);
     return matchesText && matchesStatus;
   });
 
@@ -784,8 +787,8 @@ export default function MyPerformancePage() {
                   <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
                     {[
                       { key: "all", label: "Todos" },
-                      { key: "closed", label: "Avaliados" },
-                      { key: "open", label: "Em Avaliação" },
+                      { key: "avaliado", label: "Avaliados" },
+                      { key: "em_avaliacao", label: "Em Avaliação" },
                     ].map(btn => (
                       <button
                         key={btn.key}
