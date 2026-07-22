@@ -67,6 +67,8 @@ router.get("/my-performance", async (req, res) => {
       functionName: eventParticipantsTable.functionName,
       participantConfirmed: eventParticipantsTable.confirmed,
       resultsConfirmed: eventsTable.resultsConfirmed,
+      isHistorical: eventsTable.isHistorical,
+      importedScore: eventsTable.importedScore,
     })
     .from(eventParticipantsTable)
     .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
@@ -219,7 +221,12 @@ router.get("/my-performance", async (req, res) => {
         })),
     ]);
 
-    const eventScore = calculateEventResult(criteriaForCalc);
+    const rawEventScore = calculateEventResult(criteriaForCalc);
+    // Eventos históricos: usa importedScore como nota autoritativa.
+    // O cálculo via calibrações pode divergir (critérios inativos, fórmula diferente).
+    const eventScore = (p.isHistorical && p.importedScore != null)
+      ? parseFloat(p.importedScore as unknown as string)
+      : rawEventScore;
     // Sem nota (nenhum critério avaliado ainda) não tem pelotão — evita
     // mostrar "Pelotão Branco" para um evento com Quesitos 0/N.
     const platoon = eventScore > 0 ? getPlatoonByScore(eventScore, platoonRulesMapped) : null;
@@ -229,8 +236,12 @@ router.get("/my-performance", async (req, res) => {
     const isComplete = totalExpected > 0 && evaluatedCriteria >= totalExpected;
 
     // Rollup do evento = publicação parcial mais recente entre os critérios
-    // (a fonte real agora é por critério, ver criteriaDetails[].partialPublishedAt).
-    const partialTimestamps = eventCriteriaRows.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
+    // incluídos em criteriaDetails (exclui inativos sem calibração).
+    const criteriaDetailIds = new Set(criteriaDetails.map(cd => cd.criterionId));
+    const partialTimestamps = eventCriteriaRows
+      .filter(r => criteriaDetailIds.has(r.criterionId))
+      .map(c => c.partialPublishedAt)
+      .filter((d): d is Date => d != null);
     const partialPublishedAt = partialTimestamps.length > 0
       ? new Date(Math.max(...partialTimestamps.map(d => d.getTime())))
       : null;
@@ -262,6 +273,7 @@ router.get("/my-performance", async (req, res) => {
       // Trava mestra: evento só conta para média/elegibilidade depois de
       // confirmado por admin/RH (mesma regra de recomputeCycleResults).
       resultsConfirmed: p.resultsConfirmed ?? false,
+      isHistorical: p.isHistorical ?? false,
       reviewRequest: (() => {
         const rr = reviewRequestByEvent.get(p.eventId);
         if (!rr) return null;

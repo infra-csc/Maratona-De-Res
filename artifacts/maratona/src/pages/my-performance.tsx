@@ -84,6 +84,7 @@ interface EventSummary {
   criteriaDetails: CriterionDetail[];
   countsForScore: boolean;
   resultsConfirmed: boolean;
+  isHistorical?: boolean;
   reviewRequest: ReviewRequest | null;
 }
 
@@ -421,9 +422,13 @@ function EventCard({ event }: { event: EventSummary }) {
   const visibleCriteria = allActiveCriteria.filter(c => c.scoreUsed !== null);
   // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
   const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
-  // "Todos avaliados" = todos os critérios que têm nota também têm publicação final
+  // "Todos avaliados" = todos os critérios com nota têm publicação final,
+  // OU o evento é histórico e já tem pelo menos um critério calibrado.
   const criteriaWithScore = allActiveCriteria.filter(c => c.scoreUsed !== null);
-  const allScoredAreFinal = criteriaWithScore.length > 0 && criteriaWithScore.every(c => !!c.finalPublishedAt);
+  const allScoredAreFinal = criteriaWithScore.length > 0 && (
+    criteriaWithScore.every(c => !!c.finalPublishedAt) ||
+    !!event.isHistorical
+  );
   const publishLabel = event.feedbackReleased
     ? `Nota Final Confirmada${event.feedbackReleasedAt ? ` · ${formatDateTime(event.feedbackReleasedAt)}` : ""}`
     : allScoredAreFinal
@@ -635,10 +640,12 @@ export default function MyPerformancePage() {
       (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
       (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase());
     // "Avaliado" = feedbackReleased (admin finalizou) OU todos os critérios
-    // com nota têm publicação final (allScoredAreFinal)
-    // feedbackReleased cobre eventos históricos (scoreUsed=null, usam importedScore)
+    // com nota têm publicação final (allScoredAreFinal) OU evento histórico
+    // com pelo menos um critério calibrado.
     const scoredCriteria = ev.criteriaDetails.filter(c => Number(c.weight) > 0 && c.scoreUsed !== null);
-    const allScoredAreFinal = scoredCriteria.length > 0 && scoredCriteria.every(c => !!c.finalPublishedAt);
+    const allScoredAreFinal = scoredCriteria.length > 0 && (
+      scoredCriteria.every(c => !!c.finalPublishedAt) || !!ev.isHistorical
+    );
     const allFinal = ev.feedbackReleased || allScoredAreFinal;
     const matchesStatus = statusFilter === "all"
       || (statusFilter === "avaliado" && allFinal)
