@@ -321,8 +321,11 @@ router.get("/employees/:id/history", async (req, res) => {
   })));
 });
 
-// GET /employees/casa-pins — lista PINs atuais de todos os colaboradores casa
+// GET /employees/casa-pins — lista PINs atuais; filtra por ids se fornecido (?ids=1,2,3)
 router.get("/employees/casa-pins", requireRole("admin", "rh"), async (req, res) => {
+  const rawIds = req.query.ids as string | undefined;
+  const ids = rawIds ? rawIds.split(",").map(Number).filter(Boolean) : null;
+
   const rows = await db
     .select({
       name: employeesTable.name,
@@ -336,6 +339,7 @@ router.get("/employees/casa-pins", requireRole("admin", "rh"), async (req, res) 
         eq(employeesTable.employmentType, "casa"),
         eq(employeesTable.active, true),
         isNotNull(usersTable.pinValue),
+        ids ? inArray(employeesTable.id, ids) : undefined,
       )
     )
     .orderBy(employeesTable.name);
@@ -343,12 +347,18 @@ router.get("/employees/casa-pins", requireRole("admin", "rh"), async (req, res) 
   res.json({ results: rows });
 });
 
-// POST /employees/bulk-generate-pins — gera PINs para TODOS os colaboradores casa ativos
+// POST /employees/bulk-generate-pins — gera PINs; filtra por ids se fornecido no body
 router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (req, res) => {
+  const ids: number[] | null = Array.isArray(req.body?.ids) && req.body.ids.length > 0 ? req.body.ids : null;
+
   const casaEmployees = await db
     .select({ id: employeesTable.id, name: employeesTable.name, document: employeesTable.document })
     .from(employeesTable)
-    .where(and(eq(employeesTable.employmentType, "casa"), eq(employeesTable.active, true)));
+    .where(and(
+      eq(employeesTable.employmentType, "casa"),
+      eq(employeesTable.active, true),
+      ids ? inArray(employeesTable.id, ids) : undefined,
+    ));
 
   const results: { name: string; cpfLogin: string; pin: string }[] = [];
   const skipped: { name: string; reason: string }[] = [];

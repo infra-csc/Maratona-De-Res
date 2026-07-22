@@ -125,12 +125,12 @@ export default function EmployeesPage() {
   const [bulkPinSource, setBulkPinSource] = useState<"loaded" | "generated">("loaded");
   const [confirmRegen, setConfirmRegen] = useState(false);
 
-  // Load current PINs from DB whenever the dialog opens
+  // Load current PINs from DB whenever the dialog opens (only for the 22 Galpão Casa IDs)
   useEffect(() => {
     if (!bulkPinOpen) return;
     let cancelled = false;
     setBulkPinLoading(true);
-    fetch("/api/employees/casa-pins", { headers: { "Authorization": `Bearer ${token}` } })
+    fetch(`/api/employees/casa-pins?ids=${GALP_CASA_IDS.join(",")}`, { headers: { "Authorization": `Bearer ${token}` } })
       .then(r => r.json())
       .then((data: { results: BulkPinEntry[] }) => {
         if (!cancelled) {
@@ -150,7 +150,8 @@ export default function EmployeesPage() {
     try {
       const res = await fetch("/api/employees/bulk-generate-pins", {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: GALP_CASA_IDS }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
       const data = await res.json() as { results: BulkPinEntry[]; skipped: BulkPinSkip[] };
