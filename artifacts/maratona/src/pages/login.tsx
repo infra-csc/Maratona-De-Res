@@ -9,6 +9,18 @@ const ACCENT = "#ccff00";
 const ACCENT_HOVER = "#b8e600";
 const ACCENT_FG = "#161e00";
 
+// Login page always uses its own dark palette — independent of system theme
+const PAGE_BG = "#0b1200";
+const CARD_BG = "#0d0d0d";
+const CARD_BORDER = "#ccff00";
+const CARD_BORDER_ACCENT = "#ccff00";
+const INPUT_BG = "#181818";
+const INPUT_BORDER = "rgba(255,255,255,0.12)";
+const LABEL_COLOR = ACCENT;
+const TEXT_COLOR = "rgba(255,255,255,0.9)";
+const MUTED_COLOR = "#ccff0055";
+const HINT_COLOR = "rgba(255,255,255,0.35)";
+
 export default function LoginPage() {
   const [value, setValue] = useState("");
   const [password, setPassword] = useState("");
@@ -63,19 +75,19 @@ export default function LoginPage() {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
-      style={{ backgroundColor: "hsl(var(--background))" }}
+      style={{ backgroundColor: PAGE_BG }}
     >
       {/* Branding */}
-      <div className="mb-10 text-center">
+      <div className="mb-10 text-center select-none">
         <p
-          className="text-5xl font-black uppercase leading-none tracking-tight"
-          style={{ fontFamily: CONDENSED, color: "var(--brand-heading)" }}
+          className="text-6xl font-black uppercase leading-none tracking-tight"
+          style={{ fontFamily: CONDENSED, color: ACCENT }}
         >
           Maratona
         </p>
         <p
-          className="text-5xl font-black uppercase leading-none tracking-tight"
-          style={{ fontFamily: CONDENSED, color: "var(--brand-heading-sub)" }}
+          className="text-6xl font-black uppercase leading-none tracking-tight"
+          style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.30)" }}
         >
           de Resultados
         </p>
@@ -85,9 +97,9 @@ export default function LoginPage() {
       <div className="w-full" style={{ maxWidth: 420 }}>
         <div
           style={{
-            backgroundColor: "hsl(var(--card))",
-            border: `2px solid ${ACCENT}33`,
-            color: "hsl(var(--card-foreground))",
+            backgroundColor: CARD_BG,
+            border: `1.5px solid ${CARD_BORDER}`,
+            color: TEXT_COLOR,
           }}
         >
           {step === "main" && (
@@ -95,10 +107,7 @@ export default function LoginPage() {
               <div>
                 <label
                   className="block text-[11px] font-black uppercase tracking-widest mb-2"
-                  style={{
-                    fontFamily: CONDENSED,
-                    color: "hsl(var(--muted-foreground))",
-                  }}
+                  style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
                 >
                   {isPin ? "Senha" : "Senha ou E-mail"}
                 </label>
@@ -119,17 +128,17 @@ export default function LoginPage() {
                     fontSize: isPin ? 32 : 16,
                     letterSpacing: isPin ? "0.55em" : "0.02em",
                     textAlign: isPin ? "center" : "left",
-                    backgroundColor: "hsl(var(--secondary))",
-                    border: `1px solid hsl(var(--border))`,
-                    color: "hsl(var(--foreground))",
+                    backgroundColor: INPUT_BG,
+                    border: `1px solid ${INPUT_BORDER}`,
+                    color: TEXT_COLOR,
                   }}
-                  onFocus={e => (e.currentTarget.style.borderColor = ACCENT)}
-                  onBlur={e => (e.currentTarget.style.borderColor = "hsl(var(--border))")}
+                  onFocus={e => (e.currentTarget.style.borderColor = CARD_BORDER_ACCENT)}
+                  onBlur={e => (e.currentTarget.style.borderColor = INPUT_BORDER)}
                 />
                 {!isPin && value.length === 0 && (
                   <p
                     className="text-[10px] mt-1.5"
-                    style={{ fontFamily: CONDENSED, color: "hsl(var(--muted-foreground))", opacity: 0.7 }}
+                    style={{ fontFamily: CONDENSED, color: HINT_COLOR }}
                   >
                     Colaboradores: digitem a senha de 4 dígitos recebida
                   </p>
@@ -138,24 +147,20 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading || !value.trim()}
-                className="w-full font-black uppercase flex items-center justify-center gap-2 transition-colors"
+                disabled={loading}
+                className="w-full font-black uppercase flex items-center justify-center gap-2 transition-all"
                 style={{
                   fontFamily: CONDENSED,
                   letterSpacing: "0.1em",
-                  backgroundColor: loading || !value.trim() ? `${ACCENT}80` : ACCENT,
+                  backgroundColor: loading ? `${ACCENT}60` : ACCENT,
                   color: ACCENT_FG,
                   height: 52,
                   border: "none",
-                  cursor: loading || !value.trim() ? "not-allowed" : "pointer",
+                  cursor: loading ? "not-allowed" : "pointer",
                   fontSize: 15,
                 }}
-                onMouseEnter={e => {
-                  if (!loading && value.trim()) e.currentTarget.style.backgroundColor = ACCENT_HOVER;
-                }}
-                onMouseLeave={e => {
-                  if (!loading && value.trim()) e.currentTarget.style.backgroundColor = ACCENT;
-                }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT_HOVER; }}
+                onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT; }}
               >
                 {loading
                   ? "Autenticando…"
@@ -172,20 +177,20 @@ export default function LoginPage() {
               <div
                 className="flex items-center gap-3 px-4 py-3"
                 style={{
-                  backgroundColor: `${ACCENT}0d`,
-                  border: `1px solid ${ACCENT}33`,
+                  backgroundColor: `${ACCENT}0a`,
+                  border: `1px solid ${ACCENT}25`,
                 }}
               >
                 <div className="flex-1 min-w-0">
                   <p
                     className="text-[10px] font-black uppercase tracking-widest"
-                    style={{ fontFamily: CONDENSED, color: `${ACCENT}99` }}
+                    style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
                   >
                     {isEmail ? "E-mail" : "CPF"}
                   </p>
                   <p
                     className="font-black text-sm truncate"
-                    style={{ fontFamily: CONDENSED, color: "hsl(var(--foreground))" }}
+                    style={{ fontFamily: CONDENSED, color: TEXT_COLOR }}
                   >
                     {value}
                   </p>
@@ -196,7 +201,7 @@ export default function LoginPage() {
                   className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide"
                   style={{
                     fontFamily: CONDENSED,
-                    color: "hsl(var(--muted-foreground))",
+                    color: LABEL_COLOR,
                     background: "none",
                     border: "none",
                     cursor: "pointer",
@@ -209,7 +214,7 @@ export default function LoginPage() {
               <div>
                 <label
                   className="block text-[11px] font-black uppercase tracking-widest mb-2"
-                  style={{ fontFamily: CONDENSED, color: "hsl(var(--muted-foreground))" }}
+                  style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
                 >
                   Senha
                 </label>
@@ -227,12 +232,12 @@ export default function LoginPage() {
                     padding: "0 16px",
                     fontSize: 16,
                     letterSpacing: "0.02em",
-                    backgroundColor: "hsl(var(--secondary))",
-                    border: `1px solid hsl(var(--border))`,
-                    color: "hsl(var(--foreground))",
+                    backgroundColor: INPUT_BG,
+                    border: `1px solid ${INPUT_BORDER}`,
+                    color: TEXT_COLOR,
                   }}
-                  onFocus={e => (e.currentTarget.style.borderColor = ACCENT)}
-                  onBlur={e => (e.currentTarget.style.borderColor = "hsl(var(--border))")}
+                  onFocus={e => (e.currentTarget.style.borderColor = CARD_BORDER_ACCENT)}
+                  onBlur={e => (e.currentTarget.style.borderColor = INPUT_BORDER)}
                 />
               </div>
 
@@ -243,8 +248,8 @@ export default function LoginPage() {
                 style={{
                   fontFamily: CONDENSED,
                   letterSpacing: "0.1em",
-                  backgroundColor: loading ? `${ACCENT}80` : ACCENT,
-                  color: ACCENT_FG,
+                  backgroundColor: loading ? `${ACCENT}40` : ACCENT,
+                  color: loading ? `${ACCENT_FG}80` : ACCENT_FG,
                   height: 52,
                   border: "none",
                   cursor: loading ? "not-allowed" : "pointer",
@@ -261,7 +266,7 @@ export default function LoginPage() {
 
         <p
           className="text-center text-[9px] font-bold uppercase tracking-widest mt-5"
-          style={{ color: "hsl(var(--muted-foreground))", opacity: 0.5 }}
+          style={{ color: MUTED_COLOR }}
         >
           Sistema exclusivo • Uso restrito
         </p>
