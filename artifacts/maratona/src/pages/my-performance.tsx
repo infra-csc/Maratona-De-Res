@@ -415,18 +415,14 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
 
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
-  // Apenas critérios calibrados (finalPublishedAt) e com peso > 0
-  // Todos os critérios ativos com peso > 0 (para contagem total)
-  const allActiveCriteria = event.criteriaDetails.filter(c => Number(c.weight) > 0);
-  // Apenas os calibrados (scoreUsed != null) — colaborador só vê nota calibrada
-  const visibleCriteria = allActiveCriteria.filter(c => c.scoreUsed !== null);
+  // Todos os critérios calibrados (scoreUsed !== null) — peso=0 incluído.
+  // Critério calibrado mas com peso=0 foi avaliado: colaborador deve ver.
+  const visibleCriteria = event.criteriaDetails.filter(c => c.scoreUsed !== null);
   // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
   const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
-  // "Todos avaliados" = todos os critérios com nota têm publicação final,
-  // OU o evento é histórico e já tem pelo menos um critério calibrado.
-  const criteriaWithScore = allActiveCriteria.filter(c => c.scoreUsed !== null);
-  const allScoredAreFinal = criteriaWithScore.length > 0 && (
-    criteriaWithScore.every(c => !!c.finalPublishedAt) ||
+  // "Todos avaliados" = todos os calibrados têm publicação final, ou evento histórico.
+  const allScoredAreFinal = visibleCriteria.length > 0 && (
+    visibleCriteria.every(c => !!c.finalPublishedAt) ||
     !!event.isHistorical
   );
   const publishLabel = event.feedbackReleased
@@ -485,7 +481,7 @@ function EventCard({ event }: { event: EventSummary }) {
                 <span className="flex items-center gap-1"><MapPin size={11} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
               )}
               {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
-              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.length}/{allActiveCriteria.length}</span>
+              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.length}</span>
             </div>
           </div>
         </div>
@@ -639,12 +635,11 @@ export default function MyPerformancePage() {
       ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
       (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
       (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase());
-    // "Avaliado" = feedbackReleased (admin finalizou) OU todos os critérios
-    // com nota têm publicação final (allScoredAreFinal) OU evento histórico
-    // com pelo menos um critério calibrado.
-    const scoredCriteria = ev.criteriaDetails.filter(c => Number(c.weight) > 0 && c.scoreUsed !== null);
-    const allScoredAreFinal = scoredCriteria.length > 0 && (
-      scoredCriteria.every(c => !!c.finalPublishedAt) || !!ev.isHistorical
+    // "Avaliado" = feedbackReleased OU todos os calibrados (peso=0 incluso)
+    // têm publicação final OU evento histórico.
+    const visibleCriteria = ev.criteriaDetails.filter(c => c.scoreUsed !== null);
+    const allScoredAreFinal = visibleCriteria.length > 0 && (
+      visibleCriteria.every(c => !!c.finalPublishedAt) || !!ev.isHistorical
     );
     const allFinal = ev.feedbackReleased || allScoredAreFinal;
     const matchesStatus = statusFilter === "all"
