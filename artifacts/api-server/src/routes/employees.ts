@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
-import { eq, and, inArray, ne, notInArray } from "drizzle-orm";
+import { eq, and, inArray, ne, notInArray, isNotNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -319,6 +319,28 @@ router.get("/employees/:id/history", async (req, res) => {
     bonusValue: parseFloat(r.bonusValue),
     eventBreakdown: [],
   })));
+});
+
+// GET /employees/casa-pins — lista PINs atuais de todos os colaboradores casa
+router.get("/employees/casa-pins", requireRole("admin", "rh"), async (req, res) => {
+  const rows = await db
+    .select({
+      name: employeesTable.name,
+      cpfLogin: usersTable.cpfLogin,
+      pin: usersTable.pinValue,
+    })
+    .from(employeesTable)
+    .innerJoin(usersTable, eq(usersTable.employeeId, employeesTable.id))
+    .where(
+      and(
+        eq(employeesTable.employmentType, "casa"),
+        eq(employeesTable.active, true),
+        isNotNull(usersTable.pinValue),
+      )
+    )
+    .orderBy(employeesTable.name);
+
+  res.json({ results: rows });
 });
 
 // POST /employees/bulk-generate-pins — gera PINs para TODOS os colaboradores casa ativos

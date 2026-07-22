@@ -122,9 +122,31 @@ export default function EmployeesPage() {
   const [bulkPinOpen, setBulkPinOpen] = useState(false);
   const [bulkPinLoading, setBulkPinLoading] = useState(false);
   const [bulkPinResult, setBulkPinResult] = useState<{ results: BulkPinEntry[]; skipped: BulkPinSkip[] } | null>(null);
+  const [bulkPinSource, setBulkPinSource] = useState<"loaded" | "generated">("loaded");
+  const [confirmRegen, setConfirmRegen] = useState(false);
+
+  // Load current PINs from DB whenever the dialog opens
+  useEffect(() => {
+    if (!bulkPinOpen) return;
+    let cancelled = false;
+    setBulkPinLoading(true);
+    fetch("/api/employees/casa-pins", { headers: { "Authorization": `Bearer ${token}` } })
+      .then(r => r.json())
+      .then((data: { results: BulkPinEntry[] }) => {
+        if (!cancelled) {
+          setBulkPinResult(data.results.length > 0 ? { results: data.results, skipped: [] } : null);
+          setBulkPinSource("loaded");
+          setConfirmRegen(false);
+        }
+      })
+      .catch(() => { if (!cancelled) setBulkPinResult(null); })
+      .finally(() => { if (!cancelled) setBulkPinLoading(false); });
+    return () => { cancelled = true; };
+  }, [bulkPinOpen, token]);
 
   const handleBulkGeneratePins = useCallback(async () => {
     setBulkPinLoading(true);
+    setConfirmRegen(false);
     try {
       const res = await fetch("/api/employees/bulk-generate-pins", {
         method: "POST",
@@ -133,6 +155,7 @@ export default function EmployeesPage() {
       if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
       const data = await res.json() as { results: BulkPinEntry[]; skipped: BulkPinSkip[] };
       setBulkPinResult(data);
+      setBulkPinSource("generated");
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
     } catch (e) {
       toast({ title: "Erro ao gerar PINs", description: (e as Error).message, variant: "destructive" });
@@ -1007,11 +1030,15 @@ export default function EmployeesPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {!bulkPinResult ? (
+          {bulkPinLoading && !bulkPinResult ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Hash size={24} className="animate-spin" style={{ color: "#ccff00" }} />
+              <p className="text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Carregando senhas…</p>
+            </div>
+          ) : !bulkPinResult ? (
             <div className="space-y-4 pt-1">
               <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                Gera uma senha de 4 dígitos nova para <strong>todos</strong> os colaboradores casa ativos com CPF cadastrado.
-                Senhas anteriores serão substituídas imediatamente.
+                Nenhuma senha gerada ainda. Clique abaixo para gerar senhas de 4 dígitos para todos os colaboradores casa ativos com CPF cadastrado.
               </p>
               <div className="flex justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
                 <button onClick={() => setBulkPinOpen(false)} className="h-10 px-4 rounded-lg font-bold text-sm uppercase" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
@@ -1021,17 +1048,19 @@ export default function EmployeesPage() {
                   className="h-10 px-5 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-60"
                   style={{ backgroundColor: "#ccff00", color: "#000" }}
                 >
-                  {bulkPinLoading ? <><Hash size={15} className="animate-spin" /> Gerando…</> : <><Hash size={15} /> Gerar todos os PINs</>}
+                  <Hash size={15} /> Gerar todos os PINs
                 </button>
               </div>
             </div>
           ) : (
             <div className="space-y-3 pt-1">
-              {/* Stats */}
-              <div className="flex gap-3">
+              {/* Stats + source badge */}
+              <div className="flex gap-3 items-stretch">
                 <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
                   <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>{bulkPinResult.results.length}</p>
-                  <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Senhas geradas</p>
+                  <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+                    {bulkPinSource === "generated" ? "Senhas geradas agora" : "Senhas ativas"}
+                  </p>
                 </div>
                 {bulkPinResult.skipped.length > 0 && (
                   <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
@@ -1114,16 +1143,33 @@ export default function EmployeesPage() {
                     <Copy size={13} /> Copiar lista
                   </button>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  {confirmRegen ? (
+                    <>
+                      <span className="text-[11px] font-bold" style={{ color: WARNING }}>Substituir todas as senhas?</span>
+                      <button
+                        onClick={handleBulkGeneratePins}
+                        disabled={bulkPinLoading}
+                        className="h-9 px-3 rounded-lg font-black text-xs uppercase flex items-center gap-1 disabled:opacity-60"
+                        style={{ backgroundColor: WARNING, color: "#000", cursor: "pointer" }}
+                      >
+                        {bulkPinLoading ? <Hash size={12} className="animate-spin" /> : <Hash size={12} />} Confirmar
+                      </button>
+                      <button onClick={() => setConfirmRegen(false)} className="h-9 px-3 rounded-lg font-bold text-xs uppercase" style={{ border: "1px solid var(--border)", cursor: "pointer" }}>
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRegen(true)}
+                      className="h-9 px-4 rounded-lg font-bold text-xs uppercase flex items-center gap-1"
+                      style={{ border: "1px solid var(--border)", cursor: "pointer" }}
+                    >
+                      <Hash size={13} /> Gerar novas senhas
+                    </button>
+                  )}
                   <button
-                    onClick={() => setBulkPinResult(null)}
-                    className="h-9 px-4 rounded-lg font-bold text-xs uppercase"
-                    style={{ border: "1px solid var(--border)", cursor: "pointer" }}
-                  >
-                    <Hash size={13} className="inline mr-1" />Gerar novamente
-                  </button>
-                  <button
-                    onClick={() => { setBulkPinOpen(false); setBulkPinResult(null); }}
+                    onClick={() => { setBulkPinOpen(false); setBulkPinResult(null); setConfirmRegen(false); }}
                     className="h-9 px-4 rounded-lg font-bold text-xs uppercase"
                     style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", cursor: "pointer" }}
                   >
