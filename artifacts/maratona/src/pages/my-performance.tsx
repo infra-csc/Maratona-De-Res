@@ -1001,16 +1001,34 @@ export default function MyPerformancePage() {
                       </div>
                     </div>
                   </div>
-                  {entries.length > 2 && (
-                    <div className="mt-4 pt-3 grid grid-cols-2 sm:grid-cols-3 gap-2" style={{ borderTop: "1px solid var(--border)" }}>
-                      {entries.slice(1, entries.length - 1).map(e => (
-                        <div key={e.name} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "var(--muted)" }}>
-                          <span className="text-[11px] font-bold text-foreground truncate">{e.name}</span>
-                          <span className="text-[11px] font-black shrink-0" style={{ color: scoreColor(e.avg * 10) }}>{e.avg.toFixed(1)}</span>
+                  {/* Ranking completo de todos os critérios */}
+                  <div className="mt-4 pt-3 space-y-2" style={{ borderTop: "1px solid var(--border)" }}>
+                    <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground mb-2">Ranking de Quesitos</p>
+                    {entries.map((e, i) => {
+                      const isFirst = i === 0;
+                      const isLast = i === entries.length - 1;
+                      return (
+                        <div key={e.name} className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-muted-foreground w-4 shrink-0 text-right">{i + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-[11px] font-bold text-foreground truncate">{e.name}</span>
+                              {isFirst && <span className="text-[8px] font-black uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(204,255,0,0.15)", color: "#7a9200" }}>melhor</span>}
+                              {isLast && entries.length > 1 && <span className="text-[8px] font-black uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(134,34,0,0.08)", color: "#c05020" }}>a desenvolver</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--border)" }}>
+                                <div className="h-full rounded-full" style={{ width: `${(e.avg / 10) * 100}%`, backgroundColor: isFirst ? "#ccff00" : scoreColor(e.avg * 10) }} />
+                              </div>
+                              <span className="text-[12px] font-black shrink-0 w-[28px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: isFirst ? "#7a9200" : (scoreColor(e.avg * 10) === "#ccff00" ? "#7a9200" : scoreColor(e.avg * 10)) }}>
+                                {e.avg.toFixed(1)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })()}
