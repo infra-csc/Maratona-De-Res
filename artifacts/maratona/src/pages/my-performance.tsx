@@ -847,21 +847,23 @@ export default function MyPerformancePage() {
                   <div className="divide-y" style={{ borderColor: "var(--border)" }}>
                     {scoredEvts.map((ev, i) => (
                       <div key={ev.eventId} className="flex items-center gap-3 px-5 py-3">
-                        <span className="text-[10px] font-black text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                        <span className="text-[10px] font-black text-muted-foreground w-5 shrink-0 text-right">{i + 1}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-bold text-foreground truncate">{ev.eventName}</p>
-                          {ev.startDate && (
-                            <p className="text-[10px] text-muted-foreground">{new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
-                          )}
-                        </div>
-                        <div className="shrink-0 w-[100px]">
-                          <div className="h-[3px] rounded-full overflow-hidden mb-1" style={{ backgroundColor: "var(--muted)" }}>
-                            <div className="h-full rounded-full" style={{ width: `${ev.eventScore}%`, backgroundColor: scoreColor(ev.eventScore) }} />
+                          <div className="flex items-baseline justify-between gap-2 mb-1">
+                            <p className="text-[12px] font-bold text-foreground truncate">{ev.eventName}</p>
+                            {ev.startDate && (
+                              <span className="text-[10px] text-muted-foreground shrink-0">{new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--border)" }}>
+                              <div className="h-full rounded-full" style={{ width: `${ev.eventScore}%`, backgroundColor: scoreColor(ev.eventScore) }} />
+                            </div>
+                            <span className="text-[15px] font-black shrink-0 w-[42px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(ev.eventScore) === "#ccff00" ? "var(--foreground)" : scoreColor(ev.eventScore) }}>
+                              {ev.eventScore.toFixed(1)}
+                            </span>
                           </div>
                         </div>
-                        <span className="text-[14px] font-black shrink-0 w-[44px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(ev.eventScore) }}>
-                          {ev.eventScore.toFixed(1)}
-                        </span>
                       </div>
                     ))}
                   </div>
