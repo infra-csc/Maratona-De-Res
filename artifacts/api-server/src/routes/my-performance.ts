@@ -102,7 +102,8 @@ router.get("/my-performance", async (req, res) => {
     // conta para o colaborador — mesma regra do fechamento e do ranking da prova.
     if (p.participantConfirmed === false) continue;
 
-    // event_criteria deste evento (inclui eventScoped para cálculo de nota)
+    // Todos os event_criteria deste evento — SEM filtro active, pois critérios
+    // inativos que já foram calibrados ainda devem aparecer para o colaborador.
     const eventCriteriaRows = await db
       .select({
         criterionId: eventCriteriaTable.criterionId,
@@ -122,22 +123,7 @@ router.get("/my-performance", async (req, res) => {
       .from(eventCriteriaTable)
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
       .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
-      .where(and(eq(eventCriteriaTable.eventId, p.eventId), eq(eventCriteriaTable.active, true)));
-
-    // Catálogo global de critérios ativos (não-eventScoped) — fonte da verdade
-    // para o total. Eventos antigos podem ter menos linhas em event_criteria,
-    // mas o colaborador sempre vê todos os 5 quesitos do ciclo.
-    const globalCriteria = await db
-      .select({
-        id: criteriaTable.id,
-        name: criteriaTable.name,
-        description: criteriaTable.description,
-        responsibleAreaId: criteriaTable.responsibleAreaId,
-        responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
-        defaultWeight: criteriaTable.defaultWeight,
-      })
-      .from(criteriaTable)
-      .where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
+      .where(eq(eventCriteriaTable.eventId, p.eventId));
 
     // Avaliações do TIME do evento (não por colaborador)
     const [allEvals, allCalibrations, areaAssignmentsRaw] = await Promise.all([
@@ -161,67 +147,49 @@ router.get("/my-performance", async (req, res) => {
 
     const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentsRaw);
 
-    // Constrói criteriaDetails com base no catálogo global — garante que todos
-    // os quesitos aparecem mesmo que o evento não tenha linha em event_criteria.
-    const criteriaDetails = globalCriteria.map(g => {
-      const eventRow = eventCriteriaRows.find(r => r.criterionId === g.id);
-      const weight = parseFloat(((eventRow?.weight ?? g.defaultWeight) ?? "1") as string);
-
-      if (!eventRow) {
-        // Critério existe no catálogo mas não neste evento — sem nota.
+    // Constrói criteriaDetails diretamente dos critérios do evento (não-eventScoped).
+    // Inclui critério se: active=true OU tem calibração (eventos históricos podem ter
+    // critérios desativados mas já calibrados que o colaborador deve ver).
+    const criteriaDetails = eventCriteriaRows
+      .filter(r => !r.eventScoped)
+      .filter(r => r.active || allCalibrations.some(cal => cal.criterionId === r.criterionId))
+      .map(r => {
+        const weight = parseFloat(((r.weight ?? r.defaultWeight) ?? "1") as string);
+        const submittedEvals = allEvals.filter(e => e.criterionId === r.criterionId && e.status === "submitted");
+        const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
+        const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
+        const calibration = allCalibrations.find(cal => cal.criterionId === r.criterionId);
+        const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
+        const scoreUsed = calibratedScore;
+        const completion = getCriterionEvaluationStatus(r.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+        const isEvaluated = calibratedScore !== null || completion.isEvaluated;
+        const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
+        const publicComments = allEvals
+          .filter(e => e.criterionId === r.criterionId && e.commentVisibility === "public" && e.comments)
+          .map(e => e.comments!);
         return {
-          criterionId: g.id,
-          criterionName: g.name,
-          criterionDescription: g.description,
-          responsibleAreaLabel: g.responsibleAreaLabel ?? null,
+          criterionId: r.criterionId!,
+          criterionName: r.criterionName ?? "",
+          criterionDescription: r.criterionDescription ?? null,
+          responsibleAreaLabel: r.responsibleAreaLabel ?? r.responsibleAreaName ?? null,
           weight,
-          scoreUsed: null as number | null,
-          criterionTotal: null as number | null,
-          publicComments: [] as string[],
-          evaluated: false,
-          status: "pendente" as const,
-          partialPublishedAt: null as Date | null,
-          finalPublishedAt: null as Date | null,
+          scoreUsed,
+          criterionTotal,
+          publicComments,
+          evaluated: isEvaluated,
+          status: isEvaluated ? "avaliado" as const : "pendente" as const,
+          partialPublishedAt: r.partialPublishedAt ?? null,
+          finalPublishedAt: r.finalPublishedAt ?? null,
         };
-      }
-
-      // Tem linha no event_criteria — calcula normalmente.
-      const submittedEvals = allEvals.filter(e => e.criterionId === g.id && e.status === "submitted");
-      const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
-      const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
-      const calibration = allCalibrations.find(cal => cal.criterionId === g.id);
-      const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
-      const scoreUsed = calibratedScore;
-      const completion = getCriterionEvaluationStatus(eventRow.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
-      const isEvaluated = calibratedScore !== null || completion.isEvaluated;
-      const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
-      const publicComments = allEvals
-        .filter(e => e.criterionId === g.id && e.commentVisibility === "public" && e.comments)
-        .map(e => e.comments!);
-
-      return {
-        criterionId: g.id,
-        criterionName: g.name,
-        criterionDescription: g.description,
-        responsibleAreaLabel: eventRow.responsibleAreaLabel ?? eventRow.responsibleAreaName ?? null,
-        weight,
-        scoreUsed,
-        criterionTotal,
-        publicComments,
-        evaluated: isEvaluated,
-        status: isEvaluated ? "avaliado" as const : "pendente" as const,
-        partialPublishedAt: eventRow.partialPublishedAt ?? null,
-        finalPublishedAt: eventRow.finalPublishedAt ?? null,
-      };
-    });
+      });
 
     // Mescla critérios duplicados (eventScoped) nos seus pais para o cálculo
-    // da nota. Usa apenas linhas com event_criteria (não os "vazios" do catálogo).
+    // da nota. Usa apenas linhas ATIVAS em event_criteria (inativos são só display).
     const criteriaForCalc = mergeEventScopedCriteria([
       ...criteriaDetails
-        .filter(cd => eventCriteriaRows.some(r => r.criterionId === cd.criterionId))
+        .filter(cd => eventCriteriaRows.some(r => r.criterionId === cd.criterionId && r.active))
         .map(cd => {
-          const row = eventCriteriaRows.find(r => r.criterionId === cd.criterionId)!;
+          const row = eventCriteriaRows.find(r => r.criterionId === cd.criterionId && r.active)!;
           return {
             criterionId: cd.criterionId!,
             weight: cd.weight,
@@ -256,9 +224,9 @@ router.get("/my-performance", async (req, res) => {
     // mostrar "Pelotão Branco" para um evento com Quesitos 0/N.
     const platoon = eventScore > 0 ? getPlatoonByScore(eventScore, platoonRulesMapped) : null;
     const evaluatedCriteria = criteriaDetails.filter(c => c.evaluated).length;
-    // Total sempre baseado no catálogo global — não no que está em event_criteria.
-    const totalExpected = globalCriteria.length;
-    const isComplete = totalExpected > 0 && evaluatedCriteria === totalExpected;
+    // Total = critérios ativos não-eventScoped do evento
+    const totalExpected = eventCriteriaRows.filter(r => r.active && !r.eventScoped).length;
+    const isComplete = totalExpected > 0 && evaluatedCriteria >= totalExpected;
 
     // Rollup do evento = publicação parcial mais recente entre os critérios
     // (a fonte real agora é por critério, ver criteriaDetails[].partialPublishedAt).
