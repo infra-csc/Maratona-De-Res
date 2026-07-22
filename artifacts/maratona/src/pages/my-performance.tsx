@@ -421,13 +421,18 @@ function EventCard({ event }: { event: EventSummary }) {
   const visibleCriteria = allActiveCriteria.filter(c => !!c.finalPublishedAt);
   // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
   const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
+  // "Todos avaliados" = todos os critérios que têm nota também têm publicação final
+  const criteriaWithScore = allActiveCriteria.filter(c => c.scoreUsed !== null);
+  const allScoredAreFinal = criteriaWithScore.length > 0 && criteriaWithScore.every(c => !!c.finalPublishedAt);
   const publishLabel = event.feedbackReleased
     ? `Nota Final Confirmada${event.feedbackReleasedAt ? ` · ${formatDateTime(event.feedbackReleasedAt)}` : ""}`
-    : anyCriterionFinal
-      ? "Avaliado — Projeção Parcial"
-      : event.partialPublishedAt
-        ? `Avaliação Parcial · ${formatDateTime(event.partialPublishedAt)}`
-        : "Pendente";
+    : allScoredAreFinal
+      ? "Avaliado"
+      : anyCriterionFinal
+        ? "Avaliado — Projeção Parcial"
+        : event.partialPublishedAt
+          ? `Avaliação Parcial · ${formatDateTime(event.partialPublishedAt)}`
+          : "Pendente";
 
   return (
     <div className="mb-3 rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}>
@@ -488,11 +493,6 @@ function EventCard({ event }: { event: EventSummary }) {
                 <span className="font-black text-[19px] leading-none" style={{ color: scoreColor(event.eventScore) }}>
                   {event.eventScore.toFixed(1)}
                 </span>
-                {event.projectedPlatoon && (
-                  <span className="block text-[8px] uppercase font-black mt-0.5 whitespace-nowrap" style={{ color: scoreColor(event.eventScore) }}>
-                    {event.projectedPlatoon}
-                  </span>
-                )}
               </div>
               {(() => {
                 const rs = reviewStatusInfo(event.reviewRequest?.status);
@@ -704,11 +704,6 @@ export default function MyPerformancePage() {
                       <p className="text-[10px] font-bold uppercase text-muted-foreground">
                         {summary.isQuarterClosed ? "Resultado oficial" : "Projeção parcial"}
                       </p>
-                      {summary.currentPlatoon && (
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: scoreColor(result), color: result >= 60 ? "#161e00" : "#fff" }}>
-                          {summary.currentPlatoon}
-                        </span>
-                      )}
                       {result !== null && (
                         <span className="text-[9px] font-bold text-muted-foreground">{scoreLabel(result)}</span>
                       )}
@@ -772,11 +767,6 @@ export default function MyPerformancePage() {
                         />
                       ))}
                     </div>
-                    {summary.totalEvents > 0 && (
-                      <p className="text-[9px] text-muted-foreground mt-2">
-                        {summary.totalEvents} evento{summary.totalEvents !== 1 ? "s" : ""} no ciclo · {summary.openEvents > 0 ? `${summary.openEvents} ainda aberto${summary.openEvents !== 1 ? "s" : ""}` : "todos fechados"}
-                      </p>
-                    )}
                   </div>
                 );
               })()}
@@ -839,6 +829,55 @@ export default function MyPerformancePage() {
                 </div>
               </div>
             )}
+
+            {/* Detalhamento dos eventos que compõem a média */}
+            {(() => {
+              const scoredEvts = (data.events ?? [])
+                .filter(ev => ev.resultsConfirmed && ev.countsForScore && ev.eventScore > 0)
+                .sort((a, b) => a.startDate.localeCompare(b.startDate));
+              if (scoredEvts.length === 0) return null;
+              const total = scoredEvts.reduce((s, e) => s + e.eventScore, 0);
+              const avg = total / scoredEvts.length;
+              return (
+                <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Detalhamento da Média ({scoredEvts.length} evento{scoredEvts.length !== 1 ? "s" : ""})</p>
+                    <p className="text-[10px] font-black text-muted-foreground">Soma ÷ Qtd = Média</p>
+                  </div>
+                  <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                    {scoredEvts.map((ev, i) => (
+                      <div key={ev.eventId} className="flex items-center gap-3 px-5 py-3">
+                        <span className="text-[10px] font-black text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-bold text-foreground truncate">{ev.eventName}</p>
+                          {ev.startDate && (
+                            <p className="text-[10px] text-muted-foreground">{new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+                          )}
+                        </div>
+                        <div className="shrink-0 w-[100px]">
+                          <div className="h-[3px] rounded-full overflow-hidden mb-1" style={{ backgroundColor: "var(--muted)" }}>
+                            <div className="h-full rounded-full" style={{ width: `${ev.eventScore}%`, backgroundColor: scoreColor(ev.eventScore) }} />
+                          </div>
+                        </div>
+                        <span className="text-[14px] font-black shrink-0 w-[44px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(ev.eventScore) }}>
+                          {ev.eventScore.toFixed(1)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "var(--muted)", borderTop: "1px solid var(--border)" }}>
+                    <div className="text-[10px] font-black uppercase text-muted-foreground">
+                      Soma: {total.toFixed(1)} ÷ {scoredEvts.length} eventos
+                    </div>
+                    <div className="flex items-baseline gap-1" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      <span className="text-[11px] font-bold text-muted-foreground">=</span>
+                      <span className="font-black text-[20px] leading-none" style={{ color: scoreColor(avg) }}>{avg.toFixed(1)}</span>
+                      <span className="text-[10px] text-muted-foreground">/100</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Penalidades e Méritos */}
             <div>
@@ -971,61 +1010,6 @@ export default function MyPerformancePage() {
               );
             })()}
 
-            {/* Item 7 — Linha do Tempo de notas (sparkline SVG) */}
-            {(() => {
-              const pts = (data.events ?? [])
-                .filter(ev => ev.resultsConfirmed && ev.countsForScore && ev.eventScore > 0 && ev.startDate)
-                .sort((a, b) => a.startDate.localeCompare(b.startDate));
-              if (pts.length < 2) return null;
-              const scores = pts.map(e => e.eventScore);
-              const W = 600, H = 90, PAD = 18;
-              const minS = Math.min(50, ...scores) - 5;
-              const maxS = Math.max(100, ...scores);
-              const toX = (i: number) => PAD + (i / (pts.length - 1)) * (W - PAD * 2);
-              const toY = (s: number) => PAD + ((maxS - s) / (maxS - minS)) * (H - PAD * 2);
-              const pathD = pts.map((e, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(e.eventScore)}`).join(" ");
-              const areaD = `${pathD} L ${toX(pts.length - 1)} ${H} L ${toX(0)} ${H} Z`;
-              return (
-                <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                    <TrendingUp size={13} /> Evolução de Notas no Ciclo
-                  </p>
-                  <div className="w-full overflow-hidden">
-                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 90 }} preserveAspectRatio="none">
-                      {/* Grid lines */}
-                      {[60, 70, 80, 90, 100].map(v => (
-                        <line key={v} x1={PAD} y1={toY(v)} x2={W - PAD} y2={toY(v)} stroke="var(--border)" strokeWidth="0.8" />
-                      ))}
-                      {/* Area fill */}
-                      <path d={areaD} fill="rgba(204,255,0,0.06)" />
-                      {/* Line */}
-                      <path d={pathD} fill="none" stroke="rgba(204,255,0,0.5)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-                      {/* Dots */}
-                      {pts.map((e, i) => (
-                        <circle key={e.eventId} cx={toX(i)} cy={toY(e.eventScore)} r="4" fill={scoreColor(e.eventScore)} stroke="var(--card)" strokeWidth="2" />
-                      ))}
-                    </svg>
-                    {/* Labels abaixo */}
-                    <div className="flex justify-between mt-1 px-[18px]">
-                      {pts.length <= 6
-                        ? pts.map(e => (
-                            <div key={e.eventId} className="text-center" style={{ width: `${100 / pts.length}%` }}>
-                              <div className="text-[8px] font-black leading-none" style={{ color: scoreColor(e.eventScore) }}>{e.eventScore.toFixed(0)}</div>
-                              <div className="text-[7px] text-muted-foreground truncate mt-0.5">{e.startDate ? new Date(e.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}</div>
-                            </div>
-                          ))
-                        : (
-                          <>
-                            <div className="text-[8px] text-muted-foreground">{new Date(pts[0].startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</div>
-                            <div className="text-[9px] font-black text-muted-foreground">{pts.length} eventos</div>
-                            <div className="text-[8px] text-muted-foreground">{new Date(pts[pts.length - 1].startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</div>
-                          </>
-                        )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* Histórico de Eventos */}
             <div>
