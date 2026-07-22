@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, areaConformityRoutingTable } from "@workspace/db";
-import { eq, and, sql, inArray, ilike, or } from "drizzle-orm";
+import { eq, and, sql, inArray, ilike, or, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
@@ -1335,6 +1335,69 @@ router.delete("/events/:id/criteria/:eventCriterionId", requireRole("admin", "rh
   await db.delete(eventCriteriaTable).where(eq(eventCriteriaTable.id, ecId));
   await db.delete(criteriaTable).where(eq(criteriaTable.id, link.criterionId));
   await audit(req.user!.userId, "delete", "criteria", link.criterionId, crit, null);
+  res.json(await loadEventDetail(eventId));
+});
+
+/**
+ * PATCH /events/:id/criteria/:ecId/swap-source
+ * Admin corrige a origem de um quesito DUPLICADO (eventScoped) mesmo quando o
+ * evento já possui avaliações: altera name + source_criterion_id sem tocar nas
+ * avaliações existentes — elas permanecem vinculadas ao mesmo criterionId.
+ * Body: { sourceCriterionId: number }
+ */
+router.patch("/events/:id/criteria/:ecId/swap-source", requireRole("admin"), async (req, res) => {
+  const eventId = parseInt(req.params.id as string);
+  const ecId = parseInt(req.params.ecId as string);
+
+  const [link] = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.id, ecId), eq(eventCriteriaTable.eventId, eventId)))
+    .limit(1);
+  if (!link) { res.status(404).json({ error: "Critério do evento não encontrado" }); return; }
+
+  const [crit] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, link.criterionId)).limit(1);
+  if (!crit?.eventScoped) {
+    res.status(400).json({ error: "Apenas quesitos duplicados podem ter a origem trocada." });
+    return;
+  }
+
+  const newSourceId = Number(req.body?.sourceCriterionId);
+  if (!newSourceId) { res.status(400).json({ error: "Informe o novo critério de origem (sourceCriterionId)" }); return; }
+
+  const [newSource] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, newSourceId)).limit(1);
+  if (!newSource || newSource.eventScoped) {
+    res.status(400).json({ error: "Critério de origem inválido" }); return;
+  }
+
+  const [srcLink] = await db.select().from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, newSourceId)))
+    .limit(1);
+  if (!srcLink) { res.status(404).json({ error: "Critério de origem não está vinculado a este evento" }); return; }
+
+  // Deriva nome sequencial baseado no novo source
+  const allNames = await db.select({ name: criteriaTable.name })
+    .from(criteriaTable)
+    .innerJoin(eventCriteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .where(and(eq(eventCriteriaTable.eventId, eventId), ne(criteriaTable.id, link.criterionId)));
+  const baseName = newSource.name;
+  const nums = allNames.map(c => {
+    const m = c.name.match(new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\((\\d+)\\)$`));
+    return m ? parseInt(m[1]) : null;
+  }).filter((n): n is number => n !== null);
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 2;
+  const newName = `${baseName} (${next})`;
+
+  await db.update(criteriaTable)
+    .set({
+      name: newName,
+      sourceCriterionId: newSourceId,
+      responsibleAreaId: newSource.responsibleAreaId,
+      responsibleAreaLabel: newSource.responsibleAreaLabel,
+    })
+    .where(eq(criteriaTable.id, link.criterionId));
+
+  await audit(req.user!.userId, "swap-source", "criteria", link.criterionId,
+    { oldSource: crit.sourceCriterionId, oldName: crit.name },
+    { newSource: newSourceId, newName });
   res.json(await loadEventDetail(eventId));
 });
 

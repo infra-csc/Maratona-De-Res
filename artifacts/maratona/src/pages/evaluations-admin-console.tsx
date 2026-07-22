@@ -285,6 +285,9 @@ export function AdminEvaluationsConsole() {
   const [duplicateDialog, setDuplicateDialog] = useState<{ criterionId: number; baseName: string } | null>(null);
   const [duplicateName, setDuplicateName] = useState("");
   const [duplicateAreaId, setDuplicateAreaId] = useState("");
+  const [swapDialog, setSwapDialog] = useState<{ ecId: number; currentName: string } | null>(null);
+  const [swapSourceId, setSwapSourceId] = useState("");
+  const [swapPending, setSwapPending] = useState(false);
 
   const { data: areasList } = useGetAreas({ query: { enabled: canManage, queryKey: ["areas"] as unknown[] } });
   const { data: allRoutings } = useAllCriterionRoutings();
@@ -452,6 +455,26 @@ export function AdminEvaluationsConsole() {
     if (!name) return;
     renameCriterion.mutate({ id: criterionId, data: { name } });
     setEditingName(prev => { const n = { ...prev }; delete n[criterionId]; return n; });
+  };
+  const handleSwapSource = async () => {
+    if (!swapDialog || !selected || !swapSourceId) return;
+    setSwapPending(true);
+    try {
+      const { customFetch } = await import("@/lib/custom-fetch");
+      await customFetch(`/api/events/${selected.id}/criteria/${swapDialog.ecId}/swap-source`, {
+        method: "PATCH",
+        body: JSON.stringify({ sourceCriterionId: Number(swapSourceId) }),
+      });
+      qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected.id) });
+      toast({ title: "Origem corrigida com sucesso" });
+      setSwapDialog(null);
+      setSwapSourceId("");
+    } catch (e: unknown) {
+      const msg = e && typeof e === "object" && "message" in e ? (e as { message: string }).message : String(e);
+      toast({ title: "Erro ao corrigir", description: msg, variant: "destructive" });
+    } finally {
+      setSwapPending(false);
+    }
   };
   const assignAreas = Array.from(
     new Map(
@@ -1279,6 +1302,11 @@ export function AdminEvaluationsConsole() {
                                       Renomear
                                     </button>
                                   )}
+                                  {hasEvaluations && item.eventScoped && user?.role === "admin" && !isEditingName && (
+                                    <button type="button" onClick={() => { setSwapDialog({ ecId: item.id, currentName: item.name }); setSwapSourceId(""); }} title="Corrigir critério de origem" className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)", color: WARNING }}>
+                                      <RefreshCw size={13} /> Corrigir
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     data-testid={`button-duplicate-event-criterion-${item.criterionId}`}
@@ -1440,6 +1468,45 @@ export function AdminEvaluationsConsole() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+
+                <Dialog open={swapDialog !== null} onOpenChange={o => { if (!o) { setSwapDialog(null); setSwapSourceId(""); } }}>
+                  <DialogContent className="rounded-xl max-w-md" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                    <DialogHeader>
+                      <DialogTitle className="uppercase font-black tracking-tight text-lg" style={{ fontFamily: CONDENSED }}>Corrigir Origem do Duplicado</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                      <p className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+                        Quesito duplicado: <span style={{ color: "var(--foreground)" }}>{swapDialog?.currentName}</span>
+                      </p>
+                      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                        As avaliações existentes permanecem vinculadas — só o critério de origem muda. A calibração passará a mesclar este duplicado com o novo critério escolhido.
+                      </p>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Novo critério de origem *</label>
+                        <Select value={swapSourceId} onValueChange={setSwapSourceId}>
+                          <SelectTrigger className="h-9 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--border)" }}>
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(selectedDetail?.criteria ?? [])
+                              .filter(c => !c.eventScoped && c.active)
+                              .map(c => (
+                                <SelectItem key={c.criterionId} value={c.criterionId.toString()} className="text-sm font-bold">
+                                  {c.criterionName}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <button type="button" onClick={() => { setSwapDialog(null); setSwapSourceId(""); }} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
+                      <button type="button" disabled={!swapSourceId || swapPending} onClick={handleSwapSource} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase disabled:opacity-40 transition-colors hover:opacity-90" style={{ backgroundColor: WARNING, color: "#fff" }}>
+                        {swapPending ? "Salvando..." : "Confirmar correção"}
+                      </button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
                   {hasEvaluations && (
