@@ -191,7 +191,7 @@ router.get("/my-performance", async (req, res) => {
       const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
       const calibration = allCalibrations.find(cal => cal.criterionId === g.id);
       const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
-      const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
+      const scoreUsed = calibratedScore;
       const completion = getCriterionEvaluationStatus(eventRow.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
       const isEvaluated = calibratedScore !== null || completion.isEvaluated;
       const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;

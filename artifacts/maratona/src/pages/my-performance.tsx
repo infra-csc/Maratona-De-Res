@@ -417,8 +417,8 @@ function EventCard({ event }: { event: EventSummary }) {
   // Apenas critérios calibrados (finalPublishedAt) e com peso > 0
   // Todos os critérios ativos com peso > 0 (para contagem total)
   const allActiveCriteria = event.criteriaDetails.filter(c => Number(c.weight) > 0);
-  // Apenas os já calibrados (finalPublishedAt) — para exibir as notas
-  const visibleCriteria = allActiveCriteria.filter(c => !!c.finalPublishedAt);
+  // Apenas os calibrados (scoreUsed != null) — colaborador só vê nota calibrada
+  const visibleCriteria = allActiveCriteria.filter(c => c.scoreUsed !== null);
   // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
   const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
   // "Todos avaliados" = todos os critérios que têm nota também têm publicação final
