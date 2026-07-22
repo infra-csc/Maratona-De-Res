@@ -415,7 +415,10 @@ function EventReviewRequest({ event }: { event: EventSummary }) {
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
   // Apenas critérios calibrados (finalPublishedAt) e com peso > 0
-  const visibleCriteria = event.criteriaDetails.filter(c => !!c.finalPublishedAt && Number(c.weight) > 0);
+  // Todos os critérios ativos com peso > 0 (para contagem total)
+  const allActiveCriteria = event.criteriaDetails.filter(c => Number(c.weight) > 0);
+  // Apenas os já calibrados (finalPublishedAt) — para exibir as notas
+  const visibleCriteria = allActiveCriteria.filter(c => !!c.finalPublishedAt);
   // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
   const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
   const publishLabel = event.feedbackReleased
@@ -472,7 +475,7 @@ function EventCard({ event }: { event: EventSummary }) {
                 <span className="flex items-center gap-1"><MapPin size={11} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
               )}
               {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
-              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.filter(c => c.evaluated).length}/{visibleCriteria.length}</span>
+              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.length}/{allActiveCriteria.length}</span>
             </div>
           </div>
         </div>

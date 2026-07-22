@@ -81,27 +81,27 @@ router.get("/events", async (req, res) => {
       const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
       const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false && !c.criterionEventScoped);
       const evCals = calibrations.filter(c => c.eventId === ev.id);
-      // Para históricos, só conta critérios com ao menos uma calibração salva —
-      // critérios ativos sem calibração são órfãos e não devem inflar o denominador.
-      const scorableActiveCriteria = activeCriteria.filter(c => {
+      // Todos os critérios ativos com peso > 0 — denominador correto para o total.
+      const allScorableCriteria = activeCriteria.filter(c => {
         const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
-        return w > 0 && evCals.some(cal => cal.criterionId === c.criterionId);
+        return w > 0;
       });
-      const calibratedCriteriaCount = scorableActiveCriteria.filter(c =>
+      // Critérios com calibração salva (para contadores de calibração).
+      const calibratedCriteriaCount = allScorableCriteria.filter(c =>
         evCals.some(cal => cal.criterionId === c.criterionId && cal.calibratedScore !== null)
       ).length;
-      const finalCalibratedCriteria = scorableActiveCriteria.filter(c => c.finalPublishedAt != null).length;
-      const fullyCalibrated = scorableActiveCriteria.length > 0 && finalCalibratedCriteria === scorableActiveCriteria.length;
+      const finalCalibratedCriteria = allScorableCriteria.filter(c => c.finalPublishedAt != null).length;
+      const fullyCalibrated = allScorableCriteria.length > 0 && finalCalibratedCriteria === allScorableCriteria.length;
       const partialTimestamps = activeCriteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
       const partialPublishedAt = partialTimestamps.length > 0
         ? new Date(Math.max(...partialTimestamps.map(d => d.getTime()))) : null;
-      const partialPublishedCount = scorableActiveCriteria.filter(c => c.partialPublishedAt != null).length;
+      const partialPublishedCount = allScorableCriteria.filter(c => c.partialPublishedAt != null).length;
       const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
       return {
         ...ev,
         participantCount,
         evaluationProgress: 1,
-        totalCriteria: scorableActiveCriteria.length,
+        totalCriteria: allScorableCriteria.length,
         evaluatedCriteria: calibratedCriteriaCount,
         submittedCount: 0,
         averageScore: score,
