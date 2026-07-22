@@ -73,6 +73,8 @@
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
+  --brand-heading: #2d5200;
+  --brand-heading-sub: #2d520066;
 
   --background: 210 20% 98%;
   --foreground: 222 47% 11%;
@@ -143,6 +145,8 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
+  --brand-heading: #ccff00;
+  --brand-heading-sub: #ccff0066;
 
   --background: 222 47% 8%;
   --foreground: 210 40% 96%;

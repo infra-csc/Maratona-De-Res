@@ -5,24 +5,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 
 const CONDENSED = "'Barlow Condensed', 'Barlow', sans-serif";
-
-const inputStyle: React.CSSProperties = {
-  backgroundColor: "#13161a",
-  border: "1px solid rgba(255,255,255,0.1)",
-  color: "#fff",
-  fontFamily: CONDENSED,
-  outline: "none",
-  width: "100%",
-  height: "56px",
-  padding: "0 16px",
-  fontSize: "16px",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  transition: "border-color 0.15s",
-};
-
-function focusStyle(el: HTMLInputElement) { el.style.borderColor = "#ccff00"; }
-function blurStyle(el: HTMLInputElement) { el.style.borderColor = "rgba(255,255,255,0.1)"; }
+const ACCENT = "#ccff00";
+const ACCENT_HOVER = "#b8e600";
+const ACCENT_FG = "#161e00";
 
 export default function LoginPage() {
   const [value, setValue] = useState("");
@@ -49,7 +34,11 @@ export default function LoginPage() {
       login(data.token, data.user);
       setLocation(data.user.mustChangePassword ? "/trocar-senha" : "/");
     } catch (err: unknown) {
-      toast({ title: "Acesso negado", description: err instanceof Error ? err.message : "Senha incorreta", variant: "destructive" });
+      toast({
+        title: "Acesso negado",
+        description: err instanceof Error ? err.message : "Senha incorreta",
+        variant: "destructive",
+      });
       setPassword("");
     } finally {
       setLoading(false);
@@ -60,10 +49,8 @@ export default function LoginPage() {
     e.preventDefault();
     if (!value.trim()) return;
     if (isPin) {
-      // PIN-only login — direct, no password step
       doLogin({ pin: value });
     } else {
-      // Email/CPF — go to password step
       setStep("password");
     }
   };
@@ -76,35 +63,42 @@ export default function LoginPage() {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
-      style={{ backgroundColor: "#191c1e" }}
+      style={{ backgroundColor: "hsl(var(--background))" }}
     >
       {/* Branding */}
       <div className="mb-10 text-center">
-        <div
-          className="inline-flex items-center justify-center w-12 h-12 mb-4 font-black -skew-x-6"
-          style={{ backgroundColor: "#ccff00", color: "#161e00", fontFamily: CONDENSED, fontSize: 15 }}
+        <p
+          className="text-5xl font-black uppercase leading-none tracking-tight"
+          style={{ fontFamily: CONDENSED, color: "var(--brand-heading)" }}
         >
-          <span className="skew-x-6">CE</span>
-        </div>
-        <p className="text-4xl font-black uppercase leading-none tracking-tight" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>
           Maratona
         </p>
-        <p className="text-4xl font-black uppercase leading-none tracking-tight" style={{ fontFamily: CONDENSED, color: "rgba(204,255,0,0.35)" }}>
+        <p
+          className="text-5xl font-black uppercase leading-none tracking-tight"
+          style={{ fontFamily: CONDENSED, color: "var(--brand-heading-sub)" }}
+        >
           de Resultados
         </p>
       </div>
 
       {/* Card */}
       <div className="w-full" style={{ maxWidth: 420 }}>
-        <div style={{ backgroundColor: "#22262a", border: "1px solid rgba(204,255,0,0.3)" }}>
-
-          {/* Step: main (Senha / e-mail) */}
+        <div
+          style={{
+            backgroundColor: "hsl(var(--card))",
+            border: `2px solid ${ACCENT}33`,
+            color: "hsl(var(--card-foreground))",
+          }}
+        >
           {step === "main" && (
-            <form onSubmit={handleMain} className="px-6 py-8 space-y-6">
+            <form onSubmit={handleMain} className="px-6 py-8 space-y-5">
               <div>
                 <label
                   className="block text-[11px] font-black uppercase tracking-widest mb-2"
-                  style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.4)" }}
+                  style={{
+                    fontFamily: CONDENSED,
+                    color: "hsl(var(--muted-foreground))",
+                  }}
                 >
                   {isPin ? "Senha" : "Senha ou E-mail"}
                 </label>
@@ -113,73 +107,86 @@ export default function LoginPage() {
                   inputMode={isPin ? "numeric" : undefined}
                   maxLength={isPin ? 4 : undefined}
                   value={value}
-                  onChange={e => {
-                    const v = e.target.value;
-                    // If it looks like a number being built, keep digits only up to 4
-                    if (/^\d*$/.test(v) && v.length <= 4) {
-                      setValue(v);
-                    } else if (!/^\d/.test(v)) {
-                      // Email/text path — allow freely
-                      setValue(v);
-                    } else {
-                      setValue(v);
-                    }
-                  }}
-                  placeholder={isPin ? "• • • •" : "Senha de 4 dígitos ou e-mail"}
+                  onChange={e => setValue(e.target.value)}
+                  placeholder="Senha de 4 dígitos ou e-mail"
                   required
                   autoFocus
+                  className="w-full outline-none font-bold transition-all"
                   style={{
-                    ...inputStyle,
-                    ...(isPin ? { fontSize: 28, letterSpacing: "0.6em", textAlign: "center", paddingLeft: 0 } : {}),
+                    fontFamily: CONDENSED,
+                    height: 56,
+                    padding: isPin ? "0" : "0 16px",
+                    fontSize: isPin ? 32 : 16,
+                    letterSpacing: isPin ? "0.55em" : "0.02em",
+                    textAlign: isPin ? "center" : "left",
+                    backgroundColor: "hsl(var(--secondary))",
+                    border: `1px solid hsl(var(--border))`,
+                    color: "hsl(var(--foreground))",
                   }}
-                  onFocus={e => focusStyle(e.currentTarget)}
-                  onBlur={e => blurStyle(e.currentTarget)}
+                  onFocus={e => (e.currentTarget.style.borderColor = ACCENT)}
+                  onBlur={e => (e.currentTarget.style.borderColor = "hsl(var(--border))")}
                 />
                 {!isPin && value.length === 0 && (
-                  <p className="text-[10px] mt-1.5" style={{ color: "rgba(255,255,255,0.25)", fontFamily: CONDENSED }}>
+                  <p
+                    className="text-[10px] mt-1.5"
+                    style={{ fontFamily: CONDENSED, color: "hsl(var(--muted-foreground))", opacity: 0.7 }}
+                  >
                     Colaboradores: digitem a senha de 4 dígitos recebida
                   </p>
                 )}
               </div>
+
               <button
                 type="submit"
                 disabled={loading || !value.trim()}
-                className="w-full font-black uppercase flex items-center justify-center gap-2"
+                className="w-full font-black uppercase flex items-center justify-center gap-2 transition-colors"
                 style={{
                   fontFamily: CONDENSED,
                   letterSpacing: "0.1em",
-                  backgroundColor: loading || !value.trim() ? "rgba(204,255,0,0.5)" : "#ccff00",
-                  color: "#161e00",
+                  backgroundColor: loading || !value.trim() ? `${ACCENT}80` : ACCENT,
+                  color: ACCENT_FG,
                   height: 52,
                   border: "none",
                   cursor: loading || !value.trim() ? "not-allowed" : "pointer",
                   fontSize: 15,
                 }}
-                onMouseEnter={e => { if (!loading && value.trim()) e.currentTarget.style.backgroundColor = "#b8e600"; }}
-                onMouseLeave={e => { if (!loading && value.trim()) e.currentTarget.style.backgroundColor = "#ccff00"; }}
+                onMouseEnter={e => {
+                  if (!loading && value.trim()) e.currentTarget.style.backgroundColor = ACCENT_HOVER;
+                }}
+                onMouseLeave={e => {
+                  if (!loading && value.trim()) e.currentTarget.style.backgroundColor = ACCENT;
+                }}
               >
                 {loading
                   ? "Autenticando…"
                   : isPin
-                    ? <><span>Acessar</span><ArrowRight size={16} /></>
-                    : <><span>Continuar</span><ArrowRight size={16} /></>}
+                  ? <><span>Acessar</span><ArrowRight size={16} /></>
+                  : <><span>Continuar</span><ArrowRight size={16} /></>}
               </button>
             </form>
           )}
 
-          {/* Step: password (for email/CPF logins) */}
           {step === "password" && (
-            <form onSubmit={handlePassword} className="px-6 py-8 space-y-6">
-              {/* Who */}
+            <form onSubmit={handlePassword} className="px-6 py-8 space-y-5">
+              {/* Identifier chip */}
               <div
                 className="flex items-center gap-3 px-4 py-3"
-                style={{ backgroundColor: "rgba(204,255,0,0.05)", border: "1px solid rgba(204,255,0,0.15)" }}
+                style={{
+                  backgroundColor: `${ACCENT}0d`,
+                  border: `1px solid ${ACCENT}33`,
+                }}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "rgba(204,255,0,0.5)" }}>
+                  <p
+                    className="text-[10px] font-black uppercase tracking-widest"
+                    style={{ fontFamily: CONDENSED, color: `${ACCENT}99` }}
+                  >
                     {isEmail ? "E-mail" : "CPF"}
                   </p>
-                  <p className="font-black text-sm truncate" style={{ fontFamily: CONDENSED, color: "#fff" }}>
+                  <p
+                    className="font-black text-sm truncate"
+                    style={{ fontFamily: CONDENSED, color: "hsl(var(--foreground))" }}
+                  >
                     {value}
                   </p>
                 </div>
@@ -187,7 +194,13 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => { setStep("main"); setPassword(""); }}
                   className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide"
-                  style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.3)", background: "none", border: "none", cursor: "pointer" }}
+                  style={{
+                    fontFamily: CONDENSED,
+                    color: "hsl(var(--muted-foreground))",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
                 >
                   <ArrowLeft size={11} /> Trocar
                 </button>
@@ -196,7 +209,7 @@ export default function LoginPage() {
               <div>
                 <label
                   className="block text-[11px] font-black uppercase tracking-widest mb-2"
-                  style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.4)" }}
+                  style={{ fontFamily: CONDENSED, color: "hsl(var(--muted-foreground))" }}
                 >
                   Senha
                 </label>
@@ -207,9 +220,19 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   required
                   autoFocus
-                  style={inputStyle}
-                  onFocus={e => focusStyle(e.currentTarget)}
-                  onBlur={e => blurStyle(e.currentTarget)}
+                  className="w-full outline-none font-bold transition-all"
+                  style={{
+                    fontFamily: CONDENSED,
+                    height: 56,
+                    padding: "0 16px",
+                    fontSize: 16,
+                    letterSpacing: "0.02em",
+                    backgroundColor: "hsl(var(--secondary))",
+                    border: `1px solid hsl(var(--border))`,
+                    color: "hsl(var(--foreground))",
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = ACCENT)}
+                  onBlur={e => (e.currentTarget.style.borderColor = "hsl(var(--border))")}
                 />
               </div>
 
@@ -220,15 +243,15 @@ export default function LoginPage() {
                 style={{
                   fontFamily: CONDENSED,
                   letterSpacing: "0.1em",
-                  backgroundColor: loading ? "rgba(204,255,0,0.5)" : "#ccff00",
-                  color: "#161e00",
+                  backgroundColor: loading ? `${ACCENT}80` : ACCENT,
+                  color: ACCENT_FG,
                   height: 52,
                   border: "none",
                   cursor: loading ? "not-allowed" : "pointer",
                   fontSize: 15,
                 }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = "#b8e600"; }}
-                onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = "#ccff00"; }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT_HOVER; }}
+                onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT; }}
               >
                 {loading ? "Autenticando…" : <><span>Acessar</span><ArrowRight size={16} /></>}
               </button>
@@ -236,7 +259,10 @@ export default function LoginPage() {
           )}
         </div>
 
-        <p className="text-center text-[9px] font-bold uppercase tracking-widest mt-5" style={{ color: "rgba(255,255,255,0.15)" }}>
+        <p
+          className="text-center text-[9px] font-bold uppercase tracking-widest mt-5"
+          style={{ color: "hsl(var(--muted-foreground))", opacity: 0.5 }}
+        >
           Sistema exclusivo • Uso restrito
         </p>
       </div>
