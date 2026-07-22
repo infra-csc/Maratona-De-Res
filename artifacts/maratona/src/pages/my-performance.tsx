@@ -12,9 +12,9 @@ import {
   DialogDescription, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
 import {
-  Calendar, TrendingUp, AlertTriangle,
+  Calendar, TrendingUp, TrendingDown, AlertTriangle,
   CheckCircle2, Clock, ChevronDown, ChevronRight,
-  MapPin, Search, Flag, Send,
+  MapPin, Search, Flag, Send, Award, ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -740,29 +740,105 @@ export default function MyPerformancePage() {
                 )}
               </div>
 
-              {/* Eventos Confirmados */}
+              {/* Eventos Confirmados — barra de progresso para elegibilidade */}
               {(() => {
                 const confirmed = summary.confirmedEvents ?? 0;
                 const target = summary.minEventsForEligibility ?? 8;
                 const faltam = Math.max(0, target - confirmed);
                 const atingiu = confirmed >= target;
+                const steps = Array.from({ length: target }, (_, i) => i < confirmed);
                 return (
                   <div className="rounded-xl p-[18px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Eventos Confirmados</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Elegibilidade ao Bônus</span>
                     <div className="mt-1.5 flex items-baseline gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      <span className="font-black text-[34px] leading-none text-foreground">{confirmed}</span>
-                      <span className="text-[15px] text-muted-foreground">de {target} p/ elegibilidade</span>
+                      <span className="font-black text-[34px] leading-none" style={{ color: atingiu ? "#ccff00" : "var(--foreground)" }}>{confirmed}</span>
+                      <span className="text-[15px] text-muted-foreground">/ {target} eventos</span>
                     </div>
-                    <p className={cn("mt-1 text-[10px] font-bold uppercase", atingiu ? "text-[#506600]" : "text-[#862200]")}>
-                      {atingiu ? "Elegível ao bônus" : `Faltam ${faltam} evento${faltam !== 1 ? "s" : ""} para elegibilidade`}
+                    <p className={cn("mt-1 text-[10px] font-bold uppercase", atingiu ? "text-[#506600]" : "text-[#c98a1f]")}>
+                      {atingiu ? "✓ Meta atingida — elegível ao bônus" : `Faltam ${faltam} evento${faltam !== 1 ? "s" : ""} confirmados`}
                     </p>
-                    <div className="mt-3 h-[5px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (confirmed / target) * 100)}%`, backgroundColor: atingiu ? "#ccff00" : "var(--foreground)" }} />
+                    {/* Step dots */}
+                    <div className="mt-3 flex gap-1 flex-wrap">
+                      {steps.map((filled, i) => (
+                        <div
+                          key={i}
+                          className="rounded-sm transition-all duration-300"
+                          style={{
+                            width: `calc(${100 / target}% - 3px)`,
+                            minWidth: 10,
+                            height: 8,
+                            backgroundColor: filled ? (atingiu ? "#ccff00" : "var(--foreground)") : "var(--muted)",
+                          }}
+                        />
+                      ))}
                     </div>
+                    {summary.totalEvents > 0 && (
+                      <p className="text-[9px] text-muted-foreground mt-2">
+                        {summary.totalEvents} evento{summary.totalEvents !== 1 ? "s" : ""} no ciclo · {summary.openEvents > 0 ? `${summary.openEvents} ainda aberto${summary.openEvents !== 1 ? "s" : ""}` : "todos fechados"}
+                      </p>
+                    )}
                   </div>
                 );
               })()}
             </div>
+
+            {/* Item 2 — Nota Bruta vs Nota Final */}
+            {summary.grossAverage !== null && summary.finalResult !== null && (
+              <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-4">Como sua nota final é calculada</p>
+                <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-0">
+                  {/* Média bruta */}
+                  <div className="flex-1 text-center sm:text-left">
+                    <p className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Média dos Eventos</p>
+                    <div className="flex items-baseline gap-1 justify-center sm:justify-start" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      <span className="font-black text-[28px] leading-none text-foreground">{summary.grossAverage.toFixed(1)}</span>
+                      <span className="text-[12px] text-muted-foreground">/100</span>
+                    </div>
+                    <div className="mt-1.5 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${summary.grossAverage}%`, backgroundColor: scoreColor(summary.grossAverage) }} />
+                    </div>
+                  </div>
+                  {/* Ajustes */}
+                  {(() => {
+                    const pen = summary.penaltyPoints ?? 0;
+                    const mer = summary.meritPoints ?? 0;
+                    const net = mer - pen;
+                    if (net === 0) return (
+                      <div className="flex items-center gap-2 sm:mx-6 shrink-0">
+                        <ArrowRight size={16} className="text-muted-foreground" />
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Sem ajustes</span>
+                        <ArrowRight size={16} className="text-muted-foreground" />
+                      </div>
+                    );
+                    return (
+                      <div className="flex items-center gap-2 sm:mx-6 shrink-0 flex-col sm:flex-row">
+                        <ArrowRight size={16} className="text-muted-foreground hidden sm:block" />
+                        <div className="text-center">
+                          <p className="text-[9px] font-bold uppercase text-muted-foreground">Ajustes</p>
+                          <span className="font-black text-[16px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: net >= 0 ? "#506600" : "#862200" }}>
+                            {net >= 0 ? "+" : ""}{net.toFixed(1)} pts
+                          </span>
+                          {mer > 0 && <p className="text-[8px] text-[#506600] font-bold">+{mer} méritos</p>}
+                          {pen > 0 && <p className="text-[8px] text-[#862200] font-bold">−{pen} penalidades</p>}
+                        </div>
+                        <ArrowRight size={16} className="text-muted-foreground hidden sm:block" />
+                      </div>
+                    );
+                  })()}
+                  {/* Nota final */}
+                  <div className="flex-1 text-center sm:text-right">
+                    <p className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Nota Final</p>
+                    <div className="flex items-baseline gap-1 justify-center sm:justify-end" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      <span className="font-black text-[28px] leading-none" style={{ color: scoreColor(summary.finalResult) }}>{summary.finalResult.toFixed(1)}</span>
+                      <span className="text-[12px] text-muted-foreground">/100</span>
+                    </div>
+                    <div className="mt-1.5 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${summary.finalResult}%`, backgroundColor: scoreColor(summary.finalResult) }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Penalidades e Méritos */}
             <div>
@@ -822,6 +898,134 @@ export default function MyPerformancePage() {
                 </>
               )}
             </div>
+
+            {/* Item 6 — Destaques do Ciclo (critério mais forte / mais fraco) */}
+            {(() => {
+              const scoredEvents = (data.events ?? []).filter(ev => ev.resultsConfirmed && ev.countsForScore && ev.eventScore > 0);
+              // Agrupa scoreUsed por criterionName (apenas critérios finalizados com peso)
+              const map = new Map<string, number[]>();
+              for (const ev of scoredEvents) {
+                for (const c of ev.criteriaDetails) {
+                  if (c.scoreUsed === null || !c.finalPublishedAt || Number(c.weight) <= 0) continue;
+                  const name = c.criterionName;
+                  if (!map.has(name)) map.set(name, []);
+                  map.get(name)!.push(c.scoreUsed);
+                }
+              }
+              if (map.size < 2) return null;
+              const entries = [...map.entries()].map(([name, scores]) => ({
+                name,
+                avg: scores.reduce((s, v) => s + v, 0) / scores.length,
+                count: scores.length,
+              })).sort((a, b) => b.avg - a.avg);
+              const best = entries[0];
+              const worst = entries[entries.length - 1];
+              return (
+                <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                    <Award size={13} /> Destaques do Ciclo
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Ponto forte */}
+                    <div className="rounded-lg p-4" style={{ backgroundColor: "rgba(204,255,0,0.06)", border: "1px solid rgba(204,255,0,0.2)" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp size={14} style={{ color: "#ccff00" }} />
+                        <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: "#ccff00" }}>Ponto Forte</span>
+                      </div>
+                      <p className="font-black text-[14px] text-foreground leading-tight mb-1">{best.name}</p>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-black text-[22px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#ccff00" }}>{best.avg.toFixed(1)}</span>
+                        <span className="text-[11px] text-muted-foreground">/10 média · {best.count} evento{best.count !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="mt-2 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${(best.avg / 10) * 100}%`, backgroundColor: "#ccff00" }} />
+                      </div>
+                    </div>
+                    {/* A desenvolver */}
+                    <div className="rounded-lg p-4" style={{ backgroundColor: "rgba(134,34,0,0.06)", border: "1px solid rgba(134,34,0,0.2)" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingDown size={14} className="text-[#c05020]" />
+                        <span className="text-[9px] font-black uppercase tracking-wider text-[#c05020]">A Desenvolver</span>
+                      </div>
+                      <p className="font-black text-[14px] text-foreground leading-tight mb-1">{worst.name}</p>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-black text-[22px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(worst.avg * 10) }}>{worst.avg.toFixed(1)}</span>
+                        <span className="text-[11px] text-muted-foreground">/10 média · {worst.count} evento{worst.count !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="mt-2 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${(worst.avg / 10) * 100}%`, backgroundColor: scoreColor(worst.avg * 10) }} />
+                      </div>
+                    </div>
+                  </div>
+                  {entries.length > 2 && (
+                    <div className="mt-4 pt-3 grid grid-cols-2 sm:grid-cols-3 gap-2" style={{ borderTop: "1px solid var(--border)" }}>
+                      {entries.slice(1, entries.length - 1).map(e => (
+                        <div key={e.name} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "var(--muted)" }}>
+                          <span className="text-[11px] font-bold text-foreground truncate">{e.name}</span>
+                          <span className="text-[11px] font-black shrink-0" style={{ color: scoreColor(e.avg * 10) }}>{e.avg.toFixed(1)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Item 7 — Linha do Tempo de notas (sparkline SVG) */}
+            {(() => {
+              const pts = (data.events ?? [])
+                .filter(ev => ev.resultsConfirmed && ev.countsForScore && ev.eventScore > 0 && ev.startDate)
+                .sort((a, b) => a.startDate.localeCompare(b.startDate));
+              if (pts.length < 2) return null;
+              const scores = pts.map(e => e.eventScore);
+              const W = 600, H = 90, PAD = 18;
+              const minS = Math.min(50, ...scores) - 5;
+              const maxS = Math.max(100, ...scores);
+              const toX = (i: number) => PAD + (i / (pts.length - 1)) * (W - PAD * 2);
+              const toY = (s: number) => PAD + ((maxS - s) / (maxS - minS)) * (H - PAD * 2);
+              const pathD = pts.map((e, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(e.eventScore)}`).join(" ");
+              const areaD = `${pathD} L ${toX(pts.length - 1)} ${H} L ${toX(0)} ${H} Z`;
+              return (
+                <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <TrendingUp size={13} /> Evolução de Notas no Ciclo
+                  </p>
+                  <div className="w-full overflow-hidden">
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 90 }} preserveAspectRatio="none">
+                      {/* Grid lines */}
+                      {[60, 70, 80, 90, 100].map(v => (
+                        <line key={v} x1={PAD} y1={toY(v)} x2={W - PAD} y2={toY(v)} stroke="var(--border)" strokeWidth="0.8" />
+                      ))}
+                      {/* Area fill */}
+                      <path d={areaD} fill="rgba(204,255,0,0.06)" />
+                      {/* Line */}
+                      <path d={pathD} fill="none" stroke="rgba(204,255,0,0.5)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                      {/* Dots */}
+                      {pts.map((e, i) => (
+                        <circle key={e.eventId} cx={toX(i)} cy={toY(e.eventScore)} r="4" fill={scoreColor(e.eventScore)} stroke="var(--card)" strokeWidth="2" />
+                      ))}
+                    </svg>
+                    {/* Labels abaixo */}
+                    <div className="flex justify-between mt-1 px-[18px]">
+                      {pts.length <= 6
+                        ? pts.map(e => (
+                            <div key={e.eventId} className="text-center" style={{ width: `${100 / pts.length}%` }}>
+                              <div className="text-[8px] font-black leading-none" style={{ color: scoreColor(e.eventScore) }}>{e.eventScore.toFixed(0)}</div>
+                              <div className="text-[7px] text-muted-foreground truncate mt-0.5">{e.startDate ? new Date(e.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}</div>
+                            </div>
+                          ))
+                        : (
+                          <>
+                            <div className="text-[8px] text-muted-foreground">{new Date(pts[0].startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</div>
+                            <div className="text-[9px] font-black text-muted-foreground">{pts.length} eventos</div>
+                            <div className="text-[8px] text-muted-foreground">{new Date(pts[pts.length - 1].startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</div>
+                          </>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Histórico de Eventos */}
             <div>
