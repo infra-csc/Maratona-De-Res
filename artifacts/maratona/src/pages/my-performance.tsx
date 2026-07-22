@@ -634,10 +634,12 @@ export default function MyPerformancePage() {
       ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
       (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
       (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase());
-    // "Avaliado" = todos os critérios com nota também têm publicação final
-    // (mesma lógica do allScoredAreFinal no EventCard)
+    // "Avaliado" = feedbackReleased (admin finalizou) OU todos os critérios
+    // com nota têm publicação final (allScoredAreFinal)
+    // feedbackReleased cobre eventos históricos (scoreUsed=null, usam importedScore)
     const scoredCriteria = ev.criteriaDetails.filter(c => Number(c.weight) > 0 && c.scoreUsed !== null);
-    const allFinal = scoredCriteria.length > 0 && scoredCriteria.every(c => !!c.finalPublishedAt);
+    const allScoredAreFinal = scoredCriteria.length > 0 && scoredCriteria.every(c => !!c.finalPublishedAt);
+    const allFinal = ev.feedbackReleased || allScoredAreFinal;
     const matchesStatus = statusFilter === "all"
       || (statusFilter === "avaliado" && allFinal)
       || (statusFilter === "em_avaliacao" && !allFinal);
