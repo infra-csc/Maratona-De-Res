@@ -481,7 +481,7 @@ function EventCard({ event }: { event: EventSummary }) {
                 <span className="flex items-center gap-1"><MapPin size={11} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
               )}
               {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
-              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.length}</span>
+              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.length}/{event.criteriaDetails.length}</span>
             </div>
           </div>
         </div>
