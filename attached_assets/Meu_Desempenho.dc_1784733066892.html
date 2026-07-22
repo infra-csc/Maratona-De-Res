@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>body{margin:0}::-webkit-scrollbar{height:6px;width:6px}::-webkit-scrollbar-thumb{background:rgba(128,128,128,.35);border-radius:3px}</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden;background:{{theme.bg}};color:{{theme.fg}};font-family:'Barlow',sans-serif;transition:background-color .3s,color .3s">
+  <aside style="width:250px;flex-shrink:0;display:flex;flex-direction:column;background:{{theme.card}};border-right:1px solid {{theme.border}}">
+    <div style="padding:0 16px;height:64px;flex-shrink:0;display:flex;align-items:center;border-bottom:1px solid {{theme.border}}">
+      <div style="display:flex;flex-direction:column">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;text-transform:uppercase;letter-spacing:-0.02em;line-height:1">Maratona</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:{{theme.accent}};margin-top:4px">Resultados</span>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 12px;display:flex;flex-direction:column;gap:24px">
+      <sc-for list="{{navGroups}}" as="group" hint-placeholder-count="1">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <p style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:{{theme.mutedFg}};margin:0 0 4px 8px">{{group.name}}</p>
+          <sc-for list="{{group.items}}" as="item" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:-0.01em;background:{{item.activeBg}};color:{{item.activeFg}};cursor:pointer">
+              <div style="width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;opacity:{{item.dotOpacity}}"></div>
+              <span>{{item.label}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;border-top:1px solid {{theme.border}}">
+      <div onClick="{{toggleTheme}}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;border:1px solid {{theme.border}};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:{{theme.mutedFg}};cursor:pointer">
+        <div style="width:14px;height:14px;border-radius:50%;border:2px solid currentColor;flex-shrink:0"></div><span>{{themeLabel}}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:8px;background:{{theme.primary}};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;color:{{theme.primaryFg}}">MC</span>
+        </div>
+        <div style="min-width:0">
+          <p style="margin:0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Matheus da Silva Cordeiro</p>
+          <p style="margin:2px 0 0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:{{theme.mutedFg}}">Visualizador</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;border:1px solid {{theme.border}};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;color:#e5484d;cursor:pointer"><span>Encerrar Sessão</span></div>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:18px 24px;border-bottom:1px solid {{theme.border}};display:flex;align-items:center;justify-content:space-between;gap:16px;flex-shrink:0;flex-wrap:wrap">
+      <h1 style="margin:0;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;text-transform:uppercase;letter-spacing:-0.01em;color:{{theme.accent}}">Meu Desempenho</h1>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px;border-radius:9px;border:1px solid {{theme.border}};background:{{theme.secondary}};padding:8px 14px">
+          <div style="width:14px;height:14px;border:2px solid {{theme.fg}};border-radius:3px;flex-shrink:0"></div>
+          <div style="display:flex;flex-direction:column;line-height:1.2">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;text-transform:uppercase">Ciclo 2026</span>
+            <span style="font-size:10px;font-weight:700;color:{{theme.mutedFg}}">01/06/2026 – 30/09/2026</span>
+          </div>
+        </div>
+        <button onClick="{{toggleTheme}}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid {{theme.border}};background:transparent;color:{{theme.mutedFg}};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;cursor:pointer">{{themeLabel}}</button>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow:auto;padding:20px 24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <span style="padding:6px 14px;border-radius:8px;background:{{theme.primary}};color:{{theme.primaryFg}};font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;text-transform:uppercase">{{userName}}</span>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:{{theme.mutedFg}}">{{roleLabel}}</span>
+      </div>
+
+      <div style="border-radius:10px;background:rgba(232,162,61,0.14);border:1px solid rgba(232,162,61,0.35);padding:12px 16px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:#c98a1f;margin-bottom:20px">
+        ⏱ Ciclo em andamento — nota e bônus são projeções parciais e podem mudar até o fechamento oficial
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
+        <div style="border-radius:12px;border:1px solid {{theme.border}};background:{{theme.card}};padding:18px;position:relative;overflow:hidden">
+          <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:{{theme.mutedFg}}">Média do Ciclo</span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:34px;margin-top:6px">{{summary.average}}<span style="font-size:15px;color:{{theme.mutedFg}}">/100</span></div>
+          <p style="margin:4px 0 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:{{theme.mutedFg}}">Projeção parcial</p>
+          <div style="height:5px;border-radius:3px;background:{{theme.secondary}};overflow:hidden"><div style="height:100%;border-radius:3px;width:{{summary.average}}%;background:{{theme.fg}}"></div></div>
+        </div>
+
+        <div style="border-radius:12px;background:{{theme.primary}};padding:18px;position:relative;overflow:hidden">
+          <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:{{theme.primaryFg}};opacity:.7">Bônus Caju</span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:34px;margin-top:6px;color:{{theme.primaryFg}}">{{summary.bonus}}</div>
+          <p style="margin:4px 0 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:{{theme.primaryFg}};opacity:.7">Valor parcial — projeção do ciclo em andamento</p>
+          <div style="height:5px;border-radius:3px;background:rgba(0,0,0,0.15);overflow:hidden"><div style="height:100%;border-radius:3px;width:0%;background:{{theme.primaryFg}}"></div></div>
+        </div>
+
+        <div style="border-radius:12px;border:1px solid {{theme.border}};background:{{theme.card}};padding:18px">
+          <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:{{theme.mutedFg}}">Eventos Confirmados</span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:34px;margin-top:6px">{{summary.confirmed}}<span style="font-size:15px;color:{{theme.mutedFg}}"> de {{summary.needed}} p/ elegibilidade</span></div>
+          <p style="margin:4px 0 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:{{theme.mutedFg}}">{{summary.missingLabel}}</p>
+          <div style="height:5px;border-radius:3px;background:{{theme.secondary}};overflow:hidden"><div style="height:100%;border-radius:3px;width:{{summary.eligPct}}%;background:{{theme.fg}}"></div></div>
+        </div>
+      </div>
+
+      <h3 style="margin:0 0 12px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;text-transform:uppercase;color:{{theme.accent}}">⚠ Penalidades e Méritos</h3>
+      <sc-if value="{{hasLaunches}}" hint-placeholder-val="{{false}}">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+          <sc-for list="{{launches}}" as="l" hint-placeholder-count="2">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:10px;border:1px solid {{theme.border}};background:{{theme.card}}">
+              <div>
+                <p style="margin:0;font-weight:700;font-size:13px">{{l.label}}</p>
+                <p style="margin:2px 0 0;font-size:11px;color:{{theme.mutedFg}}">{{l.date}} · {{l.eventName}}</p>
+              </div>
+              <span style="font-weight:800;font-size:14px;color:{{l.color}}">{{l.pointsLabel}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{noLaunches}}" hint-placeholder-val="{{true}}">
+        <div style="border:1px dashed {{theme.border}};border-radius:10px;padding:34px;text-align:center;font-size:13px;color:{{theme.mutedFg}};margin-bottom:24px">Nenhuma penalidade ou mérito registrado neste ciclo.</div>
+      </sc-if>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+        <h3 style="margin:0;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;text-transform:uppercase;color:{{theme.accent}}">Histórico de Eventos</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;border-radius:9px;border:1px solid {{theme.border}};overflow:hidden">
+            <sc-for list="{{eventFilters}}" as="f" hint-placeholder-count="3">
+              <button onClick="{{f.onClick}}" style="padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;border:none;background:{{f.bg}};color:{{f.fg}};cursor:pointer;white-space:nowrap">{{f.label}}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:9px;background:{{theme.secondary}};border:1px solid {{theme.border}}">
+            <div style="width:12px;height:12px;border:1.5px solid {{theme.mutedFg}};border-radius:50%;flex-shrink:0"></div>
+            <input value="{{search}}" onInput="{{onSearch}}" placeholder="Buscar evento..." style="border:none;background:transparent;outline:none;font-size:13px;color:{{theme.fg}};width:160px;font-family:'Barlow',sans-serif" />
+          </div>
+        </div>
+      </div>
+
+      <div style="border-radius:12px;border:1px solid {{theme.border}};background:{{theme.card}};overflow:hidden">
+        <sc-for list="{{events}}" as="e" hint-placeholder-count="4">
+          <div style="padding:14px 18px;border-bottom:1px solid {{theme.border}};display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+            <div>
+              <p style="margin:0;font-weight:700;font-size:13px;text-transform:uppercase">{{e.name}}</p>
+              <p style="margin:2px 0 0;font-size:11px;color:{{theme.mutedFg}}">{{e.city}} · {{e.date}}</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="padding:3px 10px;border-radius:999px;font-size:9px;font-weight:800;text-transform:uppercase;background:{{e.statusBg}};color:{{e.statusColor}}">{{e.statusLabel}}</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:19px;color:{{theme.accent}};min-width:44px;text-align:right">{{e.score}}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const darkTokens = { bg: "#0c0c0c", fg: "#f0ede8", card: "#141414", primary: "#d4ff00", primaryFg: "#0c0c0c", secondary: "#1e1e1e", mutedFg: "#7a7a7a", accent: "#d4ff00", border: "rgba(255,255,255,0.08)" };
+const lightTokens = { bg: "#f2f1ec", fg: "#111111", card: "#ffffff", primary: "#111111", primaryFg: "#ffffff", secondary: "#e8e6e0", mutedFg: "#888880", accent: "#9ab000", border: "rgba(0,0,0,0.1)" };
+
+const NAV_GROUPS_RAW = [ { name: "Colaborador", items: [ { label: "Meu Desempenho", active: true }, { label: "Como Funciona" } ] } ];
+
+const EVENTS_RAW = [
+  { name: "Girl Power – São Luís 2026", city: "São Luís", date: "29/08/2026", score: 78.5, status: "evaluated" },
+  { name: "Eco Run – Curitiba 2026", city: "Curitiba", date: "10/08/2026", score: 65.0, status: "evaluated" },
+  { name: "Circuito das Estações – Vitória", city: "Vitória", date: "22/07/2026", score: null, status: "in_review" },
+  { name: "Corrida Netshoes – São Paulo", city: "São Paulo", date: "05/07/2026", score: 66.2, status: "evaluated" },
+  { name: "Circuito Banco do Brasil – Joinville", city: "Joinville", date: "20/06/2026", score: null, status: "in_review" },
+];
+
+class Component extends DCLogic {
+  state = { isDark: true, search: "", eventFilter: "all" };
+  toggleTheme = () => this.setState(s => ({ isDark: !s.isDark }));
+  onSearch = (e) => this.setState({ search: e.target.value });
+  setEventFilter = (v) => this.setState({ eventFilter: v });
+
+  renderVals() {
+    const theme = this.state.isDark ? darkTokens : lightTokens;
+    const amber = "#e8a23d";
+    const q = this.state.search.toLowerCase();
+
+    const filtered = EVENTS_RAW.filter(e => {
+      const matchSearch = !q || e.name.toLowerCase().includes(q);
+      const matchStatus = this.state.eventFilter === "all" || e.status === this.state.eventFilter;
+      return matchSearch && matchStatus;
+    });
+
+    const events = filtered.map(e => ({
+      name: e.name, city: e.city, date: e.date,
+      score: e.score != null ? e.score.toFixed(1) : "—",
+      statusLabel: e.status === "evaluated" ? "Avaliado" : "Em Avaliação",
+      statusBg: e.status === "evaluated" ? "rgba(154,176,0,0.14)" : "rgba(232,162,61,0.16)",
+      statusColor: e.status === "evaluated" ? theme.accent : amber,
+    }));
+
+    const filterDefs = [ { key: "all", label: "Todos" }, { key: "evaluated", label: "Avaliados" }, { key: "in_review", label: "Em Avaliação" } ];
+    const eventFilters = filterDefs.map(d => {
+      const active = this.state.eventFilter === d.key;
+      return { label: d.label, onClick: () => this.setEventFilter(d.key), bg: active ? theme.primary : "transparent", fg: active ? theme.primaryFg : theme.mutedFg };
+    });
+
+    const confirmed = EVENTS_RAW.filter(e => e.status === "evaluated" || e.status === "in_review").length;
+    const needed = 8;
+    const missing = Math.max(0, needed - confirmed);
+
+    return {
+      theme, themeLabel: this.state.isDark ? "Light" : "Dark", toggleTheme: this.toggleTheme,
+      navGroups: NAV_GROUPS_RAW.map(g => ({ name: g.name, items: g.items.map(it => ({ label: it.label, activeBg: it.active ? theme.primary : "transparent", activeFg: it.active ? theme.primaryFg : theme.mutedFg, dotOpacity: it.active ? 1 : 0.5 })) })),
+      userName: "Matheus da Silva Cordeiro", roleLabel: "Colaborador",
+      summary: {
+        average: "69.9", bonus: "R$ 0", confirmed, needed,
+        missingLabel: missing > 0 ? `Faltam ${missing} eventos para o bônus` : "Elegível ao bônus",
+        eligPct: Math.round((confirmed / needed) * 100),
+      },
+      hasLaunches: false, noLaunches: true, launches: [],
+      search: this.state.search, onSearch: this.onSearch,
+      eventFilters, events,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

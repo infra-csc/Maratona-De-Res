@@ -12,9 +12,9 @@ import {
   DialogDescription, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
 import {
-  Trophy, Target, Calendar, TrendingUp, AlertTriangle,
+  Calendar, TrendingUp, AlertTriangle,
   CheckCircle2, Clock, ChevronDown, ChevronRight,
-  MapPin, DollarSign, Search, Flag, Send,
+  MapPin, Search, Flag, Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -407,81 +407,76 @@ function EventCard({ event }: { event: EventSummary }) {
         : "Pendente";
 
   return (
-    <div className="bg-white border-2 border-[#191c1e] mb-4">
+    <div className="mb-3 rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}>
       {/* Header do evento */}
       <div
         role="button"
         tabIndex={0}
         onClick={() => setOpen(v => !v)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setOpen(v => !v); }}
-        className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-[#f2f4f6] transition-colors text-left gap-4 cursor-pointer"
+        className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-[14px_18px] transition-colors text-left gap-4 cursor-pointer hover:brightness-95"
       >
         <div className="flex items-start gap-4 min-w-0 w-full">
-          <div className="mt-1 shrink-0 bg-[#ccff00] border-2 border-[#191c1e] p-2 text-[#191c1e]">
-            {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          <div className="mt-1 shrink-0 p-1.5 rounded-md" style={{ backgroundColor: "var(--accent)", color: "var(--accent-foreground)" }}>
+            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={cn(
-                "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
+                "text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full",
                 event.feedbackReleased
                   ? "bg-[#191c1e] text-[#ccff00]"
                   : anyCriterionFinal
                     ? "bg-[#506600] text-[#ccff00]"
                     : event.partialPublishedAt
                       ? "bg-[#ccff00] text-[#191c1e]"
-                      : "bg-[#d8dadc] text-[#444933]"
-              )}>
+                      : "text-muted-foreground"
+              )} style={!event.feedbackReleased && !anyCriterionFinal && !event.partialPublishedAt ? { backgroundColor: "var(--muted)" } : {}}>
                 {publishLabel}
               </span>
               {!event.countsForScore && (
                 <span
                   title="Participação apenas histórica/informativa — não entra na sua média nem na elegibilidade."
-                  className="text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#862200] bg-[#862200]/10 text-[#862200]"
+                  className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#862200]/10 text-[#862200]"
                 >
                   Não conta p/ nota
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-bold text-base text-[#191c1e]">{event.eventName}</p>
+              <p className="font-bold text-[13px] text-foreground">{event.eventName}</p>
               {event.eventScore > 0 && <EventReviewRequest event={event} />}
             </div>
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold italic text-[#747a60]">
+            <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] font-bold text-muted-foreground">
               {(event.city || event.location) && (
-                <span className="flex items-center gap-1"><MapPin size={12} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
+                <span className="flex items-center gap-1"><MapPin size={11} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
               )}
               {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
-              <span className="bg-[#f2f4f6] border border-[#191c1e] px-2 py-0.5">Quesitos: {event.evaluatedCriteria}/{event.totalCriteria}</span>
+              <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {event.evaluatedCriteria}/{event.totalCriteria}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-14 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#191c1e]/20">
-
+        <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-10 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0" style={{ borderColor: "var(--border)" }}>
           {event.eventScore > 0 && (
             <div className="flex flex-col items-end gap-1.5">
-              <div className={cn(
-                "text-right border-2 border-[#191c1e] px-3 py-1.5",
-                event.countsForScore && !event.resultsConfirmed ? "bg-[#f2f4f6]" : "bg-[#ccff00]"
-              )}>
-                <span className="block text-[10px] uppercase font-bold text-[#191c1e] mb-0.5 italic">Nota</span>
+              <div className="text-right">
+                <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-0.5">Nota</span>
                 <span className={cn(
-                  "font-black text-xl",
-                  event.countsForScore && !event.resultsConfirmed ? "text-[#747a60]" : "text-[#506600]"
-                )}>{event.eventScore.toFixed(1)}</span>
+                  "font-black text-[19px] leading-none",
+                  event.countsForScore && !event.resultsConfirmed ? "text-muted-foreground" : ""
+                )} style={event.countsForScore && event.resultsConfirmed ? { color: "var(--accent)" } : {}}>
+                  {event.eventScore.toFixed(1)}
+                </span>
                 {event.countsForScore && !event.resultsConfirmed && (
-                  <span className="block text-[8px] uppercase font-bold text-[#a15c00] italic mt-0.5 whitespace-nowrap">
-                    Não confirmada
-                  </span>
+                  <span className="block text-[8px] uppercase font-bold text-[#a15c00] mt-0.5 whitespace-nowrap">Não confirmada</span>
                 )}
               </div>
-              {/* Desfecho do pedido de revisão sempre visível ao lado da nota */}
               {(() => {
                 const rs = reviewStatusInfo(event.reviewRequest?.status);
                 if (!rs) return null;
                 return (
-                  <span className={cn("flex items-center gap-1 text-[9px] font-black uppercase italic px-1.5 py-0.5 border-2 border-[#191c1e] whitespace-nowrap", rs.badgeCls)}>
+                  <span className={cn("flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full whitespace-nowrap", rs.badgeCls)}>
                     <Flag size={9} /> {rs.label}
                   </span>
                 );
@@ -493,66 +488,66 @@ function EventCard({ event }: { event: EventSummary }) {
 
       {/* Detalhamento dos critérios */}
       {open && (
-        <div className="border-t-2 border-[#191c1e] bg-[#f2f4f6] p-5 md:p-6 space-y-4">
-          <h4 className="text-sm font-black uppercase tracking-tighter text-[#747a60] mb-2 italic">Detalhamento dos Critérios</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-5 md:p-6 space-y-4" style={{ borderTop: "1px solid var(--border)", backgroundColor: "var(--muted)" }}>
+          <h4 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-2">Detalhamento dos Critérios</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {event.criteriaDetails.map(c => (
-              <div key={c.criterionId} className="bg-white border-2 border-[#191c1e] p-4 relative overflow-hidden">
+              <div key={c.criterionId} className="p-4 rounded-xl relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                 <div className="flex justify-between items-start gap-4 mb-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-[10px] font-bold uppercase italic text-[#747a60] bg-[#f2f4f6] border border-[#191c1e] px-2 py-0.5">Peso {c.weight}</span>
+                      <span className="text-[9px] font-bold uppercase text-muted-foreground px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Peso {c.weight}</span>
                       {Number(c.weight) === 0 && (
-                        <span className="text-[10px] font-black uppercase italic text-[#862200] bg-[#ffdbd1] border border-[#862200] px-2 py-0.5">Não conta na média</span>
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#862200]/10 text-[#862200]">Não conta na média</span>
                       )}
                       {c.evaluated && (
-                        <span className="text-[10px] font-bold uppercase italic text-[#506600] flex items-center gap-1">
-                          <CheckCircle2 size={12}/> Avaliado
+                        <span className="text-[9px] font-bold uppercase text-[#506600] flex items-center gap-1">
+                          <CheckCircle2 size={11}/> Avaliado
                         </span>
                       )}
                       {event.feedbackReleased || c.finalPublishedAt ? (
                         <span
                           title={c.finalPublishedAt ? `Nota Final publicada em ${formatDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Publicado em ${formatDateTime(event.feedbackReleasedAt)}` : undefined}
-                          className="text-[10px] font-bold uppercase italic text-[#ccff00] bg-[#191c1e] border border-[#191c1e] px-2 py-0.5 flex items-center gap-1"
+                          className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#191c1e] text-[#ccff00] flex items-center gap-1"
                         >
                           ✓ Nota Final Confirmada
                         </span>
                       ) : c.partialPublishedAt ? (
                         <span
                           title={`Publicado em ${formatDateTime(c.partialPublishedAt)}`}
-                          className="text-[10px] font-bold uppercase italic text-[#444933] bg-[#ccff00] border border-[#191c1e] px-2 py-0.5"
+                          className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#ccff00] text-[#191c1e]"
                         >
-                          Avaliado — Projeção Parcial
+                          Projeção Parcial
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold uppercase italic text-[#444933] bg-[#d8dadc] border border-[#191c1e] px-2 py-0.5">
+                        <span className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full text-muted-foreground" style={{ backgroundColor: "var(--muted)" }}>
                           Pendente
                         </span>
                       )}
                     </div>
-                    <p className="font-bold text-sm text-[#191c1e] leading-tight italic">{c.criterionName}</p>
+                    <p className="font-bold text-[13px] text-foreground leading-tight">{c.criterionName}</p>
                   </div>
 
                   <div className="text-right shrink-0 flex flex-col items-end gap-1">
                     {c.scoreUsed !== null ? (
                       <>
                         <div className="flex items-end gap-1">
-                          <span className="font-black text-2xl text-[#191c1e] leading-none">{c.scoreUsed.toFixed(1)}</span>
-                          <span className="text-xs font-bold text-[#747a60] pb-1 italic">/10</span>
+                          <span className="font-black text-2xl leading-none" style={{ color: "var(--accent)" }}>{c.scoreUsed.toFixed(1)}</span>
+                          <span className="text-xs font-bold text-muted-foreground pb-1">/10</span>
                         </div>
                         <CriterionReviewRequest event={event} criterion={c} />
                       </>
                     ) : (
-                      <span className="text-[10px] font-bold uppercase italic px-2 py-1 bg-[#f2f4f6] text-[#747a60] border border-[#191c1e]">Pendente</span>
+                      <span className="text-[9px] font-bold uppercase px-2 py-1 rounded text-muted-foreground" style={{ backgroundColor: "var(--muted)" }}>Pendente</span>
                     )}
                   </div>
                 </div>
 
                 {c.publicComments.length > 0 && (
-                  <div className="mt-4 space-y-2 pt-3 border-t-2 border-[#191c1e]/20">
-                    <p className="text-[10px] font-black uppercase italic text-[#747a60]">Feedbacks da equipe avaliadora</p>
+                  <div className="mt-4 space-y-2 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground">Feedbacks da equipe avaliadora</p>
                     {c.publicComments.map((comment, i) => (
-                      <div key={i} className="text-xs text-[#444933] bg-[#f2f4f6] p-3 border-l-2 border-[#191c1e] relative">
+                      <div key={i} className="text-xs text-foreground p-3 rounded border-l-2 border-[#ccff00]" style={{ backgroundColor: "var(--muted)" }}>
                         <span className="italic leading-relaxed">"{comment}"</span>
                       </div>
                     ))}
@@ -592,15 +587,15 @@ export default function MyPerformancePage() {
 
   if (!user?.employeeId) {
     return (
-      <div className="p-8 max-w-2xl mx-auto mt-12 bg-white border-2 border-[#191c1e] text-center space-y-4">
-        <div className="w-20 h-20 bg-[#ffdbd1] border-2 border-[#191c1e] flex items-center justify-center mx-auto text-[#862200] mb-2">
-          <AlertTriangle size={32} />
+      <div className="p-8 max-w-2xl mx-auto mt-12 rounded-xl text-center space-y-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto text-[#862200] mb-2" style={{ backgroundColor: "var(--muted)" }}>
+          <AlertTriangle size={28} />
         </div>
-        <h2 className="text-2xl font-bold text-[#191c1e]">Acesso Restrito</h2>
-        <p className="text-[#444933] italic">
+        <h2 className="text-2xl font-bold text-foreground">Acesso Restrito</h2>
+        <p className="text-muted-foreground text-sm">
           Seu perfil de usuário não está vinculado a um colaborador no sistema. O painel Meu Desempenho é exclusivo para participantes da Maratona de Resultados.
         </p>
-        <p className="text-sm font-bold pt-4 text-[#747a60] border-t-2 border-[#191c1e]">Contate o RH ou o administrador do sistema para realizar a vinculação.</p>
+        <p className="text-sm font-bold pt-4 text-muted-foreground" style={{ borderTop: "1px solid var(--border)" }}>Contate o RH ou o administrador do sistema para realizar a vinculação.</p>
       </div>
     );
   }
@@ -619,265 +614,227 @@ export default function MyPerformancePage() {
   });
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="min-h-full text-foreground" style={{ backgroundColor: "var(--background)" }}>
       {/* Header */}
-      <header className="sticky top-14 md:top-0 z-30 bg-[#f7f9fb] border-b-4 border-[#191c1e] flex flex-wrap gap-4 justify-between items-center px-6 md:px-10 py-4">
-        <h1 className="text-2xl md:text-3xl italic font-black text-[#506600] uppercase tracking-tighter flex items-center gap-3">
-          <TrendingUp size={28} />
+      <header className="sticky top-14 md:top-0 z-30 flex flex-wrap gap-4 justify-between items-center px-6 md:px-10 py-[18px]" style={{ backgroundColor: "var(--background)", borderBottom: "1px solid var(--border)" }}>
+        <h1 className="font-black text-[24px] uppercase tracking-tight flex items-center gap-3" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
+          <TrendingUp size={24} />
           Meu Desempenho
         </h1>
-        <CycleBadge className="bg-[#f7f9fb]" />
+        <CycleBadge />
       </header>
 
-      <div className="p-6 md:p-10 space-y-10">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-[#191c1e] bg-[#ccff00] px-3 py-1 border-2 border-[#191c1e] text-sm italic">{data?.employee.name ?? user?.name}</span>
-          <span className="text-xs font-bold uppercase italic text-[#747a60]">{data?.employee.functionName}</span>
+      <div className="p-6 md:p-10 space-y-8">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-black text-[14px] uppercase px-3 py-1.5 rounded-lg" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)", fontFamily: "'Barlow Condensed', sans-serif" }}>{data?.employee.name ?? user?.name}</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{data?.employee.functionName}</span>
         </div>
 
-      {data && summary && (
-        <div className={cn(
-          "border-2 border-[#191c1e] px-4 py-3 text-xs font-bold italic uppercase flex items-center gap-2",
-          summary.isQuarterClosed ? "bg-[#e3f5cf] text-[#506600]" : "bg-[#fff3cd] text-[#664d03]"
-        )}>
-          {summary.isQuarterClosed ? <CheckCircle2 size={16} /> : <Clock size={16} />}
-          {summary.isQuarterClosed
-            ? "Ciclo fechado — resultado oficial"
-            : "Ciclo em andamento — nota e bônus são projeções parciais e podem mudar até o fechamento oficial"}
-        </div>
-      )}
+        {data && summary && (
+          <div className={cn(
+            "rounded-xl px-4 py-3 text-[12px] font-bold uppercase flex items-center gap-2",
+            summary.isQuarterClosed
+              ? "bg-[rgba(154,176,0,0.12)] text-[#506600]"
+              : "bg-[rgba(232,162,61,0.14)] text-[#c98a1f]"
+          )} style={{ border: `1px solid ${summary.isQuarterClosed ? "rgba(154,176,0,0.3)" : "rgba(232,162,61,0.35)"}` }}>
+            {summary.isQuarterClosed ? <CheckCircle2 size={15} /> : <Clock size={15} />}
+            {summary.isQuarterClosed
+              ? "Ciclo fechado — resultado oficial"
+              : "Ciclo em andamento — nota e bônus são projeções parciais e podem mudar até o fechamento oficial"}
+          </div>
+        )}
 
-      {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 border-2 border-[#191c1e]" />
-          ))}
-        </div>
-      )}
+        {isLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 rounded-xl" />
+            ))}
+          </div>
+        )}
 
-      {error && (
-        <Alert variant="destructive" className="bg-[#ffdbd1] border-2 border-[#862200] text-[#862200]">
-          <AlertTriangle className="h-5 w-5" />
-          <AlertDescription className="font-bold ml-2 italic">{(error as Error).message}</AlertDescription>
-        </Alert>
-      )}
+        {error && (
+          <Alert variant="destructive" className="rounded-xl bg-[#862200]/10 border-[#862200]/30 text-[#862200]">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="font-bold ml-2">{(error as Error).message}</AlertDescription>
+          </Alert>
+        )}
 
-      {data && summary && (
-        <>
-          {/* Executive Summary Cards — estilo app */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Média do Ciclo */}
-            <div className="bg-white border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden group">
-              <div className="z-10">
-                <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Média do Ciclo</p>
+        {data && summary && (
+          <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-[14px]">
+              {/* Média do Ciclo */}
+              <div className="rounded-xl p-[18px] relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Média do Ciclo</span>
                 {result !== null ? (
                   <>
-                    <h2 className="text-[40px] leading-none italic font-black mt-2">{result.toFixed(1)}<span className="text-[18px] text-[#747a60]">/100</span></h2>
-                    <p className={cn(
-                      "text-[10px] font-bold uppercase italic mt-2",
-                      summary.isQuarterClosed ? "text-[#506600]" : "text-[#a15c00]"
-                    )}>
-                      {summary.isQuarterClosed ? "Avaliado Oficialmente" : "Projeção Parcial"}
+                    <div className="mt-1.5" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      <span className="font-black text-[34px] leading-none text-foreground">{result.toFixed(1)}</span>
+                      <span className="text-[15px] text-muted-foreground">/100</span>
+                    </div>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-muted-foreground">
+                      {summary.isQuarterClosed ? "Resultado oficial" : "Projeção parcial"}
                     </p>
                   </>
                 ) : (
-                  <div className="text-lg font-medium text-[#747a60] mt-4 italic">-</div>
+                  <div className="text-lg text-muted-foreground mt-4">—</div>
                 )}
+                <div className="mt-3 h-[5px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${result ?? 0}%`, backgroundColor: "var(--foreground)" }} />
+                </div>
               </div>
-              <div className="absolute -right-3 -bottom-3 opacity-5 group-hover:scale-110 transition-transform duration-500">
-                <Trophy size={110} strokeWidth={1.5} />
-              </div>
-              <div className="w-full h-2 bg-[#191c1e] mt-auto" />
-            </div>
 
-
-            {/* Bônus Caju */}
-            <div className="bg-[#ccff00] border-2 border-[#191c1e] p-6 flex flex-col justify-between h-40 relative overflow-hidden shadow-[4px_4px_0px_0px_#191c1e]">
-              <div className="z-10">
-                <p className="text-xs font-bold uppercase italic tracking-wider text-[#161e00]">Bônus Caju</p>
+              {/* Bônus Caju */}
+              <div className="rounded-xl p-[18px] relative overflow-hidden bg-[#ccff00]">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#161e00]/70">Bônus Caju</span>
                 {!summary.eligible ? (
                   <>
-                    <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</h2>
-                    <p className="text-[10px] font-bold uppercase italic text-[#862200] mt-2">Não elegível para bônus neste ciclo</p>
+                    <div className="mt-1.5 font-black text-[34px] leading-none text-[#747a60]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</div>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-[#862200]">Não elegível para bônus neste ciclo</p>
                   </>
                 ) : summary.projectedBonus !== null ? (
                   <>
-                    <h2 className="text-[32px] leading-none italic font-black mt-2 text-[#506600]">{fmtBRL(summary.projectedBonus)}</h2>
-                    <p className="text-[10px] font-bold uppercase italic text-[#506600] mt-2">{bonusStatusLabel(summary.isQuarterClosed, summary.bonusStatus)}</p>
+                    <div className="mt-1.5 font-black text-[34px] leading-none text-[#506600]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{fmtBRL(summary.projectedBonus)}</div>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-[#506600]/80">{bonusStatusLabel(summary.isQuarterClosed, summary.bonusStatus)}</p>
                   </>
                 ) : (
-                  <div className="text-[32px] leading-none italic font-black mt-2 text-[#747a60]">—</div>
+                  <div className="mt-1.5 font-black text-[34px] leading-none text-[#747a60]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</div>
                 )}
+                <div className="mt-3 h-[5px] rounded-full overflow-hidden bg-black/15">
+                  <div className="h-full rounded-full" style={{ width: "0%" }} />
+                </div>
               </div>
-              <div className="absolute -right-3 -bottom-3 opacity-10">
-                <DollarSign size={110} strokeWidth={1.5} />
-              </div>
-              <div className="w-full h-2 bg-[#191c1e] mt-auto" />
+
+              {/* Eventos Confirmados */}
+              {(() => {
+                const confirmed = summary.confirmedEvents ?? 0;
+                const target = summary.minEventsForEligibility ?? 8;
+                const faltam = Math.max(0, target - confirmed);
+                const atingiu = confirmed >= target;
+                return (
+                  <div className="rounded-xl p-[18px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Eventos Confirmados</span>
+                    <div className="mt-1.5 flex items-baseline gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      <span className="font-black text-[34px] leading-none text-foreground">{confirmed}</span>
+                      <span className="text-[15px] text-muted-foreground">de {target} p/ elegibilidade</span>
+                    </div>
+                    <p className={cn("mt-1 text-[10px] font-bold uppercase", atingiu ? "text-[#506600]" : "text-[#862200]")}>
+                      {atingiu ? "Elegível ao bônus" : `Faltam ${faltam} evento${faltam !== 1 ? "s" : ""} para o bônus`}
+                    </p>
+                    <div className="mt-3 h-[5px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (confirmed / target) * 100)}%`, backgroundColor: atingiu ? "#ccff00" : "var(--foreground)" }} />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* Participação / Elegibilidade */}
-            {(() => {
-              const confirmed = summary.confirmedEvents ?? 0;
-              const target = summary.minEventsForEligibility ?? 8;
-              const faltam = Math.max(0, target - confirmed);
-              const atingiu = confirmed >= target;
-              return (
-                <div className="bg-white border-2 border-[#191c1e] p-5 flex flex-col justify-between h-40 relative overflow-hidden group">
-                  <div className="z-10 space-y-1">
-                    <p className="text-xs font-bold uppercase italic tracking-wider text-[#444933]">Eventos Confirmados</p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[36px] leading-none italic font-black text-[#191c1e]">{confirmed}</span>
-                      <span className="text-sm font-bold italic text-[#747a60]">de {target} p/ elegibilidade</span>
-                    </div>
-                    {atingiu ? (
-                      <p className="text-[10px] font-black uppercase italic text-[#506600] flex items-center gap-1">
-                        <CheckCircle2 size={11} /> Elegível ao bônus
-                      </p>
-                    ) : (
-                      <p className="text-[10px] font-black uppercase italic text-[#862200]">
-                        Faltam {faltam} evento{faltam !== 1 ? "s" : ""} para o bônus
-                      </p>
-                    )}
+            {/* Penalidades e Méritos */}
+            <div>
+              <h3 className="font-black text-[16px] uppercase mb-3 flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
+                <AlertTriangle size={18} /> Penalidades e Méritos
+              </h3>
+              {(data.adjustments?.length ?? 0) === 0 ? (
+                <div className="rounded-xl py-9 text-center text-[13px] text-muted-foreground" style={{ border: "1px dashed var(--border)" }}>
+                  Nenhuma penalidade ou mérito registrado neste ciclo.
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                    {data.adjustments.map((adj, idx) => (
+                      <div key={adj.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={idx > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                              adj.kind === "merit" ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200]/15 text-[#862200]"
+                            }`}>
+                              {adj.kind === "merit" ? "Mérito" : "Penalidade"}
+                            </span>
+                            <span className="text-[12px] font-bold text-foreground">{adj.penaltyType}</span>
+                            {adj.quantity > 1 && (
+                              <span className="text-[10px] font-bold text-muted-foreground px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>×{adj.quantity}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                            {adj.date && <span>{new Date(`${adj.date}T00:00:00`).toLocaleDateString("pt-BR")}</span>}
+                            {adj.eventName && <span className="flex items-center gap-1"><Calendar size={11} /> {adj.eventName}</span>}
+                          </div>
+                          {adj.reason && <p className="text-[11px] text-muted-foreground italic mt-1">"{adj.reason}"</p>}
+                        </div>
+                        <span className={`font-black text-[18px] shrink-0 ${adj.kind === "merit" ? "text-[#506600]" : "text-[#862200]"}`} style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                          {adj.kind === "merit" ? "+" : "−"}{adj.totalPoints} pts
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  {/* barra de progresso */}
-                  <div className="w-full h-2 bg-[#eceef0] mt-auto relative overflow-hidden border border-[#191c1e]">
-                    <div
-                      className="absolute left-0 top-0 h-full transition-all duration-500"
-                      style={{
-                        width: `${Math.min(100, (confirmed / target) * 100)}%`,
-                        backgroundColor: atingiu ? "#ccff00" : "#191c1e",
-                      }}
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground mt-2">
+                    Méritos somam e penalidades descontam pontos na sua nota final do ciclo (limitada entre 0 e 100).
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Histórico de Eventos */}
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-[14px]">
+                <h3 className="font-black text-[16px] uppercase flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
+                  <Calendar size={18} /> Histórico de Eventos
+                </h3>
+                <div className="flex gap-2 flex-wrap">
+                  <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                    {[
+                      { key: "all", label: "Todos" },
+                      { key: "closed", label: "Avaliados" },
+                      { key: "open", label: "Em Avaliação" },
+                    ].map(btn => (
+                      <button
+                        key={btn.key}
+                        onClick={() => setStatusFilter(btn.key as typeof statusFilter)}
+                        className="px-[14px] py-2 text-[11px] font-bold uppercase transition-colors border-none"
+                        style={statusFilter === btn.key
+                          ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }
+                          : { backgroundColor: "transparent", color: "var(--muted-foreground)" }
+                        }
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 px-[14px] py-2 rounded-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                    <Search size={12} className="text-muted-foreground shrink-0" />
+                    <input
+                      type="text"
+                      value={eventFilter}
+                      onChange={(e) => setEventFilter(e.target.value)}
+                      placeholder="Buscar evento..."
+                      className="border-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground w-40"
                     />
                   </div>
                 </div>
-              );
-            })()}
-          </div>
-
-          {/* Penalidades e Méritos */}
-          <div className="pt-4">
-            <h2 className="text-xl font-black uppercase tracking-tight text-[#506600] flex items-center gap-2 mb-4">
-              <AlertTriangle size={22} />
-              Penalidades e Méritos
-            </h2>
-            {(data.adjustments?.length ?? 0) === 0 ? (
-              <div className="text-center py-10 bg-white border-2 border-dashed border-[#747a60] text-[#747a60] font-medium">
-                Nenhuma penalidade ou mérito registrado neste ciclo.
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  {(summary.penaltyPoints ?? 0) > 0 && (
-                    <div className="bg-[#ffdbd1] border-2 border-[#191c1e] p-4 flex items-center justify-between">
-                      <span className="text-xs font-black uppercase italic tracking-wider text-[#862200]">Penalidades</span>
-                      <span className="text-2xl font-black italic text-[#862200]">-{summary.penaltyPoints} pts</span>
-                    </div>
-                  )}
-                  {(summary.meritPoints ?? 0) > 0 && (
-                    <div className="bg-[#ccff00] border-2 border-[#191c1e] p-4 flex items-center justify-between">
-                      <span className="text-xs font-black uppercase italic tracking-wider text-[#161e00]">Méritos</span>
-                      <span className="text-2xl font-black italic text-[#506600]">+{summary.meritPoints} pts</span>
-                    </div>
-                  )}
-                </div>
-                <div className="bg-white border-2 border-[#191c1e] divide-y-2 divide-[#eceef0]">
-                  {data.adjustments.map(adj => (
-                    <div key={adj.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className={`text-[10px] font-black uppercase italic px-2 py-0.5 border-2 border-[#191c1e] ${
-                            adj.kind === "merit" ? "bg-[#ccff00] text-[#161e00]" : "bg-[#ff5722] text-white"
-                          }`}>
-                            {adj.kind === "merit" ? "Mérito" : "Penalidade"}
-                          </span>
-                          <span className="text-xs font-bold italic uppercase text-[#444933]">{adj.penaltyType}</span>
-                          {adj.quantity > 1 && (
-                            <span className="text-[10px] font-bold italic uppercase text-[#747a60] bg-[#eceef0] border border-[#191c1e] px-1.5 py-0.5">x{adj.quantity}</span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3 text-xs font-bold italic text-[#747a60]">
-                          {adj.date && <span>{new Date(`${adj.date}T00:00:00`).toLocaleDateString("pt-BR")}</span>}
-                          {adj.eventName && <span className="flex items-center gap-1"><Calendar size={12} /> {adj.eventName}</span>}
-                        </div>
-                        {adj.reason && <p className="text-xs text-[#444933] italic mt-1">"{adj.reason}"</p>}
-                      </div>
-                      <span className={`font-black italic text-lg shrink-0 ${adj.kind === "merit" ? "text-[#506600]" : "text-[#862200]"}`}>
-                        {adj.kind === "merit" ? "+" : "-"}{adj.totalPoints} pts
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[10px] font-bold uppercase italic text-[#747a60] mt-2">
-                  Méritos somam e penalidades descontam pontos na sua nota final do ciclo (limitada entre 0 e 100).
-                </p>
-              </>
-            )}
-          </div>
 
-          {/* Event breakdown */}
-          <div className="pt-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <h2 className="text-xl font-black uppercase tracking-tight text-[#506600] flex items-center gap-2">
-                <Calendar size={24} />
-                Histórico de Eventos
-              </h2>
-              <div className="flex items-center gap-2">
-                <div className="flex bg-white border-2 border-[#191c1e]">
-                  {[
-                    { key: "all", label: "Todos" },
-                    { key: "closed", label: "Avaliados" },
-                    { key: "open", label: "Em avaliação" },
-                  ].map(btn => (
-                    <button
-                      key={btn.key}
-                      onClick={() => setStatusFilter(btn.key as typeof statusFilter)}
-                      className={`px-3 py-2 text-[10px] font-bold uppercase italic transition-colors ${
-                        statusFilter === btn.key
-                          ? "bg-[#ccff00] text-[#191c1e]"
-                          : "bg-white text-[#747a60] hover:bg-[#f2f4f6]"
-                      }`}
-                    >
-                      {btn.label}
-                    </button>
-                  ))}
+              {filteredEvents.length === 0 ? (
+                <div className="rounded-xl py-16 text-center text-[13px] text-muted-foreground" style={{ border: "1px dashed var(--border)" }}>
+                  {eventFilter
+                    ? `Nenhum evento encontrado para "${eventFilter}".`
+                    : `Nenhum evento registrado no ciclo ${data.cycle.name}.`}
                 </div>
-                <div className="relative max-w-sm w-full">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-                  <input
-                    type="text"
-                    value={eventFilter}
-                    onChange={(e) => setEventFilter(e.target.value)}
-                    placeholder="Buscar evento..."
-                    className="w-full pl-9 pr-4 py-2 bg-white border-2 border-[#191c1e] text-sm font-bold italic text-[#191c1e] placeholder:text-[#747a60] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
-                  />
+              ) : (
+                <div>
+                  {filteredEvents.map(ev => <EventCard key={ev.eventId} event={ev} />)}
                 </div>
-              </div>
+              )}
             </div>
-            {filteredEvents.length === 0 ? (
-              <div className="text-center py-20 bg-white border-2 border-dashed border-[#747a60] text-[#747a60] font-medium">
-                {eventFilter
-                  ? `Nenhum evento encontrado para "${eventFilter}".`
-                  : `Nenhum evento registrado no ciclo ${data.cycle.name}.`
-                }
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredEvents.map(ev => <EventCard key={ev.eventId} event={ev} />)}
-              </div>
-            )}
-          </div>
 
-          {/* Privacy note */}
-          <div className="bg-[#f2f4f6] border-2 border-[#191c1e] p-4 text-center mt-8">
-            <p className="text-[10px] font-black uppercase italic text-[#506600] tracking-widest">
-              Sigilo de Avaliação
-            </p>
-            <p className="text-xs text-[#444933] font-medium mt-1 italic">
-              Para garantir imparcialidade, as notas e comentários exibidos são consolidados. A identidade dos avaliadores é estritamente confidencial.
-            </p>
-          </div>
-        </>
-      )}
+            {/* Privacy note */}
+            <div className="rounded-xl p-4 text-center" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sigilo de Avaliação</p>
+              <p className="text-[11px] text-muted-foreground mt-1 italic">
+                Para garantir imparcialidade, as notas e comentários exibidos são consolidados. A identidade dos avaliadores é estritamente confidencial.
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
