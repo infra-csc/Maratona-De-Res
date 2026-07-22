@@ -54,6 +54,29 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
 }
 
+const APP_LINK = (() => {
+  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+  return `${window.location.origin}${base}/meu-desempenho`;
+})();
+
+function CopyLinkButton({ link }: { link: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      title="Copiar link de acesso"
+      onClick={() => {
+        navigator.clipboard.writeText(link);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90"
+      style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
+    >
+      {copied ? <><Check size={11} /> Link copiado</> : <><Copy size={11} /> Copiar link</>}
+    </button>
+  );
+}
+
 export default function EmployeesPage() {
   const { user, impersonate, token } = useAuth();
   const { toast } = useToast();
@@ -92,6 +115,7 @@ export default function EmployeesPage() {
   const [pinDialog, setPinDialog] = useState<{ empName: string; pin: string; cpfLogin: string; created: boolean } | null>(null);
   const [generatingPinId, setGeneratingPinId] = useState<number | null>(null);
   const [pinCopied, setPinCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const handleGeneratePin = useCallback(async (emp: EmployeeWithCycle) => {
     setGeneratingPinId(emp.id);
@@ -608,7 +632,7 @@ export default function EmployeesPage() {
                                   ? <><Eye size={11} className="animate-pulse" /> Abrindo…</>
                                   : <><Eye size={11} /> Ver visão</>}
                               </button>
-                              {emp.employmentType === "casa" && (
+                              {emp.employmentType === "casa" && (<>
                                 <button
                                   title={`Gerar novo PIN para ${emp.name}`}
                                   disabled={generatingPinId === emp.id}
@@ -620,7 +644,8 @@ export default function EmployeesPage() {
                                     ? <><Hash size={11} className="animate-spin" /> Gerando…</>
                                     : <><Hash size={11} /> Gerar PIN</>}
                                 </button>
-                              )}
+                                <CopyLinkButton link={APP_LINK} />
+                              </>)}
                             </div>
                           ) : emp.employmentType === "casa" ? (
                             <div className="flex flex-col items-center gap-1">
@@ -962,7 +987,7 @@ export default function EmployeesPage() {
                 <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Login (CPF)</p>
                 <p className="text-base font-black tracking-widest">{pinDialog?.cpfLogin}</p>
               </div>
-              <div className="px-4 py-4" style={{ backgroundColor: "var(--primary)" }}>
+              <div className="px-4 py-4" style={{ backgroundColor: "var(--primary)", borderBottom: "1px solid rgba(0,0,0,0.15)" }}>
                 <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--primary-foreground)", opacity: 0.65, fontFamily: CONDENSED }}>Senha (PIN)</p>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-5xl font-black tracking-[0.25em]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>
@@ -979,6 +1004,23 @@ export default function EmployeesPage() {
                     style={{ backgroundColor: "rgba(0,0,0,0.25)", color: "var(--primary-foreground)" }}
                   >
                     {pinCopied ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
+                  </button>
+                </div>
+              </div>
+              <div className="px-4 py-3" style={{ backgroundColor: "var(--secondary)" }}>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1.5" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Link de Acesso</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono flex-1 truncate" style={{ color: "var(--foreground)" }}>{APP_LINK}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(APP_LINK);
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 2000);
+                    }}
+                    className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-80"
+                    style={{ border: "1px solid var(--border)", color: "var(--foreground)" }}
+                  >
+                    {linkCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
                   </button>
                 </div>
               </div>
