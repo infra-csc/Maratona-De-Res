@@ -1001,52 +1001,52 @@ export default function EmployeesPage() {
 
       {/* Bulk PIN dialog */}
       <Dialog open={bulkPinOpen} onOpenChange={v => { if (!v) { setBulkPinOpen(false); setBulkPinResult(null); } }}>
-        <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+        <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
               Gerar PINs — Colaboradores Casa
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex flex-col gap-4 min-h-0 flex-1 overflow-hidden pt-1">
-            {!bulkPinResult ? (
-              <div className="space-y-4">
-                <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                  Gera um PIN de 4 dígitos novo para <strong>todos</strong> os colaboradores casa ativos com CPF cadastrado.
-                  PINs anteriores serão substituídos imediatamente.
-                </p>
-                <div className="flex justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-                  <button onClick={() => setBulkPinOpen(false)} className="h-10 px-4 rounded-lg font-bold text-sm uppercase" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
-                  <button
-                    onClick={handleBulkGeneratePins}
-                    disabled={bulkPinLoading}
-                    className="h-10 px-5 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-60"
-                    style={{ backgroundColor: "var(--accent)", color: "#000" }}
-                  >
-                    {bulkPinLoading ? <><Hash size={15} className="animate-spin" /> Gerando…</> : <><Hash size={15} /> Gerar todos os PINs</>}
-                  </button>
-                </div>
+          {!bulkPinResult ? (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                Gera uma senha de 4 dígitos nova para <strong>todos</strong> os colaboradores casa ativos com CPF cadastrado.
+                Senhas anteriores serão substituídas imediatamente.
+              </p>
+              <div className="flex justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+                <button onClick={() => setBulkPinOpen(false)} className="h-10 px-4 rounded-lg font-bold text-sm uppercase" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
+                <button
+                  onClick={handleBulkGeneratePins}
+                  disabled={bulkPinLoading}
+                  className="h-10 px-5 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-60"
+                  style={{ backgroundColor: "#ccff00", color: "#000" }}
+                >
+                  {bulkPinLoading ? <><Hash size={15} className="animate-spin" /> Gerando…</> : <><Hash size={15} /> Gerar todos os PINs</>}
+                </button>
               </div>
-            ) : (
-              <>
-                {/* Stats */}
-                <div className="flex gap-3 flex-shrink-0">
-                  <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{bulkPinResult.results.length}</p>
-                    <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>PINs gerados</p>
-                  </div>
-                  {bulkPinResult.skipped.length > 0 && (
-                    <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                      <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: WARNING }}>{bulkPinResult.skipped.length}</p>
-                      <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF (ignorados)</p>
-                    </div>
-                  )}
+            </div>
+          ) : (
+            <div className="space-y-3 pt-1">
+              {/* Stats */}
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                  <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>{bulkPinResult.results.length}</p>
+                  <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Senhas geradas</p>
                 </div>
+                {bulkPinResult.skipped.length > 0 && (
+                  <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: WARNING }}>{bulkPinResult.skipped.length}</p>
+                    <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF (ignorados)</p>
+                  </div>
+                )}
+              </div>
 
-                {/* Table */}
-                <div className="flex-1 overflow-y-auto rounded-lg min-h-0" style={{ border: "1px solid var(--border)" }}>
+              {/* Scrollable table */}
+              <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                <div style={{ maxHeight: 380, overflowY: "auto" }}>
                   <table className="w-full text-sm border-collapse">
-                    <thead className="sticky top-0 z-10" style={{ backgroundColor: "var(--secondary)" }}>
+                    <thead style={{ backgroundColor: "var(--secondary)", position: "sticky", top: 0, zIndex: 10 }}>
                       <tr>
                         <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Nome</th>
                         <th className="px-4 py-2.5 text-center text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Senha</th>
@@ -1054,65 +1054,69 @@ export default function EmployeesPage() {
                     </thead>
                     <tbody>
                       {bulkPinResult.results.map((r, i) => (
-                        <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "var(--secondary)" }}>
-                          <td className="px-4 py-2.5 font-medium text-sm">{r.name}</td>
+                        <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "hsl(var(--secondary))" }}>
+                          <td className="px-4 py-2.5 font-medium">{r.name}</td>
                           <td className="px-4 py-2.5 text-center">
-                            <span className="text-2xl font-black tracking-[0.25em]" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{r.pin}</span>
+                            <span className="text-xl font-black tracking-[0.25em]" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>{r.pin}</span>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+              </div>
 
-                {/* Actions */}
-                <div className="flex justify-between items-center gap-2 flex-shrink-0 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        const bom = "\uFEFF";
-                        const header = "Nome,Senha";
-                        const body = bulkPinResult.results.map(r => `"${r.name.replace(/"/g, '""')}","${r.pin}"`).join("\n");
-                        const blob = new Blob([bom + header + "\n" + body], { type: "text/csv;charset=utf-8" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url; a.download = "senhas-colaboradores.csv"; a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                      className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
-                      style={{ backgroundColor: "var(--accent)", color: "#000", border: "none" }}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                      Excel
-                    </button>
-                    <button
-                      onClick={() => {
-                        const lines = ["Nome | Senha", ...bulkPinResult.results.map(r => `${r.name} | ${r.pin}`)];
-                        navigator.clipboard.writeText(lines.join("\n"));
-                        toast({ title: "Lista copiada!", description: `${bulkPinResult.results.length} colaboradores` });
-                      }}
-                      className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
-                      style={{ border: "1px solid var(--border)" }}
-                    >
-                      <Copy size={13} /> Copiar lista
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setBulkPinResult(null); }}
-                      className="h-9 px-4 rounded-lg font-bold text-xs uppercase"
-                      style={{ border: "1px solid var(--border)" }}
-                    >
-                      <Hash size={13} className="inline mr-1" />Gerar novamente
-                    </button>
-                    <button onClick={() => { setBulkPinOpen(false); setBulkPinResult(null); }} className="h-9 px-4 rounded-lg font-bold text-xs uppercase" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                      Fechar
-                    </button>
-                  </div>
+              {/* Actions */}
+              <div className="flex justify-between items-center gap-2 pt-1" style={{ borderTop: "1px solid var(--border)" }}>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const bom = "\uFEFF";
+                      const header = "Nome,Senha";
+                      const body = bulkPinResult.results.map(r => `"${r.name.replace(/"/g, '""')}","${r.pin}"`).join("\n");
+                      const blob = new Blob([bom + header + "\n" + body], { type: "text/csv;charset=utf-8" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url; a.download = "senhas-colaboradores.csv"; a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
+                    style={{ backgroundColor: "#ccff00", color: "#000", border: "none", cursor: "pointer" }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Baixar Excel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const lines = ["Nome | Senha", ...bulkPinResult.results.map(r => `${r.name} | ${r.pin}`)];
+                      navigator.clipboard.writeText(lines.join("\n"));
+                      toast({ title: "Lista copiada!", description: `${bulkPinResult.results.length} colaboradores` });
+                    }}
+                    className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
+                    style={{ border: "1px solid var(--border)", cursor: "pointer" }}
+                  >
+                    <Copy size={13} /> Copiar lista
+                  </button>
                 </div>
-              </>
-            )}
-          </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setBulkPinResult(null)}
+                    className="h-9 px-4 rounded-lg font-bold text-xs uppercase"
+                    style={{ border: "1px solid var(--border)", cursor: "pointer" }}
+                  >
+                    <Hash size={13} className="inline mr-1" />Gerar novamente
+                  </button>
+                  <button
+                    onClick={() => { setBulkPinOpen(false); setBulkPinResult(null); }}
+                    className="h-9 px-4 rounded-lg font-bold text-xs uppercase"
+                    style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", cursor: "pointer" }}
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
