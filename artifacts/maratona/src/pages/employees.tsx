@@ -117,6 +117,31 @@ export default function EmployeesPage() {
   const [pinCopied, setPinCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
+  type BulkPinEntry = { name: string; cpfLogin: string; pin: string };
+  type BulkPinSkip = { name: string; reason: string };
+  const [bulkPinOpen, setBulkPinOpen] = useState(false);
+  const [bulkPinLoading, setBulkPinLoading] = useState(false);
+  const [bulkPinResult, setBulkPinResult] = useState<{ results: BulkPinEntry[]; skipped: BulkPinSkip[] } | null>(null);
+  const [bulkLinkCopied, setBulkLinkCopied] = useState(false);
+
+  const handleBulkGeneratePins = useCallback(async () => {
+    setBulkPinLoading(true);
+    try {
+      const res = await fetch("/api/employees/bulk-generate-pins", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+      const data = await res.json() as { results: BulkPinEntry[]; skipped: BulkPinSkip[] };
+      setBulkPinResult(data);
+      qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
+    } catch (e) {
+      toast({ title: "Erro ao gerar PINs", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBulkPinLoading(false);
+    }
+  }, [token, toast, qc]);
+
   const handleGeneratePin = useCallback(async (emp: EmployeeWithCycle) => {
     setGeneratingPinId(emp.id);
     try {
@@ -292,6 +317,14 @@ export default function EmployeesPage() {
                 style={{ border: "1px solid var(--border)" }}
               >
                 <KeyRound size={16} /> Gerar Acessos em Massa
+              </button>
+              <button
+                onClick={() => { setBulkPinOpen(true); setBulkPinResult(null); }}
+                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-90"
+                style={{ backgroundColor: "var(--accent)", color: "#000" }}
+                title="Gera um PIN de 4 dígitos para todos os colaboradores casa"
+              >
+                <Hash size={16} /> Gerar PINs (Casa)
               </button>
               <button
                 onClick={() => setResetTypeOpen(true)}
@@ -963,6 +996,125 @@ export default function EmployeesPage() {
                 Entendi
               </button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk PIN dialog */}
+      <Dialog open={bulkPinOpen} onOpenChange={v => { if (!v) { setBulkPinOpen(false); setBulkPinResult(null); } }}>
+        <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
+              Gerar PINs — Colaboradores Casa
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 min-h-0 flex-1 overflow-hidden pt-1">
+            {!bulkPinResult ? (
+              <div className="space-y-4">
+                <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                  Gera um PIN de 4 dígitos novo para <strong>todos</strong> os colaboradores casa ativos com CPF cadastrado.
+                  PINs anteriores serão substituídos imediatamente.
+                </p>
+                <div className="rounded-lg px-4 py-3 text-sm" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                  <span className="font-bold">Link de acesso (único para todos): </span>
+                  <span className="font-mono text-xs break-all">{APP_LINK}</span>
+                </div>
+                <div className="flex justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+                  <button onClick={() => setBulkPinOpen(false)} className="h-10 px-4 rounded-lg font-bold text-sm uppercase" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
+                  <button
+                    onClick={handleBulkGeneratePins}
+                    disabled={bulkPinLoading}
+                    className="h-10 px-5 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-60"
+                    style={{ backgroundColor: "var(--accent)", color: "#000" }}
+                  >
+                    {bulkPinLoading ? <><Hash size={15} className="animate-spin" /> Gerando…</> : <><Hash size={15} /> Gerar todos os PINs</>}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Link único */}
+                <div className="rounded-lg px-4 py-3 flex items-center gap-3 flex-shrink-0" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Link de Acesso (igual para todos)</p>
+                    <p className="text-xs font-mono truncate">{APP_LINK}</p>
+                  </div>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(APP_LINK); setBulkLinkCopied(true); setTimeout(() => setBulkLinkCopied(false), 2000); }}
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-[11px] uppercase"
+                    style={{ border: "1px solid var(--border)" }}
+                  >
+                    {bulkLinkCopied ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar link</>}
+                  </button>
+                </div>
+
+                {/* Stats */}
+                <div className="flex gap-3 flex-shrink-0">
+                  <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{bulkPinResult.results.length}</p>
+                    <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>PINs gerados</p>
+                  </div>
+                  {bulkPinResult.skipped.length > 0 && (
+                    <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                      <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: WARNING }}>{bulkPinResult.skipped.length}</p>
+                      <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF (ignorados)</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Table */}
+                <div className="flex-1 overflow-y-auto rounded-lg min-h-0" style={{ border: "1px solid var(--border)" }}>
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="sticky top-0 z-10" style={{ backgroundColor: "var(--secondary)" }}>
+                      <tr>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Nome</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Login (CPF)</th>
+                        <th className="px-4 py-2.5 text-center text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>PIN</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPinResult.results.map((r, i) => (
+                        <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "var(--secondary)" }}>
+                          <td className="px-4 py-2.5 font-medium text-sm">{r.name}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--muted-foreground)" }}>{r.cpfLogin}</td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className="text-xl font-black tracking-[0.2em]" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{r.pin}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-between items-center gap-2 flex-shrink-0 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+                  <button
+                    onClick={() => {
+                      const lines = [`Link: ${APP_LINK}`, "", "Nome | CPF Login | PIN", ...bulkPinResult.results.map(r => `${r.name} | ${r.cpfLogin} | ${r.pin}`)];
+                      navigator.clipboard.writeText(lines.join("\n"));
+                      toast({ title: "Lista copiada!", description: `${bulkPinResult.results.length} colaboradores` });
+                    }}
+                    className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
+                    style={{ border: "1px solid var(--border)" }}
+                  >
+                    <Copy size={13} /> Copiar tudo
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setBulkPinResult(null); }}
+                      className="h-9 px-4 rounded-lg font-bold text-xs uppercase"
+                      style={{ border: "1px solid var(--border)" }}
+                    >
+                      <Hash size={13} className="inline mr-1" />Gerar novamente
+                    </button>
+                    <button onClick={() => { setBulkPinOpen(false); setBulkPinResult(null); }} className="h-9 px-4 rounded-lg font-bold text-xs uppercase" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

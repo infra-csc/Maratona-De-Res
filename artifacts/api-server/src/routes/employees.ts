@@ -321,6 +321,61 @@ router.get("/employees/:id/history", async (req, res) => {
   })));
 });
 
+// POST /employees/bulk-generate-pins — gera PINs para TODOS os colaboradores casa ativos
+router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (req, res) => {
+  const casaEmployees = await db
+    .select({ id: employeesTable.id, name: employeesTable.name, document: employeesTable.document })
+    .from(employeesTable)
+    .where(and(eq(employeesTable.employmentType, "casa"), eq(employeesTable.active, true)));
+
+  const results: { name: string; cpfLogin: string; pin: string }[] = [];
+  const skipped: { name: string; reason: string }[] = [];
+
+  for (const emp of casaEmployees) {
+    const cpfDigits = emp.document ? normalizeCpf(emp.document) : "";
+    if (!isValidCpfLength(cpfDigits)) {
+      skipped.push({ name: emp.name, reason: "Sem CPF válido" });
+      continue;
+    }
+
+    const pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+    const passwordHash = await bcrypt.hash(pin, 12);
+
+    const [byEmpId] = await db.select({ id: usersTable.id })
+      .from(usersTable).where(eq(usersTable.employeeId, emp.id)).limit(1);
+
+    if (byEmpId) {
+      await db.update(usersTable)
+        .set({ passwordHash, mustChangePassword: false })
+        .where(eq(usersTable.id, byEmpId.id));
+    } else {
+      const [byCpf] = await db.select({ id: usersTable.id })
+        .from(usersTable).where(eq(usersTable.cpfLogin, cpfDigits)).limit(1);
+      if (byCpf) {
+        await db.update(usersTable)
+          .set({ passwordHash, mustChangePassword: false, employeeId: emp.id })
+          .where(eq(usersTable.id, byCpf.id));
+      } else {
+        await db.insert(usersTable).values({
+          name: emp.name,
+          email: null,
+          cpfLogin: cpfDigits,
+          passwordHash,
+          role: "visualizador",
+          employeeId: emp.id,
+          active: true,
+          mustChangePassword: false,
+        });
+      }
+    }
+
+    results.push({ name: emp.name, cpfLogin: cpfDigits, pin });
+  }
+
+  await audit(req.user!.userId, "bulk_generate_pins", "users", null, null, { count: results.length, skipped: skipped.length });
+  res.json({ results, skipped });
+});
+
 // POST /employees/:id/generate-pin — gera PIN de 4 dígitos para colaborador casa
 router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id);
