@@ -519,14 +519,14 @@ export default function EmployeesPage() {
         </section>
 
         {/* Search + filter */}
-        <section className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+        <section className="flex flex-col md:flex-row gap-3 items-center flex-wrap">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
             <input
               data-testid="input-search-employees"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
+              className="w-full pl-9 h-10 rounded-lg text-sm outline-none"
               style={fieldStyle}
               placeholder="Buscar por nome, função ou departamento..."
             />

@@ -151,7 +151,7 @@ export default function AreasPage() {
         </section>
 
         {/* Filters + search */}
-        <section className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <section className="flex flex-col md:flex-row gap-3 items-center flex-wrap justify-between">
           <div className="flex rounded-lg overflow-hidden w-full md:w-auto" style={{ border: "1px solid var(--border)" }}>
             {(["all", "true", "false"] as const).map(v => {
               const active = filterActive === v;
@@ -174,7 +174,7 @@ export default function AreasPage() {
               data-testid="input-search-areas"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
+              className="w-full pl-9 h-10 rounded-lg text-sm outline-none"
               style={fieldStyle}
               placeholder="Buscar departamento..."
             />

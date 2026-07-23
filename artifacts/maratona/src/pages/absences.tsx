@@ -49,6 +49,7 @@ export default function AbsencesPage() {
   const [search, setSearch] = useState("");
   const [filterKind, setFilterKind] = useState<"all" | "penalty" | "merit">("all");
   const [filterEventId, setFilterEventId] = useState<string>("__all");
+  const [filterEventPickerOpen, setFilterEventPickerOpen] = useState(false);
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
 
@@ -253,7 +254,7 @@ export default function AbsencesPage() {
 
         {/* ── Filters ── */}
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col md:flex-row gap-3 items-stretch flex-wrap">
+          <div className="flex flex-col md:flex-row gap-3 items-center flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
               <input
@@ -275,18 +276,61 @@ export default function AbsencesPage() {
                 <SelectItem value="merit">Méritos</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterEventId} onValueChange={setFilterEventId}>
-              <SelectTrigger className="h-10 rounded-lg w-[220px] text-xs font-bold uppercase" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-                <SelectValue placeholder="Evento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all">Todos os eventos</SelectItem>
-                <SelectItem value="__none">Sem evento (ciclo)</SelectItem>
-                {(events ?? []).map(e => (
-                  <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={filterEventPickerOpen} onOpenChange={setFilterEventPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className="h-10 rounded-lg px-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider shrink-0 transition-opacity hover:opacity-80"
+                  style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)", minWidth: 200, maxWidth: 280 }}
+                >
+                  <Filter size={13} style={{ color: "var(--muted-foreground)", flexShrink: 0 }} />
+                  <span className="flex-1 text-left truncate">
+                    {filterEventId === "__all"
+                      ? "Todos os eventos"
+                      : filterEventId === "__none"
+                      ? "Sem evento (ciclo)"
+                      : ((events ?? []).find(e => String(e.id) === filterEventId)?.name ?? "Evento")}
+                  </span>
+                  <ChevronsUpDown size={13} style={{ color: "var(--muted-foreground)", flexShrink: 0 }} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0 w-[320px]" align="start">
+                <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+                  <CommandInput placeholder="Buscar evento..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum evento encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="Todos os eventos"
+                        onSelect={() => { setFilterEventId("__all"); setFilterEventPickerOpen(false); }}
+                        className="flex items-center gap-2"
+                      >
+                        <Check size={13} className={filterEventId === "__all" ? "opacity-100" : "opacity-0"} />
+                        Todos os eventos
+                      </CommandItem>
+                      <CommandItem
+                        value="Sem evento ciclo"
+                        onSelect={() => { setFilterEventId("__none"); setFilterEventPickerOpen(false); }}
+                        className="flex items-center gap-2"
+                      >
+                        <Check size={13} className={filterEventId === "__none" ? "opacity-100" : "opacity-0"} />
+                        Sem evento (ciclo)
+                      </CommandItem>
+                      {(events ?? []).map(e => (
+                        <CommandItem
+                          key={e.id}
+                          value={e.name}
+                          onSelect={() => { setFilterEventId(String(e.id)); setFilterEventPickerOpen(false); }}
+                          className="flex items-center gap-2"
+                        >
+                          <Check size={13} className={filterEventId === String(e.id) ? "opacity-100" : "opacity-0"} />
+                          {e.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <div className="flex items-center gap-1 shrink-0">
               <input
                 type="date"
