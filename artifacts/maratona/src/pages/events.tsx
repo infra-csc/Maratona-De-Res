@@ -603,7 +603,7 @@ export default function EventsPage() {
                 : "var(--border)";
 
               // Score label
-              const scoreLabel = isPureHistorical
+              const scoreLabel = ev.isHistorical
                 ? "Importado"
                 : finalPubCount > 0 && partialOnlyCount > 0
                   ? `${finalPubCount}F · ${partialOnlyCount}P`
@@ -611,7 +611,7 @@ export default function EventsPage() {
                   : partialOnlyCount > 0 ? "Pub. Parcial"
                   : calSaved > 0 ? "Rascunho"
                   : "Avaliador";
-              const scoreLabelColor = isPureHistorical ? "#e8a23d"
+              const scoreLabelColor = ev.isHistorical ? "#e8a23d"
                 : finalPubCount > 0 && partialOnlyCount === 0 ? "#9ab000"
                 : finalPubCount > 0 || partialOnlyCount > 0 ? "#e8a23d"
                 : calSaved > 0 ? "#5b8def"
@@ -626,7 +626,9 @@ export default function EventsPage() {
                 ? new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
                 : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}–${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
 
-              const badge = !ev.criteriaConfirmed && !hasEvals
+              const badge = ev.isHistorical
+                ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
+                : !ev.criteriaConfirmed && !hasEvals
                 ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
                 : fc
                   ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
