@@ -84,8 +84,15 @@ router.get("/events", async (req, res) => {
     // calibrações complementares importadas via planilha).
     if (ev.isHistorical) {
       const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
-      const activeCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false && !c.criterionEventScoped);
       const evCals = calibrations.filter(c => c.eventId === ev.id);
+      // Para eventos históricos: inclui critérios ec_active=F se tiverem calibração salva
+      // (critérios podem ter sido desativados depois de já serem calibrados no sistema legado).
+      const activeCriteria = eventCriteriaRows.filter(c =>
+        c.eventId === ev.id &&
+        c.criterionActive !== false &&
+        !c.criterionEventScoped &&
+        (c.active || evCals.some(cal => cal.criterionId === c.criterionId && cal.calibratedScore !== null))
+      );
       // Todos os critérios ativos com peso > 0 — denominador correto para o total.
       const allScorableCriteria = activeCriteria.filter(c => {
         const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
