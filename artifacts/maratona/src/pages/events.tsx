@@ -603,16 +603,13 @@ export default function EventsPage() {
                 : "var(--border)";
 
               // Score label
-              const scoreLabel = ev.isHistorical
-                ? "Importado"
-                : finalPubCount > 0 && partialOnlyCount > 0
+              const scoreLabel = finalPubCount > 0 && partialOnlyCount > 0
                   ? `${finalPubCount}F · ${partialOnlyCount}P`
                   : finalPubCount > 0 ? "Pub. Final"
                   : partialOnlyCount > 0 ? "Pub. Parcial"
                   : calSaved > 0 ? "Rascunho"
                   : "Avaliador";
-              const scoreLabelColor = ev.isHistorical ? "#e8a23d"
-                : finalPubCount > 0 && partialOnlyCount === 0 ? "#9ab000"
+              const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0 ? "#9ab000"
                 : finalPubCount > 0 || partialOnlyCount > 0 ? "#e8a23d"
                 : calSaved > 0 ? "#5b8def"
                 : "var(--muted-foreground)";
@@ -660,9 +657,6 @@ export default function EventsPage() {
                       {ev.name}
                     </Link>
                     <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
-                      {ev.isHistorical && (
-                        <span className="text-[10px] font-bold uppercase" style={{ color: "#e8a23d" }}>Histórico ·</span>
-                      )}
                       {!ev.criteriaConfirmed && !hasEvals && (
                         <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Ag. RH ·</span>
                       )}
