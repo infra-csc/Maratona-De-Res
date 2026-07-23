@@ -593,10 +593,11 @@ export default function EventsPage() {
               const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
               const isPureHistorical = !!ev.isHistorical && calSaved === 0;
               const hasEvals = evaluated > 0;
+              const hasAnyPublication = calSaved > 0 || finalPubCount > 0 || partialPubTotal > 0;
               const missing = ev.unassignedAreaNames ?? [];
 
               // Accent bar color
-              const accentColor = !ev.criteriaConfirmed && !hasEvals && calSaved === 0 ? WARNING
+              const accentColor = !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication ? WARNING
                 : fc ? "#9ab000"
                 : evaluated === total && total > 0 ? "var(--accent)"
                 : evaluated > 0 ? "#e8a23d"
@@ -625,7 +626,7 @@ export default function EventsPage() {
 
               const badge = ev.isHistorical
                 ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
-                : !ev.criteriaConfirmed && !hasEvals && calSaved === 0
+                : !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication
                 ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
                 : fc
                   ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
@@ -657,7 +658,7 @@ export default function EventsPage() {
                       {ev.name}
                     </Link>
                     <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
-                      {!ev.criteriaConfirmed && !hasEvals && calSaved === 0 && (
+                      {!ev.criteriaConfirmed && !hasEvals && !hasAnyPublication && (
                         <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Ag. RH ·</span>
                       )}
                       {!ev.resultsConfirmed && ev.criteriaConfirmed && (
@@ -667,7 +668,7 @@ export default function EventsPage() {
                         {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
                       </span>
                     </div>
-                    {missing.length > 0 && !hasEvals && (
+                    {missing.length > 0 && !hasEvals && !hasAnyPublication && (
                       <p className="text-[10px] font-bold uppercase truncate mt-0.5" style={{ color: WARNING }}>
                         Sem aval.: {missing.join(", ")}
                       </p>
