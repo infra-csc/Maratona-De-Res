@@ -190,7 +190,11 @@ export default function EmployeesPage() {
   const [resetTypePending, setResetTypePending] = useState(false);
 
   // IDs dos colaboradores "casa" do Galpão Casa (Marceneiros + Montadores)
-  const GALP_CASA_IDS = [179,192,161,196,146,133,200,219,182,189,169,185,154,139,183,175,147,166,150,177,143,208];
+  // Grupo 1 — Marceneiros: Alonso, Adriano, Bruno, Everton, Gabriel, Iago,
+  //   José Marcio, João Jorge, José Renato, Matheus, Luan, Willians
+  // Grupo 2 — Montadores: Caue, Douglas, Erick, Jamerson, João Marcos,
+  //   Kaio, Lyrick, Ulisses, Vinicius, Edgard
+  const GALP_CASA_IDS = [309,324,286,328,269,255,333,354,313,321,295,316,278,261,314,301,270,292,273,307,266,343];
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
 
@@ -943,8 +947,7 @@ export default function EmployeesPage() {
                   try {
                     const res = await fetch("/api/employees/bulk-employment-reset", {
                       method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
+                      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                       body: JSON.stringify({ casaIds: GALP_CASA_IDS }),
                     });
                     if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
