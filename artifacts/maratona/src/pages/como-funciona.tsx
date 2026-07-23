@@ -182,8 +182,8 @@ export default function ComoFuncionaPage() {
                 {[
                   { item: "Uso de EPI", desc: "Equipamentos de Proteção Individual utilizados corretamente durante o evento." },
                   { item: "Estaiamento / Aterramento", desc: "Estruturas devidamente fixadas e aterradas conforme as normas de segurança." },
-                  { item: "Equipamentos", desc: "Ferramentas e equipamentos em bom estado e utilizados adequadamente." },
-                  { item: "Conduta", desc: "Comportamento profissional adequado durante toda a execução do evento." },
+                  { item: "Guarda de Equipamentos / Ferramentas", desc: "Todas as ferramentas e cases retornam à base sem perdas, danos ou esquecimentos." },
+                  { item: "Conduta e Comportamento", desc: "Comportamento profissional, uso correto de uniforme e cumprimento de horários durante o evento." },
                 ].map(({ item, desc }) => (
                   <div key={item} className="p-4 rounded-lg" style={{ backgroundColor: "var(--muted)", border: "1px solid var(--border)" }}>
                     <p className="text-[11px] font-black uppercase text-foreground mb-1">{item}</p>
@@ -209,20 +209,20 @@ export default function ComoFuncionaPage() {
             </p>
 
             <div className="mt-3 space-y-4">
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#ba1a1a]">Penalidades (descontam pontos)</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#ba1a1a]">Penalidades (descontam pontos do total)</p>
               <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "rgba(186,26,26,0.10)", borderBottom: "1px solid var(--border)" }}>
                       <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#ba1a1a]">Tipo</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#ba1a1a] text-right">Desconto</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#ba1a1a] text-right">Pontos</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[
-                      { tipo: "Ausência Não Comunicada", pts: "−5 pts" },
-                      { tipo: "Atraso Superior a 30 Minutos", pts: "−3 pts" },
-                      { tipo: "Advertência / Registro Disciplinar", pts: "−10 pts" },
+                      { tipo: "Ausência Não Comunicada", pts: "−50 pts" },
+                      { tipo: "Atraso > 30 Minutos", pts: "−10 pts" },
+                      { tipo: "Inconformidade de Ponto", pts: "−10 pts" },
                     ].map((r, i) => (
                       <tr key={r.tipo} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
                         <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.tipo}</td>
@@ -233,20 +233,20 @@ export default function ComoFuncionaPage() {
                 </table>
               </div>
 
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#506600]">Méritos (somam pontos)</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#506600]">Méritos (somam pontos ao total)</p>
               <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "#ccff00", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
                       <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#161e00]">Tipo</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#161e00] text-right">Acréscimo</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#161e00] text-right">Pontos</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[
-                      { tipo: "Rei do Galpão (destaque de armazém)", pts: "+5 pts" },
-                      { tipo: "Estrela do Evento (melhor performance)", pts: "+5 pts" },
-                      { tipo: "Colega Top (indicação pelos pares)", pts: "+3 pts" },
+                      { tipo: "Rei do Galpão", pts: "+50 pts" },
+                      { tipo: "Estrela do Evento", pts: "+25 pts" },
+                      { tipo: "Colega Top", pts: "+10 pts" },
                     ].map((r, i) => (
                       <tr key={r.tipo} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
                         <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.tipo}</td>
@@ -259,7 +259,7 @@ export default function ComoFuncionaPage() {
             </div>
 
             <div className="mt-4 p-4 rounded-lg text-[13px] leading-relaxed text-muted-foreground" style={{ backgroundColor: "var(--muted)", borderLeft: "3px solid #ccff00" }}>
-              Os valores acima são exemplos comuns. O RH pode registrar outros tipos de penalidades e méritos conforme as regras do ciclo. A nota final nunca ultrapassa 100 nem fica abaixo de 0.
+              Os pontos são descontados da <strong className="text-foreground">soma total das notas</strong> e depois divididos pelo número de eventos — por isso o impacto na sua média depende de quantos eventos você participou. Exemplo: uma penalidade de 50 pts em 8 eventos reduz a média em 6,25 pts. O RH pode ajustar os valores ou criar novos tipos conforme as regras do ciclo.
             </div>
           </Section>
         )}
@@ -268,20 +268,20 @@ export default function ComoFuncionaPage() {
         {visibleIds.has("elegibilidade") && (
           <Section id="elegibilidade" icon={Trophy} title="Elegibilidade ao Bônus" dark>
             <p className="text-[13px] leading-relaxed text-[rgba(255,255,255,0.75)]">
-              Para ter direito ao Bônus Caju, você precisa atingir o número mínimo de <strong className="text-[#ccff00]">eventos confirmados</strong> no ciclo.
+              Para ter direito ao Bônus Caju, você precisa atingir o número mínimo de <strong className="text-[#ccff00]">eventos confirmados</strong> definido pelo RH para o ciclo.
             </p>
             <div className="space-y-2 mt-2">
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(204,255,0,0.12)", border: "1px solid rgba(204,255,0,0.3)" }}>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#ccff00] sm:w-36 sm:shrink-0 sm:pt-0.5">Meta mínima</span>
-                <span className="text-[13px] font-bold text-[#ccff00] leading-snug">8 eventos confirmados no ciclo (com nota lançada e validada pelo RH)</span>
+                <span className="text-[13px] font-bold text-[#ccff00] leading-snug">O número mínimo de eventos é definido pelo RH por ciclo (consulte seu card de Elegibilidade em Meu Desempenho para ver o valor atual).</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Não elegível</span>
-                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Se você tiver menos de 8 eventos confirmados, o bônus aparecerá como "—" (não elegível para este ciclo).</span>
+                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Se você não atingir o mínimo de eventos confirmados, o bônus aparecerá como "—" (não elegível para este ciclo).</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Eventos extras</span>
-                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Eventos acima de 8 podem gerar bônus adicional. Cada evento extra dentro da sua faixa de nota soma um valor extra ao bônus.</span>
+                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Cada evento confirmado acima do mínimo pode gerar bônus adicional. O valor extra depende da nota daquele evento específico e da faixa de pelotão correspondente.</span>
               </div>
             </div>
             <p className="text-[11px] text-[rgba(204,255,0,0.6)] mt-3">
@@ -311,31 +311,50 @@ export default function ComoFuncionaPage() {
         {/* 7. Status dos Eventos */}
         {visibleIds.has("status") && (
           <Section id="status" icon={Clock} title="O Que Significa Cada Status">
-            <div>
+            <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-1">Status do evento (aparece no card)</p>
+            <div className="mb-4">
               <StatusBadge
-                label="Em Avaliação"
+                label="Pendente"
                 color="text-muted-foreground"
-                text="O evento está sendo avaliado pelos avaliadores designados. Sua nota ainda não foi publicada. Aguarde a conclusão da avaliação."
+                text="O evento ainda não tem notas publicadas. A avaliação está em andamento ou aguardando avaliador."
               />
               <StatusBadge
                 label="Avaliação Parcial"
                 color="bg-[#ccff00] text-[#191c1e]"
-                text="Parte dos critérios já foi avaliada e publicada. Você pode ver essas notas parciais, mas a avaliação ainda está em andamento."
+                text="O RH publicou notas provisórias para este evento. Você já pode ver as notas, mas elas ainda podem ser ajustadas antes da confirmação final."
               />
               <StatusBadge
-                label="Avaliação Final"
-                color="bg-[#191c1e] text-[#ccff00]"
-                text="A avaliação do evento foi concluída e publicada oficialmente. Essa é a nota definitiva para este evento."
-              />
-              <StatusBadge
-                label="Pendente"
-                color="text-muted-foreground"
-                text="O critério ainda não foi avaliado (aparece nos detalhes do evento). Quando a nota for lançada, o status mudará."
+                label="Avaliado — Projeção Parcial"
+                color="bg-[#506600] text-[#ccff00]"
+                text="Alguns critérios já têm nota final publicada, mas outros ainda estão pendentes. A nota do evento é uma projeção parcial do resultado."
               />
               <StatusBadge
                 label="Avaliado"
-                color="text-[#506600]"
-                text="O critério específico já tem nota lançada pelo avaliador."
+                color="bg-[#506600] text-[#ccff00]"
+                text="Todos os critérios avaliados têm nota final publicada. O evento está completamente avaliado."
+              />
+              <StatusBadge
+                label="Nota Final Confirmada"
+                color="bg-[#191c1e] text-[#ccff00]"
+                text="O RH liberou o feedback oficial do evento. Esta é a nota definitiva e o evento já conta oficialmente na sua média do ciclo."
+              />
+            </div>
+            <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-1">Status por quesito (dentro do evento)</p>
+            <div>
+              <StatusBadge
+                label="Pendente"
+                color="text-muted-foreground"
+                text="Este quesito ainda não tem nota lançada. Aguarde o avaliador concluir a avaliação."
+              />
+              <StatusBadge
+                label="Projeção Parcial"
+                color="bg-[#ccff00] text-[#191c1e]"
+                text="Nota publicada provisoriamente pelo RH. Ainda pode ser ajustada antes da confirmação final."
+              />
+              <StatusBadge
+                label="✓ Nota Final Confirmada"
+                color="bg-[#191c1e] text-[#ccff00]"
+                text="Nota final publicada oficialmente para este quesito. Valor definitivo."
               />
               <StatusBadge
                 label="Não conta p/ nota"
@@ -386,8 +405,8 @@ export default function ComoFuncionaPage() {
                   a: "Não. A identidade dos avaliadores é confidencial para garantir a imparcialidade da avaliação. Apenas comentários coletivos são exibidos.",
                 },
                 {
-                  q: "O que acontece se eu participar de mais de 8 eventos?",
-                  a: "Ótimo! Você acumula bônus extras proporcionais à sua faixa de nota para cada evento adicional acima do mínimo de 8.",
+                  q: "O que acontece se eu participar de mais eventos do que o mínimo exigido?",
+                  a: "Ótimo! Cada evento confirmado acima do mínimo gera um bônus extra proporcional à nota daquele evento específico. Veja o número mínimo do ciclo atual no card de Elegibilidade em Meu Desempenho.",
                 },
                 {
                   q: "A Matriz de Conformidade pode zerar minha nota do evento?",

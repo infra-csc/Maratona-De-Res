@@ -39,6 +39,7 @@ interface PerformanceData {
     isQuarterClosed: boolean;
     finalResult: number | null;
     absencePenalty: number | null;
+    scoredEventsCount?: number | null;
   };
   adjustments: Adjustment[];
   events: EventSummary[];
