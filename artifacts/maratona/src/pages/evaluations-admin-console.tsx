@@ -223,7 +223,7 @@ export function AdminEvaluationsConsole() {
         criteria: rows, total, done, unassigned, pct,
         areaNames: [...new Set(rows.map(r => r.areaName))],
         evaluatorNames: [...new Set(rows.map(r => r.assignedToName).filter((n): n is string => !!n))],
-        isDone: total > 0 && done === total,
+        isDone: (total > 0 && done === total) || (ev.partialPublishedCount ?? 0) > 0 || (ev.finalCalibratedCriteria ?? 0) > 0,
       };
     });
   }, [configuredEvents, criteriaQueries, assignQueries, evalQueries]);
