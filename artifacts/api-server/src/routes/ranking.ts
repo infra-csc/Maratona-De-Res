@@ -39,6 +39,7 @@ router.get("/ranking", async (req, res) => {
       .where(and(
         eq(quarterlyResultsTable.cycleId, cycle.id),
         eq(employeesTable.employmentType, "casa"),
+        eq(employeesTable.active, true),
         // O cargo GLOBAL cadastrado é a fonte da verdade (mesma regra de
         // participantCountsForScore): se o colaborador está hoje classificado
         // como "Sup Ceno *" (participação informativa), ele nunca deve

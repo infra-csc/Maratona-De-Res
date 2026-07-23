@@ -286,10 +286,10 @@ router.post("/employees/bulk-employment-reset", requireRole("admin", "rh"), asyn
     if (casaIds.length > 0) {
       await tx.update(employeesTable).set({ employmentType: "casa" }).where(inArray(employeesTable.id, casaIds));
       await tx.update(employeesTable).set({ employmentType: "freela" }).where(
-        and(notInArray(employeesTable.id, casaIds), eq(employeesTable.active, true)),
+        notInArray(employeesTable.id, casaIds),
       );
     } else {
-      await tx.update(employeesTable).set({ employmentType: "freela" }).where(eq(employeesTable.active, true));
+      await tx.update(employeesTable).set({ employmentType: "freela" });
     }
   });
   const cycle = await getCurrentCycle();
