@@ -1592,9 +1592,24 @@ export function AdminEvaluationsConsole() {
       ) : view === "table" ? (
         selected && (
           <div>
-            <p className="text-[11px] font-bold uppercase mb-3" style={{ color: "var(--muted-foreground)" }}>
-              Acompanhamento — {selected.name} · {selected.done} de {selected.total} critérios completos
-            </p>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>Acompanhamento —</span>
+              <Select value={String(selected.id)} onValueChange={v => setSelectedEventId(Number(v))}>
+                <SelectTrigger className="h-7 text-[11px] font-black uppercase w-auto min-w-[220px] max-w-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {enrichedEvents.map(ev => (
+                    <SelectItem key={ev.id} value={String(ev.id)} className="text-[11px] font-bold uppercase">
+                      {ev.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>
+                · {selected.done} de {selected.total} critérios completos
+              </span>
+            </div>
             <div className="rounded-xl overflow-hidden overflow-x-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
               <div className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] min-w-[820px]" style={{ backgroundColor: "var(--secondary)" }}>
                 {["Critério", "Área", "Avaliador", "Enviado em", "Status", "Ação"].map((h, i) => (
@@ -1675,7 +1690,7 @@ export function AdminEvaluationsConsole() {
               })}
             </div>
             <p className="text-[11.5px] mt-3" style={{ color: "var(--muted-foreground)" }}>
-              Clique em <b style={{ color: "var(--foreground)" }}>Atribuir</b> numa linha sem avaliador para escolher quem responde. Troque o evento na aba Atribuição.
+              Clique em <b style={{ color: "var(--foreground)" }}>Atribuir</b> numa linha sem avaliador para escolher quem responde. Use o seletor acima para trocar de evento.
             </p>
           </div>
         )
