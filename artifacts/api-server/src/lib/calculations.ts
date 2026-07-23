@@ -114,7 +114,10 @@ export function mergeEventScopedCriteria(criteria: CriterionWithDuplicates[]): C
       const mergedScore = effectiveScores.length > 0
         ? Math.round((effectiveScores.reduce((a, b) => a + b, 0) / effectiveScores.length) * 1000) / 1000
         : null;
-      return { criterionId: parent.criterionId, weight: parent.weight, averageScore: mergedScore, calibratedScore: null };
+      // Se algum membro (pai ou filho) tem calibração, o grupo está calibrado.
+      // calibratedScore=null silenciava o pai mesclado em calibratedCriteriaCount.
+      const hasAnyCalibration = members.some(m => m.calibratedScore != null);
+      return { criterionId: parent.criterionId, weight: parent.weight, averageScore: mergedScore, calibratedScore: hasAnyCalibration ? mergedScore : null };
     });
 }
 
