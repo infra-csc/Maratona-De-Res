@@ -6,18 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogClose,
-} from "@/components/ui/dialog";
 import {
   Calendar, TrendingUp, TrendingDown, AlertTriangle,
   CheckCircle2, Clock, ChevronDown, ChevronRight,
-  MapPin, Search, Flag, Send, Award, ArrowRight,
+  MapPin, Search, Award, ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 interface PerformanceData {
   employee: { id: number; name: string; department: string; functionName: string; eligible?: boolean; eligibilityStatus?: string | null };
@@ -57,15 +52,6 @@ interface Adjustment {
   eventName: string | null;
 }
 
-interface ReviewRequest {
-  id: number;
-  comment: string;
-  status: "pending" | "resolved" | "approved" | "denied";
-  createdAt: string;
-  resolvedAt: string | null;
-  resolutionNotes: string | null;
-}
-
 interface EventSummary {
   eventId: number;
   eventName: string;
@@ -86,7 +72,6 @@ interface EventSummary {
   countsForScore: boolean;
   resultsConfirmed: boolean;
   isHistorical?: boolean;
-  reviewRequest: ReviewRequest | null;
 }
 
 interface CriterionDetail {
@@ -100,24 +85,12 @@ interface CriterionDetail {
   evaluated: boolean;
   partialPublishedAt?: string | null;
   finalPublishedAt?: string | null;
-  reviewRequest?: ReviewRequest | null;
 }
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-// Rótulo/cores por desfecho do pedido de revisão. "resolved" é legado
-// (resolvido antes de existir aprovado/negado).
-function reviewStatusInfo(status: string | undefined | null) {
-  switch (status) {
-    case "pending": return { label: "Revisão solicitada", badgeCls: "bg-[#fff3cd] text-[#862200]", btnCls: "border-[#862200] text-[#862200] bg-[#862200]/10" };
-    case "approved": return { label: "Revisão aprovada", badgeCls: "bg-[#506600] text-white", btnCls: "border-[#506600] text-[#506600] bg-[#506600]/10" };
-    case "denied": return { label: "Revisão negada", badgeCls: "bg-[#862200] text-white", btnCls: "border-[#862200] text-[#862200] bg-[#862200]/10" };
-    case "resolved": return { label: "Revisão resolvida", badgeCls: "bg-[#506600] text-white", btnCls: "border-[#506600] text-[#506600] bg-[#506600]/10" };
-    default: return null;
-  }
-}
 
 function scoreColor(score: number | null): string {
   if (score === null) return "var(--muted-foreground)";
@@ -146,279 +119,9 @@ function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null):
   }
 }
 
-function CriterionReviewRequest({ event, criterion }: { event: EventSummary; criterion: CriterionDetail }) {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [resubmitting, setResubmitting] = useState(false);
-  const [comment, setComment] = useState(criterion.reviewRequest?.comment ?? "");
-
-  const mutation = useMutation({
-    mutationFn: async (text: string) => {
-      const token = localStorage.getItem("maratona_token");
-      const res = await fetch(`${import.meta.env.BASE_URL}api/my-performance/events/${event.eventId}/review-request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ comment: `[Critério: ${criterion.criterionName}] ${text}` }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Não foi possível enviar a sinalização.");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setOpen(false);
-      setResubmitting(false);
-      queryClient.invalidateQueries({ queryKey: ["my-performance"] });
-    },
-  });
-
-  const hasRequest = !!criterion.reviewRequest;
-  const showForm = !hasRequest || resubmitting;
-  const statusInfo = reviewStatusInfo(criterion.reviewRequest?.status);
-  const isResolved = hasRequest && criterion.reviewRequest!.status !== "pending";
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (!v) { setResubmitting(false); setComment(criterion.reviewRequest?.comment ?? ""); }
-      }}
-    >
-      <DialogTrigger asChild>
-        <button
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            "flex items-center gap-1 text-[10px] font-bold uppercase italic px-1.5 py-0.5 border shrink-0 transition-colors mt-1",
-            statusInfo ? statusInfo.btnCls : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
-          )}
-        >
-          <Flag size={9} />
-          {statusInfo ? statusInfo.label : "Sinalizar Revisão"}
-        </button>
-      </DialogTrigger>
-      <DialogContent onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <DialogHeader>
-          <DialogTitle className="uppercase font-black flex items-center gap-2 text-foreground">
-            <Flag size={16} className="text-[#862200]" /> Sinalizar Revisão do Critério
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            <span className="font-bold">{criterion.criterionName}</span> · {event.eventName}
-          </DialogDescription>
-        </DialogHeader>
-
-        {hasRequest && !showForm && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={cn(
-                "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
-                statusInfo?.badgeCls ?? "bg-[#fff3cd] text-[#862200]"
-              )}>
-                {statusInfo?.label ?? "Revisão sinalizada"}
-              </span>
-              <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(criterion.reviewRequest!.createdAt)}</span>
-            </div>
-            <p className="text-sm text-muted-foreground italic">"{criterion.reviewRequest!.comment}"</p>
-            {isResolved && criterion.reviewRequest!.resolutionNotes && (
-              <p className="text-sm text-[#506600] font-bold">Resposta: {criterion.reviewRequest!.resolutionNotes}</p>
-            )}
-            <button
-              onClick={() => { setComment(""); setResubmitting(true); }}
-              className="text-[11px] font-bold uppercase italic text-muted-foreground hover:text-foreground underline"
-            >
-              Sinalizar novamente
-            </button>
-          </div>
-        )}
-
-        {showForm && (
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase text-muted-foreground">Descreva o motivo da revisão</p>
-            <Textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder={`Ex: acredito que minha nota em "${criterion.criterionName}" não reflete minha atuação no evento...`}
-              className="text-sm text-foreground"
-              style={{ backgroundColor: "var(--background)", border: "1px solid var(--border)" }}
-              rows={4}
-              autoFocus
-            />
-            {mutation.isError && (
-              <p className="text-xs font-bold text-[#862200]">{(mutation.error as Error).message}</p>
-            )}
-          </div>
-        )}
-
-        <DialogFooter className="flex-row items-center gap-2 sm:justify-end">
-          {showForm ? (
-            <>
-              {hasRequest && (
-                <button
-                  onClick={() => { setResubmitting(false); setComment(criterion.reviewRequest?.comment ?? ""); }}
-                  className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e]"
-                >
-                  Cancelar
-                </button>
-              )}
-              <button
-                onClick={() => mutation.mutate(comment)}
-                disabled={!comment.trim() || mutation.isPending}
-                className="flex items-center gap-2 text-[11px] font-bold uppercase italic px-4 py-2 bg-[#191c1e] text-[#ccff00] hover:bg-[#191c1e]/90 transition-colors disabled:opacity-50"
-              >
-                <Send size={14} /> {mutation.isPending ? "Enviando..." : "Confirmar Revisão"}
-              </button>
-            </>
-          ) : (
-            <DialogClose asChild>
-              <button className="text-[11px] font-bold uppercase italic px-4 py-2 border-2 border-[#191c1e]">Fechar</button>
-            </DialogClose>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function EventReviewRequest({ event }: { event: EventSummary }) {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [resubmitting, setResubmitting] = useState(false);
-  const [comment, setComment] = useState(event.reviewRequest?.comment ?? "");
-
-  const mutation = useMutation({
-    mutationFn: async (text: string) => {
-      const token = localStorage.getItem("maratona_token");
-      const res = await fetch(`${import.meta.env.BASE_URL}api/my-performance/events/${event.eventId}/review-request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ comment: text }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Não foi possível enviar a sinalização.");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setOpen(false);
-      setResubmitting(false);
-      queryClient.invalidateQueries({ queryKey: ["my-performance"] });
-    },
-  });
-
-  const hasRequest = !!event.reviewRequest;
-  const showForm = !hasRequest || resubmitting;
-  const statusInfo = reviewStatusInfo(event.reviewRequest?.status);
-  const isResolved = hasRequest && event.reviewRequest!.status !== "pending";
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (!v) { setResubmitting(false); setComment(event.reviewRequest?.comment ?? ""); }
-      }}
-    >
-      <DialogTrigger asChild>
-        <button
-          data-testid="button-open-review-request"
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            "flex items-center gap-1.5 text-[10px] font-bold uppercase italic px-2 py-1 border-2 shrink-0 transition-colors",
-            statusInfo ? statusInfo.btnCls : "border-[#862200] text-[#862200] hover:bg-[#862200]/10"
-          )}
-        >
-          <Flag size={12} /> {statusInfo ? statusInfo.label : "Sinalizar Revisão"}
-        </button>
-      </DialogTrigger>
-      <DialogContent onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <DialogHeader>
-          <DialogTitle className="uppercase font-black flex items-center gap-2 text-foreground">
-            <Flag size={16} className="text-[#862200]" /> Sinalizar Revisão
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground">{event.eventName}</DialogDescription>
-        </DialogHeader>
-
-        {hasRequest && !showForm && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={cn(
-                "text-[10px] font-bold uppercase italic px-2 py-0.5 border-2 border-[#191c1e]",
-                statusInfo?.badgeCls ?? "bg-[#fff3cd] text-[#862200]"
-              )}>
-                {statusInfo?.label ?? "Revisão sinalizada"}
-              </span>
-              <span className="text-[10px] font-medium italic text-[#747a60]">{formatDateTime(event.reviewRequest!.createdAt)}</span>
-            </div>
-            <p className="text-sm text-muted-foreground italic">"{event.reviewRequest!.comment}"</p>
-            {isResolved && event.reviewRequest!.resolutionNotes && (
-              <p className="text-sm text-[#506600] font-bold">Resposta: {event.reviewRequest!.resolutionNotes}</p>
-            )}
-            <button
-              data-testid="button-review-request-again"
-              onClick={() => { setComment(""); setResubmitting(true); }}
-              className="text-[11px] font-bold uppercase italic text-muted-foreground hover:text-foreground underline"
-            >
-              Sinalizar novamente
-            </button>
-          </div>
-        )}
-
-        {showForm && (
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase text-muted-foreground">Descreva o motivo da revisão</p>
-            <Textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Ex: acredito que a nota do critério X não reflete minha participação..."
-              className="text-sm text-foreground"
-              style={{ backgroundColor: "var(--background)", border: "1px solid var(--border)" }}
-              rows={4}
-              autoFocus
-            />
-            {mutation.isError && (
-              <p className="text-xs font-bold text-[#862200]">{(mutation.error as Error).message}</p>
-            )}
-          </div>
-        )}
-
-        <DialogFooter className="flex-row items-center gap-2 sm:justify-end">
-          {showForm ? (
-            <>
-              {hasRequest && (
-                <button
-                  onClick={() => { setResubmitting(false); setComment(event.reviewRequest?.comment ?? ""); }}
-                  className="text-[11px] font-bold uppercase italic text-[#747a60] hover:text-[#191c1e]"
-                >
-                  Cancelar
-                </button>
-              )}
-              <button
-                data-testid="button-confirm-review-request"
-                onClick={() => mutation.mutate(comment)}
-                disabled={!comment.trim() || mutation.isPending}
-                className="flex items-center gap-2 text-[11px] font-bold uppercase italic px-4 py-2 bg-[#191c1e] text-[#ccff00] hover:bg-[#191c1e]/90 transition-colors disabled:opacity-50"
-              >
-                <Send size={14} /> {mutation.isPending ? "Enviando..." : "Confirmar Revisão"}
-              </button>
-            </>
-          ) : (
-            <DialogClose asChild>
-              <button className="text-[11px] font-bold uppercase italic px-4 py-2 border-2 border-[#191c1e]">Fechar</button>
-            </DialogClose>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
-  // Todos os critérios calibrados (scoreUsed !== null) — peso=0 incluído.
-  // Critério calibrado mas com peso=0 foi avaliado: colaborador deve ver.
-  const visibleCriteria = event.criteriaDetails.filter(c => c.scoreUsed !== null);
+  const visibleCriteria = event.criteriaDetails.filter(c => c.scoreUsed !== null && c.weight > 0);
   // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
   const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
   // "Todos avaliados" = todos os calibrados têm publicação final, ou evento histórico.
@@ -475,7 +178,6 @@ function EventCard({ event }: { event: EventSummary }) {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-bold text-[13px] text-foreground">{event.eventName}</p>
-              {event.eventScore > 0 && <EventReviewRequest event={event} />}
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] font-bold text-muted-foreground">
               {(event.city || event.location) && (
@@ -496,15 +198,6 @@ function EventCard({ event }: { event: EventSummary }) {
                   {event.eventScore.toFixed(1)}
                 </span>
               </div>
-              {(() => {
-                const rs = reviewStatusInfo(event.reviewRequest?.status);
-                if (!rs) return null;
-                return (
-                  <span className={cn("flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full whitespace-nowrap", rs.badgeCls)}>
-                    <Flag size={9} /> {rs.label}
-                  </span>
-                );
-              })()}
             </div>
           )}
         </div>
@@ -551,13 +244,10 @@ function EventCard({ event }: { event: EventSummary }) {
 
                   <div className="text-right shrink-0 flex flex-col items-end gap-1">
                     {c.scoreUsed !== null ? (
-                      <>
-                        <div className="flex items-end gap-1">
-                          <span className="font-black text-2xl leading-none" style={{ color: scoreColor(c.scoreUsed * 10) }}>{c.scoreUsed.toFixed(1)}</span>
-                          <span className="text-xs font-bold text-muted-foreground pb-1">/10</span>
-                        </div>
-                        <CriterionReviewRequest event={event} criterion={c} />
-                      </>
+                      <div className="flex items-end gap-1">
+                        <span className="font-black text-2xl leading-none" style={{ color: scoreColor(c.scoreUsed * 10) }}>{c.scoreUsed.toFixed(1)}</span>
+                        <span className="text-xs font-bold text-muted-foreground pb-1">/10</span>
+                      </div>
                     ) : (
                       <span className="text-[9px] font-bold uppercase px-2 py-1 rounded text-muted-foreground" style={{ backgroundColor: "var(--muted)" }}>Pendente</span>
                     )}

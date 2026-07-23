@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Calendar, Users, BarChart3, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck,
   Database, LogOut, Target, Menu, X, TrendingUp,
-  FolderLock, Flag, BookOpen, Settings2, Sun, Moon
+  FolderLock, BookOpen, Settings2, Sun, Moon
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -48,7 +48,6 @@ const navGroups: NavGroup[] = [
     name: "Controle",
     items: [
       { label: "Penalidades e Méritos", path: "/absences", icon: UserCheck, roles: ["admin", "rh", "diretoria"] },
-      { label: "Revisões Sinalizadas", path: "/review-requests", icon: Flag, roles: ["admin", "rh", "diretoria"] },
       { label: "Regras do Sistema", path: "/rules", icon: Settings, roles: ["admin", "rh"] },
       { label: "Integração", path: "/integration", icon: Database, roles: ["admin", "rh"] },
       { label: "Auditoria", path: "/audit", icon: FolderLock, roles: ["admin", "rh"] },
@@ -122,7 +121,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               if (user?.role === "avaliador") return item.path === "/evaluations";
               if (user?.role === "visualizador") return ["/meu-desempenho", "/como-funciona"].includes(item.path);
               if (user?.role === "diretoria") {
-                return ["/", "/calibrations", "/results", "/rules", "/absences", "/review-requests", "/criteria"].includes(item.path);
+                return ["/", "/calibrations", "/results", "/rules", "/absences", "/criteria"].includes(item.path);
               }
               return !item.roles || (user && item.roles.includes(user.role));
             });

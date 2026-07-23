@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Calendar, Star, Trophy, Gift, Flag, Clock, AlertTriangle, HelpCircle, ShieldCheck, Minus, Search, X } from "lucide-react";
+import { BookOpen, Calendar, Star, Trophy, Gift, Clock, AlertTriangle, HelpCircle, ShieldCheck, Minus, Search, X } from "lucide-react";
 
 const SECTIONS = [
   { id: "ciclo", title: "O Ciclo de Avaliação", icon: Calendar },
@@ -9,7 +9,6 @@ const SECTIONS = [
   { id: "elegibilidade", title: "Elegibilidade ao Bônus", icon: Trophy },
   { id: "bonus", title: "O Bônus Caju", icon: Gift },
   { id: "status", title: "O Que Significa Cada Status", icon: Clock },
-  { id: "revisao", title: "Sinalizar Revisão de Nota", icon: Flag },
   { id: "faq", title: "Dúvidas Frequentes", icon: HelpCircle },
 ];
 
@@ -365,29 +364,7 @@ export default function ComoFuncionaPage() {
           </Section>
         )}
 
-        {/* 8. Sinalizar Revisão */}
-        {visibleIds.has("revisao") && (
-          <Section id="revisao" icon={Flag} title="Sinalizar Revisão de Nota">
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              Se você acredita que alguma nota não reflete corretamente sua participação, você pode sinalizar uma revisão para o RH analisar.
-            </p>
-            <div className="space-y-2 mt-2">
-              <InfoRow label="Quando usar" value="Somente quando o evento ou critério já tiver nota lançada. Não é possível sinalizar revisão de itens ainda pendentes." />
-              <InfoRow label="Por evento" value="Sinaliza que você discorda de algum aspecto da avaliação do evento inteiro. Use quando não souber exatamente qual critério contestar." />
-              <InfoRow label="Por critério" value="Sinaliza que você discorda de uma nota específica (ex.: 'Qualidade da Entrega'). Mais preciso e facilita a análise do RH." highlight />
-              <InfoRow label="O que acontece" value="O RH será notificado e analisará seu pedido. A revisão pode ser resolvida (com ou sem alteração de nota) ou mantida pendente enquanto estiver em análise." />
-              <InfoRow label="Reabertura" value="Após uma revisão ser resolvida, você pode sinalizá-la novamente se necessário." />
-            </div>
-            <div className="mt-4 p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: "1px solid rgba(232,162,61,0.3)" }}>
-              <AlertTriangle size={15} className="text-[#c98a1f] shrink-0 mt-0.5" />
-              <p className="text-[12px] text-[#c98a1f] leading-relaxed">
-                A sinalização de revisão é uma comunicação formal com o RH. Use-a quando tiver uma dúvida genuína sobre sua nota — não como recurso de rotina.
-              </p>
-            </div>
-          </Section>
-        )}
-
-        {/* 9. FAQ */}
+        {/* 8. FAQ */}
         {visibleIds.has("faq") && (
           <Section id="faq" icon={HelpCircle} title="Dúvidas Frequentes">
             <div className="space-y-3">

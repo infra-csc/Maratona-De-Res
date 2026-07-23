@@ -24,7 +24,6 @@ import IntegrationPage from "@/pages/integration";
 import AuditPage from "@/pages/audit";
 import MyPerformancePage from "@/pages/my-performance";
 import ComoFuncionaPage from "@/pages/como-funciona";
-import ReviewRequestsPage from "@/pages/review-requests";
 import PublicEvalPage from "@/pages/eval-public";
 import NotFound from "@/pages/not-found";
 
@@ -121,7 +120,6 @@ function AppRoutes() {
       <Route path="/calibrations" component={() => <ProtectedRoute component={CalibrationsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/penalty-types" component={() => <ProtectedRoute component={PenaltyTypesPage} roles={["admin", "rh"]} />} />
-      <Route path="/review-requests" component={() => <ProtectedRoute component={ReviewRequestsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} />} />
       <Route path="/ranking"><Redirect to="/results" /></Route>
       <Route path="/criteria" component={() => <ProtectedRoute component={CriteriaPage} roles={["admin", "rh", "diretoria"]} />} />

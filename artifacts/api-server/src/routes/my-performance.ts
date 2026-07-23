@@ -3,9 +3,9 @@ import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, areasTable, employeeCycleEligibilityTable,
-  eventAreaAssignmentsTable, eventReviewRequestsTable,
+  eventAreaAssignmentsTable,
 } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
@@ -76,16 +76,6 @@ router.get("/my-performance", async (req, res) => {
       eq(eventParticipantsTable.employeeId, employeeId),
       eq(eventsTable.cycleId, cycle.id),
     ));
-
-  // Histórico completo fica no log (tela de Revisões Sinalizadas); para o
-  // colaborador só interessa o pedido MAIS RECENTE de cada evento.
-  const reviewRequests = await db.select().from(eventReviewRequestsTable)
-    .where(eq(eventReviewRequestsTable.employeeId, employeeId))
-    .orderBy(desc(eventReviewRequestsTable.createdAt));
-  const reviewRequestByEvent = new Map<number, typeof reviewRequests[number]>();
-  for (const rr of reviewRequests) {
-    if (!reviewRequestByEvent.has(rr.eventId)) reviewRequestByEvent.set(rr.eventId, rr);
-  }
 
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
   const platoonRulesMapped = platoonRules.map(r => ({
@@ -274,18 +264,6 @@ router.get("/my-performance", async (req, res) => {
       // confirmado por admin/RH (mesma regra de recomputeCycleResults).
       resultsConfirmed: p.resultsConfirmed ?? false,
       isHistorical: p.isHistorical ?? false,
-      reviewRequest: (() => {
-        const rr = reviewRequestByEvent.get(p.eventId);
-        if (!rr) return null;
-        return {
-          id: rr.id,
-          comment: rr.comment,
-          status: rr.status,
-          createdAt: rr.createdAt,
-          resolvedAt: rr.resolvedAt,
-          resolutionNotes: rr.resolutionNotes,
-        };
-      })(),
     });
   }
 
@@ -416,68 +394,6 @@ router.get("/my-performance", async (req, res) => {
     adjustments,
     events: eventSummaries,
   });
-});
-
-/**
- * POST /my-performance/events/:eventId/review-request
- * Colaborador sinaliza um evento para revisão (ex.: nota/critério que discorda),
- * com um comentário obrigatório. Cria um pedido "pending"; se já existir um
- * pedido pendente para este evento, apenas atualiza o comentário (evita
- * duplicar pedidos em aberto). Um pedido já resolvido pode ser reaberto com
- * um novo comentário (vira pending de novo).
- */
-router.post("/my-performance/events/:eventId/review-request", async (req, res) => {
-  const employeeId = req.user!.employeeId;
-  if (!employeeId) {
-    res.status(404).json({ error: "Nenhum colaborador vinculado a este usuário." });
-    return;
-  }
-  const eventId = parseInt(req.params.eventId as string);
-  if (isNaN(eventId)) {
-    res.status(400).json({ error: "Evento inválido." });
-    return;
-  }
-  const comment = (req.body?.comment ?? "").trim();
-  if (!comment) {
-    res.status(400).json({ error: "Comentário obrigatório para sinalizar revisão." });
-    return;
-  }
-
-  const [participation] = await db.select().from(eventParticipantsTable)
-    .where(and(eq(eventParticipantsTable.eventId, eventId), eq(eventParticipantsTable.employeeId, employeeId)))
-    .limit(1);
-  if (!participation) {
-    res.status(404).json({ error: "Você não participou deste evento." });
-    return;
-  }
-
-  // Log de pedidos: cada sinalização preserva o histórico. Um pedido ainda
-  // PENDENTE é atualizado (não duplica pendências em aberto); depois de
-  // resolvido (aprovado/negado), sinalizar de novo cria um REGISTRO NOVO —
-  // o desfecho anterior fica guardado no log de Revisões Sinalizadas.
-  const [existingPending] = await db.select().from(eventReviewRequestsTable)
-    .where(and(
-      eq(eventReviewRequestsTable.eventId, eventId),
-      eq(eventReviewRequestsTable.employeeId, employeeId),
-      eq(eventReviewRequestsTable.status, "pending"),
-    ))
-    .limit(1);
-
-  let reviewRequest;
-  if (existingPending) {
-    [reviewRequest] = await db.update(eventReviewRequestsTable).set({
-      comment,
-    }).where(eq(eventReviewRequestsTable.id, existingPending.id)).returning();
-  } else {
-    [reviewRequest] = await db.insert(eventReviewRequestsTable).values({
-      eventId,
-      employeeId,
-      comment,
-      status: "pending",
-    }).returning();
-  }
-
-  res.status(existingPending ? 200 : 201).json(reviewRequest);
 });
 
 export default router;
