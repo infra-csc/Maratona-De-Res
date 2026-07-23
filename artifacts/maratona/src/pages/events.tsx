@@ -46,6 +46,31 @@ function MiniBar({ value, total, color }: { value: number; total: number; color:
   );
 }
 
+function CalBar({ finalCount, partialCount, total }: { finalCount: number; partialCount: number; total: number }) {
+  const finalPct  = total > 0 ? Math.min(100, (finalCount   / total) * 100) : 0;
+  const partialPct = total > 0 ? Math.min(100 - finalPct, (partialCount / total) * 100) : 0;
+  const totalCount = finalCount + partialCount;
+  const labelColor = finalCount > 0 && partialCount === 0 ? "#9ab000"
+    : finalCount > 0 || partialCount > 0 ? "#e8a23d"
+    : "var(--muted-foreground)";
+  const label = finalCount > 0 && partialCount > 0
+    ? `${finalCount}F · ${partialCount}P`
+    : `${totalCount}/${total}`;
+  return (
+    <div className="flex flex-col gap-1 w-full">
+      <div className="h-[5px] rounded-full w-full overflow-hidden flex" style={{ backgroundColor: "var(--secondary)" }}>
+        {finalPct > 0 && (
+          <div className="h-full transition-all" style={{ width: `${finalPct}%`, backgroundColor: "#9ab000", borderRadius: partialPct > 0 ? "9999px 0 0 9999px" : "9999px" }} />
+        )}
+        {partialPct > 0 && (
+          <div className="h-full transition-all" style={{ width: `${partialPct}%`, backgroundColor: "#e8a23d", borderRadius: finalPct > 0 ? "0 9999px 9999px 0" : "9999px" }} />
+        )}
+      </div>
+      <span className="text-[10px] font-bold" style={{ color: labelColor }}>{label}</span>
+    </div>
+  );
+}
+
 const inputStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 export default function EventsPage() {
@@ -698,7 +723,7 @@ export default function EventsPage() {
                     {isPureHistorical || total === 0 ? (
                       <span className="text-[11px] italic opacity-40">—</span>
                     ) : (
-                      <MiniBar value={calCount} total={total} color={calColor} />
+                      <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
                     )}
                   </div>
 
