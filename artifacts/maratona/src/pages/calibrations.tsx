@@ -33,14 +33,27 @@ function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
   return result;
 }
 
-// Badge do seletor de eventos: eventos históricos sempre "Fechado"; demais mostram
-// o estado real da publicação de feedback (final > parcial), nunca o status
-// bruto do evento — sem publicação nenhuma, continua "Em Avaliação" mesmo fechado.
-function calibrationEventChip(ev: { isHistorical?: boolean; feedbackReleased?: boolean; partialPublishedAt?: string | null }): { label: string; bg: string; fg: string } {
-  if (ev.isHistorical) return { label: "Fechado", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
-  if (ev.feedbackReleased) return { label: "Avaliação Final", bg: "var(--primary)", fg: "var(--primary-foreground)" };
-  if (ev.partialPublishedAt) return { label: "Avaliação Parcial", bg: "rgba(232,162,61,0.14)", fg: AMBER };
-  return { label: "Em Avaliação", bg: "rgba(154,176,0,0.14)", fg: GOOD };
+// Badge do seletor de eventos: prioridade pub. final > pub. parcial > calibrado > fechado > em avaliação > aguardando.
+// Eventos históricos e fechados sem calibração mostram "Fechado"; demais mostram o estado real.
+function calibrationEventChip(ev: {
+  isHistorical?: boolean;
+  feedbackReleased?: boolean;
+  partialPublishedAt?: string | null;
+  finalCalibratedCriteria?: number | null;
+  calibratedCriteriaCount?: number | null;
+  status?: string;
+  evaluatedCriteria?: number | null;
+}): { label: string; bg: string; fg: string } {
+  if (ev.feedbackReleased) return { label: "Pub. Final", bg: "rgba(154,176,0,0.14)", fg: GOOD };
+  if (ev.partialPublishedAt || (ev.finalCalibratedCriteria ?? 0) > 0)
+    return { label: "Pub. Parcial", bg: "rgba(232,162,61,0.14)", fg: AMBER };
+  if ((ev.calibratedCriteriaCount ?? 0) > 0)
+    return { label: "Calibrado", bg: "rgba(91,141,239,0.14)", fg: "#5b8def" };
+  if (ev.status === "closed" || ev.isHistorical)
+    return { label: "Fechado", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
+  if ((ev.evaluatedCriteria ?? 0) > 0)
+    return { label: "Em Avaliação", bg: "rgba(154,176,0,0.14)", fg: GOOD };
+  return { label: "Aguardando", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
 }
 
 function formatDateTime(d: Date): string {
