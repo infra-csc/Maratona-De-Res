@@ -9,15 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Calculator, CircleDollarSign, Plus, Settings, ShieldCheck, Trash2, HelpCircle } from "lucide-react";
+import { Save, CircleDollarSign, Plus, Settings, ShieldCheck, Trash2, HelpCircle } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
 
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -84,6 +82,7 @@ const GROUP_META = {
 
 export default function RulesPage() {
   const { toast } = useToast();
+  usePremiumTheme();
   const qc = useQueryClient();
 
   const rulesQKey = getGetRulesQueryKey();
@@ -174,57 +173,43 @@ export default function RulesPage() {
   };
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div className="p-6 md:p-10 space-y-10">
-        {/* Page header */}
-        <section className="border-l-8 border-[#ccff00] pl-6 py-1">
-          <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-            Regras do Sistema
-          </h1>
-          <p className="text-base md:text-lg text-[#444933] italic mt-2 max-w-2xl">
-            Defina os parâmetros de cálculo e as bonificações financeiras por faixa de nota. A agressividade das regras dita o ritmo da corrida.
-          </p>
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
+      <div className="p-6 md:p-10 space-y-8">
+
+        {/* ── Header ── */}
+        <section className="flex items-start gap-4">
+          <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: "var(--accent)", minHeight: "3.5rem" }} />
+          <div>
+            <h1 data-testid="text-page-title" className="font-black uppercase leading-none" style={{ fontFamily: CONDENSED, fontSize: "clamp(2rem,5vw,3.2rem)", letterSpacing: "-0.02em" }}>
+              Regras do <span style={{ color: "var(--accent)" }}>Sistema</span>
+            </h1>
+            <p className="text-sm mt-1.5 max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
+              Defina os parâmetros de cálculo e as bonificações financeiras por faixa de nota. A agressividade das regras dita o ritmo da corrida.
+            </p>
+          </div>
         </section>
 
-        {/* SEÇÃO: Regras de Avaliação */}
-        <RuleSection
-          groupKey="avaliacao"
-          rules={rulesByGroup.avaliacao}
-          ruleValues={ruleValues}
-          setRuleValues={setRuleValues}
-          getRuleValue={getRuleValue}
-          updateRuleMutation={updateRuleMutation}
-        />
+        <RuleSection groupKey="avaliacao" rules={rulesByGroup.avaliacao} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
+        <RuleSection groupKey="elegibilidade" rules={rulesByGroup.elegibilidade} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
 
-        {/* SEÇÃO: Elegibilidade & Penalidade */}
-        <RuleSection
-          groupKey="elegibilidade"
-          rules={rulesByGroup.elegibilidade}
-          ruleValues={ruleValues}
-          setRuleValues={setRuleValues}
-          getRuleValue={getRuleValue}
-          updateRuleMutation={updateRuleMutation}
-        />
-
-        {/* SEÇÃO: Pagamento & Bônus (inclui forma de pagamento + simulador de faixas) */}
-        <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
-          <div className="bg-[#191c1e] text-[#ccff00] px-6 py-4 flex items-center gap-3 italic">
-            <CircleDollarSign size={20} />
+        {/* ── Pagamento & Bônus ── */}
+        <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="px-5 py-3.5 flex items-center gap-3" style={{ backgroundColor: "#191c1e" }}>
+            <CircleDollarSign size={18} style={{ color: "#d4ff00" }} />
             <div>
-              <h3 className="text-base font-black uppercase tracking-wider">Pagamento & Bônus</h3>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#ccff00]/70 not-italic">Forma de pagamento e simulador de faixas de bônus financeiro</p>
+              <h3 className="font-black uppercase tracking-wider text-sm" style={{ color: "#d4ff00", fontFamily: CONDENSED }}>Pagamento & Bônus</h3>
+              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(212,255,0,0.55)" }}>Forma de pagamento e simulador de faixas de bônus financeiro</p>
             </div>
           </div>
 
-          {/* Forma de Pagamento */}
           {rulesByGroup.pagamento.map(rule => {
             const meta = RULE_META[rule.key];
             const currentVal = getRuleValue(rule.key, rule.value);
             const isDirty = ruleValues[rule.key] !== undefined && ruleValues[rule.key] !== rule.value;
             return (
-              <div key={rule.key} className="p-6 border-b-2 border-[#eceef0]">
+              <div key={rule.key} className="p-5" style={{ borderBottom: "1px solid var(--border)" }}>
                 <div className="flex items-start gap-2 mb-3">
-                  <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e]">{meta?.label ?? rule.description}</p>
+                  <p className="text-sm font-black uppercase tracking-tight flex-1" style={{ color: "var(--foreground)" }}>{meta?.label ?? rule.description}</p>
                   <HelpTooltip text={meta?.help ?? ""} />
                 </div>
                 <div className="flex gap-2 max-w-xs">
@@ -232,140 +217,112 @@ export default function RulesPage() {
                     value={PAYMENT_OPTIONS.some(o => o.value === currentVal) ? currentVal : "outro"}
                     onValueChange={v => setRuleValues(prev => ({ ...prev, [rule.key]: v }))}
                   >
-                    <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0 font-bold italic uppercase text-xs tracking-wider">
+                    <SelectTrigger className="h-10 rounded-lg text-xs font-bold uppercase" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {PAYMENT_OPTIONS.map(o => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
+                      {PAYMENT_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <button
                     data-testid={`button-save-rule-${rule.key}`}
-                    className={`h-11 px-4 shrink-0 flex items-center border-2 border-[#191c1e] font-bold text-sm italic uppercase disabled:opacity-40 disabled:pointer-events-none ${isDirty ? `bg-[#ccff00] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}` : "bg-white text-[#444933] hover:bg-[#eceef0]"}`}
+                    className="h-10 px-4 shrink-0 flex items-center rounded-lg font-bold text-xs uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
+                    style={{ backgroundColor: isDirty ? "var(--accent)" : "var(--secondary)", color: isDirty ? "var(--accent-foreground)" : "var(--muted-foreground)", border: "1px solid var(--border)" }}
                     disabled={updateRuleMutation.isPending || !isDirty}
                     onClick={() => updateRuleMutation.mutate({ key: rule.key, data: { value: currentVal } })}
                   >
-                    <Save size={16} className="mr-1.5" /> Salvar
+                    <Save size={14} className="mr-1.5" /> Salvar
                   </button>
                 </div>
               </div>
             );
           })}
 
-          {/* Fórmula */}
-          <div className="px-6 py-4 bg-[#f7f9fb] border-b-2 border-[#191c1e] text-sm italic text-[#444933]">
-            <span className="font-black text-[#191c1e]">Bônus Total</span> = Prêmio Base da faixa + (Eventos Extras × Bônus por Evento Extra da faixa)
+          <div className="px-5 py-3 text-sm italic" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>
+            <span className="font-black" style={{ color: "var(--foreground)" }}>Bônus Total</span> = Prêmio Base da faixa + (Eventos Extras × Bônus por Evento Extra da faixa)
           </div>
 
-          {/* Tabela de faixas */}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Nome / Nota</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Prêmio Base (R$)</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Bônus p/ Evento Extra (R$)</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Exemplo (Base + 3 Extra)</th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-right">Ações</th>
+                <tr style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome / Nota</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Prêmio Base (R$)</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Bônus/Evento Extra (R$)</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Exemplo (Base+3)</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-right" style={{ color: "var(--muted-foreground)" }}>Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-[#eceef0]">
+              <tbody>
                 {(platoonRules ?? []).map(p => {
                   const isDirty = platoonValues[p.id] !== undefined;
                   const currentBonus = platoonValues[p.id]?.bonusValue ?? Number(p.bonusValue);
                   const currentExtra = platoonValues[p.id]?.bonusPerExtraEvent ?? Number(p.bonusPerExtraEvent ?? 0);
                   const currentName = platoonValues[p.id]?.name ?? p.name ?? "";
                   const total3 = currentBonus + 3 * currentExtra;
-
                   return (
-                    <tr key={p.id} data-testid={`row-platoon-${p.id}`} className="hover:bg-[#f2f4f6] transition-colors">
-                      <td className="px-6 py-4">
+                    <tr
+                      key={p.id}
+                      data-testid={`row-platoon-${p.id}`}
+                      className="transition-colors"
+                      style={{ borderTop: "1px solid var(--border)" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "var(--secondary)"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent"; }}
+                    >
+                      <td className="px-5 py-3.5">
                         <div className="flex flex-col gap-1.5">
-                          <Input
-                            placeholder="Nome da faixa (opcional)"
-                            className="w-40 h-8 rounded-none border-2 border-[#191c1e] bg-white text-xs font-bold italic focus-visible:ring-0"
-                            value={currentName}
-                            onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], name: e.target.value } }))}
-                          />
+                          <Input placeholder="Nome (opcional)" className="w-36 h-8 rounded-lg text-xs font-bold" value={currentName} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], name: e.target.value } }))} />
                           <div className="flex items-center gap-1">
-                            <Input
-                              data-testid={`input-platoon-min-${p.id}`}
-                              type="number" min="0" max="100" step="1"
-                              className="w-20 text-center h-9 font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0 text-sm"
-                              value={platoonValues[p.id]?.minScore ?? p.minScore}
-                              onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))}
-                            />
-                            <span className="text-[#747a60] font-bold italic text-xs">–</span>
-                            <Input
-                              data-testid={`input-platoon-max-${p.id}`}
-                              type="number" min="0" max="100" step="1"
-                              className="w-20 text-center h-9 font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0 text-sm"
-                              value={platoonValues[p.id]?.maxScore ?? p.maxScore}
-                              onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))}
-                            />
+                            <Input data-testid={`input-platoon-min-${p.id}`} type="number" min="0" max="100" step="1" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.minScore ?? p.minScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))} />
+                            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>–</span>
+                            <Input data-testid={`input-platoon-max-${p.id}`} type="number" min="0" max="100" step="1" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.maxScore ?? p.maxScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))} />
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="relative max-w-[130px] mx-auto">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#506600] font-black italic text-xs z-10">R$</span>
-                          <Input
-                            data-testid={`input-platoon-bonus-${p.id}`}
-                            type="number" min="0" step="100"
-                            className="w-full text-right h-11 font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                            value={currentBonus}
-                            onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusValue: parseFloat(e.target.value) } }))}
-                          />
+                      <td className="px-5 py-3.5 text-center">
+                        <div className="relative max-w-[120px] mx-auto">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent)" }}>R$</span>
+                          <Input data-testid={`input-platoon-bonus-${p.id}`} type="number" min="0" step="100" className="w-full text-right h-10 rounded-lg font-black" value={currentBonus} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusValue: parseFloat(e.target.value) } }))} />
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="relative max-w-[130px] mx-auto">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#506600] font-black italic text-xs z-10">R$</span>
-                          <Input
-                            data-testid={`input-platoon-extra-${p.id}`}
-                            type="number" min="0" step="50"
-                            className="w-full text-right h-11 font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                            value={currentExtra}
-                            onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusPerExtraEvent: parseFloat(e.target.value) } }))}
-                          />
+                      <td className="px-5 py-3.5 text-center">
+                        <div className="relative max-w-[120px] mx-auto">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent)" }}>R$</span>
+                          <Input data-testid={`input-platoon-extra-${p.id}`} type="number" min="0" step="50" className="w-full text-right h-10 rounded-lg font-black" value={currentExtra} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusPerExtraEvent: parseFloat(e.target.value) } }))} />
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-sm font-black italic text-[#191c1e]">{fmtBRL(total3)}</span>
+                      <td className="px-5 py-3.5 text-center">
+                        <span className="text-sm font-black" style={{ color: "var(--foreground)" }}>{fmtBRL(total3)}</span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             data-testid={`button-save-platoon-${p.id}`}
-                            className={`inline-flex items-center px-4 py-2 border-2 border-[#191c1e] font-bold text-sm italic uppercase transition-all disabled:opacity-40 disabled:pointer-events-none ${isDirty ? `bg-[#ccff00] text-[#161e00] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}` : "bg-white text-[#444933] hover:bg-[#eceef0]"}`}
+                            className="inline-flex items-center px-3 py-1.5 rounded-lg font-bold text-xs uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
+                            style={{ backgroundColor: isDirty ? "var(--accent)" : "var(--secondary)", color: isDirty ? "var(--accent-foreground)" : "var(--muted-foreground)", border: "1px solid var(--border)" }}
                             disabled={!isDirty || updatePlatoonMutation.isPending}
                             onClick={() => {
                               if (!platoonValues[p.id]) return;
                               const min = platoonValues[p.id]?.minScore ?? Number(p.minScore);
                               const max = platoonValues[p.id]?.maxScore ?? Number(p.maxScore);
-                              if (min > max) {
-                                toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" });
-                                return;
-                              }
+                              if (min > max) { toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" }); return; }
                               const conflict = findOverlappingBand(min, max, p.id);
-                              if (conflict) {
-                                toast({ title: "Faixa sobreposta", description: `O intervalo ${min}–${max} sobrepõe a faixa "${conflict.name}" (${conflict.minScore}–${conflict.maxScore}).`, variant: "destructive" });
-                                return;
-                              }
+                              if (conflict) { toast({ title: "Faixa sobreposta", description: `O intervalo ${min}–${max} sobrepõe a faixa "${conflict.name}" (${conflict.minScore}–${conflict.maxScore}).`, variant: "destructive" }); return; }
                               updatePlatoonMutation.mutate({ id: p.id, data: platoonValues[p.id] });
                             }}
                           >
-                            <Save size={15} className="mr-1.5" /> Salvar
+                            <Save size={13} className="mr-1" /> Salvar
                           </button>
                           <button
                             data-testid={`button-delete-platoon-${p.id}`}
-                            className="p-2 border-2 border-transparent text-[#747a60] hover:border-[#191c1e] hover:text-[#ba1a1a] hover:bg-[#ffdad6] transition-all"
+                            className="p-1.5 rounded transition-colors"
+                            style={{ color: "var(--muted-foreground)" }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e5484d"; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)"; }}
                             onClick={() => setDeleteTargetId(p.id)}
                             title="Remover faixa"
                           >
-                            <Trash2 size={15} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -377,120 +334,79 @@ export default function RulesPage() {
           </div>
 
           {/* Adicionar nova faixa */}
-          <div className="border-t-2 border-[#191c1e] p-6 bg-[#f7f9fb]">
-            <h4 className="text-sm font-black uppercase italic tracking-tight mb-4 flex items-center gap-2">
-              <Plus size={16} /> Adicionar Faixa
+          <div className="p-5" style={{ borderTop: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+            <h4 className="text-sm font-black uppercase tracking-tight mb-4 flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+              <Plus size={15} /> Adicionar Faixa
             </h4>
-            <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-wrap items-end gap-3">
+              {[
+                { label: "Nome (opcional)", testId: "", w: "w-32", placeholder: "Ex: Elite", type: "text", val: newBand.name, onChange: (v: string) => setNewBand(b => ({ ...b, name: v })) },
+              ].map(f => (
+                <div key={f.label} className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
+                  <Input type={f.type} value={f.val} onChange={e => f.onChange(e.target.value)} className={`h-10 ${f.w} rounded-lg font-bold`} placeholder={f.placeholder} />
+                </div>
+              ))}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Nome (opcional)</label>
-                <Input
-                  type="text"
-                  value={newBand.name}
-                  onChange={e => setNewBand(v => ({ ...v, name: e.target.value }))}
-                  className="h-11 w-36 font-bold italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                  placeholder="Ex: Elite"
-                />
+                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Mínima</label>
+                <Input data-testid="input-new-platoon-min" type="number" min="0" max="100" step="1" value={newBand.minScore} onChange={e => setNewBand(v => ({ ...v, minScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="0" />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Nota Mínima</label>
-                <Input
-                  data-testid="input-new-platoon-min"
-                  type="number" min="0" max="100" step="1"
-                  value={newBand.minScore}
-                  onChange={e => setNewBand(v => ({ ...v, minScore: e.target.value }))}
-                  className="h-11 w-24 text-center font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                  placeholder="0"
-                />
+                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Máxima</label>
+                <Input data-testid="input-new-platoon-max" type="number" min="0" max="100" step="1" value={newBand.maxScore} onChange={e => setNewBand(v => ({ ...v, maxScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="100" />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Nota Máxima</label>
-                <Input
-                  data-testid="input-new-platoon-max"
-                  type="number" min="0" max="100" step="1"
-                  value={newBand.maxScore}
-                  onChange={e => setNewBand(v => ({ ...v, maxScore: e.target.value }))}
-                  className="h-11 w-24 text-center font-black italic rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                  placeholder="100"
-                />
+                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Prêmio Base (R$)</label>
+                <Input data-testid="input-new-platoon-bonus" type="number" min="0" step="100" value={newBand.bonusValue} onChange={e => setNewBand(v => ({ ...v, bonusValue: e.target.value }))} className="h-10 w-28 text-right rounded-lg font-black" placeholder="0" />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Prêmio Base (R$)</label>
-                <Input
-                  data-testid="input-new-platoon-bonus"
-                  type="number" min="0" step="100"
-                  value={newBand.bonusValue}
-                  onChange={e => setNewBand(v => ({ ...v, bonusValue: e.target.value }))}
-                  className="h-11 w-32 text-right font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                  placeholder="0"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[#747a60] tracking-widest">Bônus Extra (R$/evento)</label>
-                <Input
-                  data-testid="input-new-platoon-extra"
-                  type="number" min="0" step="50"
-                  value={newBand.bonusPerExtraEvent}
-                  onChange={e => setNewBand(v => ({ ...v, bonusPerExtraEvent: e.target.value }))}
-                  className="h-11 w-36 text-right font-black italic text-[#506600] rounded-none border-2 border-[#191c1e] bg-white focus-visible:ring-0"
-                  placeholder="0"
-                />
+                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Bônus Extra (R$/ev.)</label>
+                <Input data-testid="input-new-platoon-extra" type="number" min="0" step="50" value={newBand.bonusPerExtraEvent} onChange={e => setNewBand(v => ({ ...v, bonusPerExtraEvent: e.target.value }))} className="h-10 w-28 text-right rounded-lg font-black" placeholder="0" />
               </div>
               <button
                 data-testid="button-add-platoon"
-                className={`h-11 px-5 flex items-center bg-[#ccff00] border-2 border-[#191c1e] font-bold text-sm italic uppercase disabled:opacity-40 disabled:pointer-events-none ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                className="h-10 px-5 flex items-center rounded-lg font-bold text-sm uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
+                style={{ backgroundColor: "var(--accent)", color: "var(--accent-foreground)" }}
                 disabled={createPlatoonMutation.isPending}
                 onClick={handleCreateBand}
               >
-                <Plus size={16} className="mr-1.5" /> Adicionar
+                <Plus size={15} className="mr-1.5" /> Adicionar
               </button>
             </div>
-            <p className="text-[11px] text-[#747a60] italic mt-3 max-w-2xl">
+            <p className="text-[11px] italic mt-3 max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
               As faixas devem cobrir de 0 a 100 sem lacunas ou sobreposições. Ajuste os limites das faixas existentes antes de adicionar uma nova.
             </p>
           </div>
         </section>
 
-        {/* Regras não mapeadas (fallback) */}
         {rulesByGroup.unknown.length > 0 && (
-          <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-4 flex items-center gap-3 italic">
-              <Settings size={20} />
-              <h3 className="text-base font-black uppercase tracking-wider">Outras Regras</h3>
+          <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="px-5 py-3.5 flex items-center gap-3" style={{ backgroundColor: "#191c1e" }}>
+              <Settings size={18} style={{ color: "#d4ff00" }} />
+              <h3 className="font-black uppercase tracking-wider text-sm" style={{ color: "#d4ff00", fontFamily: CONDENSED }}>Outras Regras</h3>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
               {rulesByGroup.unknown.map(rule => (
-                <RuleCard
-                  key={rule.key}
-                  rule={rule}
-                  ruleValues={ruleValues}
-                  setRuleValues={setRuleValues}
-                  getRuleValue={getRuleValue}
-                  updateRuleMutation={updateRuleMutation}
-                />
+                <RuleCard key={rule.key} rule={rule} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
               ))}
             </div>
           </section>
         )}
       </div>
 
-      {/* Delete confirmation */}
       <AlertDialog open={deleteTargetId !== null} onOpenChange={v => { if (!v) setDeleteTargetId(null); }}>
-        <AlertDialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl italic uppercase font-black text-[#191c1e] flex items-center gap-2">
-              <Trash2 size={20} /> Remover faixa
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+              <Trash2 size={18} /> Remover faixa
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#444933] font-bold italic">
+            <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
               Esta faixa de bônus será removida permanentemente. Colaboradores que já atingiram essa faixa no ciclo atual podem ser afetados no próximo reprocessamento.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteTargetId && deletePlatoonMutation.mutate({ id: deleteTargetId })}
-              className="rounded-none bg-[#ba1a1a] text-white border-2 border-[#191c1e] font-bold italic uppercase text-xs hover:bg-[#93000a]"
-            >
+            <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteTargetId && deletePlatoonMutation.mutate({ id: deleteTargetId })} className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "#e5484d", color: "white", border: "none" }}>
               Sim, remover
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -505,11 +421,11 @@ function HelpTooltip({ text }: { text: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button type="button" className="text-[#747a60] hover:text-[#191c1e] shrink-0 transition-colors">
-          <HelpCircle size={15} />
+        <button type="button" className="shrink-0 transition-opacity hover:opacity-60" style={{ color: "var(--muted-foreground)" }}>
+          <HelpCircle size={14} />
         </button>
       </TooltipTrigger>
-      <TooltipContent className="max-w-xs text-xs font-bold rounded-none border-2 border-[#191c1e] bg-white text-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] p-3 leading-relaxed">
+      <TooltipContent className="max-w-xs text-xs font-medium rounded-xl p-3 leading-relaxed" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
         {text}
       </TooltipContent>
     </Tooltip>
@@ -529,29 +445,19 @@ function RuleSection({ groupKey, rules, ruleValues, setRuleValues, getRuleValue,
   const meta = GROUP_META[groupKey];
   const Icon = meta.icon;
   if (rules.length === 0) return null;
-
   return (
-    <section className="bg-white border-2 border-[#191c1e] overflow-hidden">
-      <div className="bg-[#191c1e] text-[#ccff00] px-6 py-4 flex items-center gap-3 italic">
-        <Icon size={20} />
+    <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+      <div className="px-5 py-3.5 flex items-center gap-3" style={{ backgroundColor: "#191c1e" }}>
+        <Icon size={18} style={{ color: "#d4ff00" }} />
         <div>
-          <h3 className="text-base font-black uppercase tracking-wider">{meta.title}</h3>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[#ccff00]/70 not-italic">{meta.subtitle}</p>
+          <h3 className="font-black uppercase tracking-wider text-sm" style={{ color: "#d4ff00", fontFamily: CONDENSED }}>{meta.title}</h3>
+          <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(212,255,0,0.55)" }}>{meta.subtitle}</p>
         </div>
       </div>
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {rules.map(rule => (
-            <RuleCard
-              key={rule.key}
-              rule={rule}
-              ruleValues={ruleValues}
-              setRuleValues={setRuleValues}
-              getRuleValue={getRuleValue}
-              updateRuleMutation={updateRuleMutation}
-            />
-          ))}
-        </div>
+      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {rules.map(rule => (
+          <RuleCard key={rule.key} rule={rule} ruleValues={ruleValues} setRuleValues={setRuleValues} getRuleValue={getRuleValue} updateRuleMutation={updateRuleMutation} />
+        ))}
       </div>
     </section>
   );
@@ -566,22 +472,19 @@ interface RuleCardProps {
 }
 
 function RuleCard({ rule, ruleValues, setRuleValues, getRuleValue, updateRuleMutation }: RuleCardProps) {
-  const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-  const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
   const meta = RULE_META[rule.key];
   const isDirty = ruleValues[rule.key] !== undefined && ruleValues[rule.key] !== rule.value;
   const currentVal = getRuleValue(rule.key, rule.value);
-
   return (
-    <div key={rule.key} data-testid={`row-rule-${rule.key}`} className="bg-[#f2f4f6] p-5 border-2 border-[#191c1e] flex flex-col gap-3">
+    <div data-testid={`row-rule-${rule.key}`} className="p-4 rounded-xl flex flex-col gap-3" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
       <div className="flex items-start gap-2">
-        <p className="text-sm font-black italic uppercase tracking-tight text-[#191c1e] flex-1">
+        <p className="text-sm font-black uppercase tracking-tight flex-1" style={{ color: "var(--foreground)" }}>
           {meta?.label ?? rule.description}
         </p>
         <HelpTooltip text={meta?.help ?? ""} />
       </div>
       {meta?.help && (
-        <p className="text-[11px] text-[#747a60] italic leading-relaxed">
+        <p className="text-[11px] leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
           {meta.help.length > 120 ? meta.help.slice(0, 120) + "…" : meta.help}
         </p>
       )}
@@ -589,17 +492,18 @@ function RuleCard({ rule, ruleValues, setRuleValues, getRuleValue, updateRuleMut
         <Input
           data-testid={`input-rule-${rule.key}`}
           type={meta?.inputType === "number" ? "number" : "text"}
-          className="h-11 rounded-none border-2 border-[#191c1e] bg-white font-mono text-sm focus-visible:ring-0"
+          className="h-10 rounded-lg font-mono text-sm"
           value={currentVal}
           onChange={e => setRuleValues(v => ({ ...v, [rule.key]: e.target.value }))}
         />
         <button
           data-testid={`button-save-rule-${rule.key}`}
-          className={`h-11 px-4 shrink-0 flex items-center border-2 border-[#191c1e] font-bold text-sm italic uppercase disabled:opacity-40 disabled:pointer-events-none ${isDirty ? `bg-[#ccff00] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}` : "bg-white text-[#444933] hover:bg-[#eceef0]"}`}
+          className="h-10 px-4 shrink-0 flex items-center rounded-lg font-bold text-xs uppercase disabled:opacity-40 disabled:pointer-events-none transition-opacity hover:opacity-80"
+          style={{ backgroundColor: isDirty ? "var(--accent)" : "var(--card)", color: isDirty ? "var(--accent-foreground)" : "var(--muted-foreground)", border: "1px solid var(--border)" }}
           disabled={updateRuleMutation.isPending || !isDirty}
           onClick={() => updateRuleMutation.mutate({ key: rule.key, data: { value: currentVal } })}
         >
-          <Save size={16} className="mr-1.5" /> Salvar
+          <Save size={14} className="mr-1.5" /> Salvar
         </button>
       </div>
     </div>

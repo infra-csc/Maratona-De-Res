@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { useGetReviewRequests, useResolveReviewRequest, getGetReviewRequestsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Flag, Search, CheckCircle2, Calendar } from "lucide-react";
-
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -17,6 +14,7 @@ function formatDateTime(value: string): string {
 export default function ReviewRequestsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  usePremiumTheme();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "resolved">("all");
   const [resolving, setResolving] = useState<{ id: number; comment: string } | null>(null);
@@ -51,47 +49,57 @@ export default function ReviewRequestsPage() {
   const pendingCount = (requests ?? []).filter(r => r.status === "pending").length;
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
       <div className="p-6 md:p-10 space-y-8">
+
+        {/* ── Header ── */}
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className={`w-16 h-16 bg-[#862200] border-2 border-[#191c1e] flex items-center justify-center shrink-0 ${HARD_SHADOW}`}>
-              <Flag size={32} className="text-white" />
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#862200" }}>
+              <Flag size={26} className="text-white" />
             </div>
             <div>
-              <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-                Revisões <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Sinalizadas</span>
+              <h1 data-testid="text-page-title" className="font-black uppercase leading-none" style={{ fontFamily: CONDENSED, fontSize: "clamp(2rem,5vw,3.2rem)", letterSpacing: "-0.02em" }}>
+                Revisões <span style={{ color: "var(--accent)" }}>Sinalizadas</span>
               </h1>
-              <p className="text-base text-[#444933] italic mt-2">Pedidos de revisão de eventos feitos pelos colaboradores.</p>
+              <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>
+                Pedidos de revisão de eventos feitos pelos colaboradores.
+              </p>
             </div>
           </div>
-          <div className={`bg-[#ccff00] text-[#191c1e] px-5 py-3 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 shrink-0 ${HARD_SHADOW}`}>
-            <Flag size={16} /> Pendentes: <span className="text-base not-italic">{pendingCount}</span>
-          </div>
+          {pendingCount > 0 && (
+            <div className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest flex items-center gap-2 shrink-0" style={{ backgroundColor: "var(--accent)", color: "var(--accent-foreground)" }}>
+              <Flag size={14} /> Pendentes: <span className="text-sm font-black">{pendingCount}</span>
+            </div>
+          )}
         </section>
 
-        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-          <div className="relative flex-1 w-full max-w-sm">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-            <Input
+        {/* ── Filters ── */}
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+            <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-10 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider"
+              className="pl-9 h-10 w-full rounded-lg text-sm font-medium outline-none"
+              style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
               placeholder="Buscar colaborador ou evento..."
             />
           </div>
-          <div className="flex bg-white border-2 border-[#191c1e]">
-            {[
+          <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+            {([
               { key: "all", label: "Todos" },
               { key: "pending", label: "Pendentes" },
               { key: "resolved", label: "Resolvidos" },
-            ].map(btn => (
+            ] as const).map(btn => (
               <button
                 key={btn.key}
-                onClick={() => setStatusFilter(btn.key as typeof statusFilter)}
-                className={`px-3 py-2 text-[10px] font-bold uppercase italic transition-colors ${
-                  statusFilter === btn.key ? "bg-[#ccff00] text-[#191c1e]" : "bg-white text-[#747a60] hover:bg-[#f2f4f6]"
-                }`}
+                onClick={() => setStatusFilter(btn.key)}
+                className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors"
+                style={{
+                  backgroundColor: statusFilter === btn.key ? "var(--accent)" : "transparent",
+                  color: statusFilter === btn.key ? "var(--accent-foreground)" : "var(--muted-foreground)",
+                }}
               >
                 {btn.label}
               </button>
@@ -99,45 +107,65 @@ export default function ReviewRequestsPage() {
           </div>
         </div>
 
+        {/* ── List ── */}
         {isLoading ? (
-          <div className="text-center py-20 text-[#747a60] italic uppercase font-bold">Carregando registros...</div>
+          <div className="text-center py-20 text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>
+            Carregando registros...
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 bg-white border-2 border-dashed border-[#747a60] text-[#747a60] font-medium">
+          <div className="text-center py-20 rounded-xl text-sm font-medium" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
             Nenhum pedido de revisão encontrado.
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filtered.map(r => (
-              <div key={r.id} data-testid={`row-review-request-${r.id}`} className="bg-white border-2 border-[#191c1e] p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div
+                key={r.id}
+                data-testid={`row-review-request-${r.id}`}
+                className="rounded-xl p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4"
+                style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <span className={`text-[10px] font-black uppercase italic px-2 py-0.5 border-2 border-[#191c1e] ${
-                      r.status === "approved" ? "bg-[#506600] text-white"
-                      : r.status === "denied" ? "bg-[#862200] text-white"
-                      : r.status === "resolved" ? "bg-[#506600] text-white"
-                      : "bg-[#fff3cd] text-[#862200]"
-                    }`}>
+                    <span
+                      className="text-[10px] font-black uppercase px-2 py-0.5 rounded"
+                      style={{
+                        backgroundColor:
+                          r.status === "approved" || r.status === "resolved" ? "rgba(154,176,0,0.15)"
+                          : r.status === "denied" ? "rgba(229,72,77,0.15)"
+                          : "rgba(232,162,61,0.18)",
+                        color:
+                          r.status === "approved" || r.status === "resolved" ? "#9ab000"
+                          : r.status === "denied" ? "#e5484d"
+                          : "#e8a23d",
+                      }}
+                    >
                       {r.status === "approved" ? "Aprovado" : r.status === "denied" ? "Negado" : r.status === "resolved" ? "Resolvido" : "Pendente"}
                     </span>
-                    <span className="text-[10px] font-medium italic text-[#747a60]">
+                    <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
                       {formatDateTime(r.createdAt)}
                       {r.status !== "pending" && r.resolvedAt ? ` · resolvido em ${formatDateTime(r.resolvedAt)}` : ""}
                     </span>
                   </div>
-                  <p className="font-black italic uppercase text-sm text-[#191c1e]">{r.employeeName || "—"}</p>
-                  <p className="flex items-center gap-1 text-xs font-bold italic text-[#747a60] mt-1">
+                  <p className="font-black uppercase text-[14px]" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+                    {r.employeeName || "—"}
+                  </p>
+                  <p className="flex items-center gap-1 text-xs font-medium mt-1" style={{ color: "var(--muted-foreground)" }}>
                     <Calendar size={12} /> {r.eventName || "—"}
                   </p>
-                  <p className="text-xs text-[#444933] italic mt-2">"{r.comment}"</p>
+                  <p className="text-xs italic mt-2" style={{ color: "var(--muted-foreground)" }}>"{r.comment}"</p>
                   {r.status !== "pending" && r.resolutionNotes && (
-                    <p className="text-xs text-[#506600] font-bold mt-2">Resposta: {r.resolutionNotes}</p>
+                    <p className="text-xs font-bold mt-2" style={{ color: "var(--accent)" }}>
+                      Resposta: {r.resolutionNotes}
+                    </p>
                   )}
                 </div>
                 {r.status === "pending" && (
                   <button
                     data-testid={`button-resolve-${r.id}`}
                     onClick={() => { setResolving({ id: r.id, comment: r.comment }); setResolutionNotes(""); }}
-                    className={`bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-4 py-2.5 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 shrink-0 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                    className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0 transition-opacity hover:opacity-80"
+                    style={{ backgroundColor: "var(--foreground)", color: "var(--background)" }}
                   >
                     <CheckCircle2 size={14} /> Resolver
                   </button>
@@ -148,27 +176,32 @@ export default function ReviewRequestsPage() {
         )}
       </div>
 
+      {/* ── Resolve Dialog ── */}
       <Dialog open={!!resolving} onOpenChange={(v) => !v && setResolving(null)}>
-        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2 text-[#191c1e]">
-              <CheckCircle2 size={22} /> Resolver Revisão
+            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+              <CheckCircle2 size={20} /> Resolver Revisão
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <p className="text-xs text-[#444933] italic bg-[#f2f4f6] p-3 border-l-2 border-[#191c1e]">"{resolving?.comment}"</p>
+            <p className="text-xs italic p-3 rounded-lg" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", borderLeft: "3px solid var(--accent)" }}>
+              "{resolving?.comment}"
+            </p>
             <Textarea
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
               placeholder="Descreva o que foi verificado/decidido (opcional)..."
-              className="rounded-none border-2 border-[#191c1e]"
+              className="rounded-lg text-sm resize-none"
+              style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}
               rows={4}
             />
-            <div className="flex flex-wrap justify-end gap-3 pt-2 border-t-2 border-[#eceef0]">
+            <div className="flex flex-wrap justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
               <button
                 type="button"
                 onClick={() => setResolving(null)}
-                className="border-2 border-[#191c1e] bg-white px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider hover:bg-[#eceef0] transition-colors"
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-opacity hover:opacity-70"
+                style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
               >
                 Cancelar
               </button>
@@ -176,7 +209,8 @@ export default function ReviewRequestsPage() {
                 data-testid="button-deny-review"
                 disabled={resolveMutation.isPending}
                 onClick={() => resolving && resolveMutation.mutate({ id: resolving.id, data: { resolution: "denied", resolutionNotes: resolutionNotes || null } })}
-                className={`bg-[#862200] text-white border-2 border-[#191c1e] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-opacity hover:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: "rgba(229,72,77,0.15)", color: "#e5484d", border: "1px solid rgba(229,72,77,0.3)" }}
               >
                 {resolveMutation.isPending ? "Salvando..." : "Negar"}
               </button>
@@ -184,7 +218,8 @@ export default function ReviewRequestsPage() {
                 data-testid="button-approve-review"
                 disabled={resolveMutation.isPending}
                 onClick={() => resolving && resolveMutation.mutate({ id: resolving.id, data: { resolution: "approved", resolutionNotes: resolutionNotes || null } })}
-                className={`bg-[#506600] text-white border-2 border-[#191c1e] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-opacity hover:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: "var(--accent)", color: "var(--accent-foreground)" }}
               >
                 {resolveMutation.isPending ? "Salvando..." : "Aprovar"}
               </button>

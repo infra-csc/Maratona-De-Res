@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -23,9 +23,7 @@ import { Plus, Trash2, Pencil, UserMinus, Download, Search, AlertTriangle, Award
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
 import { cn } from "@/lib/utils";
-
-const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
-const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
+import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
 
 type EntryKind = "penalty" | "merit";
 
@@ -41,6 +39,7 @@ interface AbsenceFormData {
 export default function AbsencesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  usePremiumTheme();
   const qc = useQueryClient();
 
   const [open, setOpen] = useState(false);
@@ -211,61 +210,63 @@ export default function AbsencesPage() {
   const isModalPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="bg-[#f7f9fb] min-h-full text-[#191c1e]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
       <div className="p-6 md:p-10 space-y-8">
-        {/* Page header */}
+
+        {/* ── Header ── */}
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className={`w-16 h-16 bg-[#ff5722] border-2 border-[#191c1e] flex items-center justify-center shrink-0 ${HARD_SHADOW}`}>
-              <UserMinus size={32} className="text-white" />
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#e84000" }}>
+              <UserMinus size={26} className="text-white" />
             </div>
             <div>
-              <h1 data-testid="text-page-title" className="text-4xl md:text-5xl italic uppercase tracking-tighter font-black leading-none">
-                Penalidades e <span className="text-[#ccff00] bg-[#191c1e] px-3 inline-block -rotate-1">Méritos</span>
+              <h1 data-testid="text-page-title" className="font-black uppercase leading-none" style={{ fontFamily: CONDENSED, fontSize: "clamp(2rem,5vw,3.2rem)", letterSpacing: "-0.02em" }}>
+                Penalidades e <span style={{ color: "var(--accent)" }}>Méritos</span>
               </h1>
-              <p className="text-base text-[#444933] italic mt-2">Penalidades descontam e méritos somam pontos na nota final do colaborador.</p>
+              <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>
+                Penalidades descontam e méritos somam pontos na nota final do colaborador.
+              </p>
             </div>
           </div>
-
           <div className="flex items-center gap-3 flex-wrap">
             <CycleBadge />
             <button
               data-testid="button-export-absences"
               onClick={handleExport}
-              className={`bg-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+              className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-opacity hover:opacity-70"
+              style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
             >
-              <Download size={15} /> Exportar
+              <Download size={14} /> Exportar
             </button>
-
             {canEdit && (
               <button
                 data-testid="button-register-absence"
                 onClick={openCreate}
-                className={`bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-3 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-opacity hover:opacity-85"
+                style={{ backgroundColor: "#e84000", color: "white" }}
               >
-                <Plus size={16} /> Novo Lançamento
+                <Plus size={15} /> Novo Lançamento
               </button>
             )}
           </div>
         </section>
 
-        {/* Filters row */}
+        {/* ── Filters ── */}
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col md:flex-row gap-3 items-stretch">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[180px]">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#747a60]" />
-              <Input
+          <div className="flex flex-col md:flex-row gap-3 items-stretch flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+              <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="pl-10 h-11 rounded-none border-2 border-[#191c1e] bg-white font-bold italic uppercase text-xs tracking-wider"
+                className="pl-9 h-10 w-full rounded-lg text-sm font-medium outline-none"
+                style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                 placeholder="Buscar colaborador..."
               />
             </div>
-            {/* Kind filter */}
             <Select value={filterKind} onValueChange={v => setFilterKind(v as typeof filterKind)}>
-              <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] bg-white w-[180px] font-bold italic uppercase text-xs tracking-wider">
-                <Filter size={14} className="text-[#747a60] shrink-0" />
+              <SelectTrigger className="h-10 rounded-lg w-[180px] text-xs font-bold uppercase" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+                <Filter size={13} style={{ color: "var(--muted-foreground)" }} className="shrink-0" />
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>
               <SelectContent>
@@ -274,9 +275,8 @@ export default function AbsencesPage() {
                 <SelectItem value="merit">Méritos</SelectItem>
               </SelectContent>
             </Select>
-            {/* Event filter */}
             <Select value={filterEventId} onValueChange={setFilterEventId}>
-              <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] bg-white w-[220px] font-bold italic uppercase text-xs tracking-wider">
+              <SelectTrigger className="h-10 rounded-lg w-[220px] text-xs font-bold uppercase" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
                 <SelectValue placeholder="Evento" />
               </SelectTrigger>
               <SelectContent>
@@ -287,125 +287,140 @@ export default function AbsencesPage() {
                 ))}
               </SelectContent>
             </Select>
-            {/* Date range */}
             <div className="flex items-center gap-1 shrink-0">
-              <Input
+              <input
                 type="date"
                 value={filterDateFrom}
                 onChange={e => setFilterDateFrom(e.target.value)}
-                className="h-11 rounded-none border-2 border-[#191c1e] bg-white w-[148px] font-bold text-xs"
+                className="h-10 rounded-lg px-3 text-sm outline-none w-[148px]"
+                style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                 title="Data início"
               />
-              <span className="text-[#747a60] font-bold text-xs">–</span>
-              <Input
+              <span className="font-bold text-xs" style={{ color: "var(--muted-foreground)" }}>–</span>
+              <input
                 type="date"
                 value={filterDateTo}
                 onChange={e => setFilterDateTo(e.target.value)}
-                className="h-11 rounded-none border-2 border-[#191c1e] bg-white w-[148px] font-bold text-xs"
+                className="h-10 rounded-lg px-3 text-sm outline-none w-[148px]"
+                style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                 title="Data fim"
               />
             </div>
           </div>
-          {/* Totals */}
-          <div className="flex gap-3 flex-wrap">
-            <div className={`bg-[#ff5722] text-white px-5 py-3 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 shrink-0 ${HARD_SHADOW}`}>
-              <AlertTriangle size={16} /> Desconto: <span className="text-base not-italic">-{totalPenaltyPoints}</span> pts
+          <div className="flex gap-3 flex-wrap items-center">
+            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.15)", color: "#e5484d" }}>
+              <AlertTriangle size={13} /> Desconto: <span className="text-sm font-black">−{totalPenaltyPoints}</span> pts
             </div>
-            <div className={`bg-[#ccff00] text-[#191c1e] px-5 py-3 border-2 border-[#191c1e] font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 shrink-0 ${HARD_SHADOW}`}>
-              <Award size={16} /> Bônus: <span className="text-base not-italic">+{totalMeritPoints}</span> pts
+            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(154,176,0,0.15)", color: "var(--accent)" }}>
+              <Award size={13} /> Bônus: <span className="text-sm font-black">+{totalMeritPoints}</span> pts
             </div>
             {(filterKind !== "all" || filterEventId !== "__all" || filterDateFrom || filterDateTo || search) && (
               <button
                 onClick={() => { setSearch(""); setFilterKind("all"); setFilterEventId("__all"); setFilterDateFrom(""); setFilterDateTo(""); }}
-                className="border-2 border-[#191c1e] bg-white px-4 py-2 font-bold text-xs italic uppercase tracking-wider hover:bg-[#eceef0] flex items-center gap-1.5 transition-colors"
+                className="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-opacity hover:opacity-70"
+                style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}
               >
-                <X size={13} /> Limpar filtros
+                <X size={12} /> Limpar filtros
               </button>
             )}
           </div>
         </div>
 
+        {/* ── Table ── */}
         {isLoading ? (
-          <div className="text-center py-20 text-[#747a60] italic uppercase font-bold">Carregando registros...</div>
+          <div className="text-center py-20 text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>
+            Carregando registros...
+          </div>
         ) : (
-          <div className={`bg-white border-2 border-[#191c1e] overflow-hidden ${HARD_SHADOW}`}>
-            <div className="bg-[#191c1e] text-[#ccff00] px-6 py-3 flex items-center gap-2 italic">
-              <UserMinus size={18} />
-              <span className="font-black uppercase tracking-tight">Registros de Penalidades e Méritos</span>
-              <span className="ml-auto text-xs font-bold not-italic text-[#ccff00]/60">{filteredAbsences.length} registro{filteredAbsences.length !== 1 ? "s" : ""}</span>
+          <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="px-5 py-3.5 flex items-center gap-2" style={{ backgroundColor: "#191c1e" }}>
+              <UserMinus size={16} style={{ color: "#d4ff00" }} />
+              <span className="font-black uppercase text-sm tracking-tight" style={{ color: "#d4ff00", fontFamily: CONDENSED }}>
+                Registros de Penalidades e Méritos
+              </span>
+              <span className="ml-auto text-[11px] font-bold" style={{ color: "rgba(212,255,0,0.55)" }}>
+                {filteredAbsences.length} registro{filteredAbsences.length !== 1 ? "s" : ""}
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-[#191c1e] bg-[#eceef0]">
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Colaborador</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Lançamento</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Evento</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Data</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Qtd</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-center">Pontos</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933]">Motivo</th>
-                    {canEdit && <th className="px-6 py-4 text-xs font-bold uppercase italic text-[#444933] text-right">Ações</th>}
+                  <tr style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Colaborador</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Lançamento</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Evento</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Data</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Qtd</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-center" style={{ color: "var(--muted-foreground)" }}>Pontos</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Motivo</th>
+                    {canEdit && <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-right" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y-2 divide-[#eceef0]">
+                <tbody>
                   {filteredAbsences.map(a => {
                     const isMerit = a.kind === "merit";
                     return (
                       <tr
                         key={a.id}
                         data-testid={`row-absence-${a.id}`}
-                        className={cn(
-                          "hover:bg-[#f2f4f6] transition-all group",
-                          isMerit ? "border-l-4 border-l-[#84cc16]" : "border-l-4 border-l-[#ff5722]",
-                        )}
+                        className="transition-colors group"
+                        style={{ borderTop: "1px solid var(--border)", borderLeft: `3px solid ${isMerit ? "#9ab000" : "#e84000"}` }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "var(--secondary)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent"; }}
                       >
-                        <td className="px-6 py-4 font-black italic uppercase text-sm text-[#191c1e]">{a.employeeName}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-5 py-3.5 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+                          {a.employeeName}
+                        </td>
+                        <td className="px-5 py-3.5">
                           <span className={cn(
-                            "inline-flex items-center gap-1 font-black px-3 py-1 border-2 border-[#191c1e] text-[11px] uppercase italic",
-                            isMerit ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#191c1e] text-[#ccff00]",
+                            "inline-flex items-center gap-1 font-black px-2.5 py-1 rounded text-[11px] uppercase",
+                            isMerit ? "bg-[rgba(154,176,0,0.15)] text-[#9ab000]" : "bg-[rgba(229,72,77,0.15)] text-[#e5484d]",
                           )}>
-                            {isMerit ? <Award size={12} /> : <AlertTriangle size={12} />}
+                            {isMerit ? <Award size={11} /> : <AlertTriangle size={11} />}
                             {typeLabel(a.penaltyType)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 font-bold italic text-sm text-[#444933]">{a.eventName || <span className="text-[#b0b7a0] text-xs">Ciclo</span>}</td>
-                        <td className="px-6 py-4 font-bold italic text-sm text-[#444933]">{new Date(a.date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-block bg-[#eceef0] text-[#191c1e] font-black px-3 py-1 border-2 border-[#191c1e] text-xs">
+                        <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
+                          {a.eventName || <span className="text-xs opacity-50">Ciclo</span>}
+                        </td>
+                        <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
+                          {new Date(a.date + "T12:00:00").toLocaleDateString("pt-BR")}
+                        </td>
+                        <td className="px-5 py-3.5 text-center">
+                          <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>
                             {String(a.quantity).padStart(2, "0")}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={cn(
-                            "inline-block font-black px-3 py-1 border-2 border-[#191c1e] text-xs",
-                            isMerit ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#ff5722] text-white",
-                          )}>
-                            {isMerit ? "+" : "-"}{a.points * a.quantity}
+                        <td className="px-5 py-3.5 text-center">
+                          <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: isMerit ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)", color: isMerit ? "#9ab000" : "#e5484d" }}>
+                            {isMerit ? "+" : "−"}{a.points * a.quantity}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm font-bold italic text-[#747a60] uppercase tracking-tight max-w-xs truncate" title={a.reason || undefined}>
-                          {a.reason || <span className="text-[#b0b7a0] not-italic normal-case font-normal">Sem justificativa</span>}
+                        <td className="px-5 py-3.5 text-sm max-w-xs truncate" style={{ color: "var(--muted-foreground)" }} title={a.reason || undefined}>
+                          {a.reason || <span className="text-xs opacity-50">Sem justificativa</span>}
                         </td>
                         {canEdit && (
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 data-testid={`button-edit-absence-${a.id}`}
-                                className="p-2 border-2 border-transparent text-[#747a60] hover:border-[#191c1e] hover:text-[#191c1e] hover:bg-[#eceef0] transition-all"
+                                className="p-1.5 rounded transition-opacity hover:opacity-60"
+                                style={{ color: "var(--muted-foreground)" }}
                                 onClick={() => openEdit(a)}
                                 title="Editar"
                               >
-                                <Pencil size={15} />
+                                <Pencil size={14} />
                               </button>
                               <button
                                 data-testid={`button-delete-absence-${a.id}`}
-                                className="p-2 border-2 border-transparent text-[#747a60] hover:border-[#191c1e] hover:text-[#ba1a1a] hover:bg-[#ffdad6] transition-all"
+                                className="p-1.5 rounded transition-colors"
+                                style={{ color: "var(--muted-foreground)" }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e5484d"; }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)"; }}
                                 onClick={() => setDeleteTargetId(a.id)}
                                 title="Excluir"
                               >
-                                <Trash2 size={15} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </td>
@@ -415,7 +430,7 @@ export default function AbsencesPage() {
                   })}
                   {filteredAbsences.length === 0 && (
                     <tr>
-                      <td colSpan={canEdit ? 8 : 7} className="text-center py-16 italic uppercase font-bold text-[#747a60]">
+                      <td colSpan={canEdit ? 8 : 7} className="text-center py-16 text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>
                         Nenhum lançamento encontrado para os filtros selecionados.
                       </td>
                     </tr>
@@ -427,64 +442,58 @@ export default function AbsencesPage() {
         )}
       </div>
 
-      {/* Create / Edit modal */}
+      {/* ── Create / Edit modal ── */}
       <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) setEditingAbsence(null); }}>
-        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl italic uppercase font-black tracking-tight flex items-center gap-2 text-[#191c1e]">
-              <AlertTriangle size={22} /> {editingAbsence ? "Editar Lançamento" : "Registrar Lançamento"}
+            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+              <AlertTriangle size={19} /> {editingAbsence ? "Editar Lançamento" : "Registrar Lançamento"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
-            {/* Tipo */}
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">
-                Tipo de Lançamento <span className="text-[#ba1a1a]">*</span>
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                Tipo de Lançamento <span style={{ color: "#e5484d" }}>*</span>
               </Label>
               <Select
                 value={selectedType || defaultType}
                 onValueChange={v => { setValue("penaltyType", v); setValue("eventId", null); }}
               >
-                <SelectTrigger data-testid="select-penalty-type" className="h-11 rounded-none border-2 border-[#191c1e] focus:ring-0">
+                <SelectTrigger data-testid="select-penalty-type" className="h-11 rounded-lg" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
                   <SelectValue placeholder="Selecione o tipo..." />
                 </SelectTrigger>
                 <SelectContent>
                   {activeTypes.filter(t => t.kind === "penalty").length > 0 && (
                     <>
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase italic text-[#ba1a1a] tracking-wider">Penalidades (−)</div>
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#e5484d" }}>Penalidades (−)</div>
                       {activeTypes.filter(t => t.kind === "penalty").map(t => (
-                        <SelectItem key={t.slug} value={t.slug}>
-                          {t.label} — −{t.points} pts{t.requiresEvent ? " 📍" : ""}
-                        </SelectItem>
+                        <SelectItem key={t.slug} value={t.slug}>{t.label} — −{t.points} pts{t.requiresEvent ? " 📍" : ""}</SelectItem>
                       ))}
                     </>
                   )}
                   {activeTypes.filter(t => t.kind === "merit").length > 0 && (
                     <>
-                      <div className="px-2 py-1 mt-1 text-[10px] font-bold uppercase italic text-[#506600] tracking-wider">Méritos (+)</div>
+                      <div className="px-2 py-1 mt-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#9ab000" }}>Méritos (+)</div>
                       {activeTypes.filter(t => t.kind === "merit").map(t => (
-                        <SelectItem key={t.slug} value={t.slug}>
-                          {t.label} — +{t.points} pts{t.requiresEvent ? " 📍" : ""}
-                        </SelectItem>
+                        <SelectItem key={t.slug} value={t.slug}>{t.label} — +{t.points} pts{t.requiresEvent ? " 📍" : ""}</SelectItem>
                       ))}
                     </>
                   )}
                 </SelectContent>
               </Select>
               {requiresEvent && (
-                <p className="text-[11px] font-bold italic uppercase tracking-wide text-[#ba1a1a] flex items-center gap-1">
+                <p className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: "#e5484d" }}>
                   📍 Este tipo exige um evento vinculado
                 </p>
               )}
             </div>
 
-            {/* Evento */}
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
                 Evento{" "}
                 {requiresEvent
-                  ? <span className="text-[#ba1a1a]">*</span>
-                  : <span className="text-[#747a60] not-italic normal-case">(opcional para lançamentos no ciclo)</span>
+                  ? <span style={{ color: "#e5484d" }}>*</span>
+                  : <span className="normal-case font-normal text-xs">(opcional para lançamentos no ciclo)</span>
                 }
               </Label>
               <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
@@ -493,40 +502,42 @@ export default function AbsencesPage() {
                     type="button"
                     role="combobox"
                     data-testid="select-penalty-event"
-                    className={cn(
-                      "h-11 w-full flex items-center justify-between gap-2 px-3 rounded-none border-2 bg-white text-left",
-                      requiresEvent && !watchedEventId ? "border-[#ba1a1a]" : "border-[#191c1e]",
-                    )}
+                    className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-lg text-left"
+                    style={{
+                      backgroundColor: "var(--secondary)",
+                      border: requiresEvent && !watchedEventId ? "1px solid #e5484d" : "1px solid var(--border)",
+                      color: "var(--foreground)",
+                    }}
                   >
-                    <span className={cn("truncate text-sm", selectedEvent ? "font-bold italic text-[#191c1e]" : "font-bold italic uppercase text-xs tracking-wider text-[#747a60]")}>
+                    <span className={cn("truncate text-sm", selectedEvent ? "font-bold" : "font-medium text-xs")} style={{ color: selectedEvent ? "var(--foreground)" : "var(--muted-foreground)" }}>
                       {selectedEvent ? `${selectedEvent.name}${selectedEvent.cycleName ? ` (${selectedEvent.cycleName})` : ""}` : "Selecione o evento..."}
                     </span>
                     <span className="flex items-center gap-1 shrink-0">
                       {selectedEvent && (
-                        <X size={14} className="text-[#747a60] hover:text-[#ba1a1a]"
+                        <X size={13} style={{ color: "var(--muted-foreground)" }}
                           onClick={e => { e.stopPropagation(); setValue("eventId", null); }} />
                       )}
-                      <ChevronsUpDown size={16} className="text-[#191c1e] opacity-60" />
+                      <ChevronsUpDown size={14} style={{ color: "var(--muted-foreground)" }} />
                     </span>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
-                  <Command className="rounded-none">
-                    <CommandInput placeholder="Buscar por evento..." className="italic" />
-                    <CommandList className="max-h-[280px]">
-                      <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum evento encontrado.</CommandEmpty>
+                <PopoverContent align="start" className="p-0 rounded-xl w-[var(--radix-popover-trigger-width)]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <Command>
+                    <CommandInput placeholder="Buscar por evento..." />
+                    <CommandList className="max-h-[260px]">
+                      <CommandEmpty className="py-6 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum evento encontrado.</CommandEmpty>
                       <CommandGroup>
                         {(events ?? []).map(e => (
                           <CommandItem
                             key={e.id}
                             value={`${e.name} ${e.cycleName ?? ""}`}
                             onSelect={() => { setValue("eventId", e.id); setEventPickerOpen(false); }}
-                            className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2 items-start"
+                            className="cursor-pointer py-2 gap-2 items-start"
                           >
-                            <Check size={16} className={cn("mt-0.5 shrink-0", Number(watchedEventId) === e.id ? "opacity-100" : "opacity-0")} />
+                            <Check size={14} className={cn("mt-0.5 shrink-0", Number(watchedEventId) === e.id ? "opacity-100" : "opacity-0")} />
                             <span className="flex flex-col min-w-0">
-                              <span className="font-black italic uppercase text-sm leading-tight whitespace-normal">{e.name}</span>
-                              {e.cycleName && <span className="text-[11px] font-bold italic uppercase text-[#747a60]">{e.cycleName}</span>}
+                              <span className="font-black uppercase text-sm leading-tight whitespace-normal">{e.name}</span>
+                              {e.cycleName && <span className="text-[11px] font-medium" style={{ color: "var(--muted-foreground)" }}>{e.cycleName}</span>}
                             </span>
                           </CommandItem>
                         ))}
@@ -536,43 +547,45 @@ export default function AbsencesPage() {
                 </PopoverContent>
               </Popover>
               {requiresEvent && !watchedEventId && (
-                <p className="text-[11px] font-bold text-[#ba1a1a]">Selecione um evento para continuar.</p>
+                <p className="text-[11px] font-bold" style={{ color: "#e5484d" }}>Selecione um evento para continuar.</p>
               )}
             </div>
 
-            {/* Colaborador (apenas no create) */}
             {!editingAbsence && (
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Colaborador <span className="text-[#ba1a1a]">*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                  Colaborador <span style={{ color: "#e5484d" }}>*</span>
+                </Label>
                 <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
                       role="combobox"
                       data-testid="select-absence-employee"
-                      className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-none border-2 border-[#191c1e] bg-white text-left"
+                      className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-lg text-left"
+                      style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}
                     >
-                      <span className={cn("truncate text-sm", selectedEmployee ? "font-black italic uppercase text-[#191c1e]" : "font-bold italic uppercase text-xs tracking-wider text-[#747a60]")}>
+                      <span className={cn("truncate text-sm", selectedEmployee ? "font-black uppercase" : "font-medium text-xs")} style={{ color: selectedEmployee ? "var(--foreground)" : "var(--muted-foreground)" }}>
                         {selectedEmployee ? selectedEmployee.name : "Busque pelo nome..."}
                       </span>
-                      <ChevronsUpDown size={16} className="text-[#191c1e] opacity-60 shrink-0" />
+                      <ChevronsUpDown size={14} style={{ color: "var(--muted-foreground)" }} className="shrink-0" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
-                    <Command className="rounded-none">
-                      <CommandInput placeholder="Buscar pelo nome..." className="italic" />
-                      <CommandList className="max-h-[280px]">
-                        <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum colaborador encontrado.</CommandEmpty>
+                  <PopoverContent align="start" className="p-0 rounded-xl w-[var(--radix-popover-trigger-width)]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                    <Command>
+                      <CommandInput placeholder="Buscar pelo nome..." />
+                      <CommandList className="max-h-[260px]">
+                        <CommandEmpty className="py-6 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador encontrado.</CommandEmpty>
                         <CommandGroup>
                           {(employees ?? []).map(e => (
                             <CommandItem
                               key={e.id}
                               value={e.name}
                               onSelect={() => { setValue("employeeId", e.id); setEmployeePickerOpen(false); }}
-                              className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2"
+                              className="cursor-pointer py-2 gap-2"
                             >
-                              <Check size={16} className={cn("shrink-0", Number(watchedEmployeeId) === e.id ? "opacity-100" : "opacity-0")} />
-                              <span className="font-black italic uppercase text-sm truncate">{e.name}</span>
+                              <Check size={14} className={cn("shrink-0", Number(watchedEmployeeId) === e.id ? "opacity-100" : "opacity-0")} />
+                              <span className="font-black uppercase text-sm truncate">{e.name}</span>
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -585,40 +598,39 @@ export default function AbsencesPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Data <span className="text-[#ba1a1a]">*</span></Label>
-                <Input type="date" {...register("date", { required: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                  Data <span style={{ color: "#e5484d" }}>*</span>
+                </Label>
+                <Input type="date" {...register("date", { required: true })} className="h-11 rounded-lg" />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Quantidade <span className="text-[#ba1a1a]">*</span></Label>
-                <Input type="number" min="1" {...register("quantity", { valueAsNumber: true })} className="h-11 rounded-none border-2 border-[#191c1e]" />
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                  Quantidade <span style={{ color: "#e5484d" }}>*</span>
+                </Label>
+                <Input type="number" min="1" {...register("quantity", { valueAsNumber: true })} className="h-11 rounded-lg" />
               </div>
             </div>
 
-            {/* Total preview */}
-            <div className={cn(
-              "flex items-center justify-between px-4 py-3 border-2 border-[#191c1e] font-black italic uppercase tracking-tight",
-              previewKind === "merit" ? "bg-[#ccff00] text-[#191c1e]" : "bg-[#191c1e] text-[#ccff00]",
-            )}>
+            <div className="flex items-center justify-between px-4 py-3 rounded-lg font-black uppercase tracking-tight" style={{
+              backgroundColor: previewKind === "merit" ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)",
+              color: previewKind === "merit" ? "#9ab000" : "#e5484d",
+              border: `1px solid ${previewKind === "merit" ? "rgba(154,176,0,0.3)" : "rgba(229,72,77,0.3)"}`,
+            }}>
               <span className="text-xs">Total a lançar:</span>
-              <span className="text-2xl leading-none">
-                {previewKind === "merit" ? "+" : "-"}{previewPoints} pts
-              </span>
+              <span className="text-2xl leading-none">{previewKind === "merit" ? "+" : "−"}{previewPoints} pts</span>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Motivo / Observação</Label>
-              <Input
-                {...register("reason")}
-                placeholder="Detalhe do lançamento..."
-                className="h-11 rounded-none border-2 border-[#191c1e]"
-              />
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Motivo / Observação</Label>
+              <Input {...register("reason")} placeholder="Detalhe do lançamento..." className="h-11 rounded-lg" />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t-2 border-[#eceef0]">
+            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
               <button
                 type="button"
                 onClick={() => { setOpen(false); setEditingAbsence(null); }}
-                className="border-2 border-[#191c1e] bg-white px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider hover:bg-[#eceef0] transition-colors"
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-opacity hover:opacity-70"
+                style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
               >
                 Cancelar
               </button>
@@ -626,7 +638,8 @@ export default function AbsencesPage() {
                 data-testid="button-submit-absence"
                 type="submit"
                 disabled={isModalPending}
-                className={`bg-[#ff5722] text-white border-2 border-[#191c1e] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider ${HARD_SHADOW} ${HARD_SHADOW_HOVER} disabled:opacity-50`}
+                className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-opacity hover:opacity-85 disabled:opacity-50"
+                style={{ backgroundColor: "#e84000", color: "white" }}
               >
                 {isModalPending ? (editingAbsence ? "Salvando..." : "Registrando...") : (editingAbsence ? "Salvar Alterações" : "Confirmar Lançamento")}
               </button>
@@ -635,25 +648,26 @@ export default function AbsencesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
+      {/* ── Delete confirmation ── */}
       <AlertDialog open={deleteTargetId !== null} onOpenChange={v => { if (!v) setDeleteTargetId(null); }}>
-        <AlertDialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
+        <AlertDialogContent className="rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl italic uppercase font-black tracking-tight text-[#191c1e] flex items-center gap-2">
-              <Trash2 size={20} /> Confirmar exclusão
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+              <Trash2 size={18} /> Confirmar exclusão
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#444933] font-bold italic">
+            <AlertDialogDescription style={{ color: "var(--muted-foreground)" }}>
               Este lançamento será removido permanentemente. O cálculo do resultado final do colaborador será atualizado no próximo reprocessamento.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider">
+            <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleteMutation.isPending}
               onClick={() => deleteTargetId && deleteMutation.mutate({ id: deleteTargetId })}
-              className="rounded-none bg-[#ba1a1a] text-white border-2 border-[#191c1e] font-bold italic uppercase text-xs tracking-wider hover:bg-[#93000a] disabled:opacity-50"
+              className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
+              style={{ backgroundColor: "#e5484d", color: "white", border: "none" }}
             >
               Sim, excluir
             </AlertDialogAction>
