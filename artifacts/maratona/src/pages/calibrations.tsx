@@ -447,7 +447,7 @@ export default function CalibrationsPage() {
   // Publica todos os critérios calibrados de acordo com a intenção definida por critério
   async function handlePublishAll() {
     if (!selectedEventId) return;
-    const calibrated = displayActiveCriteria.filter(c => c.active && getCalibration(c.criterionId) != null);
+    const calibrated = displayActiveCriteria.filter(c => getCalibration(c.criterionId) != null);
     if (calibrated.length === 0) {
       toast({ title: "Nenhum critério calibrado para publicar", description: "Salve ao menos uma nota calibrada antes de publicar.", variant: "destructive" });
       return;
@@ -597,7 +597,7 @@ export default function CalibrationsPage() {
 
   // Inicializa publishIntents quando o evento muda ou quando os critérios carregam.
   // DEVE ficar APÓS a declaração de displayActiveCriteria para evitar TDZ em produção.
-  useEffect(() => { setPublishIntents({}); }, [selectedEventId]);
+  useEffect(() => { setPublishIntents({}); setCriterionFilter("all"); }, [selectedEventId]);
   useEffect(() => {
     if (!displayActiveCriteria.length) return;
     setPublishIntents(prev => {
@@ -1679,7 +1679,7 @@ export default function CalibrationsPage() {
                             </td>
                             {/* Status + seletor de intenção de publicação */}
                             <td className="px-1 py-2 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
-                              {!c.active ? (
+                              {!c.active && !cal ? (
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)", opacity: 0.6 }}>
                                   Inativo
                                 </span>

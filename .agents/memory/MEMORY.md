@@ -71,3 +71,4 @@
 - [Area principal criterion authority](area-principal-authority.md) — default evaluator of a criterion becomes area "principal": sees ALL area criteria, can assign/take/move freely (own action type, bypasses redirectMode)
 - [Absences pending vs answered](absence-response-vs-report.md) — a free-text field's truthiness can't signal "answered"; give Sim/Não+detail questions their own nullable boolean flag
 - [Area-principal panel silently empty](area-principal-panel-empty.md) — self-service management UI must synthesize defaults, not assume an admin setup step already ran
+- [Inactive-but-calibrated criteria display](inactive-calibrated-criteria.md) — event_criteria.active=false with existing calibration must show pub status, NOT "Inativo"; criterionFilter resets on event change
