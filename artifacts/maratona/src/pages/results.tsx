@@ -399,9 +399,20 @@ function EmployeeDetailSheet({
                   {detail.summary.finalResult != null && detail.summary.grossAverage != null &&
                    (detail.summary.penaltyPoints > 0 || detail.summary.meritPoints > 0) && (
                     <p className="text-[10px] font-bold mt-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.6 }}>
-                      {detail.summary.grossAverage.toFixed(1)}
-                      {detail.summary.penaltyPoints > 0 && <> − {detail.summary.penaltyPoints}</>}
-                      {detail.summary.meritPoints > 0 && <> + {detail.summary.meritPoints}</>}
+                      {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null ? (
+                        <>
+                          ({detail.summary.scoreSum.toFixed(1)}
+                          {detail.summary.penaltyPoints > 0 && <> − {detail.summary.penaltyPoints}</>}
+                          {detail.summary.meritPoints > 0 && <> + {detail.summary.meritPoints}</>}
+                          ) ÷ {detail.summary.confirmedEventCount}
+                        </>
+                      ) : (
+                        <>
+                          {detail.summary.grossAverage.toFixed(1)}
+                          {detail.summary.penaltyPoints > 0 && <> − {(detail.summary.penaltyPoints / (detail.summary.confirmedEventCount ?? 1)).toFixed(1)}</>}
+                          {detail.summary.meritPoints > 0 && <> + {(detail.summary.meritPoints / (detail.summary.confirmedEventCount ?? 1)).toFixed(1)}</>}
+                        </>
+                      )}
                       {" "}= {detail.summary.finalResult.toFixed(1)}
                     </p>
                   )}
