@@ -168,6 +168,9 @@ router.get("/events", async (req, res) => {
     let evaluatedCriteria = 0;
     let criteriaWithProgress = 0;
     let hasCalibration = false;
+    // Rastreia IDs de critérios pai já contados em evaluatedCriteria para evitar
+    // dupla-contagem quando pai e filho eventScoped ambos forem avaliados.
+    const evaluatedParentIds = new Set<number>();
     const criteriaRaw = activeCriteria.map((c) => {
       const weight = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
       const critEvals = submitted.filter(e => e.criterionId === c.criterionId);
@@ -179,7 +182,10 @@ router.get("/events", async (req, res) => {
       const status = getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea);
       if (weight > 0) {
         // Avaliação real: contabiliza no bar de AVALIAÇÕES
-        if (status.isEvaluated) evaluatedCriteria++;
+        if (status.isEvaluated) {
+          evaluatedCriteria++;
+          evaluatedParentIds.add(c.criterionId as number);
+        }
         // Avaliação OU calibração: determina se a nota pode ser calculada
         if (status.isEvaluated || calibratedScore !== null) criteriaWithProgress++;
       }
@@ -194,6 +200,16 @@ router.get("/events", async (req, res) => {
       const chCal = evCals.find(x => x.criterionId === ch.criterionId);
       const chCalibrated = chCal ? parseFloat(chCal.calibratedScore as unknown as string) : null;
       if (chCalibrated !== null) hasCalibration = true;
+      // Se o critério filho (eventScoped) está avaliado e o pai ainda não foi
+      // contado, conta o pai em evaluatedCriteria (critério multi-área parcialmente avaliado).
+      const chStatus = getCriterionEvaluationStatus(ch.responsibleAreaId, chEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+      if (chStatus.isEvaluated && ch.criterionSourceCriterionId != null) {
+        const parentId = ch.criterionSourceCriterionId as number;
+        if (!evaluatedParentIds.has(parentId)) {
+          evaluatedCriteria++;
+          evaluatedParentIds.add(parentId);
+        }
+      }
       criteriaRaw.push({ criterionId: ch.criterionId as number, weight: 0, averageScore: chAvg, calibratedScore: chCalibrated, isEventScoped: true, sourceCriterionId: ch.criterionSourceCriterionId as number | null });
     }
     const criteriaForCalc = mergeEventScopedCriteria(criteriaRaw);
