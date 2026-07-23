@@ -685,7 +685,7 @@ export default function EventsPage() {
 
                   {/* Avaliações mini bar */}
                   <div className="px-3.5 py-3">
-                    {isPureHistorical || total === 0 ? (
+                    {ev.isHistorical || total === 0 ? (
                       <span className="text-[11px] italic opacity-40">—</span>
                     ) : (
                       <MiniBar value={evaluated} total={total} color={evalColor} />
