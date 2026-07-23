@@ -253,7 +253,7 @@ export default function EventsPage() {
       || (cardFilter === "inEval"     && isInEvaluation(ev))
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.finalCalibratedCriteria ?? 0) === 0 && (ev.partialPublishedCount ?? 0) === 0)
       || (cardFilter === "partialPub" && hasPartialPublication(ev))
-      || (cardFilter === "fullyEval"  && !!ev.fullyCalibrated);
+      || (cardFilter === "fullyEval"  && !!ev.feedbackReleased);
     return matchSearch && matchDate && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
@@ -322,7 +322,7 @@ export default function EventsPage() {
             { val: all.length,                                        label: "Eventos",     color: "var(--foreground)" },
             { val: all.filter(e => e.status === "open").length,      label: "Abertos",     color: "var(--accent)" },
             { val: all.filter(e => hasPartialPublication(e)).length,  label: "Pub. Parcial", color: "#e8a23d" },
-            { val: all.filter(e => e.fullyCalibrated).length,         label: "Pub. Final",  color: "#9ab000" },
+            { val: all.filter(e => e.feedbackReleased).length,          label: "Pub. Final",  color: "#9ab000" },
           ].map((s, i) => (
             <div key={i} className="px-4 text-center" style={{ borderRight: i < 3 ? "1px solid var(--border)" : "none" }}>
               <span className="block font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: s.color }}>{s.val}</span>
@@ -624,7 +624,7 @@ export default function EventsPage() {
 
               // Accent bar color
               const accentColor = !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication ? WARNING
-                : fc ? "#9ab000"
+                : ev.feedbackReleased ? "#9ab000"
                 : evalDone === evalTotal && evalTotal > 0 ? "var(--accent)"
                 : evalDone > 0 ? "#e8a23d"
                 : "var(--border)";
@@ -654,11 +654,11 @@ export default function EventsPage() {
                 ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
                 : !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication
                 ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
-                : fc
+                : ev.feedbackReleased
                   ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
                   : partialOnlyCount > 0
                     ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Pub. Parcial" }
-                    : calSaved > 0
+                    : (calSaved > 0 || fc)
                       ? { bg: "rgba(91,141,239,0.14)", fg: "#5b8def", label: "Rascunho" }
                       : concluded
                         ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Concluído" }
