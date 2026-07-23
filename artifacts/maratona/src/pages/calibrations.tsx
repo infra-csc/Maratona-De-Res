@@ -1610,13 +1610,33 @@ export default function CalibrationsPage() {
                                 <div className="flex flex-col items-center gap-1">
                                   {/* Estado de publicação atual — badge prominente */}
                                   {isFinalPublished ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD, border: `1px solid ${GOOD}` }}>
-                                      <CheckCircle size={8} /> Final pub.
-                                    </span>
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD, border: `1px solid ${GOOD}` }}>
+                                        <CheckCircle size={8} /> Final pub.
+                                      </span>
+                                      <span className="text-[8px] leading-tight text-center" style={{ color: "var(--muted-foreground)" }}>
+                                        {formatDateTime(new Date(c.finalPublishedAt!))}
+                                      </span>
+                                      {c.finalPublishedByUserName && (
+                                        <span className="text-[8px] leading-tight text-center font-medium" style={{ color: GOOD }}>
+                                          {c.finalPublishedByUserName}
+                                        </span>
+                                      )}
+                                    </div>
                                   ) : c.partialPublishedAt ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(232,162,61,0.18)", color: AMBER, border: `1px solid ${AMBER}` }}>
-                                      <CheckCircle size={8} /> Parcial pub.
-                                    </span>
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(232,162,61,0.18)", color: AMBER, border: `1px solid ${AMBER}` }}>
+                                        <CheckCircle size={8} /> Parcial pub.
+                                      </span>
+                                      <span className="text-[8px] leading-tight text-center" style={{ color: "var(--muted-foreground)" }}>
+                                        {formatDateTime(new Date(c.partialPublishedAt))}
+                                      </span>
+                                      {c.partialPublishedByUserName && (
+                                        <span className="text-[8px] leading-tight text-center font-medium" style={{ color: AMBER }}>
+                                          {c.partialPublishedByUserName}
+                                        </span>
+                                      )}
+                                    </div>
                                   ) : (
                                     <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
                                       Não pub.

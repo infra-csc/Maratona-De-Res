@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, areaConformityRoutingTable } from "@workspace/db";
-import { eq, and, sql, inArray, ilike, or, ne } from "drizzle-orm";
+import { eq, and, sql, inArray, ilike, or, ne, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
@@ -306,6 +306,8 @@ async function loadEventDetail(id: number) {
     .where(eq(eventParticipantsTable.eventId, id))
     .then(rows => rows.map(p => ({ ...p, countsForScore: participantCountsForScore(p) })));
 
+  const partialPublisherAlias = aliasedTable(usersTable, "partial_publisher");
+  const finalPublisherAlias = aliasedTable(usersTable, "final_publisher");
   const criteria = await db
     .select({
       id: eventCriteriaTable.id,
@@ -321,10 +323,14 @@ async function loadEventDetail(id: number) {
       eventScoped: criteriaTable.eventScoped,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
+      partialPublishedByUserName: partialPublisherAlias.name,
+      finalPublishedByUserName: finalPublisherAlias.name,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
+    .leftJoin(partialPublisherAlias, eq(eventCriteriaTable.partialPublishedByUserId, partialPublisherAlias.id))
+    .leftJoin(finalPublisherAlias, eq(eventCriteriaTable.finalPublishedByUserId, finalPublisherAlias.id))
     .where(eq(eventCriteriaTable.eventId, id));
 
   const activeCriteria = criteria.filter(c => c.active);
@@ -1170,6 +1176,8 @@ router.post("/events/:id/conformity", async (req, res) => {
 
 router.get("/events/:id/criteria", async (req, res) => {
   const id = parseInt(req.params.id as string);
+  const partialPubAlias = aliasedTable(usersTable, "partial_pub");
+  const finalPubAlias = aliasedTable(usersTable, "final_pub");
   const criteria = await db
     .select({
       id: eventCriteriaTable.id,
@@ -1186,10 +1194,14 @@ router.get("/events/:id/criteria", async (req, res) => {
       sourceCriterionId: criteriaTable.sourceCriterionId,
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
+      partialPublishedByUserName: partialPubAlias.name,
+      finalPublishedByUserName: finalPubAlias.name,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
+    .leftJoin(partialPubAlias, eq(eventCriteriaTable.partialPublishedByUserId, partialPubAlias.id))
+    .leftJoin(finalPubAlias, eq(eventCriteriaTable.finalPublishedByUserId, finalPubAlias.id))
     .where(eq(eventCriteriaTable.eventId, id));
   const activeCriteria = criteria.filter(c => c.active);
   const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);

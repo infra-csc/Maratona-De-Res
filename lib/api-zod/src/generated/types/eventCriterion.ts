@@ -30,4 +30,8 @@ export interface EventCriterion {
   partialPublishedAt?: string | null;
   /** @nullable */
   finalPublishedAt?: string | null;
+  /** @nullable */
+  partialPublishedByUserName?: string | null;
+  /** @nullable */
+  finalPublishedByUserName?: string | null;
 }

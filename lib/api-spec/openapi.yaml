@@ -3745,6 +3745,10 @@ components:
           type: ["string", "null"]
         finalPublishedAt:
           type: ["string", "null"]
+        partialPublishedByUserName:
+          type: ["string", "null"]
+        finalPublishedByUserName:
+          type: ["string", "null"]
 
     EventCriteriaUpdate:
       type: object

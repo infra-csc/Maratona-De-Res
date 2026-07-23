@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areasTable } from "./areas";
 import { eventsTable } from "./events";
+import { usersTable } from "./users";
 
 export const criteriaTable = pgTable("criteria", {
   id: serial("id").primaryKey(),
@@ -36,6 +37,9 @@ export const eventCriteriaTable = pgTable("event_criteria", {
   // ao colaborador (sem aviso de rascunho). Não trava edição; se a nota mudar
   // após publicar como Final, o colaborador vê o valor atualizado automaticamente.
   finalPublishedAt: timestamp("final_published_at"),
+  // Auditoria de publicação: quem publicou parcial/final
+  partialPublishedByUserId: integer("partial_published_by_user_id").references(() => usersTable.id),
+  finalPublishedByUserId: integer("final_published_by_user_id").references(() => usersTable.id),
 });
 
 export const insertCriterionSchema = createInsertSchema(criteriaTable).omit({ id: true });

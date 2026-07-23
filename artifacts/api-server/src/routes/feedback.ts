@@ -203,7 +203,9 @@ router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("ad
 
   const [updated] = await db.update(eventCriteriaTable).set({
     partialPublishedAt: new Date(),
-    finalPublishedAt: null,  // Downgrade final→parcial: limpa o carimbo de final
+    partialPublishedByUserId: req.user!.userId,
+    finalPublishedAt: null,
+    finalPublishedByUserId: null,
   }).where(eq(eventCriteriaTable.id, link.id)).returning();
   await audit(req.user!.userId, "publish_partial_feedback", "event_criteria", updated.id, null, { eventId, criterionId });
 
@@ -231,10 +233,12 @@ router.post("/events/:id/criteria/:criterionId/publish-final", requireRole("admi
     .limit(1);
   if (!link) { res.status(404).json({ error: "Critério não encontrado ou inativo neste evento" }); return; }
 
+  const now = new Date();
   const [updated] = await db.update(eventCriteriaTable).set({
-    finalPublishedAt: new Date(),
-    // Garante que partialPublishedAt também esteja definido (é base para visibilidade)
-    partialPublishedAt: link.partialPublishedAt ?? new Date(),
+    finalPublishedAt: now,
+    finalPublishedByUserId: req.user!.userId,
+    partialPublishedAt: link.partialPublishedAt ?? now,
+    partialPublishedByUserId: link.partialPublishedByUserId ?? req.user!.userId,
   }).where(eq(eventCriteriaTable.id, link.id)).returning();
   await audit(req.user!.userId, "publish_final_feedback", "event_criteria", updated.id, null, { eventId, criterionId });
 
@@ -268,6 +272,7 @@ router.post("/events/:id/criteria/publish-partial-all", requireRole("admin", "rh
   for (const link of criteriaLinks) {
     await db.update(eventCriteriaTable).set({
       partialPublishedAt: now,
+      partialPublishedByUserId: req.user!.userId,
     }).where(eq(eventCriteriaTable.id, link.id));
   }
   await audit(req.user!.userId, "publish_partial_all_feedback", "events", eventId, null, { count: criteriaLinks.length });
@@ -296,7 +301,9 @@ router.post("/events/:id/criteria/publish-final-all", requireRole("admin", "rh",
   for (const link of criteriaLinks) {
     await db.update(eventCriteriaTable).set({
       finalPublishedAt: now,
+      finalPublishedByUserId: req.user!.userId,
       partialPublishedAt: link.partialPublishedAt ?? now,
+      partialPublishedByUserId: link.partialPublishedByUserId ?? req.user!.userId,
     }).where(eq(eventCriteriaTable.id, link.id));
   }
   await audit(req.user!.userId, "publish_final_all_feedback", "events", eventId, null, { count: criteriaLinks.length });

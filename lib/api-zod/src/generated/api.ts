@@ -681,7 +681,9 @@ export const GetEventResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1437,7 +1439,9 @@ export const SetConformityEvaluatorResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1571,7 +1575,9 @@ export const RedirectConformityEvaluatorResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1705,7 +1711,9 @@ export const SetConformityEvaluatorFerramentasResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1839,7 +1847,9 @@ export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -1998,7 +2008,9 @@ export const GetEventCriteriaResponseItem = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })
 export const GetEventCriteriaResponse = zod.array(GetEventCriteriaResponseItem)
 
@@ -2035,7 +2047,9 @@ export const UpdateEventCriteriaResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })),
   "warnings": zod.array(zod.string()).optional()
 })
@@ -2113,7 +2127,9 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -2247,7 +2263,9 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -2377,7 +2395,9 @@ export const ResyncEventCriteriaResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
@@ -2623,7 +2643,9 @@ export const DeleteEventCriterionResponse = zod.object({
   "eventScoped": zod.boolean().optional(),
   "sourceCriterionId": zod.number().nullish(),
   "partialPublishedAt": zod.string().nullish(),
-  "finalPublishedAt": zod.string().nullish()
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
 })).optional(),
   "areaAssignments": zod.array(zod.object({
   "id": zod.number(),
