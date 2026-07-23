@@ -303,7 +303,7 @@ router.post("/employees/bulk-employment-reset", requireRole("admin", "rh"), asyn
   });
   const cycle = await getCurrentCycle();
   if (cycle) await recomputeCycleResults(cycle.id, req.user!.userId);
-  await audit(req.user!.userId, "bulk-employment-reset", "employees", null, { casaIds, casaCount });
+  await audit(req.user!.userId, "bulk-employment-reset", "employees", undefined, { casaIds, casaCount });
   res.json({ ok: true, casaCount });
 });
 
@@ -425,13 +425,13 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
     results.push({ name: emp.name, cpfLogin: cpfDigits, pin });
   }
 
-  await audit(req.user!.userId, "bulk_generate_pins", "users", null, null, { count: results.length, skipped: skipped.length });
+  await audit(req.user!.userId, "bulk_generate_pins", "users", undefined, undefined, { count: results.length, skipped: skipped.length });
   res.json({ results, skipped });
 });
 
 // POST /employees/:id/generate-pin — gera PIN de 4 dígitos para colaborador casa
 router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
 
   const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
@@ -494,7 +494,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
   }
 
   await audit(req.user!.userId, "generate_pin", "users", userId, null, { employeeId: id });
-  res.json({ pin, cpfLogin: cpfDigits, userCreated });
+  res.json({ pin: pin!, cpfLogin: cpfDigits, userCreated });
 });
 
 export default router;

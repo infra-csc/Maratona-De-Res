@@ -222,16 +222,30 @@ router.get("/events", async (req, res) => {
       if (chStatus.requiredEvaluators > 0) {
         submittedEvaluatorCount += chStatus.submittedEvaluators;
       }
-      // Se o critério filho está avaliado e o pai ainda não foi contado,
-      // conta o pai em evaluatedCriteria (critério multi-área parcialmente avaliado).
-      if (chStatus.isEvaluated && ch.criterionSourceCriterionId != null) {
-        const parentId = ch.criterionSourceCriterionId as number;
-        if (!evaluatedParentIds.has(parentId)) {
+      // Critério eventScoped ÓRFÃO (source_criterion_id=null) não tem pai para ser fundido:
+      // usa seu próprio peso e contribui de forma independente (como um critério regular).
+      // Critério eventScoped COM pai: usa weight=0 aqui pois o merge absorve o filho no pai.
+      const isOrphan = ch.criterionSourceCriterionId == null;
+      const chWeight = isOrphan
+        ? parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string)
+        : 0;
+      if (isOrphan) {
+        if (chWeight > 0 && chStatus.isEvaluated) {
           evaluatedCriteria++;
-          evaluatedParentIds.add(parentId);
+          evaluatedParentIds.add(ch.criterionId as number);
+        }
+      } else {
+        // Se o critério filho está avaliado e o pai ainda não foi contado,
+        // conta o pai em evaluatedCriteria (critério multi-área parcialmente avaliado).
+        if (chStatus.isEvaluated) {
+          const parentId = ch.criterionSourceCriterionId as number;
+          if (!evaluatedParentIds.has(parentId)) {
+            evaluatedCriteria++;
+            evaluatedParentIds.add(parentId);
+          }
         }
       }
-      criteriaRaw.push({ criterionId: ch.criterionId as number, weight: 0, averageScore: chAvg, calibratedScore: chCalibrated, isEventScoped: true, sourceCriterionId: ch.criterionSourceCriterionId as number | null });
+      criteriaRaw.push({ criterionId: ch.criterionId as number, weight: chWeight, averageScore: chAvg, calibratedScore: chCalibrated, isEventScoped: true, sourceCriterionId: ch.criterionSourceCriterionId as number | null });
     }
     const criteriaForCalc = mergeEventScopedCriteria(criteriaRaw);
     const teamScore = criteriaWithProgress > 0 ? calculateEventResult(criteriaForCalc) : null;
@@ -246,24 +260,38 @@ router.get("/events", async (req, res) => {
     // Calibrações salvas (score preenchido, independente de publicação de feedback).
     const calibratedCriteriaCount = criteriaForCalc.filter(c => c.weight > 0 && c.calibratedScore !== null).length;
 
+    // Critérios eventScoped órfãos (sem pai) com peso > 0 — contribuem como critérios
+    // independentes em contadores de calibração, publicação e áreas sem avaliador.
+    const orphanScoped = eventScopedCriteria.filter(ch => ch.criterionSourceCriterionId == null);
+
     // Totalmente calibrado = todo critério ativo com peso > 0 já teve a calibração
     // publicada como final (não basta ter calibração parcial/rascunho).
     const finalCalibratedCriteria = activeCriteria.filter(c => {
       const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
       return w > 0 && c.finalPublishedAt != null;
+    }).length + orphanScoped.filter(ch => {
+      const w = parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string);
+      return w > 0 && ch.finalPublishedAt != null;
     }).length;
     const fullyCalibrated = scorableCount > 0 && finalCalibratedCriteria === scorableCount;
 
-    // Rollup do evento = mais recente publicação parcial entre os critérios
-    // ativos (a granularidade real agora é por critério, ver /events/:id/criteria).
-    const partialTimestamps = activeCriteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
+    // Rollup do evento = mais recente publicação parcial entre os critérios ativos
+    // (inclui órfãos eventScoped; granularidade real em /events/:id/criteria).
+    const partialTimestamps = [
+      ...activeCriteria.map(c => c.partialPublishedAt),
+      ...orphanScoped.map(ch => ch.partialPublishedAt),
+    ].filter((d): d is Date => d != null);
     const partialPublishedAt = partialTimestamps.length > 0
       ? new Date(Math.max(...partialTimestamps.map(d => d.getTime())))
       : null;
 
     // Áreas com critério ativo mas nenhum avaliador atribuído ainda — dá
     // visibilidade na listagem de eventos sem precisar entrar em cada um.
-    const areaIdsWithActiveCriteria = new Set(activeCriteria.map(c => c.responsibleAreaId).filter((id): id is number => id != null));
+    // Inclui áreas de critérios eventScoped órfãos (contribuem de forma independente).
+    const areaIdsWithActiveCriteria = new Set([
+      ...activeCriteria.map(c => c.responsibleAreaId).filter((id): id is number => id != null),
+      ...orphanScoped.map(ch => ch.responsibleAreaId).filter((id): id is number => id != null),
+    ]);
     const unassignedAreaNames = [...areaIdsWithActiveCriteria]
       .filter(areaId => !assignedByArea.has(areaId) || assignedByArea.get(areaId)!.size === 0)
       .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
@@ -272,6 +300,9 @@ router.get("/events", async (req, res) => {
     const partialPublishedCount = activeCriteria.filter(c => {
       const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
       return w > 0 && c.partialPublishedAt != null;
+    }).length + orphanScoped.filter(ch => {
+      const w = parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string);
+      return w > 0 && ch.partialPublishedAt != null;
     }).length;
     const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
     return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };

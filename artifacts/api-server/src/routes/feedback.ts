@@ -291,7 +291,7 @@ router.post("/events/:id/criteria/publish-final-all", requireRole("admin", "rh",
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
 
   const allFinalLinks = await db
-    .select({ id: eventCriteriaTable.id, partialPublishedAt: eventCriteriaTable.partialPublishedAt, eventScoped: criteriaTable.eventScoped })
+    .select({ id: eventCriteriaTable.id, partialPublishedAt: eventCriteriaTable.partialPublishedAt, partialPublishedByUserId: eventCriteriaTable.partialPublishedByUserId, eventScoped: criteriaTable.eventScoped })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
