@@ -54,6 +54,11 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
 }
 
+const LOWER_WORDS = new Set(["da","de","do","das","dos","dos","e","em","na","no","nas","nos","a","o","as","os"]);
+function toTitleCase(str: string) {
+  return str.toLowerCase().split(/\s+/).map((w, i) => i === 0 || !LOWER_WORDS.has(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(" ");
+}
+
 const APP_LINK = (() => {
   const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
   return `${window.location.origin}${base}/login`;
@@ -625,7 +630,7 @@ export default function EmployeesPage() {
                             <span className="text-sm font-black" style={{ color: isCanonical ? "var(--primary-foreground)" : "var(--foreground)" }}>{initials(emp.name)}</span>
                           </div>
                           <div>
-                            <p className="font-bold">{emp.name}</p>
+                            <p className="font-bold">{toTitleCase(emp.name)}</p>
                             {isCanonical && <span className="text-[10px] font-black uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>CANÔNICO</span>}
                             {emp.email && <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{emp.email}</p>}
                           </div>
@@ -905,8 +910,8 @@ export default function EmployeesPage() {
               <p className="font-black text-[11px] uppercase" style={{ color: WARNING }}>⚠ Ação irreversível</p>
               <p style={{ color: "var(--foreground)" }}>Os <strong>22 colaboradores do Galpão Casa</strong> (abaixo) permanecerão como <strong>Casa</strong>. <strong>Todos os demais ativos</strong> serão marcados como <strong>Freela</strong> e deixarão de contar no ranking.</p>
             </div>
-            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-              <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
+            <div className="rounded-lg max-h-64 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
+              <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5 sticky top-0" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
                 <Lock size={10} /> Marceneiros
               </div>
               {[
