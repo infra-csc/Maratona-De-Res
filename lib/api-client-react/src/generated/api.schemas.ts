@@ -314,6 +314,10 @@ export interface Event {
   submittedCount?: number;
   /** Nº de critérios ativos já avaliados (ou calibrados) neste evento. */
   evaluatedCriteria?: number;
+  /** Soma de avaliadores designados por critério ativo (pai + eventScoped). Denominador correto para barra de avaliações. */
+  totalEvaluatorSlots?: number;
+  /** Soma de avaliadores que já submeteram por critério ativo. Numerador para barra de avaliações. */
+  submittedEvaluatorCount?: number;
   /** Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback). */
   calibratedCriteriaCount?: number;
   /** Nº de critérios ativos com calibração final publicada. */

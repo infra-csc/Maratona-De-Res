@@ -168,6 +168,12 @@ router.get("/events", async (req, res) => {
     let evaluatedCriteria = 0;
     let criteriaWithProgress = 0;
     let hasCalibration = false;
+    // Contadores baseados em avaliadores (não critérios):
+    // totalEvaluatorSlots = soma de avaliadores designados por critério ativo (pai + filho).
+    // submittedEvaluatorCount = soma de avaliadores que já submeteram por critério ativo.
+    // Estes são os denominador/numerador corretos para a barra de avaliações.
+    let totalEvaluatorSlots = 0;
+    let submittedEvaluatorCount = 0;
     // Rastreia IDs de critérios pai já contados em evaluatedCriteria para evitar
     // dupla-contagem quando pai e filho eventScoped ambos forem avaliados.
     const evaluatedParentIds = new Set<number>();
@@ -181,13 +187,16 @@ router.get("/events", async (req, res) => {
       if (calibratedScore !== null) hasCalibration = true;
       const status = getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea);
       if (weight > 0) {
-        // Avaliação real: contabiliza no bar de AVALIAÇÕES
+        // Avaliação real: contabiliza no bar de AVALIAÇÕES (por critério)
         if (status.isEvaluated) {
           evaluatedCriteria++;
           evaluatedParentIds.add(c.criterionId as number);
         }
         // Avaliação OU calibração: determina se a nota pode ser calculada
         if (status.isEvaluated || calibratedScore !== null) criteriaWithProgress++;
+        // Soma slots de avaliadores para a barra baseada em avaliadores
+        totalEvaluatorSlots += status.requiredEvaluators;
+        submittedEvaluatorCount += status.submittedEvaluators;
       }
       return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore, isEventScoped: false, sourceCriterionId: null as number | null };
     });
@@ -200,9 +209,12 @@ router.get("/events", async (req, res) => {
       const chCal = evCals.find(x => x.criterionId === ch.criterionId);
       const chCalibrated = chCal ? parseFloat(chCal.calibratedScore as unknown as string) : null;
       if (chCalibrated !== null) hasCalibration = true;
-      // Se o critério filho (eventScoped) está avaliado e o pai ainda não foi
-      // contado, conta o pai em evaluatedCriteria (critério multi-área parcialmente avaliado).
       const chStatus = getCriterionEvaluationStatus(ch.responsibleAreaId, chEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+      // Critério filho (eventScoped) também contribui para os slots de avaliadores.
+      totalEvaluatorSlots += chStatus.requiredEvaluators;
+      submittedEvaluatorCount += chStatus.submittedEvaluators;
+      // Se o critério filho está avaliado e o pai ainda não foi contado,
+      // conta o pai em evaluatedCriteria (critério multi-área parcialmente avaliado).
       if (chStatus.isEvaluated && ch.criterionSourceCriterionId != null) {
         const parentId = ch.criterionSourceCriterionId as number;
         if (!evaluatedParentIds.has(parentId)) {
@@ -219,7 +231,8 @@ router.get("/events", async (req, res) => {
     // Usa scorableCount (por evento, pós-merge) e NÃO globalScorable, para que
     // eventos com critério eventScoped (duplicado) mostrem 5 e não 6 no denominador.
     const scorableCount = criteriaForCalc.filter(c => c.weight > 0).length;
-    const progress = scorableCount > 0 ? evaluatedCriteria / scorableCount : 0;
+    // Progresso baseado em avaliadores (denominador = slots totais, não critérios).
+    const progress = totalEvaluatorSlots > 0 ? submittedEvaluatorCount / totalEvaluatorSlots : 0;
 
     // Calibrações salvas (score preenchido, independente de publicação de feedback).
     const calibratedCriteriaCount = criteriaForCalc.filter(c => c.weight > 0 && c.calibratedScore !== null).length;
@@ -252,7 +265,7 @@ router.get("/events", async (req, res) => {
       return w > 0 && c.partialPublishedAt != null;
     }).length;
     const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };
   });
   res.json(enriched);
 });

@@ -3108,6 +3108,12 @@ components:
         evaluatedCriteria:
           type: integer
           description: Nº de critérios ativos já avaliados (ou calibrados) neste evento.
+        totalEvaluatorSlots:
+          type: integer
+          description: Soma de avaliadores designados por critério ativo (pai + eventScoped). Denominador correto para barra de avaliações.
+        submittedEvaluatorCount:
+          type: integer
+          description: Soma de avaliadores que já submeteram por critério ativo. Numerador para barra de avaliações.
         calibratedCriteriaCount:
           type: integer
           description: Nº de critérios ativos com calibração salva (score preenchido, independente de publicação de feedback).

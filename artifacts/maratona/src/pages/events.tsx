@@ -606,6 +606,11 @@ export default function EventsPage() {
               const concluded = ev.status === "closed";
               const total = ev.totalCriteria ?? 0;
               const evaluated = ev.evaluatedCriteria ?? 0;
+              // Barra de avaliações: usa slots de avaliadores (não contagem de critérios).
+              // totalEvaluatorSlots = soma de avaliadores designados por critério ativo.
+              // submittedEvaluatorCount = soma dos que já submeteram.
+              const evalTotal = ev.totalEvaluatorSlots ?? total;
+              const evalDone = ev.submittedEvaluatorCount ?? evaluated;
               const calCount = ev.calibratedCriteriaCount ?? 0;
               const fc = ev.fullyCalibrated ?? false;
               const finalPubCount = ev.finalCalibratedCriteria ?? 0;
@@ -613,15 +618,15 @@ export default function EventsPage() {
               const calSaved = ev.calibratedCriteriaCount ?? 0;
               const partialOnlyCount = Math.max(0, partialPubTotal - finalPubCount);
               const isPureHistorical = !!ev.isHistorical && calSaved === 0;
-              const hasEvals = evaluated > 0;
+              const hasEvals = evalDone > 0;
               const hasAnyPublication = calSaved > 0 || finalPubCount > 0 || partialPubTotal > 0;
               const missing = ev.unassignedAreaNames ?? [];
 
               // Accent bar color
               const accentColor = !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication ? WARNING
                 : fc ? "#9ab000"
-                : evaluated === total && total > 0 ? "var(--accent)"
-                : evaluated > 0 ? "#e8a23d"
+                : evalDone === evalTotal && evalTotal > 0 ? "var(--accent)"
+                : evalDone > 0 ? "#e8a23d"
                 : "var(--border)";
 
               // Score label
@@ -637,7 +642,7 @@ export default function EventsPage() {
                 : "var(--muted-foreground)";
 
               // MiniBar colors
-              const evalColor = !isPureHistorical && evaluated === total && total > 0 ? "#9ab000" : "var(--accent)";
+              const evalColor = !isPureHistorical && evalDone === evalTotal && evalTotal > 0 ? "#9ab000" : "var(--accent)";
               const calColor = fc ? "#9ab000" : calCount > 0 ? "#e8a23d" : "var(--border)";
 
               // Date display
@@ -657,9 +662,9 @@ export default function EventsPage() {
                       ? { bg: "rgba(91,141,239,0.14)", fg: "#5b8def", label: "Rascunho" }
                       : concluded
                         ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Concluído" }
-                        : evaluated === total && total > 0
+                        : evalDone === evalTotal && evalTotal > 0
                           ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Avaliado" }
-                          : evaluated > 0
+                          : evalDone > 0
                             ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Em Avaliação" }
                             : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando" };
 
@@ -707,10 +712,10 @@ export default function EventsPage() {
 
                   {/* Avaliações mini bar */}
                   <div className="px-3.5 py-3">
-                    {ev.isHistorical || total === 0 ? (
+                    {ev.isHistorical || evalTotal === 0 ? (
                       <span className="text-[11px] italic opacity-40">—</span>
                     ) : (
-                      <MiniBar value={evaluated} total={total} color={evalColor} />
+                      <MiniBar value={evalDone} total={evalTotal} color={evalColor} />
                     )}
                   </div>
 
