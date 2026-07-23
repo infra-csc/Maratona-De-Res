@@ -154,7 +154,10 @@ router.get("/events", async (req, res) => {
     // "Avaliado" exige que TODOS os avaliadores designados para a área do
     // critério tenham enviado (não apenas um, quando há mais de um por área).
     const evCals = calibrations.filter(c => c.eventId === ev.id);
+    // evaluatedCriteria = critérios onde avaliador SUBMETEU (mostra no bar AVALIAÇÕES).
+    // criteriaWithProgress = critérios com avaliação OU calibração (decide se calcula nota).
     let evaluatedCriteria = 0;
+    let criteriaWithProgress = 0;
     let hasCalibration = false;
     const criteriaRaw = activeCriteria.map((c) => {
       const weight = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
@@ -165,8 +168,12 @@ router.get("/events", async (req, res) => {
       const calibratedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
       if (calibratedScore !== null) hasCalibration = true;
       const status = getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea);
-      // Apenas critérios com peso > 0 contam como "avaliados" nos contadores.
-      if (weight > 0 && (calibratedScore !== null || status.isEvaluated)) evaluatedCriteria++;
+      if (weight > 0) {
+        // Avaliação real: contabiliza no bar de AVALIAÇÕES
+        if (status.isEvaluated) evaluatedCriteria++;
+        // Avaliação OU calibração: determina se a nota pode ser calculada
+        if (status.isEvaluated || calibratedScore !== null) criteriaWithProgress++;
+      }
       return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore, isEventScoped: false, sourceCriterionId: null as number | null };
     });
     // Adiciona critérios duplicados (eventScoped) para que o merge possa
@@ -181,7 +188,7 @@ router.get("/events", async (req, res) => {
       criteriaRaw.push({ criterionId: ch.criterionId as number, weight: 0, averageScore: chAvg, calibratedScore: chCalibrated, isEventScoped: true, sourceCriterionId: ch.criterionSourceCriterionId as number | null });
     }
     const criteriaForCalc = mergeEventScopedCriteria(criteriaRaw);
-    const teamScore = evaluatedCriteria > 0 ? calculateEventResult(criteriaForCalc) : null;
+    const teamScore = criteriaWithProgress > 0 ? calculateEventResult(criteriaForCalc) : null;
 
     // Critérios com peso > 0 são os únicos que entram nos contadores de calibração.
     // Usa scorableCount (por evento, pós-merge) e NÃO globalScorable, para que
