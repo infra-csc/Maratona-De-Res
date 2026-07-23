@@ -253,10 +253,9 @@ export default function EventsPage() {
     const matchCard = cardFilter === null
       || (cardFilter === "pendingRH"  && !ev.criteriaConfirmed)
       || (cardFilter === "inEval"     && isInEvaluation(ev))
-      || (cardFilter === "concluded"  && ev.status === "closed")
-      || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.calibratedCriteriaCount ?? 0) < (ev.totalCriteria ?? 0))
-      || (cardFilter === "fullyEval"  && !!ev.fullyCalibrated)
-      || (cardFilter === "partialPub" && hasPartialPublication(ev));
+      || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.finalCalibratedCriteria ?? 0) === 0 && (ev.partialPublishedCount ?? 0) === 0)
+      || (cardFilter === "partialPub" && hasPartialPublication(ev))
+      || (cardFilter === "fullyEval"  && !!ev.fullyCalibrated);
     return matchSearch && matchDate && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
@@ -292,12 +291,11 @@ export default function EventsPage() {
 
   const chipFilters = [
     { key: null,          label: "Todos" },
+    { key: "pendingRH",   label: "Ag. RH" },
     { key: "inEval",      label: "Em Avaliação" },
-    { key: "pendingRH",   label: "Aguardando RH" },
-    { key: "concluded",   label: "Concluídos" },
-    { key: "fullyEval",   label: "Pub. Final" },
-    { key: "partialPub",  label: "Pub. Parcial" },
     { key: "pendingCal",  label: "Falta Cal." },
+    { key: "partialPub",  label: "Pub. Parcial" },
+    { key: "fullyEval",   label: "Pub. Final" },
   ];
 
   return (
