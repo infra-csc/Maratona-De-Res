@@ -298,10 +298,10 @@ export default function EventsPage() {
         {/* Quick stats */}
         <div className="flex items-stretch shrink-0 pl-5" style={{ borderLeft: "1px solid var(--border)" }}>
           {[
-            { val: all.length,                                    label: "Eventos",    color: "var(--foreground)" },
-            { val: all.filter(e => e.status === "open").length,    label: "Abertos",    color: "var(--accent)" },
-            { val: all.filter(e => e.status === "closed").length,  label: "Concluídos", color: "var(--muted-foreground)" },
-            { val: all.filter(e => e.fullyCalibrated).length,      label: "Pub. Final", color: "#9ab000" },
+            { val: all.length,                                        label: "Eventos",     color: "var(--foreground)" },
+            { val: all.filter(e => e.status === "open").length,      label: "Abertos",     color: "var(--accent)" },
+            { val: all.filter(e => hasPartialPublication(e)).length,  label: "Pub. Parcial", color: "#e8a23d" },
+            { val: all.filter(e => e.fullyCalibrated).length,         label: "Pub. Final",  color: "#9ab000" },
           ].map((s, i) => (
             <div key={i} className="px-4 text-center" style={{ borderRight: i < 3 ? "1px solid var(--border)" : "none" }}>
               <span className="block font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: s.color }}>{s.val}</span>
