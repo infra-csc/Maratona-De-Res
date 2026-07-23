@@ -1475,7 +1475,7 @@ export default function CalibrationsPage() {
                                     {/* Nota individual do avaliador/área */}
                                     <span
                                       className="font-black text-[11px] px-2 py-px ml-1"
-                                      style={{ backgroundColor: "var(--primary)", color: "#191c1e", fontFamily: CONDENSED }}
+                                      style={{ backgroundColor: pk.activeBg, color: pk.activeFg, fontFamily: CONDENSED }}
                                       title={`Nota de ${s.name}${s.areaName ? ` (${s.areaName})` : ""}`}
                                     >
                                       {s.score.toFixed(1)}
