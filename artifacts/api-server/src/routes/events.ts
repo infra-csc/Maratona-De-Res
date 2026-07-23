@@ -96,7 +96,8 @@ router.get("/events", async (req, res) => {
         evCals.some(cal => cal.criterionId === c.criterionId && cal.calibratedScore !== null)
       ).length;
       const finalCalibratedCriteria = allScorableCriteria.filter(c => c.finalPublishedAt != null).length;
-      const fullyCalibrated = globalScorable > 0 && finalCalibratedCriteria === globalScorable;
+      const scorableCount = allScorableCriteria.length;
+      const fullyCalibrated = scorableCount > 0 && finalCalibratedCriteria === scorableCount;
       const partialTimestamps = activeCriteria.map(c => c.partialPublishedAt).filter((d): d is Date => d != null);
       const partialPublishedAt = partialTimestamps.length > 0
         ? new Date(Math.max(...partialTimestamps.map(d => d.getTime()))) : null;
@@ -106,7 +107,7 @@ router.get("/events", async (req, res) => {
         ...ev,
         participantCount,
         evaluationProgress: 1,
-        totalCriteria: globalScorable,
+        totalCriteria: scorableCount,
         evaluatedCriteria: calibratedCriteriaCount,
         submittedCount: 0,
         averageScore: score,
