@@ -657,10 +657,12 @@ export default function EventsPage() {
                 ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
                 : ev.feedbackReleased
                   ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
-                  : partialOnlyCount > 0
-                    ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Pub. Parcial" }
-                    : (calSaved > 0 || fc)
-                      ? { bg: "rgba(91,141,239,0.14)", fg: "#5b8def", label: "Rascunho" }
+                  : finalPubCount > 0 && partialOnlyCount === 0
+                    ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
+                    : partialOnlyCount > 0
+                      ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Pub. Parcial" }
+                      : (calSaved > 0 || fc)
+                        ? { bg: "rgba(91,141,239,0.14)", fg: "#5b8def", label: "Rascunho" }
                       : concluded
                         ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Concluído" }
                         : evalDone === evalTotal && evalTotal > 0
