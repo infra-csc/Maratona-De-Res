@@ -47,26 +47,24 @@ function MiniBar({ value, total, color }: { value: number; total: number; color:
 }
 
 function CalBar({ finalCount, partialCount, total }: { finalCount: number; partialCount: number; total: number }) {
-  const finalPct  = total > 0 ? Math.min(100, (finalCount   / total) * 100) : 0;
-  const partialPct = total > 0 ? Math.min(100 - finalPct, (partialCount / total) * 100) : 0;
+  const safeTotal = total > 0 ? total : 1;
+  const finalPct   = Math.min(100, (finalCount   / safeTotal) * 100);
+  const partialPct = Math.min(100 - finalPct, (partialCount / safeTotal) * 100);
   const totalCount = finalCount + partialCount;
-  const labelColor = finalCount > 0 && partialCount === 0 ? "#9ab000"
+  const labelColor = finalCount === total && total > 0 ? "#9ab000"
     : finalCount > 0 || partialCount > 0 ? "#e8a23d"
     : "var(--muted-foreground)";
-  const label = finalCount > 0 && partialCount > 0
-    ? `${finalCount}F · ${partialCount}P`
-    : `${totalCount}/${total}`;
   return (
     <div className="flex flex-col gap-1 w-full">
-      <div className="h-[5px] rounded-full w-full overflow-hidden flex" style={{ backgroundColor: "var(--secondary)" }}>
+      <div className="relative h-[5px] rounded-full w-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
         {finalPct > 0 && (
-          <div className="h-full transition-all" style={{ width: `${finalPct}%`, backgroundColor: "#9ab000", borderRadius: partialPct > 0 ? "9999px 0 0 9999px" : "9999px" }} />
+          <div className="absolute left-0 top-0 h-full" style={{ width: `${finalPct}%`, backgroundColor: "#9ab000" }} />
         )}
         {partialPct > 0 && (
-          <div className="h-full transition-all" style={{ width: `${partialPct}%`, backgroundColor: "#e8a23d", borderRadius: finalPct > 0 ? "0 9999px 9999px 0" : "9999px" }} />
+          <div className="absolute top-0 h-full" style={{ left: `${finalPct}%`, width: `${partialPct}%`, backgroundColor: "#e8a23d" }} />
         )}
       </div>
-      <span className="text-[10px] font-bold" style={{ color: labelColor }}>{label}</span>
+      <span className="text-[10px] font-bold" style={{ color: labelColor }}>{totalCount}/{total}</span>
     </div>
   );
 }
