@@ -46,13 +46,13 @@ function Section({ id, icon: Icon, title, children, dark }: SectionProps) {
 function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div
-      className="flex items-start gap-3 p-3 rounded-lg"
+      className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg"
       style={highlight
         ? { backgroundColor: "#ccff00" }
         : { backgroundColor: "var(--muted)", border: "1px solid var(--border)" }
       }
     >
-      <span className="text-[10px] font-black uppercase tracking-wider w-36 shrink-0 pt-0.5" style={{ color: highlight ? "#506600" : "var(--muted-foreground)" }}>{label}</span>
+      <span className="text-[10px] font-black uppercase tracking-wider sm:w-36 sm:shrink-0 sm:pt-0.5" style={{ color: highlight ? "#506600" : "var(--muted-foreground)" }}>{label}</span>
       <span className="text-[13px] font-bold leading-snug" style={{ color: highlight ? "#161e00" : "var(--foreground)" }}>{value}</span>
     </div>
   );
@@ -77,7 +77,7 @@ export default function ComoFuncionaPage() {
 
   return (
     <div className="min-h-full text-foreground" style={{ backgroundColor: "var(--background)" }}>
-      <div className="p-6 md:p-10 space-y-8 max-w-4xl mx-auto">
+      <div className="p-4 sm:p-6 md:p-10 space-y-8 max-w-4xl mx-auto">
 
         {/* Header */}
         <header className="border-l-4 border-[#ccff00] pl-5 py-1">
@@ -210,7 +210,7 @@ export default function ComoFuncionaPage() {
 
             <div className="mt-3 space-y-4">
               <p className="text-[10px] font-black uppercase tracking-wider text-[#ba1a1a]">Penalidades (descontam pontos)</p>
-              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+              <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "rgba(186,26,26,0.10)", borderBottom: "1px solid var(--border)" }}>
@@ -234,7 +234,7 @@ export default function ComoFuncionaPage() {
               </div>
 
               <p className="text-[10px] font-black uppercase tracking-wider text-[#506600]">Méritos (somam pontos)</p>
-              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+              <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "#ccff00", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
@@ -271,16 +271,16 @@ export default function ComoFuncionaPage() {
               Para ter direito ao Bônus Caju, você precisa atingir o número mínimo de <strong className="text-[#ccff00]">eventos confirmados</strong> no ciclo.
             </p>
             <div className="space-y-2 mt-2">
-              <div className="flex items-start gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(204,255,0,0.12)", border: "1px solid rgba(204,255,0,0.3)" }}>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[#ccff00] w-36 shrink-0 pt-0.5">Meta mínima</span>
+              <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(204,255,0,0.12)", border: "1px solid rgba(204,255,0,0.3)" }}>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#ccff00] sm:w-36 sm:shrink-0 sm:pt-0.5">Meta mínima</span>
                 <span className="text-[13px] font-bold text-[#ccff00] leading-snug">8 eventos confirmados no ciclo (com nota lançada e validada pelo RH)</span>
               </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] w-36 shrink-0 pt-0.5">Não elegível</span>
+              <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Não elegível</span>
                 <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Se você tiver menos de 8 eventos confirmados, o bônus aparecerá como "—" (não elegível para este ciclo).</span>
               </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] w-36 shrink-0 pt-0.5">Eventos extras</span>
+              <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Eventos extras</span>
                 <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Eventos acima de 8 podem gerar bônus adicional. Cada evento extra dentro da sua faixa de nota soma um valor extra ao bônus.</span>
               </div>
             </div>

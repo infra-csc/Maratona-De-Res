@@ -659,7 +659,7 @@ export default function MyPerformancePage() {
         <CycleBadge />
       </header>
 
-      <div className="p-6 md:p-10 space-y-8">
+      <div className="p-4 sm:p-6 md:p-10 space-y-8">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-black text-[14px] uppercase px-3 py-1.5 rounded-lg" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)", fontFamily: "'Barlow Condensed', sans-serif" }}>{data?.employee.name ?? user?.name}</span>
           <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{data?.employee.functionName}</span>
@@ -1065,21 +1065,21 @@ export default function MyPerformancePage() {
 
             {/* Histórico de Eventos */}
             <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-[14px]">
+              <div className="flex flex-col gap-3 mb-[14px]">
                 <h3 className="font-black text-[16px] uppercase flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
                   <Calendar size={18} /> Histórico de Eventos
                 </h3>
-                <div className="flex gap-2 flex-wrap">
-                  <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex rounded-lg overflow-hidden flex-1 sm:flex-none" style={{ border: "1px solid var(--border)" }}>
                     {[
                       { key: "all", label: "Todos" },
                       { key: "avaliado", label: "Avaliados" },
-                      { key: "em_avaliacao", label: "Em Avaliação" },
+                      { key: "em_avaliacao", label: "Em Aval." },
                     ].map(btn => (
                       <button
                         key={btn.key}
                         onClick={() => setStatusFilter(btn.key as typeof statusFilter)}
-                        className="px-[14px] py-2 text-[11px] font-bold uppercase transition-colors border-none"
+                        className="flex-1 sm:flex-none px-3 sm:px-[14px] py-2 text-[11px] font-bold uppercase transition-colors border-none"
                         style={statusFilter === btn.key
                           ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }
                           : { backgroundColor: "transparent", color: "var(--muted-foreground)" }
@@ -1089,14 +1089,14 @@ export default function MyPerformancePage() {
                       </button>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2 px-[14px] py-2 rounded-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg flex-1" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                     <Search size={12} className="text-muted-foreground shrink-0" />
                     <input
                       type="text"
                       value={eventFilter}
                       onChange={(e) => setEventFilter(e.target.value)}
                       placeholder="Buscar evento..."
-                      className="border-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground w-40"
+                      className="border-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground flex-1 min-w-0"
                     />
                   </div>
                 </div>
