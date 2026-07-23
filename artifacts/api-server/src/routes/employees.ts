@@ -181,6 +181,9 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
           movedParticipations++;
         }
       }
+      // Deleta participações do duplicado que conflitam com o canônico (mesmo evento)
+      await tx.delete(eventParticipantsTable)
+        .where(eq(eventParticipantsTable.employeeId, dupId));
     }
 
     // absences: move all
@@ -189,11 +192,26 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
       .where(inArray(absencesTable.employeeId, dupIds));
     movedAbsences = (absResult as unknown as { rowCount?: number }).rowCount ?? 0;
 
-    // employee_event_results: move scored results
-    const evalResult = await tx.update(employeeEventResultsTable)
-      .set({ employeeId: canonicalId })
-      .where(inArray(employeeEventResultsTable.employeeId, dupIds));
-    movedEvals = (evalResult as unknown as { rowCount?: number }).rowCount ?? 0;
+    // employee_event_results: move scored results (sem conflito); descarta os que conflitam
+    const canonicalResultEventIds = new Set(
+      (await tx.select({ eventId: employeeEventResultsTable.eventId })
+        .from(employeeEventResultsTable).where(eq(employeeEventResultsTable.employeeId, canonicalId)))
+        .map(r => r.eventId)
+    );
+    for (const dupId of dupIds) {
+      const dupResults = await tx.select({ id: employeeEventResultsTable.id, eventId: employeeEventResultsTable.eventId })
+        .from(employeeEventResultsTable).where(eq(employeeEventResultsTable.employeeId, dupId));
+      for (const r of dupResults) {
+        if (!canonicalResultEventIds.has(r.eventId)) {
+          await tx.update(employeeEventResultsTable)
+            .set({ employeeId: canonicalId })
+            .where(eq(employeeEventResultsTable.id, r.id));
+          canonicalResultEventIds.add(r.eventId);
+          movedEvals++;
+        }
+      }
+      await tx.delete(employeeEventResultsTable).where(eq(employeeEventResultsTable.employeeId, dupId));
+    }
 
     // event_review_requests
     const revResult = await tx.update(eventReviewRequestsTable)
@@ -262,6 +280,9 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
           canonicalQrCycles.add(r.cycleId);
         }
       }
+      // Deleta resultados trimestrais do duplicado que conflitam com o canônico (mesmo ciclo)
+      await tx.delete(quarterlyResultsTable)
+        .where(eq(quarterlyResultsTable.employeeId, dupId));
     }
 
     // Delete duplicates

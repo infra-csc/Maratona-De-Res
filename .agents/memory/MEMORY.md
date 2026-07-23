@@ -75,3 +75,4 @@
 - [Inactive-but-calibrated criteria display](inactive-calibrated-criteria.md) — event_criteria.active=false with existing calibration must show pub status, NOT "Inativo"; criterionFilter resets on event change
 - [Orphaned eventScoped criteria weight](orphan-eventscoped-criteria.md) — eventScoped with source_criterion_id=NULL must use its own weight in events-list loop, not 0; also propagate to cal/pub/unassigned counters
 - [Inactive criteria publish guard](inactive-criteria-publish-guard.md) — criteria with active=false but saved calibration appear in UI; publish endpoints require active=true → 404; guard both render AND bulk-publish handler
+- [Employee merge FK orphan bug](employee-merge-fk-orphan.md) — skipped/conflicting FK rows must be DELETEd inside the merge txn or the final employee DELETE violates FK
