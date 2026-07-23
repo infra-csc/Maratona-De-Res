@@ -138,7 +138,7 @@ export default function CalibrationsPage() {
     if (collapsedInitializedForEventId.current === selectedEventId) return;
     collapsedInitializedForEventId.current = selectedEventId;
     setCollapsedCriteria(new Set(criteria.filter(c => c.active).map(c => c.criterionId)));
-  }, [selectedEventId, criteria]);
+  }, [selectedEventId, criteria, calibrations]);
 
   const calQKey = getGetCalibrationsQueryKey({ eventId: selectedEventId ?? undefined });
   const { data: calibrations } = useGetCalibrations(
@@ -558,7 +558,11 @@ export default function CalibrationsPage() {
     });
   }
 
-  const activeCriteria = (criteria ?? []).filter(c => c.active).sort((a, b) => a.criterionId - b.criterionId);
+  // Inclui critérios com calibração salva mesmo se ec_active=F (foram calibrados antes de serem desativados no evento).
+  const calibratedCriterionIds = new Set((calibrations ?? []).filter(c => c.calibratedScore != null).map(c => c.criterionId));
+  const activeCriteria = (criteria ?? [])
+    .filter(c => c.active || calibratedCriterionIds.has(c.criterionId))
+    .sort((a, b) => a.criterionId - b.criterionId);
 
   // Mapa: criterionId → [IDs dos critérios eventScoped que têm este como fonte].
   // Permite fundir avaliações de duplicatas ("Qualidade de Entrega" + "(2)")

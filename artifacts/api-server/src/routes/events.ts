@@ -134,10 +134,19 @@ router.get("/events", async (req, res) => {
 
     const evEvals = evals.filter(e => e.eventId === ev.id);
     const submitted = evEvals.filter(e => e.status === "submitted");
+    // Pré-carrega calibrações do evento para usar no filtro de critérios abaixo.
+    const evCalsEarly = calibrations.filter(c => c.eventId === ev.id);
+    const calibratedCriterionIds = new Set(evCalsEarly.filter(c => c.calibratedScore !== null).map(c => c.criterionId));
     // Critérios pai (não-eventScoped) usados para contadores e filtros.
+    // Inclui critérios com ec_active=F se tiverem calibração salva (foram calibrados
+    // antes de serem desativados no evento por alguma operação de sync/catalog).
     // Critérios eventScoped (duplicados) são incluídos separadamente só para
     // que seus scores sejam mesclados na nota efetiva do critério pai.
-    const allEventCriteria = eventCriteriaRows.filter(c => c.eventId === ev.id && c.active && c.criterionActive !== false);
+    const allEventCriteria = eventCriteriaRows.filter(c =>
+      c.eventId === ev.id &&
+      c.criterionActive !== false &&
+      (c.active || calibratedCriterionIds.has(c.criterionId as number))
+    );
     const activeCriteria = allEventCriteria.filter(c => !c.criterionEventScoped);
     const eventScopedCriteria = allEventCriteria.filter(c => c.criterionEventScoped);
     const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentRows.filter(a => a.eventId === ev.id));
@@ -153,7 +162,7 @@ router.get("/events", async (req, res) => {
     // do grupo é a média de todos os scoreUsed (pai + filhos).
     // "Avaliado" exige que TODOS os avaliadores designados para a área do
     // critério tenham enviado (não apenas um, quando há mais de um por área).
-    const evCals = calibrations.filter(c => c.eventId === ev.id);
+    const evCals = evCalsEarly;
     // evaluatedCriteria = critérios onde avaliador SUBMETEU (mostra no bar AVALIAÇÕES).
     // criteriaWithProgress = critérios com avaliação OU calibração (decide se calcula nota).
     let evaluatedCriteria = 0;
