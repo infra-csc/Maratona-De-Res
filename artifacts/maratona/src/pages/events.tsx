@@ -596,7 +596,7 @@ export default function EventsPage() {
               const missing = ev.unassignedAreaNames ?? [];
 
               // Accent bar color
-              const accentColor = !ev.criteriaConfirmed && !hasEvals ? WARNING
+              const accentColor = !ev.criteriaConfirmed && !hasEvals && calSaved === 0 ? WARNING
                 : fc ? "#9ab000"
                 : evaluated === total && total > 0 ? "var(--accent)"
                 : evaluated > 0 ? "#e8a23d"
@@ -625,7 +625,7 @@ export default function EventsPage() {
 
               const badge = ev.isHistorical
                 ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
-                : !ev.criteriaConfirmed && !hasEvals
+                : !ev.criteriaConfirmed && !hasEvals && calSaved === 0
                 ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
                 : fc
                   ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
@@ -657,7 +657,7 @@ export default function EventsPage() {
                       {ev.name}
                     </Link>
                     <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
-                      {!ev.criteriaConfirmed && !hasEvals && (
+                      {!ev.criteriaConfirmed && !hasEvals && calSaved === 0 && (
                         <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Ag. RH ·</span>
                       )}
                       {!ev.resultsConfirmed && ev.criteriaConfirmed && (
