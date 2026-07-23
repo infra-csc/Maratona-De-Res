@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, useCloseEvent, useReleaseEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useSetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useSetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Info, Save, CheckCircle, Trophy, Flag, AlertTriangle, Send, Lock, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Calendar, Copy } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Calendar, Copy } from "lucide-react";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING, usePremiumTheme } from "@/lib/premium-theme";
@@ -284,43 +284,16 @@ export default function CalibrationsPage() {
   const [savingAll, setSavingAll] = useState(false);
   const [savingAutoFill, setSavingAutoFill] = useState(false);
 
-  // Finalização do evento (fechar + liberar notas aos funcionários).
-  const [finalizeOpen, setFinalizeOpen] = useState(false);
   const fbQKey = ["event-feedback", selectedEventId] as unknown[];
   const { data: feedback } = useGetEventFeedback(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: fbQKey },
   });
-  const closeMutation = useCloseEvent();
-  const releaseMutation = useReleaseEventFeedback();
-  const [unreleasing, setUnreleasing] = useState(false);
-
-  async function handleUnrelease() {
-    if (!selectedEventId) return;
-    setUnreleasing(true);
-    try {
-      const token = getAuthToken();
-      const res = await fetch(`/api/events/${selectedEventId}/unrelease`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
-      qc.invalidateQueries({ queryKey: fbQKey });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId) });
-      toast({ title: "Liberação desfeita", description: "O evento voltou ao estado pré-lançamento. Você pode publicar parcial ou finalizar novamente." });
-    } catch (err: unknown) {
-      toast({ title: "Falha ao desfazer liberação", description: err instanceof Error ? err.message : "Tente novamente.", variant: "destructive" });
-    } finally {
-      setUnreleasing(false);
-    }
-  }
 
   const [publishingCritId, setPublishingCritId] = useState<number | null>(null);
   const publishCriterionPartialMutation = usePublishCriterionPartialFeedback();
   const publishCriterionFinalMutation = usePublishCriterionFinalFeedback();
   const publishAllFinalMutation = usePublishAllCriteriaFinalFeedback();
   const publishAllPartialMutation = usePublishAllCriteriaPartialFeedback();
-  const finalizing = closeMutation.isPending || releaseMutation.isPending;
 
   // Conformidade
   const { data: conformity } = useGetEventConformity(selectedEventId!, {
@@ -485,35 +458,6 @@ export default function CalibrationsPage() {
     }
   }
 
-  async function handleFinalize() {
-    if (!selectedEventId) return;
-    let closed = false;
-    try {
-      await closeMutation.mutateAsync({ id: selectedEventId, data: {} });
-      closed = true;
-      await releaseMutation.mutateAsync({ id: selectedEventId });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      qc.invalidateQueries({ queryKey: fbQKey });
-      setFinalizeOpen(false);
-      toast({ title: "Evento finalizado", description: "As notas foram liberadas para os funcionários." });
-    } catch (e) {
-      const msg = (e as { message?: string })?.message;
-      // Sempre atualiza o estado: o fechamento pode ter sido aplicado mesmo que
-      // a liberação tenha falhado.
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      qc.invalidateQueries({ queryKey: fbQKey });
-      if (closed) {
-        toast({
-          title: "Evento fechado, mas notas não liberadas",
-          description: msg ? `${msg} Tente liberar novamente.` : "Não foi possível liberar as notas. Tente novamente.",
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Não foi possível finalizar", description: msg, variant: "destructive" });
-      }
-    }
-  }
-
   function getAreaScores(critId: number) {
     // Inclui avaliações dos critérios eventScoped "filhos" (cópias duplicadas
     // ligadas a este critério). O map é calculado abaixo após activeCriteria.
@@ -660,19 +604,10 @@ export default function CalibrationsPage() {
     ? displayActiveCriteria.filter(c => !!getCalibration(c.criterionId))
     : displayActiveCriteria;
 
-  // Pronto para finalizar: todos os critérios com nota da área já foram calibrados.
   const scoredCriteria = displayActiveCriteria.filter(c => getAvgScore(c.criterionId) != null);
-  const allCalibrated = scoredCriteria.length > 0 && scoredCriteria.every(c => getCalibration(c.criterionId));
   const alreadyReleased = !!feedback?.feedbackReleased;
   const feedbackReleasedAtDate = feedback?.feedbackReleasedAt ? new Date(feedback.feedbackReleasedAt) : null;
   const partialPublishedAtDate = feedback?.partialPublishedAt ? new Date(feedback.partialPublishedAt) : null;
-  // Recuperação de falha parcial: evento já fechado, porém notas ainda não liberadas.
-  const alreadyClosed = pickedEvent?.status === "closed";
-  // O backend só libera o feedback se TODAS as avaliações foram concluídas
-  // (feedback.isComplete). Espelhamos essa exigência aqui para não oferecer o
-  // fechamento e depois falhar com erro 400.
-  const evaluationsComplete = !!feedback?.isComplete;
-  const readyToFinalize = allCalibrated && evaluationsComplete && canFinalize;
 
   // Auto-preenche calibrações para critérios que têm nota do avaliador mas ainda
   // não têm calibração — útil após importar avaliações via formulário.
@@ -1419,18 +1354,6 @@ export default function CalibrationsPage() {
                         <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
                       </button>
                     )}
-                    {/* Fechar e Liberar — só aparece quando todas as calibrações estão salvas */}
-                    {readyToFinalize && canFinalize && !alreadyReleased && (
-                      <button
-                        data-testid="button-open-finalize"
-                        type="button"
-                        onClick={() => setFinalizeOpen(true)}
-                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-opacity hover:opacity-90 shrink-0"
-                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                      >
-                        <Lock size={13} /> {alreadyClosed ? "Liberar Notas" : "Fechar e Liberar"}
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -1738,30 +1661,6 @@ export default function CalibrationsPage() {
                 </div>
               )}
 
-              {/* ── FINALIZATION STATUS (single compact bar) ── */}
-              {scoredCriteria.length > 0 && !alreadyReleased && (
-                readyToFinalize ? (
-                  <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ backgroundColor: "var(--primary)" }}>
-                    <CheckCircle size={14} className="shrink-0" style={{ color: "var(--primary-foreground)" }} />
-                    <span className="text-sm font-black uppercase" style={{ color: "var(--primary-foreground)" }}>Todas as calibrações salvas — use o botão acima para fechar e liberar</span>
-                  </div>
-                ) : allCalibrated && !evaluationsComplete ? (
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                    <AlertTriangle size={14} className="shrink-0" style={{ color: WARNING }} />
-                    <p className="text-xs font-bold uppercase">Calibrações concluídas, mas há avaliações pendentes.</p>
-                  </div>
-                ) : allCalibrated && !canFinalize ? (
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
-                    <Lock size={14} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
-                    <p className="text-xs font-bold uppercase">Calibrações concluídas. O fechamento é feito pela diretoria ou RH.</p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ border: "1px dashed var(--border)" }}>
-                    <Info size={14} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
-                    <p className="text-xs font-bold uppercase" title="Calibre os critérios com nota da área para habilitar o fechamento do evento">Calibre todos os critérios para liberar o fechamento.</p>
-                  </div>
-                )
-              )}
 
             </>
           )}
@@ -1771,119 +1670,6 @@ export default function CalibrationsPage() {
 
       </div>
 
-      {/* Modal explicativo de finalização do evento */}
-      <Dialog open={finalizeOpen} onOpenChange={(o) => { if (!finalizing) setFinalizeOpen(o); }}>
-        <DialogContent className="max-w-3xl rounded-xl p-0 gap-0" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <DialogHeader className="p-5 space-y-1 text-left" style={{ backgroundColor: "var(--secondary)" }}>
-            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Flag size={20} style={{ color: "var(--accent)" }} /> Finalizar Evento
-            </DialogTitle>
-            <p className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{pickedEvent?.name}</p>
-          </DialogHeader>
-
-          <div className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">
-            {/* Resumo: como foi o evento */}
-            <div className="flex items-stretch gap-3">
-              <div className="flex-1 rounded-xl p-4 flex flex-col justify-center" style={{ border: "1px solid var(--border)" }}>
-                <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Nota Final da Equipe</span>
-                <span className="text-3xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
-                  {feedback ? feedback.eventScore.toFixed(1) : "—"}<span className="text-sm" style={{ color: "var(--muted-foreground)" }}>/100</span>
-                </span>
-              </div>
-            </div>
-
-            {scoredCriteria.length > 0 && (
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><SlidersHorizontal size={13} style={{ color: GOOD }} /> Notas Finais por Critério</p>
-                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-                  {scoredCriteria.map((c, i) => {
-                    const avg = getAvgScore(c.criterionId);
-                    const cal = getCalibration(c.criterionId);
-                    const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
-                    const peso = c.weightOverride ?? c.originalWeight ?? 0;
-                    const scores = getAreaScores(c.criterionId);
-                    return (
-                      <div key={c.criterionId} className="px-3 py-2.5" data-testid={`finalize-criterion-${c.criterionId}`} style={{ backgroundColor: i % 2 ? "var(--secondary)" : "transparent", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-xs font-black uppercase truncate">{c.criterionName}</span>
-                            <span className="text-[9px] font-bold uppercase rounded px-1 shrink-0" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>Peso {peso}</span>
-                            {Number(peso) === 0 && (
-                              <span className="text-[9px] font-black uppercase rounded px-1 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>Não conta</span>
-                            )}
-                            {c.responsibleAreaName && (
-                              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase rounded px-1 shrink-0" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}><Building2 size={10} /> {c.responsibleAreaName}</span>
-                            )}
-                          </div>
-                          <span className="flex items-center gap-1.5 justify-end text-xs font-black shrink-0">
-                            <span style={{ color: calVal != null ? "var(--muted-foreground)" : "var(--foreground)", textDecoration: calVal != null ? "line-through" : "none" }}>{avg != null ? avg.toFixed(2) : "—"}</span>
-                            {calVal != null && (
-                              <>
-                                <span style={{ color: "var(--muted-foreground)" }}>→</span>
-                                <span style={{ color: "var(--accent)" }}>{calVal.toFixed(2)}</span>
-                              </>
-                            )}
-                          </span>
-                        </div>
-                        {scores.length > 0 && (
-                          <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1.5">
-                            {scores.map((s, j) => (
-                              <span key={j} className="inline-flex items-center gap-1 text-[10px]" style={{ color: "var(--muted-foreground)" }}>
-                                {s.name}<strong className="rounded px-1 leading-tight" style={{ color: "var(--foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{s.score.toFixed(1)}</strong>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Original = média da área · Calibrada = ajuste do gestor · Final = nota usada (calibrada quando houver, senão a média).</p>
-              </div>
-            )}
-
-            {feedback && feedback.attentionPoints && feedback.attentionPoints.length > 0 && (
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><AlertTriangle size={13} style={{ color: WARNING }} /> Pontos de Atenção</p>
-                <ul className="space-y-1">
-                  {feedback.attentionPoints.map((a, i) => (
-                    <li key={i} className="text-sm pl-2.5 py-0.5" style={{ borderLeft: `4px solid ${WARNING}` }}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="rounded-lg p-3 flex items-start gap-2" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: "1px solid " + AMBER }}>
-              <Lock size={15} className="shrink-0 mt-0.5" style={{ color: AMBER }} />
-              <p className="text-xs font-bold leading-snug">
-                Ao finalizar, o evento será <strong>fechado</strong> e estas notas ficarão <strong>visíveis para os funcionários</strong>. Essa ação encerra a calibração do evento.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 p-5" style={{ borderTop: "1px solid var(--border)" }}>
-            <button
-              type="button"
-              disabled={finalizing}
-              onClick={() => setFinalizeOpen(false)}
-              className="px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wide disabled:opacity-50 transition-colors hover:opacity-80"
-              style={{ border: "1px solid var(--border)" }}
-            >
-              Cancelar
-            </button>
-            <button
-              data-testid="button-confirm-finalize"
-              type="button"
-              disabled={finalizing}
-              onClick={handleFinalize}
-              className="px-6 py-2.5 rounded-lg font-black text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-            >
-              <Send size={16} /> {finalizing ? "Finalizando..." : alreadyClosed ? "Liberar Notas" : "Finalizar e Liberar"}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
