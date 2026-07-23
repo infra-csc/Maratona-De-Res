@@ -447,7 +447,7 @@ export default function CalibrationsPage() {
   // Publica todos os critérios calibrados de acordo com a intenção definida por critério
   async function handlePublishAll() {
     if (!selectedEventId) return;
-    const calibrated = displayActiveCriteria.filter(c => getCalibration(c.criterionId) != null);
+    const calibrated = displayActiveCriteria.filter(c => c.active && getCalibration(c.criterionId) != null);
     if (calibrated.length === 0) {
       toast({ title: "Nenhum critério calibrado para publicar", description: "Salve ao menos uma nota calibrada antes de publicar.", variant: "destructive" });
       return;
@@ -1419,6 +1419,18 @@ export default function CalibrationsPage() {
                         <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
                       </button>
                     )}
+                    {/* Fechar e Liberar — só aparece quando todas as calibrações estão salvas */}
+                    {readyToFinalize && canFinalize && !alreadyReleased && (
+                      <button
+                        data-testid="button-open-finalize"
+                        type="button"
+                        onClick={() => setFinalizeOpen(true)}
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-opacity hover:opacity-90 shrink-0"
+                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                      >
+                        <Lock size={13} /> {alreadyClosed ? "Liberar Notas" : "Fechar e Liberar"}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1675,7 +1687,11 @@ export default function CalibrationsPage() {
                             </td>
                             {/* Status + seletor de intenção de publicação */}
                             <td className="px-1 py-2 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
-                              {cal && canFinalize ? (
+                              {!c.active ? (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)", opacity: 0.6 }}>
+                                  Inativo
+                                </span>
+                              ) : cal && canFinalize ? (
                                 <div className="flex flex-col items-center gap-1">
                                   {/* Estado de publicação atual — badge prominente */}
                                   {isFinalPublished ? (
@@ -1733,22 +1749,9 @@ export default function CalibrationsPage() {
               {/* ── FINALIZATION STATUS (single compact bar) ── */}
               {scoredCriteria.length > 0 && !alreadyReleased && (
                 readyToFinalize ? (
-                  <div className="rounded-xl px-4 py-3 flex items-center justify-between gap-3" style={{ backgroundColor: "var(--primary)" }}>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={14} className="shrink-0" style={{ color: "var(--primary-foreground)" }} />
-                      <span className="text-sm font-black uppercase" style={{ color: "var(--primary-foreground)" }}>Todas as calibrações salvas — pronto para publicar</span>
-                    </div>
-                    {canFinalize && (
-                      <button
-                        data-testid="button-open-finalize"
-                        type="button"
-                        onClick={() => setFinalizeOpen(true)}
-                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-opacity hover:opacity-90 shrink-0"
-                        style={{ backgroundColor: "var(--primary-foreground)", color: "var(--primary)" }}
-                      >
-                        <Send size={13} /> {alreadyClosed ? "Liberar Notas" : "Fechar e Liberar"}
-                      </button>
-                    )}
+                  <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ backgroundColor: "var(--primary)" }}>
+                    <CheckCircle size={14} className="shrink-0" style={{ color: "var(--primary-foreground)" }} />
+                    <span className="text-sm font-black uppercase" style={{ color: "var(--primary-foreground)" }}>Todas as calibrações salvas — use o botão acima para fechar e liberar</span>
                   </div>
                 ) : allCalibrated && !evaluationsComplete ? (
                   <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
