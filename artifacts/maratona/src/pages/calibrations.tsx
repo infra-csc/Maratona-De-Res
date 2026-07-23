@@ -1602,11 +1602,7 @@ export default function CalibrationsPage() {
                             </td>
                             {/* Status + seletor de intenção de publicação */}
                             <td className="px-1 py-2 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
-                              {!c.active ? (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)", opacity: 0.6 }}>
-                                  Inativo
-                                </span>
-                              ) : cal && canFinalize ? (
+                              {cal && canFinalize ? (
                                 <div className="flex flex-col items-center gap-1">
                                   {/* Estado de publicação atual — badge prominente */}
                                   {isFinalPublished ? (
