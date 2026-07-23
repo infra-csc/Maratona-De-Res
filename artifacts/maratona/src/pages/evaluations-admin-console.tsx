@@ -94,6 +94,8 @@ interface EnrichedEvent {
   areaNames: string[];
   evaluatorNames: string[];
   isDone: boolean;
+  conformityNeeded: boolean;
+  conformityComplete: boolean;
 }
 
 function initials(name: string) {
@@ -140,6 +142,7 @@ export function AdminEvaluationsConsole() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [sort, setSort] = useState<"name" | "pct" | "pending">("name");
+  const [conformityFilter, setConformityFilter] = useState<"all" | "pending" | "done">("all");
   const [critFilter, setCritFilter] = useState<"all" | "unassigned" | "pending" | "partial" | "done">("all");
   const [openPickerCriterionId, setOpenPickerCriterionId] = useState<number | null>(null);
   const [openConformityPicker, setOpenConformityPicker] = useState<"cenografia" | "ferramentas" | null>(null);
@@ -218,6 +221,7 @@ export function AdminEvaluationsConsole() {
       const done = rows.filter(r => r.state === "done").length;
       const unassigned = rows.filter(r => r.state === "unassigned").length;
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      const evC = ev as unknown as { conformityNeeded?: boolean; conformityComplete?: boolean };
       return {
         id: ev.id, name: ev.name, clientName: ev.clientName ?? null, city: ev.city ?? null, state: ev.state ?? null,
         status: ev.status, startDate: ev.startDate ?? null, endDate: ev.endDate ?? null,
@@ -225,6 +229,8 @@ export function AdminEvaluationsConsole() {
         areaNames: [...new Set(rows.map(r => r.areaName))],
         evaluatorNames: [...new Set(rows.map(r => r.assignedToName).filter((n): n is string => !!n))],
         isDone: (total > 0 && done === total) || (ev.partialPublishedCount ?? 0) > 0 || (ev.finalCalibratedCriteria ?? 0) > 0,
+        conformityNeeded: !!evC.conformityNeeded,
+        conformityComplete: !!evC.conformityComplete,
       };
     });
   }, [configuredEvents, criteriaQueries, assignQueries, evalQueries]);
@@ -237,17 +243,23 @@ export function AdminEvaluationsConsole() {
 
   const areaOptions = [...new Set(enrichedEvents.flatMap(e => e.areaNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const evaluatorOptions = [...new Set(enrichedEvents.flatMap(e => e.evaluatorNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  const hasFilters = !!(q || areaFilter || evaluatorFilter || filterDateFrom || filterDateTo);
+  const hasFilters = !!(q || areaFilter || evaluatorFilter || filterDateFrom || filterDateTo || conformityFilter !== "all");
 
   const qNorm = q.trim().toLowerCase();
   const queueEvents = baseTab
-    .filter(e =>
-      (!qNorm || e.name.toLowerCase().includes(qNorm))
-      && (!areaFilter || e.areaNames.includes(areaFilter))
-      && (!evaluatorFilter || e.evaluatorNames.includes(evaluatorFilter))
-      && (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom)
-      && (!filterDateTo || (e.startDate ?? "") <= filterDateTo),
-    )
+    .filter(e => {
+      const matchConformity = conformityFilter === "all" || (
+        conformityFilter === "pending"
+          ? (e.conformityNeeded && !e.conformityComplete)
+          : (e.conformityNeeded && e.conformityComplete)
+      );
+      return (!qNorm || e.name.toLowerCase().includes(qNorm))
+        && (!areaFilter || e.areaNames.includes(areaFilter))
+        && (!evaluatorFilter || e.evaluatorNames.includes(evaluatorFilter))
+        && (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom)
+        && (!filterDateTo || (e.startDate ?? "") <= filterDateTo)
+        && matchConformity;
+    })
     .slice()
     .sort((a, b) => {
       if (sort === "pct") return a.pct - b.pct;
@@ -793,6 +805,24 @@ export function AdminEvaluationsConsole() {
                   <option value="pct">Ordenar · Menor progresso</option>
                   <option value="pending">Ordenar · Mais pendências</option>
                 </select>
+                <div>
+                  <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--muted-foreground)" }}>Conformidade</p>
+                  <div className="flex gap-1 flex-wrap">
+                    {([["all", "Todas"], ["pending", "Pendente"], ["done", "Ok"]] as const).map(([f, label]) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setConformityFilter(f)}
+                        className="rounded px-2 py-1 text-[9px] font-bold uppercase transition-colors"
+                        style={{
+                          backgroundColor: conformityFilter === f ? "var(--primary)" : "var(--secondary)",
+                          color: conformityFilter === f ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >{label}</button>
+                    ))}
+                  </div>
+                </div>
                 {cycleWeekends.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[9px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Fim de semana:</span>
@@ -812,7 +842,7 @@ export function AdminEvaluationsConsole() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{queueEvents.length} evento(s)</span>
                   {hasFilters && (
-                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); setFilterDateFrom(""); setFilterDateTo(""); }} className="rounded-lg px-2.5 py-1 text-[9.5px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); setFilterDateFrom(""); setFilterDateTo(""); setConformityFilter("all"); }} className="rounded-lg px-2.5 py-1 text-[9.5px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
                       Limpar filtros
                     </button>
                   )}
