@@ -138,7 +138,7 @@ export default function CalibrationsPage() {
     if (collapsedInitializedForEventId.current === selectedEventId) return;
     collapsedInitializedForEventId.current = selectedEventId;
     setCollapsedCriteria(new Set(criteria.filter(c => c.active).map(c => c.criterionId)));
-  }, [selectedEventId, criteria, calibrations]);
+  }, [selectedEventId, criteria]);
 
   const calQKey = getGetCalibrationsQueryKey({ eventId: selectedEventId ?? undefined });
   const { data: calibrations } = useGetCalibrations(
