@@ -59,11 +59,6 @@ function toTitleCase(str: string) {
   return str.toLowerCase().split(/\s+/).map((w, i) => i === 0 || !LOWER_WORDS.has(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(" ");
 }
 
-const APP_LINK = (() => {
-  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-  return `${window.location.origin}${base}/login`;
-})();
-
 function CopyLinkButton({ link }: { link: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -83,6 +78,10 @@ function CopyLinkButton({ link }: { link: string }) {
 }
 
 export default function EmployeesPage() {
+  const APP_LINK = (() => {
+    const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+    return `${window.location.origin}${base}/login`;
+  })();
   const { user, impersonate, token } = useAuth();
   const { toast } = useToast();
   const [previewingId, setPreviewingId] = useState<number | null>(null);
@@ -200,6 +199,13 @@ export default function EmployeesPage() {
   const [casaSelection, setCasaSelection] = useState<Set<number>>(new Set());
   const [resetTypeSearch, setResetTypeSearch] = useState("");
 
+  const qKey = getGetEmployeesQueryKey({ active: filterActive === "true" });
+  const { data: employeesRaw, isLoading } = useGetEmployees(
+    { active: filterActive === "true" },
+    { query: { queryKey: qKey } }
+  );
+  const employees = employeesRaw as EmployeeWithCycle[] | undefined;
+
   useEffect(() => {
     if (resetTypeOpen && employees) {
       setCasaSelection(new Set(employees.filter(e => e.employmentType === "casa").map(e => e.id)));
@@ -208,13 +214,6 @@ export default function EmployeesPage() {
   }, [resetTypeOpen, employees]);
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
-
-  const qKey = getGetEmployeesQueryKey({ active: filterActive === "true" });
-  const { data: employeesRaw, isLoading } = useGetEmployees(
-    { active: filterActive === "true" },
-    { query: { queryKey: qKey } }
-  );
-  const employees = employeesRaw as EmployeeWithCycle[] | undefined;
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<EmployeeInput>({
     defaultValues: { department: "Geral", functionName: "Colaborador", employmentType: "casa" },

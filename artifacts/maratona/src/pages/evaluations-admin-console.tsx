@@ -14,6 +14,7 @@ import {
   useCreateConformityPublicToken, useCreateFerramentasPublicToken,
   type PublicToken,
 } from "@/lib/routing-api";
+import { customFetch } from "@/lib/custom-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, UserCheck } from "lucide-react";
@@ -460,7 +461,6 @@ export function AdminEvaluationsConsole() {
     if (!swapDialog || !selected || !swapSourceId) return;
     setSwapPending(true);
     try {
-      const { customFetch } = await import("@/lib/custom-fetch");
       await customFetch(`/api/events/${selected.id}/criteria/${swapDialog.ecId}/swap-source`, {
         method: "PATCH",
         body: JSON.stringify({ sourceCriterionId: Number(swapSourceId) }),
