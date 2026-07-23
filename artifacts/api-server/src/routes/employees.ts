@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
-import { eq, and, inArray, ne, notInArray, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, ne, notInArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -282,20 +282,29 @@ router.post("/employees/bulk-employment-reset", requireRole("admin", "rh"), asyn
     res.status(400).json({ error: "casaIds deve ser array de números" });
     return;
   }
+  if (casaIds.length === 0) {
+    res.status(400).json({ error: "Selecione ao menos um colaborador Casa antes de aplicar." });
+    return;
+  }
+  let casaCount = 0;
   await db.transaction(async tx => {
-    if (casaIds.length > 0) {
-      await tx.update(employeesTable).set({ employmentType: "casa" }).where(inArray(employeesTable.id, casaIds));
-      await tx.update(employeesTable).set({ employmentType: "freela" }).where(
-        notInArray(employeesTable.id, casaIds),
-      );
-    } else {
-      await tx.update(employeesTable).set({ employmentType: "freela" });
+    await tx.update(employeesTable).set({ employmentType: "casa" }).where(inArray(employeesTable.id, casaIds));
+    await tx.update(employeesTable).set({ employmentType: "freela" }).where(
+      notInArray(employeesTable.id, casaIds),
+    );
+    const [{ count }] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(employeesTable)
+      .where(and(eq(employeesTable.employmentType, "casa"), eq(employeesTable.active, true)));
+    casaCount = count;
+    if (casaCount === 0) {
+      throw new Error("Nenhum dos IDs fornecidos foi encontrado no banco. Operação cancelada para evitar esvaziar o ranking.");
     }
   });
   const cycle = await getCurrentCycle();
   if (cycle) await recomputeCycleResults(cycle.id, req.user!.userId);
-  await audit(req.user!.userId, "bulk-employment-reset", "employees", null, { casaIds });
-  res.json({ ok: true, casaCount: casaIds.length });
+  await audit(req.user!.userId, "bulk-employment-reset", "employees", null, { casaIds, casaCount });
+  res.json({ ok: true, casaCount });
 });
 
 router.get("/employees/:id/history", async (req, res) => {

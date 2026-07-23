@@ -130,12 +130,16 @@ export default function EmployeesPage() {
   const [bulkPinSource, setBulkPinSource] = useState<"loaded" | "generated">("loaded");
   const [confirmRegen, setConfirmRegen] = useState(false);
 
-  // Load current PINs from DB whenever the dialog opens (only for the 22 Galpão Casa IDs)
+  // Load current PINs from DB whenever the dialog opens (for employees marked as "casa")
   useEffect(() => {
     if (!bulkPinOpen) return;
     let cancelled = false;
     setBulkPinLoading(true);
-    fetch(`/api/employees/casa-pins?ids=${GALP_CASA_IDS.join(",")}`, { headers: { "Authorization": `Bearer ${token}` } })
+    const casaIds = (employees ?? [])
+      .filter(e => e.employmentType === "casa")
+      .map(e => e.id);
+    const idsParam = casaIds.length > 0 ? casaIds.join(",") : "0";
+    fetch(`/api/employees/casa-pins?ids=${idsParam}`, { headers: { "Authorization": `Bearer ${token}` } })
       .then(r => r.json())
       .then((data: { results: BulkPinEntry[] }) => {
         if (!cancelled) {
@@ -156,7 +160,7 @@ export default function EmployeesPage() {
       const res = await fetch("/api/employees/bulk-generate-pins", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: GALP_CASA_IDS }),
+        body: JSON.stringify({ ids: (employees ?? []).filter(e => e.employmentType === "casa").map(e => e.id) }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
       const data = await res.json() as { results: BulkPinEntry[]; skipped: BulkPinSkip[] };
@@ -193,13 +197,15 @@ export default function EmployeesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [resetTypeOpen, setResetTypeOpen] = useState(false);
   const [resetTypePending, setResetTypePending] = useState(false);
+  const [casaSelection, setCasaSelection] = useState<Set<number>>(new Set());
+  const [resetTypeSearch, setResetTypeSearch] = useState("");
 
-  // IDs dos colaboradores "casa" do Galpão Casa (Marceneiros + Montadores)
-  // Grupo 1 — Marceneiros: Alonso, Adriano, Bruno, Everton, Gabriel, Iago,
-  //   José Marcio, João Jorge, José Renato, Matheus, Luan, Willians
-  // Grupo 2 — Montadores: Caue, Douglas, Erick, Jamerson, João Marcos,
-  //   Kaio, Lyrick, Ulisses, Vinicius, Edgard
-  const GALP_CASA_IDS = [309,324,286,328,269,255,333,354,313,321,295,316,278,261,314,301,270,292,273,307,266,343];
+  useEffect(() => {
+    if (resetTypeOpen && employees) {
+      setCasaSelection(new Set(employees.filter(e => e.employmentType === "casa").map(e => e.id)));
+      setResetTypeSearch("");
+    }
+  }, [resetTypeOpen, employees]);
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
 
@@ -899,41 +905,74 @@ export default function EmployeesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Redefinir Tipos em Massa (Galpão Casa) */}
+      {/* Redefinir Tipos em Massa — seleção dinâmica */}
       <Dialog open={resetTypeOpen} onOpenChange={v => { if (!resetTypePending) setResetTypeOpen(v); }}>
-        <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+        <DialogContent className="max-w-lg rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}><RefreshCw size={18} /> Redefinir Tipos — Galpão Casa</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}><RefreshCw size={18} /> Redefinir Tipos — Casa vs Freela</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="rounded-lg p-3.5 text-sm space-y-1.5" style={{ backgroundColor: "rgba(229,72,77,0.08)", border: "1px solid rgba(229,72,77,0.25)" }}>
-              <p className="font-black text-[11px] uppercase" style={{ color: WARNING }}>⚠ Ação irreversível</p>
-              <p style={{ color: "var(--foreground)" }}>Os <strong>22 colaboradores do Galpão Casa</strong> (abaixo) permanecerão como <strong>Casa</strong>. <strong>Todos os demais ativos</strong> serão marcados como <strong>Freela</strong> e deixarão de contar no ranking.</p>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              Marque os colaboradores que devem aparecer no ranking como <strong>Casa</strong>. Todos os demais serão marcados como <strong>Freela</strong> e não contarão no ranking.
+            </p>
+            <div className="flex gap-3 text-xs font-bold">
+              <span className="px-2 py-1 rounded" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>{casaSelection.size} Casa</span>
+              <span className="px-2 py-1 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
+                {(employees?.filter(e => e.active !== false).length ?? 0) - casaSelection.size} Freela
+              </span>
             </div>
+            <Input
+              placeholder="Buscar colaborador..."
+              value={resetTypeSearch}
+              onChange={e => setResetTypeSearch(e.target.value)}
+              style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}
+            />
             <div className="rounded-lg max-h-64 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
-              <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5 sticky top-0" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
-                <Lock size={10} /> Marceneiros
-              </div>
-              {[
-                "Alonso Lucas Trindade","Adriano Silva de Araújo","Bruno da Silva Cordeiro",
-                "Everton de Jesus Marinho","Gabriel Nascimento Menezes","Iago Dias Temoteo",
-                "José Marcio da Silva Menino","João Jorge da Silva Menino","José Renato Albuquerque de Souza",
-                "Matheus da Silva Cordeiro","Luan Miguel Marques","Willians Silva de Jesus",
-              ].map((n, i) => (
-                <div key={n} className="px-3 py-1.5 text-xs font-semibold" style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>{n}</div>
-              ))}
-              <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", borderTop: "1px solid var(--border)" }}>
-                <Lock size={10} /> Montadores
-              </div>
-              {[
-                "Caue Sousa Lima","Douglas Ferreira dos Reis","Erick Ramos da Silva",
-                "Jamerson Rodrigues da Silva","João Marcos Nascimento Leite","Kaio Gabriel Ferreira Barbosa",
-                "Lyrick Andrade Alves da Silva","Ulisses Damazio Fernandes","Vinicius da Silva",
-                "Edgard Jose Soares Mariano",
-              ].map((n, i) => (
-                <div key={n} className="px-3 py-1.5 text-xs font-semibold" style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>{n}</div>
-              ))}
+              {(employees ?? [])
+                .filter(e => e.active !== false)
+                .filter(e => !resetTypeSearch || e.name.toLowerCase().includes(resetTypeSearch.toLowerCase()))
+                .map((emp, i) => {
+                  const isCasa = casaSelection.has(emp.id);
+                  const toggle = () => setCasaSelection(prev => {
+                    const next = new Set(prev);
+                    if (next.has(emp.id)) next.delete(emp.id); else next.add(emp.id);
+                    return next;
+                  });
+                  return (
+                    <div
+                      key={emp.id}
+                      onClick={toggle}
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors"
+                      style={{
+                        borderTop: i > 0 ? "1px solid var(--border)" : undefined,
+                        backgroundColor: isCasa ? "rgba(154,176,0,0.07)" : undefined,
+                      }}
+                    >
+                      <div
+                        className="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: isCasa ? GOOD : "transparent", borderColor: isCasa ? GOOD : "var(--border)" }}
+                      >
+                        {isCasa && <Check size={10} color="#fff" />}
+                      </div>
+                      <span className="text-sm flex-1">{emp.name}</span>
+                      <span
+                        className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: isCasa ? "rgba(154,176,0,0.14)" : "var(--secondary)", color: isCasa ? GOOD : "var(--muted-foreground)" }}
+                      >
+                        {isCasa ? "Casa" : "Freela"}
+                      </span>
+                    </div>
+                  );
+                })}
+              {(employees ?? []).filter(e => e.active !== false).filter(e => !resetTypeSearch || e.name.toLowerCase().includes(resetTypeSearch.toLowerCase())).length === 0 && (
+                <div className="px-3 py-4 text-sm text-center" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador encontrado</div>
+              )}
             </div>
+            {casaSelection.size === 0 && (
+              <div className="rounded-lg p-3 text-sm" style={{ backgroundColor: "rgba(229,72,77,0.08)", border: "1px solid rgba(229,72,77,0.25)", color: WARNING }}>
+                ⚠ Nenhum selecionado como Casa — todos ficarão como Freela e o ranking ficará vazio.
+              </div>
+            )}
             <div className="flex justify-end gap-3 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
               <button
                 type="button"
@@ -946,18 +985,18 @@ export default function EmployeesPage() {
               </button>
               <button
                 type="button"
-                disabled={resetTypePending}
+                disabled={resetTypePending || casaSelection.size === 0}
                 onClick={async () => {
                   setResetTypePending(true);
                   try {
                     const res = await fetch("/api/employees/bulk-employment-reset", {
                       method: "POST",
                       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                      body: JSON.stringify({ casaIds: GALP_CASA_IDS }),
+                      body: JSON.stringify({ casaIds: Array.from(casaSelection) }),
                     });
                     if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
                     await qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
-                    toast({ title: "Tipos atualizados", description: "22 colaboradores Casa confirmados. Demais marcados como Freela. Ranking recalculado." });
+                    toast({ title: "Tipos atualizados", description: `${casaSelection.size} colaborador(es) Casa. Demais marcados como Freela. Ranking recalculado.` });
                     setResetTypeOpen(false);
                   } catch (e) {
                     toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
@@ -966,7 +1005,7 @@ export default function EmployeesPage() {
                   }
                 }}
                 className="h-10 px-5 rounded-lg font-black text-xs uppercase flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: WARNING, color: "#fff" }}
+                style={{ backgroundColor: casaSelection.size === 0 ? "var(--secondary)" : WARNING, color: casaSelection.size === 0 ? "var(--muted-foreground)" : "#fff" }}
               >
                 <RefreshCw size={14} className={resetTypePending ? "animate-spin" : ""} />
                 {resetTypePending ? "Atualizando..." : "Confirmar e Aplicar"}
