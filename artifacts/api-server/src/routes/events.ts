@@ -194,9 +194,15 @@ router.get("/events", async (req, res) => {
         }
         // Avaliação OU calibração: determina se a nota pode ser calculada
         if (status.isEvaluated || calibratedScore !== null) criteriaWithProgress++;
-        // Soma slots de avaliadores para a barra baseada em avaliadores
+        // Soma slots de avaliadores para a barra baseada em avaliadores.
+        // Só contabiliza submittedEvaluators quando requiredEvaluators > 0:
+        // critérios sem avaliador designado têm submittedEvaluators = nº de
+        // submissões avulsas, mas não contribuem ao denominador — somar ao
+        // numerador sem somar ao denominador causaria "5/2" nonsense.
         totalEvaluatorSlots += status.requiredEvaluators;
-        submittedEvaluatorCount += status.submittedEvaluators;
+        if (status.requiredEvaluators > 0) {
+          submittedEvaluatorCount += status.submittedEvaluators;
+        }
       }
       return { criterionId: c.criterionId as number, weight, averageScore: avgScore, calibratedScore, isEventScoped: false, sourceCriterionId: null as number | null };
     });
@@ -211,8 +217,11 @@ router.get("/events", async (req, res) => {
       if (chCalibrated !== null) hasCalibration = true;
       const chStatus = getCriterionEvaluationStatus(ch.responsibleAreaId, chEvals.map(e => e.evaluatorUserId as number), assignedByArea);
       // Critério filho (eventScoped) também contribui para os slots de avaliadores.
+      // Mesma regra: só soma ao numerador quando há denominador (requiredEvaluators > 0).
       totalEvaluatorSlots += chStatus.requiredEvaluators;
-      submittedEvaluatorCount += chStatus.submittedEvaluators;
+      if (chStatus.requiredEvaluators > 0) {
+        submittedEvaluatorCount += chStatus.submittedEvaluators;
+      }
       // Se o critério filho está avaliado e o pai ainda não foi contado,
       // conta o pai em evaluatedCriteria (critério multi-área parcialmente avaliado).
       if (chStatus.isEvaluated && ch.criterionSourceCriterionId != null) {
