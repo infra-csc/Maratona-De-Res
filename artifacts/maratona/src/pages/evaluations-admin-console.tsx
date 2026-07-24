@@ -151,6 +151,7 @@ export function AdminEvaluationsConsole() {
   const [bulkAssignAreaId, setBulkAssignAreaId] = useState<number | null>(null);
   const [critFilter, setCritFilter] = useState<"all" | "unassigned" | "pending" | "partial" | "done">("all");
   const [viewEvalCrit, setViewEvalCrit] = useState<CritRow | null>(null);
+  const [viewConformity, setViewConformity] = useState<"cenografia" | "ferramentas" | null>(null);
   const [openPickerCriterionId, setOpenPickerCriterionId] = useState<number | null>(null);
   const [openConformityPicker, setOpenConformityPicker] = useState<"cenografia" | "ferramentas" | null>(null);
 
@@ -1322,6 +1323,16 @@ export function AdminEvaluationsConsole() {
                           </div>
                           <div className="flex items-center gap-2 whitespace-nowrap">
                             <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{cf.filled}/{cf.total}</span>
+                            {cf.filled > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setViewConformity(cf.key)}
+                                className="rounded-lg px-2.5 py-1.5 text-[10.5px] font-bold uppercase flex items-center gap-1 transition-colors hover:opacity-80"
+                                style={{ border: `1px solid ${GOOD}`, color: GOOD }}
+                              >
+                                <CheckCircle2 size={11} /> Ver
+                              </button>
+                            )}
                             {canManage && (
                               <button
                                 type="button"
@@ -2205,6 +2216,101 @@ export function AdminEvaluationsConsole() {
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--muted-foreground)" }}>Áudio</p>
                   <audio controls src={viewEvalCrit.audioUrl} className="w-full h-9" style={{ borderRadius: 8 }} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Ver Matriz de Conformidade (modal de leitura) ────────────── */}
+      {viewConformity && conformity && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewConformity(null)}>
+          <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-wide mb-0.5" style={{ color: "var(--muted-foreground)" }}>
+                  {viewConformity === "cenografia" ? "Cenografia · 5 itens" : "Ferramentas e Case · 1 item"}
+                </p>
+                <h3 className="font-black uppercase text-[16px] leading-tight" style={{ fontFamily: CONDENSED }}>
+                  {viewConformity === "cenografia" ? "Matriz de Conformidade" : "Guarda de Ferramentas"}
+                </h3>
+              </div>
+              <button type="button" onClick={() => setViewConformity(null)} className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
+            </div>
+            <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+              {/* Avaliador */}
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                  <span className="w-2 h-2 rounded-full inline-block" style={{ background: GOOD }} />
+                  {viewConformity === "cenografia"
+                    ? (selectedDetail?.conformityEvaluatorName ?? "—")
+                    : (selectedDetail?.conformityEvaluatorFerramentasName ?? "—")}
+                </span>
+              </div>
+
+              {viewConformity === "cenografia" ? (
+                <>
+                  {([
+                    { label: "Uso de EPI", val: conformity.epi, comment: conformity.epiComment },
+                    { label: "Estaiamentos", val: conformity.estaiamentos, comment: conformity.estaiamentosComment },
+                    { label: "Conduta", val: conformity.conduta, comment: conformity.condutaComment },
+                  ] as { label: string; val: boolean | null | undefined; comment: string | null | undefined }[]).map(item => (
+                    <div key={item.label} className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10.5px] font-bold uppercase">{item.label}</span>
+                        {item.val == null
+                          ? <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--border)", color: "var(--muted-foreground)" }}>Pendente</span>
+                          : item.val
+                            ? <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD }}>Sim</span>
+                            : <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>Não</span>
+                        }
+                      </div>
+                      {item.comment && <p className="text-[10px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{item.comment}</p>}
+                    </div>
+                  ))}
+                  {/* Ausências */}
+                  {(() => {
+                    const c = conformity as unknown as Record<string, unknown>;
+                    const absRep = c.absencesReport as string | null | undefined;
+                    const standout = c.standoutResponse as boolean | null | undefined;
+                    const standoutJust = c.standoutJustification as string | null | undefined;
+                    return (
+                      <>
+                        <div className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                          <p className="text-[10.5px] font-bold uppercase mb-1">Ausências / Registro</p>
+                          <p className="text-[10px] leading-snug whitespace-pre-wrap" style={{ color: "var(--muted-foreground)" }}>
+                            {absRep || "Sem registro"}
+                          </p>
+                        </div>
+                        {standout != null && (
+                          <div className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10.5px] font-bold uppercase">Destaque</span>
+                              {standout
+                                ? <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD }}>Sim</span>
+                                : <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>Não</span>}
+                            </div>
+                            {standoutJust && <p className="text-[10px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{standoutJust}</p>}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
+              ) : (
+                <div className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10.5px] font-bold uppercase">Guarda de Equipamentos</span>
+                    {conformity.guardaEquipamentos == null
+                      ? <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--border)", color: "var(--muted-foreground)" }}>Pendente</span>
+                      : conformity.guardaEquipamentos
+                        ? <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD }}>Sim</span>
+                        : <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>Não</span>}
+                  </div>
+                  {conformity.guardaEquipamentosComment && (
+                    <p className="text-[10px] mt-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{conformity.guardaEquipamentosComment}</p>
+                  )}
                 </div>
               )}
             </div>
