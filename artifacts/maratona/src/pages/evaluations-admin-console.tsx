@@ -142,7 +142,7 @@ export function AdminEvaluationsConsole() {
   const [evaluatorFilter, setEvaluatorFilter] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [sort, setSort] = useState<"name" | "pct" | "pending" | "data">("name");
+  const [sort, setSort] = useState<"name" | "pct" | "pending" | "data" | "urgencia">("name");
   const [conformityFilter, setConformityFilter] = useState<"all" | "pending" | "done">("all");
   const [noEvaluatorFilter, setNoEvaluatorFilter] = useState(false);
   const [bulkAssignAreaId, setBulkAssignAreaId] = useState<number | null>(null);
@@ -254,6 +254,13 @@ export function AdminEvaluationsConsole() {
   const doneEvents = enrichedEvents.filter(e => e.isDone);
   const baseTab = tab === "done" ? doneEvents : todoEvents;
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  const currentWeekend = cycleWeekends.find(w => w.sat <= todayStr && todayStr <= w.sun)
+    ?? cycleWeekends.filter(w => w.sat <= todayStr).at(-1) ?? null;
+  const currentWeekendDoneCount = currentWeekend
+    ? enrichedEvents.filter(e => e.isDone && !!e.startDate && e.startDate >= currentWeekend.sat && e.startDate <= currentWeekend.sun).length
+    : null;
+
   const areaOptions = [...new Set(enrichedEvents.flatMap(e => e.areaNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const evaluatorOptions = [...new Set(enrichedEvents.flatMap(e => e.evaluatorNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const hasFilters = !!(q || areaFilter || evaluatorFilter || filterDateFrom || filterDateTo || conformityFilter !== "all" || noEvaluatorFilter);
@@ -279,6 +286,13 @@ export function AdminEvaluationsConsole() {
       if (sort === "pct") return a.pct - b.pct;
       if (sort === "pending") return (b.total - b.done) - (a.total - a.done);
       if (sort === "data") return (a.startDate ?? "").localeCompare(b.startDate ?? "");
+      if (sort === "urgencia") {
+        const aUrgent = a.unassigned > 0 ? 1 : 0;
+        const bUrgent = b.unassigned > 0 ? 1 : 0;
+        if (bUrgent !== aUrgent) return bUrgent - aUrgent;
+        if (bUrgent === 1) return b.unassigned - a.unassigned;
+        return (a.startDate ?? "").localeCompare(b.startDate ?? "");
+      }
       return a.name.localeCompare(b.name, "pt-BR");
     });
 
@@ -837,17 +851,19 @@ export function AdminEvaluationsConsole() {
         <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
           <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{selected ? `${selected.pct}%` : "—"}</div>
           <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Concluído no evento</div>
-          {selected && <div className="text-[9px] mt-0.5 truncate" style={{ color: "var(--muted-foreground)", opacity: 0.7 }}>{selected.name}</div>}
+          {currentWeekendDoneCount != null && (
+            <div className="text-[9px] mt-0.5" style={{ color: "var(--muted-foreground)", opacity: 0.7 }}>{currentWeekendDoneCount} do fim de semana atual</div>
+          )}
         </div>
         <button
           type="button"
-          onClick={() => setView("people")}
+          onClick={() => { setNoEvaluatorFilter(v => !v); setView("assign"); setTab("todo"); }}
           className="rounded-xl p-3.5 text-left transition-opacity hover:opacity-80"
-          style={{ backgroundColor: pendingEvaluatorsCount > 0 ? `rgba(232,162,61,0.10)` : "var(--card)", border: pendingEvaluatorsCount > 0 ? `1px solid ${AMBER}44` : "1px solid var(--border)" }}
+          style={{ backgroundColor: noEvaluatorFilter ? `rgba(232,162,61,0.14)` : pendingEvaluatorsCount > 0 ? `rgba(232,162,61,0.10)` : "var(--card)", border: noEvaluatorFilter ? `1px solid ${AMBER}` : pendingEvaluatorsCount > 0 ? `1px solid ${AMBER}44` : "1px solid var(--border)" }}
         >
           <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: AMBER }}>{pendingEvaluatorsCount}</div>
           <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Avaliadores pendentes</div>
-          <div className="text-[9px] mt-0.5" style={{ color: AMBER, opacity: 0.8 }}>Ver aba Avaliadores →</div>
+          <div className="text-[9px] mt-0.5" style={{ color: noEvaluatorFilter ? AMBER : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
         </button>
         <button
           type="button"
@@ -903,6 +919,7 @@ export function AdminEvaluationsConsole() {
                 </div>
                 <select value={sort} onChange={e => setSort(e.target.value as typeof sort)} className="rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase" style={fieldStyle}>
                   <option value="name">Ordenar · Nome</option>
+                  <option value="urgencia">Ordenar · Urgência</option>
                   <option value="pct">Ordenar · Menor progresso</option>
                   <option value="pending">Ordenar · Mais pendências</option>
                   <option value="data">Ordenar · Data do evento</option>
@@ -1016,7 +1033,7 @@ export function AdminEvaluationsConsole() {
                       <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].bg, color: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].color }}>
                         {selected.isDone ? "Concluído" : selected.done > 0 ? "Em andamento" : "A fazer"}
                       </span>
-                      {selected.isDone && selected.unassigned > 0 && (
+                      {selected.unassigned > 0 && !!selected.endDate && selected.endDate < todayStr && (
                         <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: `rgba(232,162,61,0.16)`, color: AMBER }}>
                           <AlertTriangle size={9} /> Sem avaliador
                         </span>
