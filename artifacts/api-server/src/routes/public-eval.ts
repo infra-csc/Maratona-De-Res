@@ -379,6 +379,7 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
       .from(eventConformitiesTable)
       .where(eq(eventConformitiesTable.eventId, token.eventId));
 
+    const trimmedSubmitterName = submitterName.trim();
     if (existing.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const patch: Record<string, any> = { updatedAt: new Date() };
@@ -393,10 +394,12 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
         if (answers.absencesReport !== undefined) patch.absencesReport = answers.absencesReport || null;
         if (answers.standoutResponse !== undefined) patch.standoutResponse = answers.standoutResponse;
         if (answers.standoutJustification !== undefined) patch.standoutJustification = answers.standoutJustification || null;
+        patch.cenografiaSubmittedByName = trimmedSubmitterName;
       }
       if (isFerramentas) {
         if (answers.guardaEquipamentos !== undefined) patch.guardaEquipamentos = answers.guardaEquipamentos;
         if (answers.guardaEquipamentosComment !== undefined) patch.guardaEquipamentosComment = answers.guardaEquipamentosComment || null;
+        patch.ferramentasSubmittedByName = trimmedSubmitterName;
       }
       await tx.update(eventConformitiesTable)
         .set(patch)
@@ -417,6 +420,8 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
         standoutResponse: isCenografia ? (answers.standoutResponse ?? null) : null,
         standoutJustification: isCenografia ? (answers.standoutJustification || null) : null,
         createdByUserId: token.createdByUserId!,
+        cenografiaSubmittedByName: isCenografia ? trimmedSubmitterName : null,
+        ferramentasSubmittedByName: isFerramentas ? trimmedSubmitterName : null,
       };
       await tx.insert(eventConformitiesTable).values(insertValues);
     }

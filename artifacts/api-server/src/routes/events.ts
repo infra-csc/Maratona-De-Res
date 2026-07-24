@@ -1154,6 +1154,10 @@ router.post("/events/:id/conformity", async (req, res) => {
   // null = PENDENTE (sem penalidade); usa !== undefined para distinguir "não
   // enviado" (undefined → mantém existente) de "enviado como null" (→ PENDENTE).
   const existing = await db.select().from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, eventId));
+  // Lookup do nome do usuário logado para registrar quem preencheu cada seção.
+  const [userRow] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  const userName = userRow?.name ?? null;
+
   if (existing.length > 0) {
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (canCenografia) {
@@ -1167,10 +1171,12 @@ router.post("/events/:id/conformity", async (req, res) => {
       if (absencesReport !== undefined) patch.absencesReport = absencesReport || null;
       if (standoutResponse !== undefined) patch.standoutResponse = standoutResponse;
       if (standoutJustification !== undefined) patch.standoutJustification = standoutJustification || null;
+      if (userName) patch.cenografiaSubmittedByName = userName;
     }
     if (canFerramentas) {
       if (guardaEquipamentos !== undefined) patch.guardaEquipamentos = guardaEquipamentos;
       if (guardaEquipamentosComment !== undefined) patch.guardaEquipamentosComment = guardaEquipamentosComment || null;
+      if (userName) patch.ferramentasSubmittedByName = userName;
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [updated] = await db.update(eventConformitiesTable)

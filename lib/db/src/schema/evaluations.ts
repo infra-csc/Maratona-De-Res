@@ -60,6 +60,9 @@ export const eventConformitiesTable = pgTable("event_conformities", {
   standoutResponse: boolean("standout_response"),
   standoutJustification: text("standout_justification"),
   createdByUserId: integer("created_by_user_id").notNull().references(() => usersTable.id),
+  // Nome de quem realmente preencheu cada seção — set no save (autenticado ou link público).
+  cenografiaSubmittedByName: text("cenografia_submitted_by_name"),
+  ferramentasSubmittedByName: text("ferramentas_submitted_by_name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

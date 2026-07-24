@@ -1205,14 +1205,11 @@ export default function CalibrationsPage() {
                     const value = conformityForm[item.key];
                     const comment = conformityForm[item.commentKey];
                     const isExpanded = conformityExpandedComments.has(item.key);
-                    // "Guarda Equip." é responsabilidade de Ferramentas; os demais
-                    // itens são da Cenografia. Mostra o responsável da SEÇÃO do item
-                    // em vez do único createdByUserName da linha (que ficava igual
-                    // para todos, exibindo o nome errado na seção do outro avaliador).
-                    const responsibleName = item.key === "guardaEquipamentos"
-                      ? (fullEvent?.conformityEvaluatorFerramentasName ?? null)
-                      : (fullEvent?.conformityEvaluatorName ?? null);
-                    const answeredByName = responsibleName ?? ((conformity as unknown as Record<string, unknown>)?.createdByUserName as string | undefined) ?? null;
+                    // Mostra quem realmente preencheu cada seção (gravado no momento do save).
+                    // "Guarda Equip." = Ferramentas; demais = Cenografia.
+                    const answeredByName = item.key === "guardaEquipamentos"
+                      ? ((conformity as unknown as Record<string, unknown>)?.ferramentasSubmittedByName as string | null | undefined) ?? null
+                      : ((conformity as unknown as Record<string, unknown>)?.cenografiaSubmittedByName as string | null | undefined) ?? null;
                     return (
                       <div key={item.key} className="rounded-lg overflow-hidden" style={{ border: value === null ? "1px solid var(--border)" : value ? `1px solid ${GOOD}` : `1px solid ${WARNING}`, backgroundColor: value === null ? "var(--secondary)" : value ? "rgba(154,176,0,0.10)" : "rgba(229,72,77,0.08)" }}>
                         <div className="flex items-center gap-1 px-2 py-1.5">
