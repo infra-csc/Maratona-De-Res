@@ -1200,14 +1200,22 @@ export default function CalibrationsPage() {
                     const value = conformityForm[item.key];
                     const comment = conformityForm[item.commentKey];
                     const isExpanded = conformityExpandedComments.has(item.key);
+                    // "Guarda Equip." é responsabilidade de Ferramentas; os demais
+                    // itens são da Cenografia. Mostra o responsável da SEÇÃO do item
+                    // em vez do único createdByUserName da linha (que ficava igual
+                    // para todos, exibindo o nome errado na seção do outro avaliador).
+                    const responsibleName = item.key === "guardaEquipamentos"
+                      ? (fullEvent?.conformityEvaluatorFerramentasName ?? null)
+                      : (fullEvent?.conformityEvaluatorName ?? null);
+                    const answeredByName = responsibleName ?? ((conformity as unknown as Record<string, unknown>)?.createdByUserName as string | undefined) ?? null;
                     return (
                       <div key={item.key} className="rounded-lg overflow-hidden" style={{ border: value === null ? "1px solid var(--border)" : value ? `1px solid ${GOOD}` : `1px solid ${WARNING}`, backgroundColor: value === null ? "var(--secondary)" : value ? "rgba(154,176,0,0.10)" : "rgba(229,72,77,0.08)" }}>
                         <div className="flex items-center gap-1 px-2 py-1.5">
                           <div className="flex-1 min-w-0">
                             <span className="text-[10px] font-bold uppercase truncate block">{item.label}</span>
-                            {value !== null && !!(conformity as unknown as Record<string, unknown>)?.createdByUserName && (
+                            {value !== null && answeredByName && (
                               <span className="text-[8px] flex items-center gap-0.5 mt-0.5" style={{ color: GOOD }}>
-                                <Check size={8} /> {String((conformity as unknown as Record<string, unknown>).createdByUserName) as string}
+                                <Check size={8} /> {answeredByName}
                               </span>
                             )}
                           </div>
