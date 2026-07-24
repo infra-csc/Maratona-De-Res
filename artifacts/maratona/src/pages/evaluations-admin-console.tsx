@@ -783,28 +783,28 @@ export function AdminEvaluationsConsole() {
   }, [enrichedEvents]);
   const pendingEvaluatorsCount = [...pendingEvaluatorNames.values()].filter(v => v.submitted < v.assigned).length;
 
-  // ---- Aba Avaliadores: agregação cross-evento por pessoa ----
+  // ---- Aba Avaliadores: por evento selecionado ----
   const evaluatorCards = useMemo(() => {
-    const evaluatorUsers = (allUsers ?? []).filter(u => u.role === "avaliador" && u.active);
-    return evaluatorUsers
-      .map(u => {
-        const stats = pendingEvaluatorNames.get(u.id);
-        if (!stats) return null;
+    if (!selected) return [];
+    const byEval = new Map<number, { name: string; area: string; assigned: number; submitted: number }>();
+    for (const c of selected.criteria) {
+      if (c.assignedToId == null || !c.assignedToName) continue;
+      const cur = byEval.get(c.assignedToId) ?? { name: c.assignedToName, area: c.areaName, assigned: 0, submitted: 0 };
+      cur.assigned++;
+      if (c.state === "done") cur.submitted++;
+      byEval.set(c.assignedToId, cur);
+    }
+    return Array.from(byEval.entries())
+      .map(([id, stats]) => {
         const pct = stats.assigned > 0 ? Math.round((stats.submitted / stats.assigned) * 100) : 0;
-        let st: "ok" | "pending" | "late";
-        if (stats.submitted === stats.assigned) st = "ok";
-        else if (stats.submitted === 0) st = "late";
-        else st = "pending";
-        const cfg = {
-          ok: { label: "Em dia", bg: "rgba(154,176,0,0.14)", color: GOOD, accent: GOOD },
-          pending: { label: "Pendente", bg: "rgba(232,162,61,0.14)", color: AMBER, accent: AMBER },
-          late: { label: "Atrasado", bg: "rgba(229,72,77,0.12)", color: WARNING, accent: WARNING },
-        }[st];
-        return { id: u.id, name: u.name, area: u.areaName ?? "—", assigned: stats.assigned, submitted: stats.submitted, pct, pendingEvents: stats.pendingEvents, ...cfg };
+        const isComplete = stats.submitted === stats.assigned;
+        const cfg = isComplete
+          ? { label: "Completo", bg: "rgba(154,176,0,0.14)", color: GOOD, accent: GOOD }
+          : { label: "Pendente", bg: "rgba(232,162,61,0.14)", color: AMBER, accent: AMBER };
+        return { id, ...stats, pct, ...cfg };
       })
-      .filter((v): v is NonNullable<typeof v> => v != null)
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [allUsers, pendingEvaluatorNames]);
+  }, [selected]);
 
   return (
     <div className="space-y-5">
@@ -1033,7 +1033,7 @@ export function AdminEvaluationsConsole() {
                       <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].bg, color: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].color }}>
                         {selected.isDone ? "Concluído" : selected.done > 0 ? "Em andamento" : "A fazer"}
                       </span>
-                      {selected.unassigned > 0 && !!selected.endDate && selected.endDate < todayStr && (
+                      {selected.isDone && selected.unassigned > 0 && !!selected.endDate && selected.endDate < todayStr && (
                         <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: `rgba(232,162,61,0.16)`, color: AMBER }}>
                           <AlertTriangle size={9} /> Sem avaliador
                         </span>
@@ -1954,10 +1954,12 @@ export function AdminEvaluationsConsole() {
         )
       ) : (
         <div>
-          <p className="text-[11px] font-bold uppercase mb-3.5" style={{ color: "var(--muted-foreground)" }}>Quem está em dia e quem precisa de cobrança neste ciclo</p>
+          <p className="text-[11px] font-bold uppercase mb-3.5" style={{ color: "var(--muted-foreground)" }}>
+            {selected ? `Avaliadores atribuídos neste evento — ${selected.name}` : "Selecione um evento para ver os avaliadores"}
+          </p>
           {evaluatorCards.length === 0 ? (
             <div className="text-center py-16 rounded-xl space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador com critérios atribuídos neste ciclo.</p>
+              <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador atribuído neste evento.</p>
               <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Atribua avaliadores aos critérios do evento para ver o progresso aqui.</p>
               <button
                 type="button"
@@ -1984,36 +1986,15 @@ export function AdminEvaluationsConsole() {
                   </div>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: av.bg, color: av.color }}>{av.label}</span>
-                    <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: av.color }}>{av.submitted}/{av.assigned}</span>
+                    <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: av.color }}>{av.submitted}/{av.assigned} neste evento</span>
                   </div>
                   <div className="h-[6px] rounded-full overflow-hidden mb-3.5" style={{ backgroundColor: "var(--secondary)" }}>
                     <div className="h-full rounded-full" style={{ width: `${av.pct}%`, background: av.accent }} />
                   </div>
-                  {/* Eventos pendentes */}
-                  {av.pendingEvents.length > 0 && (
-                    <div className="mb-3 space-y-1">
-                      <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>
-                        {av.pendingEvents.length === 1 ? "Falta responder:" : `Faltam ${av.pendingEvents.length} eventos:`}
-                      </p>
-                      <div className="space-y-0.5 max-h-[88px] overflow-y-auto pr-0.5">
-                        {av.pendingEvents.map(ev => (
-                          <button
-                            key={ev.id}
-                            type="button"
-                            onClick={() => { setSelectedEventId(ev.id); setView("assign"); }}
-                            className="w-full text-left text-[10px] font-bold px-2 py-1 rounded-md transition-colors hover:opacity-80 truncate"
-                            style={{ backgroundColor: "var(--secondary)", color: av.color, border: `1px solid ${av.accent}22` }}
-                          >
-                            {ev.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => toast({ title: `${av.assigned - av.submitted} pendência(s)`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${av.assigned} critério(s) atribuído(s).` })}
+                      onClick={() => toast({ title: `${av.assigned - av.submitted} pendência(s) neste evento`, description: `${av.name} ainda não enviou ${av.assigned - av.submitted} de ${av.assigned} critério(s) atribuído(s).` })}
                       className="flex-1 rounded-lg py-2 text-[10px] font-bold uppercase transition-colors hover:opacity-80"
                       style={{ border: "1px solid var(--border)" }}
                     >
@@ -2025,7 +2006,7 @@ export function AdminEvaluationsConsole() {
                       className="flex-1 rounded-lg py-2 text-[10px] font-bold uppercase transition-colors hover:opacity-80"
                       style={{ border: "1px solid var(--border)" }}
                     >
-                      Reatribuir
+                      Ver critérios
                     </button>
                   </div>
                 </div>
