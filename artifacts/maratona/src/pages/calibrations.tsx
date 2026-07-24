@@ -40,14 +40,19 @@ function calibrationEventChip(ev: {
   feedbackReleased?: boolean;
   partialPublishedAt?: string | null;
   finalCalibratedCriteria?: number | null;
+  totalCriteria?: number | null;
   calibratedCriteriaCount?: number | null;
   status?: string;
   evaluatedCriteria?: number | null;
 }): { label: string; bg: string; fg: string } {
-  if (ev.feedbackReleased) return { label: "Pub. Final", bg: "rgba(154,176,0,0.14)", fg: GOOD };
-  if (ev.partialPublishedAt)
+  const finalCount = ev.finalCalibratedCriteria ?? 0;
+  const total = ev.totalCriteria ?? 0;
+  const allFinalPub = finalCount > 0 && total > 0 && finalCount >= total;
+  if (ev.feedbackReleased || allFinalPub)
+    return { label: "Pub. Final", bg: "rgba(154,176,0,0.14)", fg: GOOD };
+  if (ev.partialPublishedAt || finalCount > 0)
     return { label: "Pub. Parcial", bg: "rgba(232,162,61,0.14)", fg: AMBER };
-  if ((ev.finalCalibratedCriteria ?? 0) > 0 || (ev.calibratedCriteriaCount ?? 0) > 0)
+  if ((ev.calibratedCriteriaCount ?? 0) > 0)
     return { label: "Calibrado", bg: "rgba(91,141,239,0.14)", fg: "#5b8def" };
   if (ev.status === "closed" || ev.isHistorical)
     return { label: "Fechado", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
