@@ -628,6 +628,25 @@ export default function EvaluationsPage() {
     );
   const pickedEvent = selectableEvents.find(e => e.id === selectedEventId);
 
+  // Cutoff: last Saturday (most recent Saturday already past).
+  // Events with startDate strictly before this date are auto-Concluído.
+  const lastSaturday = (() => {
+    const today = new Date();
+    const day = today.getDay(); // 0=Sun … 6=Sat
+    const daysBack = day === 6 ? 7 : day + 1;
+    const sat = new Date(today);
+    sat.setDate(today.getDate() - daysBack);
+    return sat.toISOString().slice(0, 10);
+  })();
+
+  const isEventDone = (ev: { evaluationProgress?: number | null; startDate?: string | null; conformityNeeded?: boolean; conformityComplete?: boolean }) => {
+    if ((ev.startDate ?? "") < lastSaturday) return true;
+    const prog = ev.evaluationProgress ?? 0;
+    const matrixNeeded = !!ev.conformityNeeded;
+    const matrixDone = !!ev.conformityComplete;
+    return prog >= 1 && (!matrixNeeded || matrixDone);
+  };
+
   // Sidebar event list (manager/consultation only): filtered by eventSearch, progressFilter, publicationFilter
   const sidebarEvents = [...(isEvaluator ? configuredEvents : activeEvents)]
     .filter(e => {
@@ -638,10 +657,11 @@ export default function EvaluationsPage() {
         (e.clientName ?? "").toLowerCase().includes(q) ||
         (e.city ?? "").toLowerCase().includes(q);
       const prog = e.evaluationProgress ?? 0;
+      const evC = e as { conformityNeeded?: boolean; conformityComplete?: boolean };
       const matchProgress = progressFilter === "all" || (
         progressFilter === "not_started" ? prog === 0 :
-        progressFilter === "partial" ? prog > 0 && prog < 1 :
-        prog >= 1
+        progressFilter === "partial" ? !isEventDone({ ...e, ...evC }) && prog > 0 :
+        isEventDone({ ...e, ...evC })
       );
       const matchPub = publicationFilter === "all" || (
         publicationFilter === "none" ? !e.feedbackReleased && !e.partialPublishedAt :
@@ -1348,11 +1368,11 @@ export default function EvaluationsPage() {
                   sidebarEvents.map(ev => {
                     const isSelected = selectedEventId === ev.id;
                     const prog = ev.evaluationProgress ?? 0;
-                    const done = prog >= 1;
-                    const partial = prog > 0 && prog < 1;
                     const evC = ev as { conformityNeeded?: boolean; conformityComplete?: boolean };
                     const matrixNeeded = !!evC.conformityNeeded;
                     const matrixDone = !!evC.conformityComplete;
+                    const done = isEventDone({ ...ev, ...evC });
+                    const partial = !done && prog > 0;
                     const progPct = Math.round(prog * 100);
                     const progBarColor = done ? "#ccff00" : partial ? "#f0c820" : "#d4d8cc";
                     return (
@@ -1805,7 +1825,7 @@ export default function EvaluationsPage() {
                   </div>
                   <div className="bg-[#f7f9fb] border border-[#eceef0] p-3">
                     <p className="text-[20px] font-black italic text-[#ccff00] leading-none" style={{WebkitTextStroke: "1px #191c1e"}}>
-                      {Math.round((activeEvents.filter(e => (e.evaluationProgress ?? 0) >= 1).length / Math.max(1, activeEvents.length)) * 100)}%
+                      {Math.round((activeEvents.filter(e => isEventDone(e as { evaluationProgress?: number | null; startDate?: string | null; conformityNeeded?: boolean; conformityComplete?: boolean })).length / Math.max(1, activeEvents.length)) * 100)}%
                     </p>
                     <p className="text-[9px] font-black italic uppercase text-[#9aa08a] mt-0.5">concluídos</p>
                   </div>
