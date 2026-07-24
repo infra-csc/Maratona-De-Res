@@ -2472,7 +2472,7 @@ export default function EvaluationsPage() {
                                   {areaEligible.length > 0 && (
                                     <button
                                       type="button"
-                                      onClick={() => { setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); refetchTokenHistory(); }}
+                                      onClick={() => { setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); setPublicLinkIncludeConformity(g.areaId === CENOGRAFIA_AREA_ID); refetchTokenHistory(); }}
                                       className="border-2 border-[#191c1e] bg-white px-3 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
                                     >
                                       <Link2 size={13} /> Link Freelancer
@@ -2869,14 +2869,18 @@ export default function EvaluationsPage() {
                               </button>
                             );
                           }
-                          if (answeredCeno) return null;
+                          // Só esconde o botão se um link já foi usado E a conformidade
+                          // realmente foi preenchida. Se o link foi usado mas a matriz
+                          // seguiu vazia (0 itens), ainda é preciso poder reenviar — senão
+                          // fica "sem como" responder a conformidade.
+                          if (answeredCeno && filledCount > 0) return null;
                           return (
                             <button type="button"
                               onClick={() => { setConformityPublicLinkType("cenografia"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchConformityTokenHistory(); }}
                               className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] transition-colors"
                               title="Gerar link único para um freelancer responder o formulário de Cenografia"
                             >
-                              <Link2 size={12} /> Link Freelancer
+                              <Link2 size={12} /> {answeredCeno ? "Reenviar Link" : "Link Freelancer"}
                             </button>
                           );
                         })()}
