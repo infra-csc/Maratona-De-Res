@@ -121,14 +121,13 @@ export async function computeEventTeamResult(eventId: number) {
     };
   });
 
-  // Só os critérios ATIVOS entram no cálculo da nota (os inativos-calibrados
-  // aparecem no detalhe, mas não somam na nota do evento).
-  const activeDetails = criteriaDetails.filter(cd => cd.active);
-
+  // Regra: TODO critério exibido (ativo OU inativo-mas-calibrado) entra no
+  // cálculo da nota e na contagem — se tem calibração, conta. Só ficam de fora
+  // os inativos sem nenhuma calibração (que nem aparecem em displayCriteria).
   // Mescla critérios duplicados (eventScoped) nos seus pais antes do cálculo:
   // cada membro contribui com seu scoreUsed; o grupo usa o peso do critério pai.
-  const criteriaForCalc = mergeEventScopedCriteria(activeDetails.map(cd => {
-    const row = activeCriteria.find(r => r.criterionId === cd.criterionId);
+  const criteriaForCalc = mergeEventScopedCriteria(criteriaDetails.map(cd => {
+    const row = displayCriteria.find(r => r.criterionId === cd.criterionId);
     return {
       criterionId: cd.criterionId,
       weight: cd.weight,
@@ -154,13 +153,13 @@ export async function computeEventTeamResult(eventId: number) {
   const conformityScore = calculateFinalEventScore(eventScore, conformitySubtotal);
 
   const hasCalibration = criteriaDetails.some(cd => cd.calibratedScore !== null);
-  // Contagem de avaliação considera apenas critérios ATIVOS (os que compõem a
-  // nota). Os inativos-calibrados aparecem na lista, mas não entram no "X/Y".
-  const pendingCriteria = activeDetails.filter(cd => cd.status === "pendente").length;
-  const evaluatedCriteria = activeDetails.length - pendingCriteria;
-  const isComplete = activeDetails.length > 0 && pendingCriteria === 0;
+  // Contagem considera todos os critérios exibidos (ativos + inativos-calibrados),
+  // já que todos entram na nota.
+  const pendingCriteria = criteriaDetails.filter(cd => cd.status === "pendente").length;
+  const evaluatedCriteria = criteriaDetails.length - pendingCriteria;
+  const isComplete = criteriaDetails.length > 0 && pendingCriteria === 0;
 
-  return { criteriaDetails, eventScore, conformity, conformityPenalty, conformityScore, hasCalibration, pendingCriteria, evaluatedCriteria, totalCriteria: activeDetails.length, isComplete };
+  return { criteriaDetails, eventScore, conformity, conformityPenalty, conformityScore, hasCalibration, pendingCriteria, evaluatedCriteria, totalCriteria: criteriaDetails.length, isComplete };
 }
 
 /**
