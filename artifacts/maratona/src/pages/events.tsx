@@ -616,13 +616,11 @@ export default function EventsPage() {
               const concluded = ev.status === "closed";
               const total = ev.totalCriteria ?? 0;
               const evaluated = ev.evaluatedCriteria ?? 0;
-              // Barra de avaliações: prefere slots de avaliadores (mais preciso).
-              // Se não há atribuições formais (totalEvaluatorSlots = 0), cai em
-              // critérios avaliados/total — comportamento legado para eventos sem RH configurado.
-              const hasSlots = (ev.totalEvaluatorSlots ?? 0) > 0;
-              const evalTotal = hasSlots ? ev.totalEvaluatorSlots! : total;
-              const evalDone = hasSlots ? (ev.submittedEvaluatorCount ?? 0) : evaluated;
               const calCount = ev.calibratedCriteriaCount ?? 0;
+              // Barra de avaliações: usa critérios como unidade (totalCriteria como denominador).
+              // Calibração conta como avaliado para exibição — evita "1/2" quando há 5/5 calibrações.
+              const evalTotal = total;
+              const evalDone = Math.max(evaluated, calCount);
               const fc = ev.fullyCalibrated ?? false;
               const finalPubCount = ev.finalCalibratedCriteria ?? 0;
               const partialPubTotal = ev.partialPublishedCount ?? 0;
