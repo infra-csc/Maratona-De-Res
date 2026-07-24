@@ -1365,9 +1365,21 @@ export function AdminEvaluationsConsole() {
           <div className="space-y-4">
             <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
               <div className="px-5 py-3 flex flex-wrap items-center justify-between gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <SlidersHorizontal size={16} style={{ color: "var(--accent)" }} />
-                  <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Critérios, Pesos e Avaliadores — {selected.name}</span>
+                  <span className="font-black uppercase tracking-tight text-xs shrink-0" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Critérios, Pesos e Avaliadores —</span>
+                  <Select value={String(selected.id)} onValueChange={v => setSelectedEventId(Number(v))}>
+                    <SelectTrigger className="h-6 text-[11px] font-black uppercase w-auto min-w-[180px] max-w-xs" style={{ color: "var(--accent)", borderColor: "var(--accent)" }}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {enrichedEvents.map(ev => (
+                        <SelectItem key={ev.id} value={String(ev.id)} className="text-[11px] font-bold uppercase">
+                          {ev.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {assignAreas.map(a => {
@@ -1988,9 +2000,21 @@ export function AdminEvaluationsConsole() {
         )
       ) : (
         <div>
-          <p className="text-[11px] font-bold uppercase mb-3.5" style={{ color: "var(--muted-foreground)" }}>
-            {selected ? `Avaliadores atribuídos neste evento — ${selected.name}` : "Selecione um evento para ver os avaliadores"}
-          </p>
+          <div className="flex items-center gap-2 flex-wrap mb-3.5">
+            <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>Avaliadores atribuídos —</span>
+            <Select value={selected ? String(selected.id) : ""} onValueChange={v => setSelectedEventId(Number(v))}>
+              <SelectTrigger className="h-7 text-[11px] font-black uppercase w-auto min-w-[200px] max-w-sm">
+                <SelectValue placeholder="Selecione um evento" />
+              </SelectTrigger>
+              <SelectContent>
+                {enrichedEvents.map(ev => (
+                  <SelectItem key={ev.id} value={String(ev.id)} className="text-[11px] font-bold uppercase">
+                    {ev.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {evaluatorCards.length === 0 ? (
             <div className="text-center py-16 rounded-xl space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
               <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador atribuído neste evento.</p>
