@@ -18,7 +18,7 @@ import {
 import { customFetch } from "@/lib/custom-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, UserCheck } from "lucide-react";
+import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, UserCheck, Calendar, AlertTriangle, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CONDENSED, WARNING } from "@/lib/premium-theme";
 import { Input } from "@/components/ui/input";
@@ -142,8 +142,10 @@ export function AdminEvaluationsConsole() {
   const [evaluatorFilter, setEvaluatorFilter] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [sort, setSort] = useState<"name" | "pct" | "pending">("name");
+  const [sort, setSort] = useState<"name" | "pct" | "pending" | "data">("name");
   const [conformityFilter, setConformityFilter] = useState<"all" | "pending" | "done">("all");
+  const [noEvaluatorFilter, setNoEvaluatorFilter] = useState(false);
+  const [bulkAssignAreaId, setBulkAssignAreaId] = useState<number | null>(null);
   const [critFilter, setCritFilter] = useState<"all" | "unassigned" | "pending" | "partial" | "done">("all");
   const [openPickerCriterionId, setOpenPickerCriterionId] = useState<number | null>(null);
   const [openConformityPicker, setOpenConformityPicker] = useState<"cenografia" | "ferramentas" | null>(null);
@@ -254,7 +256,7 @@ export function AdminEvaluationsConsole() {
 
   const areaOptions = [...new Set(enrichedEvents.flatMap(e => e.areaNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const evaluatorOptions = [...new Set(enrichedEvents.flatMap(e => e.evaluatorNames))].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  const hasFilters = !!(q || areaFilter || evaluatorFilter || filterDateFrom || filterDateTo || conformityFilter !== "all");
+  const hasFilters = !!(q || areaFilter || evaluatorFilter || filterDateFrom || filterDateTo || conformityFilter !== "all" || noEvaluatorFilter);
 
   const qNorm = q.trim().toLowerCase();
   const queueEvents = baseTab
@@ -269,12 +271,14 @@ export function AdminEvaluationsConsole() {
         && (!evaluatorFilter || e.evaluatorNames.includes(evaluatorFilter))
         && (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom)
         && (!filterDateTo || (e.startDate ?? "") <= filterDateTo)
-        && matchConformity;
+        && matchConformity
+        && (!noEvaluatorFilter || e.unassigned > 0);
     })
     .slice()
     .sort((a, b) => {
       if (sort === "pct") return a.pct - b.pct;
       if (sort === "pending") return (b.total - b.done) - (a.total - a.done);
+      if (sort === "data") return (a.startDate ?? "").localeCompare(b.startDate ?? "");
       return a.name.localeCompare(b.name, "pt-BR");
     });
 
@@ -678,6 +682,29 @@ export function AdminEvaluationsConsole() {
     );
   }
 
+  async function handleBulkAssign(areaId: number, userId: number) {
+    if (!selected) return;
+    const unassigned = selected.criteria.filter(c => c.areaId === areaId && c.state === "unassigned");
+    if (unassigned.length === 0) { setBulkAssignAreaId(null); return; }
+    try {
+      await Promise.all(
+        unassigned.map(c =>
+          new Promise<void>((resolve, reject) => {
+            patchAssignment.mutate(
+              { criterionId: c.criterionId, assignedToId: userId, action: "assign" },
+              { onSuccess: () => resolve(), onError: (e) => reject(e) },
+            );
+          })
+        )
+      );
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      setBulkAssignAreaId(null);
+      toast({ title: `${unassigned.length} critério(s) atribuído(s)` });
+    } catch {
+      toast({ title: "Erro ao atribuir critérios", variant: "destructive" });
+    }
+  }
+
   const critFilterLabelMap: Record<string, CritState> = { unassigned: "unassigned", pending: "pending", partial: "partial", done: "done" };
   const filteredCriteria = selected
     ? (critFilter === "all" ? selected.criteria : selected.criteria.filter(c => c.state === critFilterLabelMap[critFilter]))
@@ -810,15 +837,28 @@ export function AdminEvaluationsConsole() {
         <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
           <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{selected ? `${selected.pct}%` : "—"}</div>
           <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Concluído no evento</div>
+          {selected && <div className="text-[9px] mt-0.5 truncate" style={{ color: "var(--muted-foreground)", opacity: 0.7 }}>{selected.name}</div>}
         </div>
-        <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+        <button
+          type="button"
+          onClick={() => setView("people")}
+          className="rounded-xl p-3.5 text-left transition-opacity hover:opacity-80"
+          style={{ backgroundColor: pendingEvaluatorsCount > 0 ? `rgba(232,162,61,0.10)` : "var(--card)", border: pendingEvaluatorsCount > 0 ? `1px solid ${AMBER}44` : "1px solid var(--border)" }}
+        >
           <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: AMBER }}>{pendingEvaluatorsCount}</div>
           <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Avaliadores pendentes</div>
-        </div>
-        <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="text-[9px] mt-0.5" style={{ color: AMBER, opacity: 0.8 }}>Ver aba Avaliadores →</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => { setNoEvaluatorFilter(v => !v); setTab("todo"); }}
+          className="rounded-xl p-3.5 text-left transition-opacity hover:opacity-80"
+          style={{ backgroundColor: noEvaluatorFilter ? `rgba(229,72,77,0.12)` : (selected?.unassigned ?? 0) > 0 ? `rgba(229,72,77,0.06)` : "var(--card)", border: noEvaluatorFilter ? `1px solid ${WARNING}` : (selected?.unassigned ?? 0) > 0 ? `1px solid ${WARNING}44` : "1px solid var(--border)" }}
+        >
           <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: (selected?.unassigned ?? 0) > 0 ? WARNING : "var(--foreground)" }}>{selected?.unassigned ?? 0}</div>
           <div className="text-[10px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Critérios sem avaliador</div>
-        </div>
+          <div className="text-[9px] mt-0.5" style={{ color: noEvaluatorFilter ? WARNING : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
+        </button>
       </div>
 
       {enrichedEvents.length === 0 ? (
@@ -865,23 +905,41 @@ export function AdminEvaluationsConsole() {
                   <option value="name">Ordenar · Nome</option>
                   <option value="pct">Ordenar · Menor progresso</option>
                   <option value="pending">Ordenar · Mais pendências</option>
+                  <option value="data">Ordenar · Data do evento</option>
                 </select>
-                <div>
-                  <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--muted-foreground)" }}>Conformidade</p>
-                  <div className="flex gap-1 flex-wrap">
-                    {([["all", "Todas"], ["pending", "Pendente"], ["done", "Ok"]] as const).map(([f, label]) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setConformityFilter(f)}
-                        className="rounded px-2 py-1 text-[9px] font-bold uppercase transition-colors"
-                        style={{
-                          backgroundColor: conformityFilter === f ? "var(--primary)" : "var(--secondary)",
-                          color: conformityFilter === f ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                          border: "1px solid var(--border)",
-                        }}
-                      >{label}</button>
-                    ))}
+                <div className="flex gap-2 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--muted-foreground)" }}>Conformidade</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {([["all", "Todas"], ["pending", "Pend."], ["done", "Ok"]] as const).map(([f, label]) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setConformityFilter(f)}
+                          className="rounded px-2 py-1 text-[9px] font-bold uppercase transition-colors"
+                          style={{
+                            backgroundColor: conformityFilter === f ? "var(--primary)" : "var(--secondary)",
+                            color: conformityFilter === f ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                            border: "1px solid var(--border)",
+                          }}
+                        >{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--muted-foreground)" }}>Sem avaliador</p>
+                    <button
+                      type="button"
+                      onClick={() => setNoEvaluatorFilter(v => !v)}
+                      className="flex items-center gap-1 rounded px-2 py-1 text-[9px] font-bold uppercase transition-colors whitespace-nowrap"
+                      style={{
+                        backgroundColor: noEvaluatorFilter ? WARNING : "var(--secondary)",
+                        color: noEvaluatorFilter ? "#fff" : "var(--muted-foreground)",
+                        border: `1px solid ${noEvaluatorFilter ? WARNING : "var(--border)"}`,
+                      }}
+                    >
+                      <UserX size={9} /> {noEvaluatorFilter ? "Ativo" : "Filtrar"}
+                    </button>
                   </div>
                 </div>
                 {cycleWeekends.length > 0 && (
@@ -901,9 +959,9 @@ export function AdminEvaluationsConsole() {
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{queueEvents.length} evento(s)</span>
+                  <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{queueEvents.length} de {baseTab.length} evento(s)</span>
                   {hasFilters && (
-                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); setFilterDateFrom(""); setFilterDateTo(""); setConformityFilter("all"); }} className="rounded-lg px-2.5 py-1 text-[9.5px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+                    <button type="button" onClick={() => { setQ(""); setAreaFilter(""); setEvaluatorFilter(""); setFilterDateFrom(""); setFilterDateTo(""); setConformityFilter("all"); setNoEvaluatorFilter(false); }} className="rounded-lg px-2.5 py-1 text-[9.5px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
                       Limpar filtros
                     </button>
                   )}
@@ -958,7 +1016,20 @@ export function AdminEvaluationsConsole() {
                       <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].bg, color: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].color }}>
                         {selected.isDone ? "Concluído" : selected.done > 0 ? "Em andamento" : "A fazer"}
                       </span>
+                      {selected.isDone && selected.unassigned > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: `rgba(232,162,61,0.16)`, color: AMBER }}>
+                          <AlertTriangle size={9} /> Sem avaliador
+                        </span>
+                      )}
                       <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{[selected.clientName, selected.city].filter(Boolean).join(" · ") || "—"}</span>
+                      {(selected.startDate || selected.endDate) && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                          <Calendar size={10} />
+                          {selected.startDate ? new Date(selected.startDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : ""}
+                          {selected.startDate && selected.endDate ? " – " : ""}
+                          {selected.endDate ? new Date(selected.endDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : ""}
+                        </span>
+                      )}
                     </div>
                     <h2 className="text-xl font-black uppercase tracking-tight mt-1.5" style={{ fontFamily: CONDENSED }}>{selected.name}</h2>
                   </div>
@@ -1046,6 +1117,49 @@ export function AdminEvaluationsConsole() {
                   </div>
                 </div>
 
+                {/* Bulk-assign: áreas com critérios sem avaliador */}
+                {canManage && selected.unassigned > 0 && (critFilter === "all" || critFilter === "unassigned") && (() => {
+                  const unassignedByArea = new Map<number, { areaId: number; areaName: string; count: number }>();
+                  for (const c of selected.criteria.filter(cr => cr.state === "unassigned" && cr.areaId != null)) {
+                    const key = c.areaId!;
+                    if (!unassignedByArea.has(key)) unassignedByArea.set(key, { areaId: key, areaName: c.areaName, count: 0 });
+                    unassignedByArea.get(key)!.count++;
+                  }
+                  const areas = Array.from(unassignedByArea.values());
+                  if (areas.length === 0) return null;
+                  return (
+                    <div className="rounded-lg p-3 space-y-2" style={{ border: `1px solid ${WARNING}44`, backgroundColor: `rgba(229,72,77,0.05)` }}>
+                      <p className="text-[9px] font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: WARNING }}><AlertTriangle size={10} /> {selected.unassigned} critério(s) sem avaliador — atribuição rápida por área</p>
+                      <div className="flex flex-col gap-1.5">
+                        {areas.map(a => {
+                          const open = bulkAssignAreaId === a.areaId;
+                          return (
+                            <div key={a.areaId} className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                              <div className="flex items-center justify-between gap-2 px-3 py-2" style={{ backgroundColor: "var(--secondary)" }}>
+                                <span className="text-[11px] font-black uppercase">{a.areaName} <span className="font-normal text-[10px]" style={{ color: "var(--muted-foreground)" }}>({a.count} sem avaliador)</span></span>
+                                <button
+                                  type="button"
+                                  onClick={() => setBulkAssignAreaId(open ? null : a.areaId)}
+                                  className="rounded px-2.5 py-1 text-[10px] font-bold uppercase transition-colors hover:opacity-80"
+                                  style={{ backgroundColor: open ? "var(--primary)" : "transparent", color: open ? "var(--primary-foreground)" : "var(--foreground)", border: "1px solid var(--border)" }}
+                                >
+                                  {open ? "Fechar" : "Atribuir área"}
+                                </button>
+                              </div>
+                              {open && (
+                                <div className="px-3 py-2.5">
+                                  <p className="text-[9.5px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--muted-foreground)" }}>Escolha o avaliador para todos os {a.count} critério(s) sem atribuição em {a.areaName}:</p>
+                                  <InlinePicker areaId={a.areaId} onPick={(uid) => handleBulkAssign(a.areaId, uid)} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="flex flex-col gap-2.5">
                   {filteredCriteria.length === 0 ? (
                     <div className="rounded-lg py-4 px-3.5 text-center text-[11px] font-bold uppercase" style={{ border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
@@ -1068,10 +1182,15 @@ export function AdminEvaluationsConsole() {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {c.assignedToId != null ? (
                               <div className="flex flex-col gap-0.5">
-                                <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-                                  <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.state === "done" ? GOOD : "var(--border)" }} />
-                                  {c.assignedToName}
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                                    <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.state === "done" ? GOOD : c.state === "partial" ? AMBER : "var(--border)" }} />
+                                    {c.assignedToName}
+                                  </span>
+                                  <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: STATE_CFG[c.state].bg, color: STATE_CFG[c.state].color }}>
+                                    {STATE_CFG[c.state].label}
+                                  </span>
+                                </div>
                                 {c.formSubmitterName && c.formSubmitterName !== c.assignedToName && (
                                   <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5" style={{ color: "var(--muted-foreground)" }}>
                                     <UserCheck size={9} /> Preenchido por: <span style={{ color: "var(--foreground)" }}>{c.formSubmitterName}</span>
@@ -1820,8 +1939,17 @@ export function AdminEvaluationsConsole() {
         <div>
           <p className="text-[11px] font-bold uppercase mb-3.5" style={{ color: "var(--muted-foreground)" }}>Quem está em dia e quem precisa de cobrança neste ciclo</p>
           {evaluatorCards.length === 0 ? (
-            <div className="text-center py-16 rounded-xl font-bold uppercase" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
-              Nenhum avaliador com critérios atribuídos neste ciclo.
+            <div className="text-center py-16 rounded-xl space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+              <p className="font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador com critérios atribuídos neste ciclo.</p>
+              <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Atribua avaliadores aos critérios do evento para ver o progresso aqui.</p>
+              <button
+                type="button"
+                onClick={() => setView("assign")}
+                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[11px] font-bold uppercase transition-opacity hover:opacity-80"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+              >
+                <ClipboardCheck size={13} /> Ir para Atribuição
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
