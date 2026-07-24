@@ -547,12 +547,11 @@ export default function MyPerformancePage() {
                 && scoredEvts.length === officialCount
                 && Math.abs(liveAvg - officialAvg) < 0.11;
               const displayAvg = officialAvg ?? liveAvg ?? 0;
-              const headerCount = officialCount;
               return (
                 <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                   <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                      Detalhamento da Média ({headerCount} evento{headerCount !== 1 ? "s" : ""})
+                      Detalhamento da Média ({scoredEvts.length} evento{scoredEvts.length !== 1 ? "s" : ""})
                     </p>
                     <p className="text-[10px] font-black text-muted-foreground">
                       {liveConsistent ? "Soma ÷ Qtd = Média" : "Média oficial do ciclo"}
@@ -588,7 +587,7 @@ export default function MyPerformancePage() {
                       </div>
                     ) : (
                       <div className="text-[10px] font-black uppercase text-muted-foreground">
-                        {headerCount} evento{headerCount !== 1 ? "s" : ""} computado{headerCount !== 1 ? "s" : ""}
+                        {scoredEvts.length} evento{scoredEvts.length !== 1 ? "s" : ""} computado{scoredEvts.length !== 1 ? "s" : ""}
                       </div>
                     )}
                     <div className="flex items-baseline gap-1" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
