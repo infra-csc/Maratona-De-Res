@@ -3,7 +3,7 @@ import {
   db, quarterlyResultsTable, employeesTable, absencesTable, eventsTable,
   eventParticipantsTable, platoonRulesTable,
 } from "@workspace/db";
-import { eq, and, sql, ilike, exists } from "drizzle-orm";
+import { eq, and, sql, exists } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore, calculateQuarterFinalResult } from "../lib/calculations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -53,7 +53,13 @@ router.get("/ranking", async (req, res) => {
             .where(and(
               eq(eventParticipantsTable.employeeId, employeesTable.id),
               eq(eventsTable.cycleId, cycle.id),
-              ilike(eventParticipantsTable.functionName, "cenotecnic%"),
+              // Qualquer participação que conta para nota (mesma regra de
+              // participantCountsForScore/participation.ts): freela já foi barrado
+              // pelo employmentType e "Sup Ceno *" pelo cargo global; aqui basta
+              // que a participação não seja informativa. NÃO exigir "Cenotécnica"
+              // como lista-branca — Montador, Motorista, Assistente etc. também
+              // contam para nota e devem entrar no ranking.
+              sql`(${eventParticipantsTable.functionName} IS NULL OR ${eventParticipantsTable.functionName} NOT ILIKE 'sup ceno%')`,
             )),
         ),
       ))

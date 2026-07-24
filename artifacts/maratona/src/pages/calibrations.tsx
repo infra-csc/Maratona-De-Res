@@ -591,7 +591,20 @@ export default function CalibrationsPage() {
     const raw = (weightEdits[id] ?? "").replace(",", ".").trim();
     return raw !== "" && !isNaN(Number(raw)) && Number(raw) >= 0;
   });
-  const totalDirtyCount = fillableCount + pendingReasonOnlyCrits.length + pendingWeightCritIds.length;
+
+  // Critérios cuja intenção de publicação (toggle Parc./Final) diverge do estado
+  // JÁ publicado no servidor — cada divergência é uma mudança de status pendente
+  // que o "Salvar" deve aplicar (publicar/rebaixar), não só as edições de nota.
+  // Só conta critérios calibrados (sem calibração não há o que publicar).
+  const pendingPublishCritIds = displayActiveCriteria.filter(c => {
+    if (!getCalibration(c.criterionId)) return false;
+    const intent = publishIntents[c.criterionId];
+    if (intent === undefined) return false;
+    const baseline = c.finalPublishedAt ? "final" : "partial";
+    return intent !== baseline;
+  }).map(c => c.criterionId);
+
+  const totalDirtyCount = fillableCount + pendingReasonOnlyCrits.length + pendingWeightCritIds.length + pendingPublishCritIds.length;
 
   // Quantos critérios já publicados como Final
   const finalPublishedCount = scorableActiveCriteria.filter(c => !!c.finalPublishedAt).length;
@@ -791,9 +804,28 @@ export default function CalibrationsPage() {
       }
     }
 
+    // 4. Mudanças de status (Parc./Final) — publica/rebaixa cada critério cuja
+    // intenção diverge do que já está publicado no servidor.
+    let okPublish = 0;
+    const failedPublish: number[] = [];
+    for (const critId of pendingPublishCritIds) {
+      const intent = publishIntents[critId];
+      try {
+        if (intent === "final") {
+          await publishCriterionFinalMutation.mutateAsync({ id: selectedEventId!, criterionId: critId });
+        } else {
+          await publishCriterionPartialMutation.mutateAsync({ id: selectedEventId!, criterionId: critId });
+        }
+        okPublish++;
+      } catch (e) {
+        failedPublish.push(critId);
+        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+      }
+    }
+
     setSavingAll(false);
-    const totalOk = okCal + okWeight;
-    const totalFailed = failedCal.length + failedWeight.length;
+    const totalOk = okCal + okWeight + okPublish;
+    const totalFailed = failedCal.length + failedWeight.length + failedPublish.length;
 
     if (failedCal.length === 0) {
       setCalScores({});
@@ -814,6 +846,7 @@ export default function CalibrationsPage() {
       const parts: string[] = [];
       if (okCal > 0) parts.push(`${okCal} calibraç${okCal === 1 ? "ão" : "ões"}`);
       if (okWeight > 0) parts.push(`${okWeight} peso${okWeight === 1 ? "" : "s"}`);
+      if (okPublish > 0) parts.push(`${okPublish} status`);
       toast({ title: `Tudo salvo — ${parts.join(", ")}`, description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined, variant: uniqueWarnings.length > 0 ? "destructive" : undefined });
     } else {
       toast({ title: `${totalOk} salvo(s), ${totalFailed} com erro`, description: firstError ?? "Revise os itens destacados.", variant: "destructive" });

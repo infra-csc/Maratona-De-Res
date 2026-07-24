@@ -6,7 +6,7 @@ import {
   employeeCycleEligibilityTable, areasTable, cyclesTable, eventConformitiesTable,
   eventAreaAssignmentsTable,
 } from "@workspace/db";
-import { eq, and, inArray, ilike, exists, sql } from "drizzle-orm";
+import { eq, and, inArray, exists, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import {
   calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
@@ -515,9 +515,12 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
 
     const calMap = new Map(historicalCalibrations.map(c => [c.criterionId, c]));
 
-    const hasAnyCal = calMap.size > 0;
+    // Mostra TODOS os critérios ativos do evento (mais os já calibrados, mesmo
+    // que tenham sido desativados depois). Antes, ao existir qualquer calibração,
+    // a lista era reduzida só aos critérios calibrados — o que fazia sumir do
+    // detalhe os critérios ainda não calibrados, apesar de terem nota importada.
     const historicalCriteriaDetails = historicalCriteriaRows
-      .filter(c => hasAnyCal ? calMap.has(c.criterionId!) : c.active)
+      .filter(c => c.active || calMap.has(c.criterionId!))
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       .map(c => {
         const cal = calMap.get(c.criterionId!);
@@ -645,7 +648,10 @@ router.get("/results/quarterly", async (req, res) => {
             .where(and(
               eq(eventParticipantsTable.employeeId, employeesTable.id),
               eq(eventsTable.cycleId, cycle.id),
-              ilike(eventParticipantsTable.functionName, "cenotecnic%"),
+              // Mesma regra de participantCountsForScore (participation.ts): não
+              // exigir "Cenotécnica" como lista-branca — basta a participação não
+              // ser informativa ("Sup Ceno *"); freela já foi barrado acima.
+              sql`(${eventParticipantsTable.functionName} IS NULL OR ${eventParticipantsTable.functionName} NOT ILIKE 'sup ceno%')`,
             )),
         ),
       ));
