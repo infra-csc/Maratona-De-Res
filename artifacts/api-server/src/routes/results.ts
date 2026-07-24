@@ -80,7 +80,16 @@ export async function computeEventTeamResult(eventId: number) {
     .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, eventId));
   const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments);
 
-  const criteriaDetails = activeCriteria.map(c => {
+  // Exibe os critérios ativos + os inativos que já foram calibrados: um critério
+  // pode ter sido desativado (sai do cálculo da nota) mas continua calibrado e
+  // deve permanecer visível no detalhe do evento, em vez de "sumir". O flag
+  // `active` diferencia quem entra no cálculo/contagem (só ativos).
+  const calibratedIds = new Set(allCalibrations.map(c => c.criterionId));
+  const displayCriteria = eventCriteriaRows
+    .filter(c => c.active || calibratedIds.has(c.criterionId))
+    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+
+  const criteriaDetails = displayCriteria.map(c => {
     const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
     const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
     const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
@@ -108,12 +117,17 @@ export async function computeEventTeamResult(eventId: number) {
       requiredEvaluators: completion.requiredEvaluators,
       submittedEvaluators: completion.submittedEvaluators,
       status: isEvaluated ? "avaliado" : "pendente",
+      active: !!c.active,
     };
   });
 
+  // Só os critérios ATIVOS entram no cálculo da nota (os inativos-calibrados
+  // aparecem no detalhe, mas não somam na nota do evento).
+  const activeDetails = criteriaDetails.filter(cd => cd.active);
+
   // Mescla critérios duplicados (eventScoped) nos seus pais antes do cálculo:
   // cada membro contribui com seu scoreUsed; o grupo usa o peso do critério pai.
-  const criteriaForCalc = mergeEventScopedCriteria(criteriaDetails.map(cd => {
+  const criteriaForCalc = mergeEventScopedCriteria(activeDetails.map(cd => {
     const row = activeCriteria.find(r => r.criterionId === cd.criterionId);
     return {
       criterionId: cd.criterionId,
@@ -140,11 +154,13 @@ export async function computeEventTeamResult(eventId: number) {
   const conformityScore = calculateFinalEventScore(eventScore, conformitySubtotal);
 
   const hasCalibration = criteriaDetails.some(cd => cd.calibratedScore !== null);
-  const pendingCriteria = criteriaDetails.filter(cd => cd.status === "pendente").length;
-  const evaluatedCriteria = criteriaDetails.length - pendingCriteria;
-  const isComplete = criteriaDetails.length > 0 && pendingCriteria === 0;
+  // Contagem de avaliação considera apenas critérios ATIVOS (os que compõem a
+  // nota). Os inativos-calibrados aparecem na lista, mas não entram no "X/Y".
+  const pendingCriteria = activeDetails.filter(cd => cd.status === "pendente").length;
+  const evaluatedCriteria = activeDetails.length - pendingCriteria;
+  const isComplete = activeDetails.length > 0 && pendingCriteria === 0;
 
-  return { criteriaDetails, eventScore, conformity, conformityPenalty, conformityScore, hasCalibration, pendingCriteria, evaluatedCriteria, totalCriteria: criteriaDetails.length, isComplete };
+  return { criteriaDetails, eventScore, conformity, conformityPenalty, conformityScore, hasCalibration, pendingCriteria, evaluatedCriteria, totalCriteria: activeDetails.length, isComplete };
 }
 
 /**

@@ -196,10 +196,13 @@ router.post("/events/:id/criteria/:criterionId/publish-partial", requireRole("ad
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
 
+  // Não exige active=true: um critério pode estar inativo (fora do cálculo da
+  // nota) mas já calibrado e visível na tela de calibração — nesse caso ainda
+  // deve ser possível publicar/rebaixar o status do seu feedback.
   const [link] = await db.select().from(eventCriteriaTable)
-    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId), eq(eventCriteriaTable.active, true)))
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId)))
     .limit(1);
-  if (!link) { res.status(404).json({ error: "Critério não encontrado ou inativo neste evento" }); return; }
+  if (!link) { res.status(404).json({ error: "Critério não encontrado neste evento" }); return; }
 
   const [updated] = await db.update(eventCriteriaTable).set({
     partialPublishedAt: new Date(),
@@ -228,10 +231,12 @@ router.post("/events/:id/criteria/:criterionId/publish-final", requireRole("admi
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
 
+  // Não exige active=true: um critério inativo (fora do cálculo) porém já
+  // calibrado ainda pode ter seu feedback publicado como Final pela calibração.
   const [link] = await db.select().from(eventCriteriaTable)
-    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId), eq(eventCriteriaTable.active, true)))
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId)))
     .limit(1);
-  if (!link) { res.status(404).json({ error: "Critério não encontrado ou inativo neste evento" }); return; }
+  if (!link) { res.status(404).json({ error: "Critério não encontrado neste evento" }); return; }
 
   const now = new Date();
   const [updated] = await db.update(eventCriteriaTable).set({

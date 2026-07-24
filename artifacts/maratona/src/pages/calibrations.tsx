@@ -8,7 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Calendar, Copy } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Calendar, Copy, Clock } from "lucide-react";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING, usePremiumTheme } from "@/lib/premium-theme";
@@ -420,7 +420,10 @@ export default function CalibrationsPage() {
   // Publica todos os critérios calibrados de acordo com a intenção definida por critério
   async function handlePublishAll() {
     if (!selectedEventId) return;
-    const calibrated = displayActiveCriteria.filter(c => c.active !== false && getCalibration(c.criterionId) != null);
+    // Inclui critérios inativos-mas-calibrados: eles aparecem na tela com o
+    // toggle Parc./Final, então o Publicar deve poder aplicar o status neles
+    // também (o backend permite publicar critério inativo já calibrado).
+    const calibrated = displayActiveCriteria.filter(c => getCalibration(c.criterionId) != null);
     if (calibrated.length === 0) {
       toast({ title: "Nenhum critério calibrado para publicar", description: "Salve ao menos uma nota calibrada antes de publicar.", variant: "destructive" });
       return;
@@ -467,7 +470,8 @@ export default function CalibrationsPage() {
       .filter(e => allIds.includes(e.criterionId) && e.status === "submitted")
       .map(e => {
         const crit = activeCriteria.find(ac => ac.criterionId === e.criterionId);
-        return { name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId };
+        const respondedRaw = e.submittedAt ?? e.createdAt ?? null;
+        return { name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId, respondedAt: respondedRaw ? new Date(respondedRaw as unknown as string) : null };
       });
   }
 
@@ -1452,6 +1456,11 @@ export default function CalibrationsPage() {
                                     <span className="text-[10px] font-bold">{s.name}</span>
                                     {s.areaName && (
                                       <span className="text-[8px] font-bold uppercase px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{s.areaName}</span>
+                                    )}
+                                    {s.respondedAt && (
+                                      <span className="text-[8px] font-bold flex items-center gap-0.5" style={{ color: "var(--muted-foreground)" }} title={`Respondido em ${formatDateTime(s.respondedAt)}`}>
+                                        <Clock size={8} /> {formatDateTime(s.respondedAt)}
+                                      </span>
                                     )}
                                     {s.comment && (
                                       <button
