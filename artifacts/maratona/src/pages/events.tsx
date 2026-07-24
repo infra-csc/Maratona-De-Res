@@ -207,6 +207,8 @@ export default function EventsPage() {
     (e.evaluationProgress ?? 0) > 0 &&
     (e.calibratedCriteriaCount ?? 0) === 0;
   // Publicado parcialmente: tem critério(s) com prévia publicada, mas nem tudo já virou Final.
+  // O evento só é FINAL quando TODOS os quesitos têm publicação final — enquanto sobrar
+  // qualquer critério só-parcial, ele é Parcial (mesmo que o feedback já tenha sido liberado).
   const hasPartialPublication = (e: typeof all[0]) =>
     Math.max(0, (e.partialPublishedCount ?? 0) - (e.finalCalibratedCriteria ?? 0)) > 0;
 
@@ -253,7 +255,7 @@ export default function EventsPage() {
       || (cardFilter === "inEval"     && isInEvaluation(ev))
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.finalCalibratedCriteria ?? 0) === 0 && (ev.partialPublishedCount ?? 0) === 0)
       || (cardFilter === "partialPub" && hasPartialPublication(ev))
-      || (cardFilter === "fullyEval"  && !!ev.feedbackReleased);
+      || (cardFilter === "fullyEval"  && !!ev.feedbackReleased && !hasPartialPublication(ev));
     return matchSearch && matchDate && matchCard;
   }).slice().sort((a, b) => {
     const sc = (ev: typeof a) => (ev.teamScore ?? ev.averageScore) ?? null;
@@ -322,7 +324,7 @@ export default function EventsPage() {
             { val: all.length,                                        label: "Eventos",     color: "var(--foreground)" },
             { val: all.filter(e => e.status === "open").length,      label: "Abertos",     color: "var(--accent)" },
             { val: all.filter(e => hasPartialPublication(e)).length,  label: "Pub. Parcial", color: "#e8a23d" },
-            { val: all.filter(e => e.feedbackReleased).length,          label: "Pub. Final",  color: "#9ab000" },
+            { val: all.filter(e => e.feedbackReleased && !hasPartialPublication(e)).length, label: "Pub. Final",  color: "#9ab000" },
           ].map((s, i) => (
             <div key={i} className="px-4 text-center" style={{ borderRight: i < 3 ? "1px solid var(--border)" : "none" }}>
               <span className="block font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: s.color }}>{s.val}</span>
@@ -655,7 +657,7 @@ export default function EventsPage() {
                 ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
                 : !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication
                 ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
-                : ev.feedbackReleased
+                : ev.feedbackReleased && partialOnlyCount === 0
                   ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
                   : finalPubCount > 0 && partialOnlyCount === 0
                     ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
