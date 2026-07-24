@@ -62,6 +62,8 @@ interface EventSummary {
   status: string;
   feedbackReleased?: boolean;
   feedbackReleasedAt?: string | null;
+  criteriaConfirmed?: boolean;
+  criteriaConfirmedAt?: string | null;
   partialPublishedAt?: string | null;
   eventScore: number;
   projectedPlatoon: string | null;
@@ -122,22 +124,29 @@ function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null):
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
   const visibleCriteria = event.criteriaDetails.filter(c => c.scoreUsed !== null && c.weight > 0);
-  // 3-state: feedbackReleased > algum critério finalPublishedAt > partialPublishedAt (evento) > pendente
-  const anyCriterionFinal = event.criteriaDetails.some(c => !!c.finalPublishedAt);
-  // "Todos avaliados" = todos os calibrados têm publicação final, ou evento histórico.
+  // "Avaliado" = feedbackReleased OU todos os quesitos com peso têm finalPublishedAt OU histórico.
   const allScoredAreFinal = visibleCriteria.length > 0 && (
     visibleCriteria.every(c => !!c.finalPublishedAt) ||
     !!event.isHistorical
   );
-  const publishLabel = event.feedbackReleased
-    ? `Nota Final Confirmada${event.feedbackReleasedAt ? ` · ${formatDateTime(event.feedbackReleasedAt)}` : ""}`
-    : allScoredAreFinal
-      ? "Avaliado"
-      : anyCriterionFinal
-        ? "Avaliado — Projeção Parcial"
-        : event.partialPublishedAt
-          ? `Avaliação Parcial · ${formatDateTime(event.partialPublishedAt)}`
-          : "Pendente";
+  const isAvaliado = event.feedbackReleased || allScoredAreFinal;
+  // "Em Avaliação" = avaliações liberadas (criteriaConfirmed) mas ainda não tudo publicado final.
+  const isEmAvaliacao = !isAvaliado && !!event.criteriaConfirmed;
+  // Log do "Avaliado": data do feedbackReleased ou a data mais recente de finalPublishedAt entre critérios.
+  const avaliadoDate: string | null = isAvaliado
+    ? (event.feedbackReleasedAt
+        ?? ([...visibleCriteria]
+            .map(c => c.finalPublishedAt)
+            .filter((d): d is string => !!d)
+            .sort()
+            .at(-1)
+            ?? null))
+    : null;
+  const publishLabel = isAvaliado
+    ? `Avaliado${avaliadoDate ? ` · ${formatDateTime(avaliadoDate)}` : ""}`
+    : isEmAvaliacao
+      ? "Em Avaliação"
+      : "Aguardando";
 
   return (
     <div className="mb-3 rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}>
@@ -157,14 +166,12 @@ function EventCard({ event }: { event: EventSummary }) {
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={cn(
                 "text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full",
-                event.feedbackReleased
+                isAvaliado
                   ? "bg-[#191c1e] text-[#ccff00]"
-                  : anyCriterionFinal
+                  : isEmAvaliacao
                     ? "bg-[#506600] text-[#ccff00]"
-                    : event.partialPublishedAt
-                      ? "bg-[#ccff00] text-[#191c1e]"
-                      : "text-muted-foreground"
-              )} style={!event.feedbackReleased && !anyCriterionFinal && !event.partialPublishedAt ? { backgroundColor: "var(--muted)" } : {}}>
+                    : "text-muted-foreground"
+              )} style={!isAvaliado && !isEmAvaliacao ? { backgroundColor: "var(--muted)" } : {}}>
                 {publishLabel}
               </span>
               {!event.countsForScore && (
@@ -214,30 +221,21 @@ function EventCard({ event }: { event: EventSummary }) {
                   <div>
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-[9px] font-bold uppercase text-muted-foreground px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Peso {c.weight}</span>
-                      {c.evaluated && (
-                        <span className="text-[9px] font-bold uppercase text-[#506600] flex items-center gap-1">
-                          <CheckCircle2 size={11}/> Avaliado
-                        </span>
-                      )}
                       {event.feedbackReleased || c.finalPublishedAt ? (
                         <span
-                          title={c.finalPublishedAt ? `Nota Final publicada em ${formatDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Publicado em ${formatDateTime(event.feedbackReleasedAt)}` : undefined}
+                          title={c.finalPublishedAt ? `Avaliado em ${formatDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Avaliado em ${formatDateTime(event.feedbackReleasedAt)}` : undefined}
                           className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#191c1e] text-[#ccff00] flex items-center gap-1"
                         >
-                          ✓ Nota Final Confirmada
+                          <CheckCircle2 size={11}/> Avaliado{c.finalPublishedAt ? ` · ${formatDateTime(c.finalPublishedAt)}` : ""}
                         </span>
                       ) : c.partialPublishedAt ? (
                         <span
-                          title={`Publicado em ${formatDateTime(c.partialPublishedAt)}`}
+                          title={`Publicação parcial em ${formatDateTime(c.partialPublishedAt)}`}
                           className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#ccff00] text-[#191c1e]"
                         >
                           Projeção Parcial
                         </span>
-                      ) : (
-                        <span className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full text-muted-foreground" style={{ backgroundColor: "var(--muted)" }}>
-                          Pendente
-                        </span>
-                      )}
+                      ) : null}
                     </div>
                     <p className="font-bold text-[13px] text-foreground leading-tight">{c.criterionName}</p>
                   </div>
@@ -326,8 +324,7 @@ export default function MyPerformancePage() {
       ev.eventName.toLowerCase().includes(eventFilter.toLowerCase()) ||
       (ev.city?.toLowerCase() ?? "").includes(eventFilter.toLowerCase()) ||
       (ev.state?.toLowerCase() ?? "").includes(eventFilter.toLowerCase());
-    // "Avaliado" = feedbackReleased OU todos os calibrados (peso=0 incluso)
-    // têm publicação final OU evento histórico.
+    // "Avaliado" = feedbackReleased OU todos os quesitos (com score) têm publicação final OU histórico.
     const visibleCriteria = ev.criteriaDetails.filter(c => c.scoreUsed !== null);
     const allScoredAreFinal = visibleCriteria.length > 0 && (
       visibleCriteria.every(c => !!c.finalPublishedAt) || !!ev.isHistorical
@@ -335,7 +332,7 @@ export default function MyPerformancePage() {
     const allFinal = ev.feedbackReleased || allScoredAreFinal;
     const matchesStatus = statusFilter === "all"
       || (statusFilter === "avaliado" && allFinal)
-      || (statusFilter === "em_avaliacao" && !allFinal);
+      || (statusFilter === "em_avaliacao" && !allFinal && !!ev.criteriaConfirmed);
     return matchesText && matchesStatus;
   });
 
