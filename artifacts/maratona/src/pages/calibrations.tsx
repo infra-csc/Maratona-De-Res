@@ -45,9 +45,9 @@ function calibrationEventChip(ev: {
   evaluatedCriteria?: number | null;
 }): { label: string; bg: string; fg: string } {
   if (ev.feedbackReleased) return { label: "Pub. Final", bg: "rgba(154,176,0,0.14)", fg: GOOD };
-  if (ev.partialPublishedAt || (ev.finalCalibratedCriteria ?? 0) > 0)
+  if (ev.partialPublishedAt)
     return { label: "Pub. Parcial", bg: "rgba(232,162,61,0.14)", fg: AMBER };
-  if ((ev.calibratedCriteriaCount ?? 0) > 0)
+  if ((ev.finalCalibratedCriteria ?? 0) > 0 || (ev.calibratedCriteriaCount ?? 0) > 0)
     return { label: "Calibrado", bg: "rgba(91,141,239,0.14)", fg: "#5b8def" };
   if (ev.status === "closed" || ev.isHistorical)
     return { label: "Fechado", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
@@ -960,7 +960,7 @@ export default function CalibrationsPage() {
                 {cycleWeekends.length > 0 && (
                   <div className="flex items-center gap-0 px-3.5 py-2 overflow-x-auto" style={{ borderBottom: `1px solid ${pk.border}`, backgroundColor: pk.bg, scrollbarWidth: "none" }}>
                     <span className="text-[10px] font-black uppercase shrink-0 mr-2.5" style={{ color: pk.muted, fontFamily: CONDENSED }}>Fim de semana</span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {cycleWeekends.map(w => {
                         const active = filterDateFrom === w.sat && filterDateTo === w.sun;
                         return (
