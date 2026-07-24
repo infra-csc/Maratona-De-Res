@@ -790,10 +790,12 @@ export function AdminEvaluationsConsole() {
   }, [enrichedEvents]);
   const pendingEvaluatorsCount = [...pendingEvaluatorNames.values()].filter(v => v.submitted < v.assigned).length;
 
-  // ---- Aba Avaliadores: por evento selecionado ----
+  // ---- Aba Avaliadores: por evento selecionado (critérios regulares + matriz) ----
   const evaluatorCards = useMemo(() => {
     if (!selected) return [];
     const byEval = new Map<number, { name: string; area: string; assigned: number; submitted: number }>();
+
+    // Critérios regulares
     for (const c of selected.criteria) {
       if (c.assignedToId == null || !c.assignedToName) continue;
       const cur = byEval.get(c.assignedToId) ?? { name: c.assignedToName, area: c.areaName, assigned: 0, submitted: 0 };
@@ -801,6 +803,19 @@ export function AdminEvaluationsConsole() {
       if (c.state === "done") cur.submitted++;
       byEval.set(c.assignedToId, cur);
     }
+
+    // Avaliadores da Matriz de Conformidade (cenografia + ferramentas)
+    for (const row of conformityRows) {
+      if (row.evaluatorId == null || !row.evaluatorName || row.total === 0) continue;
+      const existing = byEval.get(row.evaluatorId);
+      if (existing) {
+        existing.assigned += row.total;
+        existing.submitted += row.filled;
+      } else {
+        byEval.set(row.evaluatorId, { name: row.evaluatorName, area: row.name, assigned: row.total, submitted: row.filled });
+      }
+    }
+
     return Array.from(byEval.entries())
       .map(([id, stats]) => {
         const pct = stats.assigned > 0 ? Math.round((stats.submitted / stats.assigned) * 100) : 0;
@@ -811,7 +826,8 @@ export function AdminEvaluationsConsole() {
         return { id, ...stats, pct, ...cfg };
       })
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [selected]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, selectedDetail]);
 
   return (
     <div className="space-y-5">
