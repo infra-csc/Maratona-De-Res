@@ -84,6 +84,7 @@ interface CriterionDetail {
   scoreUsed: number | null;
   criterionTotal: number | null;
   publicComments: string[];
+  calibrationReason?: string | null;
   evaluated: boolean;
   partialPublishedAt?: string | null;
   finalPublishedAt?: string | null;
@@ -265,6 +266,14 @@ function EventCard({ event }: { event: EventSummary }) {
                         <span className="italic leading-relaxed">"{comment}"</span>
                       </div>
                     ))}
+                  </div>
+                )}
+                {c.calibrationReason && (
+                  <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Comentário de calibração</p>
+                    <div className="text-xs text-foreground p-3 rounded border-l-2" style={{ backgroundColor: "var(--muted)", borderLeftColor: "#5b8def" }}>
+                      <span className="italic leading-relaxed">"{c.calibrationReason}"</span>
+                    </div>
                   </div>
                 )}
               </div>

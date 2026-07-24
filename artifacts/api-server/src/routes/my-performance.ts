@@ -133,6 +133,7 @@ router.get("/my-performance", async (req, res) => {
       db.select({
         criterionId: calibrationsTable.criterionId,
         calibratedScore: calibrationsTable.calibratedScore,
+        calibrationReason: calibrationsTable.calibrationReason,
       }).from(calibrationsTable).where(eq(calibrationsTable.eventId, p.eventId)),
 
       db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
@@ -161,6 +162,10 @@ router.get("/my-performance", async (req, res) => {
         const publicComments = allEvals
           .filter(e => e.criterionId === r.criterionId && e.commentVisibility === "public" && e.comments)
           .map(e => e.comments!);
+        // Comentário de calibração: exibido apenas quando a nota já foi publicada
+        // (parcial ou final) — antes da publicação o colaborador não deve ver.
+        const isPublished = !!(r.partialPublishedAt || r.finalPublishedAt);
+        const calibrationReason = isPublished ? (calibration?.calibrationReason ?? null) : null;
         return {
           criterionId: r.criterionId!,
           criterionName: r.criterionName ?? "",
@@ -170,6 +175,7 @@ router.get("/my-performance", async (req, res) => {
           scoreUsed,
           criterionTotal,
           publicComments,
+          calibrationReason,
           evaluated: isEvaluated,
           status: isEvaluated ? "avaliado" as const : "pendente" as const,
           partialPublishedAt: r.partialPublishedAt ?? null,
