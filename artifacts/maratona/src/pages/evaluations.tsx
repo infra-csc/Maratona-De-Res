@@ -534,6 +534,10 @@ export default function EvaluationsPage() {
   const [publicLinkDialogAreaName, setPublicLinkDialogAreaName] = useState<string | null>(null);
   const [publicLinkRecipientName, setPublicLinkRecipientName] = useState("");
   const [publicLinkIncludeConformity, setPublicLinkIncludeConformity] = useState(false);
+  // Trava: quando o link é da área Cenografia, a matriz de conformidade é obrigatória
+  // no mesmo questionário (não pode gerar link só do critério e deixar a conformidade
+  // separada/sem resposta). Nesse caso a opção fica marcada e desabilitada.
+  const [publicLinkForceConformity, setPublicLinkForceConformity] = useState(false);
   const [generatedPublicUrl, setGeneratedPublicUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   // Conformity public link dialog state (shared for cenografia + ferramentas)
@@ -2472,7 +2476,7 @@ export default function EvaluationsPage() {
                                   {areaEligible.length > 0 && (
                                     <button
                                       type="button"
-                                      onClick={() => { setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); setPublicLinkIncludeConformity(g.areaId === CENOGRAFIA_AREA_ID); refetchTokenHistory(); }}
+                                      onClick={() => { const isCeno = g.areaId === CENOGRAFIA_AREA_ID; setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); setPublicLinkIncludeConformity(isCeno); setPublicLinkForceConformity(isCeno); refetchTokenHistory(); }}
                                       className="border-2 border-[#191c1e] bg-white px-3 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 hover:bg-[#f2f4f6] transition-all"
                                     >
                                       <Link2 size={13} /> Link Freelancer
@@ -3426,6 +3430,7 @@ export default function EvaluationsPage() {
             setPublicLinkDialogAreaName(null);
             setPublicLinkRecipientName("");
             setPublicLinkIncludeConformity(false);
+            setPublicLinkForceConformity(false);
             setGeneratedPublicUrl(null);
             setLinkCopied(false);
           }
@@ -3481,16 +3486,20 @@ export default function EvaluationsPage() {
                       className="w-full border-2 border-[#191c1e] bg-white px-4 py-3 text-sm italic font-bold focus:outline-none focus:ring-2 focus:ring-[#ccff00]"
                     />
                   </div>
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <label className={cn("flex items-start gap-2.5 select-none", publicLinkForceConformity ? "cursor-not-allowed opacity-90" : "cursor-pointer")}>
                     <input
                       type="checkbox"
                       checked={publicLinkIncludeConformity}
+                      disabled={publicLinkForceConformity}
                       onChange={e => setPublicLinkIncludeConformity(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 border-2 border-[#191c1e] accent-[#ccff00] cursor-pointer shrink-0"
+                      className="mt-0.5 w-4 h-4 border-2 border-[#191c1e] accent-[#ccff00] cursor-pointer shrink-0 disabled:cursor-not-allowed"
                     />
                     <span className="text-xs font-bold italic text-[#444933] leading-tight">
                       Incluir matriz de conformidade no questionário<br />
                       <span className="font-normal not-italic text-[#747a60]">EPI · Estaiamentos · Conduta · Faltas/Atrasos · Destaque</span>
+                      {publicLinkForceConformity && (
+                        <><br /><span className="font-bold not-italic text-[#506600]">Obrigatório para Cenografia — o avaliador responde critério e conformidade no mesmo formulário.</span></>
+                      )}
                     </span>
                   </label>
                 </div>
@@ -3567,6 +3576,7 @@ export default function EvaluationsPage() {
                 setPublicLinkDialogAreaName(null);
                 setPublicLinkRecipientName("");
                 setPublicLinkIncludeConformity(false);
+            setPublicLinkForceConformity(false);
                 setGeneratedPublicUrl(null);
                 setLinkCopied(false);
               }}
