@@ -1184,6 +1184,19 @@ export function AdminEvaluationsConsole() {
                 <div className="flex items-center justify-between gap-2.5 mb-3 flex-wrap">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Critérios por área</p>
+                    {canManage && (
+                      <button
+                        type="button"
+                        data-testid="button-sync-criteria-assign"
+                        disabled={resyncCriteria.isPending}
+                        onClick={() => resyncCriteria.mutate({ id: selected.id })}
+                        className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+                        style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--foreground)" }}
+                        title="Adiciona a este evento os critérios do catálogo que estão faltando (ex.: Carga na Saída do Galpão). É aditivo — não remove critérios já avaliados. Só afeta ESTE evento."
+                      >
+                        <RefreshCw size={12} className={resyncCriteria.isPending ? "animate-spin" : ""} /> {resyncCriteria.isPending ? "Sincronizando..." : "Sincronizar Critérios"}
+                      </button>
+                    )}
                     {canManage && critPillCounts.unassigned > 0 && (
                       <button
                         type="button"
