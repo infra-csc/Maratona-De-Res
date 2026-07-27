@@ -153,6 +153,12 @@ export function AdminEvaluationsConsole() {
   const [linkRecipientName, setLinkRecipientName] = useState("");
   const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // --- "Gerar todos os links" (um por avaliador/área, Cenografia já combina critério + matriz) ---
+  interface BatchLink { key: string; evaluatorName: string; areaName: string; criterionNames: string[]; includeConformity: boolean; url: string | null; error: string | null; }
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchLinks, setBatchLinks] = useState<BatchLink[]>([]);
+  const [batchAllCopied, setBatchAllCopied] = useState(false);
   // --- Link dialog para Matriz de Conformidade ---
   const [conformityLinkDialog, setConformityLinkDialog] = useState<{ key: "cenografia" | "ferramentas"; label: string; evaluatorId: number | null; evaluatorName: string | null } | null>(null);
   const [conformityLinkRecipientName, setConformityLinkRecipientName] = useState("");
@@ -590,6 +596,56 @@ export function AdminEvaluationsConsole() {
     );
   }
 
+  // Gera TODOS os links do evento de uma vez: agrupa os critérios por
+  // área + avaliador (mesmo agrupamento do link individual, então um avaliador
+  // responde seus critérios num questionário só). Na Cenografia o link já vem
+  // combinado com a Matriz de Conformidade (critério + matriz no mesmo form).
+  async function handleGenerateAllLinks() {
+    if (!selected) return;
+    const pending = (selected.criteria ?? []).filter(c => c.assignedToId != null && c.state !== "done");
+    const groups = new Map<string, CritRow[]>();
+    for (const c of pending) {
+      const key = `${c.areaId}|${c.assignedToId}`;
+      const arr = groups.get(key) ?? [];
+      arr.push(c);
+      groups.set(key, arr);
+    }
+    if (groups.size === 0) {
+      toast({ title: "Nenhum critério pendente com avaliador atribuído", description: "Aplique os avaliadores padrão (ou atribua) antes de gerar os links.", variant: "destructive" });
+      return;
+    }
+    setBatchRunning(true);
+    setBatchOpen(true);
+    setBatchAllCopied(false);
+    const results: BatchLink[] = [];
+    for (const [key, rows] of groups) {
+      const first = rows[0];
+      const includeConformity = first.areaId === CENOGRAFIA_AREA_ID;
+      const base: Omit<BatchLink, "url" | "error"> = {
+        key,
+        evaluatorName: first.assignedToName ?? "Avaliador",
+        areaName: first.areaName,
+        criterionNames: rows.map(r => r.criterionName),
+        includeConformity,
+      };
+      try {
+        const data = await createAdminToken.mutateAsync({
+          assignedToUserId: first.assignedToId!,
+          criterionIds: rows.map(r => r.criterionId),
+          includeConformity,
+        });
+        results.push({ ...base, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
+      } catch (e) {
+        results.push({ ...base, url: null, error: (e as Error).message });
+      }
+    }
+    setBatchLinks(results);
+    setBatchRunning(false);
+    refetchAllTokens();
+    const ok = results.filter(r => r.url).length;
+    toast({ title: `${ok} link(s) gerado(s)${ok < results.length ? ` · ${results.length - ok} com erro` : ""}` });
+  }
+
   function handleGenerateConformityLink() {
     if (!conformityLinkDialog || !selected) return;
     const recipientName = conformityLinkRecipientName.trim();
@@ -950,6 +1006,19 @@ export function AdminEvaluationsConsole() {
                         title="Preenche cada critério sem avaliador com o Avaliador Padrão cadastrado nos Critérios"
                       >
                         <UserCheck size={12} /> {generateAssignments.isPending ? "Aplicando..." : "Aplicar Avaliadores Padrão"}
+                      </button>
+                    )}
+                    {canManage && (selected.total - critPillCounts.unassigned) > 0 && (
+                      <button
+                        type="button"
+                        data-testid="button-generate-all-links"
+                        disabled={batchRunning}
+                        onClick={handleGenerateAllLinks}
+                        className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+                        style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--foreground)" }}
+                        title="Gera um link por avaliador (Cenografia já vem com a Matriz de Conformidade no mesmo questionário)"
+                      >
+                        <Link2 size={12} /> {batchRunning ? "Gerando..." : "Gerar Todos os Links"}
                       </button>
                     )}
                   </div>
@@ -1818,6 +1887,75 @@ export function AdminEvaluationsConsole() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Todos os links (batch) ─────────────────────────────────── */}
+      {batchOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="rounded-xl w-full max-w-lg overflow-hidden flex flex-col" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", maxHeight: "85vh" }}>
+            <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Todos os links · {selected?.name}</p>
+                <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{batchRunning ? "Gerando links..." : `${batchLinks.filter(l => l.url).length} link(s) prontos`}</h3>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {batchLinks.some(l => l.url) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = batchLinks.filter(l => l.url).map(l => `${l.evaluatorName} (${l.areaName}${l.includeConformity ? " + Matriz" : ""}): ${l.url}`).join("\n");
+                      navigator.clipboard.writeText(text); setBatchAllCopied(true); setTimeout(() => setBatchAllCopied(false), 2000);
+                    }}
+                    className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1.5 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                  >
+                    <Copy size={12} /> {batchAllCopied ? "Copiado!" : "Copiar Todos"}
+                  </button>
+                )}
+                <button type="button" onClick={() => setBatchOpen(false)} className="rounded-lg p-1.5 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-2.5 overflow-y-auto">
+              {batchRunning && batchLinks.length === 0 && (
+                <p className="text-[11px] text-center py-6" style={{ color: "var(--muted-foreground)" }}>Gerando os links, aguarde…</p>
+              )}
+              {batchLinks.map(l => (
+                <div key={l.key} className="rounded-lg p-3" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[11px] font-black uppercase" style={{ fontFamily: CONDENSED }}>{l.evaluatorName}</span>
+                    <span className="text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--card)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{l.areaName}</span>
+                    {l.includeConformity && (
+                      <span className="text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>+ Matriz</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] leading-snug mb-2" style={{ color: "var(--muted-foreground)" }}>{l.criterionNames.join(" · ")}</p>
+                  {l.url ? (
+                    <div className="flex gap-2 items-center">
+                      <span className="text-[10px] font-bold break-all flex-1 select-all" style={{ color: "var(--foreground)" }}>{l.url}</span>
+                      <button
+                        type="button"
+                        onClick={() => { navigator.clipboard.writeText(l.url!); toast({ title: `Link de ${l.evaluatorName} copiado` }); }}
+                        className="shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1 transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                      >
+                        <Copy size={11} /> Copiar
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] font-bold" style={{ color: WARNING }}>{l.error ?? "Falha ao gerar"}</p>
+                  )}
+                </div>
+              ))}
+              {!batchRunning && (
+                <p className="text-[9.5px] leading-snug pt-1" style={{ color: "var(--muted-foreground)" }}>
+                  A Matriz de Conformidade da Cenografia já vai junto no link do avaliador dessa área. A matriz de Ferramentas (Guarda de Equipamentos) tem link próprio na seção de conformidade.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
