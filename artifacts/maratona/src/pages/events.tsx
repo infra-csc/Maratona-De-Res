@@ -674,10 +674,10 @@ export default function EventsPage() {
                         ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Concluído" }
                         : evalDone === evalTotal && evalTotal > 0
                           ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Avaliado" }
-                          : evalDone > 0
-                            ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Em Avaliação" }
-                            : missing.length > 0
-                              ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Sem Avaliador" }
+                          : missing.length > 0
+                            ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Sem Avaliador" }
+                            : evalDone > 0 || evalTotal > 0
+                              ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Em Avaliação" }
                               : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando" };
 
               return (
