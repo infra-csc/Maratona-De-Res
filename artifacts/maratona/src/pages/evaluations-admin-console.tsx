@@ -12,6 +12,7 @@ import {
   usePatchCriterionAssignment, useUsersByArea, useAllCriterionRoutings,
   useCreateAdminPublicToken, useAllPublicTokens,
   useCreateConformityPublicToken, useCreateFerramentasPublicToken,
+  useGenerateCriterionAssignments,
   type PublicToken,
 } from "@/lib/routing-api";
 import { customFetch } from "@/lib/custom-fetch";
@@ -236,6 +237,10 @@ export function AdminEvaluationsConsole() {
   }, [configuredEvents, criteriaQueries, assignQueries, evalQueries]);
 
   const selected = enrichedEvents.find(e => e.id === selectedEventId) ?? enrichedEvents[0] ?? null;
+
+  // Aplica os avaliadores PADRÃO (routing) a todos os critérios ainda sem avaliador,
+  // de uma vez — "confirmar que serão esses critérios e essas pessoas avaliando".
+  const generateAssignments = useGenerateCriterionAssignments(selected?.id ?? 0);
 
   const todoEvents = enrichedEvents.filter(e => !e.isDone);
   const doneEvents = enrichedEvents.filter(e => e.isDone);
@@ -929,7 +934,25 @@ export function AdminEvaluationsConsole() {
 
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2.5 mb-3 flex-wrap">
-                  <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Critérios por área</p>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Critérios por área</p>
+                    {canManage && critPillCounts.unassigned > 0 && (
+                      <button
+                        type="button"
+                        data-testid="button-apply-default-evaluators"
+                        disabled={generateAssignments.isPending}
+                        onClick={() => generateAssignments.mutate(undefined, {
+                          onSuccess: (r) => toast({ title: r.generated > 0 ? `Avaliadores padrão aplicados a ${r.generated} critério(s)` : "Nenhum critério pendente para aplicar" }),
+                          onError: (e) => toast({ title: "Erro ao aplicar avaliadores", description: e.message, variant: "destructive" }),
+                        })}
+                        className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+                        style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                        title="Preenche cada critério sem avaliador com o Avaliador Padrão cadastrado nos Critérios"
+                      >
+                        <UserCheck size={12} /> {generateAssignments.isPending ? "Aplicando..." : "Aplicar Avaliadores Padrão"}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-1.5 flex-wrap">
                     {([
                       { key: "all", label: "Todos" },
