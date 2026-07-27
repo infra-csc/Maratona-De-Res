@@ -288,9 +288,14 @@ export function AdminEvaluationsConsole() {
         const evalRow = assignedToId != null
           ? evalsForEvent.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === assignedToId)
           : undefined;
+        // Se o assignedToId não corresponde ao evaluatorUserId real (ex: avaliador
+        // chegou pelo event_area_assignments enquanto o criterion_routing aponta outro
+        // default), a avaliação ainda existe mas o lookup acima não encontra.
+        // Verificar se qualquer avaliação submetida existe para o critério.
+        const anySubmitted = evalsForEvent.some(e => e.criterionId === c.criterionId && e.status === "submitted");
         let state: CritState;
         if (assignedToId == null) state = "unassigned";
-        else if (evalRow?.status === "submitted" || c.partialPublishedAt != null || c.finalPublishedAt != null) state = "done";
+        else if (anySubmitted || c.partialPublishedAt != null || c.finalPublishedAt != null) state = "done";
         else if (evalRow?.status === "draft") state = "partial";
         else state = "pending";
         return {

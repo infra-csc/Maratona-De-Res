@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
-import { eq, and, sql, inArray, ilike, or, ne, aliasedTable } from "drizzle-orm";
+import { eq, and, sql, inArray, ilike, or, ne, aliasedTable, isNotNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
@@ -51,8 +51,10 @@ router.get("/events", async (req, res) => {
     db.select({ id: criteriaTable.id, defaultWeight: criteriaTable.defaultWeight })
       .from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false))),
     // Atribuições por critério (Central de Avaliações) — usadas para calcular unassignedAreaNames.
+    // Inclui status "suggested" porque é o estado padrão de atribuições ainda não enviadas;
+    // o que importa é assignedToId != null (há alguém designado), não se já submeteu.
     db.select({ eventId: eventCriterionAssignmentsTable.eventId, criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
-      .from(eventCriterionAssignmentsTable).where(and(inArray(eventCriterionAssignmentsTable.eventId, eventIds), ne(eventCriterionAssignmentsTable.status, "suggested"))),
+      .from(eventCriterionAssignmentsTable).where(and(inArray(eventCriterionAssignmentsTable.eventId, eventIds), isNotNull(eventCriterionAssignmentsTable.assignedToId))),
   ]);
   // Quesitos globais ativos com peso > 0 — denominador fixo para todos os eventos.
   const globalScorable = globalCatalog.filter(c => parseFloat((c.defaultWeight ?? "1") as unknown as string) > 0).length || globalCatalog.length;
