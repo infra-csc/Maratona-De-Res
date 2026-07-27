@@ -315,6 +315,43 @@ export async function generateCriterionAssignments(eventId: number) {
     generated++;
   }
 
+  // Matriz de Conformidade: pré-preenche os avaliadores PADRÃO (Cenografia e
+  // Ferramentas) a partir de area_conformity_routing, sem sobrescrever escolha
+  // manual já feita no evento. Assim "Aplicar Avaliadores Padrão" traz também
+  // os avaliadores das duas matrizes, não só os dos critérios. Opcional: se a
+  // tabela ainda não existir/estiver vazia, loga e segue.
+  try {
+    const [ev] = await db.select({
+      conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId,
+      conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId,
+    }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (ev && (ev.conformityEvaluatorUserId == null || ev.conformityEvaluatorFerramentasUserId == null)) {
+      const conformityDefaults = await db.select({
+        areaName: areasTable.name,
+        defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
+      })
+        .from(areaConformityRoutingTable)
+        .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id));
+      const byName = (needle: string) => conformityDefaults.find(
+        d => (d.areaName ?? "").trim().toLowerCase().includes(needle),
+      )?.defaultEvaluatorId ?? null;
+      const patch: Partial<typeof eventsTable.$inferInsert> = {};
+      if (ev.conformityEvaluatorUserId == null) {
+        const cenografiaDefault = byName("cenografia");
+        if (cenografiaDefault != null) patch.conformityEvaluatorUserId = cenografiaDefault;
+      }
+      if (ev.conformityEvaluatorFerramentasUserId == null) {
+        const ferramentasDefault = byName("ferramentas");
+        if (ferramentasDefault != null) patch.conformityEvaluatorFerramentasUserId = ferramentasDefault;
+      }
+      if (Object.keys(patch).length > 0) {
+        await db.update(eventsTable).set(patch).where(eq(eventsTable.id, eventId));
+      }
+    }
+  } catch (err) {
+    console.error(`[routing] Falha ao pré-preencher avaliadores da matriz no evento ${eventId}:`, err);
+  }
+
   return { generated, skipped };
 }
 

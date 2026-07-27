@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, areaConformityRoutingTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable } from "@workspace/db";
 import { eq, and, sql, inArray, ilike, or, ne, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -1711,42 +1711,11 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
   // pra isso existir. Gera automaticamente ao liberar as avaliações (idempotente:
   // pula critérios que já têm atribuição, então não sobrescreve nada).
   if (confirmed) {
+    // Gera as atribuições padrão dos critérios E pré-preenche os avaliadores
+    // padrão das duas matrizes de conformidade (Cenografia/Ferramentas) — tudo
+    // centralizado em generateCriterionAssignments, idempotente e sem
+    // sobrescrever escolhas manuais já feitas no evento.
     await generateCriterionAssignments(id);
-
-    // Matriz de Conformidade: espelha o Forms oficial — 3 perguntas para o
-    // avaliador de Cenografia (EPI, Estaiamentos, Conduta) e 1 para o de
-    // Ferramentas e Case (Guarda de Equipamentos). Pré-preenche os dois a
-    // partir dos padrões configurados em Critérios, sem sobrescrever uma
-    // escolha manual já feita neste evento. Recurso opcional: se falhar
-    // (ex.: tabela area_conformity_routing ainda não migrada no banco),
-    // loga e segue — não pode derrubar a liberação das avaliações.
-    if (ev.conformityEvaluatorUserId == null || ev.conformityEvaluatorFerramentasUserId == null) {
-      try {
-        const conformityDefaults = await db.select({
-          areaName: areasTable.name,
-          defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
-        })
-          .from(areaConformityRoutingTable)
-          .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id));
-        const byName = (needle: string) => conformityDefaults.find(
-          d => (d.areaName ?? "").trim().toLowerCase().includes(needle),
-        )?.defaultEvaluatorId ?? null;
-        const patch: Partial<typeof eventsTable.$inferInsert> = {};
-        if (ev.conformityEvaluatorUserId == null) {
-          const cenografiaDefault = byName("cenografia");
-          if (cenografiaDefault != null) patch.conformityEvaluatorUserId = cenografiaDefault;
-        }
-        if (ev.conformityEvaluatorFerramentasUserId == null) {
-          const ferramentasDefault = byName("ferramentas");
-          if (ferramentasDefault != null) patch.conformityEvaluatorFerramentasUserId = ferramentasDefault;
-        }
-        if (Object.keys(patch).length > 0) {
-          await db.update(eventsTable).set(patch).where(eq(eventsTable.id, id));
-        }
-      } catch (err) {
-        console.error(`[events] Falha ao pré-preencher avaliadores da matriz no evento ${id} (rodou o db push da tabela area_conformity_routing?):`, err);
-      }
-    }
   }
 
   res.json(await loadEventDetail(id));

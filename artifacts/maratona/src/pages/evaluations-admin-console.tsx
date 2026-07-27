@@ -733,6 +733,27 @@ export function AdminEvaluationsConsole() {
         results.push({ ...base, url: null, error: (e as Error).message });
       }
     }
+    // Matriz de Cenografia: normalmente já vai combinada no link do critério da
+    // Cenografia (Carga). Só gera link próprio dela se NÃO houve grupo da
+    // Cenografia (evento sem esse critério), pra não deixar a matriz de fora.
+    const hadCenoGroup = [...groups.values()].some(rows => rows[0].areaId === CENOGRAFIA_AREA_ID);
+    if (!hadCenoGroup) {
+      try {
+        const data = await createConformityToken.mutateAsync({ recipientName: "Matriz Cenografia" });
+        results.push({ key: "ceno-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
+      } catch (e) {
+        results.push({ key: "ceno-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: null, error: (e as Error).message });
+      }
+    }
+    // Matriz de Ferramentas (Guarda de Equipamentos): 1 item, sempre com link
+    // próprio — não tem critério pra combinar.
+    try {
+      const data = await createFerramentasToken.mutateAsync({ recipientName: "Matriz Ferramentas" });
+      results.push({ key: "ferr-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
+    } catch (e) {
+      results.push({ key: "ferr-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: null, error: (e as Error).message });
+    }
+
     setBatchLinks(results);
     setBatchRunning(false);
     refetchAllTokens();
@@ -2294,7 +2315,7 @@ export function AdminEvaluationsConsole() {
               ))}
               {!batchRunning && (
                 <p className="text-[9.5px] leading-snug pt-1" style={{ color: "var(--muted-foreground)" }}>
-                  A Matriz de Conformidade da Cenografia já vai junto no link do avaliador dessa área. A matriz de Ferramentas (Guarda de Equipamentos) tem link próprio na seção de conformidade.
+                  A Matriz de Conformidade da Cenografia já vai junto no link do avaliador dessa área (critério + matriz no mesmo questionário). A matriz de Ferramentas (Guarda de Equipamentos) vem com link próprio aqui na lista.
                 </p>
               )}
             </div>
