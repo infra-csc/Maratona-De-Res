@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
-import { cn, formatEventSubtitle } from "@/lib/utils";
+import { cn, formatEventSubtitle, fmtDate } from "@/lib/utils";
 import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, useCreateAdminPublicToken, type PublicToken } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -1853,7 +1853,7 @@ export default function EvaluationsPage() {
                       {(currentEvent.city || currentEvent.location) && (
                         <span className="flex items-center gap-1"><MapPin size={9} />{currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `, ${currentEvent.state}` : ""}` : currentEvent.location}</span>
                       )}
-                      <span className="flex items-center gap-1"><Calendar size={9} />{new Date(currentEvent.startDate).toLocaleDateString('pt-BR')} — {new Date(currentEvent.endDate).toLocaleDateString('pt-BR')}</span>
+                      <span className="flex items-center gap-1"><Calendar size={9} />{fmtDate(currentEvent.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })} — {fmtDate(currentEvent.endDate, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">

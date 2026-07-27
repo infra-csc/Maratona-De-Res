@@ -11,7 +11,7 @@ import {
   CheckCircle2, Clock, ChevronDown, ChevronRight,
   MapPin, Search, Award, ArrowRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, fmtDate } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 
 interface PerformanceData {
@@ -180,7 +180,7 @@ function EventCard({ event }: { event: EventSummary }) {
               {(event.city || event.location) && (
                 <span className="flex items-center gap-1"><MapPin size={11} /> {event.city ? `${event.city}${event.state ? `/${event.state}` : ""}` : event.location}</span>
               )}
-              {event.startDate && <span>{new Date(event.startDate).toLocaleDateString("pt-BR")}</span>}
+              {event.startDate && <span>{fmtDate(event.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>}
               <span className="px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Quesitos: {visibleCriteria.length}/{event.criteriaDetails.length}</span>
             </div>
           </div>
@@ -562,7 +562,7 @@ export default function MyPerformancePage() {
                           <div className="flex items-baseline justify-between gap-2 mb-1">
                             <p className="text-[12px] font-bold text-foreground truncate">{ev.eventName}</p>
                             {ev.startDate && (
-                              <span className="text-[10px] text-muted-foreground shrink-0">{new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
+                              <span className="text-[10px] text-muted-foreground shrink-0">{fmtDate(ev.startDate)}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
@@ -638,7 +638,7 @@ export default function MyPerformancePage() {
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                            {adj.date && <span>{new Date(`${adj.date}T00:00:00`).toLocaleDateString("pt-BR")}</span>}
+                            {adj.date && <span>{fmtDate(adj.date, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>}
                             {adj.eventName && <span className="flex items-center gap-1"><Calendar size={11} /> {adj.eventName}</span>}
                           </div>
                           {adj.reason && <p className="text-[11px] text-muted-foreground italic mt-1">"{adj.reason}"</p>}

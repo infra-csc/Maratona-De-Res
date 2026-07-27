@@ -3,6 +3,7 @@ import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurr
 import type { EventInput } from "@workspace/api-client-react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { fmtDate } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -656,8 +657,8 @@ export default function EventsPage() {
 
               // Date display
               const dateStr = ev.startDate === ev.endDate
-                ? new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-                : `${new Date(ev.startDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}–${new Date(ev.endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
+                ? fmtDate(ev.startDate)
+                : `${fmtDate(ev.startDate)}–${fmtDate(ev.endDate)}`;
 
               const badge = ev.isHistorical
                 ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
@@ -675,7 +676,9 @@ export default function EventsPage() {
                           ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Avaliado" }
                           : evalDone > 0
                             ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Em Avaliação" }
-                            : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando" };
+                            : missing.length > 0
+                              ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Sem Avaliador" }
+                              : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando" };
 
               return (
                 <div
@@ -885,7 +888,7 @@ export default function EventsPage() {
                       >
                         {selectedMergeTarget ? (
                           <span className="truncate text-sm font-bold uppercase">
-                            {selectedMergeTarget.name} — {new Date(selectedMergeTarget.startDate).toLocaleDateString('pt-BR')}{selectedMergeTarget.isHistorical ? " (histórico)" : ""}
+                            {selectedMergeTarget.name} — {fmtDate(selectedMergeTarget.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })}{selectedMergeTarget.isHistorical ? " (histórico)" : ""}
                           </span>
                         ) : (
                           <span className="font-bold uppercase text-xs tracking-wider truncate" style={{ color: "var(--muted-foreground)" }}>Selecione o evento duplicado...</span>
@@ -911,7 +914,7 @@ export default function EventsPage() {
                                 <span className="flex flex-col min-w-0">
                                   <span className="font-black uppercase text-sm leading-tight whitespace-normal">{e.name}</span>
                                   <span className="text-[11px] font-bold uppercase whitespace-normal" style={{ color: "var(--muted-foreground)" }}>
-                                    {new Date(e.startDate).toLocaleDateString('pt-BR')}{e.isHistorical ? " · histórico" : ""}
+                                    {fmtDate(e.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })}{e.isHistorical ? " · histórico" : ""}
                                   </span>
                                 </span>
                               </CommandItem>

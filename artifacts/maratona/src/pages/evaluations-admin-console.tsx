@@ -101,6 +101,11 @@ interface EnrichedEvent {
   isDone: boolean;
   conformityNeeded: boolean;
   conformityComplete: boolean;
+  // Avaliadores da Matriz de Conformidade (incluídos na vista global de avaliadores)
+  conformityEvaluatorUserId?: number | null;
+  conformityEvaluatorName?: string | null;
+  conformityEvaluatorFerramentasUserId?: number | null;
+  conformityEvaluatorFerramentasName?: string | null;
 }
 
 function initials(name: string) {
@@ -306,7 +311,7 @@ export function AdminEvaluationsConsole() {
       const done = rows.filter(r => r.state === "done").length;
       const unassigned = rows.filter(r => r.state === "unassigned").length;
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      const evC = ev as unknown as { conformityNeeded?: boolean; conformityComplete?: boolean };
+      const evC = ev as unknown as { conformityNeeded?: boolean; conformityComplete?: boolean; conformityEvaluatorUserId?: number | null; conformityEvaluatorName?: string | null; conformityEvaluatorFerramentasUserId?: number | null; conformityEvaluatorFerramentasName?: string | null };
       return {
         id: ev.id, name: ev.name, clientName: ev.clientName ?? null, city: ev.city ?? null, state: ev.state ?? null,
         status: ev.status, startDate: ev.startDate ?? null, endDate: ev.endDate ?? null,
@@ -316,6 +321,10 @@ export function AdminEvaluationsConsole() {
         isDone: (total > 0 && done === total) || (ev.partialPublishedCount ?? 0) > 0 || (ev.finalCalibratedCriteria ?? 0) > 0,
         conformityNeeded: !!evC.conformityNeeded,
         conformityComplete: !!evC.conformityComplete,
+        conformityEvaluatorUserId: evC.conformityEvaluatorUserId ?? null,
+        conformityEvaluatorName: evC.conformityEvaluatorName ?? null,
+        conformityEvaluatorFerramentasUserId: evC.conformityEvaluatorFerramentasUserId ?? null,
+        conformityEvaluatorFerramentasName: evC.conformityEvaluatorFerramentasName ?? null,
       };
     });
   }, [configuredEvents, criteriaQueries, assignQueries, evalQueries]);
@@ -862,6 +871,7 @@ export function AdminEvaluationsConsole() {
   const pendingEvaluatorNames = useMemo(() => {
     const map = new Map<number, { name: string; assigned: number; submitted: number; pendingEvents: { id: number; name: string }[] }>();
     for (const ev of enrichedEvents) {
+      // Critérios regulares
       for (const c of ev.criteria) {
         if (c.assignedToId == null || !c.assignedToName) continue;
         const cur = map.get(c.assignedToId) ?? { name: c.assignedToName, assigned: 0, submitted: 0, pendingEvents: [] };
@@ -874,6 +884,24 @@ export function AdminEvaluationsConsole() {
           }
         }
         map.set(c.assignedToId, cur);
+      }
+      // Avaliadores da Matriz de Conformidade (cenografia)
+      if (ev.conformityEvaluatorUserId != null && ev.conformityEvaluatorName) {
+        const cenoConf = ev as unknown as { conformity?: { epi?: unknown; estaiamentos?: unknown; conduta?: unknown; standoutResponse?: unknown; absencesResponse?: unknown } | null };
+        const cenoDone = !!(cenoConf.conformity?.epi != null && cenoConf.conformity?.estaiamentos != null && cenoConf.conformity?.conduta != null && cenoConf.conformity?.standoutResponse != null && cenoConf.conformity?.absencesResponse != null);
+        const cur = map.get(ev.conformityEvaluatorUserId) ?? { name: ev.conformityEvaluatorName, assigned: 0, submitted: 0, pendingEvents: [] };
+        cur.assigned++;
+        if (cenoDone) { cur.submitted++; } else if (!cur.pendingEvents.some(e => e.id === ev.id)) { cur.pendingEvents.push({ id: ev.id, name: ev.name }); }
+        map.set(ev.conformityEvaluatorUserId, cur);
+      }
+      // Avaliadores da Matriz de Conformidade (ferramentas)
+      if (ev.conformityEvaluatorFerramentasUserId != null && ev.conformityEvaluatorFerramentasName) {
+        const ferrConf = ev as unknown as { conformity?: { guardaEquipamentos?: unknown } | null };
+        const ferrDone = ferrConf.conformity?.guardaEquipamentos != null;
+        const cur = map.get(ev.conformityEvaluatorFerramentasUserId) ?? { name: ev.conformityEvaluatorFerramentasName, assigned: 0, submitted: 0, pendingEvents: [] };
+        cur.assigned++;
+        if (ferrDone) { cur.submitted++; } else if (!cur.pendingEvents.some(e => e.id === ev.id)) { cur.pendingEvents.push({ id: ev.id, name: ev.name }); }
+        map.set(ev.conformityEvaluatorFerramentasUserId, cur);
       }
     }
     return map;
@@ -2090,6 +2118,63 @@ export function AdminEvaluationsConsole() {
                         <div className="absolute right-3.5 top-full mt-1 z-10 w-64 rounded-xl p-2.5 text-left" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                           <InlinePicker areaId={c.areaId} excludeId={c.assignedToId} onPick={(uid) => handleAssign(c.criterionId, uid)} />
                         </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* ── Linhas da Matriz de Conformidade ── */}
+              {conformityRows.map(cf => {
+                const isDone = cf.filled >= cf.total;
+                const hasEvaluator = cf.evaluatorId != null;
+                const cfgState = isDone
+                  ? STATE_CFG.done
+                  : hasEvaluator ? STATE_CFG.pending : STATE_CFG.unassigned;
+                return (
+                  <div key={cf.key} className="grid grid-cols-[1.6fr_1fr_1.5fr_0.8fr_1fr_1fr] items-center min-w-[820px]" style={{ borderTop: "1px solid var(--border)", backgroundColor: !hasEvaluator ? "rgba(229,72,77,0.05)" : "rgba(154,176,0,0.04)" }}>
+                    <div className="px-3.5 py-3">
+                      <div className="font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED }}>{cf.name}</div>
+                      <div className="text-[9.5px] font-bold mt-0.5" style={{ color: "var(--muted-foreground)" }}>{cf.scope}</div>
+                    </div>
+                    <div className="px-3.5 py-3 font-bold uppercase text-[11px]" style={{ color: "var(--muted-foreground)" }}>
+                      {cf.key === "cenografia" ? "Cenografia" : "Ferramentas"}
+                    </div>
+                    <div className="px-3.5 py-3 font-semibold text-xs" style={{ color: !hasEvaluator ? WARNING : "var(--foreground)" }}>
+                      {cf.evaluatorName ?? "Sem avaliador"}
+                    </div>
+                    <div className="px-3.5 py-3 font-bold text-[11px]" style={{ color: "var(--muted-foreground)" }}>
+                      {isDone ? <span className="flex items-center gap-1" style={{ color: GOOD }}><Clock size={10} /> Preenchido</span> : <span>—</span>}
+                    </div>
+                    <div className="px-3.5 py-3">
+                      <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: cfgState.bg, color: cfgState.color }}>
+                        {isDone ? "Completo" : hasEvaluator ? "Aguardando" : "Sem avaliador"}
+                      </span>
+                    </div>
+                    <div className="px-3.5 py-3 text-right flex items-center justify-end gap-2">
+                      {canManage && hasEvaluator && (
+                        <button
+                          type="button"
+                          onClick={() => setConformityLinkDialog({ key: cf.key, label: cf.name, evaluatorId: cf.evaluatorId, evaluatorName: cf.evaluatorName })}
+                          className="rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1 whitespace-nowrap transition-colors hover:opacity-80"
+                          style={{ border: "1px solid var(--border)" }}
+                          title="Gerar link para preenchimento"
+                        >
+                          <Link2 size={10} /> Link
+                        </button>
+                      )}
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setOpenConformityPicker(cf.key)}
+                          className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase whitespace-nowrap transition-opacity hover:opacity-80"
+                          style={{
+                            border: !hasEvaluator ? "1px solid var(--primary)" : "1px solid var(--border)",
+                            backgroundColor: !hasEvaluator ? "var(--primary)" : "transparent",
+                            color: !hasEvaluator ? "var(--primary-foreground)" : "var(--foreground)",
+                          }}
+                        >
+                          {!hasEvaluator ? "Atribuir" : "Gerenciar"}
+                        </button>
                       )}
                     </div>
                   </div>

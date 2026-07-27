@@ -24,7 +24,7 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
+import { cn, fmtDate } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 
 const AMBER = "#e8a23d";
@@ -508,7 +508,7 @@ function EmployeeDetailSheet({
                         <div className="flex-1 min-w-0">
                           <p className="font-bold uppercase text-[12px]">{p.label}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-                            <span>{new Date(p.date).toLocaleDateString("pt-BR")}</span>
+                            <span>{fmtDate(p.date, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
                             {p.eventName && <span>· {p.eventName}</span>}
                             {p.quantity > 1 && <span>· {p.quantity}×</span>}
                           </div>
@@ -531,7 +531,7 @@ function EmployeeDetailSheet({
                         <div className="flex-1 min-w-0">
                           <p className="font-bold uppercase text-[12px]">{m.label}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
-                            <span>{new Date(m.date).toLocaleDateString("pt-BR")}</span>
+                            <span>{fmtDate(m.date, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
                             {m.eventName && <span>· {m.eventName}</span>}
                             {m.quantity > 1 && <span>· {m.quantity}×</span>}
                           </div>

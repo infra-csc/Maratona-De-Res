@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
 import { eq, and, sql, inArray, ilike, or, ne, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -26,7 +26,7 @@ router.get("/events", async (req, res) => {
   const eventIds = events.map(e => e.id);
 
   // Busca em lote para evitar N+1 (uma query por relação, não por evento).
-  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas, conformityRows, globalCatalog] = await Promise.all([
+  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas, conformityRows, globalCatalog, criterionAssignmentRows] = await Promise.all([
     db.select({ eventId: eventParticipantsTable.eventId, functionName: eventParticipantsTable.functionName, employmentType: employeesTable.employmentType, employeeFunction: employeesTable.functionName })
       .from(eventParticipantsTable).leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id)).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
@@ -50,6 +50,9 @@ router.get("/events", async (req, res) => {
     // Catálogo global: fonte de verdade para o total de quesitos do ciclo.
     db.select({ id: criteriaTable.id, defaultWeight: criteriaTable.defaultWeight })
       .from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false))),
+    // Atribuições por critério (Central de Avaliações) — usadas para calcular unassignedAreaNames.
+    db.select({ eventId: eventCriterionAssignmentsTable.eventId, criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
+      .from(eventCriterionAssignmentsTable).where(and(inArray(eventCriterionAssignmentsTable.eventId, eventIds), ne(eventCriterionAssignmentsTable.status, "suggested"))),
   ]);
   // Quesitos globais ativos com peso > 0 — denominador fixo para todos os eventos.
   const globalScorable = globalCatalog.filter(c => parseFloat((c.defaultWeight ?? "1") as unknown as string) > 0).length || globalCatalog.length;
@@ -71,6 +74,16 @@ router.get("/events", async (req, res) => {
 
   // Filtra eventos dentro do período do ciclo atual (se o ciclo tiver datas definidas;
   // um ciclo sem startDate/endDate configurados não filtra, evitando excluir tudo por engano)
+  // Busca em lote os nomes dos avaliadores de conformidade (cenografia + ferramentas).
+  const conformityEvalIds = [...new Set([
+    ...events.map(ev => ev.conformityEvaluatorUserId).filter((id): id is number => id != null),
+    ...events.map(ev => ev.conformityEvaluatorFerramentasUserId).filter((id): id is number => id != null),
+  ])];
+  const conformityEvalUsers = conformityEvalIds.length > 0
+    ? await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable).where(inArray(usersTable.id, conformityEvalIds))
+    : [];
+  const conformityEvalNameById = new Map(conformityEvalUsers.map(u => [u.id, u.name]));
+
   const { startDate: cycleStartDate, endDate: cycleEndDate } = cycle;
   const cycleEvents = cycleStartDate && cycleEndDate
     ? events.filter(ev => ev.endDate >= cycleStartDate && ev.endDate <= cycleEndDate)
@@ -292,8 +305,19 @@ router.get("/events", async (req, res) => {
       ...activeCriteria.map(c => c.responsibleAreaId).filter((id): id is number => id != null),
       ...orphanScoped.map(ch => ch.responsibleAreaId).filter((id): id is number => id != null),
     ]);
+    // Áreas cobertas por atribuições de critério (Central de Avaliações):
+    // uma área está coberta se pelo menos um critério ativo dela tem assignedToId preenchido.
+    const evCritAssignments = criterionAssignmentRows.filter(a => a.eventId === ev.id && a.assignedToId != null);
+    const areasCoveredByCritAssign = new Set(
+      activeCriteria
+        .filter(c => c.responsibleAreaId != null && evCritAssignments.some(a => a.criterionId === c.criterionId))
+        .map(c => c.responsibleAreaId as number)
+    );
     const unassignedAreaNames = [...areaIdsWithActiveCriteria]
-      .filter(areaId => !assignedByArea.has(areaId) || assignedByArea.get(areaId)!.size === 0)
+      .filter(areaId =>
+        (!assignedByArea.has(areaId) || assignedByArea.get(areaId)!.size === 0) &&
+        !areasCoveredByCritAssign.has(areaId)
+      )
       .map(areaId => areaNameById.get(areaId) ?? `Área ${areaId}`)
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
@@ -305,7 +329,11 @@ router.get("/events", async (req, res) => {
       return w > 0 && ch.partialPublishedAt != null;
     }).length;
     const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete };
+    const conformityEvaluatorName = ev.conformityEvaluatorUserId != null
+      ? (conformityEvalNameById.get(ev.conformityEvaluatorUserId) ?? null) : null;
+    const conformityEvaluatorFerramentasName = ev.conformityEvaluatorFerramentasUserId != null
+      ? (conformityEvalNameById.get(ev.conformityEvaluatorFerramentasUserId) ?? null) : null;
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityEvaluatorName, conformityEvaluatorFerramentasName };
   });
   res.json(enriched);
 });

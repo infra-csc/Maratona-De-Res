@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, fmtDate } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 
 const GOOD = "#9ab000";
@@ -897,7 +897,7 @@ export default function EventDetailPage() {
             <p className="text-[12px] font-semibold mt-1.5" style={{ color: "var(--muted-foreground)" }}>
               {[event.clientName, event.city ? `${event.city}${event.state ? `, ${event.state}` : ""}` : event.location].filter(Boolean).join(" · ")}
               {" · "}
-              {new Date(event.startDate).toLocaleDateString('pt-BR')} — {new Date(event.endDate).toLocaleDateString('pt-BR')}
+              {fmtDate(event.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })} — {fmtDate(event.endDate, { day: "2-digit", month: "2-digit", year: "numeric" })}
             </p>
           </div>
           <div className="flex gap-2 shrink-0 items-center">
