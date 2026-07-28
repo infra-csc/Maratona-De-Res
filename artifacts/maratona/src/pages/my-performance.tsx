@@ -409,24 +409,6 @@ export default function MyPerformancePage() {
                 </div>
               </div>
 
-              {/* Bônus Caju — só sinaliza elegibilidade, sem exibir valores ao colaborador */}
-              <div className="rounded-xl p-[18px] relative overflow-hidden bg-[#ccff00]">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#161e00]/70">Bônus Caju</span>
-                {summary.eligible ? (
-                  <>
-                    <div className="mt-1.5 font-black text-[30px] leading-none text-[#506600] flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      <CheckCircle2 size={26} /> Elegível
-                    </div>
-                    <p className="mt-1 text-[10px] font-bold uppercase text-[#506600]/80">Você está elegível ao bônus deste ciclo</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="mt-1.5 font-black text-[30px] leading-none text-[#747a60]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</div>
-                    <p className="mt-1 text-[10px] font-bold uppercase text-[#862200]">Não elegível para bônus neste ciclo</p>
-                  </>
-                )}
-              </div>
-
               {/* Eventos Confirmados — barra de progresso para elegibilidade */}
               {(() => {
                 const confirmed = summary.confirmedEvents ?? 0;
