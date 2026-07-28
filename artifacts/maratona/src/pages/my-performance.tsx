@@ -111,17 +111,6 @@ function scoreLabel(score: number | null): string {
   return "Abaixo da meta";
 }
 
-function bonusStatusLabel(isQuarterClosed: boolean, bonusStatus: string | null): string {
-  if (!isQuarterClosed) return "Valor parcial — projeção do ciclo em andamento";
-  switch (bonusStatus) {
-    case "paid": return "Bônus pago";
-    case "approved": return "Aprovado — aguardando pagamento";
-    case "scheduled": return "Pagamento agendado";
-    case "blocked": return "Bloqueado — contate o RH";
-    default: return "Resultado final — aguardando aprovação do RH";
-  }
-}
-
 function EventCard({ event }: { event: EventSummary }) {
   const [open, setOpen] = useState(false);
   const visibleCriteria = event.criteriaDetails.filter(c => c.scoreUsed !== null && c.weight > 0);
@@ -325,7 +314,6 @@ export default function MyPerformancePage() {
 
   const summary = data?.summary;
   const result = summary?.finalResult ?? summary?.grossAverage ?? null;
-  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
   const filteredEvents = (data?.events ?? []).filter(ev => {
     if (!ev.resultsConfirmed) return false;
@@ -421,21 +409,21 @@ export default function MyPerformancePage() {
                 </div>
               </div>
 
-              {/* Bônus Caju */}
+              {/* Bônus Caju — só sinaliza elegibilidade, sem exibir valores ao colaborador */}
               <div className="rounded-xl p-[18px] relative overflow-hidden bg-[#ccff00]">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#161e00]/70">Bônus Caju</span>
-                {!summary.eligible ? (
+                {summary.eligible ? (
                   <>
-                    <div className="mt-1.5 font-black text-[34px] leading-none text-[#747a60]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</div>
-                    <p className="mt-1 text-[10px] font-bold uppercase text-[#862200]">Não elegível para bônus neste ciclo</p>
-                  </>
-                ) : summary.projectedBonus !== null ? (
-                  <>
-                    <div className="mt-1.5 font-black text-[34px] leading-none text-[#506600]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{fmtBRL(summary.projectedBonus)}</div>
-                    <p className="mt-1 text-[10px] font-bold uppercase text-[#506600]/80">{bonusStatusLabel(summary.isQuarterClosed, summary.bonusStatus)}</p>
+                    <div className="mt-1.5 font-black text-[30px] leading-none text-[#506600] flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      <CheckCircle2 size={26} /> Elegível
+                    </div>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-[#506600]/80">Você está elegível ao bônus deste ciclo</p>
                   </>
                 ) : (
-                  <div className="mt-1.5 font-black text-[34px] leading-none text-[#747a60]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</div>
+                  <>
+                    <div className="mt-1.5 font-black text-[30px] leading-none text-[#747a60]" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>—</div>
+                    <p className="mt-1 text-[10px] font-bold uppercase text-[#862200]">Não elegível para bônus neste ciclo</p>
+                  </>
                 )}
               </div>
 
