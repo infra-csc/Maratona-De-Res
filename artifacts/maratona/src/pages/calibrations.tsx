@@ -1610,12 +1610,50 @@ export default function CalibrationsPage() {
                                 )}
                               </div>
 
-                              {/* ── Thread de comentários + log ───────────── */}
+                              {/* ── Histórico de calibrações (sempre visível) ─ */}
+                              {(() => {
+                                const auditEntries = (calAudit ?? []).filter(a => a.criterionId === c.criterionId);
+                                if (!auditEntries.length) return null;
+                                return (
+                                  <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
+                                    <div className="flex items-center gap-1 mb-0.5">
+                                      <History size={8} style={{ color: "var(--muted-foreground)" }} />
+                                      <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                                        Histórico ({auditEntries.length})
+                                      </span>
+                                    </div>
+                                    {auditEntries.map(entry => {
+                                      const before = entry.beforeJson ? (() => { try { return JSON.parse(entry.beforeJson); } catch { return null; } })() : null;
+                                      const after  = entry.afterJson  ? (() => { try { return JSON.parse(entry.afterJson);  } catch { return null; } })() : null;
+                                      const isRecal = entry.action === "recalibrate_released";
+                                      const scoreText = after?.score != null
+                                        ? (before?.score != null ? `${before.score} → ${after.score}` : `→ ${after.score}`)
+                                        : null;
+                                      return (
+                                        <div key={entry.id} className="flex items-center gap-1.5 flex-wrap px-1.5 py-1 rounded"
+                                          style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                                          <span className="shrink-0 text-[7px] font-black uppercase px-1 py-px rounded"
+                                            style={{ backgroundColor: isRecal ? "rgba(232,162,61,0.18)" : "rgba(154,176,0,0.14)", color: isRecal ? AMBER : GOOD }}>
+                                            {isRecal ? "Recal. pós-lib." : "Calibrou"}
+                                          </span>
+                                          <span className="text-[9px] font-bold">{entry.userName ?? "?"}</span>
+                                          {scoreText && (
+                                            <span className="text-[9px] font-black" style={{ color: GOOD }}>{scoreText}</span>
+                                          )}
+                                          <span className="text-[8px] ml-auto" style={{ color: "var(--muted-foreground)" }}>
+                                            {formatDateTime(new Date(entry.createdAt))}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* ── Comentários ─────────────────────────────── */}
                               {(() => {
                                 const criterionComments = (calComments ?? []).filter(cm => cm.criterionId === c.criterionId);
                                 const commentText = newCommentTexts[c.criterionId] ?? "";
-                                const auditEntries = (calAudit ?? []).filter(a => a.criterionId === c.criterionId);
-                                const showAudit = showAuditFor.has(c.criterionId);
                                 return (
                                   <div className="mt-2 pt-1.5 space-y-1.5" style={{ borderTop: "1px dashed var(--border)" }} onClick={e => e.stopPropagation()}>
                                     {/* Header */}
@@ -1624,48 +1662,7 @@ export default function CalibrationsPage() {
                                       <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
                                         Comentários{criterionComments.length > 0 ? ` (${criterionComments.length})` : ""}
                                       </span>
-                                      {auditEntries.length > 0 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setShowAuditFor(prev => {
-                                            const n = new Set(prev);
-                                            if (n.has(c.criterionId)) n.delete(c.criterionId); else n.add(c.criterionId);
-                                            return n;
-                                          })}
-                                          className="ml-auto flex items-center gap-0.5 text-[8px] font-black uppercase"
-                                          style={{ color: showAudit ? "var(--foreground)" : "var(--muted-foreground)" }}
-                                        >
-                                          <History size={9} /> Log ({auditEntries.length})
-                                        </button>
-                                      )}
                                     </div>
-                                    {/* Audit log (toggle) */}
-                                    {showAudit && (
-                                      <div className="space-y-0.5 rounded p-1.5" style={{ backgroundColor: "var(--secondary)" }}>
-                                        {auditEntries.map(entry => {
-                                          const before = entry.beforeJson ? (() => { try { return JSON.parse(entry.beforeJson); } catch { return null; } })() : null;
-                                          const after  = entry.afterJson  ? (() => { try { return JSON.parse(entry.afterJson);  } catch { return null; } })() : null;
-                                          const isRecal = entry.action === "recalibrate_released";
-                                          return (
-                                            <div key={entry.id} className="flex items-start gap-1.5 flex-wrap">
-                                              <span className="shrink-0 text-[7px] font-black uppercase px-1 py-px rounded"
-                                                style={{ backgroundColor: isRecal ? "rgba(232,162,61,0.18)" : "rgba(154,176,0,0.14)", color: isRecal ? AMBER : GOOD }}>
-                                                {isRecal ? "Recal. pós-lib." : "Calibrou"}
-                                              </span>
-                                              <span className="text-[9px] font-bold">{entry.userName ?? "?"}</span>
-                                              {before != null && after != null && (
-                                                <span className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>
-                                                  {before.score != null ? `${before.score} → ` : ""}{after.score}
-                                                </span>
-                                              )}
-                                              <span className="text-[8px] ml-auto" style={{ color: "var(--muted-foreground)" }}>
-                                                {formatDateTime(new Date(entry.createdAt))}
-                                              </span>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
                                     {/* Comentários existentes */}
                                     {criterionComments.map(cm => (
                                       <div key={cm.id} className="rounded p-1.5 group/cm"
