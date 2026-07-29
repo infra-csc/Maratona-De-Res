@@ -574,8 +574,12 @@ export default function CalibrationsPage() {
   const childCriterionIdSet = new Set<number>(
     [...childCriterionIdsMap.values()].flat()
   );
-  // Lista de exibição: exclui os filhos (suas notas aparecem na linha do pai)
-  const displayActiveCriteria = activeCriteria.filter(c => !childCriterionIdSet.has(c.criterionId));
+  // Lista de exibição: exclui os filhos (suas notas aparecem na linha do pai).
+  // Dupla proteção: pelo set E pela flag direta (cobre casos de cache stale).
+  const displayActiveCriteria = activeCriteria.filter(c =>
+    !childCriterionIdSet.has(c.criterionId) &&
+    !(c.eventScoped && c.sourceCriterionId != null)
+  );
 
   // Inicializa publishIntents quando o evento muda ou quando os critérios carregam.
   // DEVE ficar APÓS a declaração de displayActiveCriteria para evitar TDZ em produção.

@@ -922,6 +922,8 @@ export interface Absence {
   /** @nullable */
   reason?: string | null;
   registeredByUserId?: number;
+  /** @nullable */
+  registeredByUserName?: string | null;
   createdAt?: string;
 }
 

@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, absencesTable, employeesTable, eventsTable, penaltyTypesTable } from "@workspace/db";
-import { eq, and, asc } from "drizzle-orm";
+import { db, absencesTable, employeesTable, eventsTable, penaltyTypesTable, usersTable } from "@workspace/db";
+import { eq, and, asc, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -22,6 +22,7 @@ router.get("/absences", async (req, res) => {
   const { employeeId } = req.query;
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json([]); return; }
+  const registeredByAlias = aliasedTable(usersTable, "registered_by");
   let query = db.select({
     id: absencesTable.id,
     employeeId: absencesTable.employeeId,
@@ -36,11 +37,13 @@ router.get("/absences", async (req, res) => {
     quantity: absencesTable.quantity,
     reason: absencesTable.reason,
     registeredByUserId: absencesTable.registeredByUserId,
+    registeredByUserName: registeredByAlias.name,
     createdAt: absencesTable.createdAt,
   })
   .from(absencesTable)
   .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
   .leftJoin(eventsTable, eq(absencesTable.eventId, eventsTable.id))
+  .leftJoin(registeredByAlias, eq(absencesTable.registeredByUserId, registeredByAlias.id))
   .$dynamic();
 
   const conditions = [eq(absencesTable.cycleId, cycle.id)];

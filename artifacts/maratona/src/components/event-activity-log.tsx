@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Star, Sliders, MessagesSquare, MessageSquare, ClipboardCheck, History, ShieldCheck } from "lucide-react";
+import { Activity, Star, Sliders, MessagesSquare, MessageSquare, ClipboardCheck, History, ShieldCheck, Send } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { CONDENSED } from "@/lib/premium-theme";
@@ -23,6 +23,8 @@ const KIND_CFG: Record<string, { icon: React.ReactNode; color: string; bg: strin
   event_comment: { icon: <MessageSquare size={9} />,   color: "#64748b", bg: "rgba(100,116,139,0.14)" },
   conformity:    { icon: <ShieldCheck size={9} />,     color: "#06b6d4", bg: "rgba(6,182,212,0.13)" },
   audit:         { icon: <ClipboardCheck size={9} />,  color: "#94a3b8", bg: "rgba(148,163,184,0.13)" },
+  publish:       { icon: <Send size={9} />,            color: "#f59e0b", bg: "rgba(245,158,11,0.13)" },
+  publish_final: { icon: <Send size={9} />,            color: "#10b981", bg: "rgba(16,185,129,0.13)" },
 };
 
 function fmtDTShort(iso: string) {

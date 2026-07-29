@@ -3980,6 +3980,8 @@ components:
           type: ["string", "null"]
         registeredByUserId:
           type: integer
+        registeredByUserName:
+          type: ["string", "null"]
         createdAt:
           type: string
 

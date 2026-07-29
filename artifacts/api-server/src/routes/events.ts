@@ -1727,9 +1727,24 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
   const critName = new Map(criteriaRows.map(c => [c.id, c.name]));
 
   // Run all queries in parallel
-  const [evals, cals, calComments, evComments, auditRows] = await Promise.all([
-    // 1. Evaluations submitted
-    db.select({ id: evaluationsTable.id, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, userName: usersTable.name, submittedAt: evaluationsTable.submittedAt })
+  const actPartialPubAlias = aliasedTable(usersTable, "act_partial_pub");
+  const actFinalPubAlias   = aliasedTable(usersTable, "act_final_pub");
+  const [evals, cals, calComments, evComments, auditRows, pubRows] = await Promise.all([
+    // 1. Evaluations submitted — usa submitter_name para links públicos
+    db.select({
+        id: evaluationsTable.id,
+        criterionId: evaluationsTable.criterionId,
+        score: evaluationsTable.score,
+        userName: usersTable.name,
+        submitterName: sql<string | null>`(
+          SELECT submitter_name FROM public_eval_tokens
+          WHERE event_id = ${evaluationsTable.eventId}
+            AND created_by_user_id = ${evaluationsTable.evaluatorUserId}
+            AND used_at IS NOT NULL
+          ORDER BY used_at DESC LIMIT 1
+        )`,
+        submittedAt: evaluationsTable.submittedAt,
+      })
       .from(evaluationsTable)
       .leftJoin(usersTable, eq(evaluationsTable.evaluatorUserId, usersTable.id))
       .where(and(eq(evaluationsTable.eventId, id), eq(evaluationsTable.status, "submitted"), isNotNull(evaluationsTable.submittedAt))),
@@ -1755,6 +1770,21 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
       .where(and(eq(auditLogsTable.entity, "events"), eq(auditLogsTable.entityId, String(id))))
       .orderBy(desc(auditLogsTable.createdAt))
       .limit(200),
+    // 6. Criterion publication events (partial + final publish)
+    db.select({
+        criterionId: eventCriteriaTable.criterionId,
+        partialPublishedAt: eventCriteriaTable.partialPublishedAt,
+        finalPublishedAt: eventCriteriaTable.finalPublishedAt,
+        partialPublishedByName: actPartialPubAlias.name,
+        finalPublishedByName: actFinalPubAlias.name,
+      })
+      .from(eventCriteriaTable)
+      .leftJoin(actPartialPubAlias, eq(eventCriteriaTable.partialPublishedByUserId, actPartialPubAlias.id))
+      .leftJoin(actFinalPubAlias,   eq(eventCriteriaTable.finalPublishedByUserId,   actFinalPubAlias.id))
+      .where(and(
+        eq(eventCriteriaTable.eventId, id),
+        or(isNotNull(eventCriteriaTable.partialPublishedAt), isNotNull(eventCriteriaTable.finalPublishedAt))
+      )),
   ]);
 
   const ACTION_LABELS: Record<string, string> = {
@@ -1794,7 +1824,9 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
 
   for (const e of evals) {
     if (!e.submittedAt) continue;
-    entries.push({ id: `eval-${e.id}`, kind: "eval", label: "Enviou avaliação", userName: e.userName ?? null, criterionName: critName.get(e.criterionId) ?? null, score: parseFloat(e.score as unknown as string), detail: null, createdAt: new Date(e.submittedAt).toISOString() });
+    // Para avaliações via link público, usa o nome digitado (submitter_name) em vez da conta do gerente
+    const displayName = e.submitterName ?? e.userName ?? null;
+    entries.push({ id: `eval-${e.id}`, kind: "eval", label: "Enviou avaliação", userName: displayName, criterionName: critName.get(e.criterionId) ?? null, score: parseFloat(e.score as unknown as string), detail: null, createdAt: new Date(e.submittedAt).toISOString() });
   }
   for (const c of cals) {
     entries.push({ id: `cal-${c.id}`, kind: "calibration", label: "Calibrou nota", userName: c.userName ?? null, criterionName: critName.get(c.criterionId) ?? null, score: parseFloat(c.score as unknown as string), detail: null, createdAt: new Date(c.calibratedAt).toISOString() });
@@ -1806,6 +1838,14 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
   for (const ec of evComments) {
     const m = ec.message;
     entries.push({ id: `evcomment-${ec.id}`, kind: "event_comment", label: "Comentou no evento", userName: ec.userName ?? null, criterionName: null, score: null, detail: m.length > 100 ? m.slice(0, 100) + "…" : m, createdAt: new Date(ec.createdAt).toISOString() });
+  }
+  for (const p of pubRows) {
+    if (p.partialPublishedAt) {
+      entries.push({ id: `pub-partial-${p.criterionId}`, kind: "publish", label: "Publicou parcial", userName: p.partialPublishedByName ?? null, criterionName: critName.get(p.criterionId) ?? null, score: null, detail: null, createdAt: new Date(p.partialPublishedAt).toISOString() });
+    }
+    if (p.finalPublishedAt) {
+      entries.push({ id: `pub-final-${p.criterionId}`, kind: "publish_final", label: "Publicou final", userName: p.finalPublishedByName ?? null, criterionName: critName.get(p.criterionId) ?? null, score: null, detail: null, createdAt: new Date(p.finalPublishedAt).toISOString() });
+    }
   }
   for (const a of auditRows) {
     const isConformity = a.action === "update_conformity" || a.action === "create_conformity";

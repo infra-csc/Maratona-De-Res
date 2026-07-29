@@ -440,8 +440,16 @@ export default function AbsencesPage() {
                             {isMerit ? "+" : "−"}{a.points * a.quantity}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5 text-sm max-w-xs truncate" style={{ color: "var(--muted-foreground)" }} title={a.reason || undefined}>
-                          {a.reason || <span className="text-xs opacity-50">Sem justificativa</span>}
+                        <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)", maxWidth: "22rem" }}>
+                          <span className="block leading-snug" style={{ wordBreak: "break-word", whiteSpace: "normal" }}>
+                            {a.reason || <span className="text-xs opacity-50">Sem justificativa</span>}
+                          </span>
+                          {(a as Absence & { registeredByUserName?: string | null }).registeredByUserName && (
+                            <span className="mt-1 flex items-center gap-1 text-[10px] opacity-60">
+                              <span className="font-bold uppercase tracking-wide">por</span>
+                              {(a as Absence & { registeredByUserName?: string | null }).registeredByUserName}
+                            </span>
+                          )}
                         </td>
                         {canEdit && (
                           <td className="px-5 py-3.5 text-right">
