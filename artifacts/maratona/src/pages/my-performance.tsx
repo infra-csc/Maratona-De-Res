@@ -512,80 +512,83 @@ export default function MyPerformancePage() {
                     ))}
                   </div>
 
-                  {/* Cadeia de cálculo */}
-                  <div className="px-5 py-4 space-y-0" style={{ backgroundColor: "var(--muted)", borderTop: "1px solid var(--border)" }}>
-                    {/* Passo 1: Soma ÷ N = Média Bruta */}
-                    <div className="flex items-center gap-2 flex-wrap py-2" style={{ borderBottom: "1px solid var(--border)" }}>
-                      <div className="flex items-center gap-1.5 flex-wrap flex-1">
-                        <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wide">Soma</span>
-                        <span className="font-black text-[17px] leading-none text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{liveConsistent ? liveTotal.toFixed(1) : (displayAvg * N).toFixed(1)}</span>
-                        <span className="text-[13px] font-bold text-muted-foreground">÷</span>
-                        <span className="font-black text-[17px] leading-none text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{N}</span>
-                        <span className="text-[11px] text-muted-foreground font-bold">prova{N !== 1 ? "s" : ""}</span>
-                        <span className="text-[13px] font-bold text-muted-foreground">=</span>
+                  {/* Fórmula de cálculo */}
+                  <div className="px-5 py-5" style={{ backgroundColor: "var(--muted)", borderTop: "1px solid var(--border)" }}>
+                    {/* Rótulo da fórmula */}
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-4">
+                      {netPenalty !== 0
+                        ? `( soma das notas ${pen > 0 ? "− penalidades" : ""}${mer > 0 ? " + méritos" : ""} ) ÷ nº de provas = nota final`
+                        : "soma das notas ÷ nº de provas = nota final"}
+                    </p>
+
+                    {/* Blocos da fórmula */}
+                    <div className="flex items-stretch gap-0 flex-wrap">
+
+                      {/* SOMA */}
+                      <div className="flex flex-col items-center justify-center px-4 py-3 rounded-l-lg min-w-[72px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                        <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground mb-1">Soma</span>
+                        <span className="font-black text-[24px] leading-none text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                          {liveConsistent ? liveTotal.toFixed(1) : (displayAvg * N).toFixed(1)}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground">Média bruta</span>
-                        <span className="font-black text-[20px] leading-none ml-1" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(displayAvg) }}>{displayAvg.toFixed(1)}</span>
+
+                      {/* − PENALIDADES */}
+                      {pen > 0 && (
+                        <>
+                          <div className="flex items-center px-2 self-center">
+                            <span className="text-[18px] font-black text-muted-foreground">−</span>
+                          </div>
+                          <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "rgba(192,57,43,0.08)", border: "1px solid rgba(192,57,43,0.25)" }}>
+                            <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: "#c0392b" }}>Penalidades</span>
+                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#c0392b" }}>{pen}</span>
+                          </div>
+                        </>
+                      )}
+
+                      {/* + MÉRITOS */}
+                      {mer > 0 && (
+                        <>
+                          <div className="flex items-center px-2 self-center">
+                            <span className="text-[18px] font-black text-muted-foreground">+</span>
+                          </div>
+                          <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "rgba(80,102,0,0.08)", border: "1px solid rgba(80,102,0,0.25)" }}>
+                            <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: "#506600" }}>Méritos</span>
+                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#506600" }}>{mer}</span>
+                          </div>
+                        </>
+                      )}
+
+                      {/* ÷ N PROVAS */}
+                      <div className="flex items-center px-2 self-center">
+                        <span className="text-[18px] font-black text-muted-foreground">÷</span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                        <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground mb-1">Provas</span>
+                        <span className="font-black text-[24px] leading-none text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{N}</span>
+                      </div>
+
+                      {/* = NOTA FINAL */}
+                      <div className="flex items-center px-2 self-center">
+                        <span className="text-[18px] font-black text-muted-foreground">=</span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center px-4 py-3 rounded-r-lg flex-1 min-w-[88px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                        <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground mb-1">
+                          Nota Final{isClamped ? " (limitado a 0–100)" : ""}
+                        </span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-black text-[28px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(finalVal) }}>{finalVal.toFixed(1)}</span>
+                          <span className="text-[11px] text-muted-foreground">/100</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Passo 2: ajustes — só mostra se houver penalidades ou méritos */}
+                    {/* Explicação textual — só quando há penalidade/mérito */}
                     {netPenalty !== 0 && (
-                      <div className="flex items-center gap-2 flex-wrap py-2" style={{ borderBottom: "1px solid var(--border)" }}>
-                        <div className="flex items-center gap-1.5 flex-wrap flex-1">
-                          {pen > 0 && (
-                            <>
-                              <span className="text-[11px] font-bold uppercase text-muted-foreground">Penalidades</span>
-                              <span className="font-black text-[17px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#c0392b" }}>−{pen}</span>
-                              <span className="text-[11px] font-bold text-muted-foreground">pts</span>
-                            </>
-                          )}
-                          {mer > 0 && (
-                            <>
-                              {pen > 0 && <span className="text-[13px] font-bold text-muted-foreground">/</span>}
-                              <span className="text-[11px] font-bold uppercase text-muted-foreground">Méritos</span>
-                              <span className="font-black text-[17px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#506600" }}>+{mer}</span>
-                              <span className="text-[11px] font-bold text-muted-foreground">pts</span>
-                            </>
-                          )}
-                          <span className="text-[13px] font-bold text-muted-foreground">÷</span>
-                          <span className="font-black text-[17px] leading-none text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{N}</span>
-                          <span className="text-[11px] text-muted-foreground font-bold">prova{N !== 1 ? "s" : ""}</span>
-                          <span className="text-[13px] font-bold text-muted-foreground">=</span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[10px] font-bold uppercase text-muted-foreground">Ajuste</span>
-                          <span className="font-black text-[20px] leading-none ml-1" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: netPenalty > 0 ? "#c0392b" : "#506600" }}>
-                            {netPenalty > 0 ? "−" : "+"}{Math.abs(penPerEvent).toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
+                      <p className="mt-3 text-[10px] text-muted-foreground leading-relaxed">
+                        Penalidades e méritos são somados ao total antes de dividir pelas provas —
+                        {" "}por isso o impacto depende de quantos eventos você participou.
+                      </p>
                     )}
-
-                    {/* Passo 3: resultado final */}
-                    <div className="flex items-center justify-between gap-2 pt-3">
-                      <div className="flex items-center gap-2 flex-wrap text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
-                        {netPenalty !== 0 ? (
-                          <>
-                            <span>{displayAvg.toFixed(1)}</span>
-                            <span>{netPenalty > 0 ? "−" : "+"}</span>
-                            <span>{Math.abs(penPerEvent).toFixed(1)}</span>
-                            <span>=</span>
-                          </>
-                        ) : (
-                          <span>Sem ajustes de penalidade/mérito</span>
-                        )}
-                        {isClamped && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--border)" }}>limitado a 0–100</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[11px] font-black uppercase text-muted-foreground">Nota Final</span>
-                        <span className="font-black text-[26px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(finalVal) }}>{finalVal.toFixed(1)}</span>
-                        <span className="text-[12px] text-muted-foreground">/100</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
               );
