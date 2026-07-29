@@ -3,7 +3,7 @@ import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, areasTable, employeeCycleEligibilityTable,
-  eventAreaAssignmentsTable, employeeEventResultsTable,
+  eventAreaAssignmentsTable, employeeEventResultsTable, eventConformitiesTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
@@ -153,7 +153,7 @@ router.get("/my-performance", async (req, res) => {
       .where(eq(eventCriteriaTable.eventId, p.eventId));
 
     // Avaliações do TIME do evento (não por colaborador)
-    const [allEvals, allCalibrations, areaAssignmentsRaw] = await Promise.all([
+    const [allEvals, allCalibrations, areaAssignmentsRaw, conformityRow] = await Promise.all([
       db.select({
         criterionId: evaluationsTable.criterionId,
         score: evaluationsTable.score,
@@ -171,7 +171,32 @@ router.get("/my-performance", async (req, res) => {
 
       db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
         .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, p.eventId)),
+
+      db.select({
+        epi: eventConformitiesTable.epi,
+        estaiamentos: eventConformitiesTable.estaiamentos,
+        guardaEquipamentos: eventConformitiesTable.guardaEquipamentos,
+        conduta: eventConformitiesTable.conduta,
+        epiComment: eventConformitiesTable.epiComment,
+        estaiamentosComment: eventConformitiesTable.estaiamentosComment,
+        guardaEquipamentosComment: eventConformitiesTable.guardaEquipamentosComment,
+        condutaComment: eventConformitiesTable.condutaComment,
+      }).from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, p.eventId)).limit(1),
     ]);
+
+    // Itens da Matriz de Conformidade que reprovaram (false = NÃO conforme)
+    const conformity = conformityRow[0] ?? null;
+    const CONFORMITY_ITEMS = [
+      { key: "epi" as const,               label: "EPI",                   commentKey: "epiComment" as const },
+      { key: "estaiamentos" as const,       label: "Estaiamentos",          commentKey: "estaiamentosComment" as const },
+      { key: "guardaEquipamentos" as const, label: "Guarda de Equipamentos",commentKey: "guardaEquipamentosComment" as const },
+      { key: "conduta" as const,            label: "Conduta",               commentKey: "condutaComment" as const },
+    ];
+    const conformityFailedItems: { label: string; comment: string | null }[] = conformity
+      ? CONFORMITY_ITEMS
+          .filter(item => conformity[item.key] === false)
+          .map(item => ({ label: item.label, comment: conformity[item.commentKey] ?? null }))
+      : [];
 
     const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentsRaw);
 
@@ -312,6 +337,7 @@ router.get("/my-performance", async (req, res) => {
         const diff = Math.round((raw - fin) * 100) / 100;
         return diff > 0 ? diff : 0;
       })(),
+      conformityFailedItems,
       projectedPlatoon: platoon?.name ?? null,
       projectedPlatoonColor: platoon?.color ?? null,
       evaluatedCriteria,

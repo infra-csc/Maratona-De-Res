@@ -69,6 +69,7 @@ interface EventSummary {
   eventScore: number;
   rawTeamScore?: number | null;
   conformityPenalty?: number;
+  conformityFailedItems?: { label: string; comment: string | null }[];
   projectedPlatoon: string | null;
   projectedPlatoonColor: string | null;
   evaluatedCriteria: number;
@@ -201,11 +202,17 @@ function EventCard({ event }: { event: EventSummary }) {
                       {(event.rawTeamScore ?? event.eventScore + (event.conformityPenalty ?? 0)).toFixed(1)}
                     </span>
                   </div>
-                  {/* Desconto Matriz */}
-                  <div className="flex items-center gap-1">
+                  {/* Desconto Matriz + itens reprovados */}
+                  <div className="flex flex-col items-end gap-0.5">
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(192,57,43,0.12)", color: "#c0392b" }}>
                       Matriz −{(event.conformityPenalty ?? 0).toFixed(1)}
                     </span>
+                    {(event.conformityFailedItems ?? []).map((item, i) => (
+                      <span key={i} className="text-[9px] font-bold px-1.5 py-0.5 rounded text-right" style={{ backgroundColor: "rgba(192,57,43,0.07)", color: "#c0392b" }}
+                        title={item.comment ?? undefined}>
+                        NÃO: {item.label}{item.comment ? " ⓘ" : ""}
+                      </span>
+                    ))}
                   </div>
                   {/* Nota final em destaque */}
                   <div className="text-right">
