@@ -87,10 +87,13 @@ router.get("/my-performance", async (req, res) => {
   // batiam com as outras telas. Só caímos no cálculo ao vivo quando ainda NÃO
   // existe linha oficial (evento não confirmado) — aí é projeção mesmo.
   const officialEventScores = new Map<number, number>();
+  // rawTeamScore = eventScore da linha (nota bruta antes da penalidade da Matriz)
+  const officialRawEventScores = new Map<number, number>();
   {
     const officialRows = await db
       .select({
         eventId: employeeEventResultsTable.eventId,
+        eventScore: employeeEventResultsTable.eventScore,
         finalEventScore: employeeEventResultsTable.finalEventScore,
       })
       .from(employeeEventResultsTable)
@@ -102,6 +105,9 @@ router.get("/my-performance", async (req, res) => {
     for (const r of officialRows) {
       if (r.finalEventScore != null) {
         officialEventScores.set(r.eventId, parseFloat(r.finalEventScore as unknown as string));
+      }
+      if (r.eventScore != null) {
+        officialRawEventScores.set(r.eventId, parseFloat(r.eventScore as unknown as string));
       }
     }
   }
@@ -293,6 +299,19 @@ router.get("/my-performance", async (req, res) => {
       partialPublishedAt,
       eventScore,
       teamScore: eventScore,
+      // Penalidade da Matriz de Performance: diferença entre nota bruta e final
+      // do snapshot oficial. Zero quando não há penalidade (ou evento ao vivo).
+      rawTeamScore: (() => {
+        const raw = officialRawEventScores.get(p.eventId ?? 0);
+        return raw ?? null;
+      })(),
+      conformityPenalty: (() => {
+        const raw = officialRawEventScores.get(p.eventId ?? 0);
+        const fin = officialEventScores.get(p.eventId ?? 0);
+        if (raw == null || fin == null) return 0;
+        const diff = Math.round((raw - fin) * 100) / 100;
+        return diff > 0 ? diff : 0;
+      })(),
       projectedPlatoon: platoon?.name ?? null,
       projectedPlatoonColor: platoon?.color ?? null,
       evaluatedCriteria,

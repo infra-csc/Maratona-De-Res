@@ -67,6 +67,8 @@ interface EventSummary {
   criteriaConfirmedAt?: string | null;
   partialPublishedAt?: string | null;
   eventScore: number;
+  rawTeamScore?: number | null;
+  conformityPenalty?: number;
   projectedPlatoon: string | null;
   projectedPlatoonColor: string | null;
   evaluatedCriteria: number;
@@ -189,13 +191,38 @@ function EventCard({ event }: { event: EventSummary }) {
 
         <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pl-10 sm:pl-0 border-t sm:border-t-0 pt-3 sm:pt-0" style={{ borderColor: "var(--border)" }}>
           {event.eventScore > 0 && (
-            <div className="flex flex-col items-end gap-1.5">
-              <div className="text-right">
-                <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-0.5">Nota</span>
-                <span className="font-black text-[19px] leading-none" style={{ color: scoreColor(event.eventScore) }}>
-                  {event.eventScore.toFixed(1)}
-                </span>
-              </div>
+            <div className="flex flex-col items-end gap-1">
+              {(event.conformityPenalty ?? 0) > 0 ? (
+                <>
+                  {/* Nota bruta riscada */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground">Nota time</span>
+                    <span className="font-black text-[14px] leading-none line-through text-muted-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      {(event.rawTeamScore ?? event.eventScore + (event.conformityPenalty ?? 0)).toFixed(1)}
+                    </span>
+                  </div>
+                  {/* Desconto Matriz */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(192,57,43,0.12)", color: "#c0392b" }}>
+                      Matriz −{(event.conformityPenalty ?? 0).toFixed(1)}
+                    </span>
+                  </div>
+                  {/* Nota final em destaque */}
+                  <div className="text-right">
+                    <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-0.5">Nota final</span>
+                    <span className="font-black text-[19px] leading-none" style={{ color: scoreColor(event.eventScore) }}>
+                      {event.eventScore.toFixed(1)}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-right">
+                  <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-0.5">Nota</span>
+                  <span className="font-black text-[19px] leading-none" style={{ color: scoreColor(event.eventScore) }}>
+                    {event.eventScore.toFixed(1)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
