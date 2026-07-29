@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, ArrowLeft } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const CONDENSED = "'Barlow Condensed', 'Barlow', sans-serif";
 const ACCENT = "#ccff00";
@@ -22,55 +22,38 @@ const MUTED_COLOR = "#ccff0055";
 const HINT_COLOR = "rgba(255,255,255,0.35)";
 
 export default function LoginPage() {
-  const [value, setValue] = useState("");
-  const [password, setPassword] = useState("");
-  const [step, setStep] = useState<"main" | "password">("main");
+  const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();
 
-  const isPin = /^\d{4}$/.test(value);
-  const isEmail = value.includes("@");
+  const isReady = /^\d{11}$/.test(cpf);
 
-  async function doLogin(body: Record<string, string>) {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isReady) return;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ identifier: cpf, password: cpf }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Erro ao autenticar");
+      if (!res.ok) throw new Error(data.error ?? "CPF não encontrado ou sem acesso");
       login(data.token, data.user);
       setLocation(data.user.mustChangePassword ? "/trocar-senha" : "/");
     } catch (err: unknown) {
       toast({
         title: "Acesso negado",
-        description: err instanceof Error ? err.message : "Senha incorreta",
+        description: err instanceof Error ? err.message : "CPF inválido",
         variant: "destructive",
       });
-      setPassword("");
     } finally {
       setLoading(false);
     }
   }
-
-  const handleMain = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!value.trim()) return;
-    if (isPin) {
-      doLogin({ pin: value });
-    } else {
-      setStep("password");
-    }
-  };
-
-  const handlePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    doLogin({ identifier: value, password });
-  };
 
   return (
     <div
@@ -102,166 +85,71 @@ export default function LoginPage() {
             color: TEXT_COLOR,
           }}
         >
-          {step === "main" && (
-            <form onSubmit={handleMain} className="px-6 py-8 space-y-5">
-              <div>
-                <label
-                  className="block text-[11px] font-black uppercase tracking-widest mb-2"
-                  style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
-                >
-                  {isPin ? "Senha" : "Senha ou E-mail"}
-                </label>
-                <input
-                  type={isPin ? "password" : "text"}
-                  inputMode={isPin ? "numeric" : undefined}
-                  maxLength={isPin ? 4 : undefined}
-                  value={value}
-                  onChange={e => setValue(e.target.value)}
-                  placeholder="Senha de 4 dígitos ou e-mail"
-                  required
-                  autoFocus
-                  className="w-full outline-none font-bold transition-all"
-                  style={{
-                    fontFamily: CONDENSED,
-                    height: 56,
-                    padding: isPin ? "0" : "0 16px",
-                    fontSize: isPin ? 32 : 16,
-                    letterSpacing: isPin ? "0.55em" : "0.02em",
-                    textAlign: isPin ? "center" : "left",
-                    backgroundColor: INPUT_BG,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    color: TEXT_COLOR,
-                  }}
-                  onFocus={e => (e.currentTarget.style.borderColor = CARD_BORDER_ACCENT)}
-                  onBlur={e => (e.currentTarget.style.borderColor = INPUT_BORDER)}
-                />
-                {!isPin && value.length === 0 && (
-                  <p
-                    className="text-[10px] mt-1.5"
-                    style={{ fontFamily: CONDENSED, color: HINT_COLOR }}
-                  >
-                    Colaboradores: digitem a senha de 4 dígitos recebida
-                  </p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full font-black uppercase flex items-center justify-center gap-2 transition-all"
+          <form onSubmit={handleSubmit} className="px-6 py-8 space-y-5">
+            <div>
+              <label
+                className="block text-[11px] font-black uppercase tracking-widest mb-2"
+                style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
+              >
+                CPF
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={11}
+                value={cpf}
+                onChange={e => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                placeholder="Somente números"
+                required
+                autoFocus
+                autoComplete="off"
+                className="w-full outline-none font-bold transition-all"
                 style={{
                   fontFamily: CONDENSED,
-                  letterSpacing: "0.1em",
-                  backgroundColor: loading ? `${ACCENT}60` : ACCENT,
-                  color: ACCENT_FG,
-                  height: 52,
-                  border: "none",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  fontSize: 15,
+                  height: 56,
+                  padding: "0 16px",
+                  fontSize: cpf.length > 0 ? 22 : 16,
+                  letterSpacing: cpf.length > 0 ? "0.18em" : "0.02em",
+                  backgroundColor: INPUT_BG,
+                  border: `1px solid ${INPUT_BORDER}`,
+                  color: TEXT_COLOR,
+                  colorScheme: "dark",
                 }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT_HOVER; }}
-                onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT; }}
+                onFocus={e => (e.currentTarget.style.borderColor = CARD_BORDER_ACCENT)}
+                onBlur={e => (e.currentTarget.style.borderColor = INPUT_BORDER)}
+              />
+              <p
+                className="text-[10px] mt-1.5"
+                style={{ fontFamily: CONDENSED, color: HINT_COLOR }}
               >
-                {loading
-                  ? "Autenticando…"
-                  : isPin
-                  ? <><span>Acessar</span><ArrowRight size={16} /></>
-                  : <><span>Continuar</span><ArrowRight size={16} /></>}
-              </button>
-            </form>
-          )}
+                {cpf.length === 0
+                  ? "Digite seu CPF (11 dígitos)"
+                  : cpf.length < 11
+                  ? `${11 - cpf.length} dígito${11 - cpf.length !== 1 ? "s" : ""} restante${11 - cpf.length !== 1 ? "s" : ""}`
+                  : "✓ CPF completo"}
+              </p>
+            </div>
 
-          {step === "password" && (
-            <form onSubmit={handlePassword} className="px-6 py-8 space-y-5">
-              {/* Identifier chip */}
-              <div
-                className="flex items-center gap-3 px-4 py-3"
-                style={{
-                  backgroundColor: `${ACCENT}0a`,
-                  border: `1px solid ${ACCENT}25`,
-                }}
-              >
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="text-[10px] font-black uppercase tracking-widest"
-                    style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
-                  >
-                    {isEmail ? "E-mail" : "CPF"}
-                  </p>
-                  <p
-                    className="font-black text-sm truncate"
-                    style={{ fontFamily: CONDENSED, color: TEXT_COLOR }}
-                  >
-                    {value}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setStep("main"); setPassword(""); }}
-                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide"
-                  style={{
-                    fontFamily: CONDENSED,
-                    color: LABEL_COLOR,
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  <ArrowLeft size={11} /> Trocar
-                </button>
-              </div>
-
-              <div>
-                <label
-                  className="block text-[11px] font-black uppercase tracking-widest mb-2"
-                  style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
-                >
-                  Senha
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoFocus
-                  className="w-full outline-none font-bold transition-all"
-                  style={{
-                    fontFamily: CONDENSED,
-                    height: 56,
-                    padding: "0 16px",
-                    fontSize: 16,
-                    letterSpacing: "0.02em",
-                    backgroundColor: INPUT_BG,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    color: TEXT_COLOR,
-                  }}
-                  onFocus={e => (e.currentTarget.style.borderColor = CARD_BORDER_ACCENT)}
-                  onBlur={e => (e.currentTarget.style.borderColor = INPUT_BORDER)}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full font-black uppercase flex items-center justify-center gap-2"
-                style={{
-                  fontFamily: CONDENSED,
-                  letterSpacing: "0.1em",
-                  backgroundColor: loading ? `${ACCENT}40` : ACCENT,
-                  color: loading ? `${ACCENT_FG}80` : ACCENT_FG,
-                  height: 52,
-                  border: "none",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  fontSize: 15,
-                }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT_HOVER; }}
-                onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = ACCENT; }}
-              >
-                {loading ? "Autenticando…" : <><span>Acessar</span><ArrowRight size={16} /></>}
-              </button>
-            </form>
-          )}
+            <button
+              type="submit"
+              disabled={loading || !isReady}
+              className="w-full font-black uppercase flex items-center justify-center gap-2 transition-all"
+              style={{
+                fontFamily: CONDENSED,
+                letterSpacing: "0.1em",
+                backgroundColor: !isReady || loading ? `${ACCENT}40` : ACCENT,
+                color: !isReady || loading ? `${ACCENT_FG}80` : ACCENT_FG,
+                height: 52,
+                border: "none",
+                cursor: !isReady || loading ? "not-allowed" : "pointer",
+                fontSize: 15,
+              }}
+              onMouseEnter={e => { if (isReady && !loading) e.currentTarget.style.backgroundColor = ACCENT_HOVER; }}
+              onMouseLeave={e => { if (isReady && !loading) e.currentTarget.style.backgroundColor = !isReady || loading ? `${ACCENT}40` : ACCENT; }}
+            >
+              {loading ? "Autenticando…" : <><span>Acessar</span><ArrowRight size={16} /></>}
+            </button>
+          </form>
         </div>
 
         <p
