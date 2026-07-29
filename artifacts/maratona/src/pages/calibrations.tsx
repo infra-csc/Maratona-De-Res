@@ -133,6 +133,7 @@ export default function CalibrationsPage() {
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [newCommentTexts, setNewCommentTexts] = useState<Record<number, string>>({});
   const [showAuditFor, setShowAuditFor] = useState<Set<number>>(new Set());
+  const [expandedEvalComments, setExpandedEvalComments] = useState<Set<string>>(new Set());
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
@@ -1493,7 +1494,38 @@ export default function CalibrationsPage() {
                                       </button>
                                     )}
                                   </div>
-                                  {s.comment && <p className="text-[11px] leading-snug line-clamp-3 mt-0.5">{s.comment}</p>}
+                                  {s.comment && (() => {
+                                    const expandKey = `${c.criterionId}-${i}`;
+                                    const isExpanded = expandedEvalComments.has(expandKey);
+                                    const isLong = s.comment.length > 140 || s.comment.split("\n").length > 3;
+                                    return (
+                                      <div className="mt-0.5">
+                                        <p
+                                          className={`text-[11px] leading-snug${!isExpanded && isLong ? " line-clamp-3" : ""}`}
+                                          style={{ whiteSpace: "pre-wrap" }}
+                                        >
+                                          {s.comment}
+                                        </p>
+                                        {isLong && (
+                                          <button
+                                            type="button"
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              setExpandedEvalComments(prev => {
+                                                const n = new Set(prev);
+                                                if (n.has(expandKey)) n.delete(expandKey); else n.add(expandKey);
+                                                return n;
+                                              });
+                                            }}
+                                            className="text-[9px] font-black uppercase mt-0.5"
+                                            style={{ color: GOOD }}
+                                          >
+                                            {isExpanded ? "▲ ver menos" : "▼ ver mais"}
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               ))}
                               {/* ── Justificativa da calibração (editável) ── */}
