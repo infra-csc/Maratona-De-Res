@@ -551,9 +551,28 @@ export default function CalibrationsPage() {
       childCriterionIdsMap.set(c.sourceCriterionId, arr);
     }
   });
+
+  // Segunda passagem: critérios eventScoped ÓRFÃOS (sourceCriterionId=null) com o
+  // mesmo nome de um critério não-scoped → fundir pelo nome para exibição unificada.
+  const nonScopedByName = new Map<string, number>(
+    activeCriteria
+      .filter(c => !c.eventScoped)
+      .map(c => [c.criterionName.trim().toUpperCase(), c.criterionId])
+  );
+  activeCriteria.forEach(c => {
+    if (c.eventScoped && c.sourceCriterionId == null) {
+      const parentId = nonScopedByName.get(c.criterionName.trim().toUpperCase());
+      if (parentId != null) {
+        const arr = childCriterionIdsMap.get(parentId) ?? [];
+        if (!arr.includes(c.criterionId)) arr.push(c.criterionId);
+        childCriterionIdsMap.set(parentId, arr);
+      }
+    }
+  });
+
   // Conjunto de IDs de critérios "filhos" — ocultos da tabela (fundidos no pai)
   const childCriterionIdSet = new Set<number>(
-    activeCriteria.filter(c => c.eventScoped && c.sourceCriterionId != null).map(c => c.criterionId)
+    [...childCriterionIdsMap.values()].flat()
   );
   // Lista de exibição: exclui os filhos (suas notas aparecem na linha do pai)
   const displayActiveCriteria = activeCriteria.filter(c => !childCriterionIdSet.has(c.criterionId));
