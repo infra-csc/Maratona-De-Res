@@ -739,7 +739,7 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                         {net < 0 ? (
                           <span className="text-xs font-black px-2 py-0.5 rounded" style={{ backgroundColor: WARNING, color: "#fff" }}>-{Math.abs(net)}</span>
                         ) : net > 0 ? (
-                          <span className="text-xs font-black px-2 py-0.5 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>+{net}</span>
+                          <span className="text-xs font-black px-2 py-0.5 rounded" style={{ backgroundColor: "rgba(22,163,74,0.15)", color: "#16a34a" }}>+{net}</span>
                         ) : (
                           <span className="font-bold" style={{ color: "var(--muted-foreground)" }}>—</span>
                         )}
