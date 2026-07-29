@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle, fmtDate } from "@/lib/utils";
-import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, useCreateAdminPublicToken, type PublicToken } from "@/lib/routing-api";
+import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, useCreateAdminPublicToken, useDeletePublicToken, type PublicToken } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AdminEvaluationsConsole } from "./evaluations-admin-console";
@@ -551,6 +551,7 @@ export default function EvaluationsPage() {
   );
   const { data: publicLinkEligibleCriteria } = usePublicLinkEligibleCriteria(selectedEventId ?? null);
   const createPublicToken = useCreatePublicToken(selectedEventId ?? 0);
+  const deletePublicToken = useDeletePublicToken(selectedEventId ?? 0);
   const createConformityPublicToken = useCreateConformityPublicToken(selectedEventId ?? 0);
   const createFerramentasPublicToken = useCreateFerramentasPublicToken(selectedEventId ?? 0);
   const { data: publicTokenHistory, refetch: refetchTokenHistory } = usePublicTokens(
@@ -3577,9 +3578,23 @@ export default function EvaluationsPage() {
                           <CheckCircle size={10} /> Respondido
                         </span>
                       ) : (
-                        <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 mt-0.5">
-                          Pendente
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5 mt-0.5">
+                            Pendente
+                          </span>
+                          <button
+                            type="button"
+                            title="Excluir link"
+                            disabled={deletePublicToken.isPending}
+                            onClick={() => deletePublicToken.mutate(
+                              { tokenId: t.id },
+                              { onSuccess: () => refetchTokenHistory() },
+                            )}
+                            className="mt-0.5 border-2 border-[#191c1e] p-0.5 hover:bg-red-100 hover:border-red-400 transition-colors disabled:opacity-40"
+                          >
+                            <Trash2 size={12} className="text-red-500" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}

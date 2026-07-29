@@ -317,6 +317,21 @@ export function useCreateAdminPublicToken(eventId: number) {
   });
 }
 
+/** Exclui um token pendente (não usado). Só funciona se usedAt for null. */
+export function useDeletePublicToken(eventId: number) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { tokenId: string }>({
+    mutationFn: ({ tokenId }) =>
+      apiFetch<void>(`/api/public-eval-tokens/${tokenId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: publicTokensKey(eventId) });
+      qc.invalidateQueries({ queryKey: ["conformity-public-tokens", eventId] });
+      qc.invalidateQueries({ queryKey: ["conformity-ferramentas-public-tokens", eventId] });
+      qc.invalidateQueries({ queryKey: ["all-public-tokens", eventId] });
+    },
+  });
+}
+
 /** Usuários de uma área (para popular pickers). */
 export function useUsersByArea(areaId: number | null) {
   return useQuery<RouteUser[]>({

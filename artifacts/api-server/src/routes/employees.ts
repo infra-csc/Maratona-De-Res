@@ -328,6 +328,40 @@ router.post("/employees/bulk-employment-reset", requireRole("admin", "rh"), asyn
   res.json({ ok: true, casaCount });
 });
 
+/**
+ * Atualiza CPF (campo document) em lote a partir de uma lista {name, document}.
+ * Busca por nome exato (case-insensitive). Idempotente.
+ */
+router.post("/employees/bulk-set-cpf", requireRole("admin", "rh"), async (req, res) => {
+  const entries = req.body as { name: string; document: string }[];
+  if (!Array.isArray(entries) || entries.length === 0) {
+    res.status(400).json({ error: "Envie um array [{name, document}]" });
+    return;
+  }
+
+  const updated: { id: number; name: string }[] = [];
+  const notFound: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.name || !entry.document) continue;
+    const normalized = entry.name.trim().toLowerCase();
+    const all = await db.select({ id: employeesTable.id, name: employeesTable.name })
+      .from(employeesTable);
+    const match = all.find(e => e.name.trim().toLowerCase() === normalized);
+    if (!match) {
+      notFound.push(entry.name);
+      continue;
+    }
+    await db.update(employeesTable)
+      .set({ document: entry.document.trim() })
+      .where(eq(employeesTable.id, match.id));
+    updated.push({ id: match.id, name: match.name });
+  }
+
+  await audit(req.user!.userId, "bulk-set-cpf", "employees", undefined, { updated: updated.length, notFound });
+  res.json({ updated, notFound });
+});
+
 router.get("/employees/:id/history", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const results = await db.select().from(quarterlyResultsTable)

@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check, Link } from "lucide-react";
+import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check, Link, CreditCard } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
 
@@ -128,6 +128,55 @@ export default function EmployeesPage() {
   const [bulkPinResult, setBulkPinResult] = useState<{ results: BulkPinEntry[]; skipped: BulkPinSkip[] } | null>(null);
   const [bulkPinSource, setBulkPinSource] = useState<"loaded" | "generated">("loaded");
   const [confirmRegen, setConfirmRegen] = useState(false);
+
+  const [bulkCpfOpen, setBulkCpfOpen] = useState(false);
+  const [bulkCpfLoading, setBulkCpfLoading] = useState(false);
+  type BulkCpfResult = { updated: { id: number; name: string }[]; notFound: string[] };
+  const [bulkCpfResult, setBulkCpfResult] = useState<BulkCpfResult | null>(null);
+
+  const CPF_DATA = [
+    { name: "ADRIANO SILVA DE ARAUJO",          document: "23474520881" },
+    { name: "ALONSO LUCAS TRINDADE",             document: "28042772831" },
+    { name: "BRUNO DA SILVA CORDEIRO",           document: "34920606842" },
+    { name: "CAUE SOUZA LIMA",                   document: "59701230809" },
+    { name: "DOUGLAS FERREIRA DOS REIS",         document: "42771339838" },
+    { name: "EDGARD JOSE SOARES MARIANO",        document: "40378835890" },
+    { name: "ERICK RAMOS DA SILVA",              document: "54952929876" },
+    { name: "EVERTON DE JESUS MARINHO SANTOS",   document: "41227528841" },
+    { name: "GABRIEL NASCIMENTO MENEZES",        document: "45589964890" },
+    { name: "IAGO DIAS TEMOTEO",                 document: "40249005875" },
+    { name: "JAMERSON RODRIGUES DA SILVA",       document: "35816863843" },
+    { name: "JOAO JORGE DA SILVA MENINO",        document: "45165575845" },
+    { name: "JOAO MARCOS NASCIMENTO LEITE",      document: "06765767533" },
+    { name: "JOSE MARCIO DA SILVA MENINO",       document: "39096766857" },
+    { name: "JOSE RENATO ALBUQUERQUE DE SOUZA",  document: "34735716874" },
+    { name: "KAIO GABRIEL FERREIRA BARBOZA",     document: "44892939846" },
+    { name: "LUAN MIGUEL MARQUES",               document: "33454560870" },
+    { name: "LYRICK ANDRADE ALVES DA SILVA",     document: "90000502863" },
+    { name: "MATHEUS DA SILVA CORDEIRO",         document: "48193325893" },
+    { name: "ULISSES DAMAZIO FERNANDES",         document: "35103131862" },
+    { name: "VINICIUS DA SILVA",                 document: "54723995803" },
+    { name: "WILLIANS SILVA DE JESUS",           document: "38193810821" },
+  ];
+
+  const handleBulkSetCpf = useCallback(async () => {
+    setBulkCpfLoading(true);
+    setBulkCpfResult(null);
+    try {
+      const res = await fetch("/api/employees/bulk-set-cpf", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(CPF_DATA),
+      });
+      const data = await res.json() as BulkCpfResult;
+      setBulkCpfResult(data);
+      qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
+    } catch {
+      toast({ title: "Erro ao importar CPFs", variant: "destructive" });
+    } finally {
+      setBulkCpfLoading(false);
+    }
+  }, [token, toast, qc]);
 
   // Load current PINs from DB whenever the dialog opens (for employees marked as "casa")
   useEffect(() => {
@@ -371,6 +420,16 @@ export default function EmployeesPage() {
               >
                 <RefreshCw size={15} /> Redefinir Tipos
               </button>
+              {user?.role === "admin" && (
+                <button
+                  onClick={() => { setBulkCpfOpen(true); setBulkCpfResult(null); }}
+                  className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+                  style={{ border: "1px solid var(--border)" }}
+                  title="Importar CPFs para os colaboradores listados"
+                >
+                  <CreditCard size={15} /> Importar CPFs
+                </button>
+              )}
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                   <button
@@ -1281,6 +1340,86 @@ export default function EmployeesPage() {
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de importação em lote de CPFs */}
+      <Dialog open={bulkCpfOpen} onOpenChange={v => { setBulkCpfOpen(v); if (!v) setBulkCpfResult(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard size={18} /> Importar CPFs
+            </DialogTitle>
+          </DialogHeader>
+          {!bulkCpfResult ? (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Vai definir o CPF de <strong>{CPF_DATA.length} colaboradores</strong> pelo nome exato.
+                A operação é idempotente — rodar de novo não altera dados já corretos.
+              </p>
+              <div className="rounded-lg border text-xs max-h-48 overflow-y-auto divide-y">
+                {CPF_DATA.map(e => (
+                  <div key={e.name} className="flex justify-between px-3 py-1.5 gap-2">
+                    <span className="truncate font-medium">{e.name}</span>
+                    <span className="shrink-0 text-muted-foreground font-mono">
+                      {e.document.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setBulkCpfOpen(false)}
+                  className="h-9 px-4 rounded-lg text-sm font-bold uppercase"
+                  style={{ border: "1px solid var(--border)" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleBulkSetCpf}
+                  disabled={bulkCpfLoading}
+                  className="h-9 px-4 rounded-lg text-sm font-bold uppercase flex items-center gap-2 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                >
+                  {bulkCpfLoading ? <><RefreshCw size={14} className="animate-spin" /> Importando…</> : <><CreditCard size={14} /> Confirmar</>}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
+                <CheckCircle2 size={16} /> {bulkCpfResult.updated.length} colaboradores atualizados
+              </div>
+              {bulkCpfResult.updated.length > 0 && (
+                <div className="rounded-lg border text-xs max-h-36 overflow-y-auto divide-y">
+                  {bulkCpfResult.updated.map(e => (
+                    <div key={e.id} className="px-3 py-1.5 text-green-800">{e.name}</div>
+                  ))}
+                </div>
+              )}
+              {bulkCpfResult.notFound.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">
+                    <AlertTriangle size={13} /> {bulkCpfResult.notFound.length} não encontrados
+                  </p>
+                  <div className="rounded-lg border border-amber-200 text-xs max-h-28 overflow-y-auto divide-y divide-amber-100">
+                    {bulkCpfResult.notFound.map(n => (
+                      <div key={n} className="px-3 py-1.5 text-amber-800">{n}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end pt-1">
+                <button
+                  onClick={() => setBulkCpfOpen(false)}
+                  className="h-9 px-5 rounded-lg text-sm font-bold uppercase"
+                  style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

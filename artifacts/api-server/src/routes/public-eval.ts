@@ -9,7 +9,8 @@ import {
   eventCriterionAssignmentsTable,
   eventConformitiesTable,
 } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
+import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
 
@@ -432,6 +433,45 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
     }).where(eq(publicEvalTokensTable.id, tokenId));
   });
 
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /public-eval-tokens/:tokenId   (autenticado)
+// Remove um token PENDENTE (usedAt IS NULL). Tokens já respondidos não podem
+// ser excluídos — retorna 409. O avaliador só pode excluir seus próprios tokens;
+// admin/rh podem excluir qualquer um.
+// ---------------------------------------------------------------------------
+router.delete("/public-eval-tokens/:tokenId", requireAuth, async (req, res) => {
+  const tokenId = req.params.tokenId as string;
+  const user = req.user!;
+
+  const [token] = await db
+    .select({
+      id: publicEvalTokensTable.id,
+      createdByUserId: publicEvalTokensTable.createdByUserId,
+      usedAt: publicEvalTokensTable.usedAt,
+    })
+    .from(publicEvalTokensTable)
+    .where(eq(publicEvalTokensTable.id, tokenId))
+    .limit(1);
+
+  if (!token) {
+    res.status(404).json({ error: "Token não encontrado" });
+    return;
+  }
+  if (token.usedAt) {
+    res.status(409).json({ error: "Este link já foi respondido e não pode ser excluído" });
+    return;
+  }
+  const isOwner = token.createdByUserId === user.userId;
+  const isAdminOrRh = user.role === "admin" || user.role === "rh";
+  if (!isOwner && !isAdminOrRh) {
+    res.status(403).json({ error: "Sem permissão para excluir este link" });
+    return;
+  }
+
+  await db.delete(publicEvalTokensTable).where(eq(publicEvalTokensTable.id, tokenId));
   res.json({ ok: true });
 });
 
