@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
-import { eq, and, sql, inArray, ilike, or, ne, aliasedTable, isNotNull } from "drizzle-orm";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
+import { eq, and, sql, inArray, ilike, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
@@ -1711,6 +1711,90 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
   }
 
   res.json(await loadEventDetail(id));
+});
+
+// ── Log completo de atividades do evento ─────────────────────────────────────
+router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid event id" }); return; }
+
+  // Map criterion names for this event
+  const criteriaRows = await db
+    .select({ id: criteriaTable.id, name: criteriaTable.name })
+    .from(criteriaTable)
+    .innerJoin(eventCriteriaTable, eq(criteriaTable.id, eventCriteriaTable.criterionId))
+    .where(eq(eventCriteriaTable.eventId, id));
+  const critName = new Map(criteriaRows.map(c => [c.id, c.name]));
+
+  // Run all queries in parallel
+  const [evals, cals, calComments, evComments, auditRows] = await Promise.all([
+    // 1. Evaluations submitted
+    db.select({ id: evaluationsTable.id, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, userName: usersTable.name, submittedAt: evaluationsTable.submittedAt })
+      .from(evaluationsTable)
+      .leftJoin(usersTable, eq(evaluationsTable.evaluatorUserId, usersTable.id))
+      .where(and(eq(evaluationsTable.eventId, id), eq(evaluationsTable.status, "submitted"), isNotNull(evaluationsTable.submittedAt))),
+    // 2. Calibrations
+    db.select({ id: calibrationsTable.id, criterionId: calibrationsTable.criterionId, score: calibrationsTable.calibratedScore, userName: usersTable.name, calibratedAt: calibrationsTable.calibratedAt })
+      .from(calibrationsTable)
+      .leftJoin(usersTable, eq(calibrationsTable.calibratedByUserId, usersTable.id))
+      .where(eq(calibrationsTable.eventId, id)),
+    // 3. Calibration comments
+    db.select({ id: calibrationCommentsTable.id, criterionId: calibrationCommentsTable.criterionId, text: calibrationCommentsTable.text, userName: usersTable.name, createdAt: calibrationCommentsTable.createdAt })
+      .from(calibrationCommentsTable)
+      .leftJoin(usersTable, eq(calibrationCommentsTable.createdByUserId, usersTable.id))
+      .where(eq(calibrationCommentsTable.eventId, id)),
+    // 4. Event comments
+    db.select({ id: eventCommentsTable.id, message: eventCommentsTable.message, userName: usersTable.name, createdAt: eventCommentsTable.createdAt })
+      .from(eventCommentsTable)
+      .leftJoin(usersTable, eq(eventCommentsTable.userId, usersTable.id))
+      .where(eq(eventCommentsTable.eventId, id)),
+    // 5. Event-level audit entries
+    db.select({ id: auditLogsTable.id, action: auditLogsTable.action, userName: usersTable.name, createdAt: auditLogsTable.createdAt })
+      .from(auditLogsTable)
+      .leftJoin(usersTable, eq(auditLogsTable.userId, usersTable.id))
+      .where(and(eq(auditLogsTable.entity, "events"), eq(auditLogsTable.entityId, String(id))))
+      .orderBy(desc(auditLogsTable.createdAt))
+      .limit(200),
+  ]);
+
+  const ACTION_LABELS: Record<string, string> = {
+    "create": "Criou o evento",
+    "update": "Editou o evento",
+    "close": "Fechou o evento",
+    "reopen": "Reabriu o evento",
+    "confirm-results": "Confirmou os resultados",
+    "unconfirm-results": "Desconfirmou os resultados",
+    "merge": "Mesclou com outro evento",
+    "delete": "Excluiu o evento",
+    "update-historical-result": "Importou resultado histórico",
+    "release-feedback": "Liberou o feedback",
+    "finalize": "Finalizou o evento",
+  };
+
+  type Entry = { id: string; kind: string; label: string; userName: string | null; criterionName: string | null; score: number | null; detail: string | null; createdAt: string };
+  const entries: Entry[] = [];
+
+  for (const e of evals) {
+    if (!e.submittedAt) continue;
+    entries.push({ id: `eval-${e.id}`, kind: "eval", label: "Enviou avaliação", userName: e.userName ?? null, criterionName: critName.get(e.criterionId) ?? null, score: parseFloat(e.score as unknown as string), detail: null, createdAt: new Date(e.submittedAt).toISOString() });
+  }
+  for (const c of cals) {
+    entries.push({ id: `cal-${c.id}`, kind: "calibration", label: "Calibrou nota", userName: c.userName ?? null, criterionName: critName.get(c.criterionId) ?? null, score: parseFloat(c.score as unknown as string), detail: null, createdAt: new Date(c.calibratedAt).toISOString() });
+  }
+  for (const cm of calComments) {
+    const t = cm.text;
+    entries.push({ id: `calcomment-${cm.id}`, kind: "cal_comment", label: "Comentou na calibração", userName: cm.userName ?? null, criterionName: critName.get(cm.criterionId) ?? null, score: null, detail: t.length > 100 ? t.slice(0, 100) + "…" : t, createdAt: new Date(cm.createdAt).toISOString() });
+  }
+  for (const ec of evComments) {
+    const m = ec.message;
+    entries.push({ id: `evcomment-${ec.id}`, kind: "event_comment", label: "Comentou no evento", userName: ec.userName ?? null, criterionName: null, score: null, detail: m.length > 100 ? m.slice(0, 100) + "…" : m, createdAt: new Date(ec.createdAt).toISOString() });
+  }
+  for (const a of auditRows) {
+    entries.push({ id: `audit-${a.id}`, kind: "audit", label: ACTION_LABELS[a.action] ?? a.action, userName: a.userName ?? null, criterionName: null, score: null, detail: null, createdAt: new Date(a.createdAt).toISOString() });
+  }
+
+  entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  res.json(entries.slice(0, 300));
 });
 
 // Mural de comentários — chat geral do evento, aberto a qualquer usuário

@@ -130,12 +130,14 @@ router.get("/calibrations/audit", requireRole("admin", "rh", "diretoria"), async
   const calRows = await db.select({
     id: calibrationsTable.id,
     criterionId: calibrationsTable.criterionId,
+    calibratedScore: calibrationsTable.calibratedScore,
   }).from(calibrationsTable).where(eq(calibrationsTable.eventId, parseInt(eventId as string)));
 
   if (calRows.length === 0) { res.json([]); return; }
 
   const calIdStrings = calRows.map(c => String(c.id));
   const criterionByCalId = new Map(calRows.map(c => [String(c.id), c.criterionId]));
+  const scoreByCalId = new Map(calRows.map(c => [String(c.id), parseFloat(c.calibratedScore as unknown as string)]));
 
   // Busca os critérios do evento para nomes
   const criteriaRows = await db.select({ id: criteriaTable.id, name: criteriaTable.name })
@@ -162,11 +164,18 @@ router.get("/calibrations/audit", requireRole("admin", "rh", "diretoria"), async
   .orderBy(desc(auditLogsTable.createdAt))
   .limit(500);
 
-  res.json(logs.map(l => ({
-    ...l,
-    criterionId: l.entityId ? (criterionByCalId.get(l.entityId) ?? null) : null,
-    criterionName: l.entityId ? (criterionNameById.get(criterionByCalId.get(l.entityId)!) ?? null) : null,
-  })));
+  res.json(logs.map(l => {
+    const criterionId = l.entityId ? (criterionByCalId.get(l.entityId) ?? null) : null;
+    // For legacy entries without afterJson, inject the current calibrated score as fallback
+    const fallbackScore = l.entityId ? (scoreByCalId.get(l.entityId) ?? null) : null;
+    const afterJsonFinal = l.afterJson ?? (fallbackScore != null ? JSON.stringify({ score: fallbackScore }) : null);
+    return {
+      ...l,
+      afterJson: afterJsonFinal,
+      criterionId,
+      criterionName: criterionId ? (criterionNameById.get(criterionId) ?? null) : null,
+    };
+  }));
 });
 
 // ── Comentários de calibração ─────────────────────────────────────────────────
