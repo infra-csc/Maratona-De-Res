@@ -164,11 +164,20 @@ router.get("/calibrations/audit", requireRole("admin", "rh", "diretoria"), async
   .orderBy(desc(auditLogsTable.createdAt))
   .limit(500);
 
+  // Fallback: only apply current score to the MOST RECENT entry per calibration.
+  // Older entries don't reliably reflect the score at that point in time.
+  const fallbackUsed = new Set<string>();
+
   res.json(logs.map(l => {
     const criterionId = l.entityId ? (criterionByCalId.get(l.entityId) ?? null) : null;
-    // For legacy entries without afterJson, inject the current calibrated score as fallback
-    const fallbackScore = l.entityId ? (scoreByCalId.get(l.entityId) ?? null) : null;
-    const afterJsonFinal = l.afterJson ?? (fallbackScore != null ? JSON.stringify({ score: fallbackScore }) : null);
+    let afterJsonFinal = l.afterJson;
+    if (!afterJsonFinal && l.entityId && !fallbackUsed.has(l.entityId)) {
+      const fallbackScore = scoreByCalId.get(l.entityId) ?? null;
+      if (fallbackScore != null) {
+        afterJsonFinal = JSON.stringify({ score: fallbackScore });
+      }
+      fallbackUsed.add(l.entityId); // mark used regardless, so older entries get nothing
+    }
     return {
       ...l,
       afterJson: afterJsonFinal,
