@@ -13,6 +13,7 @@ import { getAuthToken } from "@/lib/custom-fetch";
 import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING, usePremiumTheme } from "@/lib/premium-theme";
+import { EventActivityLog } from "@/components/event-activity-log";
 
 const GOOD = "#9ab000";
 const AMBER = "#e8a23d";
@@ -1893,6 +1894,12 @@ export default function CalibrationsPage() {
           )}
           </div>{/* end left column */}
         </div>
+        )}
+
+        {selectedEventId && (
+          <div className="mt-4">
+            <EventActivityLog eventId={selectedEventId} />
+          </div>
         )}
 
       </div>
