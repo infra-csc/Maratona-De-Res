@@ -3,7 +3,7 @@ import {
   db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
   eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, areasTable, employeeCycleEligibilityTable,
-  eventAreaAssignmentsTable,
+  eventAreaAssignmentsTable, employeeEventResultsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
@@ -78,6 +78,33 @@ router.get("/my-performance", async (req, res) => {
       eq(eventParticipantsTable.employeeId, employeeId),
       eq(eventsTable.cycleId, cycle.id),
     ));
+
+  // Notas OFICIAIS por evento — mesma fonte usada por Resultados, Ranking e o
+  // grid de colaboradores. Recalcular a nota aqui ao vivo divergia do oficial:
+  // o snapshot passa por computeEventTeamResult (que aplica a penalidade da
+  // Matriz de Conformidade), enquanto calculateEventResult devolve a nota crua.
+  // Resultado: o colaborador via uma quantidade de eventos e uma média que não
+  // batiam com as outras telas. Só caímos no cálculo ao vivo quando ainda NÃO
+  // existe linha oficial (evento não confirmado) — aí é projeção mesmo.
+  const officialEventScores = new Map<number, number>();
+  {
+    const officialRows = await db
+      .select({
+        eventId: employeeEventResultsTable.eventId,
+        finalEventScore: employeeEventResultsTable.finalEventScore,
+      })
+      .from(employeeEventResultsTable)
+      .innerJoin(eventsTable, eq(employeeEventResultsTable.eventId, eventsTable.id))
+      .where(and(
+        eq(employeeEventResultsTable.employeeId, employeeId),
+        eq(eventsTable.cycleId, cycle.id),
+      ));
+    for (const r of officialRows) {
+      if (r.finalEventScore != null) {
+        officialEventScores.set(r.eventId, parseFloat(r.finalEventScore as unknown as string));
+      }
+    }
+  }
 
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
   const platoonRulesMapped = platoonRules.map(r => ({
@@ -220,11 +247,17 @@ router.get("/my-performance", async (req, res) => {
     ]);
 
     const rawEventScore = calculateEventResult(criteriaForCalc);
-    // Eventos históricos: usa importedScore como nota autoritativa.
-    // O cálculo via calibrações pode divergir (critérios inativos, fórmula diferente).
-    const eventScore = (p.isHistorical && p.importedScore != null)
-      ? parseFloat(p.importedScore as unknown as string)
-      : rawEventScore;
+    // Ordem de autoridade da nota do evento:
+    // 1. linha oficial em employee_event_results (já com penalidade de
+    //    conformidade) — é o que Resultados/Ranking/grid mostram;
+    // 2. importedScore, para eventos históricos ainda sem linha oficial;
+    // 3. cálculo ao vivo pelas calibrações — projeção de evento não confirmado.
+    const officialScore = officialEventScores.get(p.eventId);
+    const eventScore = officialScore != null
+      ? officialScore
+      : (p.isHistorical && p.importedScore != null)
+        ? parseFloat(p.importedScore as unknown as string)
+        : rawEventScore;
     // Sem nota (nenhum critério avaliado ainda) não tem pelotão — evita
     // mostrar "Pelotão Branco" para um evento com Quesitos 0/N.
     const platoon = eventScore > 0 ? getPlatoonByScore(eventScore, platoonRulesMapped) : null;
@@ -370,6 +403,16 @@ router.get("/my-performance", async (req, res) => {
     ? quarterResult.eventsCount
     : scoredEvents.length;
 
+  // Elegibilidade conta eventos PARTICIPADOS (confirmados), não eventos COM
+  // NOTA. Um evento confirmado que ainda não teve a nota calculada já conta
+  // para a meta — por isso este número é sempre >= scoredEvents.length.
+  // Precisa espelhar exatamente participatedEventsCount de results.ts, senão
+  // o colaborador vê "faltam 2 eventos" enquanto o grid de RH o mostra
+  // "Elegível / 8 eventos".
+  const participatedEventsCount = quarterResult
+    ? quarterResult.participatedEventsCount
+    : eventSummaries.filter(e => e.resultsConfirmed && e.countsForScore).length;
+
   res.json({
     employee: {
       id: employee.id,
@@ -391,6 +434,7 @@ router.get("/my-performance", async (req, res) => {
       openEvents,
       confirmedEvents: scoredEvents.length,
       scoredEventsCount: responseEventsCount,
+      participatedEventsCount,
       minEventsForEligibility,
       totalAbsences,
       penaltyPoints: Math.round(penaltyPoints * 100) / 100,

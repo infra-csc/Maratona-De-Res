@@ -8,7 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Calendar, Copy, Clock } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Copy, Clock } from "lucide-react";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING, usePremiumTheme } from "@/lib/premium-theme";
@@ -1156,7 +1156,6 @@ export default function CalibrationsPage() {
                     ) : (
                       <div className="space-y-1">
                         {relevantParticipants.map(p => {
-                          const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
                           return (
                             <div key={p.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--secondary)" }}>
                               <div className="w-7 h-7 rounded-md flex items-center justify-center font-black text-[10px] shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
@@ -1166,11 +1165,6 @@ export default function CalibrationsPage() {
                                 <p className="font-black uppercase text-[10px] leading-tight truncate">{p.employeeName}</p>
                                 <p className="text-[9px] font-bold uppercase truncate" style={{ color: "var(--muted-foreground)" }}>{p.functionName}</p>
                               </div>
-                              {realizadasCount != null && (
-                                <span className="text-[9px] font-bold uppercase shrink-0 flex items-center gap-0.5 rounded px-1.5 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>
-                                  <Calendar size={9} /> {realizadasCount}d
-                                </span>
-                              )}
                             </div>
                           );
                         })}

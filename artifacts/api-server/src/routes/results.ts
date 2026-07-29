@@ -284,6 +284,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
         employeeId: eventParticipantsTable.employeeId,
         eventId: eventParticipantsTable.eventId,
         functionName: eventParticipantsTable.functionName,
+        confirmed: eventParticipantsTable.confirmed,
         employmentType: employeesTable.employmentType,
         employeeFunction: employeesTable.functionName,
       })
@@ -314,6 +315,12 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
   const participatedByEmployee = new Map<number, Set<number>>();
   for (const r of participationRows) {
     if (!r.employeeId) continue;
+    // MESMO predicado usado na gravação de employee_event_results (fase 1):
+    // participante marcado como INATIVO ("não participou de fato") não conta
+    // nem para participatedEventsCount nem para a média. Sem este filtro o
+    // colaborador herdava a nota do TIME do evento (eventScoreById é a nota do
+    // evento, não a linha dele), sendo creditado por um evento em que não foi.
+    if (r.confirmed === false) continue;
     if (!participantCountsForScore(r)) continue;
     if (!participatedByEmployee.has(r.employeeId)) participatedByEmployee.set(r.employeeId, new Set());
     participatedByEmployee.get(r.employeeId)!.add(r.eventId);

@@ -1,14 +1,42 @@
 ---
-name: Diária date-based tracking
-description: How "days actually worked" (diária) is tracked per event participant — date array vs count, validation, and gating for informational participants.
+name: Diária validation removed — presence is just `confirmed`
+description: The per-diem (diária) confirmation/validation feature was removed from Maratona; how participant presence is controlled now, and what remains of the old columns.
 ---
 
-`event_participants.actualDiariaDates` (date[], nullable) is the source of truth for which specific calendar days a participant actually worked. `actualDiariaCount` is kept only as a derived/legacy int column — the backend always sets it to `actualDiariaDates.length` whenever dates are written, and never accepts a raw count from the client anymore (`EventParticipantUpdate` only exposes `actualDiariaDates`).
+# Diária tracking was removed (2026-07)
 
-**Why:** a single count number wasn't enough for RH — they needed to see the event's calendar and pick which day(s) a participant was actually present, since multi-day events are common. A child table (one row per worked day) was considered and rejected as overkill for an internal tool with no downstream calculation depending on it.
+Maratona no longer validates or confirms "diárias" (per-diem days worked) at all.
+Participant presence in an event is controlled **exclusively** by the
+`event_participants.confirmed` boolean.
+
+The current product workflow is:
+
+1. Participants are synced from the external Logística Interna app.
+2. If a person did not attend → mark them **inactive** (`confirmed = false`),
+   with a free-text `comment` as justification.
+3. If a person attended but did not come through the sync → add them manually.
+4. Confirm the event results. No diária step anywhere.
+
+**Why:** the diária reconciliation UI (date-by-date picker, "modo rápido"
+quick-confirm, Previstas/Realizadas badges) was pure operational overhead — the
+data it collected fed **no** score or eligibility calculation. Scoring uses
+`participantCountsForScore()` (employmentType + functionName) and cycle
+eligibility uses `participatedEventsCount` over confirmed events. The old UI
+copy claiming diárias mattered "para fins de nota e elegibilidade" was simply
+wrong.
 
 **How to apply:**
-- Candidate/selectable dates for the picker come from the **event's** `startDate`/`endDate` range, not the participant's `scheduledDiariaStart/End` (those are synced read-only from external logistics and are frequently null — using them as the bound would make the picker unusable for most participants). The scheduled range is only shown as an informational hint.
-- Validation lives server-side (PATCH `/events/:id/participants/:participantId`): each submitted date must be a valid `YYYY-MM-DD` string within the event's own date range, deduped and sorted before persisting.
-- Non-scored/informational participants (`countsForScore === false`, e.g. "Sup Ceno*" functions or freelas per `participation.ts`) are hard-gated from having any diária data — the backend rejects the request with 400 if `actualDiariaDates` is present in the body and the participant doesn't count for score. UI must mirror this by hiding the diária control entirely for those rows (only inactive-toggle + delete remain), but the server check is the real boundary.
-- The "Realizadas" picker is a `Dialog` (not a `Popover`) opened per participant, with **local state** for the selected date set — only one `PATCH` fires on explicit "Salvar", not per-checkbox-click (a Popover + mutate-per-click was reported by the user as feeling "travado"/frozen). Includes a "Confirmar Diárias Previstas" quick-action that bulk-selects (locally, still requires Salvar) the event dates falling inside `scheduledDiariaStart`–`scheduledDiariaEnd`.
+- `PATCH /events/:id/participants/:participantId` accepts only `confirmed`,
+  `functionName`, and `comment`. Sending `actualDiariaDates` or
+  `diariaQuickConfirmed` is no longer supported — those keys are ignored/rejected.
+- The justification comment box renders **only** when a participant is inactive.
+  There is no longer a "zero diárias requires justification" rule.
+- The columns `actualDiariaDates`, `actualDiariaCount`, `diariaQuickConfirmed`,
+  `diariaQuickConfirmedAt` were intentionally **kept** in the DB (historical data
+  preserved, and prod DB writes must ship as in-app actions — see
+  `prod-write-via-app-only.md`). They are marked `deprecated` in the OpenAPI
+  response schema and are read-only legacy. Do not resurrect them as inputs.
+- `scheduledDiaria*` ("previstas") still exists and is still written by the
+  integration sync — see `employment-type-diaria-sync.md`. It is no longer
+  surfaced in the event-detail UI, but the sync mapping was deliberately left
+  intact so the data keeps landing if the external contract starts sending it.

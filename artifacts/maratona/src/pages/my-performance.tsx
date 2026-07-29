@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Calendar, TrendingUp, TrendingDown, AlertTriangle,
   CheckCircle2, Clock, ChevronDown, ChevronRight,
-  MapPin, Search, Award, ArrowRight,
+  MapPin, Search, Award,
 } from "lucide-react";
 import { cn, fmtDate } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +27,7 @@ interface PerformanceData {
     closedEvents: number;
     openEvents: number;
     confirmedEvents: number;
+    participatedEventsCount?: number | null;
     minEventsForEligibility: number;
     totalAbsences: number;
     penaltyPoints: number;
@@ -411,7 +412,9 @@ export default function MyPerformancePage() {
 
               {/* Eventos Confirmados — barra de progresso para elegibilidade */}
               {(() => {
-                const confirmed = summary.confirmedEvents ?? 0;
+                // Elegibilidade usa eventos PARTICIPADOS (mesma métrica do grid
+                // de colaboradores), não eventos com nota já calculada.
+                const confirmed = summary.participatedEventsCount ?? summary.confirmedEvents ?? 0;
                 const target = summary.minEventsForEligibility ?? 8;
                 const faltam = Math.max(0, target - confirmed);
                 const atingiu = confirmed >= target;
@@ -445,64 +448,6 @@ export default function MyPerformancePage() {
                 );
               })()}
             </div>
-
-            {/* Item 2 — Nota Bruta vs Nota Final */}
-            {summary.grossAverage !== null && summary.finalResult !== null && (
-              <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-4">Como sua nota final é calculada</p>
-                <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-0">
-                  {/* Média bruta */}
-                  <div className="flex-1 text-center sm:text-left">
-                    <p className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Média dos Eventos</p>
-                    <div className="flex items-baseline gap-1 justify-center sm:justify-start" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      <span className="font-black text-[28px] leading-none text-foreground">{summary.grossAverage.toFixed(1)}</span>
-                      <span className="text-[12px] text-muted-foreground">/100</span>
-                    </div>
-                    <div className="mt-1.5 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${summary.grossAverage}%`, backgroundColor: scoreColor(summary.grossAverage) }} />
-                    </div>
-                  </div>
-                  {/* Ajustes */}
-                  {(() => {
-                    const pen = summary.penaltyPoints ?? 0;
-                    const mer = summary.meritPoints ?? 0;
-                    const net = mer - pen;
-                    if (net === 0) return (
-                      <div className="flex items-center gap-2 sm:mx-6 shrink-0">
-                        <ArrowRight size={16} className="text-muted-foreground" />
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Sem ajustes</span>
-                        <ArrowRight size={16} className="text-muted-foreground" />
-                      </div>
-                    );
-                    return (
-                      <div className="flex items-center gap-2 sm:mx-6 shrink-0 flex-col sm:flex-row">
-                        <ArrowRight size={16} className="text-muted-foreground hidden sm:block" />
-                        <div className="text-center">
-                          <p className="text-[9px] font-bold uppercase text-muted-foreground">Ajustes</p>
-                          <span className="font-black text-[16px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: net >= 0 ? "#506600" : "#862200" }}>
-                            {net >= 0 ? "+" : ""}{net.toFixed(1)} pts
-                          </span>
-                          {mer > 0 && <p className="text-[8px] text-[#506600] font-bold">+{mer} méritos</p>}
-                          {pen > 0 && <p className="text-[8px] text-[#862200] font-bold">−{pen} penalidades</p>}
-                        </div>
-                        <ArrowRight size={16} className="text-muted-foreground hidden sm:block" />
-                      </div>
-                    );
-                  })()}
-                  {/* Nota final */}
-                  <div className="flex-1 text-center sm:text-right">
-                    <p className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Nota Final</p>
-                    <div className="flex items-baseline gap-1 justify-center sm:justify-end" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      <span className="font-black text-[28px] leading-none" style={{ color: scoreColor(summary.finalResult) }}>{summary.finalResult.toFixed(1)}</span>
-                      <span className="text-[12px] text-muted-foreground">/100</span>
-                    </div>
-                    <div className="mt-1.5 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${summary.finalResult}%`, backgroundColor: scoreColor(summary.finalResult) }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Detalhamento dos eventos que compõem a média */}
             {(() => {

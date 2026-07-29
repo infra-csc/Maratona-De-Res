@@ -22,17 +22,14 @@ a no-op until the external app's contract is extended (see
 `integration-external-sync.md`) — auto-populates once it is, zero code changes
 needed here.
 
-As of 2026-07, `scheduledDiariaCount`/`Start`/`End` ("previstas") are sync-only
-again — the manual RH edit UI/endpoint support that briefly existed was removed
-per explicit product direction: previstas must always come from Logística
-Interna's escalação data, never be hand-typed in Maratona. `PATCH
-/events/:id/participants/:participantId` only accepts `confirmed` and
-`actualDiariaDates` now; sending `scheduledDiaria*` there is rejected with 400.
-Until the external sync contract actually exposes this data, "Previstas" will
-keep showing "—" in the UI — that is expected, not a bug.
+`scheduledDiariaCount`/`Start`/`End` ("previstas") are sync-only — never
+hand-typed in Maratona. They must always come from Logística Interna's
+escalação data.
 
-`actualDiariaCount` ("realizadas") remains the RH-manual side of this pair:
-reconciled by hand in Maratona event-detail, and must NEVER be touched by the
-sync loop, since the external app has no way to report real attendance, only
-the planned schedule. Same informational-participant gate (400 if
-`countsForScore===false`) applies to both scheduled and actual diária fields.
+**Superseded:** the whole diária reconciliation feature ("realizadas",
+date pickers, quick-confirm) was removed from the app in 2026-07 — see
+`diaria-date-tracking.md`. The sync mapping above was deliberately left in
+place, so `scheduledDiaria*` still populates if the external contract starts
+sending it, but nothing in the UI reads it anymore and
+`PATCH /events/:id/participants/:participantId` no longer accepts any diária
+field. Presence is now controlled solely by `confirmed`.

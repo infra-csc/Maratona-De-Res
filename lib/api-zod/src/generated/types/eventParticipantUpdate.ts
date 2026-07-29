@@ -12,16 +12,10 @@ export interface EventParticipantUpdate {
      * @nullable
      */
   functionName?: string | null;
+  /** Presença do colaborador no evento. false = não compareceu (inativo). Este flag é o único controle de presença — não há mais validação de diárias. */
   confirmed?: boolean;
   /**
-     * Diárias realizadas (preenchidas manualmente pelo RH com base na presença real). As diárias previstas (scheduledDiaria*) não são editáveis por aqui — vêm apenas da sincronização com a logística interna.
-     * @nullable
-     */
-  actualDiariaDates?: string[] | null;
-  /** true = modo rápido: gestor confirmou presença sem comparar datas. Equivale a "Realizadas = Previstas". Registra timestamp de auditoria. */
-  diariaQuickConfirmed?: boolean;
-  /**
-     * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).
+     * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de inatividade).
      * @nullable
      */
   comment?: string | null;

@@ -2,7 +2,7 @@ import { useRoute, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import { useGetEvent, useGetEventResult, useGetEvaluations, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, BarChart3, CheckCircle2, ShieldAlert, Unlock, AlertTriangle, Trash2, UserCheck, UserX, UserPlus, Check, ChevronsUpDown, MessageSquare, Zap } from "lucide-react";
+import { ArrowLeft, BarChart3, CheckCircle2, ShieldAlert, Unlock, AlertTriangle, Trash2, UserCheck, UserX, UserPlus, Check, ChevronsUpDown, MessageSquare } from "lucide-react";
 import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,22 +23,6 @@ import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 const GOOD = "#9ab000";
 const AMBER = "#e8a23d";
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
-
-function eventDateRange(startDate: string, endDate: string): string[] {
-  const dates: string[] = [];
-  const cursor = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  while (cursor <= end) {
-    dates.push(cursor.toISOString().slice(0, 10));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return dates;
-}
-
-function formatDiariaDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
-}
 
 function splitImportedNoteLines(note: string): string[] {
   return note
@@ -142,187 +126,6 @@ function ExpandableComment({ comment }: { comment: string }) {
         {expanded ? "Ver menos" : "Ver mais"}
       </button>
     </div>
-  );
-}
-
-function ParticipantDiariaDialog({
-  employeeId, employeeName, candidateDates, scheduledStart, scheduledEnd, scheduledCount,
-  currentDates, quickConfirmed, isSaving, onSave, onQuickConfirm,
-}: {
-  employeeId: number; employeeName: string; candidateDates: string[];
-  scheduledStart: string | null | undefined; scheduledEnd: string | null | undefined; scheduledCount: number | null | undefined;
-  currentDates: string[]; quickConfirmed: boolean; isSaving: boolean;
-  onSave: (dates: string[], onDone: () => void) => void;
-  onQuickConfirm: (onDone: () => void) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set(currentDates));
-  useEffect(() => { if (open) setSelected(new Set(currentDates)); }, [open, currentDates]);
-
-  const scheduledDates = scheduledStart && scheduledEnd
-    ? candidateDates.filter(d => d >= scheduledStart && d <= scheduledEnd)
-    : [];
-  const scheduledSet = new Set(scheduledDates);
-
-  const toggle = (d: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(d)) next.delete(d); else next.add(d);
-      return next;
-    });
-  };
-
-  const sortedCurrent = [...currentDates].sort();
-  const sortedSelected = Array.from(selected).sort();
-  const dirty = JSON.stringify(sortedSelected) !== JSON.stringify(sortedCurrent);
-
-  const actionBtn = "flex items-center gap-1.5 px-3 py-2 rounded-lg font-black uppercase text-[11px] tracking-tight transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90";
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          data-testid={`button-diaria-dates-${employeeId}`}
-          className="self-center flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
-          style={
-            quickConfirmed ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }
-            : currentDates.length === 0 ? { backgroundColor: "rgba(232,162,61,0.14)", color: AMBER }
-            : { border: "1px solid var(--border)" }
-          }
-        >
-          {quickConfirmed ? <Zap size={11} className="shrink-0" /> : <Calendar size={11} className="shrink-0" />}
-          <span className="text-[10px] font-bold uppercase">
-            {quickConfirmed ? "Modo Rápido" : `Realizadas: ${currentDates.length}`}
-          </span>
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-        <DialogHeader>
-          <DialogTitle className="font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
-            Diárias Realizadas — {employeeName}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-
-          {/* ── MODO RÁPIDO ─────────────────────────────────────────────── */}
-          <div className="rounded-xl p-4 space-y-3" style={{ border: quickConfirmed ? `1px solid ${GOOD}` : "1px solid var(--border)", backgroundColor: quickConfirmed ? "rgba(154,176,0,0.08)" : "var(--secondary)" }}>
-            <div className="flex items-center gap-2">
-              <Zap size={14} style={{ color: quickConfirmed ? GOOD : "var(--muted-foreground)" }} />
-              <span className="text-xs font-black uppercase tracking-tight">
-                Modo Rápido — Confirmar Sem Comparar Datas
-              </span>
-            </div>
-            <p className="text-[11px] leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-              Use quando a presença foi confirmada verbalmente ou via documento externo.
-              O sistema trata como <strong>Realizadas = Previstas</strong> para fins de nota e elegibilidade.
-            </p>
-            {quickConfirmed ? (
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase" style={{ color: GOOD }}>
-                  <CheckCircle2 size={13} /> Presença confirmada em modo rápido
-                </span>
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => onQuickConfirm(() => setOpen(false))}
-                  className="text-[10px] font-bold uppercase underline underline-offset-2 disabled:opacity-40 hover:opacity-70"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
-                  Desfazer
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                data-testid={`button-quick-confirm-${employeeId}`}
-                disabled={isSaving}
-                onClick={() => onQuickConfirm(() => setOpen(false))}
-                className={actionBtn}
-                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                <Zap size={14} /> Confirmar Sem Comparar Datas
-              </button>
-            )}
-          </div>
-
-          {/* ── MODO DETALHADO ───────────────────────────────────────────── */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Calendar size={13} />
-              <span className="text-xs font-black uppercase tracking-tight">
-                Modo Detalhado — Selecione data a data
-              </span>
-            </div>
-            {quickConfirmed && (
-              <p className="text-[11px]" style={{ color: AMBER }}>
-                Salvar datas específicas abaixo cancela o modo rápido automaticamente.
-              </p>
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3" style={{ backgroundColor: "var(--secondary)" }}>
-              <span className="text-xs font-bold uppercase">
-                Previstas: {scheduledCount ?? "—"}
-                {scheduledStart && scheduledEnd && (
-                  <span className="normal-case font-semibold" style={{ color: "var(--muted-foreground)" }}> ({formatDiariaDate(scheduledStart)} – {formatDiariaDate(scheduledEnd)})</span>
-                )}
-              </span>
-              <span data-testid={`text-diaria-selected-count-${employeeId}`} className="text-sm font-black uppercase" style={{ color: "var(--accent)" }}>
-                Selecionadas: {selected.size}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button type="button" data-testid={`button-confirm-previstas-${employeeId}`} onClick={() => setSelected(new Set(scheduledSet))} disabled={scheduledSet.size === 0} className={actionBtn} style={{ border: "1px solid var(--border)" }}>
-                <CheckCircle2 size={14} /> Marcar Previstas
-              </button>
-              <button type="button" onClick={() => setSelected(new Set(candidateDates))} className={actionBtn} style={{ border: "1px solid var(--border)" }}>
-                Marcar Todos
-              </button>
-              <button type="button" onClick={() => setSelected(new Set())} disabled={selected.size === 0} className={actionBtn} style={{ border: "1px solid var(--border)" }}>
-                Limpar
-              </button>
-            </div>
-
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-              {candidateDates.map(dateStr => {
-                const checked = selected.has(dateStr);
-                const isScheduled = scheduledSet.has(dateStr);
-                return (
-                  <button
-                    key={dateStr}
-                    type="button"
-                    data-testid={`checkbox-diaria-${employeeId}-${dateStr}`}
-                    onClick={() => toggle(dateStr)}
-                    className="flex flex-col items-center justify-center gap-0.5 px-2 py-3 rounded-lg font-bold uppercase text-[11px] transition-colors"
-                    style={checked ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)" }}
-                  >
-                    <span>{formatDiariaDate(dateStr)}</span>
-                    {isScheduled && (
-                      <span className="text-[8px] normal-case font-semibold" style={{ color: "var(--muted-foreground)" }}>prevista</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 rounded-lg font-black uppercase text-xs transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            data-testid={`button-save-diaria-${employeeId}`}
-            disabled={!dirty || isSaving}
-            onClick={() => onSave(sortedSelected, () => setOpen(false))}
-            className="px-4 py-2 rounded-lg font-black uppercase text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-          >
-            {isSaving ? "Salvando..." : "Salvar Datas"}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -780,8 +583,6 @@ export default function EventDetailPage() {
         qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         if (vars.data.confirmed !== undefined) {
           toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
-        } else if (vars.data.actualDiariaDates !== undefined) {
-          toast({ title: "Diárias realizadas atualizadas" });
         } else if (vars.data.functionName !== undefined) {
           toast({ title: "Cargo no evento atualizado" });
         }
@@ -1066,15 +867,11 @@ export default function EventDetailPage() {
                   return a.employeeName.localeCompare(b.employeeName, "pt-BR");
                 }).map(p => {
                   const isInactive = p.confirmed === false;
-                  const isConfirmed = p.confirmed === true;
                   const isInformational = p.countsForScore === false;
-                  const selectedDates = p.actualDiariaDates ?? [];
-                  const realizadasCount = p.actualDiariaDates != null ? p.actualDiariaDates.length : p.actualDiariaCount;
-                  const candidateDates = eventDateRange(event.startDate, event.endDate);
-                  const isQuickConfirmed = p.diariaQuickConfirmed === true;
-                  const hasZeroDiarias = !isConfirmed && (realizadasCount == null || realizadasCount === 0);
-                  const showCommentBox = isInactive || hasZeroDiarias;
-                  const commentReason = isInactive ? "Colaborador inativo — justifique" : "Nenhuma diária realizada — justifique";
+                  // Diárias não são mais validadas: o único motivo para exigir
+                  // justificativa é o colaborador ter sido marcado como inativo.
+                  const showCommentBox = isInactive;
+                  const commentReason = "Colaborador inativo — justifique";
                   return (
                     <div
                       key={p.id}
@@ -1153,80 +950,6 @@ export default function EventDetailPage() {
                             </span>
                           )}
                         </div>
-
-                        {isInformational ? (
-                          <p className="text-[10px] font-bold uppercase" style={{ color: WARNING, opacity: 0.8 }}>
-                            Participação informativa — sem controle de diárias.
-                          </p>
-                        ) : (p.scheduledDiariaCount != null || realizadasCount != null || canManage) ? (
-                          <div className="flex items-start gap-2 flex-wrap">
-                            <div
-                              data-testid={`text-scheduled-diaria-${p.employeeId}`}
-                              className="flex items-start gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase leading-tight"
-                              style={{ border: "1px solid var(--border)" }}
-                              title="Diárias previstas vêm da escalação (logística interna)."
-                            >
-                              <Calendar size={11} className="shrink-0 mt-[1px]" />
-                              <div>
-                                <div>
-                                  Previstas:{" "}
-                                  {p.scheduledDiariaCount != null ? p.scheduledDiariaCount : (
-                                    <span className="normal-case not-italic font-semibold" style={{ color: "var(--muted-foreground)" }} title="Sem diárias previstas cadastradas na Logística Interna">Não cadastrado</span>
-                                  )}
-                                </div>
-                                {p.scheduledDiariaStart && p.scheduledDiariaEnd && (
-                                  <div className="normal-case font-semibold" style={{ color: "var(--muted-foreground)" }}>
-                                    {formatDiariaDate(p.scheduledDiariaStart)} – {formatDiariaDate(p.scheduledDiariaEnd)}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {canManage ? (
-                              <>
-                                {!isQuickConfirmed && (
-                                  <button
-                                    type="button"
-                                    data-testid={`button-quick-ok-${p.employeeId}`}
-                                    disabled={updateParticipant.isPending}
-                                    onClick={() => {
-                                      updateParticipant.mutate(
-                                        { id, participantId: p.id, data: { diariaQuickConfirmed: true } },
-                                        { onSuccess: () => toast({ title: `Confirmado ✓ — ${p.employeeName}`, description: "Diária tratada como cumprida." }) },
-                                      );
-                                    }}
-                                    title="Confirmar diárias como cumpridas sem abrir o calendário detalhado"
-                                    className="self-center flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors whitespace-nowrap disabled:opacity-40 hover:opacity-80"
-                                    style={{ border: `1px solid ${GOOD}`, color: GOOD }}
-                                  >
-                                    <CheckCircle2 size={11} className="shrink-0" />
-                                    <span className="text-[10px] font-bold uppercase">Confirmar/OK</span>
-                                  </button>
-                                )}
-                                <ParticipantDiariaDialog
-                                  employeeId={p.employeeId}
-                                  employeeName={p.employeeName}
-                                  candidateDates={candidateDates}
-                                  scheduledStart={p.scheduledDiariaStart}
-                                  scheduledEnd={p.scheduledDiariaEnd}
-                                  scheduledCount={p.scheduledDiariaCount}
-                                  currentDates={selectedDates}
-                                  quickConfirmed={isQuickConfirmed}
-                                  isSaving={updateParticipant.isPending}
-                                  onSave={(dates, onDone) => {
-                                    updateParticipant.mutate({ id, participantId: p.id, data: { actualDiariaDates: dates } }, { onSuccess: onDone });
-                                  }}
-                                  onQuickConfirm={(onDone) => {
-                                    updateParticipant.mutate({ id, participantId: p.id, data: { diariaQuickConfirmed: !isQuickConfirmed } }, { onSuccess: onDone });
-                                  }}
-                                />
-                              </>
-                            ) : realizadasCount != null ? (
-                              <span className="self-center text-[10px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
-                                Realizadas: {realizadasCount}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : null}
                       </div>
                       {showCommentBox && (
                         <div className="px-4 pb-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>

@@ -965,33 +965,21 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
   res.status(204).end();
 });
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
-  const { confirmed, actualDiariaDates, comment, diariaQuickConfirmed, functionName } = req.body;
-  if (confirmed === undefined && actualDiariaDates === undefined && comment === undefined && diariaQuickConfirmed === undefined && functionName === undefined) {
-    res.status(400).json({ error: "informe confirmed, actualDiariaDates, diariaQuickConfirmed, functionName e/ou comment" });
+  // Diárias não são mais validadas pelo app. As colunas scheduledDiaria*
+  // continuam sendo preenchidas pelo sync da Logística Interna (somente
+  // leitura), mas actualDiariaDates/diariaQuickConfirmed não são mais
+  // escritas: presença é controlada apenas pelo flag `confirmed`.
+  const { confirmed, comment, functionName } = req.body;
+  if (confirmed === undefined && comment === undefined && functionName === undefined) {
+    res.status(400).json({ error: "informe confirmed, functionName e/ou comment" });
     return;
   }
   if (confirmed !== undefined && typeof confirmed !== "boolean") { res.status(400).json({ error: "confirmed deve ser boolean" }); return; }
-  if (diariaQuickConfirmed !== undefined && typeof diariaQuickConfirmed !== "boolean") { res.status(400).json({ error: "diariaQuickConfirmed deve ser boolean" }); return; }
   if (comment !== undefined && comment !== null && typeof comment !== "string") { res.status(400).json({ error: "comment deve ser string ou null" }); return; }
   if (functionName !== undefined && functionName !== null && typeof functionName !== "string") { res.status(400).json({ error: "functionName deve ser string ou null" }); return; }
-
-  let normalizedDates: string[] | null | undefined = undefined;
-  if (actualDiariaDates !== undefined) {
-    if (actualDiariaDates !== null) {
-      if (!Array.isArray(actualDiariaDates) || actualDiariaDates.some((d: unknown) => typeof d !== "string" || !ISO_DATE_RE.test(d))) {
-        res.status(400).json({ error: "actualDiariaDates deve ser uma lista de datas no formato YYYY-MM-DD" });
-        return;
-      }
-      normalizedDates = Array.from(new Set(actualDiariaDates as string[])).sort();
-    } else {
-      normalizedDates = null;
-    }
-  }
 
   const [existing] = await db.select().from(eventParticipantsTable)
     .where(and(eq(eventParticipantsTable.id, participantId), eq(eventParticipantsTable.eventId, eventId))).limit(1);
@@ -1006,38 +994,12 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
   const effectiveFunctionName = functionName !== undefined ? functionName : existing.functionName;
   const countsForScore = participantCountsForScore({ employmentType, functionName: effectiveFunctionName, employeeFunction: emp?.functionName });
 
-  const changesDiaria = normalizedDates !== undefined;
-  if (changesDiaria && !countsForScore) {
-    res.status(400).json({ error: "Participação informativa (não conta para nota) não permite registro de diárias." });
-    return;
-  }
-
-  if (normalizedDates) {
-    const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
-    if (ev && normalizedDates.some(d => d < ev.startDate || d > ev.endDate)) {
-      res.status(400).json({ error: `As datas devem estar dentro do período do evento (${ev.startDate} a ${ev.endDate}).` });
-      return;
-    }
-  }
-
   const [updated] = await db
     .update(eventParticipantsTable)
     .set({
       ...(functionName !== undefined && { functionName: functionName ?? null }),
       ...(confirmed !== undefined && { confirmed }),
-      ...(normalizedDates !== undefined && {
-        actualDiariaDates: normalizedDates,
-        actualDiariaCount: normalizedDates ? normalizedDates.length : null,
-        // Salvar datas específicas cancela o modo rápido — o gestor está sendo
-        // detalhado agora; reset garante que os dois modos não coexistam.
-        diariaQuickConfirmed: false,
-        diariaQuickConfirmedAt: null,
-      }),
       ...(comment !== undefined && { comment: comment === null ? null : comment.trim() || null }),
-      ...(diariaQuickConfirmed !== undefined && {
-        diariaQuickConfirmed,
-        diariaQuickConfirmedAt: diariaQuickConfirmed ? new Date() : null,
-      }),
     })
     .where(eq(eventParticipantsTable.id, participantId))
     .returning();

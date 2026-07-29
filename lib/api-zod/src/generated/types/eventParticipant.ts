@@ -25,24 +25,31 @@ export interface EventParticipant {
   /** @nullable */
   scheduledDiariaEnd?: string | null;
   /**
-     * Datas (YYYY-MM-DD) dentro do período do evento em que o colaborador realmente participou. actualDiariaCount é derivado do tamanho desta lista.
+     * LEGADO — a validação de diárias foi removida do app. Mantido apenas como leitura de dados históricos; não é mais escrito. A presença é controlada exclusivamente pelo campo `confirmed`.
+     * @deprecated
      * @nullable
      */
   actualDiariaDates?: string[] | null;
-  /** @nullable */
+  /**
+     * LEGADO — ver actualDiariaDates. Não é mais escrito.
+     * @deprecated
+     * @nullable
+     */
   actualDiariaCount?: number | null;
   /**
-     * true quando o gestor confirmou as diárias no modo rápido (sem comparar data a data). Equivale a "Realizadas = Previstas" para fins de nota. null/false = modo detalhado (padrão).
+     * LEGADO — o modo rápido de confirmação não existe mais.
+     * @deprecated
      * @nullable
      */
   diariaQuickConfirmed?: boolean | null;
   /**
-     * Timestamp (ISO 8601) da confirmação rápida, para auditoria.
+     * LEGADO — timestamp histórico da confirmação rápida.
+     * @deprecated
      * @nullable
      */
   diariaQuickConfirmedAt?: string | null;
   /**
-     * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de diárias não cumpridas ou de inatividade).
+     * Comentário livre sobre o colaborador nesse evento (ex.: justificativa de inatividade).
      * @nullable
      */
   comment?: string | null;
