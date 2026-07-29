@@ -123,11 +123,13 @@ function EventCard({ event }: { event: EventSummary }) {
     visibleCriteria.every(c => !!c.finalPublishedAt) ||
     !!event.isHistorical
   );
-  const isAvaliado = event.feedbackReleased || allScoredAreFinal;
-  // "Em Avaliação" = avaliações liberadas (criteriaConfirmed) mas ainda não tudo publicado final.
-  const isEmAvaliacao = !isAvaliado && !!event.criteriaConfirmed;
-  // Log do "Avaliado": data do feedbackReleased ou a data mais recente de finalPublishedAt entre critérios.
-  const avaliadoDate: string | null = isAvaliado
+  const isAvaliadoFinal = event.feedbackReleased || allScoredAreFinal;
+  // "Avaliado · Parcial" = algum critério já tem publicação parcial (mas não final total).
+  const hasAnyPartial = visibleCriteria.some(c => !!c.partialPublishedAt) || !!event.partialPublishedAt;
+  const isAvaliadoParcial = !isAvaliadoFinal && hasAnyPartial;
+  const isEmAvaliacao = !isAvaliadoFinal && !isAvaliadoParcial && !!event.criteriaConfirmed;
+  // Log do "Avaliado Final": data do feedbackReleased ou a data mais recente de finalPublishedAt.
+  const avaliadoDate: string | null = isAvaliadoFinal
     ? (event.feedbackReleasedAt
         ?? ([...visibleCriteria]
             .map(c => c.finalPublishedAt)
@@ -136,11 +138,13 @@ function EventCard({ event }: { event: EventSummary }) {
             .at(-1)
             ?? null))
     : null;
-  const publishLabel = isAvaliado
-    ? `Avaliado${avaliadoDate ? ` · ${formatDateTime(avaliadoDate)}` : ""}`
-    : isEmAvaliacao
-      ? "Em Avaliação"
-      : "Aguardando";
+  const publishLabel = isAvaliadoFinal
+    ? `Avaliado · Final${avaliadoDate ? ` · ${formatDateTime(avaliadoDate)}` : ""}`
+    : isAvaliadoParcial
+      ? "Avaliado · Parcial"
+      : isEmAvaliacao
+        ? "Em Avaliação"
+        : "Aguardando";
 
   return (
     <div className="mb-3 rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}>
@@ -160,12 +164,14 @@ function EventCard({ event }: { event: EventSummary }) {
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={cn(
                 "text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full",
-                isAvaliado
+                isAvaliadoFinal
                   ? "bg-[#191c1e] text-[#ccff00]"
-                  : isEmAvaliacao
-                    ? "bg-[#506600] text-[#ccff00]"
-                    : "text-muted-foreground"
-              )} style={!isAvaliado && !isEmAvaliacao ? { backgroundColor: "var(--muted)" } : {}}>
+                  : isAvaliadoParcial
+                    ? "bg-[#1a5c2e] text-[#4ade80]"
+                    : isEmAvaliacao
+                      ? "bg-[#506600] text-[#ccff00]"
+                      : "text-muted-foreground"
+              )} style={!isAvaliadoFinal && !isAvaliadoParcial && !isEmAvaliacao ? { backgroundColor: "var(--muted)" } : {}}>
                 {publishLabel}
               </span>
               {!event.countsForScore && (
@@ -585,9 +591,9 @@ export default function MyPerformancePage() {
                           <div className="flex items-center px-2 self-center">
                             <span className="text-[18px] font-black text-muted-foreground">+</span>
                           </div>
-                          <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "rgba(80,102,0,0.08)", border: "1px solid rgba(80,102,0,0.25)" }}>
-                            <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: "#506600" }}>Méritos</span>
-                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#506600" }}>{mer}</span>
+                          <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "rgba(22,163,74,0.10)", border: "1px solid rgba(22,163,74,0.30)" }}>
+                            <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: "#16a34a" }}>Méritos</span>
+                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#16a34a" }}>{mer}</span>
                           </div>
                         </>
                       )}
@@ -659,7 +665,7 @@ export default function MyPerformancePage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                              adj.kind === "merit" ? "bg-[#ccff00] text-[#161e00]" : "bg-[#862200]/15 text-[#862200]"
+                              adj.kind === "merit" ? "bg-[#16a34a]/15 text-[#15803d]" : "bg-[#862200]/15 text-[#862200]"
                             }`}>
                               {adj.kind === "merit" ? "Mérito" : "Penalidade"}
                             </span>
