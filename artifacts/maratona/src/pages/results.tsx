@@ -100,35 +100,73 @@ function FaixaBadge({ minScore, maxScore, color }: { minScore?: number | null; m
 /* RANKING TAB                                                         */
 /* ------------------------------------------------------------------ */
 
-function PodiumRow({ entry, rank, onClick, clickable }: { entry: any; rank: number; onClick: () => void; clickable: boolean }) {
-  const isLeader = rank === 1;
-  const medalLabel = rank === 1 ? "Ouro" : rank === 2 ? "Prata" : "Bronze";
-  const rankColor = isLeader ? "var(--accent)" : "var(--muted-foreground)";
+const MEDAL: Record<1 | 2 | 3, { color: string; dimColor: string; bg: string; border: string; platformH: number; label: string }> = {
+  1: { color: "#FFD700", dimColor: "#B8860B", bg: "rgba(255,215,0,0.13)", border: "rgba(255,215,0,0.55)", platformH: 60, label: "Ouro" },
+  2: { color: "#D0D0D0", dimColor: "#888",    bg: "rgba(192,192,192,0.10)", border: "rgba(192,192,192,0.45)", platformH: 40, label: "Prata" },
+  3: { color: "#CD7F32", dimColor: "#8B4513", bg: "rgba(205,127,50,0.11)", border: "rgba(205,127,50,0.45)", platformH: 26, label: "Bronze" },
+};
+
+function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; canViewDetail: boolean; onSelect: (id: number) => void }) {
+  // Classic podium layout: 2nd left · 1st centre · 3rd right
+  const slots: [any | undefined, any | undefined, any | undefined] = [top3[1], top3[0], top3[2]];
+  const ranks: (1 | 2 | 3)[] = [2, 1, 3];
+
   return (
-    <button
-      type="button"
-      onClick={clickable ? onClick : undefined}
-      data-testid={`podium-card-${entry.employeeId}`}
-      className={cn("w-full text-left rounded-xl flex items-center gap-3 p-3.5", clickable && "cursor-pointer transition-opacity hover:opacity-90")}
-      style={{
-        backgroundColor: isLeader ? "var(--primary)" : "var(--card)",
-        border: isLeader ? "1px solid var(--primary)" : "1px solid var(--border)",
-      }}
-    >
-      <span className="font-black shrink-0 leading-none" style={{ fontFamily: CONDENSED, fontSize: isLeader ? 26 : 22, color: isLeader ? "var(--primary-foreground)" : rankColor }}>
-        #{rank}
-      </span>
-      <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isLeader ? "var(--primary-foreground)" : "var(--secondary)" }}>
-        <span className="font-black text-[13px]" style={{ fontFamily: CONDENSED, color: isLeader ? "var(--primary)" : "var(--foreground)" }}>{initials(entry.employeeName)}</span>
+    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+      <div className="flex items-end">
+        {slots.map((entry, i) => {
+          const rank = ranks[i];
+          const med = MEDAL[rank];
+          const isFirst = rank === 1;
+          if (!entry) return <div key={i} className="flex-1" />;
+          return (
+            <button
+              key={entry.employeeId}
+              type="button"
+              data-testid={`podium-card-${entry.employeeId}`}
+              onClick={canViewDetail ? () => onSelect(entry.employeeId) : undefined}
+              className={cn("flex-1 flex flex-col items-center gap-0 pt-4 pb-0 outline-none", canViewDetail && "cursor-pointer hover:opacity-80 transition-opacity")}
+            >
+              {/* Crown / spacer */}
+              <div className="h-5 flex items-center justify-center mb-1">
+                {isFirst && <Crown size={15} style={{ color: med.color }} />}
+              </div>
+
+              {/* Avatar circle */}
+              <div className="rounded-full flex items-center justify-center shrink-0"
+                style={{ width: isFirst ? 54 : 42, height: isFirst ? 54 : 42, backgroundColor: med.bg, border: `2px solid ${med.border}` }}>
+                <span style={{ fontFamily: CONDENSED, fontWeight: 900, fontSize: isFirst ? 17 : 13, color: med.color }}>
+                  {initials(entry.employeeName)}
+                </span>
+              </div>
+
+              {/* Score */}
+              <span className="font-black leading-none mt-1.5"
+                data-testid={`text-podium-result-${entry.employeeId}`}
+                style={{ fontFamily: CONDENSED, fontSize: isFirst ? 22 : 17, color: med.color }}>
+                {entry.finalResult.toFixed(1)}
+              </span>
+
+              {/* Name (first two words) */}
+              <p data-testid={`text-podium-name-${entry.employeeId}`}
+                className="text-[9px] font-bold uppercase text-center w-full px-1 mt-0.5 mb-2 leading-tight"
+                style={{ color: "var(--muted-foreground)" }}>
+                {entry.employeeName.split(" ").slice(0, 2).join(" ")}
+              </p>
+
+              {/* Platform block */}
+              <div className="w-full flex flex-col items-center justify-center rounded-t-sm"
+                style={{ height: med.platformH, backgroundColor: med.bg, borderTop: `2px solid ${med.border}` }}>
+                <span style={{ fontFamily: CONDENSED, fontWeight: 900, fontSize: isFirst ? 26 : 20, color: med.color, lineHeight: 1 }}>
+                  #{rank}
+                </span>
+                <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: med.dimColor }}>{med.label}</span>
+              </div>
+            </button>
+          );
+        })}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-bold uppercase truncate" data-testid={`text-podium-name-${entry.employeeId}`} style={{ color: isLeader ? "var(--primary-foreground)" : "var(--foreground)" }}>{entry.employeeName}</p>
-        <span className="text-[9px] font-bold uppercase" style={{ color: isLeader ? "var(--primary-foreground)" : "var(--muted-foreground)", opacity: isLeader ? 0.75 : 1 }}>{medalLabel}</span>
-      </div>
-      <span className="font-black text-xl shrink-0" style={{ fontFamily: CONDENSED, color: isLeader ? "var(--primary-foreground)" : rankColor }} data-testid={`text-podium-result-${entry.employeeId}`}>
-        {entry.finalResult.toFixed(1)}
-      </span>
-    </button>
+    </div>
   );
 }
 
@@ -331,9 +369,9 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
               <Trophy size={15} style={{ color: "var(--accent)" }} />
               <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Pódio da Maratona</h3>
             </div>
-            {top3[0] && <PodiumRow entry={top3[0]} rank={1} clickable={canViewDetail} onClick={() => openDetail(top3[0].employeeId)} />}
-            {top3[1] && <PodiumRow entry={top3[1]} rank={2} clickable={canViewDetail} onClick={() => openDetail(top3[1].employeeId)} />}
-            {top3[2] && <PodiumRow entry={top3[2]} rank={3} clickable={canViewDetail} onClick={() => openDetail(top3[2].employeeId)} />}
+            {top3.length > 0 && (
+              <PodiumStage top3={top3} canViewDetail={canViewDetail} onSelect={openDetail} />
+            )}
             {canViewDetail && (
               <p className="text-[11px] px-1" style={{ color: "var(--muted-foreground)" }}>Clique em um colaborador para ver o detalhamento de provas, penalidades e méritos.</p>
             )}
