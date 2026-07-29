@@ -32,6 +32,7 @@ interface AbsenceFormData {
   employeeId: number | null;
   eventId: number | null;
   date: string;
+  date2: string;
   quantity: number;
   reason: string;
 }
@@ -72,13 +73,14 @@ export default function AbsencesPage() {
   const defaultType = activeTypes[0]?.slug ?? "falta";
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<AbsenceFormData>({
-    defaultValues: { quantity: 1, penaltyType: defaultType, employeeId: null, eventId: null, date: "", reason: "" },
+    defaultValues: { quantity: 1, penaltyType: defaultType, employeeId: null, eventId: null, date: "", date2: "", reason: "" },
   });
 
   const selectedType = watch("penaltyType");
   const watchedEmployeeId = watch("employeeId");
   const watchedEventId = watch("eventId");
   const watchedQty = watch("quantity");
+  const watchedDate2 = watch("date2");
   const selectedEmployee = (employees ?? []).find(e => e.id === Number(watchedEmployeeId));
   const selectedEvent = (events ?? []).find(e => e.id === Number(watchedEventId));
   const requiresEvent = typeRequiresEvent(selectedType);
@@ -93,22 +95,17 @@ export default function AbsencesPage() {
         employeeId: editingAbsence.employeeId,
         eventId: editingAbsence.eventId ?? null,
         date: editingAbsence.date,
+        date2: "",
         quantity: editingAbsence.quantity,
         reason: editingAbsence.reason ?? "",
       });
     } else {
-      reset({ quantity: 1, penaltyType: defaultType, employeeId: null, eventId: null, date: "", reason: "" });
+      reset({ quantity: 1, penaltyType: defaultType, employeeId: null, eventId: null, date: "", date2: "", reason: "" });
     }
   }, [open, editingAbsence, defaultType]);
 
   const createMutation = useCreateAbsence({
     mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: qKey });
-        toast({ title: "Lançamento registrado com sucesso" });
-        setOpen(false);
-        setEditingAbsence(null);
-      },
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
     },
   });
@@ -157,7 +154,7 @@ export default function AbsencesPage() {
     setOpen(true);
   }
 
-  function onSubmit(d: AbsenceFormData) {
+  async function onSubmit(d: AbsenceFormData) {
     if (requiresEvent && !d.eventId) {
       toast({ title: "Evento obrigatório", description: `${typeLabel(d.penaltyType)} exige um evento vinculado.`, variant: "destructive" });
       return;
@@ -178,16 +175,26 @@ export default function AbsencesPage() {
         },
       });
     } else {
-      createMutation.mutate({
-        data: {
-          penaltyType: d.penaltyType,
-          employeeId: Number(d.employeeId),
-          eventId: d.eventId ? Number(d.eventId) : null,
-          date: d.date,
-          quantity: Number(d.quantity),
-          reason: d.reason || undefined,
-        },
-      });
+      const payload = {
+        penaltyType: d.penaltyType,
+        employeeId: Number(d.employeeId),
+        eventId: d.eventId ? Number(d.eventId) : null,
+        quantity: Number(d.quantity),
+        reason: d.reason || undefined,
+      };
+      const hasSecondDate = !!d.date2?.trim();
+      try {
+        await createMutation.mutateAsync({ data: { ...payload, date: d.date } });
+        if (hasSecondDate) {
+          await createMutation.mutateAsync({ data: { ...payload, date: d.date2 } });
+        }
+        qc.invalidateQueries({ queryKey: qKey });
+        toast({ title: hasSecondDate ? "2 lançamentos registrados com sucesso" : "Lançamento registrado com sucesso" });
+        setOpen(false);
+        setEditingAbsence(null);
+      } catch {
+        // erro já exibido pelo onError da mutation
+      }
     }
   }
 
@@ -444,10 +451,19 @@ export default function AbsencesPage() {
                           <span className="block leading-snug" style={{ wordBreak: "break-word", whiteSpace: "normal" }}>
                             {a.reason || <span className="text-xs opacity-50">Sem justificativa</span>}
                           </span>
-                          {(a as Absence & { registeredByUserName?: string | null }).registeredByUserName && (
-                            <span className="mt-1 flex items-center gap-1 text-[10px] opacity-60">
-                              <span className="font-bold uppercase tracking-wide">por</span>
-                              {(a as Absence & { registeredByUserName?: string | null }).registeredByUserName}
+                          {((a as Absence & { registeredByUserName?: string | null }).registeredByUserName || a.createdAt) && (
+                            <span className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px] opacity-60">
+                              {(a as Absence & { registeredByUserName?: string | null }).registeredByUserName && (
+                                <>
+                                  <span className="font-bold uppercase tracking-wide">por</span>
+                                  <span>{(a as Absence & { registeredByUserName?: string | null }).registeredByUserName}</span>
+                                </>
+                              )}
+                              {a.createdAt && (
+                                <span className="font-mono" title="Data/hora do lançamento">
+                                  {(a as Absence & { registeredByUserName?: string | null }).registeredByUserName ? "·" : ""} {new Date(a.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              )}
                             </span>
                           )}
                         </td>
@@ -663,13 +679,26 @@ export default function AbsencesPage() {
               </div>
             </div>
 
+            {/* Segunda data — só disponível ao criar (não ao editar) */}
+            {!editingAbsence && (
+              <div className="space-y-1.5">
+                <Label className="font-bold uppercase text-xs tracking-wider flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
+                  2ª Data
+                  <span className="normal-case font-medium text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
+                    opcional — cria 2 registros
+                  </span>
+                </Label>
+                <Input type="date" {...register("date2")} className="h-11 rounded-lg" />
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-4 py-3 rounded-lg font-black uppercase tracking-tight" style={{
               backgroundColor: previewKind === "merit" ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)",
               color: previewKind === "merit" ? "#9ab000" : "#e5484d",
               border: `1px solid ${previewKind === "merit" ? "rgba(154,176,0,0.3)" : "rgba(229,72,77,0.3)"}`,
             }}>
-              <span className="text-xs">Total a lançar:</span>
-              <span className="text-2xl leading-none">{previewKind === "merit" ? "+" : "−"}{previewPoints} pts</span>
+              <span className="text-xs">{!editingAbsence && watchedDate2?.trim() ? "Total a lançar (×2 datas):" : "Total a lançar:"}</span>
+              <span className="text-2xl leading-none">{previewKind === "merit" ? "+" : "−"}{!editingAbsence && watchedDate2?.trim() ? previewPoints * 2 : previewPoints} pts</span>
             </div>
 
             <div className="space-y-1.5">
