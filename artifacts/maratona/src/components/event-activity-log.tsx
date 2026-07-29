@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Star, Sliders, MessagesSquare, MessageSquare, ClipboardCheck, History } from "lucide-react";
+import { Activity, Star, Sliders, MessagesSquare, MessageSquare, ClipboardCheck, History, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getAuthToken } from "@/lib/custom-fetch";
 import { CONDENSED } from "@/lib/premium-theme";
@@ -21,6 +21,7 @@ const KIND_CFG: Record<string, { icon: React.ReactNode; color: string; bg: strin
   calibration:   { icon: <Sliders size={9} />,         color: "#6366f1", bg: "rgba(99,102,241,0.13)" },
   cal_comment:   { icon: <MessagesSquare size={9} />,  color: "#e8a23d", bg: "rgba(232,162,61,0.14)" },
   event_comment: { icon: <MessageSquare size={9} />,   color: "#64748b", bg: "rgba(100,116,139,0.14)" },
+  conformity:    { icon: <ShieldCheck size={9} />,     color: "#06b6d4", bg: "rgba(6,182,212,0.13)" },
   audit:         { icon: <ClipboardCheck size={9} />,  color: "#94a3b8", bg: "rgba(148,163,184,0.13)" },
 };
 

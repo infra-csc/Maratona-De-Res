@@ -1748,8 +1748,8 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
       .from(eventCommentsTable)
       .leftJoin(usersTable, eq(eventCommentsTable.userId, usersTable.id))
       .where(eq(eventCommentsTable.eventId, id)),
-    // 5. Event-level audit entries
-    db.select({ id: auditLogsTable.id, action: auditLogsTable.action, userName: usersTable.name, createdAt: auditLogsTable.createdAt })
+    // 5. Event-level audit entries (including conformity)
+    db.select({ id: auditLogsTable.id, action: auditLogsTable.action, userName: usersTable.name, beforeJson: auditLogsTable.beforeJson, afterJson: auditLogsTable.afterJson, createdAt: auditLogsTable.createdAt })
       .from(auditLogsTable)
       .leftJoin(usersTable, eq(auditLogsTable.userId, usersTable.id))
       .where(and(eq(auditLogsTable.entity, "events"), eq(auditLogsTable.entityId, String(id))))
@@ -1771,6 +1771,24 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
     "finalize": "Finalizou o evento",
   };
 
+  // Human-readable names for each conformity field
+  const CONFORMITY_FIELD_LABELS: Record<string, string> = {
+    epi: "EPI",
+    estaiamentos: "Estaiamentos",
+    guardaEquipamentos: "Guarda Equipamentos",
+    conduta: "Conduta",
+    epiComment: "Comentário EPI",
+    estaiamentosComment: "Comentário Estaiamentos",
+    guardaEquipamentosComment: "Comentário Guarda Equipamentos",
+    condutaComment: "Comentário Conduta",
+    absencesResponse: "Houve falta/atraso?",
+    absencesReport: "Observação faltas",
+    standoutResponse: "Destaque profissional?",
+    standoutJustification: "Justificativa destaque",
+  };
+  const CONFORMITY_BOOL_FIELDS = new Set(["epi","estaiamentos","guardaEquipamentos","conduta","absencesResponse","standoutResponse"]);
+  const fmtBool = (v: unknown) => v === true ? "SIM" : v === false ? "NÃO" : "PENDENTE";
+
   type Entry = { id: string; kind: string; label: string; userName: string | null; criterionName: string | null; score: number | null; detail: string | null; createdAt: string };
   const entries: Entry[] = [];
 
@@ -1790,6 +1808,43 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
     entries.push({ id: `evcomment-${ec.id}`, kind: "event_comment", label: "Comentou no evento", userName: ec.userName ?? null, criterionName: null, score: null, detail: m.length > 100 ? m.slice(0, 100) + "…" : m, createdAt: new Date(ec.createdAt).toISOString() });
   }
   for (const a of auditRows) {
+    const isConformity = a.action === "update_conformity" || a.action === "create_conformity";
+    if (isConformity) {
+      // Expand into per-field diff entries
+      const before = a.beforeJson ? (() => { try { return JSON.parse(a.beforeJson); } catch { return {}; } })() : {};
+      const after  = a.afterJson  ? (() => { try { return JSON.parse(a.afterJson);  } catch { return {}; } })() : {};
+      let fieldIdx = 0;
+      for (const field of Object.keys(CONFORMITY_FIELD_LABELS)) {
+        const bVal = before[field];
+        const aVal = after[field];
+        // Skip unchanged fields (both undefined/null and same value)
+        if (bVal === aVal) continue;
+        if (bVal == null && aVal == null) continue;
+        const fieldLabel = CONFORMITY_FIELD_LABELS[field];
+        const isBool = CONFORMITY_BOOL_FIELDS.has(field);
+        let detail: string | null = null;
+        if (isBool) {
+          const from = before[field] !== undefined ? fmtBool(bVal) : null;
+          const to = fmtBool(aVal);
+          detail = from != null ? `${from} → ${to}` : to;
+        } else {
+          // Text comment field
+          const val = String(aVal ?? "").trim();
+          detail = val.length > 80 ? val.slice(0, 80) + "…" : val || null;
+        }
+        entries.push({
+          id: `audit-${a.id}-${fieldIdx++}`,
+          kind: "conformity",
+          label: isBool ? `Matriz: ${fieldLabel}` : `Comentou: ${fieldLabel}`,
+          userName: a.userName ?? null,
+          criterionName: null,
+          score: null,
+          detail,
+          createdAt: new Date(a.createdAt).toISOString(),
+        });
+      }
+      continue; // don't also add as generic audit entry
+    }
     entries.push({ id: `audit-${a.id}`, kind: "audit", label: ACTION_LABELS[a.action] ?? a.action, userName: a.userName ?? null, criterionName: null, score: null, detail: null, createdAt: new Date(a.createdAt).toISOString() });
   }
 
