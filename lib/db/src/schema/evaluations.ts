@@ -81,6 +81,16 @@ export const employeeEventResultsTable = pgTable("employee_event_results", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Thread de comentários de calibração — múltiplos por critério/evento.
+export const calibrationCommentsTable = pgTable("calibration_comments", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
+  criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  createdByUserId: integer("created_by_user_id").notNull().references(() => usersTable.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertEvaluationSchema = createInsertSchema(evaluationsTable).omit({ id: true, createdAt: true });
 export const insertCalibrationSchema = createInsertSchema(calibrationsTable).omit({ id: true, calibratedAt: true });
 export const insertEmployeeEventResultSchema = createInsertSchema(employeeEventResultsTable).omit({ id: true, createdAt: true, updatedAt: true });

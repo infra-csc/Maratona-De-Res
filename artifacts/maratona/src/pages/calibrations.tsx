@@ -8,8 +8,9 @@ import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Copy, Clock } from "lucide-react";
+import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Copy, Clock, History, Trash2, Plus } from "lucide-react";
 import { getAuthToken } from "@/lib/custom-fetch";
+import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
 import { cn, formatEventSubtitle } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING, usePremiumTheme } from "@/lib/premium-theme";
 
@@ -130,6 +131,8 @@ export default function CalibrationsPage() {
   const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
   const [contextOpen, setContextOpen] = useState(false);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
+  const [newCommentTexts, setNewCommentTexts] = useState<Record<number, string>>({});
+  const [showAuditFor, setShowAuditFor] = useState<Set<number>>(new Set());
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
@@ -157,6 +160,11 @@ export default function CalibrationsPage() {
     collapsedInitializedForEventId.current = selectedEventId;
     setCollapsedCriteria(new Set(criteria.filter(c => c.active).map(c => c.criterionId)));
   }, [selectedEventId, criteria]);
+
+  const { data: calComments } = useCalibrationComments(selectedEventId);
+  const { data: calAudit } = useCalibrationAudit(selectedEventId);
+  const addCommentMutation = useAddCalibrationComment(selectedEventId ?? 0);
+  const deleteCommentMutation = useDeleteCalibrationComment(selectedEventId ?? 0);
 
   const calQKey = getGetCalibrationsQueryKey({ eventId: selectedEventId ?? undefined });
   const { data: calibrations } = useGetCalibrations(
@@ -1561,6 +1569,126 @@ export default function CalibrationsPage() {
                                   </div>
                                 )}
                               </div>
+
+                              {/* ── Thread de comentários + log ───────────── */}
+                              {(() => {
+                                const criterionComments = (calComments ?? []).filter(cm => cm.criterionId === c.criterionId);
+                                const commentText = newCommentTexts[c.criterionId] ?? "";
+                                const auditEntries = (calAudit ?? []).filter(a => a.criterionId === c.criterionId);
+                                const showAudit = showAuditFor.has(c.criterionId);
+                                return (
+                                  <div className="mt-2 pt-1.5 space-y-1.5" style={{ borderTop: "1px dashed var(--border)" }} onClick={e => e.stopPropagation()}>
+                                    {/* Header */}
+                                    <div className="flex items-center gap-2">
+                                      <MessageSquare size={9} style={{ color: "var(--muted-foreground)" }} />
+                                      <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                                        Comentários{criterionComments.length > 0 ? ` (${criterionComments.length})` : ""}
+                                      </span>
+                                      {auditEntries.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowAuditFor(prev => {
+                                            const n = new Set(prev);
+                                            if (n.has(c.criterionId)) n.delete(c.criterionId); else n.add(c.criterionId);
+                                            return n;
+                                          })}
+                                          className="ml-auto flex items-center gap-0.5 text-[8px] font-black uppercase"
+                                          style={{ color: showAudit ? "var(--foreground)" : "var(--muted-foreground)" }}
+                                        >
+                                          <History size={9} /> Log ({auditEntries.length})
+                                        </button>
+                                      )}
+                                    </div>
+                                    {/* Audit log (toggle) */}
+                                    {showAudit && (
+                                      <div className="space-y-0.5 rounded p-1.5" style={{ backgroundColor: "var(--secondary)" }}>
+                                        {auditEntries.map(entry => {
+                                          const before = entry.beforeJson ? (() => { try { return JSON.parse(entry.beforeJson); } catch { return null; } })() : null;
+                                          const after  = entry.afterJson  ? (() => { try { return JSON.parse(entry.afterJson);  } catch { return null; } })() : null;
+                                          const isRecal = entry.action === "recalibrate_released";
+                                          return (
+                                            <div key={entry.id} className="flex items-start gap-1.5 flex-wrap">
+                                              <span className="shrink-0 text-[7px] font-black uppercase px-1 py-px rounded"
+                                                style={{ backgroundColor: isRecal ? "rgba(232,162,61,0.18)" : "rgba(154,176,0,0.14)", color: isRecal ? AMBER : GOOD }}>
+                                                {isRecal ? "Recal. pós-lib." : "Calibrou"}
+                                              </span>
+                                              <span className="text-[9px] font-bold">{entry.userName ?? "?"}</span>
+                                              {before != null && after != null && (
+                                                <span className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>
+                                                  {before.score != null ? `${before.score} → ` : ""}{after.score}
+                                                </span>
+                                              )}
+                                              <span className="text-[8px] ml-auto" style={{ color: "var(--muted-foreground)" }}>
+                                                {formatDateTime(new Date(entry.createdAt))}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                    {/* Comentários existentes */}
+                                    {criterionComments.map(cm => (
+                                      <div key={cm.id} className="rounded p-1.5 group/cm"
+                                        style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                          <User size={8} style={{ color: "var(--muted-foreground)" }} />
+                                          <span className="text-[9px] font-black">{cm.createdByName ?? "?"}</span>
+                                          <span className="text-[8px]" style={{ color: "var(--muted-foreground)" }}>
+                                            {formatDateTime(new Date(cm.createdAt))}
+                                          </span>
+                                          {canFinalize && (
+                                            <button type="button"
+                                              onClick={() => deleteCommentMutation.mutate(cm.id)}
+                                              disabled={deleteCommentMutation.isPending}
+                                              className="ml-auto opacity-0 group-hover/cm:opacity-100 transition-opacity"
+                                              style={{ color: "var(--muted-foreground)" }} title="Excluir">
+                                              <Trash2 size={9} />
+                                            </button>
+                                          )}
+                                        </div>
+                                        <p className="text-[11px] leading-snug whitespace-pre-wrap">{cm.text}</p>
+                                      </div>
+                                    ))}
+                                    {/* Input novo comentário */}
+                                    {canFinalize && (
+                                      <div className="flex gap-1.5">
+                                        <textarea rows={1}
+                                          placeholder="Adicionar comentário… (Ctrl+Enter)"
+                                          value={commentText}
+                                          onChange={e => {
+                                            setNewCommentTexts(prev => ({ ...prev, [c.criterionId]: e.target.value }));
+                                            e.target.style.height = "auto";
+                                            e.target.style.height = e.target.scrollHeight + "px";
+                                          }}
+                                          onFocus={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
+                                          onKeyDown={e => {
+                                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && commentText.trim()) {
+                                              e.preventDefault();
+                                              addCommentMutation.mutate(
+                                                { criterionId: c.criterionId, text: commentText.trim() },
+                                                { onSuccess: () => setNewCommentTexts(prev => ({ ...prev, [c.criterionId]: "" })) }
+                                              );
+                                            }
+                                          }}
+                                          className="flex-1 px-2 py-1.5 text-[11px] rounded resize-none leading-snug overflow-hidden focus:outline-none"
+                                          style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)", color: "var(--foreground)", minHeight: 30 }}
+                                        />
+                                        <button type="button"
+                                          disabled={!commentText.trim() || addCommentMutation.isPending}
+                                          onClick={() => addCommentMutation.mutate(
+                                            { criterionId: c.criterionId, text: commentText.trim() },
+                                            { onSuccess: () => setNewCommentTexts(prev => ({ ...prev, [c.criterionId]: "" })) }
+                                          )}
+                                          className="self-end h-8 w-8 rounded flex items-center justify-center disabled:opacity-40 hover:opacity-80 transition-opacity"
+                                          style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)", flexShrink: 0 }}
+                                          title="Enviar comentário">
+                                          <Plus size={12} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                             {/* Peso */}
                             <td className="px-2 py-2.5 text-center" onClick={e => e.stopPropagation()}>
