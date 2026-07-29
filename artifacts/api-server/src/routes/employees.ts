@@ -328,9 +328,19 @@ router.post("/employees/bulk-employment-reset", requireRole("admin", "rh"), asyn
   res.json({ ok: true, casaCount });
 });
 
+/** Normaliza nome para comparação: minúsculas, sem acentos, espaços colapsados. */
+function normalizeName(s: string): string {
+  return s
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")  // remove diacritics
+    .replace(/\s+/g, " ")             // collapse multiple spaces
+    .toLowerCase();
+}
+
 /**
  * Atualiza CPF (campo document) em lote a partir de uma lista {name, document}.
- * Busca por nome exato (case-insensitive). Idempotente.
+ * Busca por nome normalizado (sem acento, case-insensitive, espaço duplo tolerado). Idempotente.
  */
 router.post("/employees/bulk-set-cpf", requireRole("admin", "rh"), async (req, res) => {
   const entries = req.body as { name: string; document: string }[];
@@ -342,12 +352,14 @@ router.post("/employees/bulk-set-cpf", requireRole("admin", "rh"), async (req, r
   const updated: { id: number; name: string }[] = [];
   const notFound: string[] = [];
 
+  // Busca todos de uma vez para eficiência
+  const all = await db.select({ id: employeesTable.id, name: employeesTable.name })
+    .from(employeesTable);
+
   for (const entry of entries) {
     if (!entry.name || !entry.document) continue;
-    const normalized = entry.name.trim().toLowerCase();
-    const all = await db.select({ id: employeesTable.id, name: employeesTable.name })
-      .from(employeesTable);
-    const match = all.find(e => e.name.trim().toLowerCase() === normalized);
+    const normalized = normalizeName(entry.name);
+    const match = all.find(e => normalizeName(e.name) === normalized);
     if (!match) {
       notFound.push(entry.name);
       continue;

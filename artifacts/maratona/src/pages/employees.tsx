@@ -150,7 +150,7 @@ export default function EmployeesPage() {
     { name: "JOAO MARCOS NASCIMENTO LEITE",      document: "06765767533" },
     { name: "JOSE MARCIO DA SILVA MENINO",       document: "39096766857" },
     { name: "JOSE RENATO ALBUQUERQUE DE SOUZA",  document: "34735716874" },
-    { name: "KAIO GABRIEL FERREIRA BARBOZA",     document: "44892939846" },
+    { name: "KAIO GABRIEL FERREIRA BARBOSA",     document: "44892939846" },
     { name: "LUAN MIGUEL MARQUES",               document: "33454560870" },
     { name: "LYRICK ANDRADE ALVES DA SILVA",     document: "90000502863" },
     { name: "MATHEUS DA SILVA CORDEIRO",         document: "48193325893" },
