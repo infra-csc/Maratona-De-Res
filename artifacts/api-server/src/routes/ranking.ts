@@ -131,6 +131,7 @@ router.get("/ranking-detail", async (req, res) => {
         importedScore: eventsTable.importedScore,
         functionName: eventParticipantsTable.functionName,
         resultsConfirmed: eventsTable.resultsConfirmed,
+        participationConfirmed: eventParticipantsTable.confirmed,
       })
       .from(eventParticipantsTable)
       .leftJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
@@ -187,6 +188,7 @@ router.get("/ranking-detail", async (req, res) => {
         noScoreReason,
         participationFunction: p.functionName ?? null,
         resultsConfirmed: p.resultsConfirmed ?? false,
+        participationConfirmed: p.participationConfirmed,
       };
     }
 
@@ -210,6 +212,7 @@ router.get("/ranking-detail", async (req, res) => {
       noScoreReason,
       participationFunction: p.functionName ?? null,
       resultsConfirmed: p.resultsConfirmed ?? false,
+      participationConfirmed: p.participationConfirmed,
     };
   });
   events.sort((a, b) => b.eventScore - a.eventScore);
@@ -255,7 +258,9 @@ router.get("/ranking-detail", async (req, res) => {
   // nota (não freela nem "Sup Ceno *") entram na base — independente de status.
   // Alguns eventos ficam "open" mas são confirmados pelo responsável antes do
   // fechamento formal; o flag resultsConfirmed é o gate definitivo.
-  const scored = events.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
+  // Alinhado ao recomputeCycleResults: participante marcado como ausente
+  // (confirmed === false) não conta para nota — mesma regra dos dois lados.
+  const scored = events.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed && e.participationConfirmed !== false);
   const scoreSum = Math.round(scored.reduce((s, e) => s + e.eventScore, 0) * 100) / 100;
   const grossAverage = scored.length > 0 ? Math.round(scoreSum / scored.length * 100) / 100 : null;
 
