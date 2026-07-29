@@ -410,7 +410,7 @@ export default function EmployeesPage() {
                 style={{ backgroundColor: "var(--accent)", color: "#000" }}
                 title="Gera um PIN de 4 dígitos para todos os colaboradores casa"
               >
-                <Hash size={16} /> Gerar PINs (Casa)
+                <Hash size={16} /> Gerar Senhas (Casa)
               </button>
               <button
                 onClick={() => setResetTypeOpen(true)}
@@ -1132,19 +1132,19 @@ export default function EmployeesPage() {
         <DialogContent className="max-w-2xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
-              Gerar PINs — Colaboradores Casa
+              Gerar Senhas — Colaboradores Casa
             </DialogTitle>
           </DialogHeader>
 
           {bulkPinLoading && !bulkPinResult ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Hash size={24} className="animate-spin" style={{ color: "#ccff00" }} />
-              <p className="text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Carregando senhas…</p>
+              <p className="text-sm font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Carregando…</p>
             </div>
           ) : !bulkPinResult ? (
             <div className="space-y-4 pt-1">
               <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                Nenhuma senha gerada ainda. Clique abaixo para gerar senhas de 4 dígitos para todos os colaboradores casa ativos com CPF cadastrado.
+                Nenhuma senha definida ainda. Clique abaixo para definir a senha de todos os colaboradores casa ativos com CPF cadastrado. A senha de cada um será o próprio CPF (11 dígitos sem pontuação).
               </p>
               <div className="flex justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
                 <button onClick={() => setBulkPinOpen(false)} className="h-10 px-4 rounded-lg font-bold text-sm uppercase" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
@@ -1154,7 +1154,7 @@ export default function EmployeesPage() {
                   className="h-10 px-5 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-60"
                   style={{ backgroundColor: "#ccff00", color: "#000" }}
                 >
-                  <Hash size={15} /> Gerar todos os PINs
+                  <Hash size={15} /> Definir senhas (CPF)
                 </button>
               </div>
             </div>
@@ -1165,7 +1165,7 @@ export default function EmployeesPage() {
                 <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
                   <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>{bulkPinResult.results.length}</p>
                   <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
-                    {bulkPinSource === "generated" ? "Senhas geradas agora" : "Senhas ativas"}
+                    {bulkPinSource === "generated" ? "Senhas definidas agora" : "Senhas ativas"}
                   </p>
                 </div>
                 {bulkPinResult.skipped.length > 0 && (
@@ -1191,7 +1191,9 @@ export default function EmployeesPage() {
                         <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "hsl(var(--secondary))" }}>
                           <td className="px-4 py-2.5 font-medium">{r.name}</td>
                           <td className="px-4 py-2.5 text-center">
-                            <span className="text-xl font-black tracking-[0.25em]" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>{r.pin}</span>
+                            <span className="text-sm font-black font-mono" style={{ color: "#ccff00" }}>
+                              {r.pin.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}
+                            </span>
                           </td>
                         </tr>
                       ))}
@@ -1252,7 +1254,7 @@ export default function EmployeesPage() {
                 <div className="flex gap-2 items-center">
                   {confirmRegen ? (
                     <>
-                      <span className="text-[11px] font-bold" style={{ color: WARNING }}>Substituir todas as senhas?</span>
+                      <span className="text-[11px] font-bold" style={{ color: WARNING }}>Redefinir senhas para CPF?</span>
                       <button
                         onClick={handleBulkGeneratePins}
                         disabled={bulkPinLoading}
@@ -1271,7 +1273,7 @@ export default function EmployeesPage() {
                       className="h-9 px-4 rounded-lg font-bold text-xs uppercase flex items-center gap-1"
                       style={{ border: "1px solid var(--border)", cursor: "pointer" }}
                     >
-                      <Hash size={13} /> Gerar novas senhas
+                      <Hash size={13} /> Redefinir senhas (CPF)
                     </button>
                   )}
                   <button
@@ -1293,14 +1295,14 @@ export default function EmployeesPage() {
         <DialogContent className="max-w-sm rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
-              {pinDialog?.created ? "Acesso Criado" : "Novo PIN Gerado"}
+              {pinDialog?.created ? "Acesso Criado" : "Senha Redefinida"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-1">
             <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
               {pinDialog?.created
-                ? "Acesso criado com sucesso. Anote as credenciais abaixo — o PIN não será exibido novamente."
-                : `PIN redefinido para ${pinDialog?.empName}. Anote — o PIN não será exibido novamente.`}
+                ? "Acesso criado com sucesso. A senha é o CPF do colaborador (11 dígitos)."
+                : `Senha redefinida para ${pinDialog?.empName}. A senha é o CPF do colaborador.`}
             </p>
 
             <div className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--border)" }}>
@@ -1309,10 +1311,10 @@ export default function EmployeesPage() {
                 <p className="text-base font-black tracking-widest">{pinDialog?.cpfLogin}</p>
               </div>
               <div className="px-4 py-4" style={{ backgroundColor: "var(--primary)", borderBottom: "1px solid rgba(0,0,0,0.15)" }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--primary-foreground)", opacity: 0.65, fontFamily: CONDENSED }}>Senha (PIN)</p>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--primary-foreground)", opacity: 0.65, fontFamily: CONDENSED }}>Senha (CPF)</p>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-5xl font-black tracking-[0.25em]" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>
-                    {pinDialog?.pin}
+                  <span className="text-2xl font-black font-mono tracking-wider" style={{ color: "var(--primary-foreground)" }}>
+                    {pinDialog?.pin.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}
                   </span>
                   <button
                     onClick={() => {

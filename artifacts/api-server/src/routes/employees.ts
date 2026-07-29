@@ -427,25 +427,15 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
   const results: { name: string; cpfLogin: string; pin: string }[] = [];
   const skipped: { name: string; reason: string }[] = [];
 
-  // Collect existing pinValues to guarantee uniqueness within this batch
-  const usedPins = new Set<string>();
-
   for (const emp of casaEmployees) {
     const cpfDigits = emp.document ? normalizeCpf(emp.document) : "";
     if (!isValidCpfLength(cpfDigits)) {
-      skipped.push({ name: emp.name, reason: "Sem CPF válido" });
+      skipped.push({ name: emp.name, reason: "Sem CPF cadastrado" });
       continue;
     }
 
-    // Generate unique PIN
-    let pin: string;
-    let attempts = 0;
-    do {
-      pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
-      attempts++;
-    } while (usedPins.has(pin) && attempts < 100);
-    usedPins.add(pin);
-
+    // Senha = CPF do colaborador (11 dígitos sem formatação)
+    const pin = cpfDigits;
     const passwordHash = await bcrypt.hash(pin, 12);
 
     const [byEmpId] = await db.select({ id: usersTable.id })
@@ -480,7 +470,7 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
     results.push({ name: emp.name, cpfLogin: cpfDigits, pin });
   }
 
-  await audit(req.user!.userId, "bulk_generate_pins", "users", undefined, undefined, { count: results.length, skipped: skipped.length });
+  await audit(req.user!.userId, "bulk_generate_senhas_cpf", "users", undefined, undefined, { count: results.length, skipped: skipped.length });
   res.json({ results, skipped });
 });
 
@@ -502,15 +492,9 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
     return;
   }
 
-  // Generate unique PIN (not already used by another user)
-  let pin: string;
-  for (let attempt = 0; attempt < 50; attempt++) {
-    pin = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
-    const [existing] = await db.select({ id: usersTable.id }).from(usersTable)
-      .where(and(eq(usersTable.pinValue, pin!), ne(usersTable.employeeId, id))).limit(1);
-    if (!existing) break;
-  }
-  const passwordHash = await bcrypt.hash(pin!, 12);
+  // Senha = CPF do colaborador (11 dígitos sem formatação)
+  const pin = cpfDigits;
+  const passwordHash = await bcrypt.hash(pin, 12);
 
   let userId: number;
   let userCreated = false;
