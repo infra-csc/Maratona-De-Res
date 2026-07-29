@@ -286,8 +286,10 @@ export function AdminEvaluationsConsole() {
         const assignedToId = a?.assignedToId ?? null;
         const assignedToName = a?.assignedToName ?? null;
         const evalRow = assignedToId != null
-          ? evalsForEvent.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === assignedToId)
-          : undefined;
+          ? (evalsForEvent.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === assignedToId && e.status === "submitted")
+             ?? evalsForEvent.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === assignedToId)
+             ?? evalsForEvent.find(e => e.criterionId === c.criterionId && e.status === "submitted"))
+          : evalsForEvent.find(e => e.criterionId === c.criterionId && e.status === "submitted");
         // Se o assignedToId não corresponde ao evaluatorUserId real (ex: avaliador
         // chegou pelo event_area_assignments enquanto o criterion_routing aponta outro
         // default), a avaliação ainda existe mas o lookup acima não encontra.

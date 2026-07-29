@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
+import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable, publicEvalTokensTable } from "@workspace/db";
 import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -105,6 +105,13 @@ router.get("/evaluations", async (req, res) => {
     criterionName: criteriaTable.name,
     evaluatorUserId: evaluationsTable.evaluatorUserId,
     evaluatorName: usersTable.name,
+    tokenSubmitterName: sql<string | null>`(
+      SELECT submitter_name FROM public_eval_tokens
+      WHERE event_id = ${evaluationsTable.eventId}
+        AND created_by_user_id = ${evaluationsTable.evaluatorUserId}
+        AND used_at IS NOT NULL
+      LIMIT 1
+    )`,
     score: evaluationsTable.score,
     comments: evaluationsTable.comments,
     audioUrl: evaluationsTable.audioUrl,
@@ -148,8 +155,9 @@ router.get("/evaluations", async (req, res) => {
   res.json(evaluations.map(e => ({
     ...e,
     score: parseFloat(e.score as unknown as string),
-    evaluatorName: hideEvaluatorName ? null : e.evaluatorName,
+    evaluatorName: hideEvaluatorName ? null : (e.tokenSubmitterName ?? e.evaluatorName),
     evaluatorUserId: hideEvaluatorName ? null : e.evaluatorUserId,
+    tokenSubmitterName: undefined, // strip internal field
   })));
 });
 
