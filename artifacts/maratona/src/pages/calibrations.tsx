@@ -1535,6 +1535,14 @@ export default function CalibrationsPage() {
                                   {cal?.calibratedByName && (
                                     <span className="text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>{cal.calibratedByName}</span>
                                   )}
+                                  {calVal != null && (
+                                    <span className="text-[10px] font-black" style={{ color: GOOD }}>→ {calVal.toFixed(2)}</span>
+                                  )}
+                                  {cal?.calibratedAt && (
+                                    <span className="text-[8px] flex items-center gap-0.5" style={{ color: "var(--muted-foreground)" }}>
+                                      <Clock size={8} /> {formatDateTime(new Date(cal.calibratedAt))}
+                                    </span>
+                                  )}
                                   {/* ── Indicador de salvo ── */}
                                   {savedReasonIds.has(c.criterionId) && !reasonChanged && (
                                     <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black uppercase" style={{ color: GOOD }}>
