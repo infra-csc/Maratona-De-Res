@@ -2368,8 +2368,8 @@ export function AdminEvaluationsConsole() {
           <div className="rounded-xl w-full max-w-lg overflow-hidden flex flex-col" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", maxHeight: "85vh" }}>
             <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Todos os links · {selected?.name}</p>
-                <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }}>{batchRunning ? "Gerando links..." : `${batchLinks.filter(l => l.url).length} link(s) prontos`}</h3>
+                <h3 className="font-black uppercase text-sm truncate" style={{ fontFamily: CONDENSED }} title={selected?.name}>{selected?.name}</h3>
+                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>{batchRunning ? "Gerando links..." : `${batchLinks.filter(l => l.url).length} link(s) prontos`}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {batchLinks.some(l => l.url) && (
