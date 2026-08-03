@@ -422,6 +422,11 @@ export default function EventDetailPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const canManage = !!user && ["admin", "rh"].includes(user.role);
+  const isOperador = user?.role === "operador";
+  // Gestão de equipe (adicionar/remover participante) também é permitida ao
+  // papel "operador" — que NÃO pode confirmar resultados financeiros, editar
+  // nota histórica, nem ver/gerenciar a Matriz de Conformidade (só canManage).
+  const canManageTeam = canManage || isOperador;
   const canManageConformity = canManage || (!!user && user.id === event?.conformityEvaluatorUserId);
 
   const [conformityEvaluatorPickerOpen, setConformityEvaluatorPickerOpen] = useState(false);
@@ -621,7 +626,7 @@ export default function EventDetailPage() {
   const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
   const [newParticipantEmployeeId, setNewParticipantEmployeeId] = useState<number | null>(null);
   const [newParticipantFunction, setNewParticipantFunction] = useState<string>(DEFAULT_FUNCTION);
-  const { data: allEmployees } = useGetEmployees({ active: true }, { query: { enabled: canManage, queryKey: ["employees", "active"] as unknown[] } });
+  const { data: allEmployees } = useGetEmployees({ active: true }, { query: { enabled: canManageTeam, queryKey: ["employees", "active"] as unknown[] } });
   const alreadyAllocatedIds = new Set((event?.participants ?? []).map(p => p.employeeId));
   const availableEmployees = (allEmployees ?? []).filter(e => !alreadyAllocatedIds.has(e.id));
   const selectedNewEmployee = availableEmployees.find(e => e.id === newParticipantEmployeeId);
@@ -639,7 +644,7 @@ export default function EventDetailPage() {
     },
   });
 
-  const { data: usersList } = useGetUsers({ query: { enabled: canManage, queryKey: ["users"] as unknown[] } });
+  const { data: usersList } = useGetUsers({ query: { enabled: canManageTeam, queryKey: ["users"] as unknown[] } });
   const evaluators = (usersList ?? []).filter(u => u.role === "avaliador" && u.active);
 
   if (isLoading) {
@@ -842,11 +847,11 @@ export default function EventDetailPage() {
         )}
 
         {/* ── Equipe Alocada ── */}
-        {((event.participants && event.participants.length > 0) || canManage) && (
+        {((event.participants && event.participants.length > 0) || canManageTeam) && (
           <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="px-5 py-3 flex items-center justify-between gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
               <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Equipe Alocada ({event.participants?.filter(p => p.countsForScore !== false).length ?? 0})</span>
-              {canManage && (
+              {canManageTeam && (
                 <button
                   data-testid="button-add-participant"
                   onClick={() => setAddParticipantOpen(true)}
@@ -869,8 +874,10 @@ export default function EventDetailPage() {
                 }).map(p => {
                   const isInactive = p.confirmed === false;
                   const isInformational = p.countsForScore === false;
-                  // Diárias não são mais validadas: o único motivo para exigir
-                  // justificativa é o colaborador ter sido marcado como inativo.
+                  // Sem validação/controle de diárias: a sincronização com a Logística
+                  // Interna decide quem participou. Se a pessoa não foi, marca-se
+                  // inativo aqui; se foi e não veio na sincronização, adiciona-se
+                  // manualmente — sem exigir diárias registradas para confirmar resultados.
                   const showCommentBox = isInactive;
                   const commentReason = "Colaborador inativo — justifique";
                   return (
@@ -887,7 +894,7 @@ export default function EventDetailPage() {
                             {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
                           </div>
                           <p className="flex-1 font-bold uppercase text-sm leading-tight min-w-0 break-words">{p.employeeName}</p>
-                          {canManage && (
+                          {canManageTeam && (
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 data-testid={`button-toggle-participant-${p.employeeId}`}
@@ -911,7 +918,7 @@ export default function EventDetailPage() {
                           )}
                         </div>
 
-                        {canManage ? (
+                        {canManageTeam ? (
                           <div className="flex items-center gap-1.5">
                             <select
                               value={matchParticipantFunction(p.functionName)}
@@ -958,7 +965,7 @@ export default function EventDetailPage() {
                             participantId={p.id}
                             employeeId={p.employeeId}
                             initialComment={p.comment}
-                            canManage={canManage}
+                            canManage={canManageTeam}
                             reason={commentReason}
                             isInactive={isInactive}
                             isSaving={updateParticipant.isPending}
@@ -1083,7 +1090,8 @@ export default function EventDetailPage() {
           </DialogContent>
         </Dialog>
 
-        {/* ── Matriz de Conformidade ── */}
+        {/* ── Matriz de Conformidade — não visível para "operador" (não vê notas/respostas) ── */}
+        {!isOperador && (
         <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
           <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
             <ShieldAlert size={16} style={{ color: "var(--accent)" }} />
@@ -1320,6 +1328,7 @@ export default function EventDetailPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* ── Performance Individual ── */}
         {hasPerformanceTable && result && result.eventScore > 0 && participantResults.length > 0 && (

@@ -207,7 +207,14 @@ export function AdminEvaluationsConsole() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const canManage = !!user && ["admin", "rh"].includes(user.role);
+  const isOperador = user?.role === "operador";
+  // "operador" tem os mesmos poderes de atribuição/envio de avaliação que
+  // admin/rh (sincronizar critérios, aplicar avaliadores padrão, gerar links,
+  // atribuir/redirecionar) — mas NUNCA vê o conteúdo de uma resposta já
+  // enviada (nota, comentário, áudio, respostas da matriz de conformidade).
+  // Isso é controlado à parte por canViewSubmissions, abaixo.
+  const canManage = !!user && (["admin", "rh"].includes(user.role) || isOperador);
+  const canViewSubmissions = !!user && ["admin", "rh"].includes(user.role);
 
   const [view, setView] = useState<"assign" | "table" | "people" | "criterios">("assign");
   const [tab, setTab] = useState<"todo" | "done">("todo");
@@ -754,20 +761,22 @@ export function AdminEvaluationsConsole() {
     // Cenografia (evento sem esse critério), pra não deixar a matriz de fora.
     const hadCenoGroup = [...groups.values()].some(rows => rows[0].areaId === CENOGRAFIA_AREA_ID);
     if (!hadCenoGroup) {
+      const cenoEvaluatorName = selectedDetail?.conformityEvaluatorName ?? "Sem avaliador";
       try {
         const data = await createConformityToken.mutateAsync({ recipientName: "Matriz Cenografia" });
-        results.push({ key: "ceno-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
+        results.push({ key: "ceno-matrix", evaluatorName: cenoEvaluatorName, areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
       } catch (e) {
-        results.push({ key: "ceno-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: null, error: (e as Error).message });
+        results.push({ key: "ceno-matrix", evaluatorName: cenoEvaluatorName, areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: null, error: (e as Error).message });
       }
     }
     // Matriz de Ferramentas (Guarda de Equipamentos): 1 item, sempre com link
     // próprio — não tem critério pra combinar.
+    const ferramentasEvaluatorName = selectedDetail?.conformityEvaluatorFerramentasName ?? "Sem avaliador";
     try {
       const data = await createFerramentasToken.mutateAsync({ recipientName: "Matriz Ferramentas" });
-      results.push({ key: "ferr-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
+      results.push({ key: "ferr-matrix", evaluatorName: ferramentasEvaluatorName, areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
     } catch (e) {
-      results.push({ key: "ferr-matrix", evaluatorName: "Matriz de Conformidade", areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: null, error: (e as Error).message });
+      results.push({ key: "ferr-matrix", evaluatorName: ferramentasEvaluatorName, areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: null, error: (e as Error).message });
     }
 
     setBatchLinks(results);
@@ -975,19 +984,25 @@ export function AdminEvaluationsConsole() {
           <p className="text-[11px] font-bold uppercase tracking-wide mt-0.5" style={{ color: "var(--muted-foreground)" }}>Acompanhe o progresso e atribua avaliadores</p>
         </div>
         <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
-          {([
-            { key: "assign", label: "Atribuição", Icon: ClipboardCheck },
-            { key: "criterios", label: "Critérios", Icon: SlidersHorizontal },
-            { key: "table", label: "Tabela", Icon: Table2 },
-            { key: "people", label: "Avaliadores", Icon: Users },
-          ] as const).map((v, idx) => (
+          {(() => {
+            const tabs = ([
+              { key: "assign", label: "Atribuição", Icon: ClipboardCheck },
+              { key: "criterios", label: "Critérios", Icon: SlidersHorizontal },
+              { key: "table", label: "Tabela", Icon: Table2 },
+              { key: "people", label: "Avaliadores", Icon: Users },
+            ] as const)
+              // "operador" só enxerga a aba de Atribuição — as demais expõem
+              // edição de catálogo de critérios ou visões mais amplas fora do
+              // escopo dele (confirmar equipe + enviar avaliação).
+              .filter(v => !isOperador || v.key === "assign");
+            return tabs.map((v, idx) => (
             <button
               key={v.key}
               type="button"
               onClick={() => setView(v.key)}
               className={cn(
                 "px-3.5 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors",
-                idx < 3 && "border-r",
+                idx < tabs.length - 1 && "border-r",
               )}
               style={{
                 fontFamily: CONDENSED,
@@ -998,7 +1013,8 @@ export function AdminEvaluationsConsole() {
             >
               <v.Icon size={13} /> {v.label}
             </button>
-          ))}
+            ));
+          })()}
         </div>
       </div>
 
@@ -1409,7 +1425,7 @@ export function AdminEvaluationsConsole() {
                                   <Link2 size={11} /> Link
                                 </button>
                               )}
-                              {c.score != null && (
+                              {c.score != null && canViewSubmissions && (
                                 <button
                                   type="button"
                                   onClick={() => setViewEvalCrit(c)}
@@ -1472,7 +1488,7 @@ export function AdminEvaluationsConsole() {
                           </div>
                           <div className="flex items-center gap-2 whitespace-nowrap">
                             <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{cf.filled}/{cf.total}</span>
-                            {cf.filled > 0 && (
+                            {cf.filled > 0 && canViewSubmissions && (
                               <button
                                 type="button"
                                 onClick={() => setViewConformity(cf.key)}
@@ -2416,7 +2432,7 @@ export function AdminEvaluationsConsole() {
       )}
 
       {/* ── Ver avaliação (modal de leitura) ───────────────────────── */}
-      {viewEvalCrit && (
+      {viewEvalCrit && canViewSubmissions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewEvalCrit(null)}>
           <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
@@ -2485,7 +2501,7 @@ export function AdminEvaluationsConsole() {
       )}
 
       {/* ── Ver Matriz de Conformidade (modal de leitura) ────────────── */}
-      {viewConformity && conformity && (
+      {viewConformity && conformity && canViewSubmissions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewConformity(null)}>
           <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>

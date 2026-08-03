@@ -70,7 +70,7 @@ router.get("/employees/:id", async (req, res) => {
 
 const EMPLOYMENT_TYPES = ["casa", "freela"];
 
-router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
+router.post("/employees", requireRole("admin", "rh", "operador"), async (req, res) => {
   const { name, document, email, phone, department, functionName, employmentType } = req.body;
   if (!name) { res.status(400).json({ error: "Nome obrigatório" }); return; }
   if (employmentType !== undefined && !EMPLOYMENT_TYPES.includes(employmentType)) {
@@ -115,7 +115,7 @@ router.post("/employees", requireRole("admin", "rh"), async (req, res) => {
   res.status(201).json({ ...employee, generatedAccess });
 });
 
-router.patch("/employees/:id", requireRole("admin", "rh"), async (req, res) => {
+router.patch("/employees/:id", requireRole("admin", "rh", "operador"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { name, document, email, phone, department, functionName, employmentType, active, eligibleForBonus, eligibilityStatus, eligibilityReason } = req.body;
   const [before] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);

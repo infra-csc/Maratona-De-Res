@@ -24,6 +24,9 @@ const ROLES: { value: string; label: string; bg: string; fg: string }[] = [
   { value: "avaliador", label: "Avaliador", bg: "var(--secondary)", fg: "var(--muted-foreground)" },
   { value: "diretoria", label: "Diretoria", bg: "rgba(229,72,77,0.12)", fg: WARNING },
   { value: "visualizador", label: "Visualizador", bg: "rgba(232,162,61,0.14)", fg: AMBER },
+  // Confirma equipes por evento e envia avaliação (qualquer área), cadastra/edita
+  // colaboradores — mas nunca vê nota, resposta enviada ou matriz de conformidade.
+  { value: "operador", label: "Operador", bg: "rgba(91,141,239,0.14)", fg: "#5b8def" },
 ];
 
 function initials(name: string) {

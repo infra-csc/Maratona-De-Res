@@ -938,7 +938,7 @@ router.get("/events/:id/participants", async (req, res) => {
   res.json(participants.map(p => ({ ...p, countsForScore: participantCountsForScore(p) })));
 });
 
-router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events/:id/participants", requireRole("admin", "rh", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const { employeeId, functionName, teamName } = req.body;
   if (!employeeId) { res.status(400).json({ error: "employeeId obrigatório" }); return; }
@@ -953,7 +953,7 @@ router.post("/events/:id/participants", requireRole("admin", "rh"), async (req, 
   });
 });
 
-router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
+router.delete("/events/:id/participants/:participantId", requireRole("admin", "rh", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
   const [existing] = await db.select().from(eventParticipantsTable)
@@ -965,7 +965,9 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
   res.status(204).end();
 });
 
-router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh"), async (req, res) => {
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const participantId = parseInt(req.params.participantId as string);
   // Diárias não são mais validadas pelo app. As colunas scheduledDiaria*
@@ -1028,7 +1030,7 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
 
 // Matriz de Conformidade
 // POST /events/:id/conformity-evaluator — atribui (ou remove) o avaliador de conformidade
-router.post("/events/:id/conformity-evaluator", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events/:id/conformity-evaluator", requireRole("admin", "rh", "operador"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { userId } = req.body as { userId: number | null };
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
@@ -1043,7 +1045,7 @@ router.post("/events/:id/conformity-evaluator", requireRole("admin", "rh"), asyn
 });
 
 // Grupo 1 (Ferramentas e Case): assign/unassign the equipment evaluator (admin/RH only)
-router.post("/events/:id/conformity-evaluator-ferramentas", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events/:id/conformity-evaluator-ferramentas", requireRole("admin", "rh", "operador"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { userId } = req.body as { userId: number | null };
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
@@ -1584,7 +1586,7 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
  * vínculos para critérios ativos que ainda não estão no evento. Critérios
  * criados sob medida para o evento (eventScoped) nunca são tocados.
  */
-router.post("/events/:id/criteria/resync", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events/:id/criteria/resync", requireRole("admin", "rh", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   // Default force=true: sync is always additive (never removes criteria with evaluations).
   // Explicit force=false opt-out is available for strict mode.

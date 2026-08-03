@@ -47,7 +47,7 @@ router.get("/users/my-principal-areas", async (req, res) => {
 // GET /criterion-routing
 // Retorna o roteamento de todos os critérios (admin/rh).
 // ---------------------------------------------------------------------------
-router.get("/criterion-routing", requireRole("admin", "rh"), async (_req, res) => {
+router.get("/criterion-routing", requireRole("admin", "rh", "operador"), async (_req, res) => {
   const routings = await db.select({
     criterionId: criterionRoutingTable.criterionId,
     defaultEvaluatorId: criterionRoutingTable.defaultEvaluatorId,
@@ -355,7 +355,7 @@ export async function generateCriterionAssignments(eventId: number) {
   return { generated, skipped };
 }
 
-router.post("/events/:id/criterion-assignments/generate", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events/:id/criterion-assignments/generate", requireRole("admin", "rh", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const result = await generateCriterionAssignments(eventId);
   res.json(result);
@@ -395,7 +395,7 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
   // --- REDIRECIONAMENTO (avaliador atual passa para outro) ---
   if (action === "redirect") {
     const isCurrentAssignee = assignment.assignedToId === user.userId;
-    const isManager = ["admin", "rh"].includes(user.role);
+    const isManager = ["admin", "rh", "operador"].includes(user.role);
     if (!isCurrentAssignee && !isManager) {
       res.status(403).json({ error: "Sem permissão para redirecionar esta avaliação" });
       return;
@@ -457,7 +457,7 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
   // precisar de papel admin/rh. Diferente do redirect: não passa pelas
   // regras de redirectMode (é o "chefe" da área decidindo, não um repasse).
   if (action === "assign") {
-    const isManager = ["admin", "rh"].includes(user.role);
+    const isManager = ["admin", "rh", "operador"].includes(user.role);
     const [criterion] = await db.select({ areaId: criteriaTable.responsibleAreaId })
       .from(criteriaTable).where(eq(criteriaTable.id, criterionId)).limit(1);
     const principalAreaIds = isManager ? [] : await getPrincipalAreaIds(user.userId);
@@ -675,7 +675,7 @@ router.post("/events/:id/public-token", async (req, res) => {
 // submissão conte como avaliação desse avaliador.
 // Body: { assignedToUserId: number, criterionIds: number[], recipientName?: string }
 // ---------------------------------------------------------------------------
-router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "diretoria", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const { assignedToUserId, criterionIds, recipientName, includeConformity } = req.body ?? {};
 
@@ -798,7 +798,7 @@ router.post("/events/:id/public-token/conformity", async (req, res) => {
     res.status(400).json({ error: "Evento não está aberto para avaliações" }); return;
   }
 
-  const isAdminRh = ["admin", "rh"].includes(user.role);
+  const isAdminRh = ["admin", "rh", "operador"].includes(user.role);
   if (!isAdminRh && ev.conformityEvaluatorUserId !== user.userId) {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Cenografia deste evento" }); return;
   }
@@ -863,7 +863,7 @@ router.post("/events/:id/public-token/conformity-ferramentas", async (req, res) 
     res.status(400).json({ error: "Evento não está aberto para avaliações" }); return;
   }
 
-  const isAdminRh = ["admin", "rh"].includes(user.role);
+  const isAdminRh = ["admin", "rh", "operador"].includes(user.role);
   if (!isAdminRh && ev.conformityEvaluatorFerramentasUserId !== user.userId) {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Ferramentas deste evento" }); return;
   }
@@ -958,7 +958,7 @@ router.get("/events/:id/public-tokens/conformity-ferramentas", async (req, res) 
 // avaliador, qualquer formulário — critérios, Cenografia, Ferramentas e Case),
 // para dar visibilidade central de quem enviou o quê e se já foi respondido.
 // ---------------------------------------------------------------------------
-router.get("/events/:id/public-tokens/all", requireRole("admin", "rh"), async (req, res) => {
+router.get("/events/:id/public-tokens/all", requireRole("admin", "rh", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);
 
   const tokens = await db.select({
