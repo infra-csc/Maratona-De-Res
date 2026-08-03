@@ -122,8 +122,9 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               if (user?.role === "visualizador") return ["/meu-desempenho", "/como-funciona"].includes(item.path);
               // "operador": confirma equipes por evento, envia avaliação (Atribuição)
               // e cadastra/edita colaboradores — nada de bônus, regras, auditoria,
-              // critérios, calibrações ou ranking.
-              if (hasRole(user, "operador")) return ["/events", "/evaluations", "/employees", "/como-funciona"].includes(item.path);
+              // critérios, calibrações, ranking ou o guia "Como Funciona" (voltado
+              // a colaborador, não a este papel operacional).
+              if (hasRole(user, "operador")) return ["/events", "/evaluations", "/employees"].includes(item.path);
               if (user?.role === "diretoria") {
                 return ["/", "/calibrations", "/results", "/rules", "/absences", "/criteria"].includes(item.path);
               }
