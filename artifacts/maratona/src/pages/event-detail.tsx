@@ -15,7 +15,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, hasRole } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn, fmtDate } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
@@ -422,7 +422,7 @@ export default function EventDetailPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const canManage = !!user && ["admin", "rh"].includes(user.role);
-  const isOperador = user?.role === "operador";
+  const isOperador = hasRole(user, "operador");
   // Gestão de equipe (adicionar/remover participante) também é permitida ao
   // papel "operador" — que NÃO pode confirmar resultados financeiros, editar
   // nota histórica, nem ver/gerenciar a Matriz de Conformidade (só canManage).

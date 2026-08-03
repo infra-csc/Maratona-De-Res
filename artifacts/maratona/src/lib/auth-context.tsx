@@ -15,6 +15,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+/**
+ * Compara o papel do usuário de forma tolerante a maiúsculas/minúsculas e
+ * espaços — proteção defensiva caso o valor salvo divirja do literal exato
+ * usado nos checks de role (ex.: "Operador" em vez de "operador").
+ */
+export function hasRole(user: { role?: string | null } | null | undefined, role: string): boolean {
+  return (user?.role ?? "").trim().toLowerCase() === role.toLowerCase();
+}
+
 const TOKEN_KEY = "maratona_token";
 const USER_KEY = "maratona_user";
 const REAL_TOKEN_KEY = "maratona_real_token";

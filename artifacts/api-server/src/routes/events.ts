@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
 import { eq, and, sql, inArray, ilike, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
-import { requireAuth, requireRole } from "../lib/auth.js";
+import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
@@ -340,7 +340,7 @@ router.get("/events", async (req, res) => {
   // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
   // a nota — redact aqui na origem, já que a tela de Eventos (no menu dele)
   // exibiria averageScore/teamScore como a coluna "Nota" senão.
-  if (req.user?.role === "operador") {
+  if (isRole(req.user?.role, "operador")) {
     res.json(enriched.map(ev => ({ ...ev, averageScore: null, teamScore: null })));
     return;
   }
@@ -569,7 +569,7 @@ async function resyncEventCriteriaOnce(eventId: number, options: { force?: boole
 
 router.get("/events/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const detail = await loadEventDetail(id, req.user?.role === "operador");
+  const detail = await loadEventDetail(id, isRole(req.user?.role, "operador"));
   if (!detail) { res.status(404).json({ error: "Não encontrado" }); return; }
   res.json(detail);
 });
@@ -1067,7 +1067,7 @@ router.post("/events/:id/conformity-evaluator", requireRole("admin", "rh", "oper
     .where(eq(eventsTable.id, id))
     .returning();
   await audit(req.user!.userId, "set_conformity_evaluator", "events", id, { conformityEvaluatorUserId: before.conformityEvaluatorUserId }, { conformityEvaluatorUserId: updated.conformityEvaluatorUserId });
-  const detail = await loadEventDetail(id, req.user!.role === "operador");
+  const detail = await loadEventDetail(id, isRole(req.user!.role, "operador"));
   res.json(detail);
 });
 
@@ -1082,7 +1082,7 @@ router.post("/events/:id/conformity-evaluator-ferramentas", requireRole("admin",
     .where(eq(eventsTable.id, id))
     .returning();
   await audit(req.user!.userId, "set_conformity_evaluator_ferramentas", "events", id, { conformityEvaluatorFerramentasUserId: before.conformityEvaluatorFerramentasUserId }, { conformityEvaluatorFerramentasUserId: updated.conformityEvaluatorFerramentasUserId });
-  res.json(await loadEventDetail(id, req.user!.role === "operador"));
+  res.json(await loadEventDetail(id, isRole(req.user!.role, "operador")));
 });
 
 // Redirect: Grupo 2 (Cenografia) evaluator can delegate to another user in area 13
@@ -1102,7 +1102,7 @@ router.patch("/events/:id/conformity-evaluator", async (req, res) => {
   }
   await db.update(eventsTable).set({ conformityEvaluatorUserId: newUserId }).where(eq(eventsTable.id, id));
   await audit(requesterId, "redirect_conformity_evaluator", "events", id, { from: ev.conformityEvaluatorUserId }, { to: newUserId });
-  res.json(await loadEventDetail(id, req.user!.role === "operador"));
+  res.json(await loadEventDetail(id, isRole(req.user!.role, "operador")));
 });
 
 // Redirect: Grupo 1 (Ferramentas e Case) evaluator can delegate to another user in area 16
@@ -1122,7 +1122,7 @@ router.patch("/events/:id/conformity-evaluator-ferramentas", async (req, res) =>
   }
   await db.update(eventsTable).set({ conformityEvaluatorFerramentasUserId: newUserId }).where(eq(eventsTable.id, id));
   await audit(requesterId, "redirect_conformity_evaluator_ferramentas", "events", id, { from: ev.conformityEvaluatorFerramentasUserId }, { to: newUserId });
-  res.json(await loadEventDetail(id, req.user!.role === "operador"));
+  res.json(await loadEventDetail(id, isRole(req.user!.role, "operador")));
 });
 
 router.get("/events/:id/conformity", async (req, res) => {
@@ -1439,7 +1439,7 @@ router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async 
   await db.insert(eventCriteriaTable).values({ eventId, criterionId: copy.id, active: true, weightOverride: "0" });
 
   await audit(req.user!.userId, "duplicate", "criteria", copy.id, null, { eventId, sourceCriterionId, name: copy.name });
-  res.status(201).json(await loadEventDetail(eventId, req.user!.role === "operador"));
+  res.status(201).json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
 });
 
 /**
@@ -1469,7 +1469,7 @@ router.delete("/events/:id/criteria/:eventCriterionId", requireRole("admin", "rh
   await db.delete(eventCriteriaTable).where(eq(eventCriteriaTable.id, ecId));
   await db.delete(criteriaTable).where(eq(criteriaTable.id, link.criterionId));
   await audit(req.user!.userId, "delete", "criteria", link.criterionId, crit, null);
-  res.json(await loadEventDetail(eventId, req.user!.role === "operador"));
+  res.json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
 });
 
 /**
@@ -1532,7 +1532,7 @@ router.patch("/events/:id/criteria/:ecId/swap-source", requireRole("admin"), asy
   await audit(req.user!.userId, "swap-source", "criteria", link.criterionId,
     { oldSource: crit.sourceCriterionId, oldName: crit.name },
     { newSource: newSourceId, newName });
-  res.json(await loadEventDetail(eventId, req.user!.role === "operador"));
+  res.json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
 });
 
 /**
@@ -1598,7 +1598,7 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
   });
 
   await audit(req.user!.userId, "set_assignments", "events", eventId, null, { assignments: parsedItems });
-  res.json(await loadEventDetail(eventId, req.user!.role === "operador"));
+  res.json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
 });
 
 /**
@@ -1621,7 +1621,7 @@ router.post("/events/:id/criteria/resync", requireRole("admin", "rh", "operador"
   try {
     const { deactivated, added, activated } = await resyncEventCriteriaOnce(eventId, { force });
     await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated, added, activated, force }, null);
-    res.json({ ...(await loadEventDetail(eventId, req.user!.role === "operador")), removedStale: deactivated, addedNew: added, reactivated: activated });
+    res.json({ ...(await loadEventDetail(eventId, isRole(req.user!.role, "operador"))), removedStale: deactivated, addedNew: added, reactivated: activated });
   } catch (err) {
     if (err instanceof ResyncBlockedError) {
       const message = err.reason === "confirmed"
@@ -1739,7 +1739,7 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
     await generateCriterionAssignments(id);
   }
 
-  res.json(await loadEventDetail(id, req.user!.role === "operador"));
+  res.json(await loadEventDetail(id, isRole(req.user!.role, "operador")));
 });
 
 // ── Log completo de atividades do evento ─────────────────────────────────────

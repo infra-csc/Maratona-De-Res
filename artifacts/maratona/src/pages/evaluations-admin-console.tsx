@@ -17,7 +17,7 @@ import {
 } from "@/lib/routing-api";
 import { customFetch } from "@/lib/custom-fetch";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, hasRole } from "@/lib/auth-context";
 import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, UserCheck, Calendar, AlertTriangle, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CONDENSED, WARNING } from "@/lib/premium-theme";
@@ -207,7 +207,7 @@ export function AdminEvaluationsConsole() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const isOperador = user?.role === "operador";
+  const isOperador = hasRole(user, "operador");
   // "operador" tem os mesmos poderes de atribuição/envio de avaliação que
   // admin/rh (sincronizar critérios, aplicar avaliadores padrão, gerar links,
   // atribuir/redirecionar) — mas NUNCA vê o conteúdo de uma resposta já

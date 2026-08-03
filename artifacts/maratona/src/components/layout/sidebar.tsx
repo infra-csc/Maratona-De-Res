@@ -6,7 +6,7 @@ import {
   FolderLock, BookOpen, Settings2, Sun, Moon
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePremiumTheme, CONDENSED, WARNING } from "@/lib/premium-theme";
@@ -123,7 +123,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               // "operador": confirma equipes por evento, envia avaliação (Atribuição)
               // e cadastra/edita colaboradores — nada de bônus, regras, auditoria,
               // critérios, calibrações ou ranking.
-              if (user?.role === "operador") return ["/events", "/evaluations", "/employees", "/como-funciona"].includes(item.path);
+              if (hasRole(user, "operador")) return ["/events", "/evaluations", "/employees", "/como-funciona"].includes(item.path);
               if (user?.role === "diretoria") {
                 return ["/", "/calibrations", "/results", "/rules", "/absences", "/criteria"].includes(item.path);
               }

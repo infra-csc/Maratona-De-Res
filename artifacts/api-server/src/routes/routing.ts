@@ -8,7 +8,7 @@ import {
   publicEvalTokenCriteriaTable, areaConformityRoutingTable, evaluationsTable,
 } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
-import { requireAuth, requireRole } from "../lib/auth.js";
+import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
 const router = Router();
@@ -395,7 +395,7 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
   // --- REDIRECIONAMENTO (avaliador atual passa para outro) ---
   if (action === "redirect") {
     const isCurrentAssignee = assignment.assignedToId === user.userId;
-    const isManager = ["admin", "rh", "operador"].includes(user.role);
+    const isManager = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
     if (!isCurrentAssignee && !isManager) {
       res.status(403).json({ error: "Sem permissão para redirecionar esta avaliação" });
       return;
@@ -457,7 +457,7 @@ router.patch("/events/:id/criterion-assignments/:criterionId", async (req, res) 
   // precisar de papel admin/rh. Diferente do redirect: não passa pelas
   // regras de redirectMode (é o "chefe" da área decidindo, não um repasse).
   if (action === "assign") {
-    const isManager = ["admin", "rh", "operador"].includes(user.role);
+    const isManager = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
     const [criterion] = await db.select({ areaId: criteriaTable.responsibleAreaId })
       .from(criteriaTable).where(eq(criteriaTable.id, criterionId)).limit(1);
     const principalAreaIds = isManager ? [] : await getPrincipalAreaIds(user.userId);
@@ -798,7 +798,7 @@ router.post("/events/:id/public-token/conformity", async (req, res) => {
     res.status(400).json({ error: "Evento não está aberto para avaliações" }); return;
   }
 
-  const isAdminRh = ["admin", "rh", "operador"].includes(user.role);
+  const isAdminRh = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
   if (!isAdminRh && ev.conformityEvaluatorUserId !== user.userId) {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Cenografia deste evento" }); return;
   }
@@ -863,7 +863,7 @@ router.post("/events/:id/public-token/conformity-ferramentas", async (req, res) 
     res.status(400).json({ error: "Evento não está aberto para avaliações" }); return;
   }
 
-  const isAdminRh = ["admin", "rh", "operador"].includes(user.role);
+  const isAdminRh = ["admin", "rh", "operador"].some(r => isRole(user.role, r));
   if (!isAdminRh && ev.conformityEvaluatorFerramentasUserId !== user.userId) {
     res.status(403).json({ error: "Você não é o avaliador de conformidade Ferramentas deste evento" }); return;
   }

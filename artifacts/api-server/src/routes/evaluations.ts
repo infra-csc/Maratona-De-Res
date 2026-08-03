@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable, publicEvalTokensTable } from "@workspace/db";
 import { eq, and, or, inArray, sql } from "drizzle-orm";
-import { requireAuth, requireRole } from "../lib/auth.js";
+import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getPrincipalAreaIds } from "./routing.js";
 
@@ -156,7 +156,7 @@ router.get("/evaluations", async (req, res) => {
   // resposta já enviada (nota, comentário, áudio) — só se foi respondida ou
   // não. Redact aqui, na origem, em vez de confiar só na UI escondendo o
   // botão "Ver resposta" (a API não pode devolver o dado que a tela esconde).
-  const redactContent = user.role === "operador";
+  const redactContent = isRole(user.role, "operador");
   res.json(evaluations.map(e => ({
     ...e,
     score: redactContent ? null : parseFloat(e.score as unknown as string),

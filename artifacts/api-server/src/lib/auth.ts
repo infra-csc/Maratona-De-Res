@@ -54,9 +54,23 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 }
 
+/**
+ * Compara o papel do usuário de forma tolerante a maiúsculas/minúsculas e
+ * espaços — mesma proteção defensiva usada em requireRole, mas para checks
+ * inline (ex.: "req.user!.role === 'operador'") espalhados pelas rotas.
+ */
+export function isRole(role: string | null | undefined, target: string): boolean {
+  return (role ?? "").trim().toLowerCase() === target.toLowerCase();
+}
+
 export function requireRole(...roles: string[]) {
+  // Comparação tolerante a maiúsculas/minúsculas e espaços — proteção
+  // defensiva caso o valor salvo divirja do literal exato (ex.: "Operador"
+  // em vez de "operador"), o que rejeitaria silenciosamente um papel válido.
+  const normalizedRoles = roles.map(r => r.trim().toLowerCase());
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const userRole = (req.user?.role ?? "").trim().toLowerCase();
+    if (!req.user || !normalizedRoles.includes(userRole)) {
       res.status(403).json({ error: "Acesso negado" });
       return;
     }
