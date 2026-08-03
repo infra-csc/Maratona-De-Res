@@ -152,9 +152,16 @@ router.get("/evaluations", async (req, res) => {
   const evaluations = await query;
 
   const hideEvaluatorName = user.role === "visualizador";
+  // "operador" atribui/envia avaliações mas nunca deve ver o CONTEÚDO de uma
+  // resposta já enviada (nota, comentário, áudio) — só se foi respondida ou
+  // não. Redact aqui, na origem, em vez de confiar só na UI escondendo o
+  // botão "Ver resposta" (a API não pode devolver o dado que a tela esconde).
+  const redactContent = user.role === "operador";
   res.json(evaluations.map(e => ({
     ...e,
-    score: parseFloat(e.score as unknown as string),
+    score: redactContent ? null : parseFloat(e.score as unknown as string),
+    comments: redactContent ? null : e.comments,
+    audioUrl: redactContent ? null : e.audioUrl,
     evaluatorName: hideEvaluatorName ? null : (e.tokenSubmitterName ?? e.evaluatorName),
     evaluatorUserId: hideEvaluatorName ? null : e.evaluatorUserId,
     tokenSubmitterName: undefined, // strip internal field

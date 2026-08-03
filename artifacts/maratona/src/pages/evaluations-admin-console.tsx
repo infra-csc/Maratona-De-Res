@@ -1990,7 +1990,7 @@ export function AdminEvaluationsConsole() {
                         data-testid="button-resync-criteria"
                         onClick={() => resyncCriteria.mutate({ id: selected.id })}
                         disabled={resyncCriteria.isPending}
-                        title={hasEvaluations ? "Reativa critérios globais ativos que foram desativados neste evento (não toca critérios com avaliações)" : "Remove critérios que não fazem mais parte do catálogo ativo e adiciona os que faltam"}
+                        title={hasEvaluations ? "Adiciona critérios novos do catálogo que ainda faltam neste evento (não toca critérios com avaliações, não reativa os que foram desligados de propósito)" : "Remove critérios que não fazem mais parte do catálogo ativo e adiciona os que faltam (não reativa os que foram desligados de propósito)"}
                         className="rounded-lg px-5 py-3 font-bold text-sm uppercase tracking-wide flex items-center gap-2 disabled:opacity-50 transition-colors hover:opacity-80"
                         style={{ border: "1px solid var(--border)" }}
                       >

@@ -337,10 +337,22 @@ router.get("/events", async (req, res) => {
       ? (conformityEvalNameById.get(ev.conformityEvaluatorFerramentasUserId) ?? null) : null;
     return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityEvaluatorName, conformityEvaluatorFerramentasName };
   });
+  // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
+  // a nota — redact aqui na origem, já que a tela de Eventos (no menu dele)
+  // exibiria averageScore/teamScore como a coluna "Nota" senão.
+  if (req.user?.role === "operador") {
+    res.json(enriched.map(ev => ({ ...ev, averageScore: null, teamScore: null })));
+    return;
+  }
   res.json(enriched);
 });
 
-async function loadEventDetail(id: number) {
+// redactConformityContent: quando o solicitante é "operador", esconde o
+// CONTEÚDO da matriz de conformidade (respostas Sim/Não/comentários) — ele
+// pode atribuir quem responde, mas nunca ver o que foi respondido. Preserva
+// o sinal "respondido ou não" (mantém valores não-nulos como `true` neutro,
+// em vez de null) para não quebrar a contagem de progresso "X/Y" da tela.
+async function loadEventDetail(id: number, redactConformityContent = false) {
   const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
   if (!ev) return null;
 
@@ -448,7 +460,20 @@ async function loadEventDetail(id: number) {
     conformityEvaluatorFerramentasName = u2?.name ?? null;
   }
 
-  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: conformity ?? null, conformityEvaluatorName, conformityEvaluatorFerramentasName };
+  const maskAnswered = (v: boolean | null) => v != null ? true : null;
+  const safeConformity = conformity && redactConformityContent
+    ? {
+        ...conformity,
+        epi: maskAnswered(conformity.epi), estaiamentos: maskAnswered(conformity.estaiamentos),
+        conduta: maskAnswered(conformity.conduta), guardaEquipamentos: maskAnswered(conformity.guardaEquipamentos),
+        absencesResponse: maskAnswered(conformity.absencesResponse), standoutResponse: maskAnswered(conformity.standoutResponse),
+        epiComment: null, estaiamentosComment: null, condutaComment: null, guardaEquipamentosComment: null,
+        absencesReport: conformity.absencesReport?.trim() ? "•••" : conformity.absencesReport,
+        standoutJustification: null,
+      }
+    : conformity;
+
+  return { ...ev, participants, criteria: enrichedCriteria, areaAssignments, hasEvaluations: ev.isHistorical ? true : hasEvaluations, evaluationProgress, evaluationMatrix: [], results: [], conformity: safeConformity ?? null, conformityEvaluatorName, conformityEvaluatorFerramentasName };
 }
 
 async function eventHasEvaluations(eventId: number) {
@@ -518,10 +543,15 @@ async function resyncEventCriteriaOnce(eventId: number, options: { force?: boole
     toDeactivate = deactivateCandidates.filter(e => !protectedIds.has(e.criterionId));
   }
 
-  const toActivate = existing.filter(e => !e.active && !e.eventScoped && e.criterionActive);
+  // NÃO reativa critérios que estão inativos NESTE evento, mesmo que o
+  // catálogo global continue ativo — um critério pode ter sido desligado de
+  // propósito só para este evento (ex.: não tem Cenografia nesta prova), e o
+  // sync silenciosamente trazendo ele de volta é o bug reportado ("aparecendo
+  // vários [que não deviam]"). Reativar é uma decisão manual, feita direto no
+  // toggle do critério (aba Critérios), não uma consequência de "sincronizar".
   const toAdd = [...globalActiveIds].filter(cid => !existingCriterionIds.has(cid));
 
-  if (toDeactivate.length === 0 && toActivate.length === 0 && toAdd.length === 0) {
+  if (toDeactivate.length === 0 && toAdd.length === 0) {
     return { deactivated: 0, added: 0 };
   }
 
@@ -529,20 +559,17 @@ async function resyncEventCriteriaOnce(eventId: number, options: { force?: boole
     for (const row of toDeactivate) {
       await tx.update(eventCriteriaTable).set({ active: false }).where(eq(eventCriteriaTable.id, row.id));
     }
-    for (const row of toActivate) {
-      await tx.update(eventCriteriaTable).set({ active: true }).where(eq(eventCriteriaTable.id, row.id));
-    }
     if (toAdd.length > 0) {
       await tx.insert(eventCriteriaTable).values(toAdd.map(criterionId => ({ eventId, criterionId, active: true })));
     }
   });
 
-  return { deactivated: toDeactivate.length, added: toAdd.length, activated: toActivate.length };
+  return { deactivated: toDeactivate.length, added: toAdd.length, activated: 0 };
 }
 
 router.get("/events/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const detail = await loadEventDetail(id);
+  const detail = await loadEventDetail(id, req.user?.role === "operador");
   if (!detail) { res.status(404).json({ error: "Não encontrado" }); return; }
   res.json(detail);
 });
@@ -1040,7 +1067,7 @@ router.post("/events/:id/conformity-evaluator", requireRole("admin", "rh", "oper
     .where(eq(eventsTable.id, id))
     .returning();
   await audit(req.user!.userId, "set_conformity_evaluator", "events", id, { conformityEvaluatorUserId: before.conformityEvaluatorUserId }, { conformityEvaluatorUserId: updated.conformityEvaluatorUserId });
-  const detail = await loadEventDetail(id);
+  const detail = await loadEventDetail(id, req.user!.role === "operador");
   res.json(detail);
 });
 
@@ -1055,7 +1082,7 @@ router.post("/events/:id/conformity-evaluator-ferramentas", requireRole("admin",
     .where(eq(eventsTable.id, id))
     .returning();
   await audit(req.user!.userId, "set_conformity_evaluator_ferramentas", "events", id, { conformityEvaluatorFerramentasUserId: before.conformityEvaluatorFerramentasUserId }, { conformityEvaluatorFerramentasUserId: updated.conformityEvaluatorFerramentasUserId });
-  res.json(await loadEventDetail(id));
+  res.json(await loadEventDetail(id, req.user!.role === "operador"));
 });
 
 // Redirect: Grupo 2 (Cenografia) evaluator can delegate to another user in area 13
@@ -1075,7 +1102,7 @@ router.patch("/events/:id/conformity-evaluator", async (req, res) => {
   }
   await db.update(eventsTable).set({ conformityEvaluatorUserId: newUserId }).where(eq(eventsTable.id, id));
   await audit(requesterId, "redirect_conformity_evaluator", "events", id, { from: ev.conformityEvaluatorUserId }, { to: newUserId });
-  res.json(await loadEventDetail(id));
+  res.json(await loadEventDetail(id, req.user!.role === "operador"));
 });
 
 // Redirect: Grupo 1 (Ferramentas e Case) evaluator can delegate to another user in area 16
@@ -1095,7 +1122,7 @@ router.patch("/events/:id/conformity-evaluator-ferramentas", async (req, res) =>
   }
   await db.update(eventsTable).set({ conformityEvaluatorFerramentasUserId: newUserId }).where(eq(eventsTable.id, id));
   await audit(requesterId, "redirect_conformity_evaluator_ferramentas", "events", id, { from: ev.conformityEvaluatorFerramentasUserId }, { to: newUserId });
-  res.json(await loadEventDetail(id));
+  res.json(await loadEventDetail(id, req.user!.role === "operador"));
 });
 
 router.get("/events/:id/conformity", async (req, res) => {
@@ -1412,7 +1439,7 @@ router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async 
   await db.insert(eventCriteriaTable).values({ eventId, criterionId: copy.id, active: true, weightOverride: "0" });
 
   await audit(req.user!.userId, "duplicate", "criteria", copy.id, null, { eventId, sourceCriterionId, name: copy.name });
-  res.status(201).json(await loadEventDetail(eventId));
+  res.status(201).json(await loadEventDetail(eventId, req.user!.role === "operador"));
 });
 
 /**
@@ -1442,7 +1469,7 @@ router.delete("/events/:id/criteria/:eventCriterionId", requireRole("admin", "rh
   await db.delete(eventCriteriaTable).where(eq(eventCriteriaTable.id, ecId));
   await db.delete(criteriaTable).where(eq(criteriaTable.id, link.criterionId));
   await audit(req.user!.userId, "delete", "criteria", link.criterionId, crit, null);
-  res.json(await loadEventDetail(eventId));
+  res.json(await loadEventDetail(eventId, req.user!.role === "operador"));
 });
 
 /**
@@ -1505,7 +1532,7 @@ router.patch("/events/:id/criteria/:ecId/swap-source", requireRole("admin"), asy
   await audit(req.user!.userId, "swap-source", "criteria", link.criterionId,
     { oldSource: crit.sourceCriterionId, oldName: crit.name },
     { newSource: newSourceId, newName });
-  res.json(await loadEventDetail(eventId));
+  res.json(await loadEventDetail(eventId, req.user!.role === "operador"));
 });
 
 /**
@@ -1571,7 +1598,7 @@ router.put("/events/:id/assignments", requireRole("admin", "rh"), async (req, re
   });
 
   await audit(req.user!.userId, "set_assignments", "events", eventId, null, { assignments: parsedItems });
-  res.json(await loadEventDetail(eventId));
+  res.json(await loadEventDetail(eventId, req.user!.role === "operador"));
 });
 
 /**
@@ -1594,7 +1621,7 @@ router.post("/events/:id/criteria/resync", requireRole("admin", "rh", "operador"
   try {
     const { deactivated, added, activated } = await resyncEventCriteriaOnce(eventId, { force });
     await audit(req.user!.userId, "resync_criteria", "events", eventId, { deactivated, added, activated, force }, null);
-    res.json({ ...(await loadEventDetail(eventId)), removedStale: deactivated, addedNew: added, reactivated: activated });
+    res.json({ ...(await loadEventDetail(eventId, req.user!.role === "operador")), removedStale: deactivated, addedNew: added, reactivated: activated });
   } catch (err) {
     if (err instanceof ResyncBlockedError) {
       const message = err.reason === "confirmed"
@@ -1712,7 +1739,7 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
     await generateCriterionAssignments(id);
   }
 
-  res.json(await loadEventDetail(id));
+  res.json(await loadEventDetail(id, req.user!.role === "operador"));
 });
 
 // ── Log completo de atividades do evento ─────────────────────────────────────
