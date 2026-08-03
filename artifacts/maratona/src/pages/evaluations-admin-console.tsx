@@ -527,7 +527,14 @@ export function AdminEvaluationsConsole() {
   const deleteCriterion = useDeleteEventCriterion({
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Quesito excluído" }); },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" }),
+      // "Não encontrado" no delete significa que o servidor já não tem esse quesito
+      // (foi excluído em outra ação, ou a lista ficou dessincronizada após um
+      // "Sincronizar Critérios"). Sem isso, a linha "fantasma" ficava presa na
+      // tela para sempre — recarrega para o cliente refletir o estado real.
+      onError: (e: { message?: string }) => {
+        toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" });
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) });
+      },
     },
   });
   const renameCriterion = useUpdateCriterion({
