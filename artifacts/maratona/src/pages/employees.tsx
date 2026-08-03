@@ -264,10 +264,9 @@ export default function EmployeesPage() {
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
 
-  const { register, handleSubmit, reset, setValue, watch } = useForm<EmployeeInput>({
+  const { register, handleSubmit, reset } = useForm<EmployeeInput>({
     defaultValues: { department: "Geral", functionName: "Colaborador", employmentType: "casa" },
   });
-  const watchedEmploymentType = watch("employmentType");
 
   const createMutation = useCreateEmployee({
     mutation: {
@@ -445,7 +444,7 @@ export default function EmployeesPage() {
                     <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Colaborador</DialogTitle>
                   </DialogHeader>
                   <form
-                    onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, department: "Geral", functionName: "Colaborador" } }))}
+                    onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, department: "Geral", functionName: "Colaborador", employmentType: "casa" } }))}
                     className="space-y-5 pt-4"
                   >
                     <div className="space-y-1.5">
@@ -466,18 +465,13 @@ export default function EmployeesPage() {
                         <Input data-testid="input-employee-phone" {...register("phone")} placeholder="(11) 99999-9999" className="h-11 rounded-lg" style={fieldStyle} />
                       </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo de Contratação</Label>
-                      <Select defaultValue="casa" value={watchedEmploymentType} onValueChange={v => setValue("employmentType", v as EmploymentType)}>
-                        <SelectTrigger data-testid="select-employment-type" className="h-11 rounded-lg" style={fieldStyle}>
-                          <SelectValue placeholder="Selecione o tipo..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="casa">Casa</SelectItem>
-                          <SelectItem value="freela">Freela</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="rounded-lg px-3.5 py-2.5 flex items-center gap-2" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
+                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo de Contratação</span>
+                      <span className="ml-auto text-xs font-black uppercase" style={{ color: "var(--foreground)" }}>Casa</span>
                     </div>
+                    <p className="text-[11px] -mt-3" style={{ color: "var(--muted-foreground)" }}>
+                      Cadastro manual é sempre "Casa" — colaboradores Freela vêm pela sincronização. Para alterar depois, edite o colaborador.
+                    </p>
                     <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
                       <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
                       <button
