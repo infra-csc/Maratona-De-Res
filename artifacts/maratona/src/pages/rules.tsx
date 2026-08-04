@@ -16,6 +16,7 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
+import { getAuthToken } from "@/lib/custom-fetch";
 
 const NEW_TIERS_2026 = [
   { name: "Sem Bônus",   minScore: 0,  maxScore: 70,  minInclusive: true, maxInclusive: false, bonusValue: 0,    bonusPerExtraEvent: 0,   color: "#64748b" },
@@ -143,10 +144,13 @@ export default function RulesPage() {
   async function handleReplaceAll() {
     setReplacing(true);
     try {
+      const token = getAuthToken();
       const res = await fetch("/api/platoon-rules/replace-all", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ rules: NEW_TIERS_2026 }),
       });
       if (!res.ok) {
