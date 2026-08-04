@@ -19,13 +19,13 @@ import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
 import { getAuthToken } from "@/lib/custom-fetch";
 
 const NEW_TIERS_2026 = [
-  { name: "Sem Bônus",   minScore: 0,  maxScore: 70,  minInclusive: true, maxInclusive: false, bonusValue: 0,    bonusPerExtraEvent: 0,   color: "#64748b" },
-  { name: "70 – 74,99", minScore: 70, maxScore: 75,  minInclusive: true, maxInclusive: false, bonusValue: 1200, bonusPerExtraEvent: 200, color: "#4ade80" },
-  { name: "75 – 79,99", minScore: 75, maxScore: 80,  minInclusive: true, maxInclusive: false, bonusValue: 1700, bonusPerExtraEvent: 250, color: "#22c55e" },
-  { name: "80 – 84,99", minScore: 80, maxScore: 85,  minInclusive: true, maxInclusive: false, bonusValue: 2200, bonusPerExtraEvent: 300, color: "#16a34a" },
-  { name: "85 – 89,99", minScore: 85, maxScore: 90,  minInclusive: true, maxInclusive: false, bonusValue: 2700, bonusPerExtraEvent: 350, color: "#15803d" },
-  { name: "90 – 94,99", minScore: 90, maxScore: 95,  minInclusive: true, maxInclusive: false, bonusValue: 3200, bonusPerExtraEvent: 400, color: "#166534" },
-  { name: "95 – 100",   minScore: 95, maxScore: 100, minInclusive: true, maxInclusive: true,  bonusValue: 3700, bonusPerExtraEvent: 450, color: "#14532d" },
+  { name: "Sem Bônus",        minScore: 0,  maxScore: 70,  minInclusive: true, maxInclusive: false, bonusValue: 0,    bonusPerExtraEvent: 0,   color: "#64748b" },
+  { name: "Branco Caminhada", minScore: 70, maxScore: 75,  minInclusive: true, maxInclusive: false, bonusValue: 1200, bonusPerExtraEvent: 200, color: "#e2e8f0" },
+  { name: "Branco Corrida",   minScore: 75, maxScore: 80,  minInclusive: true, maxInclusive: false, bonusValue: 1700, bonusPerExtraEvent: 250, color: "#cbd5e1" },
+  { name: "Branco",           minScore: 80, maxScore: 85,  minInclusive: true, maxInclusive: false, bonusValue: 2200, bonusPerExtraEvent: 300, color: "#94a3b8" },
+  { name: "Verde",            minScore: 85, maxScore: 90,  minInclusive: true, maxInclusive: false, bonusValue: 2700, bonusPerExtraEvent: 350, color: "#22c55e" },
+  { name: "Azul",             minScore: 90, maxScore: 95,  minInclusive: true, maxInclusive: false, bonusValue: 3200, bonusPerExtraEvent: 400, color: "#3b82f6" },
+  { name: "Quênia",           minScore: 95, maxScore: 100, minInclusive: true, maxInclusive: true,  bonusValue: 3700, bonusPerExtraEvent: 450, color: "#FFD700" },
 ];
 
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
