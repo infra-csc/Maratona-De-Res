@@ -415,9 +415,22 @@ router.get("/my-performance", async (req, res) => {
   let currentPlatoonColor: string | null = null;
   let currentPlatoonMinScore: number | null = null;
   let currentPlatoonMaxScore: number | null = null;
+  let nextPlatoon: string | null = null;
+  let nextPlatoonColor: string | null = null;
+  let nextPlatoonMinScore: number | null = null;
   let currentBonus = null;
   let bonusStatus: string | null = null;
   let finalResult: number | null = null;
+
+  // Helper: given the current rule, find the next tier (higher displayOrder / higher minScore).
+  // platoonRulesMapped is already ordered by displayOrder ascending.
+  const getNextPlatoonRule = (currentName: string | null) => {
+    if (!currentName) return null;
+    const idx = platoonRulesMapped.findIndex(r => r.name === currentName);
+    if (idx === -1 || idx === platoonRulesMapped.length - 1) return null;
+    return platoonRulesMapped[idx + 1];
+  };
+
   if (quarterResult) {
     currentPlatoon = quarterResult.platoon;
     // Enriquecer com cor/faixas via lookup em platoonRulesMapped, para que a
@@ -426,9 +439,13 @@ router.get("/my-performance", async (req, res) => {
     currentPlatoonColor = snapRule?.color ?? (quarterResult.platoonColor as string | null) ?? null;
     currentPlatoonMinScore = snapRule?.minScore ?? null;
     currentPlatoonMaxScore = snapRule?.maxScore ?? null;
+    finalResult = parseFloat(quarterResult.finalResult as unknown as string);
+    const nextRule = getNextPlatoonRule(currentPlatoon);
+    nextPlatoon = nextRule?.name ?? null;
+    nextPlatoonColor = nextRule?.color ?? null;
+    nextPlatoonMinScore = nextRule?.minScore ?? null;
     currentBonus = parseFloat(quarterResult.bonusValue as unknown as string);
     bonusStatus = quarterResult.bonusStatus;
-    finalResult = parseFloat(quarterResult.finalResult as unknown as string);
   } else if (grossAverage !== null) {
     // Espelha a regra de fechamento (results.ts): méritos somam, penalidades
     // subtraem, resultado travado entre 0 e 100 — projeção precisa refletir
@@ -440,13 +457,17 @@ router.get("/my-performance", async (req, res) => {
     currentPlatoonColor = proj?.color ?? null;
     currentPlatoonMinScore = proj?.minScore ?? null;
     currentPlatoonMaxScore = proj?.maxScore ?? null;
+    finalResult = projectedFinalResult;
+    const nextRule = getNextPlatoonRule(currentPlatoon);
+    nextPlatoon = nextRule?.name ?? null;
+    nextPlatoonColor = nextRule?.color ?? null;
+    nextPlatoonMinScore = nextRule?.minScore ?? null;
     const scoredEventsWithDate = scoredEvents
       .filter(e => !!e.startDate)
       .map(e => ({ score: e.eventScore, date: e.startDate as string }));
     const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEventsForEligibility) : [];
     currentBonus = eligible ? calculateTieredBonus(projectedFinalResult, extraEventScores, platoonRulesMapped) : 0;
     bonusStatus = eligible ? "projected" : "not_eligible";
-    finalResult = projectedFinalResult;
   }
 
   // Quando existe snapshot, a média bruta e a contagem de eventos oficial
@@ -486,6 +507,9 @@ router.get("/my-performance", async (req, res) => {
       currentPlatoonColor,
       currentPlatoonMinScore,
       currentPlatoonMaxScore,
+      nextPlatoon,
+      nextPlatoonColor,
+      nextPlatoonMinScore,
       projectedBonus: currentBonus,
       bonusStatus,
       eligible,

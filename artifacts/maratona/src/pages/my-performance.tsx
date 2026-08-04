@@ -23,6 +23,9 @@ interface PerformanceData {
     currentPlatoonColor: string | null;
     currentPlatoonMinScore: number | null;
     currentPlatoonMaxScore: number | null;
+    nextPlatoon: string | null;
+    nextPlatoonColor: string | null;
+    nextPlatoonMinScore: number | null;
     projectedBonus: number | null;
     bonusStatus: string | null;
     eligible: boolean;
@@ -509,42 +512,86 @@ export default function MyPerformancePage() {
               })()}
 
               {/* Pelotão — 3ª coluna da grade de resumo */}
-              {summary.currentPlatoon && (
-                <div
-                  className="rounded-xl p-[18px] relative overflow-hidden"
-                  style={{
-                    backgroundColor: summary.currentPlatoonColor ? `${summary.currentPlatoonColor}18` : "var(--card)",
-                    border: `1px solid ${summary.currentPlatoonColor ? `${summary.currentPlatoonColor}55` : "var(--border)"}`,
-                    borderLeft: `4px solid ${summary.currentPlatoonColor ?? "var(--accent)"}`,
-                  }}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pelotão</span>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    {summary.currentPlatoonColor && (
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: summary.currentPlatoonColor }} />
+              {summary.currentPlatoon && (() => {
+                const score = summary.finalResult;
+                const min = summary.currentPlatoonMinScore;
+                const max = summary.currentPlatoonMaxScore;
+                const progressPct = (score != null && min != null && max != null && max > min)
+                  ? Math.min(100, Math.max(0, ((score - min) / (max - min)) * 100))
+                  : null;
+                const gapToNext = (score != null && summary.nextPlatoonMinScore != null)
+                  ? Math.max(0, summary.nextPlatoonMinScore - score)
+                  : null;
+                return (
+                  <div
+                    className="rounded-xl p-[18px] relative overflow-hidden"
+                    style={{
+                      backgroundColor: summary.currentPlatoonColor ? `${summary.currentPlatoonColor}18` : "var(--card)",
+                      border: `1px solid ${summary.currentPlatoonColor ? `${summary.currentPlatoonColor}55` : "var(--border)"}`,
+                      borderLeft: `4px solid ${summary.currentPlatoonColor ?? "var(--accent)"}`,
+                    }}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pelotão</span>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      {summary.currentPlatoonColor && (
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: summary.currentPlatoonColor }} />
+                      )}
+                      <span
+                        className="font-black text-[24px] leading-none"
+                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: summary.currentPlatoonColor ?? "var(--foreground)" }}
+                      >
+                        {summary.currentPlatoon}
+                      </span>
+                    </div>
+                    {min != null && max != null && (
+                      <p className="text-[10px] font-bold mt-1 text-muted-foreground">
+                        {min}–{max}
+                      </p>
                     )}
-                    <span
-                      className="font-black text-[24px] leading-none"
-                      style={{ fontFamily: "'Barlow Condensed', sans-serif", color: summary.currentPlatoonColor ?? "var(--foreground)" }}
-                    >
-                      {summary.currentPlatoon}
-                    </span>
+
+                    {/* Barra de progresso dentro da faixa atual */}
+                    {progressPct !== null && (
+                      <div className="mt-2.5">
+                        <div
+                          className="w-full h-1.5 rounded-full overflow-hidden"
+                          style={{ backgroundColor: summary.currentPlatoonColor ? `${summary.currentPlatoonColor}30` : "var(--muted)" }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${progressPct}%`,
+                              backgroundColor: summary.currentPlatoonColor ?? "var(--accent)",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Falta para o próximo pelotão */}
+                    {gapToNext !== null && summary.nextPlatoon && (
+                      <p className="text-[10px] font-semibold mt-2 leading-tight" style={{ color: summary.nextPlatoonColor ?? "var(--muted-foreground)" }}>
+                        +{gapToNext.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pts → {summary.nextPlatoon}
+                      </p>
+                    )}
+
+                    {/* Mensagem de conquista para o tier máximo */}
+                    {!summary.nextPlatoon && summary.currentPlatoon && (
+                      <p className="text-[10px] font-semibold mt-2 leading-tight" style={{ color: summary.currentPlatoonColor ?? "var(--accent)" }}>
+                        🏆 Nível máximo atingido!
+                      </p>
+                    )}
+
+                    {summary.projectedBonus != null && summary.eligible && summary.projectedBonus > 0 && (
+                      <p
+                        className="text-[10px] font-bold mt-1.5"
+                        style={{ color: summary.currentPlatoonColor ?? "var(--accent)" }}
+                      >
+                        Bônus: {summary.projectedBonus.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
+                      </p>
+                    )}
                   </div>
-                  {summary.currentPlatoonMinScore != null && summary.currentPlatoonMaxScore != null && (
-                    <p className="text-[10px] font-bold mt-1 text-muted-foreground">
-                      {summary.currentPlatoonMinScore}–{summary.currentPlatoonMaxScore}
-                    </p>
-                  )}
-                  {summary.projectedBonus != null && summary.eligible && summary.projectedBonus > 0 && (
-                    <p
-                      className="text-[10px] font-bold mt-1.5"
-                      style={{ color: summary.currentPlatoonColor ?? "var(--accent)" }}
-                    >
-                      Bônus: {summary.projectedBonus.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
-                    </p>
-                  )}
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Detalhamento dos eventos que compõem a média */}
