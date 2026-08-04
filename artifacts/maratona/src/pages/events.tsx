@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Calendar, ChevronRight, Users, Plus, GitMerge, ChevronsUpDown, Check, SlidersHorizontal, ChevronUp, ChevronDown, Trash2, Pencil, MoreHorizontal, CalendarRange } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, hasRole } from "@/lib/auth-context";
 import { formatCyclePeriod } from "@/components/cycle-badge";
 import { PremiumCard, CONDENSED, WARNING } from "@/lib/premium-theme";
 import { cn } from "@/lib/utils";
@@ -284,7 +284,7 @@ export default function EventsPage() {
     return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
   });
 
-  const canCreate = user && ["admin", "rh"].includes(user.role);
+  const canCreate = user && (["admin", "rh"].includes(user.role) || hasRole(user, "operador"));
   const hasDateFilter = !!(filterDateFrom || filterDateTo);
 
   useEffect(() => {
@@ -372,7 +372,7 @@ export default function EventsPage() {
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Evento</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
+                <form onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, endDate: d.startDate } }))} className="space-y-5 pt-4">
                   <div className="space-y-1.5">
                     <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: WARNING }}>*</span></Label>
                     <Input data-testid="input-event-name" {...register("name", { required: true })} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-lg" style={inputStyle} />
@@ -381,15 +381,9 @@ export default function EventsPage() {
                     <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Cliente</Label>
                     <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-lg" style={inputStyle} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Início <span style={{ color: WARNING }}>*</span></Label>
-                      <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Fim <span style={{ color: WARNING }}>*</span></Label>
-                      <Input data-testid="input-event-end" type="date" {...register("endDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Data do Evento <span style={{ color: WARNING }}>*</span></Label>
+                    <Input data-testid="input-event-start" type="date" {...register("startDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
