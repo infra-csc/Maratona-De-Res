@@ -18,10 +18,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import {
   Download, LockKeyhole, Wallet, CheckCircle2, Wallet2, Users,
   Search, Trophy, Crown, Award, AlertTriangle, MapPin, ChevronRight, Table2, ListOrdered,
-  ArrowUpDown, ArrowUp, ArrowDown, RefreshCw,
+  ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn, fmtDate } from "@/lib/utils";
@@ -636,6 +637,126 @@ function EmployeeDetailSheet({
 }
 
 /* ------------------------------------------------------------------ */
+/* PLATOON DISTRIBUTION PANEL                                         */
+/* ------------------------------------------------------------------ */
+
+type PlatoonGroup = {
+  platoon: string;
+  color: string | null;
+  minScore: number | null;
+  maxScore: number | null;
+  count: number;
+  avgScore: number;
+  totalBonus: number;
+};
+
+function buildPlatoonGroups(rows: QuarterlyResult[]): PlatoonGroup[] {
+  const grouped = new Map<string, { items: QuarterlyResult[]; color: string | null; min: number | null; max: number | null }>();
+  for (const r of rows) {
+    const key = r.platoon ?? "Sem faixa";
+    if (!grouped.has(key)) {
+      grouped.set(key, { items: [], color: r.platoonColor ?? null, min: r.platoonMinScore ?? null, max: r.platoonMaxScore ?? null });
+    }
+    grouped.get(key)!.items.push(r);
+  }
+  return [...grouped.entries()]
+    .map(([platoon, { items, color, min, max }]) => ({
+      platoon,
+      color,
+      minScore: min,
+      maxScore: max,
+      count: items.length,
+      avgScore: items.reduce((s, r) => s + r.finalResult, 0) / items.length,
+      totalBonus: items.reduce((s, r) => s + (r.bonusValue ?? 0), 0),
+    }))
+    .sort((a, b) => (b.minScore ?? -1) - (a.minScore ?? -1));
+}
+
+function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
+  const groups = buildPlatoonGroups(rows);
+  if (groups.length === 0) return null;
+
+  const chartData = groups.map(g => ({ name: g.platoon, count: g.count, color: g.color }));
+  const chartHeight = Math.max(groups.length * 48, 100);
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+      <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
+        <BarChart3 size={16} style={{ color: "var(--accent)" }} />
+        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+          Distribuição por Pelotão
+        </span>
+        <span className="ml-auto text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+          {rows.length} colaborador{rows.length !== 1 ? "es" : ""}
+        </span>
+      </div>
+
+      <div className="p-5 grid md:grid-cols-2 gap-6 items-start">
+        {/* Horizontal bar chart */}
+        <div style={{ height: chartHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 36, bottom: 0, left: 4 }}>
+              <XAxis type="number" hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={80}
+                tick={{ fontSize: 10, fontWeight: 700, fill: "var(--foreground)", fontFamily: CONDENSED }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <RechartsTooltip
+                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                content={({ payload }) => {
+                  if (!payload?.length) return null;
+                  const item = payload[0];
+                  return (
+                    <div className="rounded-lg px-3 py-2 text-xs font-bold shadow-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                      <span style={{ color: "var(--muted-foreground)" }}>{item.payload.name}: </span>
+                      <span style={{ fontFamily: CONDENSED, fontWeight: 900 }}>{item.value as number} colaborador{(item.value as number) !== 1 ? "es" : ""}</span>
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="count" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, fontWeight: 900, fontFamily: CONDENSED, fill: "var(--foreground)" }}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color ?? "var(--primary)"} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Summary table */}
+        <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+          <div className="grid grid-cols-[1.4fr_0.6fr_0.7fr_1fr]" style={{ backgroundColor: "var(--secondary)" }}>
+            {(["Pelotão", "Qtd", "Média", "Bônus Total"] as const).map(h => (
+              <div key={h} className="px-3 py-2.5 text-[9px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Pelotão" ? "left" : "center" }}>{h}</div>
+            ))}
+          </div>
+          {groups.map((g, i) => (
+            <div key={g.platoon} className="grid grid-cols-[1.4fr_0.6fr_0.7fr_1fr] items-center" style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
+              <div className="px-3 py-2.5">
+                <FaixaBadge name={g.platoon} minScore={g.minScore} maxScore={g.maxScore} color={g.color} compact />
+              </div>
+              <div className="px-3 py-2.5 text-center">
+                <span className="font-black text-sm" style={{ fontFamily: CONDENSED }}>{g.count}</span>
+              </div>
+              <div className="px-3 py-2.5 text-center">
+                <span className="font-black text-sm" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{g.avgScore.toFixed(1)}</span>
+              </div>
+              <div className="px-3 py-2.5 text-center">
+                <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: "var(--primary)" }}>{fmtBRLShort(g.totalBonus)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* CONSOLIDAÇÃO TAB                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -646,11 +767,18 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
   });
   const rows = results ?? [];
   const [search, setSearch] = useState("");
+  const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
   const [sortKey, setSortKey] = useState<keyof QuarterlyResult | null>("finalResult");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const filteredRows = rows.filter(r => {
+  const eligibleFilteredRows = rows.filter(r => {
+    if (filterEligible === "eligible") return r.eligible !== false;
+    if (filterEligible === "ineligible") return r.eligible === false;
+    return true;
+  });
+
+  const filteredRows = eligibleFilteredRows.filter(r => {
     const matchSearch = !search || (r.employeeName ?? "").toLowerCase().includes(search.toLowerCase());
     return matchSearch;
   });
@@ -717,15 +845,29 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
         </div>
       ) : (
         <div className="space-y-3.5">
-          <div className="relative max-w-md">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
+          <PlatoonDistributionPanel rows={eligibleFilteredRows} />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
+                style={fieldStyle}
+                placeholder="Buscar colaborador..."
+              />
+            </div>
+            <select
+              value={filterEligible}
+              onChange={e => setFilterEligible(e.target.value as "all" | "eligible" | "ineligible")}
+              className="h-11 rounded-lg px-3 text-sm font-bold"
               style={fieldStyle}
-              placeholder="Buscar colaborador..."
-            />
+            >
+              <option value="all">Todos</option>
+              <option value="eligible">Elegíveis</option>
+              <option value="ineligible">Não elegíveis</option>
+            </select>
           </div>
 
           <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
