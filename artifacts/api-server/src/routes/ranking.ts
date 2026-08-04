@@ -287,6 +287,8 @@ router.get("/ranking-detail", async (req, res) => {
       meritPoints,
       platoon: quarterResult?.platoon ?? null,
       platoonColor: quarterResult?.platoonColor ?? null,
+      platoonMinScore: quarterResult?.platoon ? (platoonRulesMapped.find(r => r.name === quarterResult.platoon)?.minScore ?? null) : null,
+      platoonMaxScore: quarterResult?.platoon ? (platoonRulesMapped.find(r => r.name === quarterResult.platoon)?.maxScore ?? null) : null,
       bonusValue: isManager && quarterResult ? parseFloat(quarterResult.bonusValue as unknown as string) : null,
       eventsCount: events.length,
       scoreSum: grossAverage !== null ? scoreSum : null,

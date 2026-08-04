@@ -411,12 +411,21 @@ router.get("/my-performance", async (req, res) => {
   const hasSupCenoParticipation = participations.some(p => isInformationalFunction(p.functionName));
   const eligible = registrationEligible && quarterEligible && !hasSupCenoParticipation;
 
-  let currentPlatoon = null;
+  let currentPlatoon: string | null = null;
+  let currentPlatoonColor: string | null = null;
+  let currentPlatoonMinScore: number | null = null;
+  let currentPlatoonMaxScore: number | null = null;
   let currentBonus = null;
   let bonusStatus: string | null = null;
   let finalResult: number | null = null;
   if (quarterResult) {
     currentPlatoon = quarterResult.platoon;
+    // Enriquecer com cor/faixas via lookup em platoonRulesMapped, para que a
+    // tela do colaborador possa exibir o badge colorido mesmo sem consulta extra.
+    const snapRule = currentPlatoon ? platoonRulesMapped.find(r => r.name === currentPlatoon) : null;
+    currentPlatoonColor = snapRule?.color ?? (quarterResult.platoonColor as string | null) ?? null;
+    currentPlatoonMinScore = snapRule?.minScore ?? null;
+    currentPlatoonMaxScore = snapRule?.maxScore ?? null;
     currentBonus = parseFloat(quarterResult.bonusValue as unknown as string);
     bonusStatus = quarterResult.bonusStatus;
     finalResult = parseFloat(quarterResult.finalResult as unknown as string);
@@ -428,6 +437,9 @@ router.get("/my-performance", async (req, res) => {
     const projectedFinalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, scoredEvents.length);
     const proj = getPlatoonByScore(projectedFinalResult, platoonRulesMapped);
     currentPlatoon = proj?.name ?? null;
+    currentPlatoonColor = proj?.color ?? null;
+    currentPlatoonMinScore = proj?.minScore ?? null;
+    currentPlatoonMaxScore = proj?.maxScore ?? null;
     const scoredEventsWithDate = scoredEvents
       .filter(e => !!e.startDate)
       .map(e => ({ score: e.eventScore, date: e.startDate as string }));
@@ -471,6 +483,9 @@ router.get("/my-performance", async (req, res) => {
     summary: {
       grossAverage: responseGrossAverage,
       currentPlatoon,
+      currentPlatoonColor,
+      currentPlatoonMinScore,
+      currentPlatoonMaxScore,
       projectedBonus: currentBonus,
       bonusStatus,
       eligible,

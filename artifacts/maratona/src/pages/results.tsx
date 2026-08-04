@@ -79,19 +79,23 @@ function contrastingTextColor(hex: string): string {
   return luminance > 0.6 ? "#111111" : "#ffffff";
 }
 
-function FaixaBadge({ minScore, maxScore, color }: { minScore?: number | null; maxScore?: number | null; color?: string | null }) {
-  if (minScore == null && maxScore == null) return <span style={{ color: "var(--muted-foreground)" }} className="font-bold">—</span>;
+function FaixaBadge({ name, minScore, maxScore, color, compact = false }: { name?: string | null; minScore?: number | null; maxScore?: number | null; color?: string | null; compact?: boolean }) {
+  const hasData = name || minScore != null || maxScore != null;
+  if (!hasData) return <span style={{ color: "var(--muted-foreground)" }} className="font-bold">—</span>;
   const bg = color ?? "var(--secondary)";
   const fg = color ? contrastingTextColor(color) : "var(--muted-foreground)";
-  const label = minScore != null && maxScore != null
+  const range = minScore != null && maxScore != null
     ? `${minScore}–${maxScore}`
-    : minScore != null ? `≥ ${minScore}` : `≤ ${maxScore}`;
+    : minScore != null ? `≥ ${minScore}` : maxScore != null ? `≤ ${maxScore}` : null;
+  const primary = name ?? range ?? "";
+  const secondary = name && range && !compact ? range : null;
   return (
     <span
-      className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+      className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full"
       style={{ backgroundColor: bg, color: fg }}
     >
-      {label}
+      <span>{primary}</span>
+      {secondary && <span className="opacity-55 text-[9px] font-bold">{secondary}</span>}
     </span>
   );
 }
@@ -146,6 +150,16 @@ function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; canViewDe
                 style={{ fontFamily: CONDENSED, fontSize: isFirst ? 22 : 17, color: med.color }}>
                 {entry.finalResult.toFixed(1)}
               </span>
+
+              {/* Tier badge */}
+              {(entry as any).platoonColor && (
+                <span
+                  className="inline-flex items-center text-[8px] font-black uppercase px-2 py-0.5 rounded-full mt-0.5"
+                  style={{ backgroundColor: (entry as any).platoonColor, color: contrastingTextColor((entry as any).platoonColor) }}
+                >
+                  {(entry as any).platoon ?? `${(entry as any).platoonMinScore}–${(entry as any).platoonMaxScore}`}
+                </span>
+              )}
 
               {/* Name (first two words) */}
               <p data-testid={`text-podium-name-${entry.employeeId}`}
@@ -333,7 +347,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                               {entry.absences} penalidades
                             </span>
                           )}
-                          <FaixaBadge minScore={entry.platoonMinScore} maxScore={entry.platoonMaxScore} color={entry.platoonColor} />
+                          <FaixaBadge name={entry.platoon} minScore={entry.platoonMinScore} maxScore={entry.platoonMaxScore} color={entry.platoonColor} />
                         </div>
                       </div>
                       <div className="hidden md:flex items-center gap-2 w-36 shrink-0">
@@ -423,6 +437,25 @@ function EmployeeDetailSheet({
                 <SheetTitle className="text-2xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
                   {detail.employee.name}
                 </SheetTitle>
+                {/* Platoon badge — shown prominently below the name */}
+                {(detail.summary as any).platoon && (
+                  <div className="mt-2.5">
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide"
+                      style={{
+                        backgroundColor: (detail.summary as any).platoonColor ?? "var(--secondary)",
+                        color: (detail.summary as any).platoonColor ? contrastingTextColor((detail.summary as any).platoonColor) : "var(--muted-foreground)",
+                      }}
+                    >
+                      {(detail.summary as any).platoon}
+                      {(detail.summary as any).platoonMinScore != null && (detail.summary as any).platoonMaxScore != null && (
+                        <span className="opacity-60 text-[9px] font-bold">
+                          {(detail.summary as any).platoonMinScore}–{(detail.summary as any).platoonMaxScore}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </SheetHeader>
 

@@ -20,6 +20,9 @@ interface PerformanceData {
   summary: {
     grossAverage: number | null;
     currentPlatoon: string | null;
+    currentPlatoonColor: string | null;
+    currentPlatoonMinScore: number | null;
+    currentPlatoonMaxScore: number | null;
     projectedBonus: number | null;
     bonusStatus: string | null;
     eligible: boolean;
@@ -98,6 +101,15 @@ function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+
+function contrastingTextColor(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "#fff";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#111111" : "#ffffff";
+}
 
 function scoreColor(score: number | null): string {
   if (score === null) return "var(--muted-foreground)";
@@ -235,6 +247,14 @@ function EventCard({ event }: { event: EventSummary }) {
                     {event.eventScore.toFixed(1)}
                   </span>
                 </div>
+              )}
+              {event.projectedPlatoon && event.projectedPlatoonColor && (
+                <span
+                  className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: event.projectedPlatoonColor, color: contrastingTextColor(event.projectedPlatoonColor) }}
+                >
+                  {event.projectedPlatoon}
+                </span>
               )}
             </div>
           )}
@@ -487,6 +507,44 @@ export default function MyPerformancePage() {
                   </div>
                 );
               })()}
+
+              {/* Pelotão — 3ª coluna da grade de resumo */}
+              {summary.currentPlatoon && (
+                <div
+                  className="rounded-xl p-[18px] relative overflow-hidden"
+                  style={{
+                    backgroundColor: summary.currentPlatoonColor ? `${summary.currentPlatoonColor}18` : "var(--card)",
+                    border: `1px solid ${summary.currentPlatoonColor ? `${summary.currentPlatoonColor}55` : "var(--border)"}`,
+                    borderLeft: `4px solid ${summary.currentPlatoonColor ?? "var(--accent)"}`,
+                  }}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pelotão</span>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {summary.currentPlatoonColor && (
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: summary.currentPlatoonColor }} />
+                    )}
+                    <span
+                      className="font-black text-[24px] leading-none"
+                      style={{ fontFamily: "'Barlow Condensed', sans-serif", color: summary.currentPlatoonColor ?? "var(--foreground)" }}
+                    >
+                      {summary.currentPlatoon}
+                    </span>
+                  </div>
+                  {summary.currentPlatoonMinScore != null && summary.currentPlatoonMaxScore != null && (
+                    <p className="text-[10px] font-bold mt-1 text-muted-foreground">
+                      {summary.currentPlatoonMinScore}–{summary.currentPlatoonMaxScore}
+                    </p>
+                  )}
+                  {summary.projectedBonus != null && summary.eligible && summary.projectedBonus > 0 && (
+                    <p
+                      className="text-[10px] font-bold mt-1.5"
+                      style={{ color: summary.currentPlatoonColor ?? "var(--accent)" }}
+                    >
+                      Bônus: {summary.projectedBonus.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Detalhamento dos eventos que compõem a média */}
