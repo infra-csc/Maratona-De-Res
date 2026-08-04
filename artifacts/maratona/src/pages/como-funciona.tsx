@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BookOpen, Calendar, Star, Trophy, Gift, Clock, AlertTriangle, HelpCircle, ShieldCheck, Minus, Search, X } from "lucide-react";
+import { useGetRules, useGetPlatoonRules, useGetPenaltyTypes } from "@workspace/api-client-react";
 
 const SECTIONS = [
   { id: "ciclo", title: "O Ciclo de Avaliação", icon: Calendar },
@@ -22,7 +23,7 @@ interface SectionProps {
 
 function Section({ id, icon: Icon, title, children, dark }: SectionProps) {
   return (
-    <section id={id} className="rounded-xl overflow-hidden scroll-mt-24" style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}>
+    <section id={id} className="rounded-xl overflow-hidden scroll-mt-24" style={{ border: "1px solid var(--border)", backgroundColor: dark ? "#14171a" : "var(--card)" }}>
       <div
         className="px-5 py-3.5 flex items-center gap-3"
         style={dark
@@ -35,7 +36,7 @@ function Section({ id, icon: Icon, title, children, dark }: SectionProps) {
           {title}
         </h2>
       </div>
-      <div className="p-5 space-y-3 text-foreground">
+      <div className={`p-5 space-y-3 ${dark ? "" : "text-foreground"}`}>
         {children}
       </div>
     </section>
@@ -68,6 +69,32 @@ function StatusBadge({ label, color, text }: { label: string; color: string; tex
 
 export default function ComoFuncionaPage() {
   const [search, setSearch] = useState("");
+
+  const { data: rules } = useGetRules();
+  const { data: platoonRules } = useGetPlatoonRules();
+  const { data: penaltyTypes } = useGetPenaltyTypes();
+
+  const minEvents = (() => {
+    const raw = rules?.find(r => r.key === "min_events_eligibility")?.value;
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) ? n : null;
+  })();
+
+  const bonusTiers = (platoonRules ?? [])
+    .filter(t => t.active && t.bonusValue > 0)
+    .slice()
+    .sort((a, b) => a.minScore - b.minScore);
+
+  const activePenalties = (penaltyTypes ?? []).filter(t => t.active && t.kind === "penalty").sort((a, b) => a.displayOrder - b.displayOrder);
+  const activeMerits = (penaltyTypes ?? []).filter(t => t.active && t.kind === "merit").sort((a, b) => a.displayOrder - b.displayOrder);
+
+  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  const fmtScore = (n: number) => {
+    const r = Math.round(n * 100) / 100;
+    return r % 1 === 0 ? String(r) : r.toFixed(2).replace(".", ",");
+  };
+  const fmtRange = (min: number, max: number, maxInclusive?: boolean) =>
+    maxInclusive ? `${fmtScore(min)} – ${fmtScore(max)}` : `${fmtScore(min)} – ${fmtScore(max - 0.01)}`;
 
   const q = search.toLowerCase().trim();
   const visibleIds = new Set(
@@ -218,40 +245,36 @@ export default function ComoFuncionaPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { tipo: "Ausência Não Comunicada", pts: "−50 pts" },
-                      { tipo: "Atraso > 30 Minutos", pts: "−10 pts" },
-                      { tipo: "Inconformidade de Ponto", pts: "−10 pts" },
-                    ].map((r, i) => (
-                      <tr key={r.tipo} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
-                        <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.tipo}</td>
-                        <td className="px-4 py-3 text-[13px] font-black text-[#ba1a1a] text-right">{r.pts}</td>
+                    {activePenalties.length > 0 ? activePenalties.map((r, i) => (
+                      <tr key={r.id} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
+                        <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.label}</td>
+                        <td className="px-4 py-3 text-[13px] font-black text-[#ba1a1a] text-right">−{r.points} pts</td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr><td colSpan={2} className="px-4 py-3 text-[13px] text-muted-foreground">Nenhum tipo de penalidade cadastrado.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
 
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#506600]">Méritos (somam pontos ao total)</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#16a34a]">Méritos (somam pontos ao total)</p>
               <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr style={{ backgroundColor: "#ccff00", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#161e00]">Tipo</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#161e00] text-right">Pontos</th>
+                    <tr style={{ backgroundColor: "rgba(22,163,74,0.10)", borderBottom: "1px solid var(--border)" }}>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#16a34a]">Tipo</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#16a34a] text-right">Pontos</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { tipo: "Rei do Galpão", pts: "+50 pts" },
-                      { tipo: "Estrela do Evento", pts: "+25 pts" },
-                      { tipo: "Colega Top", pts: "+10 pts" },
-                    ].map((r, i) => (
-                      <tr key={r.tipo} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
-                        <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.tipo}</td>
-                        <td className="px-4 py-3 text-[13px] font-black text-[#506600] text-right">{r.pts}</td>
+                    {activeMerits.length > 0 ? activeMerits.map((r, i) => (
+                      <tr key={r.id} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
+                        <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.label}</td>
+                        <td className="px-4 py-3 text-[13px] font-black text-[#16a34a] text-right">+{r.points} pts</td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr><td colSpan={2} className="px-4 py-3 text-[13px] text-muted-foreground">Nenhum tipo de mérito cadastrado.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -272,7 +295,12 @@ export default function ComoFuncionaPage() {
             <div className="space-y-2 mt-2">
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(204,255,0,0.12)", border: "1px solid rgba(204,255,0,0.3)" }}>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#ccff00] sm:w-36 sm:shrink-0 sm:pt-0.5">Meta mínima</span>
-                <span className="text-[13px] font-bold text-[#ccff00] leading-snug">O número mínimo de eventos é definido pelo RH por ciclo (consulte seu card de Elegibilidade em Meu Desempenho para ver o valor atual).</span>
+                <span className="text-[13px] font-bold text-[#ccff00] leading-snug">
+                  {minEvents !== null
+                    ? <>Você precisa de pelo menos <strong>{minEvents} eventos confirmados</strong> neste ciclo para ter direito ao bônus.</>
+                    : "O número mínimo de eventos é definido pelo RH por ciclo."}{" "}
+                  Esse número é definido pelo RH e pode mudar a cada ciclo — acompanhe seu progresso no card de Elegibilidade em Meu Desempenho.
+                </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Não elegível</span>
@@ -298,11 +326,40 @@ export default function ComoFuncionaPage() {
             <div className="space-y-2 mt-2">
               <InfoRow label="Como é calculado" value="Depende da sua Nota Final no ciclo. Quanto maior a nota, maior o bônus (definido por faixas de nota)." />
               <InfoRow label="Bônus Base" value="É o valor fixo correspondente à sua faixa de nota." />
-              <InfoRow label="Bônus Extra" value="Para cada evento que você participou além dos 8 mínimos, você recebe um valor adicional proporcional à sua faixa de nota." highlight />
+              <InfoRow label="Bônus Extra" value={`Para cada evento que você participou além ${minEvents !== null ? `dos ${minEvents} mínimos` : "do mínimo exigido"}, você recebe um valor adicional proporcional à sua faixa de nota.`} highlight />
               <InfoRow label="Pagamento" value="O bônus é pago via Caju Saldo Livre após o fechamento e aprovação do ciclo pelo RH." />
             </div>
+            {bonusTiers.length > 0 && (
+              <div className="mt-4 rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr style={{ backgroundColor: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground">Faixa</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground">Nota</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground text-right">Bônus Base</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground text-right">Extra/Evento</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bonusTiers.map((t, i) => (
+                      <tr key={t.id} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
+                        <td className="px-4 py-3 text-[13px] font-bold text-foreground">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color, border: "1px solid rgba(0,0,0,0.15)" }} />
+                            {t.name}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[13px] text-muted-foreground">{fmtRange(t.minScore, t.maxScore, t.maxInclusive)}</td>
+                        <td className="px-4 py-3 text-[13px] font-black text-foreground text-right">{fmtBRL(t.bonusValue)}</td>
+                        <td className="px-4 py-3 text-[13px] font-bold text-muted-foreground text-right">{t.bonusPerExtraEvent > 0 ? `+${fmtBRL(t.bonusPerExtraEvent)}` : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div className="mt-4 p-4 rounded-lg text-[13px] leading-relaxed text-muted-foreground" style={{ backgroundColor: "var(--muted)", borderLeft: "3px solid #ccff00" }}>
-              As faixas de nota e os valores de bônus são definidos pelo RH e podem variar entre ciclos. Consulte seu gestor para detalhes do ciclo atual.
+              As faixas acima são as vigentes no ciclo atual, definidas pelo RH, e podem ser ajustadas entre ciclos.
             </div>
           </Section>
         )}

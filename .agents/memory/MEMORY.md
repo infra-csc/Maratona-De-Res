@@ -77,3 +77,4 @@
 - [Orphaned eventScoped criteria weight](orphan-eventscoped-criteria.md) — eventScoped with source_criterion_id=NULL must use its own weight in events-list loop, not 0; also propagate to cal/pub/unassigned counters
 - [Inactive criteria publish guard](inactive-criteria-publish-guard.md) — criteria with active=false but saved calibration appear in UI; publish endpoints require active=true → 404; guard both render AND bulk-publish handler
 - [Employee merge FK orphan bug](employee-merge-fk-orphan.md) — skipped/conflicting FK rows must be DELETEd inside the merge txn or the final employee DELETE violates FK
+- [Auth limitation for appPreview screenshots](auth-screenshot-limitation.md) — Maratona's JWT-in-localStorage auth blocks Screenshot tool on protected routes; verify via tsc + curl API contracts instead
