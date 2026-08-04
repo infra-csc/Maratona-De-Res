@@ -9,13 +9,23 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CircleDollarSign, Plus, Settings, ShieldCheck, Trash2, HelpCircle } from "lucide-react";
+import { Save, CircleDollarSign, Plus, Settings, ShieldCheck, Trash2, HelpCircle, RefreshCw } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
+
+const NEW_TIERS_2026 = [
+  { name: "Sem Bônus",   minScore: 0,  maxScore: 70,  minInclusive: true, maxInclusive: false, bonusValue: 0,    bonusPerExtraEvent: 0,   color: "#64748b" },
+  { name: "70 – 74,99", minScore: 70, maxScore: 75,  minInclusive: true, maxInclusive: false, bonusValue: 1200, bonusPerExtraEvent: 200, color: "#4ade80" },
+  { name: "75 – 79,99", minScore: 75, maxScore: 80,  minInclusive: true, maxInclusive: false, bonusValue: 1700, bonusPerExtraEvent: 250, color: "#22c55e" },
+  { name: "80 – 84,99", minScore: 80, maxScore: 85,  minInclusive: true, maxInclusive: false, bonusValue: 2200, bonusPerExtraEvent: 300, color: "#16a34a" },
+  { name: "85 – 89,99", minScore: 85, maxScore: 90,  minInclusive: true, maxInclusive: false, bonusValue: 2700, bonusPerExtraEvent: 350, color: "#15803d" },
+  { name: "90 – 94,99", minScore: 90, maxScore: 95,  minInclusive: true, maxInclusive: false, bonusValue: 3200, bonusPerExtraEvent: 400, color: "#166534" },
+  { name: "95 – 100",   minScore: 95, maxScore: 100, minInclusive: true, maxInclusive: true,  bonusValue: 3700, bonusPerExtraEvent: 450, color: "#14532d" },
+];
 
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -94,6 +104,8 @@ export default function RulesPage() {
   const [ruleValues, setRuleValues] = useState<Record<string, string>>({});
   const [platoonValues, setPlatoonValues] = useState<Record<number, Partial<{ name: string; minScore: number; maxScore: number; bonusValue: number; bonusPerExtraEvent: number }>>>({});
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
+  const [replacing, setReplacing] = useState(false);
 
   const updateRuleMutation = useUpdateRule({
     mutation: {
@@ -127,6 +139,30 @@ export default function RulesPage() {
       onError: () => toast({ title: "Erro ao remover faixa", variant: "destructive" }),
     },
   });
+
+  async function handleReplaceAll() {
+    setReplacing(true);
+    try {
+      const res = await fetch("/api/platoon-rules/replace-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ rules: NEW_TIERS_2026 }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Erro desconhecido");
+      }
+      qc.invalidateQueries({ queryKey: platoonQKey });
+      setPlatoonValues({});
+      setShowReplaceDialog(false);
+      toast({ title: "Faixas substituídas com sucesso", description: `${NEW_TIERS_2026.length} faixas aplicadas.` });
+    } catch (e: unknown) {
+      toast({ title: "Erro ao substituir faixas", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setReplacing(false);
+    }
+  }
 
   function findOverlappingBand(min: number, max: number, excludeId?: number) {
     return (platoonRules ?? []).find(p => p.id !== excludeId && min <= Number(p.maxScore) && max >= Number(p.minScore));
@@ -238,8 +274,18 @@ export default function RulesPage() {
             );
           })}
 
-          <div className="px-5 py-3 text-sm italic" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>
-            <span className="font-black" style={{ color: "var(--foreground)" }}>Bônus Total</span> = Prêmio Base da faixa + (Eventos Extras × Bônus por Evento Extra da faixa)
+          <div className="px-5 py-3 flex items-center justify-between gap-4" style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
+            <p className="text-sm italic" style={{ color: "var(--muted-foreground)" }}>
+              <span className="font-black" style={{ color: "var(--foreground)" }}>Bônus Total</span> = Prêmio Base da faixa + (Eventos Extras × Bônus por Evento Extra da faixa)
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowReplaceDialog(true)}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs uppercase transition-opacity hover:opacity-80"
+              style={{ backgroundColor: "rgba(212,255,0,0.12)", color: "#d4ff00", border: "1px solid rgba(212,255,0,0.25)" }}
+            >
+              <RefreshCw size={12} /> Substituir Faixas 2026
+            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -408,6 +454,59 @@ export default function RulesPage() {
             <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteTargetId && deletePlatoonMutation.mutate({ id: deleteTargetId })} className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "#e5484d", color: "white", border: "none" }}>
               Sim, remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Dialog: Substituir todas as faixas ── */}
+      <AlertDialog open={showReplaceDialog} onOpenChange={v => { if (!v) setShowReplaceDialog(false); }}>
+        <AlertDialogContent className="rounded-xl max-w-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+              <RefreshCw size={18} /> Substituir Faixas 2026
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
+                  Esta ação <strong>apaga todas as faixas atuais</strong> e cria as 7 novas faixas abaixo. O reprocessamento do ciclo não é executado automaticamente — faça-o após confirmar.
+                </p>
+                <div className="rounded-lg overflow-hidden text-xs" style={{ border: "1px solid var(--border)" }}>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr style={{ backgroundColor: "var(--secondary)" }}>
+                        <th className="px-3 py-2 text-left font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Faixa</th>
+                        <th className="px-3 py-2 text-right font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Base</th>
+                        <th className="px-3 py-2 text-right font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Extra/Prova</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {NEW_TIERS_2026.map((t, i) => (
+                        <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+                          <td className="px-3 py-1.5 font-bold" style={{ color: "var(--foreground)" }}>{t.name}</td>
+                          <td className="px-3 py-1.5 text-right font-black" style={{ fontFamily: CONDENSED, color: t.bonusValue > 0 ? "#16a34a" : "var(--muted-foreground)" }}>
+                            {t.bonusValue > 0 ? fmtBRL(t.bonusValue) : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-right font-black" style={{ fontFamily: CONDENSED, color: t.bonusPerExtraEvent > 0 ? "#16a34a" : "var(--muted-foreground)" }}>
+                            {t.bonusPerExtraEvent > 0 ? fmtBRL(t.bonusPerExtraEvent) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={replacing}
+              onClick={(e) => { e.preventDefault(); void handleReplaceAll(); }}
+              className="rounded-lg font-bold uppercase text-xs"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-foreground)", border: "none", opacity: replacing ? 0.6 : 1 }}
+            >
+              {replacing ? "Aplicando…" : "Confirmar e Aplicar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

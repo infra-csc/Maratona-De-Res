@@ -68,6 +68,45 @@ function validatePlatoonRanges(ranges: RangeRow[]): string | null {
   return null;
 }
 
+router.post("/platoon-rules/replace-all", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const { rules: incoming } = req.body as { rules?: any[] };
+  if (!Array.isArray(incoming) || incoming.length === 0) {
+    res.status(400).json({ error: "rules[] obrigatório e não pode ser vazio" }); return;
+  }
+  const ranges: RangeRow[] = incoming.map((r, i) => ({
+    id: i,
+    minScore: parseFloat(r.minScore),
+    maxScore: parseFloat(r.maxScore),
+    minInclusive: r.minInclusive ?? true,
+    maxInclusive: r.maxInclusive ?? false,
+  }));
+  const err = validatePlatoonRanges(ranges);
+  if (err) { res.status(400).json({ error: err }); return; }
+
+  const before = await db.select().from(platoonRulesTable);
+  await db.transaction(async (tx) => {
+    await tx.delete(platoonRulesTable);
+    for (let i = 0; i < incoming.length; i++) {
+      const r = incoming[i];
+      await tx.insert(platoonRulesTable).values({
+        name: (r.name as string | undefined)?.trim() || `${parseFloat(r.minScore)}-${parseFloat(r.maxScore)}`,
+        color: (r.color as string | undefined) ?? "#94a3b8",
+        minScore: String(parseFloat(r.minScore)),
+        maxScore: String(parseFloat(r.maxScore)),
+        minInclusive: r.minInclusive ?? true,
+        maxInclusive: r.maxInclusive ?? false,
+        bonusValue: String(parseFloat(r.bonusValue ?? 0)),
+        bonusPerExtraEvent: String(parseFloat(r.bonusPerExtraEvent ?? 0)),
+        description: (r.description as string | undefined) ?? null,
+        displayOrder: i + 1,
+      });
+    }
+  });
+  const after = await db.select().from(platoonRulesTable).orderBy(platoonRulesTable.displayOrder);
+  await audit(req.user!.userId, "replace_all", "platoon_rules", "all", before, after);
+  res.json({ replaced: after.length });
+});
+
 router.post("/platoon-rules", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { name, color, minScore, maxScore, minInclusive, maxInclusive, bonusValue, bonusPerExtraEvent, description, displayOrder } = req.body;
   if (minScore === undefined || maxScore === undefined) {
