@@ -32,3 +32,25 @@ per-event tier lookup. The extra portion is only meaningful once persisted —
 `extraBonusValue`) must be added to that insert AND to the `GET
 /results/quarterly` select — existing snapshot rows will show 0 until the
 next close recomputes them.
+
+**Zero-bonus tier must zero out the extra portion too.** Both functions look
+up the base platoon by the employee's *overall* score first, and both must
+`return 0` immediately if that base platoon's `bonusValue <= 0` — a "no
+bonus" tier (e.g. the bottom bracket, historically "Pelotão Branco" 0–70)
+means zero bonus, full stop, even if some individual extra events that
+quarter scored high enough to carry their own positive `bonusPerExtraEvent`.
+Before this guard existed, someone stuck in the zero tier overall could still
+accumulate a nonzero "extra" bonus from a couple of good events, which reads
+as a real payroll bug once the money is on screen. Verify any future change
+to this math against that exact case (low overall tier + high-scoring extra
+events → total must stay 0), not just the common "everything in one tier" case.
+
+**Recompute overwrites the stored bonus value even when payment is locked.**
+`POST /results/quarterly/recompute` (and quarter-close) always writes the
+freshly-calculated `bonusValue`/`extraBonusValue` into `quarterly_results`,
+even for rows whose `bonusStatus` is preserved (`paidAt` set or status in
+`PRESERVE_STATUSES`) — only the *status* is protected, not the number. A
+divergence only produces a `warnings[]` entry ("revise o pagamento"), it does
+not block the overwrite. Tell whoever triggers a recompute that already
+paid/approved figures can silently change and must be checked against the
+warnings list.

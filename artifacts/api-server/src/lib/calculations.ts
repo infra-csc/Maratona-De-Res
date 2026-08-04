@@ -276,7 +276,10 @@ export function calculateTieredBonus(
   rules: PlatoonRuleData[],
 ): number {
   const platoon = getPlatoonByScore(score, rules);
-  if (!platoon) return 0;
+  // Faixa sem bônus (ex.: "0-70") zera o bônus por completo — inclusive a
+  // parte extra por evento. Não faz sentido pagar extra por evento a quem
+  // está na faixa "não elegível ao bônus" pela nota geral do ciclo.
+  if (!platoon || platoon.bonusValue <= 0) return 0;
   const extraBonus = extraEventScores.reduce((sum, evScore) => {
     const evPlatoon = getPlatoonByScore(evScore, rules);
     return sum + (evPlatoon?.bonusPerExtraEvent ?? 0);
@@ -287,13 +290,16 @@ export function calculateTieredBonus(
 /**
  * Parcela de bônus extra isolada — soma de bonusPerExtraEvent por evento
  * extra, usando a faixa da nota de CADA evento extra individualmente.
- * Não inclui o prêmio base.
+ * Não inclui o prêmio base. Segue a mesma regra de calculateTieredBonus:
+ * se a faixa da nota geral não paga bônus, a parte extra também é zerada.
  */
 export function calculateExtraBonusValue(
-  _baseScore: number,
+  baseScore: number,
   extraEventScores: number[],
   rules: PlatoonRuleData[],
 ): number {
+  const platoon = getPlatoonByScore(baseScore, rules);
+  if (!platoon || platoon.bonusValue <= 0) return 0;
   const extraBonus = extraEventScores.reduce((sum, evScore) => {
     const evPlatoon = getPlatoonByScore(evScore, rules);
     return sum + (evPlatoon?.bonusPerExtraEvent ?? 0);

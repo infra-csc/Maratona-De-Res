@@ -581,11 +581,18 @@ function EmployeeDetailSheet({
                 </section>
               )}
 
-              {detail.summary.bonusValue != null && detail.summary.bonusValue > 0 && (
-                <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)", border: "2px solid var(--primary)" }}>
-                  <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus do Ciclo</span>
-                  <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }}>{fmtBRL(detail.summary.bonusValue)}</span>
-                </section>
+              {detail.summary.bonusValue != null && (
+                detail.summary.bonusValue > 0 ? (
+                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)", border: "2px solid var(--primary)" }}>
+                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus do Ciclo</span>
+                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(detail.summary.bonusValue)}</span>
+                  </section>
+                ) : (
+                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)" }}>
+                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Bônus do Ciclo</span>
+                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(0)}</span>
+                  </section>
+                )
               )}
             </div>
           </div>
