@@ -574,7 +574,7 @@ router.get("/events/:id", async (req, res) => {
   res.json(detail);
 });
 
-router.post("/events", requireRole("admin", "rh"), async (req, res) => {
+router.post("/events", requireRole("admin", "rh", "operador"), async (req, res) => {
   const { name, clientName, location, city, state, startDate, endDate } = req.body;
   if (!name || !startDate || !endDate) {
     res.status(400).json({ error: "Campos obrigatórios: name, startDate, endDate" });
