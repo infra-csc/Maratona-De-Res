@@ -791,7 +791,7 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                         </div>
                       </div>
                       <div className="px-4 py-3.5 text-center">
-                        <FaixaBadge minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
+                        <FaixaBadge name={r.platoon} minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
                       </div>
                     </div>
                   );
@@ -1135,7 +1135,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                         </div>
                       </div>
                       <div className="px-4 py-3.5 text-center">
-                        <FaixaBadge minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
+                        <FaixaBadge name={r.platoon} minScore={r.platoonMinScore} maxScore={r.platoonMaxScore} color={r.platoonColor} />
                       </div>
                       <div className="px-4 py-3.5 text-center">
                         {r.eligible === false ? (
