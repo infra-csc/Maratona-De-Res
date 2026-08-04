@@ -251,10 +251,17 @@ export function getPlatoonByScore(
   score: number,
   rules: PlatoonRuleData[],
 ): PlatoonRuleData | null {
+  // Faixas são definidas com casas decimais fechadas em ambas as pontas
+  // (ex: 79,99 / 80,00) para não deixar dúvida visual sobre o limite —
+  // mas uma nota computada por soma/divisão pode chegar aqui com mais
+  // de 2 casas decimais (ex: 79.995). Arredondar para 2 casas antes de
+  // comparar evita que esse resíduo de ponto flutuante caia numa lacuna
+  // entre duas faixas fechadas.
+  const roundedScore = Math.round(score * 100) / 100;
   const sorted = [...rules].sort((a, b) => b.minScore - a.minScore);
   for (const rule of sorted) {
-    const aboveMin = rule.minInclusive ? score >= rule.minScore : score > rule.minScore;
-    const belowMax = rule.maxInclusive ? score <= rule.maxScore : score < rule.maxScore;
+    const aboveMin = rule.minInclusive ? roundedScore >= rule.minScore : roundedScore > rule.minScore;
+    const belowMax = rule.maxInclusive ? roundedScore <= rule.maxScore : roundedScore < rule.maxScore;
     if (aboveMin && belowMax) return rule;
   }
   return null;

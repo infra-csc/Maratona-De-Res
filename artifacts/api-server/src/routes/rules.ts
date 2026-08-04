@@ -36,6 +36,13 @@ router.get("/platoon-rules", async (_req, res) => {
 
 type RangeRow = { id: number; minScore: number; maxScore: number; minInclusive: boolean; maxInclusive: boolean };
 
+// Notas trabalham com 2 casas decimais, então o menor incremento
+// representável é 0,01. Duas faixas fechadas nos dois extremos (ex:
+// 70–74,99 e 75–79,99) não deixam nenhuma nota real de fora mesmo com
+// essa folga de 0,01 entre elas — por isso essa folga conta como
+// cobertura completa, e não como uma lacuna real.
+const SCORE_STEP = 0.01;
+
 function validatePlatoonRanges(ranges: RangeRow[]): string | null {
   const active = [...ranges].sort((a, b) => a.minScore - b.minScore);
   if (active.length === 0) {
@@ -54,16 +61,22 @@ function validatePlatoonRanges(ranges: RangeRow[]): string | null {
     const next = active[i + 1];
     const currMax = curr.maxScore;
     const nextMin = next.minScore;
-    if (currMax > nextMin) {
+    const gap = Math.round((nextMin - currMax) * 100) / 100;
+    if (gap < 0) {
       return `Sobreposição de intervalos detectada: "${curr.minScore}–${curr.maxScore}" e "${next.minScore}–${next.maxScore}"`;
     }
-    if (currMax < nextMin) {
+    if (gap > SCORE_STEP) {
       return `Lacuna entre intervalos detectada: ${curr.maxScore} → ${next.minScore}`;
     }
-    const boundaryOk = curr.maxInclusive !== next.minInclusive;
-    if (!boundaryOk) {
-      return `Conflito de inclusão no limite ${currMax}: "${curr.minScore}–${curr.maxScore}" e "${next.minScore}–${next.maxScore}" cobrem o mesmo ponto`;
+    if (gap === 0) {
+      // As faixas se tocam no mesmo número (estilo antigo, ex: 75–80 / 80–85):
+      // só é válido se exatamente um dos dois lados incluir esse ponto.
+      const boundaryOk = curr.maxInclusive !== next.minInclusive;
+      if (!boundaryOk) {
+        return `Conflito de inclusão no limite ${currMax}: "${curr.minScore}–${curr.maxScore}" e "${next.minScore}–${next.maxScore}" cobrem o mesmo ponto`;
+      }
     }
+    // gap === SCORE_STEP (0,01): faixas fechadas e disjuntas (ex: 74,99 / 75) — cobertura completa, sem conflito de inclusão possível.
   }
   return null;
 }

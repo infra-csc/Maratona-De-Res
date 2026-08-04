@@ -18,14 +18,18 @@ import {
 import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
 import { getAuthToken } from "@/lib/custom-fetch";
 
+// Faixas fechadas nas duas pontas, com folga decimal de 0,01 entre elas
+// (ex: 74,99 / 75,00) — evita a ambiguidade de duas faixas “tocando” no
+// mesmo número inteiro (uma nota de 80 pontos precisa cair em UMA faixa
+// só, nunca nas duas ao mesmo tempo nem em nenhuma).
 const NEW_TIERS_2026 = [
-  { name: "Sem Bônus",        minScore: 0,  maxScore: 70,  minInclusive: true, maxInclusive: false, bonusValue: 0,    bonusPerExtraEvent: 0,   color: "#64748b" },
-  { name: "Branco Caminhada", minScore: 70, maxScore: 75,  minInclusive: true, maxInclusive: false, bonusValue: 1200, bonusPerExtraEvent: 200, color: "#e2e8f0" },
-  { name: "Branco Corrida",   minScore: 75, maxScore: 80,  minInclusive: true, maxInclusive: false, bonusValue: 1700, bonusPerExtraEvent: 250, color: "#cbd5e1" },
-  { name: "Branco",           minScore: 80, maxScore: 85,  minInclusive: true, maxInclusive: false, bonusValue: 2200, bonusPerExtraEvent: 300, color: "#94a3b8" },
-  { name: "Verde",            minScore: 85, maxScore: 90,  minInclusive: true, maxInclusive: false, bonusValue: 2700, bonusPerExtraEvent: 350, color: "#22c55e" },
-  { name: "Azul",             minScore: 90, maxScore: 95,  minInclusive: true, maxInclusive: false, bonusValue: 3200, bonusPerExtraEvent: 400, color: "#3b82f6" },
-  { name: "Quênia",           minScore: 95, maxScore: 100, minInclusive: true, maxInclusive: true,  bonusValue: 3700, bonusPerExtraEvent: 450, color: "#FFD700" },
+  { name: "Sem Bônus",              minScore: 0,  maxScore: 69.99, minInclusive: true, maxInclusive: true, bonusValue: 0,    bonusPerExtraEvent: 0,   color: "#64748b" },
+  { name: "Branco Caminhada",       minScore: 70, maxScore: 74.99, minInclusive: true, maxInclusive: true, bonusValue: 1200, bonusPerExtraEvent: 200, color: "#e2e8f0" },
+  { name: "Branco Corrida",         minScore: 75, maxScore: 79.99, minInclusive: true, maxInclusive: true, bonusValue: 1700, bonusPerExtraEvent: 250, color: "#cbd5e1" },
+  { name: "Verde",                  minScore: 80, maxScore: 84.99, minInclusive: true, maxInclusive: true, bonusValue: 2200, bonusPerExtraEvent: 300, color: "#22c55e" },
+  { name: "Azul",                   minScore: 85, maxScore: 89.99, minInclusive: true, maxInclusive: true, bonusValue: 2700, bonusPerExtraEvent: 350, color: "#3b82f6" },
+  { name: "Quênia",                 minScore: 90, maxScore: 94.99, minInclusive: true, maxInclusive: true, bonusValue: 3200, bonusPerExtraEvent: 400, color: "#ca8a04" },
+  { name: "Quênia Alto Rendimento", minScore: 95, maxScore: 100,   minInclusive: true, maxInclusive: true, bonusValue: 3700, bonusPerExtraEvent: 450, color: "#facc15" },
 ];
 
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -323,9 +327,9 @@ export default function RulesPage() {
                         <div className="flex flex-col gap-1.5">
                           <Input placeholder="Nome (opcional)" className="w-36 h-8 rounded-lg text-xs font-bold" value={currentName} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], name: e.target.value } }))} />
                           <div className="flex items-center gap-1">
-                            <Input data-testid={`input-platoon-min-${p.id}`} type="number" min="0" max="100" step="1" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.minScore ?? p.minScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))} />
+                            <Input data-testid={`input-platoon-min-${p.id}`} type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.minScore ?? p.minScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))} />
                             <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>–</span>
-                            <Input data-testid={`input-platoon-max-${p.id}`} type="number" min="0" max="100" step="1" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.maxScore ?? p.maxScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))} />
+                            <Input data-testid={`input-platoon-max-${p.id}`} type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.maxScore ?? p.maxScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))} />
                           </div>
                         </div>
                       </td>
@@ -399,11 +403,11 @@ export default function RulesPage() {
               ))}
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Mínima</label>
-                <Input data-testid="input-new-platoon-min" type="number" min="0" max="100" step="1" value={newBand.minScore} onChange={e => setNewBand(v => ({ ...v, minScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="0" />
+                <Input data-testid="input-new-platoon-min" type="number" min="0" max="100" step="0.01" value={newBand.minScore} onChange={e => setNewBand(v => ({ ...v, minScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="0" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Máxima</label>
-                <Input data-testid="input-new-platoon-max" type="number" min="0" max="100" step="1" value={newBand.maxScore} onChange={e => setNewBand(v => ({ ...v, maxScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="100" />
+                <Input data-testid="input-new-platoon-max" type="number" min="0" max="100" step="0.01" value={newBand.maxScore} onChange={e => setNewBand(v => ({ ...v, maxScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="100" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Prêmio Base (R$)</label>

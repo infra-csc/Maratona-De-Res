@@ -195,17 +195,18 @@ async function seed() {
 
   console.log(`✓ ${criteria.length} critérios da Matriz de Performance criados (ativos)`);
 
-  // Pelotões — 7 faixas (2 sub-faixas cada em Quênia/Azul/Verde + 1 em Branco),
-  // com bônus base + bônus por evento extra além do mínimo de elegibilidade,
-  // sem teto (Simulador de Bônus).
+  // Pelotões — 7 faixas, com bônus base + bônus por evento extra além do
+  // mínimo de elegibilidade, sem teto (Simulador de Bônus). Faixas fechadas
+  // nas duas pontas com folga decimal de 0,01 entre elas (ex: 74,99 / 75)
+  // para nunca haver ambiguidade numa nota exatamente no limite (ex: 80).
   await db.insert(platoonRulesTable).values([
-    { name: "Pelotão Quênia", color: "#dc2626", minScore: "95", maxScore: "100", minInclusive: true, maxInclusive: true,  bonusValue: "3700.00", bonusPerExtraEvent: "450.00", description: "Top performers — bônus máximo Caju", displayOrder: 1 },
-    { name: "Pelotão Quênia", color: "#dc2626", minScore: "90", maxScore: "95",  minInclusive: true, maxInclusive: false, bonusValue: "3200.00", bonusPerExtraEvent: "400.00", description: "Top performers — bônus máximo Caju", displayOrder: 2 },
-    { name: "Pelotão Azul",   color: "#2563eb", minScore: "85", maxScore: "90",  minInclusive: true, maxInclusive: false, bonusValue: "2700.00", bonusPerExtraEvent: "350.00", description: "Alta performance",   displayOrder: 3 },
-    { name: "Pelotão Azul",   color: "#2563eb", minScore: "80", maxScore: "85",  minInclusive: true, maxInclusive: false, bonusValue: "2200.00", bonusPerExtraEvent: "300.00", description: "Alta performance",   displayOrder: 4 },
-    { name: "Pelotão Verde",  color: "#16a34a", minScore: "75", maxScore: "80",  minInclusive: true, maxInclusive: false, bonusValue: "1700.00", bonusPerExtraEvent: "250.00", description: "Boa performance",    displayOrder: 5 },
-    { name: "Pelotão Verde",  color: "#16a34a", minScore: "70", maxScore: "75",  minInclusive: true, maxInclusive: false, bonusValue: "1200.00", bonusPerExtraEvent: "200.00", description: "Boa performance",    displayOrder: 6 },
-    { name: "Pelotão Branco", color: "#64748b", minScore: "0",  maxScore: "70",  minInclusive: true, maxInclusive: false, bonusValue: "0.00",    bonusPerExtraEvent: "0.00",   description: "Precisa melhorar",  displayOrder: 7 },
+    { name: "Quênia Alto Rendimento", color: "#facc15", minScore: "95", maxScore: "100",  minInclusive: true, maxInclusive: true, bonusValue: "3700.00", bonusPerExtraEvent: "450.00", description: "Top performers — bônus máximo Caju", displayOrder: 1 },
+    { name: "Quênia",                 color: "#ca8a04", minScore: "90", maxScore: "94.99", minInclusive: true, maxInclusive: true, bonusValue: "3200.00", bonusPerExtraEvent: "400.00", description: "Top performers — bônus máximo Caju", displayOrder: 2 },
+    { name: "Azul",                   color: "#3b82f6", minScore: "85", maxScore: "89.99", minInclusive: true, maxInclusive: true, bonusValue: "2700.00", bonusPerExtraEvent: "350.00", description: "Alta performance",   displayOrder: 3 },
+    { name: "Verde",                  color: "#22c55e", minScore: "80", maxScore: "84.99", minInclusive: true, maxInclusive: true, bonusValue: "2200.00", bonusPerExtraEvent: "300.00", description: "Alta performance",   displayOrder: 4 },
+    { name: "Branco Corrida",         color: "#cbd5e1", minScore: "75", maxScore: "79.99", minInclusive: true, maxInclusive: true, bonusValue: "1700.00", bonusPerExtraEvent: "250.00", description: "Boa performance",    displayOrder: 5 },
+    { name: "Branco Caminhada",       color: "#e2e8f0", minScore: "70", maxScore: "74.99", minInclusive: true, maxInclusive: true, bonusValue: "1200.00", bonusPerExtraEvent: "200.00", description: "Boa performance",    displayOrder: 6 },
+    { name: "Sem Bônus",              color: "#64748b", minScore: "0",  maxScore: "69.99", minInclusive: true, maxInclusive: true, bonusValue: "0.00",    bonusPerExtraEvent: "0.00",   description: "Precisa melhorar",  displayOrder: 7 },
   ]);
 
   console.log("✓ Regras de pelotão criadas (Simulador de Bônus, 7 faixas)");
