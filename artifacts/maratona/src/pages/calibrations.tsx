@@ -1699,9 +1699,12 @@ export default function CalibrationsPage() {
                                           </span>
                                           {canFinalize && (
                                             <button type="button"
-                                              onClick={() => deleteCommentMutation.mutate(cm.id)}
+                                              onClick={() => deleteCommentMutation.mutate(cm.id, {
+                                                onSuccess: () => toast({ title: "Comentário excluído" }),
+                                                onError: (e: Error) => toast({ title: "Erro ao excluir comentário", description: e.message, variant: "destructive" }),
+                                              })}
                                               disabled={deleteCommentMutation.isPending}
-                                              className="ml-auto opacity-0 group-hover/cm:opacity-100 transition-opacity"
+                                              className="ml-auto opacity-60 hover:opacity-100 transition-opacity disabled:opacity-30"
                                               style={{ color: "var(--muted-foreground)" }} title="Excluir">
                                               <Trash2 size={9} />
                                             </button>
