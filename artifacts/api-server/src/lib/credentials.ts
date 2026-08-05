@@ -14,12 +14,10 @@ export function isValidCpfLength(digits: string): boolean {
 }
 
 /**
- * Default password for auto-provisioned colaborador logins: "Maratona@" plus
- * the last 4 digits of the CPF. Deterministic (so it can be regenerated for
- * support purposes) yet not guessable from public info alone, and every
- * account is forced to change it on first login (mustChangePassword).
+ * Default password for auto-provisioned colaborador logins: the CPF digits
+ * themselves. The login page sends the raw CPF as the password, so provisioning
+ * must use the same value.
  */
 export function defaultPasswordForCpf(cpfDigits: string): string {
-  const last4 = cpfDigits.slice(-4);
-  return `Maratona@${last4}`;
+  return cpfDigits;
 }

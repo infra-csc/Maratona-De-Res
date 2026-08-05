@@ -38,7 +38,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: cpf, password: `Maratona@${cpf.slice(-4)}` }),
+        body: JSON.stringify({ identifier: cpf, password: cpf }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "CPF não encontrado ou sem acesso");
