@@ -455,7 +455,7 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
 
     if (byEmpId) {
       await db.update(usersTable)
-        .set({ passwordHash, pinValue: pin, mustChangePassword: false })
+        .set({ passwordHash, pinValue: pin, mustChangePassword: false, cpfLogin: cpfDigits })
         .where(eq(usersTable.id, byEmpId.id));
     } else {
       const [byCpf] = await db.select({ id: usersTable.id })
@@ -517,7 +517,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
   if (byEmpId) {
     userId = byEmpId.id;
     await db.update(usersTable)
-      .set({ passwordHash, pinValue: pin!, mustChangePassword: false })
+      .set({ passwordHash, pinValue: pin!, mustChangePassword: false, cpfLogin: cpfDigits })
       .where(eq(usersTable.id, userId));
   } else {
     const [byCpf] = await db.select({ id: usersTable.id })
