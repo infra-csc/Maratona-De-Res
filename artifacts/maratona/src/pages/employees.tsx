@@ -208,7 +208,8 @@ export default function EmployeesPage() {
       const res = await fetch("/api/employees/bulk-generate-pins", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: (employees ?? []).filter(e => e.employmentType === "casa").map(e => e.id) }),
+        // No ids → backend generates for ALL active casa employees regardless of frontend filters
+        body: JSON.stringify({}),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
       const data = await res.json() as { results: BulkPinEntry[]; skipped: BulkPinSkip[] };
