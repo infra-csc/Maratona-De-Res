@@ -455,14 +455,14 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
 
     if (byEmpId) {
       await db.update(usersTable)
-        .set({ passwordHash, pinValue: pin, mustChangePassword: false, cpfLogin: cpfDigits })
+        .set({ passwordHash, pinValue: pin, mustChangePassword: false, cpfLogin: cpfDigits, role: "visualizador" })
         .where(eq(usersTable.id, byEmpId.id));
     } else {
       const [byCpf] = await db.select({ id: usersTable.id })
         .from(usersTable).where(eq(usersTable.cpfLogin, cpfDigits)).limit(1);
       if (byCpf) {
         await db.update(usersTable)
-          .set({ passwordHash, pinValue: pin, mustChangePassword: false, employeeId: emp.id })
+          .set({ passwordHash, pinValue: pin, mustChangePassword: false, employeeId: emp.id, role: "visualizador" })
           .where(eq(usersTable.id, byCpf.id));
       } else {
         await db.insert(usersTable).values({
@@ -517,7 +517,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
   if (byEmpId) {
     userId = byEmpId.id;
     await db.update(usersTable)
-      .set({ passwordHash, pinValue: pin!, mustChangePassword: false, cpfLogin: cpfDigits })
+      .set({ passwordHash, pinValue: pin!, mustChangePassword: false, cpfLogin: cpfDigits, role: "visualizador" })
       .where(eq(usersTable.id, userId));
   } else {
     const [byCpf] = await db.select({ id: usersTable.id })
