@@ -296,7 +296,7 @@ export default function EventsPage() {
     if (chip) chip.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
   }, [cycle?.startDate]);
 
-  const GRID_COLS = "1fr 90px 56px 130px 130px 80px 120px 72px";
+  const GRID_COLS = "1fr 90px 56px 130px 130px 110px 80px 120px 72px";
 
   const chipFilters = [
     { key: null,          label: "Todos" },
@@ -579,11 +579,31 @@ export default function EventsPage() {
               className="grid sticky top-0 z-10"
               style={{ gridTemplateColumns: GRID_COLS, backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}
             >
-              {(["name","date","participants","evaluated","calibr","score"] as const).map((col, i) => {
+              {(["name","date","participants","evaluated","calibr"] as const).map((col, i) => {
                 const labels: Record<string, string> = {
                   name: "Evento", date: "Data", participants: "Part.",
-                  evaluated: "Avaliações", calibr: "Calibrações", score: "Nota",
+                  evaluated: "Avaliações", calibr: "Calibrações",
                 };
+                const active = colActive(col);
+                const asc = sortAsc(col);
+                return (
+                  <div
+                    key={col}
+                    onClick={() => handleColSort(col)}
+                    className={cn("px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none flex items-center gap-1 transition-colors group", i === 0 && "pl-4")}
+                    style={{ fontFamily: CONDENSED, color: active ? "var(--accent)" : "var(--muted-foreground)" }}
+                  >
+                    {labels[col]}
+                    <span className={cn("inline-flex flex-col leading-none transition-opacity", active ? "opacity-100" : "opacity-0 group-hover:opacity-40")}>
+                      <ChevronUp size={8} />
+                      <ChevronDown size={8} style={{ marginTop: -2 }} />
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Matriz</div>
+              {(["score"] as const).map((col, i) => {
+                const labels: Record<string, string> = { score: "Nota" };
                 const active = colActive(col);
                 const asc = sortAsc(col);
                 return (
@@ -731,6 +751,19 @@ export default function EventsPage() {
                       <span className="text-[11px] italic opacity-40">—</span>
                     ) : (
                       <CalBar finalCount={finalPubCount} partialCount={partialOnlyCount} total={total} />
+                    )}
+                  </div>
+
+                  {/* Matriz de Conformidade mini bar */}
+                  <div className="px-3.5 py-3">
+                    {!ev.conformityNeeded ? (
+                      <span className="text-[11px] italic opacity-40">—</span>
+                    ) : (
+                      <MiniBar
+                        value={ev.conformityFilled ?? 0}
+                        total={ev.conformityTotal ?? 0}
+                        color={ev.conformityComplete ? "#9ab000" : (ev.conformityFilled ?? 0) > 0 ? "#e8a23d" : "var(--border)"}
+                      />
                     )}
                   </div>
 

@@ -60,18 +60,26 @@ router.get("/events", async (req, res) => {
   const globalScorable = globalCatalog.filter(c => parseFloat((c.defaultWeight ?? "1") as unknown as string) > 0).length || globalCatalog.length;
   const areaNameById = new Map(allAreas.map(a => [a.id, a.name]));
 
-  // Calcula se a Matriz de Conformidade foi preenchida por quem foi atribuído.
+  // Calcula se a Matriz de Conformidade foi preenchida por quem foi atribuído,
+  // e também um contador X/Y (itens respondidos / itens esperados) para exibir
+  // na listagem de eventos igual às barras de Avaliações/Calibrações.
+  // Cenografia = 5 itens (epi, estaiamentos, conduta, standoutResponse, absencesResponse);
+  // Ferramentas = 1 item (guardaEquipamentos). Só conta os lados que têm avaliador atribuído.
   function getConformityStatus(ev: (typeof events)[0]) {
     const cenoAssigned = ev.conformityEvaluatorUserId != null;
     const ferrAssigned = ev.conformityEvaluatorFerramentasUserId != null;
     const conformityNeeded = cenoAssigned || ferrAssigned;
-    if (!conformityNeeded) return { conformityNeeded: false, conformityComplete: false };
+    if (!conformityNeeded) return { conformityNeeded: false, conformityComplete: false, conformityFilled: 0, conformityTotal: 0 };
     const conf = conformityRows.find(c => c.eventId === ev.id);
-    const cenoDone = !cenoAssigned || (conf != null &&
-      conf.epi != null && conf.estaiamentos != null && conf.conduta != null &&
-      conf.standoutResponse != null && conf.absencesResponse != null);
-    const ferrDone = !ferrAssigned || (conf != null && conf.guardaEquipamentos != null);
-    return { conformityNeeded, conformityComplete: cenoDone && ferrDone };
+    const cenoFields = [conf?.epi, conf?.estaiamentos, conf?.conduta, conf?.standoutResponse, conf?.absencesResponse];
+    const cenoFilled = cenoAssigned ? cenoFields.filter(v => v != null).length : 0;
+    const cenoTotal = cenoAssigned ? 5 : 0;
+    const ferrFilled = ferrAssigned && conf?.guardaEquipamentos != null ? 1 : 0;
+    const ferrTotal = ferrAssigned ? 1 : 0;
+    const conformityFilled = cenoFilled + ferrFilled;
+    const conformityTotal = cenoTotal + ferrTotal;
+    const conformityComplete = conformityFilled === conformityTotal;
+    return { conformityNeeded, conformityComplete, conformityFilled, conformityTotal };
   }
 
   // Filtra eventos dentro do período do ciclo atual (se o ciclo tiver datas definidas;
@@ -124,7 +132,7 @@ router.get("/events", async (req, res) => {
       const partialPublishedAt = partialTimestamps.length > 0
         ? new Date(Math.max(...partialTimestamps.map(d => d.getTime()))) : null;
       const partialPublishedCount = allScorableCriteria.filter(c => c.partialPublishedAt != null).length;
-      const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
+      const { conformityNeeded, conformityComplete, conformityFilled, conformityTotal } = getConformityStatus(ev);
       return {
         ...ev,
         participantCount,
@@ -144,6 +152,8 @@ router.get("/events", async (req, res) => {
         unassignedAreaNames: [],
         conformityNeeded,
         conformityComplete,
+        conformityFilled,
+        conformityTotal,
       };
     }
 
@@ -330,12 +340,12 @@ router.get("/events", async (req, res) => {
       const w = parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string);
       return w > 0 && ch.partialPublishedAt != null;
     }).length;
-    const { conformityNeeded, conformityComplete } = getConformityStatus(ev);
+    const { conformityNeeded, conformityComplete, conformityFilled, conformityTotal } = getConformityStatus(ev);
     const conformityEvaluatorName = ev.conformityEvaluatorUserId != null
       ? (conformityEvalNameById.get(ev.conformityEvaluatorUserId) ?? null) : null;
     const conformityEvaluatorFerramentasName = ev.conformityEvaluatorFerramentasUserId != null
       ? (conformityEvalNameById.get(ev.conformityEvaluatorFerramentasUserId) ?? null) : null;
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityEvaluatorName, conformityEvaluatorFerramentasName };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityEvaluatorName, conformityEvaluatorFerramentasName };
   });
   // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
   // a nota — redact aqui na origem, já que a tela de Eventos (no menu dele)
