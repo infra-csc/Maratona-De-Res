@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurrentCycle, getGetEventsQueryKey, ApiError, useNormalizeEventDates, useConfirmEventResultsBulk, useUpdateEvent } from "@workspace/api-client-react";
-import type { EventInput, NormalizeDatesResult } from "@workspace/api-client-react";
+import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurrentCycle, useGetEventConformity, getGetEventsQueryKey, ApiError, useNormalizeEventDates, useConfirmEventResultsBulk, useUpdateEvent } from "@workspace/api-client-react";
+import type { EventConformity, EventInput, NormalizeDatesResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ConfirmDialog } from "@/components/shared";
 import { useForm } from "react-hook-form";
@@ -99,6 +99,154 @@ function serverErrorMessage(e: unknown): string {
 
 /** Quantas mudanças de data mostrar na prévia antes do "+N mais". */
 const DATE_PREVIEW_LIMIT = 10;
+// ── Conformity Quick-View ─────────────────────────────────────────────────────
+const CONFORMITY_GROUPS: {
+  id: "cenografia" | "ferramentas";
+  label: string;
+  items: { label: string; get: (d: EventConformity) => boolean | null | undefined }[];
+  extras?: { label: string; get: (d: EventConformity) => boolean | null | undefined; getReport?: (d: EventConformity) => string | null | undefined }[];
+}[] = [
+  {
+    id: "cenografia",
+    label: "Cenografia",
+    items: [
+      { label: "Uso de EPI", get: (d) => d.epi },
+      { label: "Estaiamentos / Aterramentos", get: (d) => d.estaiamentos },
+      { label: "Conduta", get: (d) => d.conduta },
+    ],
+    extras: [{ label: "Ausências / Registro", get: (d) => d.absencesResponse, getReport: (d) => d.absencesReport }],
+  },
+  {
+    id: "ferramentas",
+    label: "Ferramentas e Case",
+    items: [{ label: "Guarda de Equipamentos", get: (d) => d.guardaEquipamentos }],
+  },
+];
+
+function SimNaoBadge({ value }: { value: boolean | null | undefined }) {
+  if (value === true)
+    return (
+      <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e8f5c8", color: "#4a7c00", letterSpacing: "0.06em" }}>
+        SIM
+      </span>
+    );
+  if (value === false)
+    return (
+      <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: "#e5484d", letterSpacing: "0.06em" }}>
+        NÃO
+      </span>
+    );
+  return (
+    <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(232,162,61,0.16)", color: "#c97800", letterSpacing: "0.06em" }}>
+      PENDENTE
+    </span>
+  );
+}
+
+function ConformityQuickView({ eventId }: { eventId: number }) {
+  const { data, isLoading } = useGetEventConformity(eventId, {
+    query: { enabled: !!eventId, queryKey: ["event-conformity-popup", eventId] as unknown[] },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <span className="text-xs font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando…</span>
+      </div>
+    );
+  }
+
+  const totalItems = CONFORMITY_GROUPS.reduce((acc, g) => acc + g.items.length + (g.extras?.length ?? 0), 0);
+  const filledItems = !data ? 0 : CONFORMITY_GROUPS.reduce((acc, g) => {
+    const core = g.items.filter(i => i.get(data) !== null && i.get(data) !== undefined).length;
+    const extras = (g.extras ?? []).filter(i => i.get(data) !== null && i.get(data) !== undefined).length;
+    return acc + core + extras;
+  }, 0);
+  const allSim = !!data && CONFORMITY_GROUPS.every(g =>
+    g.items.every(i => i.get(data) === true) &&
+    (g.extras ?? []).every(i => i.get(data) === true)
+  );
+
+  return (
+    <div className="space-y-0">
+      {/* Summary dot row */}
+      <div className="flex items-center gap-2 px-1 pb-3">
+        <span
+          className="w-2.5 h-2.5 rounded-full shrink-0"
+          style={{ backgroundColor: allSim ? "#9ab000" : filledItems > 0 ? "#e8a23d" : "var(--border)" }}
+        />
+        <span className="text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+          {filledItems}/{totalItems} {filledItems === totalItems ? "completo" : "preenchido(s)"}
+        </span>
+      </div>
+
+      {!data ? (
+        <div className="flex flex-col items-center gap-1.5 py-8 text-center">
+          <span className="text-sm font-bold" style={{ color: "var(--muted-foreground)" }}>Matriz não preenchida</span>
+          <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Nenhum avaliador submeteu respostas ainda.</span>
+        </div>
+      ) : (
+        CONFORMITY_GROUPS.map(group => {
+          const extrasCount = group.extras?.length ?? 0;
+          const totalCount = group.items.length + extrasCount;
+          return (
+            <div key={group.id} className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", marginBottom: 10 }}>
+              {/* Group header */}
+              <div className="px-4 py-2.5 flex items-center gap-2" style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
+                <span className="text-[10px] font-black uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+                  {group.label}
+                </span>
+                <span className="text-[10px] font-bold" style={{ color: "var(--muted-foreground)", opacity: 0.6 }}>
+                  · {totalCount} {totalCount === 1 ? "item" : "itens"}
+                </span>
+              </div>
+
+              {/* Core items */}
+              {group.items.map((item, idx) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between px-4 py-3"
+                  style={{ borderBottom: (idx < group.items.length - 1 || extrasCount > 0) ? "1px solid var(--border)" : undefined }}
+                >
+                  <span className="text-sm font-bold uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
+                    {item.label}
+                  </span>
+                  <SimNaoBadge value={item.get(data)} />
+                </div>
+              ))}
+
+              {/* Extra items (absences, etc.) */}
+              {group.extras?.map((item, idx) => {
+                const val = item.get(data);
+                const report = item.getReport ? item.getReport(data) : undefined;
+                const noEntry = val === null || val === undefined;
+                return (
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between px-4 py-3"
+                    style={{ borderBottom: idx < extrasCount - 1 ? "1px solid var(--border)" : undefined }}
+                  >
+                    <span className="text-sm font-bold uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
+                      {item.label}
+                    </span>
+                    {noEntry && !report ? (
+                      <span className="text-[10px] font-bold italic" style={{ color: "var(--muted-foreground)" }}>Sem registro</span>
+                    ) : noEntry && report ? (
+                      <span className="text-[10px] font-bold max-w-[180px] truncate text-right" style={{ color: "var(--muted-foreground)" }}>{report}</span>
+                    ) : (
+                      <SimNaoBadge value={val} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function EventsPage() {
   const { user } = useAuth();
@@ -139,6 +287,7 @@ export default function EventsPage() {
   // 60 s (e ao voltar o foco) e a lista filtrada podia mudar entre abrir e confirmar.
   const [bulkConfirmIds, setBulkConfirmIds] = useState<{ id: number; name: string; startDate: string }[]>([]);
   const [editingEvent, setEditingEvent] = useState<{ id: number; name: string; startDate: string; endDate: string; clientName?: string | null; city?: string | null; state?: string | null; location?: string | null } | null>(null);
+  const [conformityPopup, setConformityPopup] = useState<{ id: number; name: string } | null>(null);
 
   const queryKey = getGetEventsQueryKey();
   const { data: events, isLoading } = useGetEvents(
@@ -858,17 +1007,24 @@ export default function EventsPage() {
                     )}
                   </div>
 
-                  {/* Matriz de Conformidade mini bar */}
+                  {/* Matriz de Conformidade mini bar — clicável */}
                   <div className="px-3.5 py-3">
                     {!ev.conformityNeeded ? (
                       <span className="text-[11px] italic opacity-40">—</span>
                     ) : (
-                      <MiniBar
-                        value={ev.conformityFilled ?? 0}
-                        total={ev.conformityTotal ?? 0}
-                        color={ev.conformityComplete ? GOOD : (ev.conformityFilled ?? 0) > 0 ? AMBER : "var(--border)"}
-                        title={`${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
-                      />
+                      <button
+                        type="button"
+                        title="Ver Matriz de Conformidade"
+                        onClick={() => setConformityPopup({ id: ev.id, name: ev.name })}
+                        className="w-full text-left hover:opacity-75 transition-opacity"
+                      >
+                        <MiniBar
+                          value={ev.conformityFilled ?? 0}
+                          total={ev.conformityTotal ?? 0}
+                          color={ev.conformityComplete ? GOOD : (ev.conformityFilled ?? 0) > 0 ? AMBER : "var(--border)"}
+                          title={`${ev.conformityFilled ?? 0} de ${ev.conformityTotal ?? 0} itens da Matriz de Conformidade respondidos`}
+                        />
+                      </button>
                     )}
                   </div>
 
@@ -1281,6 +1437,21 @@ export default function EventsPage() {
               </button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Conformity Matrix Quick-View Dialog */}
+      <Dialog open={!!conformityPopup} onOpenChange={(o) => { if (!o) setConformityPopup(null); }}>
+        <DialogContent className="max-w-md" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader className="pb-1">
+            <div className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+              Matriz de Conformidade
+            </div>
+            <DialogTitle className="text-base font-black uppercase leading-tight" style={{ fontFamily: CONDENSED }}>
+              {conformityPopup?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {conformityPopup && <ConformityQuickView eventId={conformityPopup.id} />}
         </DialogContent>
       </Dialog>
     </div>
