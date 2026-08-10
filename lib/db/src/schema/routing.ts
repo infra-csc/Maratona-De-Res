@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, boolean, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, boolean, text, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { criteriaTable } from "./criteria";
@@ -104,7 +104,10 @@ export const publicEvalTokensTable = pgTable("public_eval_tokens", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   /** 'criteria' | 'conformity_cenografia' | 'conformity_ferramentas' */
   tokenType: text("token_type").notNull().default("criteria"),
-});
+}, (t) => ({
+  eventIdx: index("public_eval_tokens_event_idx").on(t.eventId),
+  createdByIdx: index("public_eval_tokens_created_by_idx").on(t.createdByUserId),
+}));
 
 /**
  * Critérios cobertos por um token de avaliação pública (relação N:N —

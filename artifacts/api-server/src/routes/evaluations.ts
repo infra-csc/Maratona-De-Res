@@ -3,6 +3,7 @@ import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCrit
 import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { parseId } from "../lib/params.js";
 import { getPrincipalAreaIds } from "./routing.js";
 import { recomputeCycleResults } from "./results.js";
 
@@ -147,7 +148,8 @@ router.get("/evaluations", async (req, res) => {
   .$dynamic();
 
   const conditions = [];
-  if (eventId) conditions.push(eq(evaluationsTable.eventId, parseInt(eventId as string)));
+  const evId = parseId(eventId as string | undefined);
+  if (evId) conditions.push(eq(evaluationsTable.eventId, evId));
   if (status) conditions.push(eq(evaluationsTable.status, status as string));
 
   // Avaliador: enxerga as PRÓPRIAS avaliações, as das áreas em que foi

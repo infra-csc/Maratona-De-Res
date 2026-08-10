@@ -4,6 +4,7 @@ import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipant
 import { eq, and, inArray, notInArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole, bumpTokenVersion } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { parseId } from "../lib/params.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
@@ -77,7 +78,14 @@ router.get("/employees", async (req, res) => {
 });
 
 router.get("/employees/:id", async (req, res) => {
-  const id = parseInt(req.params.id as string);
+  const id = parseId(req.params.id);
+  if (!id) { res.status(400).json({ error: "ID inválido" }); return; }
+  const user = req.user!;
+  // avaliador / visualizador só podem consultar o próprio perfil de colaborador
+  const isManager = ["admin", "rh", "operador", "diretoria"].includes(user.role);
+  if (!isManager && user.employeeId !== id) {
+    res.status(403).json({ error: "Acesso não autorizado" }); return;
+  }
   const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   if (!employee) { res.status(404).json({ error: "Não encontrado" }); return; }
   res.json(canSeeEmployeePii(req.user?.role) ? employee : publicEmployeeView(employee));
@@ -131,7 +139,8 @@ router.post("/employees", requireRole("admin", "rh", "operador"), async (req, re
 });
 
 router.patch("/employees/:id", requireRole("admin", "rh", "operador"), async (req, res) => {
-  const id = parseInt(req.params.id as string);
+  const id = parseId(req.params.id);
+  if (!id) { res.status(400).json({ error: "ID inválido" }); return; }
   const { name, document, email, phone, department, functionName, employmentType, active, eligibleForBonus, eligibilityStatus, eligibilityReason } = req.body;
   const [before] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
@@ -165,7 +174,8 @@ router.patch("/employees/:id", requireRole("admin", "rh", "operador"), async (re
 });
 
 router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res) => {
-  const canonicalId = parseInt(req.params.id as string);
+  const canonicalId = parseId(req.params.id);
+  if (!canonicalId) { res.status(400).json({ error: "ID inválido" }); return; }
   const { duplicateIds } = req.body as { duplicateIds: number[] };
   if (!Array.isArray(duplicateIds) || duplicateIds.length === 0) {
     res.status(400).json({ error: "duplicateIds obrigatório" }); return;
@@ -392,8 +402,8 @@ router.post("/employees/bulk-set-cpf", requireRole("admin", "rh"), async (req, r
 });
 
 router.get("/employees/:id/history", requireRole("admin", "rh", "diretoria"), async (req, res) => {
-  const id = parseInt(req.params.id as string);
-  if (Number.isNaN(id)) { res.status(400).json({ error: "ID inválido." }); return; }
+  const id = parseId(req.params.id as string);
+  if (!id) { res.status(400).json({ error: "ID inválido" }); return; }
   const results = await db.select().from(quarterlyResultsTable)
     .where(eq(quarterlyResultsTable.employeeId, id))
     .orderBy(quarterlyResultsTable.cycleId);

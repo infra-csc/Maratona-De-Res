@@ -21,6 +21,9 @@ export const evaluationsTable = pgTable("evaluations", {
   submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
+  eventIdx: index("evaluations_event_idx").on(t.eventId),
+  evaluatorIdx: index("evaluations_evaluator_idx").on(t.evaluatorUserId),
+  eventCriterionIdx: index("evaluations_event_criterion_idx").on(t.eventId, t.criterionId),
   // Uma avaliação por (evento, critério, avaliador): duplo clique/duas abas
   // criavam duas linhas e a média contava o avaliador em dobro.
   // Antes do push em produção: rode scripts/sql/check-duplicates.sql.
@@ -38,6 +41,8 @@ export const calibrationsTable = pgTable("calibrations", {
   calibratedByUserId: integer("calibrated_by_user_id").notNull().references(() => usersTable.id),
   calibratedAt: timestamp("calibrated_at").notNull().defaultNow(),
 }, (t) => ({
+  eventIdx: index("calibrations_event_idx").on(t.eventId),
+  eventCriterionIdx: index("calibrations_event_criterion_idx").on(t.eventId, t.criterionId),
   // Uma calibração por (evento, critério): duas linhas tornavam a nota
   // oficial dependente da ordem em que o Postgres devolvia as linhas.
   eventCriterionUq: uniqueIndex("calibrations_event_criterion_uq").on(t.eventId, t.criterionId),
@@ -101,7 +106,9 @@ export const calibrationCommentsTable = pgTable("calibration_comments", {
   text: text("text").notNull(),
   createdByUserId: integer("created_by_user_id").notNull().references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  eventCriterionIdx: index("calibration_comments_event_criterion_idx").on(t.eventId, t.criterionId),
+}));
 
 export const insertEvaluationSchema = createInsertSchema(evaluationsTable).omit({ id: true, createdAt: true });
 export const insertCalibrationSchema = createInsertSchema(calibrationsTable).omit({ id: true, calibratedAt: true });
