@@ -606,7 +606,7 @@ router.post("/events", requireRole("admin", "rh", "operador"), async (req, res) 
   res.status(201).json({ ...ev, participantCount: 0, evaluationProgress: 0, averageScore: null });
 });
 
-router.patch("/events/:id", requireRole("admin", "rh"), async (req, res) => {
+router.patch("/events/:id", requireRole("admin", "rh", "operador"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   // status é gerenciado exclusivamente pelas rotas /close e /reopen, que
   // aplicam a lógica de negócio correta (forcedClosed, recomputeCycleResults).

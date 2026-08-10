@@ -814,7 +814,7 @@ export default function EventsPage() {
                           className="p-1.5 min-w-[170px] rounded-lg shadow-lg"
                           style={{ backgroundColor: "var(--card)", border: "2px solid var(--border)", color: "var(--foreground)", zIndex: 9999 }}
                         >
-                          {user && ["admin", "rh"].includes(user.role) && (
+                          {user && (["admin", "rh"].includes(user.role) || hasRole(user, "operador")) && (
                             <DropdownMenuItem
                               data-testid={`button-edit-event-${ev.id}`}
                               onClick={() => setEditingEvent({ id: ev.id, name: ev.name, startDate: ev.startDate, endDate: ev.endDate, clientName: ev.clientName, city: ev.city, state: ev.state, location: ev.location })}
@@ -1021,7 +1021,7 @@ export default function EventsPage() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Editar Evento</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmitEdit(d => { if (editingEvent) editMutation.mutate({ id: editingEvent.id, data: d }); })} className="space-y-5 pt-4">
+          <form onSubmit={handleSubmitEdit(d => { if (editingEvent) editMutation.mutate({ id: editingEvent.id, data: { ...d, endDate: d.startDate } }); })} className="space-y-5 pt-4">
             <div className="space-y-1.5">
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: WARNING }}>*</span></Label>
               <Input data-testid="input-edit-event-name" {...registerEdit("name", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
@@ -1030,15 +1030,9 @@ export default function EventsPage() {
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Cliente</Label>
               <Input data-testid="input-edit-event-client" {...registerEdit("clientName")} className="h-11 rounded-lg" style={inputStyle} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Início <span style={{ color: WARNING }}>*</span></Label>
-                <Input data-testid="input-edit-event-start" type="date" {...registerEdit("startDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Fim <span style={{ color: WARNING }}>*</span></Label>
-                <Input data-testid="input-edit-event-end" type="date" {...registerEdit("endDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Data do Evento <span style={{ color: WARNING }}>*</span></Label>
+              <Input data-testid="input-edit-event-start" type="date" {...registerEdit("startDate", { required: true })} className="h-11 rounded-lg" style={inputStyle} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
