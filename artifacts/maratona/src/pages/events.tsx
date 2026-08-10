@@ -798,7 +798,7 @@ export default function EventsPage() {
                         <ChevronRight size={13} />
                       </button>
                     </Link>
-                    {user && ["admin", "rh", "diretoria"].includes(user.role) && (
+                    {user && (["admin", "rh", "diretoria"].includes(user.role) || hasRole(user, "operador")) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
