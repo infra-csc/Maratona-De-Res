@@ -26,6 +26,7 @@ import cyclesRouter from "./cycles.js";
 import routingRouter from "./routing.js";
 import publicEvalRouter from "./public-eval.js";
 import reviewRequestsRouter from "./review-requests.js";
+import adminRouter from "./admin.js";
 
 const router: IRouter = Router();
 
@@ -70,6 +71,7 @@ router.use(exportsRouter);
 // reviewRequestsRouter mounted before auditRouter/integrationRouter so that its
 // own requireRole guard (admin|rh|diretoria) is used instead of the blanket one.
 router.use(reviewRequestsRouter);
+router.use(adminRouter);
 router.use(auditRouter);
 router.use(integrationRouter);
 
