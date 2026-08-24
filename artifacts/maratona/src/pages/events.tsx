@@ -830,16 +830,18 @@ export default function EventsPage() {
                               </Link>
                             </DropdownMenuItem>
                           )}
-                          {user?.role === "admin" && (
+                          {user && ["admin", "operador"].includes(user.role) && (
                             <>
                               <DropdownMenuSeparator style={{ backgroundColor: "var(--border)", margin: "4px 0" }} />
-                              <DropdownMenuItem
-                                data-testid={`button-merge-event-${ev.id}`}
-                                onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
-                                className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]"
-                              >
-                                <GitMerge size={13} /> Mesclar
-                              </DropdownMenuItem>
+                              {user.role === "admin" && (
+                                <DropdownMenuItem
+                                  data-testid={`button-merge-event-${ev.id}`}
+                                  onClick={() => { setMergeForEvent({ id: ev.id, name: ev.name }); setMergeTargetId(""); }}
+                                  className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2 hover:bg-[var(--secondary)]"
+                                >
+                                  <GitMerge size={13} /> Mesclar
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 data-testid={`button-delete-event-${ev.id}`}
                                 onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}

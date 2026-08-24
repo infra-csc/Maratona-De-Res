@@ -783,7 +783,7 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
   res.json({ updated: updated.length, notFound: notFound.length, notFoundIds: notFound });
 });
 
-router.delete("/events/:id", requireRole("admin"), async (req, res) => {
+router.delete("/events/:id", requireRole("admin", "operador"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   if (Number.isNaN(id)) { res.status(400).json({ error: "ID inválido." }); return; }
   try {
