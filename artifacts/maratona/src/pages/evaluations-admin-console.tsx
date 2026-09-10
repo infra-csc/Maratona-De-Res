@@ -16,6 +16,8 @@ import {
   type PublicToken,
 } from "@/lib/routing-api";
 import { customFetch } from "@/lib/custom-fetch";
+import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
+import { fmtDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, UserCheck, Calendar, AlertTriangle, UserX } from "lucide-react";
@@ -344,6 +346,11 @@ export function AdminEvaluationsConsole() {
   }, [configuredEvents, criteriaQueries, assignQueries, evalQueries]);
 
   const selected = enrichedEvents.find(e => e.id === selectedEventId) ?? enrichedEvents[0] ?? null;
+  // Cabeçalho usado em todo texto copiado (links): "NOME DO EVENTO · dd/mm" —
+  // quem recebe a mensagem precisa saber de qual evento é o link.
+  const batchEventHeader = selected
+    ? `${selected.name}${selected.startDate ? ` · ${fmtDate(selected.startDate)}${selected.endDate && selected.endDate !== selected.startDate ? `–${fmtDate(selected.endDate)}` : ""}` : ""}`
+    : "";
 
   // Aplica os avaliadores PADRÃO (routing) a todos os critérios ainda sem avaliador,
   // de uma vez — "confirmar que serão esses critérios e essas pessoas avaliando".
@@ -2382,9 +2389,14 @@ export function AdminEvaluationsConsole() {
                 {batchLinks.some(l => l.url) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      const text = batchLinks.filter(l => l.url).map(l => `${l.evaluatorName} (${l.areaName}${l.includeConformity ? " + Matriz" : ""}): ${l.url}`).join("\n");
-                      navigator.clipboard.writeText(text); setBatchAllCopied(true); setTimeout(() => setBatchAllCopied(false), 2000);
+                    onClick={async () => {
+                      const text = [
+                        batchEventHeader,
+                        "",
+                        ...batchLinks.filter(l => l.url).map(l => `${l.evaluatorName} (${l.areaName}${l.includeConformity ? " + Matriz" : ""}): ${l.url}`),
+                      ].join("\n");
+                      if (await copyToClipboard(text)) { setBatchAllCopied(true); setTimeout(() => setBatchAllCopied(false), 2000); }
+                      else toast(COPY_FAILED_TOAST);
                     }}
                     className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1.5 transition-opacity hover:opacity-90"
                     style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
@@ -2416,7 +2428,11 @@ export function AdminEvaluationsConsole() {
                       <span className="text-[10px] font-bold break-all flex-1 select-all" style={{ color: "var(--foreground)" }}>{l.url}</span>
                       <button
                         type="button"
-                        onClick={() => { navigator.clipboard.writeText(l.url!); toast({ title: `Link de ${l.evaluatorName} copiado` }); }}
+                        onClick={async () => {
+                          const text = `${batchEventHeader} — ${l.evaluatorName} (${l.areaName}${l.includeConformity ? " + Matriz" : ""}): ${l.url}`;
+                          if (await copyToClipboard(text)) toast({ title: `Link de ${l.evaluatorName} copiado`, description: batchEventHeader });
+                          else toast(COPY_FAILED_TOAST);
+                        }}
                         className="shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1 transition-opacity hover:opacity-90"
                         style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                       >
@@ -2682,7 +2698,11 @@ export function AdminEvaluationsConsole() {
                     />
                     <button
                       type="button"
-                      onClick={() => { navigator.clipboard.writeText(generatedLinkUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                      onClick={async () => {
+                        const text = `${batchEventHeader} — ${linkDialog?.assignedToName ?? "Avaliador"}: ${generatedLinkUrl}`;
+                        if (await copyToClipboard(text)) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }
+                        else toast(COPY_FAILED_TOAST);
+                      }}
                       className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase flex items-center gap-1 shrink-0 transition-colors hover:opacity-80"
                       style={{ border: "1px solid var(--border)" }}
                     >
@@ -2798,7 +2818,11 @@ export function AdminEvaluationsConsole() {
                     />
                     <button
                       type="button"
-                      onClick={() => { navigator.clipboard.writeText(conformityLinkUrl); setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2000); }}
+                      onClick={async () => {
+                        const text = `${batchEventHeader} — Matriz ${conformityLinkDialog?.label ?? "de Conformidade"}: ${conformityLinkUrl}`;
+                        if (await copyToClipboard(text)) { setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2000); }
+                        else toast(COPY_FAILED_TOAST);
+                      }}
                       className="shrink-0 rounded-lg px-2.5 py-2 flex items-center gap-1 text-[10px] font-bold uppercase transition-colors hover:opacity-80"
                       style={{ border: "1px solid var(--border)" }}
                     >

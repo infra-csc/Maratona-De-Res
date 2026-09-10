@@ -6,6 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2, X, AlertCircle, Search, Send, BarChart3 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -2117,7 +2118,7 @@ export default function EvaluationsPage() {
                                     const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
                                     if (pending) return (
                                       <button type="button"
-                                        onClick={() => { navigator.clipboard.writeText(`${base}/eval/${pending.id}`); toast({ title: "Link copiado!", description: `Para: ${pending.recipientName ?? "freelancer"}` }); }}
+                                        onClick={async () => { if (await copyToClipboard(`${base}/eval/${pending.id}`)) toast({ title: "Link copiado!", description: `Para: ${pending.recipientName ?? "freelancer"}` }); else toast(COPY_FAILED_TOAST); }}
                                         className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-[#f7ffd1] hover:bg-[#eeff99] text-[11px] font-black uppercase shrink-0 w-fit"
                                       ><Copy size={11} /> Copiar link</button>
                                     );
@@ -2734,7 +2735,7 @@ export default function EvaluationsPage() {
                             const pendingUrl = `${ferrBase}/eval/${pendingFerr.id}`;
                             return (
                               <button type="button"
-                                onClick={() => { navigator.clipboard.writeText(pendingUrl); toast({ title: "Link copiado!", description: `Para: ${pendingFerr.recipientName ?? "freelancer"}` }); }}
+                                onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingFerr.recipientName ?? "freelancer"}` }); else toast(COPY_FAILED_TOAST); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-[#f7ffd1] hover:bg-[#eeff99] transition-colors"
                                 title="Copiar link já enviado — só existe um link por evento"
                               >
@@ -2886,7 +2887,7 @@ export default function EvaluationsPage() {
                             const pendingUrl = `${cenoBase}/eval/${pendingCeno.id}`;
                             return (
                               <button type="button"
-                                onClick={() => { navigator.clipboard.writeText(pendingUrl); toast({ title: "Link copiado!", description: `Para: ${pendingCeno.recipientName ?? "freelancer"}` }); }}
+                                onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingCeno.recipientName ?? "freelancer"}` }); else toast(COPY_FAILED_TOAST); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold italic uppercase border-2 border-[#191c1e] bg-[#f7ffd1] hover:bg-[#eeff99] transition-colors"
                                 title="Copiar link já enviado — só existe um link por evento"
                               >
@@ -3534,10 +3535,9 @@ export default function EvaluationsPage() {
                   <span className="text-xs font-bold italic break-all flex-1 select-all">{generatedPublicUrl}</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedPublicUrl ?? "");
-                      setLinkCopied(true);
-                      setTimeout(() => setLinkCopied(false), 2500);
+                    onClick={async () => {
+                      if (await copyToClipboard(generatedPublicUrl ?? "")) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); }
+                      else toast(COPY_FAILED_TOAST);
                     }}
                     className="shrink-0 bg-[#ccff00] border-2 border-[#191c1e] px-3 py-2 flex items-center gap-1.5 font-bold text-xs italic uppercase hover:bg-[#b8e800] transition-colors"
                   >
@@ -3688,7 +3688,7 @@ export default function EvaluationsPage() {
                       <div className="border-2 border-[#191c1e] bg-[#f2f4f6] px-3 py-2 flex items-center gap-2 min-w-0">
                         <span className="text-xs italic font-bold text-[#444933] truncate flex-1">{shownUrl}</span>
                         <button type="button"
-                          onClick={() => { navigator.clipboard.writeText(shownUrl); setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2500); }}
+                          onClick={async () => { if (await copyToClipboard(shownUrl)) { setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2500); } else toast(COPY_FAILED_TOAST); }}
                           className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black italic uppercase bg-[#ccff00] border-2 border-[#191c1e] hover:bg-[#b8e600] transition-colors"
                         >
                           <Copy size={12} />{conformityLinkCopied ? "Copiado!" : "Copiar"}
@@ -3973,7 +3973,7 @@ export default function EvaluationsPage() {
                               <input readOnly value={url} className="flex-1 min-w-0 bg-white border-2 border-[#191c1e] px-2 py-1.5 text-xs font-mono truncate" />
                               <button
                                 type="button"
-                                onClick={() => { navigator.clipboard.writeText(url); toast({ title: "Link copiado!" }); }}
+                                onClick={async () => { if (await copyToClipboard(url)) toast({ title: "Link copiado!" }); else toast(COPY_FAILED_TOAST); }}
                                 className="shrink-0 flex items-center gap-1 px-3 py-1.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] text-[11px] font-black uppercase"
                               >
                                 <Copy size={12} /> Copiar
@@ -4026,10 +4026,9 @@ export default function EvaluationsPage() {
                       <input readOnly value={adminLinkUrl} className="flex-1 min-w-0 bg-white border-2 border-[#191c1e] px-2 py-1.5 text-xs font-mono truncate" />
                       <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(adminLinkUrl);
-                          setAdminLinkCopied(true);
-                          setTimeout(() => setAdminLinkCopied(false), 2000);
+                        onClick={async () => {
+                          if (await copyToClipboard(adminLinkUrl)) { setAdminLinkCopied(true); setTimeout(() => setAdminLinkCopied(false), 2000); }
+                          else toast(COPY_FAILED_TOAST);
                         }}
                         className="shrink-0 flex items-center gap-1 px-3 py-1.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] text-[11px] font-black uppercase transition-colors"
                       >

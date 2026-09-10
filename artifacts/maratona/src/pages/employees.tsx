@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import { useForm } from "react-hook-form";
 import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check, Link, CreditCard } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -64,10 +65,9 @@ function CopyLinkButton({ link }: { link: string }) {
   return (
     <button
       title="Copiar link de acesso"
-      onClick={() => {
-        navigator.clipboard.writeText(link);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+      onClick={async () => {
+        if (await copyToClipboard(link)) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+        else window.prompt("Não foi possível copiar automaticamente. Copie o link:", link);
       }}
       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90"
       style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
@@ -1202,10 +1202,9 @@ export default function EmployeesPage() {
                 <Link size={12} style={{ color: "var(--muted-foreground)", flexShrink: 0 }} />
                 <span className="text-xs font-mono flex-1 truncate" style={{ color: "var(--muted-foreground)" }}>{APP_LINK}</span>
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(APP_LINK);
-                    setBulkLinkCopied(true);
-                    setTimeout(() => setBulkLinkCopied(false), 2000);
+                  onClick={async () => {
+                    if (await copyToClipboard(APP_LINK)) { setBulkLinkCopied(true); setTimeout(() => setBulkLinkCopied(false), 2000); }
+                    else toast(COPY_FAILED_TOAST);
                   }}
                   className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded font-black text-[10px] uppercase transition-all hover:opacity-80"
                   style={{ border: "1px solid var(--border)", color: "var(--foreground)", cursor: "pointer" }}
@@ -1235,10 +1234,10 @@ export default function EmployeesPage() {
                     Baixar Excel
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const lines = ["Nome | Senha", ...bulkPinResult.results.map(r => `${r.name} | ${r.pin}`)];
-                      navigator.clipboard.writeText(lines.join("\n"));
-                      toast({ title: "Lista copiada!", description: `${bulkPinResult.results.length} colaboradores` });
+                      if (await copyToClipboard(lines.join("\n"))) toast({ title: "Lista copiada!", description: `${bulkPinResult.results.length} colaboradores` });
+                      else toast(COPY_FAILED_TOAST);
                     }}
                     className="flex items-center gap-2 h-9 px-4 rounded-lg font-bold text-xs uppercase"
                     style={{ border: "1px solid var(--border)", cursor: "pointer" }}
@@ -1312,11 +1311,10 @@ export default function EmployeesPage() {
                     {pinDialog?.pin.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}
                   </span>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (!pinDialog) return;
-                      navigator.clipboard.writeText(pinDialog.pin);
-                      setPinCopied(true);
-                      setTimeout(() => setPinCopied(false), 2000);
+                      if (await copyToClipboard(pinDialog.pin)) { setPinCopied(true); setTimeout(() => setPinCopied(false), 2000); }
+                      else toast(COPY_FAILED_TOAST);
                     }}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-80"
                     style={{ backgroundColor: "rgba(0,0,0,0.25)", color: "var(--primary-foreground)" }}
