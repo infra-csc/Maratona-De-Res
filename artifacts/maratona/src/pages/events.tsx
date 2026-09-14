@@ -261,6 +261,9 @@ export default function EventsPage() {
     const matchDate = (!filterDateFrom || ev.endDate >= filterDateFrom) && (!filterDateTo || ev.startDate <= filterDateTo);
     const matchCard = cardFilter === null
       || (cardFilter === "pendingRH"  && !ev.criteriaConfirmed)
+      // Resultados ainda não confirmados (botão "Confirmar Resultados"): equipe/elegibilidade
+      // pendente de validação. Históricos importados ficam de fora — não passam por essa etapa.
+      || (cardFilter === "unconfirmed" && !ev.resultsConfirmed && !ev.isHistorical)
       || (cardFilter === "inEval"     && isInEvaluation(ev))
       || (cardFilter === "pendingCal" && isPastOrClosed(ev) && (ev.finalCalibratedCriteria ?? 0) === 0 && (ev.partialPublishedCount ?? 0) === 0)
       || (cardFilter === "partialPub" && hasPartialPublication(ev))
@@ -301,6 +304,7 @@ export default function EventsPage() {
   const chipFilters = [
     { key: null,          label: "Todos" },
     { key: "pendingRH",   label: "Ag. RH" },
+    { key: "unconfirmed", label: "Não Confirmados" },
     { key: "inEval",      label: "Em Avaliação" },
     { key: "pendingCal",  label: "Falta Cal." },
     { key: "partialPub",  label: "Pub. Parcial" },
