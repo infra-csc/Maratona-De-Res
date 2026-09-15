@@ -465,7 +465,7 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
             <div className="flex-1 min-w-0">
               <p className="font-black uppercase text-[12px] leading-tight">Bônus por evento extra</p>
               <p className="mt-1 text-[10px] font-bold" style={muted}>
-                {bd.scoredEventsCount} prova(s) pontuada(s) · mínimo {bd.minEvents} · {bd.extraEvents.length} extra(s), contadas a partir da {bd.minEvents + 1}ª em ordem de data. Cada extra paga pela faixa da nota daquele evento.
+                {bd.scoredEventsCount} prova(s) pontuada(s) · mínimo {bd.minEvents} · {bd.extraEvents.length} extra(s) × {fmtBRL(bd.extraEvents[0]?.value ?? 0)}, o valor por evento adicional da faixa da média. Extras contados a partir da {bd.minEvents + 1}ª prova, em ordem de data.
               </p>
             </div>
             <span className={cn("font-black text-lg shrink-0", !bd.applied && "line-through opacity-50")} style={{ fontFamily: CONDENSED }}>{fmtBRL(bd.extraValue)}</span>
@@ -480,13 +480,10 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] font-bold" style={muted}>
                       {ev.startDate && <span>{fmtDate(ev.startDate, dateFull)}</span>}
                       <span>· nota {ev.eventScore.toFixed(1)}</span>
-                      {ev.platoon && (
-                        <span className="px-1 rounded font-black uppercase text-[9px]" style={{ backgroundColor: ev.platoonColor ?? "var(--card)", color: ev.platoonColor ? contrastingTextColor(ev.platoonColor) : "var(--muted-foreground)" }}>{ev.platoon}</span>
-                      )}
                     </div>
                   </div>
                   <span className="font-black text-[12px] shrink-0" style={{ color: ev.value > 0 ? GOOD : "var(--muted-foreground)" }}>
-                    {ev.value > 0 ? "+" + fmtBRLShort(ev.value) : "R$ 0 · faixa sem extra"}
+                    {ev.value > 0 ? "+" + fmtBRLShort(ev.value) : "R$ 0"}
                   </span>
                 </div>
               ))}

@@ -326,7 +326,7 @@ export default function ComoFuncionaPage() {
             <div className="space-y-2 mt-2">
               <InfoRow label="Como é calculado" value="Depende da sua Nota Final no ciclo. Quanto maior a nota, maior o bônus (definido por faixas de nota)." />
               <InfoRow label="Bônus Base" value="É o valor fixo correspondente à sua faixa de nota." />
-              <InfoRow label="Bônus Extra" value={`Para cada evento que você participou além ${minEvents !== null ? `dos ${minEvents} mínimos` : "do mínimo exigido"}, você recebe um valor adicional proporcional à sua faixa de nota.`} highlight />
+              <InfoRow label="Bônus Extra" value={`Para cada evento que você participou além ${minEvents !== null ? `dos ${minEvents} mínimos` : "do mínimo exigido"}, você recebe um valor fixo por evento, definido pela faixa da sua nota média (a mesma faixa do prêmio base).`} highlight />
               <InfoRow label="Pagamento" value="O bônus é pago via Caju Saldo Livre após o fechamento e aprovação do ciclo pelo RH." />
             </div>
             {bonusTiers.length > 0 && (
@@ -440,7 +440,7 @@ export default function ComoFuncionaPage() {
                 },
                 {
                   q: "O que acontece se eu participar de mais eventos do que o mínimo exigido?",
-                  a: "Ótimo! Cada evento confirmado acima do mínimo gera um bônus extra proporcional à nota daquele evento específico. Veja o número mínimo do ciclo atual no card de Elegibilidade em Meu Desempenho.",
+                  a: "Ótimo! Cada evento confirmado acima do mínimo gera um bônus extra no valor por evento adicional da faixa da sua nota média. A nota de cada evento entra na média, mas não muda o valor pago por evento extra. Veja o número mínimo do ciclo atual no card de Elegibilidade em Meu Desempenho.",
                 },
                 {
                   q: "A Matriz de Conformidade pode zerar minha nota do evento?",

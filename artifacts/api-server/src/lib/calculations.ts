@@ -273,9 +273,11 @@ export function calculateBonusByScore(score: number, rules: PlatoonRuleData[]): 
 }
 
 /**
- * Bônus total = Prêmio Base da faixa da nota média + soma de bônus por
- * evento extra, onde cada evento extra usa a faixa da SUA PRÓPRIA nota
- * (não a nota geral do colaborador).
+ * Bônus total = Prêmio Base da faixa da NOTA MÉDIA do ciclo + (nº de eventos
+ * extras × bônus por evento adicional DA MESMA FAIXA). A média define a faixa,
+ * e a faixa define os dois valores; a nota individual de cada evento extra não
+ * altera o valor pago. Regra da tabela "Faixas de Bonificação" (ex.: faixa
+ * 70–74,99 com 3 extras = 1.200 + 3 × 200 = R$ 1.800).
  */
 export function calculateTieredBonus(
   score: number,
@@ -287,18 +289,14 @@ export function calculateTieredBonus(
   // parte extra por evento. Não faz sentido pagar extra por evento a quem
   // está na faixa "não elegível ao bônus" pela nota geral do ciclo.
   if (!platoon || platoon.bonusValue <= 0) return 0;
-  const extraBonus = extraEventScores.reduce((sum, evScore) => {
-    const evPlatoon = getPlatoonByScore(evScore, rules);
-    return sum + (evPlatoon?.bonusPerExtraEvent ?? 0);
-  }, 0);
+  const extraBonus = extraEventScores.length * (platoon.bonusPerExtraEvent ?? 0);
   return Math.round((platoon.bonusValue + extraBonus) * 100) / 100;
 }
 
 /**
- * Parcela de bônus extra isolada — soma de bonusPerExtraEvent por evento
- * extra, usando a faixa da nota de CADA evento extra individualmente.
- * Não inclui o prêmio base. Segue a mesma regra de calculateTieredBonus:
- * se a faixa da nota geral não paga bônus, a parte extra também é zerada.
+ * Parcela de bônus extra isolada — nº de eventos extras × bônus por evento
+ * adicional da faixa da NOTA MÉDIA. Não inclui o prêmio base. Mesma regra de
+ * calculateTieredBonus: se a faixa da média não paga bônus, o extra é zerado.
  */
 export function calculateExtraBonusValue(
   baseScore: number,
@@ -307,10 +305,7 @@ export function calculateExtraBonusValue(
 ): number {
   const platoon = getPlatoonByScore(baseScore, rules);
   if (!platoon || platoon.bonusValue <= 0) return 0;
-  const extraBonus = extraEventScores.reduce((sum, evScore) => {
-    const evPlatoon = getPlatoonByScore(evScore, rules);
-    return sum + (evPlatoon?.bonusPerExtraEvent ?? 0);
-  }, 0);
+  const extraBonus = extraEventScores.length * (platoon.bonusPerExtraEvent ?? 0);
   return Math.round(extraBonus * 100) / 100;
 }
 

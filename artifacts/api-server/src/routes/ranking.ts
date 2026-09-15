@@ -276,8 +276,8 @@ router.get("/ranking-detail", async (req, res) => {
   // Composição do bônus (só gestores — é dado financeiro). Replica a regra de
   // recomputeCycleResults + calculateTieredBonus para mostrar a conta inteira:
   // prêmio base pela faixa da nota final + extra por evento pontuado além do
-  // mínimo de elegibilidade (em ordem de data), cada extra pago pela faixa da
-  // nota DAQUELE evento. A base usa a nota final gravada no ciclo (a mesma que
+  // mínimo de elegibilidade (em ordem de data), cada extra pago pelo valor por
+  // evento adicional da faixa da NOTA MÉDIA. A base usa a nota final gravada no ciclo (a mesma que
   // gerou o bônus gravado); se o valor ao vivo divergir do gravado, o front
   // avisa para recalcular o ciclo.
   let bonusBreakdown: Record<string, unknown> | undefined;
@@ -288,6 +288,7 @@ router.get("/ranking-detail", async (req, res) => {
       .sort((a, b) => (a.startDate ?? "").localeCompare(b.startDate ?? ""));
     const baseScore = quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : liveFinalResult;
     const basePlatoon = baseScore != null ? getPlatoonByScore(baseScore, platoonRulesMapped) : null;
+    const perExtraValue = basePlatoon?.bonusPerExtraEvent ?? 0;
     const extraEvents = scoredByDate.slice(minEvents).map((e, i) => {
       const p = getPlatoonByScore(e.eventScore, platoonRulesMapped);
       return {
@@ -298,7 +299,7 @@ router.get("/ranking-detail", async (req, res) => {
         eventScore: e.eventScore,
         platoon: p?.name ?? null,
         platoonColor: p?.color ?? null,
-        value: p?.bonusPerExtraEvent ?? 0,
+        value: perExtraValue,
       };
     });
     const baseValue = basePlatoon?.bonusValue ?? 0;
