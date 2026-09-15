@@ -89,6 +89,7 @@ export default function EventsPage() {
   const [mergeTargetPickerOpen, setMergeTargetPickerOpen] = useState(false);
   const [mergeConflict, setMergeConflict] = useState<{ evaluations: number; calibrations: number; conformities: number; results: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<{ id: number; name: string; startDate: string; endDate: string; clientName?: string | null; city?: string | null; state?: string | null; location?: string | null } | null>(null);
 
   const queryKey = getGetEventsQueryKey();
@@ -152,6 +153,28 @@ export default function EventsPage() {
       toast({ title: "Datas normalizadas", description: `${d.fixedCount} corrigidos + ${d.normalizedCount} unificados para data única.` });
     },
     onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const bulkConfirmMutation = useMutation({
+    mutationFn: async (eventIds: number[]) => {
+      const token = localStorage.getItem("maratona_token");
+      const res = await fetch("/api/events/confirm-results-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ eventIds }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e as { error?: string }).error ?? `HTTP ${res.status}`); }
+      return res.json() as Promise<{ confirmed: number; skipped: number; warnings: string[] }>;
+    },
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey });
+      setBulkConfirmOpen(false);
+      const parts = [`${d.confirmed} evento(s) confirmado(s).`];
+      if (d.skipped > 0) parts.push(`${d.skipped} já estavam confirmados ou são históricos.`);
+      if (d.warnings.length > 0) parts.push(d.warnings.join(" "));
+      toast({ title: "Resultados confirmados", description: parts.join(" ") });
+    },
+    onError: (e: Error) => toast({ title: "Erro ao confirmar em lote", description: e.message, variant: "destructive" }),
   });
 
   const editMutation = useMutation({
@@ -577,6 +600,30 @@ export default function EventsPage() {
             )}
           </div>
         ) : (
+          <>
+          {cardFilter === "unconfirmed" && user?.role === "admin" && (
+            <div
+              className="mb-3 flex items-center justify-between gap-3 flex-wrap rounded-xl px-4 py-3"
+              style={{ backgroundColor: "rgba(232,162,61,0.10)", border: "1px solid rgba(232,162,61,0.35)" }}
+            >
+              <p className="text-[12px] font-semibold" style={{ color: "var(--foreground)" }}>
+                <strong>{filtered.length}</strong> evento(s) com resultados não confirmados{hasDateFilter ? " no período selecionado" : ""}.
+                <span className="block text-[11px] font-normal" style={{ color: "var(--muted-foreground)" }}>
+                  Confirmar faz esses eventos passarem a contar na elegibilidade e na nota dos colaboradores.
+                </span>
+              </p>
+              <button
+                type="button"
+                data-testid="button-bulk-confirm"
+                onClick={() => setBulkConfirmOpen(true)}
+                disabled={bulkConfirmMutation.isPending}
+                className="h-9 px-4 rounded-lg text-[12px] font-bold uppercase tracking-wide inline-flex items-center gap-2 shrink-0 transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+              >
+                <Check size={14} /> Confirmar {filtered.length} evento(s)
+              </button>
+            </div>
+          )}
           <PremiumCard className="overflow-hidden">
             {/* Table header */}
             <div
@@ -864,6 +911,7 @@ export default function EventsPage() {
               );
             })}
           </PremiumCard>
+          </>
         )}
 
         {/* Legend + count */}
@@ -985,6 +1033,48 @@ export default function EventsPage() {
                 {mergeMutation.isPending ? "Mesclando..." : mergeConflict ? "Mesclar Mesmo Assim" : "Mesclar e Excluir Duplicado"}
               </button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Bulk confirm dialog ── */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={(open) => { if (!bulkConfirmMutation.isPending) setBulkConfirmOpen(open); }}>
+        <DialogContent className="max-w-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
+              Confirmar {filtered.length} evento(s)
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            Os resultados destes eventos passam a contar na elegibilidade e na nota dos colaboradores. Dá para desfazer depois, evento a evento.
+          </p>
+          <ul className="max-h-60 overflow-y-auto rounded-lg text-[12px] divide-y" style={{ border: "1px solid var(--border)" }}>
+            {filtered.map(ev => (
+              <li key={ev.id} className="px-3 py-2 flex items-center justify-between gap-3" style={{ borderColor: "var(--border)" }}>
+                <span className="font-semibold truncate">{ev.name}</span>
+                <span className="shrink-0" style={{ color: "var(--muted-foreground)" }}>{fmtDate(ev.startDate)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setBulkConfirmOpen(false)}
+              disabled={bulkConfirmMutation.isPending}
+              className="h-10 px-4 rounded-lg text-[12px] font-bold uppercase disabled:opacity-50"
+              style={{ border: "1px solid var(--border)" }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => bulkConfirmMutation.mutate(filtered.map(ev => ev.id))}
+              disabled={bulkConfirmMutation.isPending || filtered.length === 0}
+              className="h-10 px-5 rounded-lg text-[12px] font-bold uppercase inline-flex items-center gap-2 disabled:opacity-50"
+              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+            >
+              <Check size={14} /> {bulkConfirmMutation.isPending ? "Confirmando..." : "Confirmar todos"}
+            </button>
           </div>
         </DialogContent>
       </Dialog>

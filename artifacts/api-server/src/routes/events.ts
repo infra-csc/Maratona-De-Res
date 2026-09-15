@@ -937,6 +937,54 @@ router.post("/events/:id/confirm-results", requireRole("admin", "rh"), async (re
   res.json({ ...ev, warnings });
 });
 
+// Confirmação em lote (admin): mesma trava do endpoint individual, aplicada a
+// vários eventos numa transação. Só toca eventos ainda não confirmados e não
+// históricos; recalcula os resultados UMA vez por ciclo afetado (e não uma vez
+// por evento, que seria N recomputações do ciclo inteiro).
+router.post("/events/confirm-results-bulk", requireRole("admin"), async (req, res) => {
+  const raw = req.body?.eventIds;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    res.status(400).json({ error: "Informe a lista de eventos (eventIds)." }); return;
+  }
+  const ids = [...new Set(raw.map((v: unknown) => Number(v)))].filter(n => Number.isInteger(n) && n > 0);
+  if (ids.length === 0 || ids.length !== new Set(raw).size) {
+    res.status(400).json({ error: "Lista de eventos inválida." }); return;
+  }
+  if (ids.length > 200) { res.status(400).json({ error: "Máximo de 200 eventos por vez." }); return; }
+
+  const pending = await db.select().from(eventsTable).where(and(
+    inArray(eventsTable.id, ids),
+    eq(eventsTable.resultsConfirmed, false),
+    eq(eventsTable.isHistorical, false),
+  ));
+  if (pending.length === 0) {
+    res.json({ confirmed: 0, skipped: ids.length, warnings: [] }); return;
+  }
+
+  const now = new Date();
+  const userId = req.user!.userId;
+  const updated = await db.transaction(async (tx) => {
+    return tx.update(eventsTable).set({
+      resultsConfirmed: true, resultsConfirmedAt: now, resultsConfirmedBy: userId,
+    }).where(and(
+      inArray(eventsTable.id, pending.map(e => e.id)),
+      eq(eventsTable.resultsConfirmed, false),
+    )).returning();
+  });
+
+  const beforeById = new Map(pending.map(e => [e.id, e]));
+  for (const ev of updated) {
+    await audit(userId, "confirm-results", "events", ev.id, beforeById.get(ev.id), { ...ev, bulk: true });
+  }
+
+  const warnings: string[] = [];
+  for (const cycleId of new Set(updated.map(e => e.cycleId))) {
+    const r = await recomputeCycleResults(cycleId, userId);
+    warnings.push(...r.warnings);
+  }
+  res.json({ confirmed: updated.length, skipped: ids.length - updated.length, warnings });
+});
+
 router.post("/events/:id/unconfirm-results", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
