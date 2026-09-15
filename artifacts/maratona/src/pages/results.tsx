@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { RankingDetailBonusBreakdown } from "@workspace/api-client-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -403,6 +403,131 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 /* SHARED DETAIL SHEET COMPONENT                                       */
 /* ------------------------------------------------------------------ */
 
+const BONUS_STATUS_LABEL: Record<string, string> = {
+  projected: "Projetado",
+  approved: "Aprovado",
+  scheduled: "Agendado",
+  paid: "Pago",
+  blocked: "Bloqueado",
+  not_eligible: "Não elegível",
+};
+
+type BonusBreakdownData = RankingDetailBonusBreakdown;
+
+/** Conta completa do bônus no detalhamento: base + cada evento extra + total. */
+function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
+  const dateFull = { day: "2-digit", month: "2-digit", year: "numeric" } as const;
+  const zeroMsg = bd.zeroReason === "not_eligible"
+    ? "Não elegível ao bônus: " + (bd.eligibilityReason ?? "motivo não informado") + "."
+    : bd.zeroReason === "no_bonus_platoon"
+    ? "Nota final " + (bd.baseScore != null ? bd.baseScore.toFixed(2) : "—") + " está na faixa “" + (bd.basePlatoon ?? "sem faixa") + "”, que não paga bônus. Nesse caso os eventos extras também não são pagos."
+    : bd.zeroReason === "no_result"
+    ? "Resultado do ciclo ainda não calculado para este colaborador (nenhum evento confirmado que conte para nota)."
+    : null;
+  const diverges = bd.storedTotal != null && Math.abs(bd.storedTotal - bd.totalValue) > 0.01;
+  const rowStyle: React.CSSProperties = { backgroundColor: "var(--card)" };
+  const muted: React.CSSProperties = { color: "var(--muted-foreground)" };
+  return (
+    <section className="space-y-2.5" data-testid="detail-bonus-breakdown">
+      <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+        <Wallet2 size={14} /> Composição do Bônus
+      </h4>
+
+      {zeroMsg && (
+        <div className="px-3 py-2.5 text-[12px] font-semibold leading-snug" style={{ border: "2px solid " + AMBER, color: "var(--foreground)", backgroundColor: "rgba(232,162,61,0.08)" }}>
+          {zeroMsg}
+        </div>
+      )}
+
+      <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
+        {/* Prêmio base */}
+        <div className="flex items-start gap-3 px-3 py-3" style={rowStyle}>
+          <div className="flex-1 min-w-0">
+            <p className="font-black uppercase text-[12px] leading-tight">Prêmio base da faixa</p>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-bold" style={muted}>
+              {bd.basePlatoon ? (
+                <span className="px-1.5 py-0.5 rounded font-black uppercase" style={{ backgroundColor: bd.basePlatoonColor ?? "var(--secondary)", color: bd.basePlatoonColor ? contrastingTextColor(bd.basePlatoonColor) : "var(--muted-foreground)" }}>
+                  {bd.basePlatoon}
+                  {bd.basePlatoonMinScore != null && bd.basePlatoonMaxScore != null && (
+                    <span className="opacity-60 ml-1">{bd.basePlatoonMinScore}–{bd.basePlatoonMaxScore}</span>
+                  )}
+                </span>
+              ) : <span>Sem faixa</span>}
+              <span>· nota final {bd.baseScore != null ? bd.baseScore.toFixed(2) : "—"}</span>
+            </div>
+          </div>
+          <span className={cn("font-black text-lg shrink-0", !bd.applied && "line-through opacity-50")} style={{ fontFamily: CONDENSED }}>{fmtBRL(bd.baseValue)}</span>
+        </div>
+
+        {/* Eventos extras */}
+        <div className="px-3 py-3" style={{ ...rowStyle, borderTop: "1px solid var(--border)" }}>
+          <div className="flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-black uppercase text-[12px] leading-tight">Bônus por evento extra</p>
+              <p className="mt-1 text-[10px] font-bold" style={muted}>
+                {bd.scoredEventsCount} prova(s) pontuada(s) · mínimo {bd.minEvents} · {bd.extraEvents.length} extra(s), contadas a partir da {bd.minEvents + 1}ª em ordem de data. Cada extra paga pela faixa da nota daquele evento.
+              </p>
+            </div>
+            <span className={cn("font-black text-lg shrink-0", !bd.applied && "line-through opacity-50")} style={{ fontFamily: CONDENSED }}>{fmtBRL(bd.extraValue)}</span>
+          </div>
+          {bd.extraEvents.length > 0 ? (
+            <div className="mt-2.5 rounded-md overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+              {bd.extraEvents.map((ev, idx) => (
+                <div key={ev.eventId} data-testid={"detail-bonus-extra-" + ev.eventId} className="flex items-center gap-2.5 px-2.5 py-2" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--secondary)" }}>
+                  <span className="text-[10px] font-black shrink-0 w-7 text-center" style={muted}>{ev.position}ª</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold uppercase text-[11px] leading-tight truncate" title={ev.eventName}>{ev.eventName}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] font-bold" style={muted}>
+                      {ev.startDate && <span>{fmtDate(ev.startDate, dateFull)}</span>}
+                      <span>· nota {ev.eventScore.toFixed(1)}</span>
+                      {ev.platoon && (
+                        <span className="px-1 rounded font-black uppercase text-[9px]" style={{ backgroundColor: ev.platoonColor ?? "var(--card)", color: ev.platoonColor ? contrastingTextColor(ev.platoonColor) : "var(--muted-foreground)" }}>{ev.platoon}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="font-black text-[12px] shrink-0" style={{ color: ev.value > 0 ? GOOD : "var(--muted-foreground)" }}>
+                    {ev.value > 0 ? "+" + fmtBRLShort(ev.value) : "R$ 0 · faixa sem extra"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] font-semibold" style={muted}>
+              Nenhum evento extra: {bd.scoredEventsCount} prova(s) pontuada(s) para um mínimo de {bd.minEvents}.
+            </p>
+          )}
+        </div>
+
+        {/* Total */}
+        <div className="flex items-center justify-between px-4 py-3.5" style={{ backgroundColor: bd.applied ? "var(--primary)" : "var(--secondary)", borderTop: "2px solid var(--border)" }}>
+          <div>
+            <span className="text-xs font-black uppercase tracking-widest block" style={{ fontFamily: CONDENSED, color: bd.applied ? "var(--primary-foreground)" : "var(--muted-foreground)", opacity: 0.8 }}>Bônus do Ciclo</span>
+            {bd.applied && (
+              <span className="text-[10px] font-bold block mt-0.5" style={{ color: "var(--primary-foreground)", opacity: 0.65 }}>
+                {fmtBRLShort(bd.baseValue)} base + {fmtBRLShort(bd.extraValue)} extra
+              </span>
+            )}
+          </div>
+          <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: bd.applied ? "var(--primary-foreground)" : "var(--muted-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(bd.totalValue)}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold" style={muted}>
+        {bd.bonusStatus && <span>Status: <strong style={{ color: "var(--foreground)" }}>{BONUS_STATUS_LABEL[bd.bonusStatus] ?? bd.bonusStatus}</strong></span>}
+        {bd.paymentMethod && <span>· Pagamento: {bd.paymentMethod}</span>}
+        {bd.paymentDueDate && <span>· Previsto: {fmtDate(bd.paymentDueDate.slice(0, 10), dateFull)}</span>}
+        {bd.paidAt && <span>· Pago em: {fmtDate(bd.paidAt.slice(0, 10), dateFull)}</span>}
+      </div>
+
+      {diverges && (
+        <div className="px-3 py-2.5 text-[12px] font-semibold leading-snug" style={{ border: "2px solid " + WARNING, color: "var(--foreground)", backgroundColor: "rgba(229,72,77,0.08)" }}>
+          O valor gravado no ciclo é {fmtBRL(bd.storedTotal ?? 0)}, diferente da conta acima. Algum dado mudou depois do último cálculo: use "Recalcular Ciclo" na aba Bônus &amp; Pagamentos.
+        </div>
+      )}
+    </section>
+  );
+}
+
 function EmployeeDetailSheet({
   employeeId,
   onClose,
@@ -416,28 +541,30 @@ function EmployeeDetailSheet({
   });
 
   return (
-    <Sheet open={!!employeeId} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-[520px] overflow-y-auto p-0 rounded-none"
-        style={{ backgroundColor: "var(--background)", borderLeft: "2px solid var(--border)" }}
+    <Dialog open={!!employeeId} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent
+        className="w-[calc(100vw-2rem)] max-w-5xl max-h-[90vh] overflow-y-auto p-0 gap-0 sm:rounded-xl"
+        style={{ backgroundColor: "var(--background)", border: "2px solid var(--border)" }}
       >
         {detailLoading || !detail ? (
-          <div className="p-10 text-center font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Carregando detalhamento...</div>
+          <div className="p-10 text-center font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+            <DialogTitle className="sr-only">Carregando detalhamento</DialogTitle>
+            Carregando detalhamento...
+          </div>
         ) : (
           <div>
             {/* Header brutalist */}
-            <SheetHeader className="p-0 text-left" style={{ borderBottom: "2px solid var(--border)" }}>
-              <div className="px-6 pt-6 pb-4" style={{ backgroundColor: "var(--secondary)" }}>
+            <DialogHeader className="p-0 text-left space-y-0" style={{ borderBottom: "2px solid var(--border)" }}>
+              <div className="px-6 pt-6 pb-4 pr-14 rounded-t-xl" style={{ backgroundColor: "var(--secondary)" }}>
                 <div className="flex flex-wrap items-center gap-1.5 mb-2">
                   {detail.employee.functionName && (
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--accent)", color: "#191c1e" }}>{detail.employee.functionName}</span>
                   )}
                   <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{detail.cycle.name}</span>
                 </div>
-                <SheetTitle className="text-2xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
+                <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
                   {detail.employee.name}
-                </SheetTitle>
+                </DialogTitle>
                 {/* Platoon badge — shown prominently below the name */}
                 {(detail.summary as any).platoon && (
                   <div className="mt-2.5">
@@ -458,9 +585,10 @@ function EmployeeDetailSheet({
                   </div>
                 )}
               </div>
-            </SheetHeader>
+            </DialogHeader>
 
-            <div className="p-5 space-y-6">
+            <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <div className="space-y-6 min-w-0">
               {/* Stats grid — brutalist */}
               <section className="grid grid-cols-2 gap-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
                 <div className="p-4" style={{ backgroundColor: "var(--primary)", borderRight: "2px solid var(--border)" }}>
@@ -569,6 +697,25 @@ function EmployeeDetailSheet({
                 )}
               </section>
 
+              </div>
+
+              <div className="space-y-6 min-w-0">
+              {detail.summary.bonusBreakdown && <BonusBreakdownSection bd={detail.summary.bonusBreakdown} />}
+
+              {!detail.summary.bonusBreakdown && detail.summary.bonusValue != null && (
+                detail.summary.bonusValue > 0 ? (
+                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)", border: "2px solid var(--primary)" }}>
+                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus do Ciclo</span>
+                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(detail.summary.bonusValue)}</span>
+                  </section>
+                ) : (
+                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)" }}>
+                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Bônus do Ciclo</span>
+                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(0)}</span>
+                  </section>
+                )
+              )}
+
               {detail.penalties.length > 0 && (
                 <section className="space-y-2.5">
                   <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: WARNING }}>
@@ -615,24 +762,12 @@ function EmployeeDetailSheet({
                 </section>
               )}
 
-              {detail.summary.bonusValue != null && (
-                detail.summary.bonusValue > 0 ? (
-                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--primary)", border: "2px solid var(--primary)" }}>
-                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus do Ciclo</span>
-                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(detail.summary.bonusValue)}</span>
-                  </section>
-                ) : (
-                  <section className="p-4 flex items-center justify-between" style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)" }}>
-                    <span className="text-xs font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Bônus do Ciclo</span>
-                    <span className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} data-testid="detail-bonus-value">{fmtBRL(0)}</span>
-                  </section>
-                )
-              )}
+              </div>
             </div>
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

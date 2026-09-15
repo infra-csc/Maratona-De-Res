@@ -1397,6 +1397,58 @@ export type RankingDetailCycle = {
   name: string;
 };
 
+export interface RankingDetailBonusExtraEvent {
+  position: number;
+  eventId: number;
+  eventName: string;
+  /** @nullable */
+  startDate?: string | null;
+  eventScore: number;
+  /** @nullable */
+  platoon?: string | null;
+  /** @nullable */
+  platoonColor?: string | null;
+  value: number;
+}
+
+export interface RankingDetailBonusBreakdown {
+  minEvents: number;
+  scoredEventsCount: number;
+  /** @nullable */
+  baseScore?: number | null;
+  /** @nullable */
+  basePlatoon?: string | null;
+  /** @nullable */
+  basePlatoonColor?: string | null;
+  /** @nullable */
+  basePlatoonMinScore?: number | null;
+  /** @nullable */
+  basePlatoonMaxScore?: number | null;
+  baseValue: number;
+  extraValue: number;
+  totalValue: number;
+  applied: boolean;
+  /** @nullable */
+  zeroReason?: string | null;
+  /** @nullable */
+  eligible?: boolean | null;
+  /** @nullable */
+  eligibilityReason?: string | null;
+  /** @nullable */
+  storedTotal?: number | null;
+  /** @nullable */
+  storedExtra?: number | null;
+  /** @nullable */
+  bonusStatus?: string | null;
+  /** @nullable */
+  paymentMethod?: string | null;
+  /** @nullable */
+  paymentDueDate?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  extraEvents: RankingDetailBonusExtraEvent[];
+}
+
 export type RankingDetailSummary = {
   /** @nullable */
   finalResult?: number | null;
@@ -1415,6 +1467,7 @@ export type RankingDetailSummary = {
   scoreSum?: number | null;
   confirmedEventCount?: number;
   isQuarterClosed: boolean;
+  bonusBreakdown?: RankingDetailBonusBreakdown;
 };
 
 export interface RankingDetail {

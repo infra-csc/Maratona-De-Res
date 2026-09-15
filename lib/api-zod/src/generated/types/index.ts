@@ -143,6 +143,8 @@ export * from './quarterEligibilityInput';
 export * from './quarterlyEvolution';
 export * from './quarterlyResult';
 export * from './rankingDetail';
+export * from './rankingDetailBonusBreakdown';
+export * from './rankingDetailBonusExtraEvent';
 export * from './rankingDetailCycle';
 export * from './rankingDetailEmployee';
 export * from './rankingDetailEvent';

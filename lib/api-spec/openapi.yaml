@@ -4764,6 +4764,8 @@ components:
               type: integer
             isQuarterClosed:
               type: boolean
+            bonusBreakdown:
+              $ref: "#/components/schemas/RankingDetailBonusBreakdown"
         events:
           type: array
           items:
@@ -4776,6 +4778,76 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RankingDetailRow"
+
+    RankingDetailBonusExtraEvent:
+      type: object
+      required: [position, eventId, eventName, eventScore, value]
+      properties:
+        position:
+          type: integer
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        startDate:
+          type: ["string", "null"]
+        eventScore:
+          type: number
+        platoon:
+          type: ["string", "null"]
+        platoonColor:
+          type: ["string", "null"]
+        value:
+          type: number
+
+    RankingDetailBonusBreakdown:
+      type: object
+      required: [minEvents, scoredEventsCount, baseValue, extraValue, totalValue, applied, extraEvents]
+      properties:
+        minEvents:
+          type: integer
+        scoredEventsCount:
+          type: integer
+        baseScore:
+          type: ["number", "null"]
+        basePlatoon:
+          type: ["string", "null"]
+        basePlatoonColor:
+          type: ["string", "null"]
+        basePlatoonMinScore:
+          type: ["number", "null"]
+        basePlatoonMaxScore:
+          type: ["number", "null"]
+        baseValue:
+          type: number
+        extraValue:
+          type: number
+        totalValue:
+          type: number
+        applied:
+          type: boolean
+        zeroReason:
+          type: ["string", "null"]
+        eligible:
+          type: ["boolean", "null"]
+        eligibilityReason:
+          type: ["string", "null"]
+        storedTotal:
+          type: ["number", "null"]
+        storedExtra:
+          type: ["number", "null"]
+        bonusStatus:
+          type: ["string", "null"]
+        paymentMethod:
+          type: ["string", "null"]
+        paymentDueDate:
+          type: ["string", "null"]
+        paidAt:
+          type: ["string", "null"]
+        extraEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingDetailBonusExtraEvent"
 
     AuditLog:
       type: object

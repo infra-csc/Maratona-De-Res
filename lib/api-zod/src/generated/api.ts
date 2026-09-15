@@ -2939,6 +2939,7 @@ export const GetAbsencesResponseItem = zod.object({
   "quantity": zod.number(),
   "reason": zod.string().nullish(),
   "registeredByUserId": zod.number().optional(),
+  "registeredByUserName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
 export const GetAbsencesResponse = zod.array(GetAbsencesResponseItem)
@@ -2992,6 +2993,7 @@ export const UpdateAbsenceResponse = zod.object({
   "quantity": zod.number(),
   "reason": zod.string().nullish(),
   "registeredByUserId": zod.number().optional(),
+  "registeredByUserName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -3569,7 +3571,39 @@ export const GetRankingDetailResponse = zod.object({
   "eventsCount": zod.number(),
   "scoreSum": zod.number().nullish(),
   "confirmedEventCount": zod.number().optional(),
-  "isQuarterClosed": zod.boolean()
+  "isQuarterClosed": zod.boolean(),
+  "bonusBreakdown": zod.object({
+  "minEvents": zod.number(),
+  "scoredEventsCount": zod.number(),
+  "baseScore": zod.number().nullish(),
+  "basePlatoon": zod.string().nullish(),
+  "basePlatoonColor": zod.string().nullish(),
+  "basePlatoonMinScore": zod.number().nullish(),
+  "basePlatoonMaxScore": zod.number().nullish(),
+  "baseValue": zod.number(),
+  "extraValue": zod.number(),
+  "totalValue": zod.number(),
+  "applied": zod.boolean(),
+  "zeroReason": zod.string().nullish(),
+  "eligible": zod.boolean().nullish(),
+  "eligibilityReason": zod.string().nullish(),
+  "storedTotal": zod.number().nullish(),
+  "storedExtra": zod.number().nullish(),
+  "bonusStatus": zod.string().nullish(),
+  "paymentMethod": zod.string().nullish(),
+  "paymentDueDate": zod.string().nullish(),
+  "paidAt": zod.string().nullish(),
+  "extraEvents": zod.array(zod.object({
+  "position": zod.number(),
+  "eventId": zod.number(),
+  "eventName": zod.string(),
+  "startDate": zod.string().nullish(),
+  "eventScore": zod.number(),
+  "platoon": zod.string().nullish(),
+  "platoonColor": zod.string().nullish(),
+  "value": zod.number()
+}))
+}).optional()
 }),
   "events": zod.array(zod.object({
   "eventId": zod.number(),

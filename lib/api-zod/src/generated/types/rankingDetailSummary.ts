@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { RankingDetailBonusBreakdown } from './rankingDetailBonusBreakdown';
 
 export type RankingDetailSummary = {
   /** @nullable */
@@ -24,4 +25,5 @@ export type RankingDetailSummary = {
   scoreSum?: number | null;
   confirmedEventCount?: number;
   isQuarterClosed: boolean;
+  bonusBreakdown?: RankingDetailBonusBreakdown;
 };

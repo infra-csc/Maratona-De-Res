@@ -6,7 +6,7 @@ import {
 import { eq, and, sql, exists } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore, calculateQuarterFinalResult } from "../lib/calculations.js";
-import { getCurrentCycle } from "../lib/cycle.js";
+import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { computeEventTeamResult } from "./results.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
@@ -149,6 +149,7 @@ router.get("/ranking-detail", async (req, res) => {
     maxScore: parseFloat(r.maxScore as unknown as string),
     minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
     bonusValue: parseFloat(r.bonusValue as unknown as string),
+    bonusPerExtraEvent: parseFloat((r.bonusPerExtraEvent ?? 0) as unknown as string),
   }));
 
   const validParticipations = participations.filter(p => p.eventId);
@@ -272,6 +273,66 @@ router.get("/ranking-detail", async (req, res) => {
     ? calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, scored.length)
     : (quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : null);
 
+  // Composição do bônus (só gestores — é dado financeiro). Replica a regra de
+  // recomputeCycleResults + calculateTieredBonus para mostrar a conta inteira:
+  // prêmio base pela faixa da nota final + extra por evento pontuado além do
+  // mínimo de elegibilidade (em ordem de data), cada extra pago pela faixa da
+  // nota DAQUELE evento. A base usa a nota final gravada no ciclo (a mesma que
+  // gerou o bônus gravado); se o valor ao vivo divergir do gravado, o front
+  // avisa para recalcular o ciclo.
+  let bonusBreakdown: Record<string, unknown> | undefined;
+  if (isManager) {
+    const minEvents = await getMinEventsForEligibility();
+    const scoredByDate = scored
+      .filter(e => !!e.startDate)
+      .sort((a, b) => (a.startDate ?? "").localeCompare(b.startDate ?? ""));
+    const baseScore = quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : liveFinalResult;
+    const basePlatoon = baseScore != null ? getPlatoonByScore(baseScore, platoonRulesMapped) : null;
+    const extraEvents = scoredByDate.slice(minEvents).map((e, i) => {
+      const p = getPlatoonByScore(e.eventScore, platoonRulesMapped);
+      return {
+        position: minEvents + i + 1,
+        eventId: e.eventId,
+        eventName: e.eventName,
+        startDate: e.startDate ?? null,
+        eventScore: e.eventScore,
+        platoon: p?.name ?? null,
+        platoonColor: p?.color ?? null,
+        value: p?.bonusPerExtraEvent ?? 0,
+      };
+    });
+    const baseValue = basePlatoon?.bonusValue ?? 0;
+    const extraValue = Math.round(extraEvents.reduce((s, e) => s + e.value, 0) * 100) / 100;
+    const zeroReason = !quarterResult ? "no_result"
+      : !quarterResult.eligible ? "not_eligible"
+      : !basePlatoon || basePlatoon.bonusValue <= 0 ? "no_bonus_platoon"
+      : null;
+    const applied = zeroReason === null;
+    bonusBreakdown = {
+      minEvents,
+      scoredEventsCount: scoredByDate.length,
+      baseScore,
+      basePlatoon: basePlatoon?.name ?? null,
+      basePlatoonColor: basePlatoon?.color ?? null,
+      basePlatoonMinScore: basePlatoon?.minScore ?? null,
+      basePlatoonMaxScore: basePlatoon?.maxScore ?? null,
+      baseValue,
+      extraValue,
+      totalValue: applied ? Math.round((baseValue + extraValue) * 100) / 100 : 0,
+      applied,
+      zeroReason,
+      eligible: quarterResult ? quarterResult.eligible : null,
+      eligibilityReason: quarterResult?.eligibilityReason ?? null,
+      storedTotal: quarterResult ? parseFloat(quarterResult.bonusValue as unknown as string) : null,
+      storedExtra: quarterResult ? parseFloat(quarterResult.extraBonusValue as unknown as string) : null,
+      bonusStatus: quarterResult?.bonusStatus ?? null,
+      paymentMethod: quarterResult?.paymentMethod ?? null,
+      paymentDueDate: quarterResult?.paymentDueDate ? String(quarterResult.paymentDueDate) : null,
+      paidAt: quarterResult?.paidAt ? new Date(quarterResult.paidAt).toISOString() : null,
+      extraEvents,
+    };
+  }
+
   res.json({
     employee: {
       id: employee.id,
@@ -294,6 +355,7 @@ router.get("/ranking-detail", async (req, res) => {
       scoreSum: grossAverage !== null ? scoreSum : null,
       confirmedEventCount: scored.length,
       isQuarterClosed: !!quarterResult,
+      ...(bonusBreakdown ? { bonusBreakdown } : {}),
     },
     events,
     penalties,
