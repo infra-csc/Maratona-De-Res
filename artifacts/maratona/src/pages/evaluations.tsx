@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventParticipants, useGetEventCriteria, useGetEvent, useGetEventResult, useCreateEvaluation, useGetUsers, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetEmployees, useAddEventParticipant, useRemoveEventParticipant, useUpdateEventParticipant, useGetAbsences, useUpdateEventAssignments, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useGetCurrentCycle, getGetEvaluationsQueryKey, getGetEventQueryKey, exportPendingEvaluations, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvaluations, useGetEventCriteria, useGetEvent, useCreateEvaluation, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetCurrentCycle, getGetEvaluationsQueryKey, getGetEventQueryKey, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
-import { CheckCircle, Clock, Users, Download, Calendar, MapPin, Building2, Save, Flag, Target, Lock, ChevronsUpDown, Check, Info, ListChecks, User, SlidersHorizontal, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, ChevronUp, ChevronDown, Trophy, UserPlus, UserX, UserCheck, Trash2, Loader2, X, AlertCircle, Search, Send, BarChart3 } from "lucide-react";
+import { CheckCircle, Clock, Users, Calendar, MapPin, Building2, Save, Flag, Target, Lock, Check, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, Trash2, Loader2, AlertCircle, Send } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
 import { cn, formatEventSubtitle, fmtDate } from "@/lib/utils";
-import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useAllPublicTokens, useCreateAdminPublicToken, useDeletePublicToken, type PublicToken } from "@/lib/routing-api";
+import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useDeletePublicToken, type PublicToken } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AdminEvaluationsConsole } from "./evaluations-admin-console";
@@ -22,31 +19,6 @@ import { BODY } from "@/lib/premium-theme";
 
 const HARD_SHADOW = "shadow-[4px_4px_0px_0px_#191c1e]";
 const HARD_SHADOW_HOVER = "transition-all hover:shadow-[2px_2px_0px_0px_#191c1e] hover:translate-x-[2px] hover:translate-y-[2px]";
-
-// Funções comuns pré-definidas para o seletor de participante (mesma lista de event-detail.tsx).
-const PARTICIPANT_FUNCTIONS = [
-  "Cenotécnica",
-  "Cenotécnica Local",
-  "Cenotécnico",
-  "Sup Ceno",
-  "Sup Ceno Local",
-  "Colaborador",
-] as const;
-const DEFAULT_PARTICIPANT_FUNCTION = "Cenotécnica";
-
-/** Retorna a opção pré-definida que melhor corresponde ao functionName do colaborador. */
-function matchParticipantFunction(fn?: string | null): string {
-  if (!fn) return DEFAULT_PARTICIPANT_FUNCTION;
-  const norm = fn.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const exact = PARTICIPANT_FUNCTIONS.find(
-    o => o.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === norm
-  );
-  if (exact) return exact;
-  const prefix = PARTICIPANT_FUNCTIONS.find(
-    o => norm.startsWith(o.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())
-  );
-  return prefix ?? DEFAULT_PARTICIPANT_FUNCTION;
-}
 
 function ScoreButton({ score, current, onClick, disabled, label }: { score: number, current: number | null, onClick: () => void, disabled: boolean, label?: string }) {
   const isSelected = current === score;
@@ -300,26 +272,8 @@ function ConformityLinkHistory({ history }: { history: PublicToken[] }) {
   );
 }
 
-function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
-  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
-  const result: { sat: string; sun: string; label: string }[] = [];
-  const end = new Date(endDate + "T12:00:00");
-  const d = new Date(startDate + "T12:00:00");
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-  while (d <= end) {
-    const sat = d.toISOString().split("T")[0];
-    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
-    const sun = sunD.toISOString().split("T")[0];
-    const label = `${String(d.getDate()).padStart(2,"0")}–${String(sunD.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
-    result.push({ sat, sun, label });
-    d.setDate(d.getDate() + 7);
-  }
-  return result;
-}
-
 export default function EvaluationsPage() {
   const { user } = useAuth();
-  const isManager = !!user && ["admin", "rh", "diretoria"].includes(user.role);
   const isEvaluator = user?.role === "avaliador";
   // Everyone who is not an evaluator (managers, diretoria, visualizador) is in
   // read-only consultation mode: they inspect evaluation progress, never score.
@@ -328,20 +282,6 @@ export default function EvaluationsPage() {
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [activeEvalTab, setActiveEvalTab] = useState<"todo" | "done">("todo");
-  const [eventSearch, setEventSearch] = useState("");
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
-  const [selectedAvaliadorIds, setSelectedAvaliadorIds] = useState<number[]>([]);
-  const [avaliadorPickerOpen, setAvaliadorPickerOpen] = useState(false);
-  const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>([]);
-  const [selectedCriterionIds, setSelectedCriterionIds] = useState<number[]>([]);
-  const [selectedMatrixQuestions, setSelectedMatrixQuestions] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "com-nota" | "sem-nota">("all");
-  const [progressFilter, setProgressFilter] = useState<"all" | "not_started" | "partial" | "done">("all");
-  const [publicationFilter, setPublicationFilter] = useState<"all" | "none" | "partial" | "final">("all");
-  const [conformityFilter, setConformityFilter] = useState<"all" | "pending" | "done">("all");
-  const [expandedCriteria, setExpandedCriteria] = useState<Set<number>>(new Set());
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   // Per-criterion audio override (objectPath). "" means the user cleared a
@@ -364,53 +304,8 @@ export default function EvaluationsPage() {
   const [redirectFerramentasOpen, setRedirectFerramentasOpen] = useState(false);
   const [redirectFerramentasTargetId, setRedirectFerramentasTargetId] = useState<number | null>(null);
 
-  // Equipe Alocada — edição do time direto na Central de Avaliações (admin/rh/diretoria).
-  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
-  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
-  const [newParticipantEmployeeId, setNewParticipantEmployeeId] = useState<number | null>(null);
-  const [newParticipantFunction, setNewParticipantFunction] = useState<string>(DEFAULT_PARTICIPANT_FUNCTION);
-  const [pendingRemoveParticipant, setPendingRemoveParticipant] = useState<number | null>(null);
-
-  // Atribuição de avaliadores por área (admin/rh)
-  const [assignAreaPickerOpen, setAssignAreaPickerOpen] = useState<number | null>(null);
-  const [assignAreaUserIds, setAssignAreaUserIds] = useState<number[]>([]);
-  // Atribuição dos avaliadores da matriz de conformidade (admin/rh)
-  const [setConformityPickerOpen, setSetConformityPickerOpen] = useState(false);
-  const [conformityPickerUserId, setConformityPickerUserId] = useState<number | null>(null);
-  const [setFerramentasPickerOpen, setSetFerramentasPickerOpen] = useState(false);
-  const [ferramentasPickerUserId, setFerramentasPickerUserId] = useState<number | null>(null);
-
   const { data: events } = useGetEvents({});
   const { data: cycle } = useGetCurrentCycle();
-
-  // Lista global de avaliadores (independe do evento selecionado) para permitir
-  // filtrar por Avaliador antes ou sem escolher um Evento.
-  const { data: allUsers } = useGetUsers({
-    query: { enabled: isConsultation, queryKey: ["users"] as unknown[] },
-  });
-  const allAvaliadores = (allUsers ?? [])
-    .filter(u => u.role === "avaliador" && u.active)
-    .map(u => ({ id: u.id, name: u.name }))
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
-
-  const { data: participants } = useGetEventParticipants(selectedEventId!, {
-    query: { enabled: !!selectedEventId, queryKey: ["event-participants", selectedEventId] as unknown[] },
-  });
-
-  // Colaboradores disponíveis para adicionar à equipe (apenas gestores, ao editar o time deste evento).
-  const { data: allEmployeesForTeam } = useGetEmployees({ active: true }, {
-    query: { enabled: isManager && !!selectedEventId, queryKey: ["employees", "active"] as unknown[] },
-  });
-  const alreadyAllocatedIds = new Set((participants ?? []).map(p => p.employeeId));
-  const availableEmployees = (allEmployeesForTeam ?? []).filter(e => !alreadyAllocatedIds.has(e.id));
-  const selectedNewEmployee = availableEmployees.find(e => e.id === newParticipantEmployeeId);
-
-  // Faltas/atrasos estruturados (tabela `absences`) filtrados pelo evento selecionado —
-  // a API só filtra por employeeId, então filtramos por eventId no cliente.
-  const { data: allAbsencesForEval } = useGetAbsences({}, {
-    query: { enabled: isManager && !!selectedEventId, queryKey: ["absences-central-avaliacoes"] as unknown[] },
-  });
-  const eventAbsences = (allAbsencesForEval ?? []).filter(a => a.eventId === selectedEventId);
 
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-criteria", selectedEventId] as unknown[] },
@@ -426,15 +321,10 @@ export default function EvaluationsPage() {
   const { data: myConformityData } = useGetEventConformity(selectedEventId!, {
     query: { enabled: isAnyConformityEvaluator, queryKey: ["event-conformity-eval", selectedEventId] as unknown[] },
   });
-  // Admin/consultation view also needs conformity data (read-only) to show responses.
-  const { data: adminConformityData } = useGetEventConformity(selectedEventId!, {
-    query: { enabled: isConsultation && !!selectedEventId, queryKey: ["conformity-admin", selectedEventId] as unknown[] },
-  });
   const conformityEvalMutation = useSetEventConformity({
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: ["event-conformity-eval", selectedEventId] });
-        qc.invalidateQueries({ queryKey: ["conformity-admin", selectedEventId] });
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e?.message ?? "Não foi possível salvar. Tente novamente.", variant: "destructive" }),
     },
@@ -460,32 +350,6 @@ export default function EvaluationsPage() {
       onError: () => toast({ title: "Erro ao redirecionar", variant: "destructive" }),
     },
   });
-  const setConformityEvaluatorMutation = useSetConformityEvaluator({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setSetConformityPickerOpen(false); toast({ title: "Avaliador da Matriz atribuído" }); },
-      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
-    },
-  });
-  const setFerramentasEvaluatorMutation = useSetConformityEvaluatorFerramentas({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setSetFerramentasPickerOpen(false); toast({ title: "Avaliador de Ferramentas atribuído" }); },
-      onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
-    },
-  });
-  const updateAssignmentsMutation = useUpdateEventAssignments({
-    mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) }); setAssignAreaPickerOpen(null); toast({ title: "Atribuição salva" }); },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
-    },
-  });
-
-  // Reset expanded criteria when event changes
-  useEffect(() => {
-    setExpandedCriteria(new Set());
-    setTypeFilter("all");
-    setStatusFilter("all");
-  }, [selectedEventId]);
-
   useEffect(() => {
     if (myConformityData) {
       setConformityEvalForm({
@@ -516,10 +380,6 @@ export default function EvaluationsPage() {
     { eventId: selectedEventId ?? undefined },
     { query: { enabled: !!selectedEventId, queryKey: evalsQKey } }
   );
-
-  const { data: eventResult } = useGetEventResult(selectedEventId!, {
-    query: { enabled: !!selectedEventId && isManager, queryKey: ["event-result-eval", selectedEventId] as unknown[] },
-  });
 
   // Criterion assignments for the selected event (new routing system)
   const { data: criterionAssignments } = useEventCriterionAssignments(selectedEventId ?? 0);
@@ -562,54 +422,19 @@ export default function EvaluationsPage() {
   // evento (não só quando o dialog de link está aberto) — precisamos saber se
   // já existe link enviado para trocar o formulário por uma view de histórico.
   const { data: conformityPublicTokenHistory, refetch: refetchConformityTokenHistory } = useConformityPublicTokens(
-    (isConformityEvaluatorForEvent || isManager) ? (selectedEventId ?? null) : null,
+    isConformityEvaluatorForEvent ? (selectedEventId ?? null) : null,
   );
   const { data: ferramentasPublicTokenHistory, refetch: refetchFerramentasTokenHistory } = useFerramentasPublicTokens(
-    (isFerramentasEvaluatorForEvent || isManager) ? (selectedEventId ?? null) : null,
+    isFerramentasEvaluatorForEvent ? (selectedEventId ?? null) : null,
   );
-  // Admin/RH: histórico consolidado de todos os links públicos do evento,
-  // de qualquer avaliador/formulário — dá visibilidade central de quem enviou o quê.
-  const { data: allPublicTokens, refetch: refetchAllPublicTokens } = useAllPublicTokens(isManager ? (selectedEventId ?? null) : null);
-  // Admin link dialog — gera link para qualquer avaliador designado
-  const [adminLinkDialog, setAdminLinkDialog] = useState<{ areaName: string; criterionIds: number[]; assigned: { id: number; name: string }[] } | null>(null);
-  const [adminLinkForUserId, setAdminLinkForUserId] = useState<number | null>(null);
-  const [adminLinkUrl, setAdminLinkUrl] = useState<string | null>(null);
-  const [adminLinkCopied, setAdminLinkCopied] = useState(false);
-  const createAdminPublicToken = useCreateAdminPublicToken(selectedEventId ?? 0);
 
   const createMutation = useCreateEvaluation({
     mutation: {
-      onSuccess: () => qc.invalidateQueries({ queryKey: evalsQKey }),
-      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
-    },
-  });
-
-  const invalidateTeamQueries = () => {
-    qc.invalidateQueries({ queryKey: ["event-participants", selectedEventId] as unknown[] });
-    qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId ?? 0) });
-  };
-  const addParticipant = useAddEventParticipant({
-    mutation: {
       onSuccess: () => {
-        invalidateTeamQueries();
-        toast({ title: "Colaborador adicionado à equipe" });
-        setAddParticipantOpen(false);
-        setNewParticipantEmployeeId(null);
-        setNewParticipantFunction(DEFAULT_PARTICIPANT_FUNCTION);
+        qc.invalidateQueries({ queryKey: evalsQKey });
+        toast({ title: "Rascunho salvo" });
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao adicionar", description: e.message, variant: "destructive" }),
-    },
-  });
-  const removeParticipant = useRemoveEventParticipant({
-    mutation: {
-      onSuccess: () => { invalidateTeamQueries(); toast({ title: "Participante removido" }); },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
-    },
-  });
-  const updateParticipant = useUpdateEventParticipant({
-    mutation: {
-      onSuccess: () => invalidateTeamQueries(),
-      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
     },
   });
 
@@ -617,67 +442,6 @@ export default function EvaluationsPage() {
   const activeEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
   // Only events whose criteria the RH has already confirmed can be evaluated.
   const configuredEvents = activeEvents.filter(e => e.criteriaConfirmed);
-  const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
-  // Evaluators may only act on RH-released events; consultation roles may inspect any open event.
-  // Ordenado alfabeticamente por nome do evento (pt-BR, ignorando maiúsc./acentos).
-  const selectableEvents = [...(isEvaluator ? configuredEvents : activeEvents)]
-    .filter(e => {
-      const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
-      return matchDate;
-    })
-    .sort((a, b) =>
-      (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" })
-    );
-  const pickedEvent = selectableEvents.find(e => e.id === selectedEventId);
-
-  // Cutoff: last Saturday (most recent Saturday already past).
-  // Events with startDate strictly before this date are auto-Concluído.
-  const lastSaturday = (() => {
-    const today = new Date();
-    const day = today.getDay(); // 0=Sun … 6=Sat
-    const daysBack = day === 6 ? 7 : day + 1;
-    const sat = new Date(today);
-    sat.setDate(today.getDate() - daysBack);
-    return sat.toISOString().slice(0, 10);
-  })();
-
-  const isEventDone = (ev: { evaluationProgress?: number | null; startDate?: string | null; conformityNeeded?: boolean; conformityComplete?: boolean }) => {
-    if ((ev.startDate ?? "") < lastSaturday) return true;
-    const prog = ev.evaluationProgress ?? 0;
-    const matrixNeeded = !!ev.conformityNeeded;
-    const matrixDone = !!ev.conformityComplete;
-    return prog >= 1 && (!matrixNeeded || matrixDone);
-  };
-
-  // Sidebar event list (manager/consultation only): filtered by eventSearch, progressFilter, publicationFilter
-  const sidebarEvents = [...(isEvaluator ? configuredEvents : activeEvents)]
-    .filter(e => {
-      const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
-      const q = eventSearch.toLowerCase();
-      const matchSearch = !q ||
-        (e.name ?? "").toLowerCase().includes(q) ||
-        (e.clientName ?? "").toLowerCase().includes(q) ||
-        (e.city ?? "").toLowerCase().includes(q);
-      const prog = e.evaluationProgress ?? 0;
-      const evC = e as { conformityNeeded?: boolean; conformityComplete?: boolean };
-      const matchProgress = progressFilter === "all" || (
-        progressFilter === "not_started" ? prog === 0 :
-        progressFilter === "partial" ? !isEventDone({ ...e, ...evC }) && prog > 0 :
-        isEventDone({ ...e, ...evC })
-      );
-      const matchPub = publicationFilter === "all" || (
-        publicationFilter === "none" ? !e.feedbackReleased && !e.partialPublishedAt :
-        publicationFilter === "partial" ? !e.feedbackReleased && !!e.partialPublishedAt :
-        !!e.feedbackReleased
-      );
-      const matchConformity = conformityFilter === "all" || (
-        conformityFilter === "pending"
-          ? ((e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityNeeded && !(e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityComplete)
-          : ((e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityNeeded && (e as { conformityNeeded?: boolean; conformityComplete?: boolean }).conformityComplete)
-      );
-      return matchDate && matchSearch && matchProgress && matchPub && matchConformity;
-    })
-    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" }));
 
   // For evaluators: fetch criteria for every selectable event so the overview
   // only lists events that actually have work for their area (and so the empty
@@ -808,97 +572,13 @@ export default function EvaluationsPage() {
   const todoEvents = evaluatorEventStats.filter(s => !s.done && !publishedNotDoneIds.has(s.event.id)).map(s => s.event);
   const doneEvents = evaluatorEventStats.filter(s => s.done).map(s => s.event);
 
-  // Consultation mode: when a manager picks an Avaliador WITHOUT picking an
-  // Evento, the filter must still return something — a cross-event overview
-  // of that avaliador's assigned events, instead of the generic empty state.
-  // Same query-key pattern as the evaluator overview above (deduped/cached).
-  // Also activates with NO avaliador picked as long as Status is narrowed to
-  // Pendentes/Avaliadas — otherwise that filter had zero visible effect
-  // (the generic "Pronto para consultar" empty state ignored it entirely).
-  const crossEventLookupActive = isConsultation && !selectedEventId && (selectedAvaliadorIds.length > 0 || statusFilter !== "all");
-  const crossEventCriteriaQueries = useQueries({
-    queries: crossEventLookupActive
-      ? activeEvents.map(ev => ({
-          queryKey: ["event-criteria", ev.id] as unknown[],
-          queryFn: () => getEventCriteria(ev.id),
-        }))
-      : [],
-  });
-  const crossEventDetailQueries = useQueries({
-    queries: crossEventLookupActive
-      ? activeEvents.map(ev => ({
-          queryKey: getGetEventQueryKey(ev.id),
-          queryFn: () => getEvent(ev.id),
-        }))
-      : [],
-  });
-  const crossEventEvalQueries = useQueries({
-    queries: crossEventLookupActive
-      ? activeEvents.map(ev => ({
-          queryKey: getGetEvaluationsQueryKey({ eventId: ev.id }),
-          queryFn: () => getEvaluations({ eventId: ev.id }),
-        }))
-      : [],
-  });
-  const crossEventAvaliadorStats = crossEventLookupActive
-    ? activeEvents.map((ev, i) => {
-        const detail = crossEventDetailQueries[i]?.data;
-        const evs = crossEventEvalQueries[i]?.data ?? [];
-        const critAll = (crossEventCriteriaQueries[i]?.data ?? []).filter(
-          c => c.active && c.responsibleAreaId != null,
-        );
-        if (selectedAvaliadorIds.length > 0) {
-          const combinedAreaIds = new Set(
-            (detail?.areaAssignments ?? [])
-              .filter(a => a.evaluatorUserId != null && selectedAvaliadorIds.includes(a.evaluatorUserId))
-              .map(a => a.areaId),
-          );
-          const crit = critAll.filter(c => combinedAreaIds.has(c.responsibleAreaId!));
-          const submitted = crit.filter(c =>
-            selectedAvaliadorIds.some(uid => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === uid)?.status === "submitted")
-          ).length;
-          const total = crit.length;
-          return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
-        }
-        // Sem avaliador selecionado: agrega TODOS os avaliadores designados —
-        // um critério só conta como concluído quando TODOS os avaliadores da
-        // área confirmaram (mesma regra de completude usada no evento aberto).
-        const evaluatorIdsByArea = new Map<number, number[]>();
-        for (const a of (detail?.areaAssignments ?? [])) {
-          if (a.evaluatorUserId == null) continue;
-          const list = evaluatorIdsByArea.get(a.areaId);
-          if (list) list.push(a.evaluatorUserId);
-          else evaluatorIdsByArea.set(a.areaId, [a.evaluatorUserId]);
-        }
-        const crit = critAll.filter(c => (evaluatorIdsByArea.get(c.responsibleAreaId!) ?? []).length > 0);
-        const submitted = crit.filter(c => {
-          const assignedIds = evaluatorIdsByArea.get(c.responsibleAreaId!) ?? [];
-          return assignedIds.every(uid => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === uid)?.status === "submitted");
-        }).length;
-        const total = crit.length;
-        return { event: ev, total, submitted, done: total > 0 && submitted === total && !!ev.resultsConfirmed, relevant: total > 0 };
-      }).filter(s => s.relevant)
-    : [];
-  const crossEventAvaliadorFiltered = statusFilter === "all"
-    ? crossEventAvaliadorStats
-    : crossEventAvaliadorStats.filter(s => (statusFilter === "done" ? s.done : !s.done));
-  const crossEventAvaliadorEntries = [...crossEventAvaliadorFiltered]
-    .sort((a, b) => (a.event.name ?? "").localeCompare(b.event.name ?? "", "pt-BR", { sensitivity: "base" }));
-  const crossEventAvaliadorEvents = crossEventAvaliadorEntries.map(s => s.event);
-  const selectedAvaliadorName = selectedAvaliadorIds.length === 1
-    ? (allAvaliadores.find(a => a.id === selectedAvaliadorIds[0])?.name ?? null)
-    : selectedAvaliadorIds.length > 1 ? `${selectedAvaliadorIds.length} avaliadores` : null;
-
   // If the selected event stops being selectable (closed or criteria unconfirmed
   // server-side), clear the selection so trigger text and loaded data stay in sync.
   useEffect(() => {
     if (selectedEventId == null || !events) return;
     const stillValid = events.some(e => e.id === selectedEventId && (e.status === "open" || e.status === "closed") && (isEvaluator ? e.criteriaConfirmed : true));
-    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); setSelectedAvaliadorIds([]); setStatusFilter("all"); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); }
+    if (!stillValid) { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }
   }, [selectedEventId, events, isEvaluator]);
-  const canRelease = isManager;
-  const eventComplete = eventResult?.isComplete ?? false;
-  const feedbackReleased = eventResult?.feedbackReleased ?? false;
 
   const currentEvent = events?.find(e => e.id === selectedEventId);
   const criteriaLocked = currentEvent ? !currentEvent.criteriaConfirmed : false;
@@ -942,71 +622,6 @@ export default function EvaluationsPage() {
           .filter(u => u.id !== user?.id)
           .map(u => ({ id: u.id, name: u.name }));
 
-  // Avaliadores atribuídos a cada área (evento → área → avaliador[]); pode haver
-  // mais de um por área — a nota final é a média entre eles.
-  const assignedEvaluatorsByArea = new Map<number, { id: number; name: string }[]>();
-  for (const a of (selectedEventDetail?.areaAssignments ?? [])) {
-    if (a.evaluatorUserId == null) continue;
-    const list = assignedEvaluatorsByArea.get(a.areaId) ?? [];
-    list.push({ id: a.evaluatorUserId, name: a.evaluatorName ?? "Sem nome" });
-    assignedEvaluatorsByArea.set(a.areaId, list);
-  }
-
-  // Áreas únicas com critérios ativos neste evento — usadas na UI de atribuição de avaliadores.
-  const eventAreasForAssignment = Array.from(
-    new Map(
-      activeCriteria
-        .filter(c => c.responsibleAreaId != null)
-        .map(c => [c.responsibleAreaId!, { id: c.responsibleAreaId!, name: c.responsibleAreaName ?? "Sem área" }])
-    ).values()
-  ).sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
-
-  // Manager-only oversight: per-criterion submission status ("quem preencheu / quem falta").
-  // "submitted" só quando TODOS os avaliadores designados para a área enviaram;
-  // "partial" cobre o caso de 1 de N já ter enviado.
-  type CriterionUiStatus = {
-    state: "submitted" | "partial" | "draft" | "pending";
-    submittedNames: string[];
-    pendingNames: string[];
-    requiredCount: number;
-    submittedCount: number;
-  };
-  function criterionStatus(criterionId: number, responsibleAreaId: number | null): CriterionUiStatus {
-    const evs = (evaluations ?? []).filter(e => e.criterionId === criterionId);
-    const assigned = responsibleAreaId != null ? (assignedEvaluatorsByArea.get(responsibleAreaId) ?? []) : [];
-    const evalByEvaluator = new Map(evs.filter(e => e.evaluatorUserId != null).map(e => [e.evaluatorUserId as number, e]));
-    if (assigned.length > 0) {
-      const submitted = assigned.filter(a => evalByEvaluator.get(a.id)?.status === "submitted");
-      const drafted = assigned.filter(a => evalByEvaluator.get(a.id)?.status === "draft");
-      const pending = assigned.filter(a => !submitted.includes(a));
-      const state: CriterionUiStatus["state"] = submitted.length === assigned.length
-        ? "submitted"
-        : submitted.length > 0
-          ? "partial"
-          : drafted.length > 0
-            ? "draft"
-            : "pending";
-      return { state, submittedNames: submitted.map(a => a.name), pendingNames: pending.map(a => a.name), requiredCount: assigned.length, submittedCount: submitted.length };
-    }
-    // Sem atribuição configurada para a área: cai no fallback "qualquer envio conta" (espelha o backend).
-    const submitted = evs.find(e => e.status === "submitted");
-    if (submitted) return { state: "submitted", submittedNames: [submitted.evaluatorName ?? "—"], pendingNames: [], requiredCount: 1, submittedCount: 1 };
-    const draft = evs.find(e => e.status === "draft");
-    if (draft) return { state: "draft", submittedNames: [], pendingNames: [], requiredCount: 1, submittedCount: 0 };
-    return { state: "pending", submittedNames: [], pendingNames: [], requiredCount: 1, submittedCount: 0 };
-  }
-
-  function groupByArea(list: typeof activeCriteria) {
-    return Object.values(
-      list.reduce((acc, c) => {
-        const key = c.responsibleAreaName ?? "Sem área definida";
-        (acc[key] ??= { area: key, criteria: [] as typeof activeCriteria }).criteria.push(c);
-        return acc;
-      }, {} as Record<string, { area: string; criteria: typeof activeCriteria }>)
-    );
-  }
-  const areaGroups = groupByArea(activeCriteria);
-
   // Agrupa os critérios do avaliador logado por área — inclui areaId para
   // suportar botões de redirecionar/link-público por formulário (grupo de área).
   const myAreaGroups = (() => {
@@ -1023,71 +638,8 @@ export default function EvaluationsPage() {
     return Array.from(map.values());
   })();
 
-  const teamSubmittedCount = activeCriteria.filter(c => criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted").length;
-  const teamProgressPct = activeCriteria.length ? (teamSubmittedCount / activeCriteria.length) * 100 : 0;
-
-  // Avaliadores atribuídos ao evento (evento → área → avaliador), com status
-  // agregado (Pendente/Concluído) para permitir consultar/filtrar por pessoa.
-  const avaliadorMap = new Map<number, { id: number; name: string; areaIds: Set<number> }>();
-  for (const a of (selectedEventDetail?.areaAssignments ?? [])) {
-    if (a.evaluatorUserId == null) continue;
-    const existing = avaliadorMap.get(a.evaluatorUserId);
-    if (existing) existing.areaIds.add(a.areaId);
-    else avaliadorMap.set(a.evaluatorUserId, { id: a.evaluatorUserId, name: a.evaluatorName ?? "Sem nome", areaIds: new Set([a.areaId]) });
-  }
-  // Progresso POR avaliador: conta apenas as submissões DELE, não a completude
-  // agregada do critério (que pode exigir outro avaliador da mesma área).
-  const avaliadorStats = Array.from(avaliadorMap.values())
-    .map(av => {
-      const crit = activeCriteria.filter(c => c.responsibleAreaId != null && av.areaIds.has(c.responsibleAreaId));
-      const submitted = crit.filter(c =>
-        (evaluations ?? []).some(e => e.criterionId === c.criterionId && e.evaluatorUserId === av.id && e.status === "submitted")
-      ).length;
-      const total = crit.length;
-      return { ...av, total, submitted, done: total > 0 && submitted === total };
-    })
-    .filter(av => av.total > 0)
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
-
-  const selectedAvaliadores = avaliadorStats.filter(av => selectedAvaliadorIds.includes(av.id));
-  // Com avaliadores selecionados, "avaliado" = submissão de QUALQUER deles; sem seleção, completude agregada.
-  const isCriterionDone = (c: (typeof activeCriteria)[number]) =>
-    selectedAvaliadores.length > 0
-      ? selectedAvaliadores.some(av => (evaluations ?? []).some(e => e.criterionId === c.criterionId && e.evaluatorUserId === av.id && e.status === "submitted"))
-      : criterionStatus(c.criterionId, c.responsibleAreaId ?? null).state === "submitted";
-  const avaliadorFilteredCriteria = selectedAvaliadores.length > 0
-    ? activeCriteria.filter(c => c.responsibleAreaId != null && selectedAvaliadores.some(av => av.areaIds.has(c.responsibleAreaId!)))
-    : activeCriteria;
-  const statusFilteredCriteria = statusFilter === "all"
-    ? avaliadorFilteredCriteria
-    : avaliadorFilteredCriteria.filter(c => (statusFilter === "done" ? isCriterionDone(c) : !isCriterionDone(c)));
-  const typeFilteredCriteria = typeFilter === "all"
-    ? statusFilteredCriteria
-    : typeFilter === "com-nota"
-      ? statusFilteredCriteria.filter(c => getSubmittedEvals(c.criterionId).length > 0)
-      : statusFilteredCriteria.filter(c => getSubmittedEvals(c.criterionId).length === 0);
-  const areaFilteredCriteria = selectedAreaIds.length > 0
-    ? typeFilteredCriteria.filter(c => c.responsibleAreaId != null && selectedAreaIds.includes(c.responsibleAreaId))
-    : typeFilteredCriteria;
-  const criterionFilteredCriteria = selectedCriterionIds.length > 0
-    ? areaFilteredCriteria.filter(c => selectedCriterionIds.includes(c.criterionId))
-    : areaFilteredCriteria;
-  const filteredAreaGroups = groupByArea(criterionFilteredCriteria);
-
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
-  }
-
-  function getSubmittedEvals(criterionId: number) {
-    return (evaluations ?? []).filter(e => e.criterionId === criterionId && e.status === "submitted");
-  }
-
-  function toggleExpand(criterionId: number) {
-    setExpandedCriteria(prev => {
-      const next = new Set(prev);
-      next.has(criterionId) ? next.delete(criterionId) : next.add(criterionId);
-      return next;
-    });
   }
 
   function formatEvalDate(v: string | null | undefined) {
@@ -1144,12 +696,17 @@ export default function EvaluationsPage() {
   async function handleLaunchAll() {
     if (!selectedEventId) return;
     setLaunching(true);
+    // Rastreia o progresso para que, em caso de falha, o toast diga qual
+    // critério quebrou e quantos já haviam sido enviados antes dele.
+    let sentCount = 0;
+    let failingCriterionName: string | null = null;
     try {
       for (const c of myCriteria) {
         const ev = getEval(c.criterionId);
         if (ev?.status === "submitted") continue;
         const score = currentScore(c.criterionId);
         if (score == null) continue;
+        failingCriterionName = c.criterionName ?? `critério #${c.criterionId}`;
         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
         const audioUrl = currentAudio(c.criterionId);
         const created = await createEvaluation({
@@ -1160,6 +717,8 @@ export default function EvaluationsPage() {
           audioUrl: audioUrl ?? undefined,
         });
         await submitEvaluation(created.id);
+        sentCount += 1;
+        failingCriterionName = null;
       }
       await qc.invalidateQueries({ queryKey: evalsQKey });
       toast({ title: "Avaliação lançada com sucesso", description: "Você não tem pendências para este evento." });
@@ -1171,7 +730,17 @@ export default function EvaluationsPage() {
       // failure). Refetch so getEval() reflects the real server state and the
       // next attempt skips what's already done instead of erroring again.
       await qc.invalidateQueries({ queryKey: evalsQKey });
-      toast({ title: "Erro ao lançar avaliação", description: ((e as { message?: string })?.message ?? "") + " Confira o que ficou pendente e tente novamente.", variant: "destructive" });
+      const reason = (e as { message?: string })?.message?.trim();
+      const sentMsg = sentCount === 0
+        ? "Nenhum critério foi enviado antes da falha."
+        : sentCount === 1
+          ? "1 critério foi enviado antes da falha."
+          : `${sentCount} critérios foram enviados antes da falha.`;
+      toast({
+        title: failingCriterionName ? `Erro ao lançar "${failingCriterionName}"` : "Erro ao lançar avaliação",
+        description: `${sentMsg}${reason ? ` Motivo: ${reason}.` : ""} Confira o que ficou pendente e tente novamente.`,
+        variant: "destructive",
+      });
     } finally {
       setLaunching(false);
     }
@@ -1187,10 +756,9 @@ export default function EvaluationsPage() {
   const pendingToFill = myCriteria.filter(c => !criterionReady(c.criterionId)).length;
   const toSubmitCount = myCriteria.filter(c => getEval(c.criterionId)?.status !== "submitted").length;
 
-  const completedCount = myCriteria.filter(c => {
-    const ev = getEval(c.criterionId);
-    return ev && (ev.status === "submitted" || ev.status === "draft");
-  }).length;
+  // Só "submitted" conta como concluído — mesma régua do card do evento
+  // (EvaluatorEventCard); rascunho é trabalho em andamento, não entregue.
+  const completedCount = myCriteria.filter(c => getEval(c.criterionId)?.status === "submitted").length;
 
   // Beyond the scored criteria, avaliadores da Matriz de Conformidade also
   // answer extra Sim/Não questions (Ferramentas e Case / Cenografia). Those
@@ -1211,19 +779,6 @@ export default function EvaluationsPage() {
   const totalCompleted = completedCount + extraConformityItemsCompleted;
 
   const progressPct = totalItems ? (totalCompleted / totalItems) * 100 : 0;
-
-  async function handleExportPending() {
-    try {
-      const data = await exportPendingEvaluations();
-      const blob = new Blob([data.data], { type: "text/csv" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = data.filename;
-      a.click();
-    } catch {
-      toast({ title: "Erro ao exportar", variant: "destructive" });
-    }
-  }
 
   const labels: Record<number, string> = {
     0: "Crítico, não atendeu ao básico",
@@ -1258,17 +813,6 @@ export default function EvaluationsPage() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {isManager && (
-            <button
-              data-testid="button-export-pending"
-              onClick={handleExportPending}
-              className="flex items-center gap-1.5 border-2 border-[#ccff00]/40 px-3 py-1.5 text-[11px] font-black italic uppercase text-[#ccff00] hover:border-[#ccff00] hover:bg-[#ccff00]/10 transition-colors"
-            >
-              <Download size={13} /> Exportar Pendentes
-            </button>
-          )}
-        </div>
       </div>
 
       {/* ── Body: sidebar + main ── */}
@@ -1276,227 +820,6 @@ export default function EvaluationsPage() {
 
         {/* ── Sidebar ── */}
         <aside className="w-72 shrink-0 bg-white border-r-2 border-[#191c1e] flex flex-col overflow-hidden">
-
-          {/* Manager/consultation: inline event list + filters */}
-          {!isEvaluator && (
-            <>
-              {/* ── Header: título + chips de filtro rápido + busca ── */}
-              <div className="shrink-0 border-b-2 border-[#191c1e]">
-
-                {/* Barra título */}
-                <div className="bg-[#191c1e] px-4 py-2.5 flex items-center justify-between">
-                  <span className="text-[11px] font-black italic uppercase tracking-widest text-[#ccff00] flex items-center gap-1.5">
-                    <Flag size={11} /> Eventos
-                  </span>
-                  <span className="text-[10px] font-black italic text-white/60 tabular-nums">
-                    {sidebarEvents.length}<span className="text-white/30">/{activeEvents.length}</span>
-                  </span>
-                </div>
-
-                <div className="px-3 pt-3 pb-3 space-y-3">
-                  {/* Busca */}
-                  <div className="relative">
-                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9aa08a] pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Buscar evento, cliente, cidade..."
-                      value={eventSearch}
-                      onChange={e => setEventSearch(e.target.value)}
-                      className="w-full pl-8 pr-7 h-8 text-[11px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white placeholder:text-[#b0b8a0] placeholder:not-italic placeholder:normal-case"
-                    />
-                    {eventSearch && (
-                      <button type="button" onClick={() => setEventSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#747a60] hover:text-[#191c1e]">
-                        <X size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Progresso chips */}
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black italic uppercase tracking-wider text-[#9aa08a] flex items-center gap-1"><BarChart3 size={9} /> Progresso</p>
-                    <div className="flex gap-1 flex-wrap">
-                      {([["all","Todos"],["not_started","Não iniciado"],["partial","Em andamento"],["done","Concluído"]] as const).map(([f, label]) => (
-                        <button key={f} onClick={() => setProgressFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 px-2 border-2 transition-colors leading-tight", progressFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Matriz + Publicação em linha */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black italic uppercase tracking-wider text-[#9aa08a] flex items-center gap-1"><ListChecks size={9} /> Matriz</p>
-                      <div className="flex gap-1 flex-wrap">
-                        {([["all","Todas"],["pending","Pend."],["done","Ok"]] as const).map(([f, label]) => (
-                          <button key={f} onClick={() => setConformityFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 px-2 border-2 transition-colors leading-tight", conformityFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black italic uppercase tracking-wider text-[#9aa08a] flex items-center gap-1"><Send size={9} /> Publicação</p>
-                      <div className="flex gap-1 flex-wrap">
-                        {([["all","Todos"],["none","—"],["partial","◑"],["final","✓"]] as const).map(([f, label]) => (
-                          <button key={f} onClick={() => setPublicationFilter(f)} className={cn("text-[9px] font-black italic uppercase py-1 px-2 border-2 transition-colors leading-tight", publicationFilter === f ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Event list (flex-1, scrollável) ── */}
-              <div className="overflow-auto flex-1">
-                {selectedEventId != null && (
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedEventId(null); setScores({}); setComments({}); setAudioOverrides({}); }}
-                    className="w-full text-left px-3 py-1.5 text-[9px] font-black italic uppercase text-[#747a60] border-b border-[#eceef0] hover:bg-[#f7f9fb] flex items-center gap-1"
-                  >
-                    <X size={9} /> Todos os eventos
-                  </button>
-                )}
-                {sidebarEvents.length === 0 ? (
-                  <div className="p-4 text-center text-[10px] italic font-bold uppercase text-[#747a60]">
-                    {eventSearch || progressFilter !== "all" || publicationFilter !== "all" || conformityFilter !== "all"
-                      ? "Sem resultados para esses filtros."
-                      : "Nenhum evento disponível."}
-                  </div>
-                ) : (
-                  sidebarEvents.map(ev => {
-                    const isSelected = selectedEventId === ev.id;
-                    const prog = ev.evaluationProgress ?? 0;
-                    const evC = ev as { conformityNeeded?: boolean; conformityComplete?: boolean };
-                    const matrixNeeded = !!evC.conformityNeeded;
-                    const matrixDone = !!evC.conformityComplete;
-                    const done = isEventDone({ ...ev, ...evC });
-                    const partial = !done && prog > 0;
-                    const progPct = Math.round(prog * 100);
-                    const progBarColor = done ? "#ccff00" : partial ? "#f0c820" : "#d4d8cc";
-                    return (
-                      <button
-                        key={ev.id}
-                        type="button"
-                        data-testid={`option-event-${ev.id}`}
-                        onClick={() => { setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                        className={cn(
-                          "w-full text-left px-4 py-3 border-b border-[#eceef0] last:border-0 transition-colors border-l-4",
-                          isSelected
-                            ? "bg-[#eeffaa] border-l-[#ccff00]"
-                            : done
-                              ? "bg-[#f5ffea] border-l-[#88b800] hover:bg-[#ecffcc]"
-                              : partial
-                                ? "bg-[#fffdf0] border-l-[#d4b020] hover:bg-[#fff9e0]"
-                                : "bg-white border-l-transparent hover:bg-[#f7f9fb]"
-                        )}
-                      >
-                        {/* Nome + status dot */}
-                        <div className="flex items-start justify-between gap-2">
-                          <p className={cn("font-black italic uppercase text-[11px] leading-snug truncate flex-1", done ? "text-[#2e4400]" : "text-[#191c1e]")}>
-                            {ev.name}
-                          </p>
-                          <div className={cn("w-2 h-2 shrink-0 mt-1", done ? "bg-[#88b800]" : partial ? "bg-[#d4b020]" : "bg-[#d4d8cc]")} />
-                        </div>
-                        {/* Cliente + cidade */}
-                        {(ev.clientName || ev.city) && (
-                          <p className="text-[10px] text-[#9aa08a] truncate mt-0.5">
-                            {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
-                          </p>
-                        )}
-                        {/* Barra de progresso + badges */}
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className="flex-1 h-2 bg-[#e8ece0] overflow-hidden">
-                            <div style={{ width: `${progPct}%`, backgroundColor: progBarColor, transition: "width 0.4s" }} className="h-full" />
-                          </div>
-                          <span className={cn("text-[10px] font-black tabular-nums shrink-0 w-8 text-right", done ? "text-[#506600]" : partial ? "text-[#8a7000]" : "text-[#9aa08a]")}>
-                            {progPct}%
-                          </span>
-                        </div>
-                        {/* Badges linha */}
-                        {(ev.feedbackReleased || ev.partialPublishedAt || matrixNeeded) && (
-                          <div className="flex items-center gap-1.5 mt-1.5">
-                            {ev.feedbackReleased
-                              ? <span title="Feedback final publicado" className="text-[9px] font-black italic uppercase px-1.5 py-0.5 border border-[#88b800] bg-[#f0ffe0] text-[#506600] shrink-0">Final ✓</span>
-                              : ev.partialPublishedAt
-                                ? <span title="Feedback parcial publicado" className="text-[9px] font-black italic uppercase px-1.5 py-0.5 border border-[#d4b020] bg-[#fffbe0] text-[#8a7000] shrink-0">Parcial ◑</span>
-                                : null
-                            }
-                            {matrixNeeded && (
-                              <span
-                                title={matrixDone ? "Matriz de conformidade concluída" : "Matriz de conformidade pendente"}
-                                className={cn("text-[9px] font-black italic uppercase shrink-0 px-1.5 py-0.5 border", matrixDone ? "text-[#506600] border-[#a0c830] bg-[#f0ffe0]" : "text-[#b02f00] border-[#f08080] bg-[#fff0ee]")}
-                              >
-                                Matriz {matrixDone ? "✓" : "!"}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* ── Período (compacto, no rodapé) ── */}
-              <div className="px-3 py-2 border-t border-[#eceef0] shrink-0">
-                <p className="text-[9px] font-black italic uppercase tracking-widest text-[#747a60] mb-1.5 flex items-center gap-1"><Calendar size={9} /> Período</p>
-                <div className="space-y-1.5">
-                  <div className="flex gap-1.5">
-                    <div className="flex-1">
-                      <label className="text-[8px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">De</label>
-                      <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-[8px] font-bold italic uppercase tracking-wide text-[#9aa088] block mb-0.5">Até</label>
-                      <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full h-7 px-2 text-[10px] border-2 border-[#191c1e] bg-[#f7f9fb] font-bold italic focus:outline-none focus:bg-white" />
-                    </div>
-                  </div>
-                  {cycleWeekends.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {cycleWeekends.map(w => {
-                        const active = filterDateFrom === w.sat && filterDateTo === w.sun;
-                        return (
-                          <button
-                            key={w.sat}
-                            type="button"
-                            onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                            className={cn("px-1.5 py-0.5 text-[8px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d4c8] hover:border-[#191c1e] hover:text-[#191c1e]")}
-                          >
-                            {w.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {(filterDateFrom || filterDateTo) && (
-                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[9px] font-bold italic uppercase text-[#747a60] hover:text-[#b02f00]">
-                      × Limpar datas
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Limpar filtros */}
-              {(progressFilter !== "all" || publicationFilter !== "all" || conformityFilter !== "all" || filterDateFrom || filterDateTo || eventSearch) && (
-                <div className="px-3 py-1.5 border-t-2 border-[#191c1e] shrink-0">
-                  <button type="button" data-testid="button-clear-filters" onClick={() => { setSelectedEventId(null); setSelectedAvaliadorIds([]); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); setStatusFilter("all"); setTypeFilter("all"); setProgressFilter("all"); setPublicationFilter("all"); setConformityFilter("all"); setFilterDateFrom(""); setFilterDateTo(""); setEventSearch(""); }} className="text-[10px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1">
-                    <X size={11} /> Limpar filtros
-                  </button>
-                </div>
-              )}
-
-              <div className="px-4 py-2.5 border-t-2 border-[#eceef0] shrink-0 bg-[#f7f9fb]">
-                <p className="text-[9px] italic text-[#9aa08a] leading-snug flex items-start gap-1.5">
-                  <Info size={10} className="shrink-0 mt-0.5" />
-                  {isConsultation ? "Modo consulta — visualize o andamento das avaliações sem editar notas." : "Apenas eventos configurados e liberados pelo RH aparecem aqui."}
-                </p>
-              </div>
-            </>
-          )}
 
           {/* Evaluator: lista compacta A Fazer / Concluídas */}
           {isEvaluator && (
@@ -1751,88 +1074,20 @@ export default function EvaluationsPage() {
           </DialogContent>
         </Dialog>
 
-        {!selectedEventId && crossEventLookupActive ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <User size={22} />
-              <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight">
-                {selectedAvaliadorName ? `Avaliações de ${selectedAvaliadorName}` : "Avaliações — Todos os Avaliadores"}
-              </h3>
-            </div>
-            <p className="text-sm text-[#444933] italic px-1 -mt-1">
-              {selectedAvaliadorName
-                ? "Todos os eventos com avaliações atribuídas a este avaliador. Clique em um evento para consultar os critérios em detalhe."
-                : "Eventos filtrados pelo status selecionado, considerando todos os avaliadores. Clique em um evento para consultar os critérios em detalhe."}
-            </p>
-            {crossEventAvaliadorEntries.length === 0 ? (
-              <div className="text-center py-24 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60] px-6">
-                {statusFilter === "pending"
-                  ? `Nenhuma avaliação pendente${selectedAvaliadorName ? ` para ${selectedAvaliadorName}` : ""}.`
-                  : statusFilter === "done"
-                    ? `Nenhuma avaliação concluída${selectedAvaliadorName ? ` para ${selectedAvaliadorName}` : ""}.`
-                    : `Nenhum evento com avaliações atribuídas${selectedAvaliadorName ? ` a ${selectedAvaliadorName}` : ""}.`}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {crossEventAvaliadorEntries.map(({ event: ev, total, submitted, done }) => (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    data-testid={`card-cross-event-${ev.id}`}
-                    onClick={() => setSelectedEventId(ev.id)}
-                    className={`text-left bg-white border-2 border-[#191c1e] p-5 transition-all hover:bg-[#f7f9fb] ${HARD_SHADOW} ${HARD_SHADOW_HOVER}`}
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <span className="font-black italic uppercase text-sm leading-tight">{ev.name}</span>
-                      {done ? (
-                        <CheckCircle size={16} className="shrink-0 text-[#506600]" />
-                      ) : (
-                        <span className="shrink-0 text-[9px] font-black italic uppercase text-[#862200] tracking-wide">pendente</span>
-                      )}
-                    </div>
-                    <p className="text-[11px] font-bold italic uppercase text-[#747a60]">{ev.clientName}</p>
-                    <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2 mt-3 mb-1.5">
-                      <div className="bg-[#ccff00] h-full" style={{ width: `${total ? (submitted / total) * 100 : 0}%` }} />
-                    </div>
-                    <p className="text-[11px] text-[#747a60] italic">{submitted} de {total} critérios preenchidos.</p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : !selectedEventId ? (
+        {!selectedEventId ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-8">
             <div className="border-2 border-[#191c1e] bg-white p-10 max-w-sm w-full flex flex-col items-center gap-4 relative">
               <div className="w-20 h-20 border-2 border-[#191c1e] bg-[#191c1e] flex items-center justify-center skew-x-[-4deg]">
-                {isConsultation
-                  ? <BarChart3 className="text-[#ccff00] skew-x-[4deg]" size={36} />
-                  : <Rocket className="text-[#ccff00] skew-x-[4deg]" size={36} />
-                }
+                <Rocket className="text-[#ccff00] skew-x-[4deg]" size={36} />
               </div>
               <div>
                 <h2 className="text-xl italic uppercase font-black tracking-tight text-[#191c1e] leading-tight">
-                  {isConsultation ? "Modo Consulta" : "Pronto para avaliar"}
+                  Pronto para avaliar
                 </h2>
                 <p className="text-[#747a60] italic text-sm mt-1.5 leading-relaxed">
-                  {isConsultation
-                    ? "Selecione um evento ao lado para acompanhar o andamento das avaliações da equipe."
-                    : "Selecione um evento ao lado para iniciar ou continuar sua avaliação."}
+                  Selecione um evento ao lado para iniciar ou continuar sua avaliação.
                 </p>
               </div>
-              {isManager && activeEvents.length > 0 && (
-                <div className="w-full border-t-2 border-[#eceef0] pt-4 grid grid-cols-2 gap-3 text-left">
-                  <div className="bg-[#f7f9fb] border border-[#eceef0] p-3">
-                    <p className="text-[20px] font-black italic text-[#191c1e] leading-none">{activeEvents.length}</p>
-                    <p className="text-[9px] font-black italic uppercase text-[#9aa08a] mt-0.5">eventos ativos</p>
-                  </div>
-                  <div className="bg-[#f7f9fb] border border-[#eceef0] p-3">
-                    <p className="text-[20px] font-black italic text-[#ccff00] leading-none" style={{WebkitTextStroke: "1px #191c1e"}}>
-                      {Math.round((activeEvents.filter(e => isEventDone(e as { evaluationProgress?: number | null; startDate?: string | null; conformityNeeded?: boolean; conformityComplete?: boolean })).length / Math.max(1, activeEvents.length)) * 100)}%
-                    </p>
-                    <p className="text-[9px] font-black italic uppercase text-[#9aa08a] mt-0.5">concluídos</p>
-                  </div>
-                </div>
-              )}
               <div className="absolute -bottom-[3px] -right-[3px] w-full h-full border-2 border-[#191c1e] -z-10" />
             </div>
           </div>
@@ -1863,141 +1118,6 @@ export default function EvaluationsPage() {
                     <span className="text-[10px] font-black italic text-white/60 flex items-center gap-1"><Users size={11} />{currentEvent.participantCount} part.</span>
                   </div>
                 </div>
-                {/* Barra progresso da equipe (manager) */}
-                {isManager && (
-                  <div className="bg-[#f7f9fb] border-t border-[#eceef0] px-5 py-2 flex items-center gap-3">
-                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><BarChart3 size={9} /> Progresso do Time</span>
-                    <div className="flex-1 h-2 bg-[#e0e3da] overflow-hidden">
-                      <div className="h-full bg-[#ccff00] transition-[width]" style={{ width: `${teamProgressPct}%` }} />
-                    </div>
-                    <span className="text-[11px] font-black italic text-[#191c1e] shrink-0 tabular-nums w-9 text-right">{Math.round(teamProgressPct)}%</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Barra de filtros de critérios (consultation + evento selecionado) ── */}
-            {isConsultation && !!selectedEventId && (
-              <div className="bg-white border-2 border-[#191c1e] flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
-
-                {/* Avaliador */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><User size={10}/> Avaliador</span>
-                  {(() => {
-                    const avaliadorOptions = avaliadorStats.length > 0
-                      ? avaliadorStats.map(av => ({ id: av.id, name: av.name, suffix: `${av.submitted}/${av.total}` }))
-                      : allAvaliadores.map(av => ({ id: av.id, name: av.name, suffix: null as string | null }));
-                    const toggleAvaliador = (id: number) =>
-                      setSelectedAvaliadorIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-                    return (
-                      <Popover open={avaliadorPickerOpen} onOpenChange={setAvaliadorPickerOpen}>
-                        <PopoverTrigger asChild>
-                          <button type="button" data-testid="select-avaliador" className="h-7 px-2.5 flex items-center gap-2 border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors max-w-[180px]">
-                            <span className="truncate text-[#191c1e]">
-                              {selectedAvaliadorIds.length === 0 ? "Todos" : selectedAvaliadorIds.length === 1 ? (avaliadorOptions.find(a => a.id === selectedAvaliadorIds[0])?.name ?? "1 sel.") : `${selectedAvaliadorIds.length} sel.`}
-                            </span>
-                            <ChevronsUpDown size={11} className="shrink-0 text-[#191c1e]" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" side="bottom" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-64 z-50">
-                          <Command className="rounded-none">
-                            <CommandInput data-testid="input-avaliador-search" placeholder="Buscar avaliador..." className="italic text-xs" />
-                            <CommandList className="max-h-[240px]">
-                              <CommandEmpty className="py-4 text-center text-xs italic font-bold uppercase text-[#747a60]">Nenhum encontrado.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem value="Todos os avaliadores" data-testid="option-avaliador-all" onSelect={() => { setSelectedAvaliadorIds([]); setAvaliadorPickerOpen(false); }} className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2">
-                                  <Check size={13} className={cn("shrink-0", selectedAvaliadorIds.length === 0 ? "opacity-100" : "opacity-0")} />
-                                  <span className="font-bold italic uppercase text-xs">Todos</span>
-                                </CommandItem>
-                                {avaliadorOptions.map(av => (
-                                  <CommandItem key={av.id} value={av.name} data-testid={`option-avaliador-${av.id}`} onSelect={() => toggleAvaliador(av.id)} className="rounded-none cursor-pointer aria-selected:bg-[#eeffaa] aria-selected:text-[#161e00] py-2 gap-2">
-                                    <div className={cn("w-3.5 h-3.5 border-2 shrink-0 flex items-center justify-center", selectedAvaliadorIds.includes(av.id) ? "bg-[#191c1e] border-[#191c1e]" : "border-[#aaa] bg-white")}>
-                                      {selectedAvaliadorIds.includes(av.id) && <Check size={9} className="text-[#ccff00]" strokeWidth={3} />}
-                                    </div>
-                                    <span className="font-bold italic uppercase text-xs truncate">{av.name}{av.suffix ? ` (${av.suffix})` : ""}</span>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    );
-                  })()}
-                </div>
-
-                {/* Área pills */}
-                {eventAreasForAssignment.length > 1 && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><Building2 size={10}/> Área:</span>
-                    {eventAreasForAssignment.map(area => {
-                      const active = selectedAreaIds.includes(area.id);
-                      return (
-                        <button key={area.id} type="button" onClick={() => setSelectedAreaIds(prev => prev.includes(area.id) ? prev.filter(x => x !== area.id) : [...prev, area.id])}
-                          className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                          {area.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Critério multi-select (Popover) */}
-                {activeCriteria.length > 1 && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><ListChecks size={10}/> Critério</span>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button type="button" className="h-7 px-2.5 flex items-center gap-2 border-2 border-[#191c1e] bg-white italic font-bold text-[10px] uppercase hover:bg-[#f7f9fb] transition-colors max-w-[160px]">
-                          <span className="truncate text-[#191c1e]">
-                            {selectedCriterionIds.length === 0 ? "Todos" : `${selectedCriterionIds.length} sel.`}
-                          </span>
-                          <ChevronsUpDown size={11} className="shrink-0 text-[#191c1e]" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" side="bottom" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-56 z-50">
-                        <div className="max-h-56 overflow-y-auto divide-y divide-[#eceef0]">
-                          <button type="button" onClick={() => setSelectedCriterionIds([])} className={cn("w-full text-left px-3 py-2 text-[10px] font-bold italic uppercase flex items-center gap-2 hover:bg-[#f7f9fb]", selectedCriterionIds.length === 0 ? "bg-[#f0ffe0] text-[#191c1e]" : "text-[#747a60]")}>
-                            <Check size={11} className={selectedCriterionIds.length === 0 ? "opacity-100" : "opacity-0"} /> Todos
-                          </button>
-                          {activeCriteria.map(c => {
-                            const active = selectedCriterionIds.includes(c.criterionId);
-                            return (
-                              <button key={c.criterionId} type="button" onClick={() => setSelectedCriterionIds(prev => prev.includes(c.criterionId) ? prev.filter(x => x !== c.criterionId) : [...prev, c.criterionId])}
-                                className={cn("w-full text-left px-3 py-2 text-[10px] font-bold italic uppercase flex items-center gap-2 hover:bg-[#f7f9fb]", active ? "bg-[#eeffaa] text-[#191c1e]" : "text-[#747a60]")}>
-                                <div className={cn("w-3 h-3 border-2 shrink-0 flex items-center justify-center", active ? "bg-[#191c1e] border-[#191c1e]" : "border-[#aaa] bg-white")}>
-                                  {active && <Check size={8} className="text-[#ccff00]" strokeWidth={3} />}
-                                </div>
-                                {c.criterionName}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
-
-                {/* Respostas de Matriz pills */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[9px] font-black italic uppercase text-[#747a60] shrink-0 flex items-center gap-1"><ShieldAlert size={10}/> Matriz:</span>
-                  {([["epi","EPI"],["estaiamentos","Estai."],["guardaEquipamentos","Guarda Eq."],["conduta","Conduta"],["ausencias","Ausências"],["standout","Destaque"]] as const).map(([key, label]) => {
-                    const active = selectedMatrixQuestions.includes(key);
-                    return (
-                      <button key={key} type="button" onClick={() => setSelectedMatrixQuestions(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])}
-                        className={cn("px-2 py-0.5 text-[9px] font-black italic uppercase border-2 transition-colors", active ? "bg-[#191c1e] text-[#ccff00] border-[#191c1e]" : "bg-white text-[#747a60] border-[#d0d3d6] hover:border-[#191c1e] hover:text-[#191c1e]")}>
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Limpar filtros de critérios */}
-                {(selectedAvaliadorIds.length > 0 || selectedAreaIds.length > 0 || selectedCriterionIds.length > 0 || selectedMatrixQuestions.length > 0) && (
-                  <button type="button" onClick={() => { setSelectedAvaliadorIds([]); setSelectedAreaIds([]); setSelectedCriterionIds([]); setSelectedMatrixQuestions([]); }} className="ml-auto text-[9px] font-black italic uppercase text-[#862200] hover:underline flex items-center gap-1 shrink-0">
-                    <X size={10} /> Limpar
-                  </button>
-                )}
               </div>
             )}
 
@@ -2007,456 +1127,11 @@ export default function EvaluationsPage() {
               <div className="space-y-4 order-2 lg:order-none">
                 <div className="flex items-center justify-between gap-4 px-1">
                   <h3 className="text-xl md:text-2xl italic uppercase font-black tracking-tight flex items-center gap-2">
-                    {isConsultation ? (<><ListChecks size={20} /> Status das Avaliações</>) : (<><Target size={20} /> Critérios de Avaliação</>)}
+                    <Target size={20} /> Critérios de Avaliação
                   </h3>
-                  {isConsultation && filteredAreaGroups.length > 0 && (
-                    <span className="text-[10px] font-black italic uppercase text-[#747a60] border border-[#d0d3d6] px-2 py-0.5 shrink-0">
-                      {filteredAreaGroups.reduce((sum, g) => sum + g.criteria.length, 0)} quesitos
-                    </span>
-                  )}
                 </div>
 
-                {isConsultation ? (
-                  filteredAreaGroups.length === 0 ? (
-                    <div className="text-center py-12 bg-white border-2 border-[#191c1e] italic uppercase font-bold text-[#747a60]">
-                      {statusFilter === "pending"
-                        ? "Nenhuma avaliação pendente com os filtros atuais."
-                        : statusFilter === "done"
-                          ? "Nenhuma avaliação concluída com os filtros atuais."
-                          : selectedAvaliadores.length > 0
-                            ? "Estes avaliadores não têm critérios atribuídos neste evento."
-                            : "Nenhum critério ativo neste evento."}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {criteriaLocked && (
-                        <div className="flex items-start gap-2.5 bg-[#fff4e5] border-2 border-[#191c1e] px-4 py-3">
-                          <Lock size={16} className="shrink-0 mt-0.5 text-[#b02f00]" />
-                          <p className="text-[11px] md:text-xs font-bold italic uppercase tracking-wide text-[#b02f00]">Critérios ainda não confirmados — as áreas não podem avaliar até a liberação.</p>
-                        </div>
-                      )}
-
-                      {/* Matriz de Conformidade + Perguntas de Evento */}
-                      {isConsultation && !!selectedEventId && (
-                        <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
-                          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
-                            <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight">
-                              <ShieldAlert size={16} className="shrink-0" /> Matriz de Conformidade
-                            </span>
-                            <span className="text-[10px] font-black italic uppercase text-[#747a60] bg-white border border-[#d8dadc] px-2 py-0.5">4 critérios</span>
-                          </div>
-                          <div className="divide-y-2 divide-[#eceef0]">
-
-                            {/* Avaliadores designados — atribuição pelo admin/rh */}
-                            {isManager && (
-                              <div className="px-5 py-4 space-y-4">
-                                <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933]">Avaliadores Designados</p>
-
-                                {/* Cenografia */}
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">Cenografia</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setSetConformityPickerOpen(v => !v); setSetFerramentasPickerOpen(false); }}
-                                      className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] text-[11px] font-black uppercase shrink-0"
-                                    >
-                                      <UserPlus size={11} /> Atribuir
-                                    </button>
-                                  </div>
-                                  <div className="flex items-center gap-2 pl-0.5">
-                                    <User size={11} className="shrink-0 text-[#747a60]" />
-                                    <span className="text-[11px] italic text-[#444933]">
-                                      {selectedEventDetail?.conformityEvaluatorName ?? <span className="text-[#9aa088]">Sem avaliador atribuído</span>}
-                                    </span>
-                                  </div>
-                                  {setConformityPickerOpen && (
-                                    <div className="border-2 border-[#191c1e] bg-[#f9fafb] max-h-44 overflow-y-auto">
-                                      <button
-                                        type="button"
-                                        onClick={() => setConformityEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: null } })}
-                                        className="w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase text-[#9aa088] hover:bg-[#f2f4f6] border-b border-[#eceef0]"
-                                      >
-                                        — Remover atribuição
-                                      </button>
-                                      {allAvaliadores.map(av => (
-                                        <button
-                                          key={av.id}
-                                          type="button"
-                                          onClick={() => setConformityEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: av.id } })}
-                                          className={cn("w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase hover:bg-[#f2f4f6] border-b border-[#eceef0] last:border-b-0 flex items-center justify-between gap-2", av.id === selectedEventDetail?.conformityEvaluatorUserId ? "text-[#506600] bg-[#f7ffe0]" : "text-[#191c1e]")}
-                                        >
-                                          {av.name}
-                                          {av.id === selectedEventDetail?.conformityEvaluatorUserId && <CheckCircle size={11} className="shrink-0 text-[#506600]" />}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Ferramentas e Case */}
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">Ferramentas e Case</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setSetFerramentasPickerOpen(v => !v); setSetConformityPickerOpen(false); }}
-                                      className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f2f4f6] text-[11px] font-black uppercase shrink-0"
-                                    >
-                                      <UserPlus size={11} /> Atribuir
-                                    </button>
-                                  </div>
-                                  <div className="flex items-center gap-2 pl-0.5">
-                                    <User size={11} className="shrink-0 text-[#747a60]" />
-                                    <span className="text-[11px] italic text-[#444933]">
-                                      {selectedEventDetail?.conformityEvaluatorFerramentasName ?? <span className="text-[#9aa088]">Sem avaliador atribuído</span>}
-                                    </span>
-                                  </div>
-                                  {(() => {
-                                    const pending = (ferramentasPublicTokenHistory ?? []).find(t => !t.usedAt);
-                                    const answered = (ferramentasPublicTokenHistory ?? []).find(t => t.usedAt);
-                                    const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                                    if (pending) return (
-                                      <button type="button"
-                                        onClick={async () => { if (await copyToClipboard(`${base}/eval/${pending.id}`)) toast({ title: "Link copiado!", description: `Para: ${pending.recipientName ?? "freelancer"}` }); else toast(COPY_FAILED_TOAST); }}
-                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-[#f7ffd1] hover:bg-[#eeff99] text-[11px] font-black uppercase shrink-0 w-fit"
-                                      ><Copy size={11} /> Copiar link</button>
-                                    );
-                                    if (answered) return (
-                                      <span className="text-[10px] font-bold italic text-[#506600] flex items-center gap-1"><CheckCircle size={10} /> Respondido</span>
-                                    );
-                                    return (
-                                      <button type="button"
-                                        onClick={() => { setConformityPublicLinkType("ferramentas"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchFerramentasTokenHistory(); }}
-                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f5f5f5] text-[11px] font-black uppercase shrink-0 w-fit"
-                                      ><Link2 size={11} /> Link Freelancer</button>
-                                    );
-                                  })()}
-                                  {setFerramentasPickerOpen && (
-                                    <div className="border-2 border-[#191c1e] bg-[#f9fafb] max-h-44 overflow-y-auto">
-                                      <button
-                                        type="button"
-                                        onClick={() => setFerramentasEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: null } })}
-                                        className="w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase text-[#9aa088] hover:bg-[#f2f4f6] border-b border-[#eceef0]"
-                                      >
-                                        — Remover atribuição
-                                      </button>
-                                      {allAvaliadores.map(av => (
-                                        <button
-                                          key={av.id}
-                                          type="button"
-                                          onClick={() => setFerramentasEvaluatorMutation.mutate({ id: selectedEventId!, data: { userId: av.id } })}
-                                          className={cn("w-full text-left px-3 py-2 text-[11px] font-bold italic uppercase hover:bg-[#f2f4f6] border-b border-[#eceef0] last:border-b-0 flex items-center justify-between gap-2", av.id === selectedEventDetail?.conformityEvaluatorFerramentasUserId ? "text-[#506600] bg-[#f7ffe0]" : "text-[#191c1e]")}
-                                        >
-                                          {av.name}
-                                          {av.id === selectedEventDetail?.conformityEvaluatorFerramentasUserId && <CheckCircle size={11} className="shrink-0 text-[#506600]" />}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Respostas dos 4 critérios de matriz */}
-                            {(() => {
-                              const matrixItems = [
-                                { key: "epi" as const, label: "EPI", val: adminConformityData?.epi, comment: adminConformityData?.epiComment },
-                                { key: "estaiamentos" as const, label: "Estaiamentos/Aterramento", val: adminConformityData?.estaiamentos, comment: adminConformityData?.estaiamentosComment },
-                                { key: "conduta" as const, label: "Conduta", val: adminConformityData?.conduta, comment: adminConformityData?.condutaComment },
-                                { key: "guardaEquipamentos" as const, label: "Guarda de Equipamentos", val: adminConformityData?.guardaEquipamentos, comment: adminConformityData?.guardaEquipamentosComment },
-                              ].filter(item => selectedMatrixQuestions.length === 0 || selectedMatrixQuestions.includes(item.key));
-                              if (matrixItems.length === 0) return null;
-                              return (
-                                <div className="px-5 py-4">
-                                  <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-3">Respostas da Matriz</p>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {matrixItems.map(item => (
-                                      <div key={item.key} className="border-2 border-[#eceef0] p-3">
-                                        <div className="flex items-center justify-between gap-2 mb-1">
-                                          <span className="text-[11px] font-bold italic uppercase text-[#191c1e]">{item.label}</span>
-                                          <span className={`text-[10px] font-black italic uppercase px-2 py-0.5 border shrink-0 ${item.val === null || item.val === undefined ? "bg-[#d8dadc] text-[#444933] border-[#c0c4c8]" : item.val ? "bg-[#ccff00] text-[#161e00] border-[#506600]" : "bg-[#ff5722] text-white border-[#8b1a00]"}`}>
-                                            {item.val === null || item.val === undefined ? "—" : item.val ? "SIM" : "NÃO"}
-                                          </span>
-                                        </div>
-                                        {item.comment && item.val === false && (
-                                          <p className="text-[11px] italic text-[#444933] leading-snug">{item.comment}</p>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })()}
-
-                            {/* Faltas/Atrasos */}
-                            {(selectedMatrixQuestions.length === 0 || selectedMatrixQuestions.includes("ausencias")) && (
-                              <div className="px-5 py-4">
-                                <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
-                                  <Clock size={12} /> Faltas/Atrasos (+30 min)
-                                </p>
-                                {eventAbsences.length > 0 && (
-                                  <ul className="space-y-1.5 mb-2">
-                                    {eventAbsences.map(a => (
-                                      <li key={a.id} className="flex items-center justify-between gap-2 border-2 border-[#eceef0] px-3 py-1.5">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <User size={11} className="shrink-0 text-[#747a60]" />
-                                          <span className="font-black italic uppercase text-xs text-[#191c1e] truncate">{a.employeeName ?? "—"}</span>
-                                          <span className="text-[10px] font-bold italic uppercase text-[#747a60] shrink-0">
-                                            {a.penaltyType}{a.quantity && a.quantity > 1 ? ` ×${a.quantity}` : ""}
-                                          </span>
-                                        </div>
-                                        <span className="text-[10px] font-black italic text-[#b02f00] shrink-0">-{Number(a.points)} pts</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                                {adminConformityData?.absencesResponse === true ? (
-                                  <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap border-l-2 border-[#b02f00] pl-3">{adminConformityData.absencesReport || "—"}</p>
-                                ) : adminConformityData?.absencesResponse === false ? (
-                                  <p className="text-[11px] italic text-[#9aa088]">Nenhuma falta ou atraso registrada.</p>
-                                ) : eventAbsences.length === 0 ? (
-                                  <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
-                                ) : null}
-                              </div>
-                            )}
-
-                            {/* Destaque de Desempenho */}
-                            {(selectedMatrixQuestions.length === 0 || selectedMatrixQuestions.includes("standout")) && (
-                              <div className="px-5 py-4">
-                                <p className="text-[10px] font-bold uppercase italic tracking-wider text-[#444933] mb-2 flex items-center gap-1.5">
-                                  <Trophy size={12} /> Destaque de Desempenho
-                                </p>
-                                {adminConformityData?.standoutResponse === true && adminConformityData.standoutJustification ? (
-                                  <div className="border-2 border-[#506600] bg-[#f7ffe0] p-3">
-                                    <p className="text-sm italic text-[#191c1e] leading-relaxed whitespace-pre-wrap">{adminConformityData.standoutJustification}</p>
-                                  </div>
-                                ) : adminConformityData?.standoutResponse === false ? (
-                                  <p className="text-[11px] italic text-[#9aa088]">Nenhum destaque registrado.</p>
-                                ) : (
-                                  <p className="text-[11px] italic text-[#9aa088]">Ainda não respondido.</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {filteredAreaGroups.map(g => {
-                        const submittedInArea = g.criteria.filter(c => isCriterionDone(c)).length;
-                        const areaDone = submittedInArea === g.criteria.length;
-                        const areaId = g.criteria[0]?.responsibleAreaId ?? null;
-                        const areaAssigned = areaId != null ? (assignedEvaluatorsByArea.get(areaId) ?? []) : [];
-                        const isEditingThisArea = isManager && assignAreaPickerOpen === areaId;
-                        return (
-                          <div key={g.area} data-testid={`status-area-${g.area}`} className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
-                            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b-2 border-[#191c1e] bg-[#f2f4f6]">
-                              <span className="inline-flex items-center gap-2 font-black italic uppercase tracking-tight min-w-0 truncate pr-1.5">
-                                <Building2 size={16} className="shrink-0" /> {g.area}
-                              </span>
-                              <span className="flex items-center gap-2 shrink-0">
-                                {isManager && areaId != null && !isEditingThisArea && (
-                                  <>
-                                    {areaAssigned.map(a => (
-                                      <span key={a.id} className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black italic uppercase bg-white border border-[#d8dadc] px-2 py-0.5">
-                                        <User size={10} /> {a.name.split(" ")[0]}
-                                      </span>
-                                    ))}
-                                    {areaAssigned.length > 0 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setAdminLinkDialog({ areaName: g.area, criterionIds: g.criteria.map(c => c.criterionId), assigned: areaAssigned });
-                                          setAdminLinkForUserId(areaAssigned.length === 1 ? areaAssigned[0].id : null);
-                                          setAdminLinkUrl(null);
-                                          setAdminLinkCopied(false);
-                                          refetchAllPublicTokens();
-                                        }}
-                                        className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] transition-colors text-[10px] font-black uppercase tracking-tight"
-                                        title="Gerar link de avaliação para este avaliador"
-                                      >
-                                        <Link2 size={11} /> Link
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => { setAssignAreaPickerOpen(areaId); setAssignAreaUserIds(areaAssigned.map(a => a.id)); }}
-                                      className="flex items-center gap-1 px-2 py-0.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] transition-colors text-[10px] font-black uppercase tracking-tight"
-                                    >
-                                      <UserPlus size={11} /> {areaAssigned.length === 0 ? "Atribuir" : "Alterar"}
-                                    </button>
-                                  </>
-                                )}
-                                <span className={cn("px-3 py-1 border-2 border-[#191c1e] font-bold text-[11px] italic uppercase skew-x-[-8deg] inline-block", areaDone ? "bg-[#506600] text-[#ccff00]" : "bg-[#ffb5a0] text-[#3b0900]")}>
-                                  <span className="inline-block skew-x-[8deg]">{submittedInArea}/{g.criteria.length} {areaDone ? "Concluído" : "Pendente"}</span>
-                                </span>
-                              </span>
-                            </div>
-                            {isEditingThisArea && areaId != null && (
-                              <div className="px-5 py-3 border-b-2 border-[#d8dadc] bg-[#fafbf5] space-y-2">
-                                <div className="max-h-40 overflow-y-auto space-y-0.5 border-2 border-[#191c1e] p-2 bg-[#f9fafb]">
-                                  {allAvaliadores.length === 0 && (
-                                    <p className="text-[11px] italic text-[#9aa088] px-2 py-1">Nenhum avaliador cadastrado.</p>
-                                  )}
-                                  {allAvaliadores.map(av => {
-                                    const checked = assignAreaUserIds.includes(av.id);
-                                    return (
-                                      <label key={av.id} className="flex items-center gap-2.5 cursor-pointer hover:bg-[#f2f4f6] px-2 py-1.5">
-                                        <input
-                                          type="checkbox"
-                                          checked={checked}
-                                          onChange={() => setAssignAreaUserIds(prev => checked ? prev.filter(id => id !== av.id) : [...prev, av.id])}
-                                          className="w-3.5 h-3.5 accent-[#506600]"
-                                        />
-                                        <span className="text-[12px] font-bold italic uppercase text-[#191c1e]">{av.name}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    disabled={updateAssignmentsMutation.isPending}
-                                    onClick={() => updateAssignmentsMutation.mutate({ id: selectedEventId!, data: { assignments: [{ areaId, evaluatorUserIds: assignAreaUserIds }] } })}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#ccff00] bg-[#191c1e] text-[#ccff00] hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors text-[11px] font-black uppercase tracking-tight disabled:opacity-50"
-                                  >
-                                    <Save size={13} /> Salvar
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setAssignAreaPickerOpen(null)}
-                                    className="px-3 py-1.5 border-2 border-[#191c1e] bg-white text-[#191c1e] hover:bg-[#f2f4f6] transition-colors text-[11px] font-black uppercase tracking-tight"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                            <ul>
-                              {g.criteria.map(c => {
-                                const st = criterionStatus(c.criterionId, c.responsibleAreaId ?? null);
-                                // Um registro de roteamento por critério (redirecionamento) manda
-                                // sobre a atribuição por área — sem isso, "Responsável" continuava
-                                // mostrando o avaliador da área mesmo depois de redirecionar.
-                                const directAssignment = criterionAssignments?.find(x => x.criterionId === c.criterionId);
-                                const assignedNames = c.responsibleAreaId != null ? (assignedEvaluatorsByArea.get(c.responsibleAreaId) ?? []).map(a => a.name) : [];
-                                const responsible = directAssignment?.assignedToName ?? (assignedNames.length > 0 ? assignedNames.join(", ") : (st.submittedNames[0] ?? null));
-                                const submittedEvals = getSubmittedEvals(c.criterionId);
-                                const isExpanded = expandedCriteria.has(c.criterionId);
-                                const hasContent = submittedEvals.length > 0;
-                                return (
-                                  <li key={c.criterionId} data-testid={`status-crit-${c.criterionId}`} className="border-t-2 border-[#eceef0] first:border-t-0">
-                                    {/* Status row */}
-                                    <div className="flex items-center justify-between gap-3 px-5 py-3">
-                                      <button
-                                        type="button"
-                                        onClick={() => hasContent && toggleExpand(c.criterionId)}
-                                        className={`flex items-center gap-2 min-w-0 text-left ${hasContent ? "cursor-pointer group" : "cursor-default"}`}
-                                      >
-                                        {hasContent && (
-                                          isExpanded
-                                            ? <ChevronUp size={14} className="shrink-0 text-[#747a60] group-hover:text-[#191c1e]" />
-                                            : <ChevronDown size={14} className="shrink-0 text-[#747a60] group-hover:text-[#191c1e]" />
-                                        )}
-                                        <span className="font-bold italic text-[#191c1e] min-w-0 truncate">{c.criterionName}</span>
-                                        <span className="text-[11px] font-bold italic uppercase text-[#d8dadc] bg-[#f2f4f6] border border-[#d8dadc] px-1.5 py-0.5 shrink-0">
-                                          Peso {c.weightOverride ?? c.originalWeight ?? 0}
-                                        </span>
-                                        {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && !c.eventScoped && (
-                                          <span className="text-[9px] font-black italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-1.5 py-0.5 shrink-0">
-                                            Não conta na média
-                                          </span>
-                                        )}
-                                        {c.eventScoped && (
-                                          <span className="text-[9px] font-black italic uppercase text-[#506600] bg-[#f7ffd1] border border-[#506600] px-1.5 py-0.5 shrink-0">
-                                            Entra na média
-                                          </span>
-                                        )}
-                                      </button>
-                                      <span className="shrink-0 flex items-center gap-2">
-                                        <span data-testid={`status-responsible-${c.criterionId}`} className="text-[11px] font-bold italic uppercase text-[#747a60] whitespace-nowrap hidden sm:inline-flex items-center gap-1 pr-0.5">
-                                          <User size={11} className="shrink-0" /> {responsible ?? "Sem responsável"}
-                                        </span>
-                                        {(() => {
-                                          const a = criterionAssignments?.find(x => x.criterionId === c.criterionId);
-                                          if (!a?.redirectedFromId) return null;
-                                          const date = a.updatedAt
-                                            ? new Date(a.updatedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-                                            : null;
-                                          return (
-                                            <span
-                                              title={`Redirecionado de ${a.redirectedFromName ?? "?"} para ${a.assignedToName ?? "?"}${date ? ` em ${date}` : ""}`}
-                                              className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#e8f0fe] text-[#3451b2] border border-[#3451b2] px-1.5 py-0.5 shrink-0"
-                                            >
-                                              <CornerDownRight size={10} /> {a.redirectedFromName?.split(" ")[0] ?? "?"}→{a.assignedToName?.split(" ")[0] ?? "?"}{date ? ` · ${date}` : ""}
-                                            </span>
-                                          );
-                                        })()}
-                                        {st.state === "submitted" ? (
-                                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-1"><CheckCircle size={12} /> Preenchido</span>
-                                        ) : st.state === "partial" ? (
-                                          <span data-testid={`status-partial-${c.criterionId}`} title={`Falta: ${st.pendingNames.join(", ")}`} className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#fff4c2] text-[#5c4a00] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> {st.submittedCount}/{st.requiredCount} Parcial</span>
-                                        ) : st.state === "draft" ? (
-                                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#ffdbd1] text-[#862200] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Rascunho</span>
-                                        ) : (
-                                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-1"><Clock size={12} /> Falta</span>
-                                        )}
-                                        {hasContent && (
-                                          <Link
-                                            href={`/calibrations?eventId=${selectedEventId}`}
-                                            title="Ir para Calibração deste evento"
-                                            className="inline-flex items-center gap-1 text-[11px] font-black italic uppercase bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] px-2 py-1 hover:bg-[#506600] transition-colors shrink-0"
-                                          >
-                                            <SlidersHorizontal size={11} /> Cal.
-                                          </Link>
-                                        )}
-                                      </span>
-                                    </div>
-                                    {/* Expanded: score + comment per evaluator */}
-                                    {isExpanded && hasContent && (
-                                      <div className="bg-[#f7f9fb] border-t-2 border-[#eceef0] px-5 py-4 space-y-3">
-                                        {submittedEvals.map((ev, i) => (
-                                          <div key={i} className="border-2 border-[#e0e3e5] bg-white p-3 space-y-2">
-                                            <div className="flex items-center justify-between gap-3">
-                                              <span className="text-[11px] font-bold italic uppercase text-[#747a60] flex items-center gap-1">
-                                                <User size={11} /> {ev.evaluatorName ?? "Avaliador"}
-                                              </span>
-                                              <div className="flex items-center gap-2">
-                                                {ev.score != null && (
-                                                  <span className="text-xl font-black italic text-[#506600]">
-                                                    {parseFloat(ev.score as unknown as string).toFixed(1)}
-                                                    <span className="text-[11px] text-[#747a60]">/10</span>
-                                                  </span>
-                                                )}
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border border-[#191c1e] px-1.5 py-0.5">
-                                                  <CheckCircle size={10} /> Enviado
-                                                </span>
-                                              </div>
-                                            </div>
-                                            {ev.comments && (
-                                              <p className="text-xs italic text-[#444933] leading-relaxed border-l-2 border-[#ccff00] pl-3 whitespace-pre-wrap">
-                                                {ev.comments}
-                                              </p>
-                                            )}
-                                            {ev.audioUrl && (
-                                              <div className="pt-1">
-                                                <AudioPlayer objectPath={ev.audioUrl} />
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
-                ) : criteriaLocked ? (
+                {criteriaLocked ? (
                   <div data-testid="notice-criteria-locked" className="text-center py-14 bg-[#fff4e5] border-2 border-[#191c1e] px-6">
                     <div className="w-14 h-14 border-2 border-[#191c1e] bg-[#ff5722] text-white flex items-center justify-center mx-auto mb-4">
                       <Lock size={26} />
@@ -2634,13 +1309,14 @@ export default function EvaluationsPage() {
 
                                 <div className="flex items-center justify-end pt-3 gap-3 flex-wrap">
                                   <button
+                                    type="button"
                                     onClick={() => handleSaveDraft(c.criterionId)}
-                                    disabled={score == null || !comment.trim()}
+                                    disabled={score == null || !comment.trim() || createMutation.isPending}
                                     data-testid={`button-save-draft-${c.criterionId}`}
                                     className="bg-white border-2 border-[#191c1e] px-4 py-2 font-bold text-xs italic uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-[#eceef0] transition-all"
                                   >
-                                    <Save size={14} />
-                                    {isDraft ? "Atualizar Rascunho" : "Salvar Rascunho"}
+                                    {createMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                    {createMutation.isPending ? "Salvando..." : isDraft ? "Atualizar Rascunho" : "Salvar Rascunho"}
                                   </button>
                                 </div>
                               </div>
@@ -3051,108 +1727,24 @@ export default function EvaluationsPage() {
               <div className="order-1 lg:order-none sticky top-16 md:top-2 lg:top-6 space-y-6 z-10">
                 <div className={`bg-white border-2 border-[#191c1e] ${HARD_SHADOW}`}>
                   <div className="bg-[#191c1e] text-[#ccff00] px-5 py-4 italic">
-                    <h3 className="text-lg font-black uppercase tracking-tight">{isConsultation ? "Status do Time" : "Resumo da Avaliação"}</h3>
-                    <p className="text-[11px] font-bold uppercase text-white/70">{isConsultation ? "Acompanhamento da equipe" : "Sua avaliação para este evento"}</p>
+                    <h3 className="text-lg font-black uppercase tracking-tight">Resumo da Avaliação</h3>
+                    <p className="text-[11px] font-bold uppercase text-white/70">Sua avaliação para este evento</p>
                   </div>
 
                   <div className="p-5 border-b-2 border-[#eceef0]">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs font-bold italic uppercase text-[#444933]">Progresso</span>
-                      <span className="text-sm font-black italic text-[#506600]">{Math.round(isConsultation ? teamProgressPct : progressPct)}%</span>
+                      <span className="text-sm font-black italic text-[#506600]">{Math.round(progressPct)}%</span>
                     </div>
                     <div className="w-full bg-[#eceef0] border border-[#191c1e] h-2.5 mb-2">
-                      <div className="bg-[#ccff00] h-full transition-[width] duration-500" style={{ width: `${isConsultation ? teamProgressPct : progressPct}%` }} />
+                      <div className="bg-[#ccff00] h-full transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
                     </div>
                     <p className="text-[11px] text-[#747a60] italic">
-                      {isConsultation
-                        ? `${teamSubmittedCount} de ${activeCriteria.length} critérios submetidos pelo time.`
-                        : extraConformityItemsTotal > 0
-                          ? `${totalCompleted} de ${totalItems} itens preenchidos — ${completedCount} de ${myCriteria.length} critérios e ${extraConformityItemsCompleted} de ${extraConformityItemsTotal} perguntas da matriz (rascunho ou submetido).`
-                          : `${completedCount} de ${myCriteria.length} critérios preenchidos (rascunho ou submetido).`}
+                      {extraConformityItemsTotal > 0
+                        ? `${totalCompleted} de ${totalItems} itens concluídos — ${completedCount} de ${myCriteria.length} critérios submetidos e ${extraConformityItemsCompleted} de ${extraConformityItemsTotal} perguntas da matriz respondidas.`
+                        : `${completedCount} de ${myCriteria.length} critérios submetidos.`}
                     </p>
                   </div>
-
-                  {/* Confidential administrative info — managers only */}
-                  {isManager && (
-                    <div className="p-5 bg-[#f2f4f6] space-y-4 border-b-2 border-[#eceef0]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold italic uppercase text-[#444933]">Equipe</span>
-                        <span className="text-sm font-black italic">{participants?.length || 0} pessoas</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold italic uppercase text-[#444933]">Critérios Pendentes</span>
-                        <span className="text-sm font-black italic text-[#b02f00]">{activeCriteria.length - teamSubmittedCount}</span>
-                      </div>
-                      {eventResult && (
-                        <div className="pt-2 border-t-2 border-[#e0e3e5] space-y-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs font-black italic uppercase">Nota Parcial da Equipe</span>
-                            <div className="text-right">
-                              <span className="text-xl font-black italic text-[#506600]">{eventResult.eventScore.toFixed(1)}</span>
-                              <span className="text-xs text-[#747a60] italic">/100</span>
-                            </div>
-                          </div>
-                          {!eventResult.hasCalibration && (
-                            <p className="text-[10px] font-bold italic uppercase tracking-wide text-[#b02f00] leading-tight">
-                              Provisória — antes da calibração. O valor final do colaborador sai após a calibração.
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {/* Indicadores rápidos de conformidade */}
-                      {adminConformityData && (
-                        <div className="pt-2 border-t-2 border-[#e0e3e5] space-y-2">
-                          {adminConformityData.standoutResponse === true && (
-                            <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#506600] bg-[#f7ffe0] border border-[#506600] px-3 py-2">
-                              <Trophy size={13} className="shrink-0" />
-                              <span>Destaque de desempenho registrado</span>
-                            </div>
-                          )}
-                          {[adminConformityData.epi, adminConformityData.estaiamentos, adminConformityData.conduta, adminConformityData.guardaEquipamentos].some(v => v === false) && (
-                            <div className="flex items-center gap-2 text-[11px] font-bold italic uppercase text-[#862200] bg-[#ffdbd1] border border-[#862200] px-3 py-2">
-                              <ShieldAlert size={13} className="shrink-0" />
-                              <span>Não-conformidade na matriz</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {/* Links públicos enviados — visão consolidada, qualquer avaliador/formulário */}
-                      {!!allPublicTokens && allPublicTokens.length > 0 && (
-                        <div className="pt-2 border-t-2 border-[#e0e3e5] space-y-2">
-                          <p className="text-xs font-bold italic uppercase text-[#444933]">Links Públicos Enviados</p>
-                          <div className="border-2 border-[#191c1e] divide-y-2 divide-[#eceef0] max-h-48 overflow-y-auto bg-white">
-                            {allPublicTokens.map(t => (
-                              <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold italic truncate">
-                                    {t.usedAt ? (t.submitterName ?? t.recipientName ?? "—") : (t.recipientName ?? "—")}
-                                  </p>
-                                  <p className="text-[10px] italic text-[#747a60] truncate">
-                                    {t.tokenType === "conformity_cenografia" ? "Matriz — Cenografia" : t.tokenType === "conformity_ferramentas" ? "Matriz — Ferramentas" : "Critérios"}
-                                    {" · "}por {t.createdByName ?? "—"} · {fmtDT(t.createdAt)}
-                                  </p>
-                                  {t.usedAt && (
-                                    <p className="text-[10px] font-bold italic text-[#3f5200] truncate">
-                                      Respondido: {fmtDT(t.usedAt)}
-                                    </p>
-                                  )}
-                                </div>
-                                {t.usedAt ? (
-                                  <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#ccff00] text-[#161e00] border-2 border-[#191c1e] px-2 py-0.5 flex items-center gap-1">
-                                    <CheckCircle size={10} /> Ok
-                                  </span>
-                                ) : (
-                                  <span className="shrink-0 text-[10px] font-bold italic uppercase bg-[#f2f4f6] text-[#747a60] border-2 border-[#191c1e] px-2 py-0.5">
-                                    Pendente
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   {/* Grade summary — evaluators only. Includes both scored
                       criteria AND the extra Sim/Não questions from the
@@ -3270,7 +1862,7 @@ export default function EvaluationsPage() {
                             </AlertDialogTitle>
                             <AlertDialogDescription className="text-sm text-[#444933] italic leading-relaxed">
                               Você está prestes a submeter {toSubmitCount} {toSubmitCount === 1 ? "avaliação" : "avaliações"} para
-                              {" "}<strong>{pickedEvent?.name}</strong>. Após o lançamento, as notas ficam
+                              {" "}<strong>{currentEvent?.name}</strong>. Após o lançamento, as notas ficam
                               {" "}<strong>bloqueadas para edição</strong> e compõem a nota final da equipe. Deseja continuar?
                             </AlertDialogDescription>
                           </AlertDialogHeader>
@@ -3324,36 +1916,6 @@ export default function EvaluationsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Release Feedback Card (Admin only) */}
-                {canRelease && eventComplete && (
-                  <div className="bg-white border-2 border-dashed border-[#191c1e] p-5">
-                    <h4 className="text-xs font-black italic uppercase flex items-center gap-2 mb-2"><Target size={14} /> Ação de Gestão</h4>
-                    {feedbackReleased ? (
-                      <div className="flex items-center gap-2 text-sm text-[#506600] font-bold italic uppercase">
-                        <CheckCircle size={16} /> Feedback liberado para a equipe
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm text-[#506600] font-bold italic uppercase">
-                          <CheckCircle size={16} /> Liberado para calibragem
-                        </div>
-                        <p className="text-xs text-[#747a60] italic">
-                          {eventResult?.hasCalibration
-                            ? "Todas as avaliações foram concluídas e a calibragem já está em andamento. Acesse a tela de Calibrações para revisar e finalizar as notas da equipe."
-                            : "Todas as avaliações foram concluídas. O evento foi liberado para calibragem — acesse a tela de Calibrações para ajustar as notas antes de liberar o feedback à equipe."}
-                        </p>
-                        <Link
-                          href="/calibrations"
-                          data-testid="link-go-to-calibrations"
-                          className="w-full bg-[#191c1e] text-[#ccff00] border-2 border-[#191c1e] py-3 font-bold text-sm italic uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:bg-[#2a2f33]"
-                        >
-                          <SlidersHorizontal size={15} /> Ir para Calibrações <ArrowRight size={15} />
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -3472,21 +2034,58 @@ export default function EvaluationsPage() {
               </div>
             )}
             {(() => {
-              const dialogEligible = (publicLinkEligibleCriteria ?? []).filter(c =>
-                (publicLinkDialogCriteriaIds ?? []).includes(c.criterionId)
-              );
-              return dialogEligible.length > 0 ? (
-                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3">
-                  <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-1">
-                    Critérios inclusos ({dialogEligible.length})
-                  </p>
-                  <ul className="space-y-0.5">
-                    {dialogEligible.map(c => (
-                      <li key={c.criterionId} className="text-sm font-black italic uppercase">{c.criterionName}</li>
-                    ))}
-                  </ul>
+              // Critérios do formulário que o backend aceita num link público
+              // (interseção entre os critérios da área e os elegíveis). Os que
+              // ficaram de fora precisam ser respondidos pelo próprio avaliador.
+              const requestedIds = publicLinkDialogCriteriaIds ?? [];
+              const eligibleById = new Map((publicLinkEligibleCriteria ?? []).map(c => [c.criterionId, c]));
+              const dialogEligible = requestedIds.flatMap(id => { const c = eligibleById.get(id); return c ? [c] : []; });
+              const excluded = requestedIds
+                .filter(id => !eligibleById.has(id))
+                .map(id => activeCriteria.find(c => c.criterionId === id)?.criterionName ?? `critério #${id}`);
+              if (publicLinkEligibleCriteria === undefined) return null;
+              if (dialogEligible.length === 0) {
+                return (
+                  <div data-testid="notice-public-link-no-criteria" className="bg-[#ffdbd1] border-2 border-[#862200] px-4 py-3 flex items-start gap-2.5">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-[#862200]" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black italic uppercase text-[#862200]">Nenhum critério disponível para link</p>
+                      <p className="text-xs italic text-[#5a1800] leading-snug">
+                        Nenhum dos critérios deste formulário pode ser respondido por link público para este avaliador/área — em geral porque já foram submetidos ou estão atribuídos a outra pessoa. Responda os critérios diretamente nesta tela ou use "Redirecionar Formulário" para passá-los a um colega.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3 space-y-2">
+                  <div>
+                    <p className="text-[10px] font-black italic uppercase text-[#747a60] mb-1">
+                      Critérios inclusos ({dialogEligible.length})
+                    </p>
+                    <ul className="space-y-0.5">
+                      {dialogEligible.map(c => (
+                        <li key={c.criterionId} className="text-sm font-black italic uppercase">{c.criterionName}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  {excluded.length > 0 && (
+                    <div data-testid="notice-public-link-partial" className="border-t-2 border-dashed border-[#d0d3d6] pt-2">
+                      <p className="text-[10px] font-black italic uppercase text-[#862200] mb-1 flex items-center gap-1">
+                        <AlertCircle size={11} /> Fora do link ({excluded.length})
+                      </p>
+                      <ul className="space-y-0.5">
+                        {excluded.map((name, i) => (
+                          <li key={i} className="text-xs italic text-[#5a1800]">{name}</li>
+                        ))}
+                      </ul>
+                      <p className="text-[10px] italic text-[#747a60] mt-1 leading-snug">
+                        Estes critérios não podem ir no link (já submetidos ou atribuídos a outra pessoa) e continuam sob sua responsabilidade nesta tela.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ) : null;
+              );
             })()}
 
             {!generatedPublicUrl ? (
@@ -3585,6 +2184,7 @@ export default function EvaluationsPage() {
                           <button
                             type="button"
                             title="Excluir link"
+                            aria-label={`Excluir link enviado para ${t.recipientName ?? "destinatário sem nome"}`}
                             disabled={deletePublicToken.isPending}
                             onClick={() => deletePublicToken.mutate(
                               { tokenId: t.id },
@@ -3619,14 +2219,20 @@ export default function EvaluationsPage() {
             >
               {generatedPublicUrl ? "Fechar" : "Cancelar"}
             </button>
-            {!generatedPublicUrl && (
+            {!generatedPublicUrl && (() => {
+              const eligibleIds = new Set((publicLinkEligibleCriteria ?? []).map(c => c.criterionId));
+              const linkCriterionIds = (publicLinkDialogCriteriaIds ?? []).filter(id => eligibleIds.has(id));
+              const noEligible = linkCriterionIds.length === 0;
+              return (
               <button
                 type="button"
-                disabled={!publicLinkRecipientName.trim() || createPublicToken.isPending}
+                data-testid="button-generate-public-link"
+                disabled={!publicLinkRecipientName.trim() || createPublicToken.isPending || noEligible}
+                title={noEligible ? "Nenhum critério disponível para gerar link" : undefined}
                 onClick={() => {
-                  if (!publicLinkRecipientName.trim()) return;
+                  if (!publicLinkRecipientName.trim() || noEligible) return;
                   createPublicToken.mutate(
-                    { recipientName: publicLinkRecipientName.trim(), criterionIds: publicLinkDialogCriteriaIds ?? undefined, includeConformity: publicLinkIncludeConformity || undefined },
+                    { recipientName: publicLinkRecipientName.trim(), criterionIds: linkCriterionIds, includeConformity: publicLinkIncludeConformity || undefined },
                     {
                       onSuccess: ({ tokenId }) => {
                         const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -3637,11 +2243,12 @@ export default function EvaluationsPage() {
                     },
                   );
                 }}
-                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50"
+                className="bg-[#ccff00] border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {createPublicToken.isPending ? "Gerando..." : "Gerar Link"}
               </button>
-            )}
+              );
+            })()}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3791,269 +2398,6 @@ export default function EvaluationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Remover participante — confirmação */}
-      <AlertDialog open={pendingRemoveParticipant !== null} onOpenChange={o => { if (!o) setPendingRemoveParticipant(null); }}>
-        <AlertDialogContent className="rounded-none border-2 border-[#191c1e]">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="italic uppercase font-black tracking-tight">Remover participante?</AlertDialogTitle>
-            <AlertDialogDescription className="italic text-[#444933]">
-              O colaborador <strong>{participants?.find(p => p.id === pendingRemoveParticipant)?.employeeName ?? ""}</strong> será removido da equipe deste evento. Se ele já possuir avaliações enviadas, as notas serão perdidas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none border-2 border-[#191c1e] italic uppercase font-bold">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingRemoveParticipant !== null && selectedEventId) {
-                  removeParticipant.mutate({ id: selectedEventId, participantId: pendingRemoveParticipant });
-                }
-                setPendingRemoveParticipant(null);
-              }}
-              className="rounded-none border-2 border-[#191c1e] bg-[#ba1a1a] text-white italic uppercase font-bold hover:bg-[#9a1414]"
-            >
-              <Trash2 size={16} className="mr-1.5" /> Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Adicionar participante à equipe */}
-      <Dialog open={addParticipantOpen} onOpenChange={(o) => { setAddParticipantOpen(o); if (!o) { setNewParticipantEmployeeId(null); setNewParticipantFunction(DEFAULT_PARTICIPANT_FUNCTION); } }}>
-        <DialogContent className="rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-          <DialogHeader>
-            <DialogTitle className="font-black italic uppercase tracking-tight text-[#191c1e]">Adicionar Colaborador</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Colaborador <span className="text-[#ba1a1a]">*</span></Label>
-              <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    role="combobox"
-                    aria-expanded={employeePickerOpen}
-                    className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-none border-2 border-[#191c1e] bg-white text-left"
-                  >
-                    <span className={cn("truncate text-sm", selectedNewEmployee ? "font-black italic uppercase text-[#191c1e]" : "font-bold italic uppercase text-xs tracking-wider text-[#747a60]")}>
-                      {selectedNewEmployee ? selectedNewEmployee.name : "Busque pelo nome..."}
-                    </span>
-                    <ChevronsUpDown size={16} className="text-[#191c1e] opacity-60 shrink-0" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="p-0 rounded-none border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e] w-[var(--radix-popover-trigger-width)]">
-                  <Command className="rounded-none">
-                    <CommandInput placeholder="Buscar pelo nome..." className="italic" />
-                    <CommandList className="max-h-[280px]">
-                      <CommandEmpty className="py-6 text-center text-sm italic font-bold uppercase text-[#747a60]">Nenhum colaborador disponível.</CommandEmpty>
-                      <CommandGroup>
-                        {availableEmployees.map(e => (
-                          <CommandItem
-                            key={e.id}
-                            value={e.name}
-                            onSelect={() => {
-                              setNewParticipantEmployeeId(e.id);
-                              setNewParticipantFunction(matchParticipantFunction(e.functionName));
-                              setEmployeePickerOpen(false);
-                            }}
-                            className="rounded-none cursor-pointer aria-selected:bg-[#ccff00] aria-selected:text-[#161e00] py-2 gap-2"
-                          >
-                            <Check size={16} className={cn("shrink-0", newParticipantEmployeeId === e.id ? "opacity-100" : "opacity-0")} />
-                            <span className="font-black italic uppercase text-sm truncate">{e.name}</span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="font-bold italic uppercase text-xs tracking-wider text-[#444933]">Função no Evento</Label>
-              <Select value={newParticipantFunction} onValueChange={setNewParticipantFunction}>
-                <SelectTrigger className="h-11 rounded-none border-2 border-[#191c1e] font-black italic uppercase text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-none border-2 border-[#191c1e]">
-                  {PARTICIPANT_FUNCTIONS.map(fn => (
-                    <SelectItem key={fn} value={fn} className="rounded-none font-bold italic uppercase text-sm cursor-pointer">
-                      {fn}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <button
-              type="button"
-              disabled={!newParticipantEmployeeId || addParticipant.isPending || !selectedEventId}
-              onClick={() => {
-                if (!newParticipantEmployeeId || !selectedEventId) return;
-                addParticipant.mutate({ id: selectedEventId, data: { employeeId: newParticipantEmployeeId, functionName: newParticipantFunction || undefined } });
-              }}
-              className="w-full h-11 bg-[#191c1e] text-[#ccff00] font-black italic uppercase tracking-tight disabled:opacity-40 hover:bg-[#ccff00] hover:text-[#191c1e] border-2 border-[#191c1e] transition-colors"
-            >
-              {addParticipant.isPending ? "Adicionando..." : "Adicionar à Equipe"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Admin link dialog — gera link público para qualquer avaliador designado */}
-      <Dialog
-        open={adminLinkDialog !== null}
-        onOpenChange={(v) => {
-          if (!v) {
-            setAdminLinkDialog(null);
-            setAdminLinkForUserId(null);
-            setAdminLinkUrl(null);
-            setAdminLinkCopied(false);
-          }
-        }}
-      >
-        <DialogContent className="max-w-md rounded-none border-2 border-[#191c1e] shadow-[6px_6px_0px_0px_#191c1e]">
-          <DialogHeader>
-            <DialogTitle className="text-xl italic uppercase font-black tracking-tight flex items-center gap-2">
-              <Link2 size={18} /> Link de Avaliação
-            </DialogTitle>
-          </DialogHeader>
-          {adminLinkDialog && (
-            <div className="space-y-4 pt-2">
-              <div className="border-l-4 border-[#ccff00] pl-3">
-                <p className="text-[10px] font-bold italic uppercase text-[#747a60]">Formulário</p>
-                <p className="text-sm font-black italic uppercase">{adminLinkDialog.areaName}</p>
-              </div>
-
-              {adminLinkDialog.assigned.length > 1 && !adminLinkUrl && (
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-black italic uppercase text-[#747a60]">Gerar link para</p>
-                  <div className="space-y-1 border-2 border-[#191c1e] p-2">
-                    {adminLinkDialog.assigned.map(a => (
-                      <label key={a.id} className="flex items-center gap-2.5 cursor-pointer hover:bg-[#f2f4f6] px-2 py-1.5">
-                        <input
-                          type="radio"
-                          name="adminLinkUser"
-                          checked={adminLinkForUserId === a.id}
-                          onChange={() => setAdminLinkForUserId(a.id)}
-                          className="accent-[#506600]"
-                        />
-                        <span className="text-sm font-bold italic uppercase">{a.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {adminLinkDialog.assigned.length === 1 && !adminLinkUrl && (
-                <div className="bg-[#f2f4f6] border-2 border-[#191c1e] px-4 py-3 flex items-center gap-2">
-                  <User size={14} />
-                  <span className="text-sm font-black italic uppercase">{adminLinkDialog.assigned[0].name}</span>
-                </div>
-              )}
-
-              {!adminLinkUrl ? (
-                <>
-                  {(() => {
-                    const existingTokens = (allPublicTokens ?? []).filter(t =>
-                      t.tokenType === "criteria" &&
-                      !t.usedAt &&
-                      t.createdByUserId === adminLinkForUserId &&
-                      (t.criterionIds ?? []).some(id => adminLinkDialog.criterionIds.includes(id))
-                    );
-                    return existingTokens.length > 0 ? (
-                      <div className="bg-[#fffde7] border-2 border-[#f5c518] px-4 py-3 space-y-2">
-                        <p className="text-[10px] font-black italic uppercase text-[#7a6000]">
-                          Link pendente existente
-                        </p>
-                        {existingTokens.map(t => {
-                          const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                          const url = `${base}/eval/${t.id}`;
-                          return (
-                            <div key={t.id} className="flex items-center gap-2">
-                              <input readOnly value={url} className="flex-1 min-w-0 bg-white border-2 border-[#191c1e] px-2 py-1.5 text-xs font-mono truncate" />
-                              <button
-                                type="button"
-                                onClick={async () => { if (await copyToClipboard(url)) toast({ title: "Link copiado!" }); else toast(COPY_FAILED_TOAST); }}
-                                className="shrink-0 flex items-center gap-1 px-3 py-1.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] text-[11px] font-black uppercase"
-                              >
-                                <Copy size={12} /> Copiar
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null;
-                  })()}
-                  <p className="text-sm italic text-[#444933]">
-                    Gere um link único para que o avaliador (ou qualquer pessoa) responda este formulário sem precisar fazer login. O link expira após o primeiro uso.
-                  </p>
-                  <DialogFooter className="gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => { setAdminLinkDialog(null); setAdminLinkForUserId(null); }}
-                      className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!adminLinkForUserId || createAdminPublicToken.isPending}
-                      onClick={() => {
-                        if (!adminLinkForUserId) return;
-                        const selectedUser = adminLinkDialog.assigned.find(a => a.id === adminLinkForUserId);
-                        createAdminPublicToken.mutate(
-                          { assignedToUserId: adminLinkForUserId, criterionIds: adminLinkDialog.criterionIds, recipientName: selectedUser?.name },
-                          {
-                            onSuccess: ({ tokenId }) => {
-                              const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                              setAdminLinkUrl(`${base}/eval/${tokenId}`);
-                            },
-                            onError: (e) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
-                          }
-                        );
-                      }}
-                      className="flex items-center gap-2 px-5 py-2.5 border-2 border-[#191c1e] bg-[#191c1e] text-[#ccff00] font-bold italic uppercase text-xs hover:bg-[#ccff00] hover:text-[#191c1e] transition-colors disabled:opacity-50"
-                    >
-                      {createAdminPublicToken.isPending ? "Gerando..." : <><Link2 size={13} /> Gerar Link</>}
-                    </button>
-                  </DialogFooter>
-                </>
-              ) : (
-                <>
-                  <div className="bg-[#f2ffd6] border-2 border-[#506600] px-4 py-4 space-y-3">
-                    <p className="text-[10px] font-black italic uppercase text-[#506600]">Link gerado com sucesso</p>
-                    <div className="flex items-center gap-2">
-                      <input readOnly value={adminLinkUrl} className="flex-1 min-w-0 bg-white border-2 border-[#191c1e] px-2 py-1.5 text-xs font-mono truncate" />
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (await copyToClipboard(adminLinkUrl)) { setAdminLinkCopied(true); setTimeout(() => setAdminLinkCopied(false), 2000); }
-                          else toast(COPY_FAILED_TOAST);
-                        }}
-                        className="shrink-0 flex items-center gap-1 px-3 py-1.5 border-2 border-[#191c1e] bg-white hover:bg-[#f7ffd1] text-[11px] font-black uppercase transition-colors"
-                      >
-                        <Copy size={12} /> {adminLinkCopied ? "Copiado!" : "Copiar"}
-                      </button>
-                    </div>
-                    <p className="text-[10px] italic text-[#506600]">
-                      Envie este link para o avaliador ou qualquer pessoa que deva preencher o formulário. Ele expira após o primeiro uso.
-                    </p>
-                  </div>
-                  <DialogFooter className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => { setAdminLinkDialog(null); setAdminLinkForUserId(null); setAdminLinkUrl(null); setAdminLinkCopied(false); }}
-                      className="border-2 border-[#191c1e] px-5 py-2.5 font-bold italic uppercase text-xs hover:bg-[#f2f4f6] transition-colors"
-                    >
-                      Fechar
-                    </button>
-                  </DialogFooter>
-                </>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
