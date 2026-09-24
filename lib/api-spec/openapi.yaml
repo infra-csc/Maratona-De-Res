@@ -2734,6 +2734,9 @@ components:
           type: string
         confirmPassword:
           type: string
+        currentPassword:
+          type: string
+          description: Obrigatória fora do fluxo de troca obrigatória (primeiro acesso).
 
     ImpersonateInput:
       type: object
@@ -3160,6 +3163,12 @@ components:
         conformityComplete:
           type: boolean
           description: true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.
+        conformityFilled:
+          type: integer
+          description: Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).
+        conformityTotal:
+          type: integer
+          description: Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).
         createdAt:
           type: string
 

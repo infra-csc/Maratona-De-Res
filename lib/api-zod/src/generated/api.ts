@@ -67,7 +67,8 @@ export const GetMeResponse = zod.object({
  */
 export const ChangePasswordBody = zod.object({
   "newPassword": zod.string(),
-  "confirmPassword": zod.string().optional()
+  "confirmPassword": zod.string().optional(),
+  "currentPassword": zod.string().optional().describe('Obrigatória fora do fluxo de troca obrigatória (primeiro acesso).')
 })
 
 export const ChangePasswordResponse = zod.object({
@@ -597,6 +598,8 @@ export const GetEventsResponseItem = zod.object({
   "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "conformityNeeded": zod.boolean().optional().describe('true se algum avaliador de Matriz de Conformidade (Cenografia ou Ferramentas) foi atribuído a este evento.'),
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
+  "conformityFilled": zod.number().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
+  "conformityTotal": zod.number().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -807,6 +810,8 @@ export const UpdateEventResponse = zod.object({
   "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "conformityNeeded": zod.boolean().optional().describe('true se algum avaliador de Matriz de Conformidade (Cenografia ou Ferramentas) foi atribuído a este evento.'),
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
+  "conformityFilled": zod.number().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
+  "conformityTotal": zod.number().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
   "createdAt": zod.string().optional()
 })
 
@@ -915,6 +920,8 @@ export const MergeEventResponse = zod.object({
   "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "conformityNeeded": zod.boolean().optional().describe('true se algum avaliador de Matriz de Conformidade (Cenografia ou Ferramentas) foi atribuído a este evento.'),
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
+  "conformityFilled": zod.number().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
+  "conformityTotal": zod.number().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
   "createdAt": zod.string().optional()
 }),
   "warnings": zod.array(zod.string())
@@ -974,6 +981,8 @@ export const CloseEventResponse = zod.object({
   "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "conformityNeeded": zod.boolean().optional().describe('true se algum avaliador de Matriz de Conformidade (Cenografia ou Ferramentas) foi atribuído a este evento.'),
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
+  "conformityFilled": zod.number().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
+  "conformityTotal": zod.number().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
   "createdAt": zod.string().optional()
 })
 
@@ -1026,6 +1035,8 @@ export const ReopenEventResponse = zod.object({
   "unassignedAreaNames": zod.array(zod.string()).optional().describe('Nomes das áreas com critério ativo neste evento que ainda não têm avaliador atribuído.'),
   "conformityNeeded": zod.boolean().optional().describe('true se algum avaliador de Matriz de Conformidade (Cenografia ou Ferramentas) foi atribuído a este evento.'),
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
+  "conformityFilled": zod.number().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
+  "conformityTotal": zod.number().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
   "createdAt": zod.string().optional()
 })
 

@@ -48,6 +48,8 @@ export interface LoginInput {
 export interface ChangePasswordInput {
   newPassword: string;
   confirmPassword?: string;
+  /** Obrigatória fora do fluxo de troca obrigatória (primeiro acesso). */
+  currentPassword?: string;
 }
 
 export interface ImpersonateInput {
@@ -350,6 +352,10 @@ export interface Event {
   conformityNeeded?: boolean;
   /** true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos. */
   conformityComplete?: boolean;
+  /** Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído). */
+  conformityFilled?: number;
+  /** Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído). */
+  conformityTotal?: number;
   createdAt?: string;
 }
 

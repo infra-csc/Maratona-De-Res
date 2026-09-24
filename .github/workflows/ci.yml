@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      # Portão que faltava: o build de produção só sai se typecheck e testes passarem.
+      - name: Typecheck (libs + api + web)
+        run: pnpm run typecheck
+
+      - name: Testes de regras de cálculo
+        run: pnpm run test
+
+      - name: Contrato OpenAPI em dia com o cliente gerado
+        run: |
+          pnpm --filter @workspace/api-spec exec orval --config ./orval.config.ts
+          git diff --exit-code -- lib/api-client-react/src/generated lib/api-zod/src/generated || {
+            echo "::error::openapi.yaml mudou sem regenerar o cliente. Rode: pnpm --filter @workspace/api-spec run codegen"; exit 1; }
+
+      - name: Build de produção (api + web)
+        run: pnpm --filter @workspace/api-server --filter @workspace/maratona run build
+        env:
+          PORT: "8080"
+          BASE_PATH: "/"
+          NODE_ENV: production

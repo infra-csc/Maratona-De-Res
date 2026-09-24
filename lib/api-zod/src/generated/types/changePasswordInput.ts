@@ -9,4 +9,6 @@
 export interface ChangePasswordInput {
   newPassword: string;
   confirmPassword?: string;
+  /** Obrigatória fora do fluxo de troca obrigatória (primeiro acesso). */
+  currentPassword?: string;
 }
