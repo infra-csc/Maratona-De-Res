@@ -1,4 +1,4 @@
-import { ShieldCheck, Flag, Send, Copy, Users, AlertTriangle, MessageSquare } from "lucide-react";
+import { ShieldCheck, Flag, Copy, Users, AlertTriangle, MessageSquare } from "lucide-react";
 
 const criteria = [
   { id: 1, name: "EPI e Segurança", area: "LOGÍSTICA", weight: 4, avaliador: 8, calibrado: 9, justificativa: "Carga um pouco desorganizada", status: "final", ts: "15/07/2026, 16:20" },

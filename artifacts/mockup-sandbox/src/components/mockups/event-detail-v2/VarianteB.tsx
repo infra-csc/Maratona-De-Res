@@ -1,4 +1,4 @@
-import { ArrowLeft, TrendingUp, TrendingDown, Users, Calendar, MapPin, ShieldCheck, BarChart3, SlidersHorizontal, Zap, ChevronRight, MessageSquare, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Users, Calendar, ShieldCheck, BarChart3, SlidersHorizontal, Zap, ChevronRight, MessageSquare, CheckCircle, AlertCircle } from "lucide-react";
 import { useState } from "react";
 
 const event = {

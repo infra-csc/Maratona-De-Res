@@ -1,4 +1,4 @@
-import { ChevronRight, Users, Search, Plus, SlidersHorizontal, ShieldCheck, AlertTriangle, CheckCircle } from "lucide-react";
+import { ChevronRight, Users, Search, Plus, SlidersHorizontal } from "lucide-react";
 
 const events = [
   { id: 1, name: "Rock in Rio 2026", city: "Rio de Janeiro", client: "Rock World", date: "12/07", participants: 24, evaluated: 4, total: 4, calCount: 4, finalCal: 4, score: 87.3, status: "closed", fc: true },

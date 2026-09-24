@@ -47,7 +47,6 @@ function MiniProgress({ value, total, color }: { value: number; total: number; c
 
 export function VarianteA() {
   const [tab, setTab] = useState<"visaoGeral" | "quesitos" | "equipe">("visaoGeral");
-  const penalty = event.avgScore - event.conformityScore;
   const delta = event.score - event.avgScore;
 
   return (

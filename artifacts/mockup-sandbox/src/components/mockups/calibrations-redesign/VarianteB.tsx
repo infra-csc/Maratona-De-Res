@@ -1,4 +1,4 @@
-import { ShieldCheck, Flag, Send, Copy, ChevronDown, Users, RotateCcw } from "lucide-react";
+import { ShieldCheck, Flag, Copy } from "lucide-react";
 
 const criteria = [
   {

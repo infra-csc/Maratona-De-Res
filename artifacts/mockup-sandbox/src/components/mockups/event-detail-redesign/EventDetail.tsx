@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Users, Calendar, MapPin, ShieldCheck, Lock, ChevronRight, Save, RefreshCw, Plus, Trash2, MessageSquare, AlertTriangle, CheckCircle, Flag, BarChart3 } from "lucide-react";
+import { ArrowLeft, Users, Calendar, MapPin, ShieldCheck, Lock, Save, RefreshCw, Plus, Trash2, MessageSquare, Flag, BarChart3 } from "lucide-react";
 
 const event = {
   name: "Rock in Rio 2026",

@@ -26,7 +26,8 @@ if (!basePath) {
   );
 }
 
-export default defineConfig(({ command }) => ({
+// async: os plugins do Replit abaixo são carregados com await import().
+export default defineConfig(async ({ command }) => ({
   base: basePath,
   plugins: [
     react(),
