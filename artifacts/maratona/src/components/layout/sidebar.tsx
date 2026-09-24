@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Calendar, Users, Trophy, Star,
-  Settings, ClipboardList, UserCheck, Building2, ShieldCheck,
+  Settings, ClipboardList, UserCheck, Building2, ShieldCheck, CalendarRange,
   Database, LogOut, Target, Menu, X, TrendingUp,
   FolderLock, BookOpen, Settings2, Sun, Moon, BarChart3 } from "lucide-react";
 import { useState } from "react";
@@ -37,6 +37,7 @@ const navGroups: NavGroup[] = [
   {
     name: "Cadastros",
     items: [
+      { label: "Ciclos", path: "/cycles", icon: CalendarRange, roles: ["admin", "rh", "diretoria"] },
       { label: "Colaboradores", path: "/employees", icon: Users },
       { label: "Critérios", path: "/criteria", icon: Star, roles: ["admin", "rh"] },
       { label: "Áreas", path: "/areas", icon: Building2, roles: ["admin", "rh"] },
@@ -131,7 +132,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               // a colaborador, não a este papel operacional).
               if (hasRole(user, "operador")) return ["/events", "/evaluations", "/employees"].includes(item.path);
               if (user?.role === "diretoria") {
-                return ["/", "/calibrations", "/results", "/analytics", "/rules", "/absences", "/criteria"].includes(item.path);
+                return ["/", "/calibrations", "/results", "/analytics", "/cycles", "/rules", "/absences", "/criteria"].includes(item.path);
               }
               return !item.roles || (user && item.roles.includes(user.role));
             });

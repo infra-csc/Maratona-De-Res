@@ -49,6 +49,8 @@ import type {
   CsvExport,
   CsvImportInput,
   Cycle,
+  CycleHistory,
+  CycleSummary,
   DashboardSummary,
   DedupeEvaluationsInput,
   DedupeEvaluationsResult,
@@ -137,6 +139,7 @@ import type {
   SurveyImportInput,
   SurveyImportResult,
   SyncResult,
+  UpdateCycleInput,
   UpdateEventCriteria200,
   UploadUrlRequest,
   UploadUrlResponse,
@@ -8109,6 +8112,83 @@ export function useGetCurrentCycle<TData = Awaited<ReturnType<typeof getCurrentC
 
 
 
+export const getListCyclesUrl = () => {
+
+
+
+
+  return `/cycles`
+}
+
+/**
+ * @summary Todos os ciclos (nunca excluídos), com os números de cada um
+ */
+export const listCycles = async ( options?: RequestInit): Promise<CycleSummary[]> => {
+
+  return customFetch<CycleSummary[]>(getListCyclesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCyclesQueryKey = () => {
+    return [
+    `/cycles`
+    ] as const;
+    }
+
+
+export const getListCyclesQueryOptions = <TData = Awaited<ReturnType<typeof listCycles>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCycles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCyclesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCycles>>> = ({ signal }) => listCycles({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCycles>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCyclesQueryResult = NonNullable<Awaited<ReturnType<typeof listCycles>>>
+export type ListCyclesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Todos os ciclos (nunca excluídos), com os números de cada um
+ */
+
+export function useListCycles<TData = Awaited<ReturnType<typeof listCycles>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCycles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCyclesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getCreateCycleUrl = () => {
 
 
@@ -8118,7 +8198,7 @@ export const getCreateCycleUrl = () => {
 }
 
 /**
- * @summary Create a new cycle and mark it as current
+ * @summary Cria um ciclo e o marca como atual (o atual precisa estar fechado se tiver eventos)
  */
 export const createCycle = async (createCycleInput: CreateCycleInput, options?: RequestInit): Promise<Cycle> => {
 
@@ -8135,7 +8215,7 @@ export const createCycle = async (createCycleInput: CreateCycleInput, options?: 
 
 
 
-export const getCreateCycleMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateCycleMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCycle>>, TError,{data: BodyType<CreateCycleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createCycle>>, TError,{data: BodyType<CreateCycleInput>}, TContext> => {
 
@@ -8164,12 +8244,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateCycleMutationResult = NonNullable<Awaited<ReturnType<typeof createCycle>>>
     export type CreateCycleMutationBody = BodyType<CreateCycleInput>
-    export type CreateCycleMutationError = ErrorType<unknown>
+    export type CreateCycleMutationError = ErrorType<void>
 
     /**
- * @summary Create a new cycle and mark it as current
+ * @summary Cria um ciclo e o marca como atual (o atual precisa estar fechado se tiver eventos)
  */
-export const useCreateCycle = <TError = ErrorType<unknown>,
+export const useCreateCycle = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCycle>>, TError,{data: BodyType<CreateCycleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createCycle>>,
@@ -8179,6 +8259,225 @@ export const useCreateCycle = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateCycleMutationOptions(options));
     }
+
+export const getUpdateCycleUrl = (id: number,) => {
+
+
+
+
+  return `/cycles/${id}`
+}
+
+/**
+ * @summary Edita nome e período (ciclo fechado só troca o nome)
+ */
+export const updateCycle = async (id: number,
+    updateCycleInput: UpdateCycleInput, options?: RequestInit): Promise<Cycle> => {
+
+  return customFetch<Cycle>(getUpdateCycleUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateCycleInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCycleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCycle>>, TError,{id: number;data: BodyType<UpdateCycleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCycle>>, TError,{id: number;data: BodyType<UpdateCycleInput>}, TContext> => {
+
+const mutationKey = ['updateCycle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCycle>>, {id: number;data: BodyType<UpdateCycleInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCycle(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCycleMutationResult = NonNullable<Awaited<ReturnType<typeof updateCycle>>>
+    export type UpdateCycleMutationBody = BodyType<UpdateCycleInput>
+    export type UpdateCycleMutationError = ErrorType<void>
+
+    /**
+ * @summary Edita nome e período (ciclo fechado só troca o nome)
+ */
+export const useUpdateCycle = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCycle>>, TError,{id: number;data: BodyType<UpdateCycleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCycle>>,
+        TError,
+        {id: number;data: BodyType<UpdateCycleInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCycleMutationOptions(options));
+    }
+
+export const getSetCurrentCycleUrl = (id: number,) => {
+
+
+
+
+  return `/cycles/${id}/set-current`
+}
+
+/**
+ * @summary Torna um ciclo aberto o ciclo atual
+ */
+export const setCurrentCycle = async (id: number, options?: RequestInit): Promise<Cycle> => {
+
+  return customFetch<Cycle>(getSetCurrentCycleUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSetCurrentCycleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCurrentCycle>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setCurrentCycle>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['setCurrentCycle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setCurrentCycle>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  setCurrentCycle(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetCurrentCycleMutationResult = NonNullable<Awaited<ReturnType<typeof setCurrentCycle>>>
+
+    export type SetCurrentCycleMutationError = ErrorType<void>
+
+    /**
+ * @summary Torna um ciclo aberto o ciclo atual
+ */
+export const useSetCurrentCycle = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCurrentCycle>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setCurrentCycle>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSetCurrentCycleMutationOptions(options));
+    }
+
+export const getGetCycleHistoryUrl = (id: number,) => {
+
+
+
+
+  return `/cycles/${id}/history`
+}
+
+/**
+ * @summary Histórico de um ciclo (números, ranking final e eventos), somente leitura
+ */
+export const getCycleHistory = async (id: number, options?: RequestInit): Promise<CycleHistory> => {
+
+  return customFetch<CycleHistory>(getGetCycleHistoryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCycleHistoryQueryKey = (id: number,) => {
+    return [
+    `/cycles/${id}/history`
+    ] as const;
+    }
+
+
+export const getGetCycleHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getCycleHistory>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCycleHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCycleHistoryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCycleHistory>>> = ({ signal }) => getCycleHistory(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCycleHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCycleHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getCycleHistory>>>
+export type GetCycleHistoryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Histórico de um ciclo (números, ranking final e eventos), somente leitura
+ */
+
+export function useGetCycleHistory<TData = Awaited<ReturnType<typeof getCycleHistory>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCycleHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCycleHistoryQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetRankingUrl = (params?: GetRankingParams,) => {
   const normalizedParams = new URLSearchParams();

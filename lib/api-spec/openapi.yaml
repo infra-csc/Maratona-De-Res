@@ -2233,10 +2233,23 @@ paths:
                 $ref: "#/components/schemas/Cycle"
 
   /cycles:
+    get:
+      operationId: listCycles
+      tags: [cycles]
+      summary: Todos os ciclos (nunca excluídos), com os números de cada um
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CycleSummary"
     post:
       operationId: createCycle
       tags: [cycles]
-      summary: Create a new cycle and mark it as current
+      summary: Cria um ciclo e o marca como atual (o atual precisa estar fechado se tiver eventos)
       requestBody:
         required: true
         content:
@@ -2250,6 +2263,85 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Cycle"
+        "400":
+          description: Dados inválidos, nome repetido ou período sobreposto
+        "409":
+          description: O ciclo atual ainda está aberto com eventos
+
+  /cycles/{id}:
+    patch:
+      operationId: updateCycle
+      tags: [cycles]
+      summary: Edita nome e período (ciclo fechado só troca o nome)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCycleInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cycle"
+        "400":
+          description: Dados inválidos, nome repetido ou período sobreposto
+        "404":
+          description: Ciclo não encontrado
+        "409":
+          description: Ciclo fechado não muda de período
+
+  /cycles/{id}/set-current:
+    post:
+      operationId: setCurrentCycle
+      tags: [cycles]
+      summary: Torna um ciclo aberto o ciclo atual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cycle"
+        "404":
+          description: Ciclo não encontrado
+        "409":
+          description: Ciclo fechado não volta a ser o atual
+
+  /cycles/{id}/history:
+    get:
+      operationId: getCycleHistory
+      tags: [cycles]
+      summary: Histórico de um ciclo (números, ranking final e eventos), somente leitura
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleHistory"
+        "404":
+          description: Ciclo não encontrado
 
   /ranking:
     get:
@@ -4842,6 +4934,133 @@ components:
           type: string
         isCurrent:
           type: boolean
+        closedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: ["string", "null"]
+
+    CycleStats:
+      type: object
+      required: [eventsTotal, eventsConfirmed, eventsOpen, collaborators, eligible, withBonus, bonusTotal, bonusPaid]
+      properties:
+        eventsTotal:
+          type: integer
+        eventsConfirmed:
+          type: integer
+        eventsOpen:
+          type: integer
+        firstEventDate:
+          type: ["string", "null"]
+        lastEventDate:
+          type: ["string", "null"]
+        collaborators:
+          type: integer
+        eligible:
+          type: integer
+        withBonus:
+          type: integer
+        bonusTotal:
+          type: number
+        bonusPaid:
+          type: number
+        avgFinalResult:
+          type: ["number", "null"]
+
+    CycleSummary:
+      allOf:
+        - $ref: "#/components/schemas/Cycle"
+        - type: object
+          required: [stats]
+          properties:
+            stats:
+              $ref: "#/components/schemas/CycleStats"
+
+    UpdateCycleInput:
+      type: object
+      properties:
+        name:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+
+    CycleHistoryEntry:
+      type: object
+      required: [position, employeeId, employeeName, employeeActive, finalResult, bonusValue, extraBonusValue, eligible, eventsCount, participatedEventsCount, totalAbsences, bonusStatus]
+      properties:
+        position:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        employeeActive:
+          type: boolean
+        finalResult:
+          type: number
+        platoon:
+          type: ["string", "null"]
+        platoonColor:
+          type: ["string", "null"]
+        bonusValue:
+          type: number
+        extraBonusValue:
+          type: number
+        eligible:
+          type: boolean
+        eligibilityReason:
+          type: ["string", "null"]
+        eventsCount:
+          type: integer
+        participatedEventsCount:
+          type: integer
+        totalAbsences:
+          type: integer
+        bonusStatus:
+          type: string
+        paidAt:
+          type: ["string", "null"]
+
+    CycleHistoryEvent:
+      type: object
+      required: [id, name, startDate, endDate, status, resultsConfirmed, isHistorical]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        clientName:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        status:
+          type: string
+        resultsConfirmed:
+          type: boolean
+        isHistorical:
+          type: boolean
+
+    CycleHistory:
+      type: object
+      required: [cycle, ranking, events]
+      properties:
+        cycle:
+          $ref: "#/components/schemas/CycleSummary"
+        ranking:
+          type: array
+          items:
+            $ref: "#/components/schemas/CycleHistoryEntry"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/CycleHistoryEvent"
 
     CreateCycleInput:
       type: object

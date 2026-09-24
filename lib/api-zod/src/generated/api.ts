@@ -3613,17 +3613,158 @@ export const GetCurrentCycleResponse = zod.object({
   "startDate": zod.string().nullish(),
   "endDate": zod.string().nullish(),
   "status": zod.string(),
-  "isCurrent": zod.boolean()
+  "isCurrent": zod.boolean(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string().nullish()
 })
 
 
 /**
- * @summary Create a new cycle and mark it as current
+ * @summary Todos os ciclos (nunca excluídos), com os números de cada um
+ */
+export const ListCyclesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "isCurrent": zod.boolean(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string().nullish()
+}).and(zod.object({
+  "stats": zod.object({
+  "eventsTotal": zod.number(),
+  "eventsConfirmed": zod.number(),
+  "eventsOpen": zod.number(),
+  "firstEventDate": zod.string().nullish(),
+  "lastEventDate": zod.string().nullish(),
+  "collaborators": zod.number(),
+  "eligible": zod.number(),
+  "withBonus": zod.number(),
+  "bonusTotal": zod.number(),
+  "bonusPaid": zod.number(),
+  "avgFinalResult": zod.number().nullish()
+})
+}))
+export const ListCyclesResponse = zod.array(ListCyclesResponseItem)
+
+
+/**
+ * @summary Cria um ciclo e o marca como atual (o atual precisa estar fechado se tiver eventos)
  */
 export const CreateCycleBody = zod.object({
   "name": zod.string(),
   "startDate": zod.string(),
   "endDate": zod.string()
+})
+
+
+/**
+ * @summary Edita nome e período (ciclo fechado só troca o nome)
+ */
+export const UpdateCycleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCycleBody = zod.object({
+  "name": zod.string().optional(),
+  "startDate": zod.string().optional(),
+  "endDate": zod.string().optional()
+})
+
+export const UpdateCycleResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "isCurrent": zod.boolean(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Torna um ciclo aberto o ciclo atual
+ */
+export const SetCurrentCycleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetCurrentCycleResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "isCurrent": zod.boolean(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Histórico de um ciclo (números, ranking final e eventos), somente leitura
+ */
+export const GetCycleHistoryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCycleHistoryResponse = zod.object({
+  "cycle": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "isCurrent": zod.boolean(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string().nullish()
+}).and(zod.object({
+  "stats": zod.object({
+  "eventsTotal": zod.number(),
+  "eventsConfirmed": zod.number(),
+  "eventsOpen": zod.number(),
+  "firstEventDate": zod.string().nullish(),
+  "lastEventDate": zod.string().nullish(),
+  "collaborators": zod.number(),
+  "eligible": zod.number(),
+  "withBonus": zod.number(),
+  "bonusTotal": zod.number(),
+  "bonusPaid": zod.number(),
+  "avgFinalResult": zod.number().nullish()
+})
+})),
+  "ranking": zod.array(zod.object({
+  "position": zod.number(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "employeeActive": zod.boolean(),
+  "finalResult": zod.number(),
+  "platoon": zod.string().nullish(),
+  "platoonColor": zod.string().nullish(),
+  "bonusValue": zod.number(),
+  "extraBonusValue": zod.number(),
+  "eligible": zod.boolean(),
+  "eligibilityReason": zod.string().nullish(),
+  "eventsCount": zod.number(),
+  "participatedEventsCount": zod.number(),
+  "totalAbsences": zod.number(),
+  "bonusStatus": zod.string(),
+  "paidAt": zod.string().nullish()
+})),
+  "events": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "status": zod.string(),
+  "resultsConfirmed": zod.boolean(),
+  "isHistorical": zod.boolean()
+}))
 })
 
 

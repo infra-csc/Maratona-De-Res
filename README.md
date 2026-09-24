@@ -45,6 +45,9 @@ O CI (`.github/workflows/ci.yml`) roda tudo isso em cada push e falha se o
 - Quem conta para nota (freela, Sup Ceno, inativo): `lib/participation.ts`.
 - Snapshot oficial do ciclo: `recomputeCycleResults` em `routes/results.ts`.
   Só eventos com **resultados confirmados** entram.
+- Ciclos (tela `/cycles`, rotas em `routes/cycles.ts`, validação em
+  `lib/cycle-rules.ts`): nunca são excluídos; só um é o atual; criar o próximo
+  exige fechar o atual se ele tiver eventos; ciclo fechado só muda de nome.
 - Notas de decisões e incidentes passados: `.agents/memory/*.md`.
 
 ## Banco

@@ -15,4 +15,8 @@ export interface Cycle {
   endDate?: string | null;
   status: string;
   isCurrent: boolean;
+  /** @nullable */
+  closedAt?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
 }

@@ -1462,6 +1462,82 @@ export interface Cycle {
   endDate?: string | null;
   status: string;
   isCurrent: boolean;
+  /** @nullable */
+  closedAt?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
+}
+
+export interface CycleStats {
+  eventsTotal: number;
+  eventsConfirmed: number;
+  eventsOpen: number;
+  /** @nullable */
+  firstEventDate?: string | null;
+  /** @nullable */
+  lastEventDate?: string | null;
+  collaborators: number;
+  eligible: number;
+  withBonus: number;
+  bonusTotal: number;
+  bonusPaid: number;
+  /** @nullable */
+  avgFinalResult?: number | null;
+}
+
+export type CycleSummary = Cycle & {
+  stats: CycleStats;
+};
+
+export interface UpdateCycleInput {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface CycleHistoryEntry {
+  position: number;
+  employeeId: number;
+  employeeName: string;
+  employeeActive: boolean;
+  finalResult: number;
+  /** @nullable */
+  platoon?: string | null;
+  /** @nullable */
+  platoonColor?: string | null;
+  bonusValue: number;
+  extraBonusValue: number;
+  eligible: boolean;
+  /** @nullable */
+  eligibilityReason?: string | null;
+  eventsCount: number;
+  participatedEventsCount: number;
+  totalAbsences: number;
+  bonusStatus: string;
+  /** @nullable */
+  paidAt?: string | null;
+}
+
+export interface CycleHistoryEvent {
+  id: number;
+  name: string;
+  /** @nullable */
+  clientName?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  state?: string | null;
+  startDate: string;
+  endDate: string;
+  status: string;
+  resultsConfirmed: boolean;
+  isHistorical: boolean;
+}
+
+export interface CycleHistory {
+  cycle: CycleSummary;
+  ranking: CycleHistoryEntry[];
+  events: CycleHistoryEvent[];
 }
 
 export interface CreateCycleInput {

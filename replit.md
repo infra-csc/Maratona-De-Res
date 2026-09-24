@@ -36,6 +36,7 @@ App interno de RH: avaliação de equipes por evento, calibração, consolidaç�
 - Só eventos com `resultsConfirmed` entram no ciclo (nota, elegibilidade, bônus); `status` não é a trava.
 - Nota média do ciclo define a faixa; a faixa define prêmio base e valor por evento extra (regra da tabela oficial, 15/09/2026).
 - Redação por papel é feita na API (operador não vê nota; visualizador só vê o próprio), nunca só na UI.
+- Ciclos nunca são excluídos (sem DELETE): o histórico de cada um fica em quarterly_results/eventos por cycleId e é consultado em /cycles/:id. Só um ciclo atual; criar o próximo exige fechar o atual quando ele tem eventos; ciclo fechado não volta a ser atual e só muda de nome.
 - Tokens públicos de avaliação são single-use e reaproveitados quando pendentes e equivalentes.
 - Login do colaborador é por CPF (senha = CPF) por decisão de produto; por isso o cadastro com CPF é restrito a gestores.
 
