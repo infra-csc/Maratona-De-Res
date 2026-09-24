@@ -10,12 +10,18 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+// Sob autoscale cada instância tem o próprio pool; o total contra o Postgres
+// é N × max. Ajuste PG_POOL_MAX conforme o número de instâncias.
+const poolMax = Number(process.env.PG_POOL_MAX ?? 10);
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,
+  max: Number.isFinite(poolMax) && poolMax > 0 ? poolMax : 10,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
   statement_timeout: 60000,
+});
+pool.on("error", (err) => {
+  console.error("[db] erro em conexão ociosa do pool:", err.message);
 });
 
 export const db = drizzle(pool, { schema });

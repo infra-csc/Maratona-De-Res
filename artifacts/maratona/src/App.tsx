@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -6,26 +7,37 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import { ErrorBoundary } from "@/components/error-boundary";
 import LoginPage from "@/pages/login";
-import ChangePasswordPage from "@/pages/change-password";
-import DashboardPage from "@/pages/dashboard";
-import EventsPage from "@/pages/events";
-import EventDetailPage from "@/pages/event-detail";
-import EmployeesPage from "@/pages/employees";
-import EvaluationsPage from "@/pages/evaluations";
-import CalibrationsPage from "@/pages/calibrations";
-import AbsencesPage from "@/pages/absences";
-import PenaltyTypesPage from "@/pages/penalty-types";
-import ResultsPage from "@/pages/results";
-import CriteriaPage from "@/pages/criteria";
-import AreasPage from "@/pages/areas";
-import UsersPage from "@/pages/users";
-import RulesPage from "@/pages/rules";
-import IntegrationPage from "@/pages/integration";
-import AuditPage from "@/pages/audit";
-import MyPerformancePage from "@/pages/my-performance";
-import ComoFuncionaPage from "@/pages/como-funciona";
-import PublicEvalPage from "@/pages/eval-public";
 import NotFound from "@/pages/not-found";
+
+// Cada página vira um chunk próprio: o colaborador que só abre "Meu Desempenho"
+// não baixa a planilha (xlsx), os gráficos nem as 4 mil linhas de Avaliações.
+const ChangePasswordPage = lazy(() => import("@/pages/change-password"));
+const DashboardPage = lazy(() => import("@/pages/dashboard"));
+const EventsPage = lazy(() => import("@/pages/events"));
+const EventDetailPage = lazy(() => import("@/pages/event-detail"));
+const EmployeesPage = lazy(() => import("@/pages/employees"));
+const EvaluationsPage = lazy(() => import("@/pages/evaluations"));
+const CalibrationsPage = lazy(() => import("@/pages/calibrations"));
+const AbsencesPage = lazy(() => import("@/pages/absences"));
+const PenaltyTypesPage = lazy(() => import("@/pages/penalty-types"));
+const ResultsPage = lazy(() => import("@/pages/results"));
+const CriteriaPage = lazy(() => import("@/pages/criteria"));
+const AreasPage = lazy(() => import("@/pages/areas"));
+const UsersPage = lazy(() => import("@/pages/users"));
+const RulesPage = lazy(() => import("@/pages/rules"));
+const IntegrationPage = lazy(() => import("@/pages/integration"));
+const AuditPage = lazy(() => import("@/pages/audit"));
+const MyPerformancePage = lazy(() => import("@/pages/my-performance"));
+const ComoFuncionaPage = lazy(() => import("@/pages/como-funciona"));
+const PublicEvalPage = lazy(() => import("@/pages/eval-public"));
+
+function PageFallback() {
+  return (
+    <div className="flex h-[60vh] items-center justify-center" role="status" aria-live="polite">
+      <div className="text-muted-foreground text-sm">Carregando...</div>
+    </div>
+  );
+}
 
 function handleAuthError(error: unknown) {
   const status = (error as { status?: number })?.status;
@@ -77,7 +89,9 @@ function ProtectedRoute({ component: Component, roles }: { component: React.Comp
   }
   return (
     <AppLayout>
-      <Component />
+      <Suspense fallback={<PageFallback />}>
+        <Component />
+      </Suspense>
     </AppLayout>
   );
 }
@@ -101,6 +115,7 @@ function AppRoutes() {
     );
   }
   return (
+    <Suspense fallback={<PageFallback />}>
     <Switch>
       <Route path="/eval/:token" component={PublicEvalPage} />
       <Route path="/login">
@@ -132,6 +147,7 @@ function AppRoutes() {
       <Route path="/como-funciona" component={() => <ProtectedRoute component={ComoFuncionaPage} />} />
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 
