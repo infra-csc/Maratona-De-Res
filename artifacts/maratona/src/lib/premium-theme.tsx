@@ -45,14 +45,22 @@ export const darkTokens: React.CSSProperties = {
   ["--foreground" as string]: "#f0ede8",
   ["--card" as string]: "#141414",
   ["--card-foreground" as string]: "#f0ede8",
+  ["--card-border" as string]: "#2a2a2a",
+  ["--popover" as string]: "#1a1a1a",
+  ["--popover-foreground" as string]: "#f0ede8",
   ["--primary" as string]: "#d4ff00",
   ["--primary-foreground" as string]: "#0c0c0c",
   ["--secondary" as string]: "#1e1e1e",
+  ["--secondary-foreground" as string]: "#f0ede8",
+  ["--muted" as string]: "#1e1e1e",
   ["--muted-foreground" as string]: "#9a9a90",
   ["--accent" as string]: "#d4ff00",
   ["--accent-foreground" as string]: "#0c0c0c",
   ["--accent-text" as string]: "#d4ff00",
+  ["--destructive" as string]: "#cf3030",
+  ["--destructive-foreground" as string]: "#ffffff",
   ["--border" as string]: "rgba(255,255,255,0.08)",
+  ["--input" as string]: "#2a2a2a",
   ["--ring" as string]: "#d4ff00",
 };
 
@@ -61,14 +69,22 @@ export const lightTokens: React.CSSProperties = {
   ["--foreground" as string]: "#111111",
   ["--card" as string]: "#ffffff",
   ["--card-foreground" as string]: "#111111",
+  ["--card-border" as string]: "#e1e7ef",
+  ["--popover" as string]: "#ffffff",
+  ["--popover-foreground" as string]: "#111111",
   ["--primary" as string]: "#111111",
   ["--primary-foreground" as string]: "#ffffff",
   ["--secondary" as string]: "#e8e6e0",
+  ["--secondary-foreground" as string]: "#111111",
+  ["--muted" as string]: "#f0f2f5",
   ["--muted-foreground" as string]: "#5f5f57",
   ["--accent" as string]: "#9ab000",
   ["--accent-foreground" as string]: "#111111",
   ["--accent-text" as string]: "#5c6b00",
+  ["--destructive" as string]: "#dc2626",
+  ["--destructive-foreground" as string]: "#ffffff",
   ["--border" as string]: "rgba(0,0,0,0.1)",
+  ["--input" as string]: "#e1e7ef",
   ["--ring" as string]: "#111111",
 };
 
@@ -90,7 +106,7 @@ export function PremiumThemeProvider({ children }: { children: React.ReactNode }
 
   // Só alterna a classe: os valores vivem em src/index.css (:root / .dark).
   // Assim `var(--card)` inline e `bg-card` do Tailwind apontam para a mesma cor,
-  // e a variante `dark:` do Tailwind + `.dark` do chart.tsx passam a funcionar.
+  // e a variante `dark:` do Tailwind passa a funcionar.
   useEffect(() => {
     const el = document.documentElement;
     el.classList.toggle("dark", isDark);

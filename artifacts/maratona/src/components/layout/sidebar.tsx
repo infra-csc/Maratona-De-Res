@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import {
-  LayoutDashboard, Calendar, Users, BarChart3, Trophy, Star,
+  LayoutDashboard, Calendar, Users, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck,
   Database, LogOut, Target, Menu, X, TrendingUp,
   FolderLock, BookOpen, Settings2, Sun, Moon
@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { usePremiumTheme, CONDENSED, WARNING } from "@/lib/premium-theme";
+import { usePremiumTheme, CONDENSED, WARNING, ACCENT_TEXT } from "@/lib/premium-theme";
 
 interface NavItem {
   label: string;
@@ -89,33 +89,38 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
             <span className="font-black text-lg uppercase tracking-tight leading-none truncate" style={{ fontFamily: CONDENSED }}>
               Maratona
             </span>
-            <span className="font-bold text-[11px] uppercase tracking-wider leading-none mt-1 truncate" style={{ color: "var(--accent)" }}>
+            <span className="font-bold text-[11px] uppercase tracking-wider leading-none mt-1 truncate" style={{ color: ACCENT_TEXT }}>
               Resultados
             </span>
           </div>
         )}
         {isMobile ? (
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Fechar menu"
             className="p-1.5 rounded-lg transition-colors shrink-0 hover:opacity-70"
             style={{ border: "1px solid var(--border)", color: "var(--foreground)" }}
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         ) : (
           <button
+            type="button"
             data-testid="button-toggle-sidebar"
             onClick={() => setCollapsed(v => !v)}
+            aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            aria-expanded={!collapsed}
             className={cn("p-1.5 rounded-lg transition-colors shrink-0 hover:opacity-70", collapsed && "mx-auto")}
             style={{ border: "1px solid var(--border)", color: "var(--foreground)" }}
           >
-            {collapsed ? <Menu size={18} /> : <X size={18} />}
+            {collapsed ? <Menu size={18} aria-hidden="true" /> : <X size={18} aria-hidden="true" />}
           </button>
         )}
       </div>
 
       <ScrollArea className="flex-1 py-4">
-        <nav className="px-3 space-y-6">
+        <nav className="px-3 space-y-6" aria-label="Navegação principal">
           {navGroups.map(group => {
             const visibleItems = group.items.filter(item => {
               if (user?.role === "avaliador") return item.path === "/evaluations";
@@ -149,6 +154,8 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
                       href={item.path}
                       data-testid={`nav-${item.path.replace("/", "") || "dashboard"}`}
                       title={collapsed && !isMobile ? item.label : undefined}
+                      aria-label={collapsed && !isMobile ? item.label : undefined}
+                      aria-current={isActive ? "page" : undefined}
                       onClick={onClose}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold uppercase tracking-tight transition-all hover:opacity-80",
@@ -160,7 +167,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
                         color: isActive ? "var(--primary-foreground)" : "var(--muted-foreground)",
                       }}
                     >
-                      <Icon size={18} className="shrink-0" />
+                      <Icon size={18} className="shrink-0" aria-hidden="true" />
                       {(!collapsed || isMobile) && <span className="whitespace-nowrap pr-1.5">{item.label}</span>}
                     </Link>
                   );
@@ -173,12 +180,15 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
 
       <div className="p-4 space-y-3" style={{ borderTop: "1px solid var(--border)" }}>
         <button
+          type="button"
           onClick={toggle}
           className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all w-full hover:opacity-70", collapsed && !isMobile && "justify-center")}
           style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
           title={collapsed && !isMobile ? (isDark ? "Modo claro" : "Modo escuro") : undefined}
+          aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+          aria-pressed={isDark}
         >
-          {isDark ? <Sun size={16} className="shrink-0" /> : <Moon size={16} className="shrink-0" />}
+          {isDark ? <Sun size={16} className="shrink-0" aria-hidden="true" /> : <Moon size={16} className="shrink-0" aria-hidden="true" />}
           {(!collapsed || isMobile) && <span>{isDark ? "Modo Claro" : "Modo Escuro"}</span>}
         </button>
 
@@ -198,16 +208,18 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               )}
             </div>
             <button
+              type="button"
               data-testid="button-logout"
               onClick={logout}
               title={collapsed && !isMobile ? "Sair" : undefined}
+              aria-label="Encerrar sessão"
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold uppercase text-[13px] tracking-tight transition-all hover:opacity-70",
                 collapsed && !isMobile ? "justify-center w-full" : "w-full"
               )}
               style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: WARNING }}
             >
-              <LogOut size={18} className="shrink-0" />
+              <LogOut size={18} className="shrink-0" aria-hidden="true" />
               {(!collapsed || isMobile) && <span>Encerrar Sessão</span>}
             </button>
           </>

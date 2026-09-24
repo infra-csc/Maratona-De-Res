@@ -27,14 +27,14 @@ export function AudioPlayer({ objectPath, className }: { objectPath: string; cla
 
   if (failed) {
     return (
-      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#ba1a1a]", className)}>
+      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase text-destructive", className)}>
         <AlertCircle size={12} /> Falha ao carregar o áudio
       </p>
     );
   }
   if (!src) {
     return (
-      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#5c5f61]", className)} data-testid="audio-loading">
+      <p className={cn("flex items-center gap-1.5 text-[11px] font-bold uppercase text-muted-foreground", className)} data-testid="audio-loading">
         <Loader2 size={12} className="animate-spin" /> Carregando áudio...
       </p>
     );
@@ -98,10 +98,16 @@ export function AudioRecorder({
         try {
           const path = await uploadAudioBlob(blob);
           onChange(path);
-        } catch {
-          setError("Falha ao enviar o áudio. Tente novamente.");
+        } catch (err) {
+          // Mostra o motivo quando a API/armazenamento devolve um — o usuário
+          // precisa saber se foi rede, permissão ou tamanho, não só "falhou".
+          const reason = err instanceof Error && err.message.trim() ? err.message.trim().replace(/\.$/, "") : null;
+          setError(reason ? `Falha ao enviar o áudio: ${reason}. Tente novamente.` : "Falha ao enviar o áudio. Tente novamente.");
         } finally {
           setUploading(false);
+          // Libera os blobs gravados — sem isso ficavam retidos em memória até a
+          // próxima gravação (ou até desmontar o componente).
+          chunksRef.current = [];
         }
       };
       recorder.start();
@@ -131,7 +137,7 @@ export function AudioRecorder({
             type="button"
             onClick={() => onChange(null)}
             data-testid="button-rerecord-audio"
-            className="inline-flex items-center gap-1.5 border-2 border-[#191c1e] bg-white px-3 py-1.5 text-[11px] font-bold italic uppercase tracking-wider transition-all hover:bg-[#eceef0]"
+            className="inline-flex items-center gap-1.5 border border-border rounded-lg bg-card text-foreground px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors hover:bg-secondary"
           >
             <RotateCcw size={12} /> Regravar áudio
           </button>
@@ -148,7 +154,7 @@ export function AudioRecorder({
           disabled={disabled || uploading}
           onClick={startRecording}
           data-testid="button-record-audio"
-          className="inline-flex items-center gap-2 border-2 border-[#191c1e] bg-[#ccff00] px-4 py-2 text-xs font-bold italic uppercase tracking-wider transition-all hover:bg-[#b8e600] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 border border-primary rounded-lg bg-primary text-primary-foreground px-4 py-2 text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {uploading ? (
             <>
@@ -165,13 +171,13 @@ export function AudioRecorder({
           type="button"
           onClick={stopRecording}
           data-testid="button-stop-audio"
-          className="inline-flex items-center gap-2 border-2 border-[#191c1e] bg-[#ba1a1a] px-4 py-2 text-xs font-bold italic uppercase tracking-wider text-white transition-all hover:bg-[#9c1414]"
+          className="inline-flex items-center gap-2 border border-destructive rounded-lg bg-destructive px-4 py-2 text-xs font-bold uppercase tracking-wider text-destructive-foreground transition-opacity hover:opacity-90"
         >
           <Square size={14} /> Parar ({mmss})
         </button>
       )}
       {error && (
-        <p className="flex items-center gap-1.5 text-[11px] font-bold italic uppercase text-[#ba1a1a]">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-destructive">
           <AlertCircle size={12} /> {error}
         </p>
       )}
