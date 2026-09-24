@@ -28,8 +28,15 @@ jobs:
       - name: Typecheck (libs + api + web)
         run: pnpm run typecheck
 
-      - name: Testes de regras de cálculo
+      # Unitários (regras de cálculo) + testes de rota: a API real (src/app.ts,
+      # sem build) contra Postgres em WebAssembly (PGlite, devDependency da raiz)
+      # com todas as migrações aplicadas. Nada de serviço externo no job.
+      - name: Testes (unitários + rotas com Postgres em WASM)
         run: pnpm run test
+
+      - name: Contrato da API
+        run: |
+          pnpm run check:api-contract
 
       - name: Contrato OpenAPI em dia com o cliente gerado
         run: |
