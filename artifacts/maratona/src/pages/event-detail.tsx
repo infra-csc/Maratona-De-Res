@@ -571,6 +571,7 @@ export default function EventDetailPage() {
     },
   });
   const resultsConfirmBusy = confirmResults.isPending || unconfirmResults.isPending;
+  const [resultsDialog, setResultsDialog] = useState<"confirm" | "unconfirm" | null>(null);
 
   const removeParticipant = useRemoveEventParticipant({
     mutation: {
@@ -715,7 +716,7 @@ export default function EventDetailPage() {
               event.resultsConfirmed ? (
                 <button
                   data-testid="button-unconfirm-results"
-                  onClick={() => unconfirmResults.mutate({ id })}
+                  onClick={() => setResultsDialog("unconfirm")}
                   disabled={resultsConfirmBusy}
                   className="h-9 px-4 rounded-lg text-[11px] font-black uppercase flex items-center gap-1.5 disabled:opacity-50 transition-opacity hover:opacity-90"
                   style={{ backgroundColor: WARNING, color: "#fff" }}
@@ -725,7 +726,7 @@ export default function EventDetailPage() {
               ) : (
                 <button
                   data-testid="button-confirm-results"
-                  onClick={() => confirmResults.mutate({ id })}
+                  onClick={() => setResultsDialog("confirm")}
                   disabled={resultsConfirmBusy}
                   className="h-9 px-4 rounded-lg text-[11px] font-black uppercase flex items-center gap-1.5 disabled:opacity-50 transition-opacity hover:opacity-90"
                   style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
@@ -737,6 +738,37 @@ export default function EventDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmar/desconfirmar resultados muda elegibilidade e bônus de todos: pede confirmação */}
+      <Dialog open={resultsDialog !== null} onOpenChange={(o) => { if (!o && !resultsConfirmBusy) setResultsDialog(null); }}>
+        <DialogContent className="max-w-md" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
+              {resultsDialog === "confirm" ? "Confirmar resultados" : "Desconfirmar resultados"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            {resultsDialog === "confirm"
+              ? "Este evento passa a contar na elegibilidade e na nota de todos os participantes. O ciclo é recalculado agora."
+              : "Este evento deixa de contar na elegibilidade e na nota dos participantes. O ciclo é recalculado agora e o bônus projetado pode mudar."}
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={() => setResultsDialog(null)} disabled={resultsConfirmBusy} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase disabled:opacity-50" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
+            <button
+              type="button"
+              disabled={resultsConfirmBusy}
+              onClick={() => {
+                const opts = { onSettled: () => setResultsDialog(null) };
+                if (resultsDialog === "confirm") confirmResults.mutate({ id }, opts); else unconfirmResults.mutate({ id }, opts);
+              }}
+              className="h-9 px-4 rounded-lg text-[11px] font-black uppercase disabled:opacity-50"
+              style={resultsDialog === "confirm" ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { backgroundColor: WARNING, color: "#fff" }}
+            >
+              {resultsConfirmBusy ? "Aguarde..." : resultsDialog === "confirm" ? "Confirmar" : "Desconfirmar"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
 

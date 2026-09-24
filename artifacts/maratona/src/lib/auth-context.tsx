@@ -106,6 +106,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("auth:unauthorized", handle);
   }, [logout]);
 
+  // Outra aba trocou de usuário (login, logout ou "Modo Dev"): o token do
+  // localStorage é lido a cada requisição, mas o usuário em memória não.
+  // Sem isto, a tela mostra um usuário e envia o token de outro (403 mudo e
+  // autoria errada). Recarrega para alinhar as duas fontes de verdade.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== TOKEN_KEY && e.key !== USER_KEY && e.key !== null) return;
+      const nowToken = localStorage.getItem(TOKEN_KEY);
+      if (nowToken === token) return;
+      window.location.reload();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [token]);
+
   const impersonate = useCallback((newToken: string, newUser: User) => {
     // Preserve the real (admin) session the first time we enter dev mode.
     if (!localStorage.getItem(REAL_TOKEN_KEY)) {

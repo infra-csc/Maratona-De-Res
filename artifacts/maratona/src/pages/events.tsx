@@ -89,6 +89,7 @@ export default function EventsPage() {
   const [mergeTargetPickerOpen, setMergeTargetPickerOpen] = useState(false);
   const [mergeConflict, setMergeConflict] = useState<{ evaluations: number; calibrations: number; conformities: number; results: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<{ id: number; name: string; startDate: string; endDate: string; clientName?: string | null; city?: string | null; state?: string | null; location?: string | null } | null>(null);
 
@@ -128,6 +129,7 @@ export default function EventsPage() {
         qc.invalidateQueries({ queryKey });
         toast({ title: "Evento excluído com sucesso." });
         setDeleteTarget(null);
+        setDeleteConfirmText("");
       },
       onError: (e: { message?: string }) => toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" }),
     },
@@ -1080,7 +1082,7 @@ export default function EventsPage() {
       </Dialog>
 
       {/* ── Delete confirmation dialog ── */}
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmText(""); } }}>
         <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED, color: WARNING }}>Excluir Evento</DialogTitle>
@@ -1089,6 +1091,10 @@ export default function EventsPage() {
             <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
               Tem certeza que deseja excluir <strong style={{ color: "var(--foreground)" }}>{deleteTarget?.name}</strong>? Todos os participantes, avaliações, calibrações e resultados vinculados serão <strong style={{ color: "var(--foreground)" }}>permanentemente removidos</strong>. Essa ação não pode ser desfeita.
             </p>
+            <div className="space-y-1.5">
+              <label htmlFor="delete-confirm-text" className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Digite EXCLUIR para confirmar</label>
+              <Input id="delete-confirm-text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder="EXCLUIR" autoComplete="off" style={inputStyle} />
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setDeleteTarget(null)}
@@ -1098,7 +1104,7 @@ export default function EventsPage() {
                 Cancelar
               </button>
               <button
-                disabled={deleteMutation.isPending}
+                disabled={deleteMutation.isPending || deleteConfirmText.trim().toUpperCase() !== "EXCLUIR"}
                 onClick={() => { if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id }); }}
                 className="h-10 px-4 rounded-lg text-white text-xs font-bold uppercase disabled:opacity-50 transition-opacity hover:opacity-90 flex items-center gap-1.5"
                 style={{ backgroundColor: WARNING }}

@@ -134,30 +134,17 @@ export default function EmployeesPage() {
   type BulkCpfResult = { updated: { id: number; name: string }[]; notFound: string[] };
   const [bulkCpfResult, setBulkCpfResult] = useState<BulkCpfResult | null>(null);
 
-  const CPF_DATA = [
-    { name: "ADRIANO SILVA DE ARAUJO",          document: "23474520881" },
-    { name: "ALONSO LUCAS TRINDADE",             document: "28042772831" },
-    { name: "BRUNO DA SILVA CORDEIRO",           document: "34920606842" },
-    { name: "CAUE SOUZA LIMA",                   document: "59701230809" },
-    { name: "DOUGLAS FERREIRA DOS REIS",         document: "42771339838" },
-    { name: "EDGARD JOSE SOARES MARIANO",        document: "40378835890" },
-    { name: "ERICK RAMOS DA SILVA",              document: "54952929876" },
-    { name: "EVERTON DE JESUS MARINHO SANTOS",   document: "41227528841" },
-    { name: "GABRIEL NASCIMENTO MENEZES",        document: "45589964890" },
-    { name: "IAGO DIAS TEMOTEO",                 document: "40249005875" },
-    { name: "JAMERSON RODRIGUES DA SILVA",       document: "35816863843" },
-    { name: "JOAO JORGE DA SILVA MENINO",        document: "45165575845" },
-    { name: "JOAO MARCOS NASCIMENTO LEITE",      document: "06765767533" },
-    { name: "JOSE MARCIO DA SILVA MENINO",       document: "39096766857" },
-    { name: "JOSE RENATO ALBUQUERQUE DE SOUZA",  document: "34735716874" },
-    { name: "KAIO GABRIEL FERREIRA BARBOSA",     document: "44892939846" },
-    { name: "LUAN MIGUEL MARQUES",               document: "33454560870" },
-    { name: "LYRICK ANDRADE ALVES DA SILVA",     document: "90000502863" },
-    { name: "MATHEUS DA SILVA CORDEIRO",         document: "48193325893" },
-    { name: "ULISSES DAMAZIO FERNANDES",         document: "35103131862" },
-    { name: "VINICIUS DA SILVA",                 document: "54723995803" },
-    { name: "WILLIANS SILVA DE JESUS",           document: "38193810821" },
-  ];
+  // Lista "Nome;CPF" colada pelo admin no diálogo (nunca dado pessoal no código).
+  const [bulkCpfText, setBulkCpfText] = useState("");
+  const parsedCpfRows = bulkCpfText
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(l => {
+      const [name, doc] = l.split(/[;,\t]/).map(x => (x ?? "").trim());
+      return { name: (name ?? "").toUpperCase(), document: (doc ?? "").replace(/\D/g, "") };
+    })
+    .filter(r => r.name && r.document.length === 11);
 
   const handleBulkSetCpf = useCallback(async () => {
     setBulkCpfLoading(true);
@@ -166,13 +153,17 @@ export default function EmployeesPage() {
       const res = await fetch("/api/employees/bulk-set-cpf", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(CPF_DATA),
+        body: JSON.stringify(parsedCpfRows),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? `Falha ao importar (HTTP ${res.status})`);
+      }
       const data = await res.json() as BulkCpfResult;
       setBulkCpfResult(data);
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
-    } catch {
-      toast({ title: "Erro ao importar CPFs", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Erro ao importar CPFs", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
     } finally {
       setBulkCpfLoading(false);
     }
@@ -243,6 +234,7 @@ export default function EmployeesPage() {
   }, [token, toast, qc]);
 
   const [mergeMode, setMergeMode] = useState(false);
+  const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [resetTypeOpen, setResetTypeOpen] = useState(false);
   const [resetTypePending, setResetTypePending] = useState(false);
@@ -300,6 +292,7 @@ export default function EmployeesPage() {
         qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey({ active: false }) });
         setMergeResult(data);
         setMergeMode(false);
+        setMergeConfirmOpen(false);
         setSelectedIds(new Set());
         setCanonicalId(null);
       },
@@ -846,11 +839,7 @@ export default function EmployeesPage() {
             </div>
             <button
               disabled={!canonicalId || mergeMutation.isPending}
-              onClick={() => {
-                if (!canonicalId) return;
-                const dupIds = Array.from(selectedIds).filter(id => id !== canonicalId);
-                mergeMutation.mutate({ id: canonicalId, data: { duplicateIds: dupIds } });
-              }}
+              onClick={() => { if (canonicalId) setMergeConfirmOpen(true); }}
               className="px-5 py-3 rounded-lg font-black text-sm uppercase flex items-center gap-2 disabled:opacity-40 shrink-0 transition-opacity hover:opacity-90"
               style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
             >
@@ -1338,6 +1327,44 @@ export default function EmployeesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Confirmação da mesclagem: apaga os registros duplicados e seus resultados */}
+      <Dialog open={mergeConfirmOpen} onOpenChange={(v) => { if (!mergeMutation.isPending) setMergeConfirmOpen(v); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><GitMerge size={18} /> Confirmar mesclagem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1 text-sm">
+            <p>
+              Vai manter <strong>{(employees ?? []).find(e => e.id === canonicalId)?.name ?? "?"}</strong> e transferir para ele as participações em eventos e faltas de:
+            </p>
+            <ul className="rounded-lg text-xs divide-y max-h-40 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
+              {Array.from(selectedIds).filter(id => id !== canonicalId).map(id => (
+                <li key={id} className="px-3 py-1.5">{(employees ?? []).find(e => e.id === id)?.name ?? `#${id}`}</li>
+              ))}
+            </ul>
+            <p className="text-xs font-semibold" style={{ color: "#b3261e" }}>
+              Os registros duplicados e os resultados de ciclo calculados para eles são apagados. Não dá para desfazer.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={() => setMergeConfirmOpen(false)} disabled={mergeMutation.isPending} className="h-9 px-4 rounded-lg text-sm font-bold uppercase disabled:opacity-50" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
+            <button
+              type="button"
+              disabled={!canonicalId || mergeMutation.isPending}
+              onClick={() => {
+                if (!canonicalId) return;
+                const dupIds = Array.from(selectedIds).filter(id => id !== canonicalId);
+                mergeMutation.mutate({ id: canonicalId, data: { duplicateIds: dupIds } });
+              }}
+              className="h-9 px-4 rounded-lg text-sm font-black uppercase flex items-center gap-2 disabled:opacity-50"
+              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+            >
+              <GitMerge size={14} /> {mergeMutation.isPending ? "Mesclando..." : "Mesclar e apagar duplicados"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo de importação em lote de CPFs */}
       <Dialog open={bulkCpfOpen} onOpenChange={v => { setBulkCpfOpen(v); if (!v) setBulkCpfResult(null); }}>
         <DialogContent className="max-w-md">
@@ -1348,20 +1375,22 @@ export default function EmployeesPage() {
           </DialogHeader>
           {!bulkCpfResult ? (
             <div className="space-y-4 py-2">
-              <p className="text-sm text-muted-foreground">
-                Vai definir o CPF de <strong>{CPF_DATA.length} colaboradores</strong> pelo nome exato.
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                Cole uma linha por colaborador no formato <code>NOME;CPF</code> (o nome precisa ser exatamente igual ao cadastro).
                 A operação é idempotente — rodar de novo não altera dados já corretos.
               </p>
-              <div className="rounded-lg border text-xs max-h-48 overflow-y-auto divide-y">
-                {CPF_DATA.map(e => (
-                  <div key={e.name} className="flex justify-between px-3 py-1.5 gap-2">
-                    <span className="truncate font-medium">{e.name}</span>
-                    <span className="shrink-0 text-muted-foreground font-mono">
-                      {e.document.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <textarea
+                id="bulk-cpf-text"
+                value={bulkCpfText}
+                onChange={e => setBulkCpfText(e.target.value)}
+                rows={8}
+                placeholder={"MARIA DA SILVA;12345678901\nJOÃO SOUZA;98765432100"}
+                className="w-full rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2"
+                style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" }}
+              />
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                {parsedCpfRows.length} linha(s) válida(s) reconhecida(s).
+              </p>
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   onClick={() => setBulkCpfOpen(false)}
@@ -1372,7 +1401,7 @@ export default function EmployeesPage() {
                 </button>
                 <button
                   onClick={handleBulkSetCpf}
-                  disabled={bulkCpfLoading}
+                  disabled={bulkCpfLoading || parsedCpfRows.length === 0}
                   className="h-9 px-4 rounded-lg text-sm font-bold uppercase flex items-center gap-2 disabled:opacity-50"
                   style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                 >

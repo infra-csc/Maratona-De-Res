@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { KeyRound, ArrowRight } from "lucide-react";
 
 export default function ChangePasswordPage() {
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [, setLocation] = useLocation();
@@ -31,7 +32,7 @@ export default function ChangePasswordPage() {
       toast({ title: "As senhas não coincidem", variant: "destructive" });
       return;
     }
-    changePasswordMutation.mutate({ data: { newPassword, confirmPassword } });
+    changePasswordMutation.mutate({ data: { newPassword, confirmPassword, ...(user?.mustChangePassword ? {} : { currentPassword }) } });
   };
 
   return (
@@ -51,11 +52,29 @@ export default function ChangePasswordPage() {
         <div className="bg-white border-2 border-[#191c1e] shadow-[4px_4px_0px_0px_#191c1e]">
           <div className="bg-[#f2f4f6] px-6 py-4 border-b-2 border-[#191c1e]">
             <p className="text-sm font-black italic text-[#191c1e] uppercase tracking-tight">Olá, {user?.name}</p>
-            <p className="text-[11px] font-bold italic text-[#747a60] uppercase tracking-wider">Por segurança, defina uma nova senha antes de continuar</p>
+            <p className="text-[11px] font-bold italic text-[#747a60] uppercase tracking-wider">{user?.mustChangePassword ? "Por segurança, defina uma nova senha antes de continuar" : "Confirme a senha atual e escolha a nova"}</p>
           </div>
 
           <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
+              {!user?.mustChangePassword && (
+                <div className="space-y-1.5">
+                  <label htmlFor="currentPassword" className="text-[13px] font-black italic text-[#191c1e] uppercase tracking-tight">
+                    Senha Atual
+                  </label>
+                  <input
+                    id="currentPassword"
+                    data-testid="input-current-password"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    autoComplete="current-password"
+                    className="w-full h-12 px-4 border-2 border-[#191c1e] bg-white text-[#191c1e] text-sm font-bold italic placeholder:text-[#747a60] placeholder:font-bold placeholder:italic focus:outline-none focus:ring-2 focus:ring-[#ccff00] focus:ring-offset-2 focus:ring-offset-[#f7f9fb]"
+                  />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label htmlFor="newPassword" className="text-[13px] font-black italic text-[#191c1e] uppercase tracking-tight">
                   Nova Senha

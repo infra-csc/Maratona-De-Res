@@ -120,7 +120,7 @@ function AppRoutes() {
       <Route path="/calibrations" component={() => <ProtectedRoute component={CalibrationsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/absences" component={() => <ProtectedRoute component={AbsencesPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/penalty-types" component={() => <ProtectedRoute component={PenaltyTypesPage} roles={["admin", "rh"]} />} />
-      <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} />} />
+      <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/ranking"><Redirect to="/results" /></Route>
       <Route path="/criteria" component={() => <ProtectedRoute component={CriteriaPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/areas" component={() => <ProtectedRoute component={AreasPage} roles={["admin", "rh"]} />} />

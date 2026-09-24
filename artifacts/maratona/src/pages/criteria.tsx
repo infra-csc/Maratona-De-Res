@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
+import { customFetch } from "@/lib/custom-fetch";
 import { useForm } from "react-hook-form";
 import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle, Settings2, Search, Calendar, Copy } from "lucide-react";
 import { useAllCriterionRoutings, useSaveCriterionRouting } from "@/lib/routing-api";
@@ -466,13 +467,7 @@ export default function CriteriaPage() {
     setFixCalibRunning(true);
     try {
       const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
-      const resp = await fetch(`${base}/events/admin/fix-calibration-criteria`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (!resp.ok) throw new Error(await resp.text());
-      const data = await resp.json();
+      const data = await customFetch<{ totalUpdated: number; results: { from: string; to: string; updated: number }[] }>(`${base}/events/admin/fix-calibration-criteria`, { method: "POST" });
       setFixCalibResult(data);
       toast({ title: `Calibrações corrigidas — ${data.totalUpdated} linha(s) atualizada(s)` });
     } catch (e: unknown) {
@@ -488,13 +483,7 @@ export default function CriteriaPage() {
     setSyncLabelsRunning(true);
     try {
       const base = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
-      const resp = await fetch(`${base}/criteria/admin/sync-area-labels`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (!resp.ok) throw new Error(await resp.text());
-      const data = await resp.json();
+      const data = await customFetch<{ updated: number }>(`${base}/criteria/admin/sync-area-labels`, { method: "POST" });
       setSyncLabelsResult(data.updated);
       toast({ title: `Rótulos de área sincronizados — ${data.updated} critério(s) atualizado(s)` });
       qc.invalidateQueries({ queryKey: qKey });
