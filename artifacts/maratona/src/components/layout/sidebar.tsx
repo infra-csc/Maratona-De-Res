@@ -3,8 +3,7 @@ import {
   LayoutDashboard, Calendar, Users, Trophy, Star,
   Settings, ClipboardList, UserCheck, Building2, ShieldCheck,
   Database, LogOut, Target, Menu, X, TrendingUp,
-  FolderLock, BookOpen, Settings2, Sun, Moon
-} from "lucide-react";
+  FolderLock, BookOpen, Settings2, Sun, Moon, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -31,7 +30,8 @@ const navGroups: NavGroup[] = [
       { label: "Eventos", path: "/events", icon: Calendar },
       { label: "Avaliações", path: "/evaluations", icon: ClipboardList },
       { label: "Calibrações", path: "/calibrations", icon: Target, roles: ["admin", "rh", "diretoria"] },
-      { label: "Resultados & Ranking", path: "/results", icon: Trophy },
+      { label: "Resultados & Ranking", path: "/results", icon: Trophy, roles: ["admin", "rh", "diretoria"] },
+      { label: "Análises", path: "/analytics", icon: BarChart3, roles: ["admin", "rh", "diretoria"] },
     ]
   },
   {
@@ -131,7 +131,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               // a colaborador, não a este papel operacional).
               if (hasRole(user, "operador")) return ["/events", "/evaluations", "/employees"].includes(item.path);
               if (user?.role === "diretoria") {
-                return ["/", "/calibrations", "/results", "/rules", "/absences", "/criteria"].includes(item.path);
+                return ["/", "/calibrations", "/results", "/analytics", "/rules", "/absences", "/criteria"].includes(item.path);
               }
               return !item.roles || (user && item.roles.includes(user.role));
             });

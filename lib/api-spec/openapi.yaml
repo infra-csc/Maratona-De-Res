@@ -17,6 +17,7 @@ tags:
   - name: rules
   - name: platoon-rules
   - name: dashboard
+  - name: analytics
   - name: results
   - name: ranking
   - name: audit
@@ -2039,6 +2040,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
+
+  /analytics/overview:
+    get:
+      operationId: getAnalyticsOverview
+      tags: [analytics]
+      summary: Indicadores do ciclo atual para a tela de Análises (gestores)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverview"
+        "404":
+          description: Nenhum ciclo ativo
 
   /dashboard/platoon-distribution:
     get:
@@ -4214,6 +4230,214 @@ components:
           type: boolean
         displayOrder:
           type: integer
+
+    AnalyticsOverview:
+      type: object
+      required: [cycle, kpis, scoreTrend, criteria, conformity, faixas, funnel, nearNextFaixa, evaluators, adjustments, clients]
+      properties:
+        cycle:
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            startDate:
+              type: ["string", "null"]
+            endDate:
+              type: ["string", "null"]
+        kpis:
+          type: object
+          required: [eventsTotal, eventsConfirmed, eventsScored, collaborators, reachedMinEvents, eligible, withBonus, bonusTotal, evaluationsSubmitted, evaluationsDraft, calibratedCriteria, penaltiesCount, meritsCount, minEvents]
+          properties:
+            eventsTotal:
+              type: integer
+            eventsConfirmed:
+              type: integer
+            eventsScored:
+              type: integer
+            avgEventScore:
+              type: ["number", "null"]
+            collaborators:
+              type: integer
+            reachedMinEvents:
+              type: integer
+            eligible:
+              type: integer
+            withBonus:
+              type: integer
+            bonusTotal:
+              type: number
+            evaluationsSubmitted:
+              type: integer
+            evaluationsDraft:
+              type: integer
+            calibratedCriteria:
+              type: integer
+            avgCalibrationShift:
+              type: ["number", "null"]
+            penaltiesCount:
+              type: integer
+            meritsCount:
+              type: integer
+            minEvents:
+              type: integer
+        scoreTrend:
+          type: array
+          items:
+            type: object
+            required: [weekStart, label, avgScore, events]
+            properties:
+              weekStart:
+                type: string
+              label:
+                type: string
+              avgScore:
+                type: number
+              events:
+                type: integer
+        criteria:
+          type: array
+          items:
+            type: object
+            required: [key, name, avgScore, calibratedCount, eventsCount]
+            properties:
+              key:
+                type: string
+              name:
+                type: string
+              area:
+                type: ["string", "null"]
+              avgScore:
+                type: number
+              evaluatorAvg:
+                type: ["number", "null"]
+              calibratedAvg:
+                type: ["number", "null"]
+              calibratedCount:
+                type: integer
+              eventsCount:
+                type: integer
+        conformity:
+          type: array
+          items:
+            type: object
+            required: [item, label, answered, nao]
+            properties:
+              item:
+                type: string
+              label:
+                type: string
+              answered:
+                type: integer
+              nao:
+                type: integer
+              naoPct:
+                type: ["number", "null"]
+        faixas:
+          type: array
+          items:
+            type: object
+            required: [name, count, bonusTotal]
+            properties:
+              name:
+                type: string
+              color:
+                type: ["string", "null"]
+              minScore:
+                type: ["number", "null"]
+              maxScore:
+                type: ["number", "null"]
+              count:
+                type: integer
+              bonusTotal:
+                type: number
+        funnel:
+          type: array
+          items:
+            type: object
+            required: [stage, label, count]
+            properties:
+              stage:
+                type: string
+              label:
+                type: string
+              count:
+                type: integer
+        nearNextFaixa:
+          type: array
+          items:
+            type: object
+            required: [employeeId, name, finalResult, nextFaixa, gap, currentBonus, potentialBonus]
+            properties:
+              employeeId:
+                type: integer
+              name:
+                type: string
+              finalResult:
+                type: number
+              currentFaixa:
+                type: ["string", "null"]
+              nextFaixa:
+                type: string
+              gap:
+                type: number
+              currentBonus:
+                type: number
+              potentialBonus:
+                type: number
+        evaluators:
+          type: array
+          items:
+            type: object
+            required: [userId, name, submitted, drafts, biasSamples]
+            properties:
+              userId:
+                type: integer
+              name:
+                type: string
+              submitted:
+                type: integer
+              drafts:
+                type: integer
+              avgGiven:
+                type: ["number", "null"]
+              calibrationBias:
+                type: ["number", "null"]
+              biasSamples:
+                type: integer
+              avgDaysToSubmit:
+                type: ["number", "null"]
+        adjustments:
+          type: array
+          items:
+            type: object
+            required: [label, kind, occurrences, points, employees]
+            properties:
+              label:
+                type: string
+              kind:
+                type: string
+                enum: [penalty, merit]
+              occurrences:
+                type: integer
+              points:
+                type: number
+              employees:
+                type: integer
+        clients:
+          type: array
+          items:
+            type: object
+            required: [client, avgScore, events]
+            properties:
+              client:
+                type: string
+              avgScore:
+                type: number
+              events:
+                type: integer
 
     DashboardSummary:
       type: object

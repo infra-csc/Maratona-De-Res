@@ -3293,6 +3293,105 @@ export const GetDashboardSummaryResponse = zod.object({
 
 
 /**
+ * @summary Indicadores do ciclo atual para a tela de Análises (gestores)
+ */
+export const GetAnalyticsOverviewResponse = zod.object({
+  "cycle": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish()
+}),
+  "kpis": zod.object({
+  "eventsTotal": zod.number(),
+  "eventsConfirmed": zod.number(),
+  "eventsScored": zod.number(),
+  "avgEventScore": zod.number().nullish(),
+  "collaborators": zod.number(),
+  "reachedMinEvents": zod.number(),
+  "eligible": zod.number(),
+  "withBonus": zod.number(),
+  "bonusTotal": zod.number(),
+  "evaluationsSubmitted": zod.number(),
+  "evaluationsDraft": zod.number(),
+  "calibratedCriteria": zod.number(),
+  "avgCalibrationShift": zod.number().nullish(),
+  "penaltiesCount": zod.number(),
+  "meritsCount": zod.number(),
+  "minEvents": zod.number()
+}),
+  "scoreTrend": zod.array(zod.object({
+  "weekStart": zod.string(),
+  "label": zod.string(),
+  "avgScore": zod.number(),
+  "events": zod.number()
+})),
+  "criteria": zod.array(zod.object({
+  "key": zod.string(),
+  "name": zod.string(),
+  "area": zod.string().nullish(),
+  "avgScore": zod.number(),
+  "evaluatorAvg": zod.number().nullish(),
+  "calibratedAvg": zod.number().nullish(),
+  "calibratedCount": zod.number(),
+  "eventsCount": zod.number()
+})),
+  "conformity": zod.array(zod.object({
+  "item": zod.string(),
+  "label": zod.string(),
+  "answered": zod.number(),
+  "nao": zod.number(),
+  "naoPct": zod.number().nullish()
+})),
+  "faixas": zod.array(zod.object({
+  "name": zod.string(),
+  "color": zod.string().nullish(),
+  "minScore": zod.number().nullish(),
+  "maxScore": zod.number().nullish(),
+  "count": zod.number(),
+  "bonusTotal": zod.number()
+})),
+  "funnel": zod.array(zod.object({
+  "stage": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+})),
+  "nearNextFaixa": zod.array(zod.object({
+  "employeeId": zod.number(),
+  "name": zod.string(),
+  "finalResult": zod.number(),
+  "currentFaixa": zod.string().nullish(),
+  "nextFaixa": zod.string(),
+  "gap": zod.number(),
+  "currentBonus": zod.number(),
+  "potentialBonus": zod.number()
+})),
+  "evaluators": zod.array(zod.object({
+  "userId": zod.number(),
+  "name": zod.string(),
+  "submitted": zod.number(),
+  "drafts": zod.number(),
+  "avgGiven": zod.number().nullish(),
+  "calibrationBias": zod.number().nullish(),
+  "biasSamples": zod.number(),
+  "avgDaysToSubmit": zod.number().nullish()
+})),
+  "adjustments": zod.array(zod.object({
+  "label": zod.string(),
+  "kind": zod.enum(['penalty', 'merit']),
+  "occurrences": zod.number(),
+  "points": zod.number(),
+  "employees": zod.number()
+})),
+  "clients": zod.array(zod.object({
+  "client": zod.string(),
+  "avgScore": zod.number(),
+  "events": zod.number()
+}))
+})
+
+
+/**
  * @summary Get platoon distribution
  */
 export const GetDashboardPlatoonDistributionResponseItem = zod.object({

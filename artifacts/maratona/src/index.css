@@ -152,6 +152,10 @@
   --status-info: #5b8def;
   --status-info-text: #2a58b8;
   --status-info-bg: rgba(91,141,239,0.14);
+  /* Gráficos (validados com dataviz/validate_palette contra a superfície do card) */
+  --viz-series-1: #6f8300;
+  --viz-series-2: #2a78d6;
+  --viz-grid: #e8e6e0;
 
   --chart-1: #2463eb;
   --chart-2: #21c45d;
@@ -244,6 +248,9 @@
   --status-info: #5b8def;
   --status-info-text: #8fb2ff;
   --status-info-bg: rgba(91,141,239,0.16);
+  --viz-series-1: #869c00;
+  --viz-series-2: #3987e5;
+  --viz-grid: #262626;
 
   --chart-1: #2d69eb;
   --chart-2: #25da67;

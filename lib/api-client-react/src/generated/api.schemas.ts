@@ -1109,6 +1109,146 @@ export interface PlatoonRuleUpdate {
   displayOrder?: number;
 }
 
+export type AnalyticsOverviewCycle = {
+  id: number;
+  name: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+};
+
+export type AnalyticsOverviewKpis = {
+  eventsTotal: number;
+  eventsConfirmed: number;
+  eventsScored: number;
+  /** @nullable */
+  avgEventScore?: number | null;
+  collaborators: number;
+  reachedMinEvents: number;
+  eligible: number;
+  withBonus: number;
+  bonusTotal: number;
+  evaluationsSubmitted: number;
+  evaluationsDraft: number;
+  calibratedCriteria: number;
+  /** @nullable */
+  avgCalibrationShift?: number | null;
+  penaltiesCount: number;
+  meritsCount: number;
+  minEvents: number;
+};
+
+export type AnalyticsOverviewScoreTrendItem = {
+  weekStart: string;
+  label: string;
+  avgScore: number;
+  events: number;
+};
+
+export type AnalyticsOverviewCriteriaItem = {
+  key: string;
+  name: string;
+  /** @nullable */
+  area?: string | null;
+  avgScore: number;
+  /** @nullable */
+  evaluatorAvg?: number | null;
+  /** @nullable */
+  calibratedAvg?: number | null;
+  calibratedCount: number;
+  eventsCount: number;
+};
+
+export type AnalyticsOverviewConformityItem = {
+  item: string;
+  label: string;
+  answered: number;
+  nao: number;
+  /** @nullable */
+  naoPct?: number | null;
+};
+
+export type AnalyticsOverviewFaixasItem = {
+  name: string;
+  /** @nullable */
+  color?: string | null;
+  /** @nullable */
+  minScore?: number | null;
+  /** @nullable */
+  maxScore?: number | null;
+  count: number;
+  bonusTotal: number;
+};
+
+export type AnalyticsOverviewFunnelItem = {
+  stage: string;
+  label: string;
+  count: number;
+};
+
+export type AnalyticsOverviewNearNextFaixaItem = {
+  employeeId: number;
+  name: string;
+  finalResult: number;
+  /** @nullable */
+  currentFaixa?: string | null;
+  nextFaixa: string;
+  gap: number;
+  currentBonus: number;
+  potentialBonus: number;
+};
+
+export type AnalyticsOverviewEvaluatorsItem = {
+  userId: number;
+  name: string;
+  submitted: number;
+  drafts: number;
+  /** @nullable */
+  avgGiven?: number | null;
+  /** @nullable */
+  calibrationBias?: number | null;
+  biasSamples: number;
+  /** @nullable */
+  avgDaysToSubmit?: number | null;
+};
+
+export type AnalyticsOverviewAdjustmentsItemKind = typeof AnalyticsOverviewAdjustmentsItemKind[keyof typeof AnalyticsOverviewAdjustmentsItemKind];
+
+
+export const AnalyticsOverviewAdjustmentsItemKind = {
+  penalty: 'penalty',
+  merit: 'merit',
+} as const;
+
+export type AnalyticsOverviewAdjustmentsItem = {
+  label: string;
+  kind: AnalyticsOverviewAdjustmentsItemKind;
+  occurrences: number;
+  points: number;
+  employees: number;
+};
+
+export type AnalyticsOverviewClientsItem = {
+  client: string;
+  avgScore: number;
+  events: number;
+};
+
+export interface AnalyticsOverview {
+  cycle: AnalyticsOverviewCycle;
+  kpis: AnalyticsOverviewKpis;
+  scoreTrend: AnalyticsOverviewScoreTrendItem[];
+  criteria: AnalyticsOverviewCriteriaItem[];
+  conformity: AnalyticsOverviewConformityItem[];
+  faixas: AnalyticsOverviewFaixasItem[];
+  funnel: AnalyticsOverviewFunnelItem[];
+  nearNextFaixa: AnalyticsOverviewNearNextFaixaItem[];
+  evaluators: AnalyticsOverviewEvaluatorsItem[];
+  adjustments: AnalyticsOverviewAdjustmentsItem[];
+  clients: AnalyticsOverviewClientsItem[];
+}
+
 export interface EventPendency {
   eventId: number;
   eventName: string;
