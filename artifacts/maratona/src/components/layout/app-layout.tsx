@@ -2,17 +2,15 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./sidebar";
 import { ImpersonationBanner } from "./impersonation-banner";
-import { PremiumThemeProvider, usePremiumTheme, darkTokens, lightTokens, BODY } from "@/lib/premium-theme";
+import { PremiumThemeProvider, BODY, ACCENT_TEXT } from "@/lib/premium-theme";
 
 function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { isDark } = usePremiumTheme();
-  const tokens = isDark ? darkTokens : lightTokens;
 
   return (
     <div
       className="flex h-screen overflow-hidden transition-colors duration-300"
-      style={{ ...tokens, backgroundColor: "var(--background)", fontFamily: BODY }}
+      style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}
     >
       {/* Desktop: sidebar persistente */}
       <div className="hidden md:flex shrink-0">
@@ -50,7 +48,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
             <span className="block font-black text-base uppercase tracking-tight leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
               Maratona
             </span>
-            <span className="block font-bold text-[10px] uppercase tracking-wider leading-none mt-0.5" style={{ color: "var(--accent)" }}>
+            <span className="block font-bold text-[10px] uppercase tracking-wider leading-none mt-0.5" style={{ color: ACCENT_TEXT }}>
               Resultados
             </span>
           </div>

@@ -6,14 +6,40 @@ import { createContext, useContext, useEffect, useState } from "react";
  * convertida, a página segue no brutalismo antigo (Plus Jakarta Sans, bordas
  * retas) porque define sua própria fontFamily/cores inline, independente
  * destas CSS custom properties.
+ *
+ * Os TOKENS DE COR ficam em src/index.css (`:root` claro, `.dark` escuro).
+ * Este arquivo só alterna a classe `dark` no <html> e exporta constantes.
  */
 
 export const CONDENSED = "'Barlow Condensed', sans-serif";
 export const BODY = "'Barlow', sans-serif";
-// Cor de alerta fixa (não faz parte do tema claro/escuro) — usada para
-// sinalizar penalidades e erros, igual nos dois modos.
-export const WARNING = "#e5484d";
 
+// ---------------------------------------------------------------------------
+// Cores semânticas FIXAS (iguais nos dois temas). Use estas constantes em vez
+// de redeclarar hex nas páginas.
+// ---------------------------------------------------------------------------
+/** Erro / penalidade / bloqueio. */
+export const WARNING = "#e5484d";
+/** Positivo / concluído / dentro da meta (lima de marca). Só para fundos, barras e ícones. */
+export const GOOD = "#9ab000";
+/** Atenção / pendente / em andamento. */
+export const AMBER = "#e8a23d";
+/** Informativo / neutro-azul (links secundários, dicas). */
+export const INFO = "#5b8def";
+/**
+ * Cor de marca legível como TEXTO. A lima `--accent` (#9ab000) tem só 2,45:1
+ * sobre branco; `--accent-text` é #5c6b00 no claro (5,90:1 sobre card) e a
+ * própria lima #d4ff00 no escuro (15,9:1). Resolve pelo tema automaticamente.
+ */
+export const ACCENT_TEXT = "var(--accent-text)";
+
+// ---------------------------------------------------------------------------
+// ESPELHOS dos tokens de tema. A FONTE DE VERDADE é src/index.css
+// (`:root` = claro, `.dark` = escuro). O provider abaixo NÃO injeta estes
+// valores: ele só alterna a classe `dark` no <html>. Mantidos exportados para
+// quem precisa do hex em runtime (ex.: canvas/gráficos) — ao alterar o CSS,
+// atualize aqui também.
+// ---------------------------------------------------------------------------
 export const darkTokens: React.CSSProperties = {
   ["--background" as string]: "#0c0c0c",
   ["--foreground" as string]: "#f0ede8",
@@ -22,9 +48,10 @@ export const darkTokens: React.CSSProperties = {
   ["--primary" as string]: "#d4ff00",
   ["--primary-foreground" as string]: "#0c0c0c",
   ["--secondary" as string]: "#1e1e1e",
-  ["--muted-foreground" as string]: "#7a7a7a",
+  ["--muted-foreground" as string]: "#9a9a90",
   ["--accent" as string]: "#d4ff00",
   ["--accent-foreground" as string]: "#0c0c0c",
+  ["--accent-text" as string]: "#d4ff00",
   ["--border" as string]: "rgba(255,255,255,0.08)",
   ["--ring" as string]: "#d4ff00",
 };
@@ -37,9 +64,10 @@ export const lightTokens: React.CSSProperties = {
   ["--primary" as string]: "#111111",
   ["--primary-foreground" as string]: "#ffffff",
   ["--secondary" as string]: "#e8e6e0",
-  ["--muted-foreground" as string]: "#888880",
+  ["--muted-foreground" as string]: "#5f5f57",
   ["--accent" as string]: "#9ab000",
   ["--accent-foreground" as string]: "#111111",
+  ["--accent-text" as string]: "#5c6b00",
   ["--border" as string]: "rgba(0,0,0,0.1)",
   ["--ring" as string]: "#111111",
 };
@@ -60,12 +88,16 @@ export function PremiumThemeProvider({ children }: { children: React.ReactNode }
     localStorage.setItem(STORAGE_KEY, isDark ? "1" : "0");
   }, [isDark]);
 
+  // Só alterna a classe: os valores vivem em src/index.css (:root / .dark).
+  // Assim `var(--card)` inline e `bg-card` do Tailwind apontam para a mesma cor,
+  // e a variante `dark:` do Tailwind + `.dark` do chart.tsx passam a funcionar.
   useEffect(() => {
-    const tokens = isDark ? darkTokens : lightTokens;
     const el = document.documentElement;
-    Object.entries(tokens).forEach(([k, v]) => {
-      el.style.setProperty(k, v as string);
-    });
+    el.classList.toggle("dark", isDark);
+    return () => {
+      // Ao sair do AppLayout (login, /eval), volta para o tema claro do :root.
+      el.classList.remove("dark");
+    };
   }, [isDark]);
 
   return (

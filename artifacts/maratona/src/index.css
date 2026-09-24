@@ -7,57 +7,64 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Bridge Tailwind v4 → tokens do app.
+ * Todas as variáveis abaixo já são cores COMPLETAS (hex/rgba), então o bridge
+ * é `var(--x)` direto — nunca `hsl(var(--x))` (isso gerava `hsl(#fff)`, inválido,
+ * e apagava bg-card/bg-primary/text-muted-foreground/ring-ring no app inteiro).
+ */
 @theme inline {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-card-border: hsl(var(--card-border));
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-card-border: var(--card-border);
 
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-popover-border: hsl(var(--popover-border));
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover-border: var(--popover-border);
 
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-primary-border: var(--primary-border);
 
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-border: var(--secondary-border);
 
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-muted-border: var(--muted-border);
 
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-text: var(--accent-text);
   --color-accent-border: var(--accent-border);
 
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-border: var(--destructive-border);
 
-  --color-chart-1: hsl(var(--chart-1));
-  --color-chart-2: hsl(var(--chart-2));
-  --color-chart-3: hsl(var(--chart-3));
-  --color-chart-4: hsl(var(--chart-4));
-  --color-chart-5: hsl(var(--chart-5));
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 
-  --color-sidebar: hsl(var(--sidebar));
-  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
-  --color-sidebar-border: hsl(var(--sidebar-border));
-  --color-sidebar-primary: hsl(var(--sidebar-primary));
-  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-primary-border: var(--sidebar-primary-border);
-  --color-sidebar-accent: hsl(var(--sidebar-accent));
-  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent-border: var(--sidebar-accent-border);
-  --color-sidebar-ring: hsl(var(--sidebar-ring));
+  --color-sidebar-ring: var(--sidebar-ring);
 
   --font-sans: var(--app-font-sans);
   --radius-sm: calc(var(--radius) - 4px);
@@ -66,61 +73,77 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ============================================================================
+   TOKENS DE COR — FONTE ÚNICA DE VERDADE
+   - Toda variável é uma cor COMPLETA (hex/rgba). Nunca tripla HSL nua.
+   - Use `var(--x)` em style inline OU a utility Tailwind (bg-card, text-muted-foreground…):
+     os dois caminhos resolvem para o mesmo valor.
+   - Tema claro em :root; tema escuro em `.dark` (classe no <html>, aplicada pelo
+     PremiumThemeProvider em src/lib/premium-theme.tsx). Os objetos lightTokens/
+     darkTokens daquele arquivo são apenas ESPELHOS destes valores — ao mudar
+     uma cor aqui, atualize o espelho.
+   - Fora do AppLayout (login, /eval/:token) vale o :root = tema claro.
+   ============================================================================ */
+
 /* LIGHT MODE */
 :root {
+  color-scheme: light;
+
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
-  --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
   --brand-heading: #2d5200;
   --brand-heading-sub: #2d520066;
 
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
-  --border: 214 32% 88%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --card-border: 214 32% 91%;
+  /* Superfícies e texto (mesmos valores de lightTokens) */
+  --background: #f2f1ec;
+  --foreground: #111111;
+  --border: rgba(0,0,0,0.1);
+  --card: #ffffff;
+  --card-foreground: #111111;
+  --card-border: #e1e7ef;
 
-  /* Navy Sidebar */
-  --sidebar: 222 47% 11%;
-  --sidebar-foreground: 215 20% 80%;
-  --sidebar-border: 222 47% 16%;
-  --sidebar-primary: 221 83% 53%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 222 47% 18%;
-  --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-ring: 221 83% 53%;
+  /* Sidebar navy (componente shadcn ui/sidebar.tsx) */
+  --sidebar: #0f1729;
+  --sidebar-foreground: #c2cad6;
+  --sidebar-border: #16213c;
+  --sidebar-primary: #2463eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #182543;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-ring: #2463eb;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --popover-border: 214 32% 88%;
+  --popover: #ffffff;
+  --popover-foreground: #0f1729;
+  --popover-border: #d7dfea;
 
-  /* Vivid Blue */
-  --primary: 221 83% 53%;
-  --primary-foreground: 0 0% 100%;
+  /* Ação primária = preto do sistema premium */
+  --primary: #111111;
+  --primary-foreground: #ffffff;
 
-  --secondary: 215 20% 93%;
-  --secondary-foreground: 222 47% 20%;
+  --secondary: #e8e6e0;
+  --secondary-foreground: #1b294b;
 
-  --muted: 215 20% 95%;
-  --muted-foreground: 215 16% 47%;
+  --muted: #f0f2f5;
+  /* 6,44:1 sobre --card e 5,69:1 sobre --background (AA para texto normal) */
+  --muted-foreground: #5f5f57;
 
-  --accent: 215 20% 93%;
-  --accent-foreground: 222 47% 20%;
+  /* Lima de marca: só para FUNDOS, barras e ícones grandes (2,45:1 sobre branco). */
+  --accent: #9ab000;
+  --accent-foreground: #111111;
+  /* Versão da marca para TEXTO: 5,90:1 sobre --card, 5,22:1 sobre --background. */
+  --accent-text: #5c6b00;
 
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
+  --input: #e1e7ef;
+  --ring: #111111;
 
-  --chart-1: 221 83% 53%;
-  --chart-2: 142 71% 45%;
-  --chart-3: 45 93% 47%;
-  --chart-4: 0 84% 60%;
-  --chart-5: 271 70% 62%;
+  --chart-1: #2463eb;
+  --chart-2: #21c45d;
+  --chart-3: #e7b008;
+  --chart-4: #ef4444;
+  --chart-5: #a05ae2;
 
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --radius: 0.75rem;
@@ -129,68 +152,83 @@
   --shadow: 0px 2px 4px 0px rgba(0,0,0,0.06), 0px 1px 2px -1px rgba(0,0,0,0.05);
   --shadow-md: 0px 4px 6px -1px rgba(0,0,0,0.07), 0px 2px 4px -1px rgba(0,0,0,0.05);
   --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01);
-  
-  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  /* Bordas derivadas: um tom mais escuro que o fundo correspondente */
+  --sidebar-primary-border: color-mix(in srgb, var(--sidebar-primary), black 8%);
+  --sidebar-accent-border: color-mix(in srgb, var(--sidebar-accent), black 8%);
+  --primary-border: color-mix(in srgb, var(--primary), black 8%);
+  --secondary-border: color-mix(in srgb, var(--secondary), black 8%);
+  --muted-border: color-mix(in srgb, var(--muted), black 8%);
+  --accent-border: color-mix(in srgb, var(--accent), black 8%);
+  --destructive-border: color-mix(in srgb, var(--destructive), black 8%);
 }
 
+/* DARK MODE — classe `dark` no <html>, alternada pelo PremiumThemeProvider */
 .dark {
+  color-scheme: dark;
+
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-  --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
   --brand-heading: #ccff00;
   --brand-heading-sub: #ccff0066;
 
-  --background: 222 47% 8%;
-  --foreground: 210 40% 96%;
-  --border: 217 32% 20%;
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 96%;
-  --card-border: 217 32% 22%;
+  /* Superfícies e texto (mesmos valores de darkTokens) */
+  --background: #0c0c0c;
+  --foreground: #f0ede8;
+  --border: rgba(255,255,255,0.08);
+  --card: #141414;
+  --card-foreground: #f0ede8;
+  --card-border: #26344a;
 
-  --sidebar: 222 47% 7%;
-  --sidebar-foreground: 215 20% 70%;
-  --sidebar-border: 222 47% 14%;
-  --sidebar-primary: 221 83% 55%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 222 47% 16%;
-  --sidebar-accent-foreground: 0 0% 95%;
-  --sidebar-ring: 221 83% 55%;
+  --sidebar: #090e1a;
+  --sidebar-foreground: #a3b0c2;
+  --sidebar-border: #131d34;
+  --sidebar-primary: #2d69eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #16213c;
+  --sidebar-accent-foreground: #f2f2f2;
+  --sidebar-ring: #2d69eb;
 
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 96%;
-  --popover-border: 217 32% 22%;
+  --popover: #0f1729;
+  --popover-foreground: #f1f5f9;
+  --popover-border: #26344a;
 
-  --primary: 221 83% 55%;
-  --primary-foreground: 0 0% 100%;
+  /* Ação primária = lima do sistema premium */
+  --primary: #d4ff00;
+  --primary-foreground: #0c0c0c;
 
-  --secondary: 217 32% 17%;
-  --secondary-foreground: 210 40% 96%;
+  --secondary: #1e1e1e;
+  --secondary-foreground: #f1f5f9;
 
-  --muted: 217 32% 17%;
-  --muted-foreground: 215 20% 65%;
+  --muted: #1d2839;
+  /* 6,49:1 sobre --card e 6,89:1 sobre --background */
+  --muted-foreground: #9a9a90;
 
-  --accent: 217 32% 17%;
-  --accent-foreground: 210 40% 96%;
+  --accent: #d4ff00;
+  --accent-foreground: #0c0c0c;
+  /* No escuro a lima já tem 15,9:1 sobre --card — texto pode usar a própria marca. */
+  --accent-text: #d4ff00;
 
-  --destructive: 0 62% 50%;
-  --destructive-foreground: 0 0% 100%;
+  --destructive: #cf3030;
+  --destructive-foreground: #ffffff;
 
-  --input: 217 32% 20%;
-  --ring: 221 83% 55%;
+  --input: #232f43;
+  --ring: #d4ff00;
 
-  --chart-1: 221 83% 55%;
-  --chart-2: 142 71% 50%;
-  --chart-3: 45 93% 55%;
-  --chart-4: 0 84% 65%;
-  --chart-5: 271 70% 65%;
+  --chart-1: #2d69eb;
+  --chart-2: #25da67;
+  --chart-3: #f7c222;
+  --chart-4: #f15b5b;
+  --chart-5: #a867e4;
+
+  /* Bordas derivadas: um tom mais claro que o fundo correspondente */
+  --sidebar-primary-border: color-mix(in srgb, var(--sidebar-primary), white 9%);
+  --sidebar-accent-border: color-mix(in srgb, var(--sidebar-accent), white 9%);
+  --primary-border: color-mix(in srgb, var(--primary), white 9%);
+  --secondary-border: color-mix(in srgb, var(--secondary), white 9%);
+  --muted-border: color-mix(in srgb, var(--muted), white 9%);
+  --accent-border: color-mix(in srgb, var(--accent), white 9%);
+  --destructive-border: color-mix(in srgb, var(--destructive), white 9%);
 }
 
 @layer base {

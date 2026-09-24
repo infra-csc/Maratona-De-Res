@@ -29,40 +29,51 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const { error, componentStack } = this.state;
       const stack = error?.stack ?? error?.message ?? "Erro desconhecido";
+      const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
       return (
-        <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#f7f9fb] p-8 text-center">
-          <div className="border-2 border-[#ba1a1a] bg-white p-8 shadow-[4px_4px_0px_0px_#191c1e] max-w-2xl w-full">
-            <h2 className="text-2xl font-black italic uppercase tracking-tighter text-[#ba1a1a] mb-2">
-              Erro inesperado
+        <div
+          role="alert"
+          className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background text-foreground p-6 text-center"
+        >
+          <div className="rounded-xl border bg-card text-card-foreground p-8 shadow-lg max-w-xl w-full">
+            <h2 className="text-2xl font-semibold tracking-tight text-destructive mb-2">
+              Algo deu errado
             </h2>
-            <p className="text-sm font-bold italic text-[#444933] mb-4">
-              A página encontrou um erro. Tente recarregar ou fazer login novamente.
+            <p className="text-sm text-muted-foreground mb-6">
+              Algo deu errado. Recarregue a página; se persistir, avise o suporte.
             </p>
-            <pre className="text-xs text-left bg-[#eceef0] border border-[#191c1e] p-3 rounded overflow-auto max-h-48 text-[#191c1e] mb-2 whitespace-pre-wrap break-all">
-              {stack}
-            </pre>
-            {componentStack && (
-              <pre className="text-xs text-left bg-[#fff8f8] border border-[#ba1a1a] p-3 rounded overflow-auto max-h-32 text-[#ba1a1a] mb-4 whitespace-pre-wrap break-all">
-                {componentStack.trim()}
-              </pre>
-            )}
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-wrap gap-3 justify-center">
               <button
+                type="button"
                 onClick={() => window.location.reload()}
-                className="border-2 border-[#191c1e] bg-[#ccff00] px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider shadow-[2px_2px_0px_0px_#191c1e] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                className="inline-flex min-h-9 items-center justify-center rounded-md border border-primary-border bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Recarregar
               </button>
               <button
+                type="button"
                 onClick={() => {
                   localStorage.clear();
-                  window.location.assign("/login");
+                  window.location.assign(`${base}/login`);
                 }}
-                className="border-2 border-[#191c1e] bg-white px-5 py-2.5 font-bold text-xs italic uppercase tracking-wider shadow-[2px_2px_0px_0px_#191c1e] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                className="inline-flex min-h-9 items-center justify-center rounded-md border [border-color:var(--button-outline)] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Fazer login novamente
               </button>
             </div>
+            <details className="mt-6 text-left">
+              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                Detalhes técnicos
+              </summary>
+              <pre className="mt-2 text-xs bg-muted border rounded-md p-3 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                {stack}
+              </pre>
+              {componentStack && (
+                <pre className="mt-2 text-xs bg-muted border rounded-md p-3 overflow-auto max-h-32 whitespace-pre-wrap break-all">
+                  {componentStack.trim()}
+                </pre>
+              )}
+            </details>
           </div>
         </div>
       );
