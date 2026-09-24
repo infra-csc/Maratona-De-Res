@@ -29,13 +29,16 @@ Opcionais: `APP_ORIGINS` (CORS, lista separada por vírgula), `PG_POOL_MAX`,
 
 ```bash
 pnpm run typecheck   # libs + api + web
-pnpm run test        # regras de cálculo (node:test)
+pnpm run test        # unitários + rotas contra Postgres em WASM (PGlite)
+pnpm run check:api-contract  # toda rota Express declarada no openapi.yaml
 pnpm run codegen     # após editar openapi.yaml
 pnpm run build       # typecheck + build de produção (api + web)
 ```
 
 O CI (`.github/workflows/ci.yml`) roda tudo isso em cada push e falha se o
-`openapi.yaml` mudar sem o cliente regenerado.
+`openapi.yaml` mudar sem o cliente regenerado ou se alguma rota ficar fora
+do spec. Testes de rota usam `scripts/test/api-harness.mjs` (app real de
+`src/`, banco PGlite em memória com todas as migrações, tokens por papel).
 
 ## Regras de negócio (onde estão)
 
@@ -52,13 +55,15 @@ O CI (`.github/workflows/ci.yml`) roda tudo isso em cada push e falha se o
 
 ## Banco
 
-- Alterou o schema? `pnpm --filter db generate` cria a migração; em produção
-  `pnpm --filter db migrate`. Leia `lib/db/migrations/README.md` para a adoção
-  no banco existente (checagem de duplicatas antes dos índices únicos).
+- Alterou o schema? `pnpm --filter db generate` cria a migração (revise o SQL,
+  prefira DDL idempotente). O pós-merge aplica com
+  `pnpm --filter @workspace/db run migrate:deploy`, que adota o baseline
+  sozinho num banco criado por push. Detalhes em `lib/db/migrations/README.md`.
 - `seed.ts` apaga tudo: só roda com `ALLOW_DESTRUCTIVE_SEED=true` fora de produção.
 
 ## Deploy (Replit)
 
-`git pull` no Shell e Republicar. O hook de pós-merge instala dependências e
-aplica o schema. Antes do primeiro pull com índices únicos, rode
+`git pull` no Shell e Republicar. O hook de pós-merge instala dependências,
+aplica as migrações versionadas e roda `push` (sem --force) como rede de
+segurança. Antes do primeiro pull com índices únicos, rode
 `scripts/sql/check-duplicates.sql` no painel Database.

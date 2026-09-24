@@ -7,10 +7,11 @@ App interno de RH: avaliação de equipes por evento, calibração, consolidaç�
 - `pnpm --filter @workspace/api-server run dev` — API na porta `PORT` (8080 no Replit; o Vite faz proxy de `/api`)
 - `pnpm --filter @workspace/maratona run dev` — app web
 - `pnpm run typecheck` — libs + api + web
-- `pnpm run test` — testes das regras de cálculo (runner nativo do Node)
+- `pnpm run test` — unitários + testes de rota (app real contra PGlite, sem serviço externo)
+- `pnpm run check:api-contract` — falha se alguma rota Express não estiver no openapi.yaml
 - `pnpm run build` — typecheck + build de produção (api + web; mockup-sandbox fica de fora)
 - `pnpm run codegen` — regenera hooks e Zod a partir de `lib/api-spec/openapi.yaml`
-- `pnpm --filter db generate` / `migrate` — migrações versionadas; `push` só em dev
+- `pnpm --filter db generate` / `migrate:deploy` — migrações versionadas (o deploy adota o baseline num banco criado por push); `push` só em dev
 - Env obrigatórias: `DATABASE_URL`, `JWT_SECRET`, `PORT`, `BASE_PATH`. Opcionais: `APP_ORIGINS`, `PG_POOL_MAX`, `SESSION_SECRET`, `PRIVATE_OBJECT_DIR`, `PUBLIC_OBJECT_SEARCH_PATHS`, `LOG_LEVEL`
 
 ## Stack
@@ -46,7 +47,9 @@ App interno de RH: avaliação de equipes por evento, calibração, consolidaç�
 - Antes de aplicar índices únicos num banco existente, rode `scripts/sql/check-duplicates.sql`.
 - `seed.ts` apaga 17 tabelas: exige `ALLOW_DESTRUCTIVE_SEED=true` e nunca roda em produção.
 - Datas de evento são `YYYY-MM-DD`: comparar como texto e exibir com `fmtDate`; `new Date("YYYY-MM-DD")` é UTC.
-- Windows: `pnpm-workspace.yaml` remove binários nativos não-linux; `vite build` local não roda (use o CI).
+- Windows: `pnpm-workspace.yaml` remove binários nativos não-linux; para rodar o web local, extraia os pacotes win32 de rollup, lightningcss e @tailwindcss/oxide (npm pack) em `node_modules/.pnpm/<pacote>/node_modules/`.
+- Sessão: requireAuth confere users.token_version (cache 30 s). Mudou papel, senha, ativo ou vínculo de colaborador? Chame `bumpTokenVersion` (lib/auth.ts).
+- Texto nunca usa GOOD/AMBER/WARNING/INFO nem `--accent`: use os *_TEXT de premium-theme ou `--accent-text` (contraste ≥ 4,5:1). Números na tela: `fmtNum` (vírgula decimal).
 
 ## User preferences
 
