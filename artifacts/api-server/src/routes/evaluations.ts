@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable, publicEvalTokensTable } from "@workspace/db";
+import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCriteriaTable, eventAreaAssignmentsTable, eventCriterionAssignmentsTable } from "@workspace/db";
 import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";

@@ -10,7 +10,7 @@ import { CheckCircle, Clock, Users, Calendar, MapPin, Building2, Save, Flag, Tar
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
-import { cn, formatEventSubtitle, fmtDate } from "@/lib/utils";
+import { cn, fmtDate } from "@/lib/utils";
 import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useDeletePublicToken, type PublicToken } from "@/lib/routing-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -39,188 +39,6 @@ function ScoreButton({ score, current, onClick, disabled, label }: { score: numb
       )}
     >
       <span className="text-lg md:text-xl font-black" style={{ fontFamily: CONDENSED }}>{score}</span>
-    </button>
-  );
-}
-
-function EvaluatorEventCard({
-  event, userId, selected, onSelect, principalAreaIds,
-}: {
-  event: { id: number; name: string; clientName?: string | null; city?: string | null; state?: string | null; cycleName?: string };
-  userId: number | undefined;
-  selected: boolean;
-  onSelect: () => void;
-  principalAreaIds?: Set<number>;
-}) {
-  const { data: criteria } = useGetEventCriteria(event.id, {
-    query: { queryKey: ["event-criteria", event.id] as unknown[] },
-  });
-  const { data: detail } = useGetEvent(event.id, {
-    query: { queryKey: getGetEventQueryKey(event.id) },
-  });
-  const { data: evals } = useGetEvaluations(
-    { eventId: event.id },
-    { query: { queryKey: getGetEvaluationsQueryKey({ eventId: event.id }) } },
-  );
-  const { data: criterionAssignments } = useEventCriterionAssignments(event.id);
-
-  const myAreaIds = new Set(
-    (detail?.areaAssignments ?? []).filter(a => a.evaluatorUserId === userId).map(a => a.areaId),
-  );
-  const assignmentByCriterionId = new Map((criterionAssignments ?? []).map(a => [a.criterionId, a]));
-  const myCriteria = (criteria ?? []).filter(c => {
-    if (!c.active) return false;
-    const assignment = assignmentByCriterionId.get(c.criterionId);
-    if (assignment?.assignedToId != null) return assignment.assignedToId === userId;
-    return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
-  });
-  const myCriterionIds = new Set(myCriteria.map(c => c.criterionId));
-  const delegatedCriteria = (criteria ?? []).filter(c => {
-    if (!c.active || c.responsibleAreaId == null || !principalAreaIds?.has(c.responsibleAreaId)) return false;
-    return !myCriterionIds.has(c.criterionId);
-  }).map(c => {
-    const assignment = assignmentByCriterionId.get(c.criterionId);
-    const submittedEval = (evals ?? []).find(e => e.criterionId === c.criterionId && e.status === "submitted");
-    return {
-      name: c.criterionName,
-      assignee: submittedEval?.evaluatorName ?? assignment?.assignedToName ?? null,
-      submitted: !!submittedEval,
-      submittedAt: submittedEval?.submittedAt ?? null,
-    };
-  });
-
-  const isConformityEval = detail?.conformityEvaluatorUserId === userId;
-  const isFerramentasEval = detail?.conformityEvaluatorFerramentasUserId === userId;
-  const conf = detail?.conformity;
-  const conformityTotal = (isConformityEval ? 5 : 0) + (isFerramentasEval ? 1 : 0);
-  const conformityDoneCount =
-    (isConformityEval
-      ? [conf?.epi, conf?.estaiamentos, conf?.conduta, conf?.standoutResponse].filter(v => v != null).length
-        + (conf?.absencesReport?.trim() ? 1 : 0)
-      : 0)
-    + (isFerramentasEval && conf?.guardaEquipamentos != null ? 1 : 0);
-  const conformityComplete = conformityTotal > 0 && conformityDoneCount === conformityTotal;
-
-  if (myCriteria.length === 0 && delegatedCriteria.length === 0 && conformityTotal === 0) return null;
-
-  const myEval = (cid: number) => (evals ?? []).find(e => e.criterionId === cid && e.evaluatorUserId === userId);
-  const total = myCriteria.length;
-  const submitted = myCriteria.filter(c => myEval(c.criterionId)?.status === "submitted").length;
-  const drafts = myCriteria.filter(c => myEval(c.criterionId)?.status === "draft").length;
-  const delegatedPending = delegatedCriteria.filter(d => !d.submitted).length;
-  const done = (total > 0 || conformityTotal > 0 || delegatedCriteria.length > 0)
-    && submitted === total
-    && delegatedPending === 0
-    && (conformityTotal === 0 || conformityComplete);
-  const inProgress = !done && (submitted > 0 || drafts > 0 || conformityDoneCount > 0 || delegatedCriteria.some(d => d.submitted));
-
-  const statusConfig = done
-    ? { label: "Concluída", badgeCls: "bg-accent/15 text-accent-text border-accent", badgeStyle: undefined as React.CSSProperties | undefined, accent: "var(--accent)", Icon: CheckCircle }
-    : inProgress
-      ? { label: "Em andamento", badgeCls: "", badgeStyle: AMBER_TINT as React.CSSProperties | undefined, accent: AMBER, Icon: Clock }
-      : { label: "A fazer", badgeCls: "bg-secondary text-muted-foreground border-border", badgeStyle: undefined as React.CSSProperties | undefined, accent: "var(--border)", Icon: ArrowRight };
-  const StatusIcon = statusConfig.Icon;
-  const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
-  const subtitle = formatEventSubtitle(event);
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      data-testid={`evaluator-event-${event.id}`}
-      className={cn(
-        "group text-left border border-border rounded-xl border-l-4 overflow-hidden transition-colors w-full",
-        selected ? "bg-accent/10" : "bg-card hover:bg-secondary/60",
-      )}
-      style={{ borderLeftColor: statusConfig.accent }}
-    >
-      <div className="p-4 md:p-5 flex flex-col gap-3">
-        {/* Top row: badge + cycle tag */}
-        <div className="flex items-center justify-between gap-2">
-          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 border font-bold text-[11px] uppercase tracking-wide rounded", statusConfig.badgeCls)} style={statusConfig.badgeStyle}>
-            <StatusIcon size={11} /> {statusConfig.label}
-          </span>
-          {event.cycleName && (
-            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider shrink-0">{event.cycleName}</span>
-          )}
-        </div>
-
-        {/* Event name + subtitle */}
-        <div className="min-w-0">
-          <h4 className="text-lg md:text-xl uppercase font-black tracking-tight leading-tight text-foreground" style={{ fontFamily: CONDENSED }}>{event.name}</h4>
-          {subtitle && (
-            <p className="text-[11px] font-bold uppercase text-muted-foreground mt-0.5 truncate flex items-center gap-1">
-              <MapPin size={10} className="shrink-0" />{subtitle}
-            </p>
-          )}
-        </div>
-
-        {/* Progress bar (criteria) */}
-        {total > 0 && (
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[11px] font-bold uppercase text-muted-foreground">
-                {submitted} de {total} {total === 1 ? "critério" : "critérios"} submetidos
-              </span>
-              <span className={cn("text-xs font-black", done ? "text-accent-text" : "text-foreground")}>{pct}%</span>
-            </div>
-            <div className="w-full bg-secondary border border-border h-2.5 rounded-sm overflow-hidden">
-              <div
-                className="h-full transition-[width] rounded-sm"
-                style={{ width: `${pct}%`, backgroundColor: done ? "var(--accent)" : inProgress ? AMBER : "var(--muted-foreground)" }}
-              />
-            </div>
-            {drafts > 0 && (
-              <p className="text-[11px] mt-1.5 font-bold uppercase flex items-center gap-1" style={{ color: AMBER }}>
-                <AlertCircle size={11} /> {drafts} em rascunho — submeta para concluir
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Conformity */}
-        {conformityTotal > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-secondary border border-border h-2.5 rounded-sm overflow-hidden">
-              <div
-                className="h-full transition-[width] rounded-sm"
-                style={{ width: `${Math.round((conformityDoneCount / conformityTotal) * 100)}%`, backgroundColor: conformityComplete ? "var(--accent)" : AMBER }}
-              />
-            </div>
-            <span className={cn("text-[11px] font-bold uppercase shrink-0", conformityComplete && "text-accent-text")} style={conformityComplete ? undefined : { color: AMBER }}>
-              Conformidade {conformityDoneCount}/{conformityTotal}
-            </span>
-          </div>
-        )}
-
-        {/* Delegated criteria */}
-        {delegatedCriteria.length > 0 && (
-          <div className="pt-2 border-t border-dashed border-border space-y-0.5">
-            {delegatedCriteria.map((d, i) => (
-              d.submitted ? (
-                <p key={i} className="text-[11px] text-accent-text flex items-start gap-1">
-                  <CheckCircle size={11} className="mt-0.5 shrink-0" />
-                  <span><span className="font-bold uppercase">{d.name}</span> — <span className="font-bold">{d.assignee ?? "?"}</span>{d.submittedAt ? ` · ${fmtDT(d.submittedAt)}` : ""}</span>
-                </p>
-              ) : (
-                <p key={i} className="text-[11px] text-muted-foreground flex items-start gap-1">
-                  <Clock size={11} className="mt-0.5 shrink-0" />
-                  <span><span className="font-bold uppercase">{d.name}</span> — {d.assignee ? <span className="font-bold">{d.assignee}</span> : <span className="text-destructive font-bold">sem avaliador</span>}</span>
-                </p>
-              )
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* CTA footer */}
-      <div className={cn(
-        "px-4 md:px-5 py-2.5 border-t border-border flex items-center justify-between text-[11px] font-black uppercase tracking-wide transition-colors",
-        selected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground group-hover:bg-accent/15 group-hover:text-foreground",
-      )}>
-        <span>{selected ? "Avaliando este evento" : "Clique para avaliar"}</span>
-        <ArrowRight size={14} className={cn("transition-transform", selected ? "" : "group-hover:translate-x-0.5")} />
-      </div>
     </button>
   );
 }
@@ -641,11 +459,6 @@ export default function EvaluationsPage() {
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
-  }
-
-  function formatEvalDate(v: string | null | undefined) {
-    if (!v) return "";
-    return new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
   function currentScore(criterionId: number): number | null {

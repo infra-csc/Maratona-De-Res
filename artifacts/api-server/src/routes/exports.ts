@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, quarterlyResultsTable, employeesTable, eventsTable, absencesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { computeEventTeamResult } from "./results.js";
 import { getCurrentCycle } from "../lib/cycle.js";

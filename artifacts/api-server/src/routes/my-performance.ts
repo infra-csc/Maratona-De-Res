@@ -209,8 +209,6 @@ router.get("/my-performance", async (req, res) => {
       .map(r => {
         const weight = parseFloat(((r.weight ?? r.defaultWeight) ?? "1") as string);
         const submittedEvals = allEvals.filter(e => e.criterionId === r.criterionId && e.status === "submitted");
-        const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
-        const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
         const calibration = allCalibrations.find(cal => cal.criterionId === r.criterionId);
         const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
         const scoreUsed = calibratedScore;
@@ -300,7 +298,6 @@ router.get("/my-performance", async (req, res) => {
     const evaluatedCriteria = criteriaDetails.filter(c => c.evaluated).length;
     // Total = critérios ativos não-eventScoped do evento
     const totalExpected = eventCriteriaRows.filter(r => r.active && !r.eventScoped).length;
-    const isComplete = totalExpected > 0 && evaluatedCriteria >= totalExpected;
 
     // Rollup do evento = publicação parcial mais recente entre os critérios
     // incluídos em criteriaDetails (exclui inativos sem calibração).

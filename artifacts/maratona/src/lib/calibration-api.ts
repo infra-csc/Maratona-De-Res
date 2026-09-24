@@ -41,7 +41,7 @@ export interface CalibrationAuditEntry {
  * que a tela possa distinguir 401/403 (sessão expirada) de falhas comuns.
  */
 export class ApiRequestError extends Error {
-  readonly name = "ApiRequestError";
+  override readonly name = "ApiRequestError";
   readonly status: number;
   constructor(status: number, message: string) {
     super(message);

@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check, Link, CreditCard } from "lucide-react";
+import {Plus, Search, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Eye, Wifi, WifiOff, Hash, Copy, Check, Link, CreditCard } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { CONDENSED, BODY, WARNING, GOOD, PremiumCard } from "@/lib/premium-theme";
 
@@ -86,23 +86,6 @@ function initials(name: string) {
 const LOWER_WORDS = new Set(["da","de","do","das","dos","dos","e","em","na","no","nas","nos","a","o","as","os"]);
 function toTitleCase(str: string) {
   return str.toLowerCase().split(/\s+/).map((w, i) => i === 0 || !LOWER_WORDS.has(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(" ");
-}
-
-function CopyLinkButton({ link }: { link: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      title="Copiar link de acesso"
-      onClick={async () => {
-        if (await copyToClipboard(link)) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
-        else window.prompt("Não foi possível copiar automaticamente. Copie o link:", link);
-      }}
-      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90"
-      style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
-    >
-      {copied ? <><Check size={11} /> Link copiado</> : <><Copy size={11} /> Copiar link</>}
-    </button>
-  );
 }
 
 export default function EmployeesPage() {

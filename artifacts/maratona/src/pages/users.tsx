@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye, Pencil, LineChart, GitMerge, X } from "lucide-react";
+import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Filter, Eye, Pencil, LineChart, GitMerge, X } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { CONDENSED, BODY, WARNING, GOOD, AMBER, INFO, PremiumCard } from "@/lib/premium-theme";
 

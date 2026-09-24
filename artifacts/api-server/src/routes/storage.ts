@@ -5,7 +5,6 @@ import {
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
-import { ObjectPermission } from "../lib/objectAcl";
 import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();

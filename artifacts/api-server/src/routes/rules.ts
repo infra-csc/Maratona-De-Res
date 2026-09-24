@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, rulesTable, platoonRulesTable } from "@workspace/db";
-import { eq, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 

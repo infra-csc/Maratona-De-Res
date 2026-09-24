@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
-import { eq, and, sql, inArray, ilike, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
+import { eq, and, sql, inArray, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria, calculateConformitySubtotal, calculateFinalEventScore } from "../lib/calculations.js";
@@ -26,7 +26,7 @@ router.get("/events", async (req, res) => {
   const eventIds = events.map(e => e.id);
 
   // Busca em lote para evitar N+1 (uma query por relação, não por evento).
-  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas, conformityRows, globalCatalog, criterionAssignmentRows] = await Promise.all([
+  const [participants, evals, eventCriteriaRows, calibrations, areaAssignmentRows, allAreas, conformityRows, , criterionAssignmentRows] = await Promise.all([
     db.select({ eventId: eventParticipantsTable.eventId, functionName: eventParticipantsTable.functionName, employmentType: employeesTable.employmentType, employeeFunction: employeesTable.functionName })
       .from(eventParticipantsTable).leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id)).where(inArray(eventParticipantsTable.eventId, eventIds)),
     db.select({ eventId: evaluationsTable.eventId, criterionId: evaluationsTable.criterionId, score: evaluationsTable.score, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId })
@@ -56,8 +56,6 @@ router.get("/events", async (req, res) => {
     db.select({ eventId: eventCriterionAssignmentsTable.eventId, criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
       .from(eventCriterionAssignmentsTable).where(and(inArray(eventCriterionAssignmentsTable.eventId, eventIds), isNotNull(eventCriterionAssignmentsTable.assignedToId))),
   ]);
-  // Quesitos globais ativos com peso > 0 — denominador fixo para todos os eventos.
-  const globalScorable = globalCatalog.filter(c => parseFloat((c.defaultWeight ?? "1") as unknown as string) > 0).length || globalCatalog.length;
   const areaNameById = new Map(allAreas.map(a => [a.id, a.name]));
 
   // Calcula se a Matriz de Conformidade foi preenchida por quem foi atribuído,
@@ -472,7 +470,6 @@ async function loadEventDetail(id: number, redactConformityContent = false) {
   // (falls back to "any submission" for areas without an assignment configured).
   const allEvals = await db.select({ criterionId: evaluationsTable.criterionId, status: evaluationsTable.status, evaluatorUserId: evaluationsTable.evaluatorUserId }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
   const submittedEvals = allEvals.filter(e => e.status === "submitted");
-  const submittedCount = submittedEvals.length;
   const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments.map(a => ({ areaId: a.areaId, evaluatorUserId: a.evaluatorUserId })));
   const evaluatedCriteriaCount = activeCriteria.filter(c => {
     const submittedIds = submittedEvals.filter(e => e.criterionId === c.criterionId).map(e => e.evaluatorUserId as number);
@@ -1093,8 +1090,6 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
   if (ev && (ev.resultsConfirmed || ev.status === "closed")) await recomputeCycleResults(ev.cycleId, req.user!.userId);
   res.status(204).end();
 });
-
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh", "operador"), async (req, res) => {
   const eventId = parseInt(req.params.id as string);

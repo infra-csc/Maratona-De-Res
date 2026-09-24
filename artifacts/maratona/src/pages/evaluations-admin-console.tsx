@@ -698,7 +698,6 @@ export function AdminEvaluationsConsole() {
   });
 
   const critMeta = new Map((selectedDetail?.criteria ?? []).map(c => [c.criterionId, c]));
-  const activeCriteriaCount = (selectedDetail?.criteria ?? []).filter(c => c.active).length;
   const targetWeightSum = (selectedDetail?.criteria ?? []).reduce((s, c) => s + (Number(c.originalWeight) || 0), 0);
   const criteriaConfirmed = selectedDetail?.criteriaConfirmed ?? false;
   const hasEvaluations = selectedDetail?.hasEvaluations ?? false;

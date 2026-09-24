@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable, areasTable, employeesTable, evaluationsTable, calibrationsTable, eventConformitiesTable, eventsTable, eventAreaAssignmentsTable } from "@workspace/db";
-import { eq, and, isNull, inArray, ne } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";

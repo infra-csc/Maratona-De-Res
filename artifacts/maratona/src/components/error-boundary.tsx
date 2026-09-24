@@ -20,12 +20,12 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: { componentStack: string }) {
+  override componentDidCatch(error: Error, info: { componentStack: string }) {
     console.error("[ErrorBoundary] Erro capturado:", error, info.componentStack);
     this.setState({ componentStack: info.componentStack });
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       const { error, componentStack } = this.state;
       const stack = error?.stack ?? error?.message ?? "Erro desconhecido";

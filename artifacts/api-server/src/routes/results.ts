@@ -72,8 +72,6 @@ export async function computeEventTeamResult(eventId: number) {
     .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
     .where(eq(eventCriteriaTable.eventId, eventId));
 
-  const activeCriteria = eventCriteriaRows.filter(c => c.active).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-
   const allEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
   const allCalibrations = await db.select().from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
   const areaAssignments = await db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })

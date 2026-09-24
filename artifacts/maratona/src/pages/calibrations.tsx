@@ -138,8 +138,6 @@ export default function CalibrationsPage() {
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
   const [weightEdits, setWeightEdits] = useState<Record<number, string>>({});
   const [savingWeightId, setSavingWeightId] = useState<number | null>(null);
-  const [collapsedCriteria, setCollapsedCriteria] = useState<Set<number>>(new Set());
-  const collapsedInitializedForEventId = useRef<number | null>(null);
   // Intenção de publicação por critério: "partial" | "final"
   const [publishIntents, setPublishIntents] = useState<Record<number, "partial" | "final">>({});
   const [publishingAll, setPublishingAll] = useState(false);
@@ -150,15 +148,6 @@ export default function CalibrationsPage() {
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
 
-  function toggleCriterionCollapsed(criterionId: number) {
-    setCollapsedCriteria(prev => {
-      const next = new Set(prev);
-      if (next.has(criterionId)) next.delete(criterionId);
-      else next.add(criterionId);
-      return next;
-    });
-  }
-
   const { data: events } = useGetEvents();
   const { data: cycle } = useGetCurrentCycle();
   const { data: criteria } = useGetEventCriteria(selectedEventId!, {
@@ -168,13 +157,6 @@ export default function CalibrationsPage() {
     { eventId: selectedEventId ?? undefined },
     { query: { enabled: !!selectedEventId, queryKey: ["evals", selectedEventId] as unknown[] } }
   );
-  useEffect(() => {
-    if (!selectedEventId || !criteria || criteria.length === 0) return;
-    if (collapsedInitializedForEventId.current === selectedEventId) return;
-    collapsedInitializedForEventId.current = selectedEventId;
-    setCollapsedCriteria(new Set(criteria.filter(c => c.active).map(c => c.criterionId)));
-  }, [selectedEventId, criteria]);
-
   const { data: calComments } = useCalibrationComments(selectedEventId);
   const { data: calAudit } = useCalibrationAudit(selectedEventId);
   const addCommentMutation = useAddCalibrationComment(selectedEventId ?? 0);

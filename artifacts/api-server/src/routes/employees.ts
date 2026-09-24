@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
-import { eq, and, inArray, ne, notInArray, isNotNull, sql } from "drizzle-orm";
+import { eq, and, inArray, notInArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
