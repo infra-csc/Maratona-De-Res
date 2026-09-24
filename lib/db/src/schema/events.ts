@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, integer, numeric, timestamp, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, numeric, timestamp, date, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
@@ -85,6 +85,9 @@ export const eventParticipantsTable = pgTable("event_participants", {
   comment: text("comment"),
 }, (t) => ({
   eventEmployeeUq: uniqueIndex("event_participants_event_employee_uq").on(t.eventId, t.employeeId),
+  // Ranking, Meu Desempenho e recálculo filtram por colaborador; o único
+  // índice existente só serve o prefixo event_id.
+  employeeIdx: index("event_participants_employee_idx").on(t.employeeId),
 }));
 
 // Mural de comentários do evento — chat aberto, visível e editável por

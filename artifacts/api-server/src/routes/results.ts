@@ -258,7 +258,11 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     }
 
     const team = await computeEventTeamResult(ev.id);
-    eventScoreById.set(ev.id, team.conformityScore);
+    // Só entra na média quem tem alguma nota de critério. Sem isso, um evento
+    // com avaliação real mas nota final 0 (ex.: 4 "Não" na matriz) sumia da
+    // média e o colaborador era premiado por ter ido mal.
+    const hasAnyScore = team.criteriaDetails.some(cd => cd.scoreUsed != null);
+    if (hasAnyScore) eventScoreById.set(ev.id, team.conformityScore);
     eventDateById.set(ev.id, ev.startDate);
     const platoonProj = getPlatoonByScore(team.conformityScore, platoonRules);
 
@@ -340,7 +344,7 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     for (const eventId of eventSet) {
       if (!scoringEventIds.has(eventId)) continue;
       const s = eventScoreById.get(eventId);
-      if (s !== undefined && s > 0) {
+      if (s !== undefined) {
         eventScores.push(s);
         const date = eventDateById.get(eventId);
         if (date) scoredEventsWithDate.push({ score: s, date });
@@ -450,8 +454,11 @@ export async function recomputeCycleResults(cycleId: number, userId: number) {
     );
   }
 
-  // FASE DE ESCRITA — rebuild atômico de todo o ciclo.
+  // FASE DE ESCRITA — rebuild atômico de todo o ciclo. A trava por ciclo
+  // serializa recálculos concorrentes (confirmação em lote × calibração):
+  // sem ela os dois delete+insert se entrelaçavam.
   await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${cycleId})`);
     if (allCycleEventIdsUnfiltered.length > 0) {
       await tx.delete(employeeEventResultsTable)
         .where(inArray(employeeEventResultsTable.eventId, allCycleEventIdsUnfiltered));

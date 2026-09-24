@@ -289,6 +289,11 @@ router.get("/my-performance", async (req, res) => {
       : (p.isHistorical && p.importedScore != null)
         ? parseFloat(p.importedScore as unknown as string)
         : rawEventScore;
+    // "Tem nota" = linha oficial, nota importada ou algum critério com nota.
+    // Nota 0 legítima conta; evento sem nenhuma avaliação não conta.
+    const hasScore = officialScore != null
+      || (p.isHistorical && p.importedScore != null)
+      || criteriaForCalc.some(c => (c.calibratedScore ?? c.averageScore) != null);
     // Sem nota (nenhum critério avaliado ainda) não tem pelotão — evita
     // mostrar "Pelotão Branco" para um evento com Quesitos 0/N.
     const platoon = eventScore > 0 ? getPlatoonByScore(eventScore, platoonRulesMapped) : null;
@@ -317,6 +322,7 @@ router.get("/my-performance", async (req, res) => {
       startDate: p.startDate,
       endDate: p.endDate,
       status: p.eventStatus,
+      hasScore,
       feedbackReleased: p.feedbackReleased ?? false,
       feedbackReleasedAt: p.feedbackReleasedAt ?? null,
       criteriaConfirmed: p.criteriaConfirmed ?? false,
@@ -397,7 +403,7 @@ router.get("/my-performance", async (req, res) => {
   const closedEvents = eventSummaries.filter(e => e.status === "closed").length;
 
   const minEventsForEligibility = await getMinEventsForEligibility();
-  const scoredEvents = eventSummaries.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed);
+  const scoredEvents = eventSummaries.filter(e => e.hasScore && e.countsForScore && e.resultsConfirmed);
   // Média bruta ao vivo — usada apenas quando não há snapshot de quarterly_results
   // (ou seja, para a projeção de ciclos ainda sem nenhum resultado calculado).
   const grossAverage = scoredEvents.length > 0
@@ -409,7 +415,10 @@ router.get("/my-performance", async (req, res) => {
   // Regra: participação como "Sup Ceno *" em qualquer evento do ciclo
   // desqualifica do ranking/bônus — mesma regra do fechamento (results.ts).
   const hasSupCenoParticipation = participations.some(p => isInformationalFunction(p.functionName));
-  const eligible = registrationEligible && quarterEligible && !hasSupCenoParticipation;
+  // Mesma regra do fechamento: abaixo do mínimo de eventos não há bônus.
+  const participatedForEligibility = eventSummaries.filter(e => e.resultsConfirmed && e.countsForScore).length;
+  const eligible = registrationEligible && quarterEligible && !hasSupCenoParticipation
+    && participatedForEligibility >= minEventsForEligibility;
 
   let currentPlatoon: string | null = null;
   let currentPlatoonColor: string | null = null;

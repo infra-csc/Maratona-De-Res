@@ -7,7 +7,7 @@ import {
   areasTable, eventsTable, eventCriteriaTable, publicEvalTokensTable,
   publicEvalTokenCriteriaTable, areaConformityRoutingTable, evaluationsTable,
 } from "@workspace/db";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 
@@ -297,21 +297,35 @@ export async function generateCriterionAssignments(eventId: number) {
     .where(inArray(criterionRoutingTable.criterionId, criterionIds));
   const routingMap = new Map(routings.map(r => [r.criterionId, r]));
 
-  const existing = await db.select({ criterionId: eventCriterionAssignmentsTable.criterionId })
+  const existing = await db.select({ id: eventCriterionAssignmentsTable.id, criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
     .from(eventCriterionAssignmentsTable)
     .where(eq(eventCriterionAssignmentsTable.eventId, eventId));
-  const existingSet = new Set(existing.map(e => e.criterionId));
+  const existingByCriterion = new Map(existing.map(e => [e.criterionId, e]));
 
   let generated = 0; let skipped = 0;
   for (const { criterionId } of eventCriteria) {
-    if (existingSet.has(criterionId)) { skipped++; continue; }
     const r = routingMap.get(criterionId);
+    const current = existingByCriterion.get(criterionId);
+    if (current) {
+      // Linha existente mas VAZIA (assignedToId null) também é reparada — o
+      // botão "Aplicar avaliadores padrão" só criava linhas novas e deixava
+      // as vazias travadas para sempre.
+      if (current.assignedToId == null && r?.defaultEvaluatorId != null) {
+        await db.update(eventCriterionAssignmentsTable)
+          .set({ assignedToId: r.defaultEvaluatorId, status: "suggested", updatedAt: new Date() })
+          .where(eq(eventCriterionAssignmentsTable.id, current.id));
+        generated++;
+      } else {
+        skipped++;
+      }
+      continue;
+    }
     await db.insert(eventCriterionAssignmentsTable).values({
       eventId,
       criterionId,
       assignedToId: r?.defaultEvaluatorId ?? null,
       status: r?.defaultEvaluatorId ? "suggested" : "pending",
-    });
+    }).onConflictDoNothing();
     generated++;
   }
 
@@ -721,8 +735,31 @@ router.post("/events/:id/admin-public-token", requireRole("admin", "rh", "direto
     ? recipientName.trim()
     : (evaluatorUser?.name ?? "Avaliador");
 
-  const tokenId = randomUUID();
   const adminTokenType = includeConformity ? "criteria_with_conformity" : "criteria";
+
+  // Reaproveita link PENDENTE equivalente (mesmo avaliador, mesmo tipo, mesmos
+  // critérios): cada clique criava um token novo e, quando duas pessoas
+  // respondiam por links diferentes, a segunda resposta era descartada.
+  const pendingSameKind = await db.select({ id: publicEvalTokensTable.id })
+    .from(publicEvalTokensTable)
+    .where(and(
+      eq(publicEvalTokensTable.eventId, eventId),
+      eq(publicEvalTokensTable.createdByUserId, assignedToUserId),
+      eq(publicEvalTokensTable.tokenType, adminTokenType),
+      isNull(publicEvalTokensTable.usedAt),
+    ));
+  if (pendingSameKind.length > 0) {
+    const wanted = [...validCriterionIds].sort((a, b) => a - b).join(",");
+    const rows = await db.select({ tokenId: publicEvalTokenCriteriaTable.tokenId, criterionId: publicEvalTokenCriteriaTable.criterionId })
+      .from(publicEvalTokenCriteriaTable)
+      .where(inArray(publicEvalTokenCriteriaTable.tokenId, pendingSameKind.map(t => t.id)));
+    const byToken = new Map<string, number[]>();
+    for (const r of rows) { if (!byToken.has(r.tokenId)) byToken.set(r.tokenId, []); byToken.get(r.tokenId)!.push(r.criterionId); }
+    const reusable = pendingSameKind.find(t => (byToken.get(t.id) ?? []).sort((a, b) => a - b).join(",") === wanted);
+    if (reusable) { res.json({ tokenId: reusable.id, reused: true }); return; }
+  }
+
+  const tokenId = randomUUID();
   await db.transaction(async (tx) => {
     await tx.insert(publicEvalTokensTable).values({
       id: tokenId,

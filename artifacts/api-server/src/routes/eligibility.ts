@@ -3,6 +3,7 @@ import { db, employeeCycleEligibilityTable, employeesTable, usersTable } from "@
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { recomputeCycleResults } from "./results.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
@@ -48,24 +49,18 @@ router.post("/cycle-eligibility", requireRole("admin", "rh", "diretoria"), async
     res.status(400).json({ error: "Campos obrigatórios: employeeId, eligible" });
     return;
   }
-  const [existing] = await db.select().from(employeeCycleEligibilityTable)
-    .where(and(
-      eq(employeeCycleEligibilityTable.employeeId, employeeId),
-      eq(employeeCycleEligibilityTable.cycleId, cycle.id),
-    )).limit(1);
-
-  let record;
-  if (existing) {
-    [record] = await db.update(employeeCycleEligibilityTable).set({
-      eligible, reason: reason ?? null, createdByUserId: req.user!.userId, updatedAt: new Date(),
-    }).where(eq(employeeCycleEligibilityTable.id, existing.id)).returning();
-  } else {
-    [record] = await db.insert(employeeCycleEligibilityTable).values({
-      employeeId, cycleId: cycle.id, eligible, reason: reason ?? null, createdByUserId: req.user!.userId,
-    }).returning();
-  }
-  await audit(req.user!.userId, "set_cycle_eligibility", "employee_cycle_eligibility", record.id);
-  res.status(201).json(record);
+  // Upsert sobre o UNIQUE (employee, cycle): dois cliques simultâneos não
+  // estouram mais em 500. E a decisão recalcula o ciclo na hora — antes o
+  // bônus continuava "projetado" com valor cheio até outro gatilho.
+  const [record] = await db.insert(employeeCycleEligibilityTable).values({
+    employeeId, cycleId: cycle.id, eligible, reason: reason ?? null, createdByUserId: req.user!.userId,
+  }).onConflictDoUpdate({
+    target: [employeeCycleEligibilityTable.employeeId, employeeCycleEligibilityTable.cycleId],
+    set: { eligible, reason: reason ?? null, createdByUserId: req.user!.userId, updatedAt: new Date() },
+  }).returning();
+  await audit(req.user!.userId, "set_cycle_eligibility", "employee_cycle_eligibility", record.id, null, { employeeId, eligible, reason: reason ?? null });
+  const { warnings } = await recomputeCycleResults(cycle.id, req.user!.userId);
+  res.status(201).json({ ...record, warnings });
 });
 
 export default router;

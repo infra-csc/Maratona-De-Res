@@ -1,5 +1,6 @@
 import { db } from "@workspace/db";
 import { auditLogsTable } from "@workspace/db";
+import { logger } from "./logger.js";
 
 export async function audit(
   userId: number | null,
@@ -18,7 +19,9 @@ export async function audit(
       beforeJson: before ? JSON.stringify(before) : null,
       afterJson: after ? JSON.stringify(after) : null,
     });
-  } catch {
-    // Non-blocking — audit failures shouldn't break the main flow
+  } catch (err) {
+    // Non-blocking — audit failures shouldn't break the main flow, but a
+    // silent failure on a financial action is worse than a log line.
+    logger.error({ err, action, entity, entityId }, "audit: falha ao gravar trilha");
   }
 }

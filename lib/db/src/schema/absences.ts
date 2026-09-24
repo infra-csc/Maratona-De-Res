@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
@@ -19,7 +19,9 @@ export const absencesTable = pgTable("absences", {
   reason: text("reason"),
   registeredByUserId: integer("registered_by_user_id").notNull().references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  employeeCycleIdx: index("absences_employee_cycle_idx").on(t.employeeId, t.cycleId),
+}));
 
 export const insertAbsenceSchema = createInsertSchema(absencesTable).omit({ id: true, createdAt: true });
 export type InsertAbsence = z.infer<typeof insertAbsenceSchema>;

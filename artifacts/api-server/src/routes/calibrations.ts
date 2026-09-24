@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, calibrationsTable, calibrationCommentsTable, criteriaTable, usersTable, areasTable, eventsTable, auditLogsTable } from "@workspace/db";
+import { db, calibrationsTable, calibrationCommentsTable, criteriaTable, usersTable, areasTable, eventsTable, auditLogsTable, eventCriteriaTable } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
@@ -67,6 +67,11 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
 
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
+  // Calibração de critério que não pertence ao evento ficava visível na tela e
+  // invisível no cálculo.
+  const [link] = await db.select({ id: eventCriteriaTable.id }).from(eventCriteriaTable)
+    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.criterionId, criterionId))).limit(1);
+  if (!link) { res.status(400).json({ error: "Este critério não faz parte do evento" }); return; }
 
   const [existing] = await db.select().from(calibrationsTable)
     .where(and(
@@ -88,12 +93,22 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
       calibratedAt: new Date(),
     }).where(eq(calibrationsTable.id, existing.id)).returning();
   } else {
+    // Duas calibrações do mesmo critério ao mesmo tempo: o UNIQUE barra a
+    // segunda e ela vira uma atualização (antes, nota não determinística).
     [calibration] = await db.insert(calibrationsTable).values({
       eventId, criterionId,
       calibratedScore: String(numScore),
       calibrationReason: reason,
       originalAverageScore: originalAverageScore !== undefined ? String(originalAverageScore) : null,
       calibratedByUserId: req.user!.userId,
+    }).onConflictDoUpdate({
+      target: [calibrationsTable.eventId, calibrationsTable.criterionId],
+      set: {
+        calibratedScore: String(numScore),
+        calibrationReason: reason,
+        calibratedByUserId: req.user!.userId,
+        calibratedAt: new Date(),
+      },
     }).returning();
   }
 

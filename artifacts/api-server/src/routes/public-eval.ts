@@ -15,6 +15,10 @@ import { recomputeCycleResults } from "./results.js";
 
 const router = Router();
 
+class TokenAlreadyUsedError extends Error {
+  constructor() { super("Este link já foi utilizado"); }
+}
+
 // Submissão por link público também muda a nota; se o evento já conta para o
 // ciclo, recalcula o snapshot oficial (autor = quem gerou o link).
 async function recomputeIfEventCounts(eventId: number, userId: number | null): Promise<void> {
@@ -248,10 +252,14 @@ router.post("/public-eval/:token/submit", async (req, res) => {
       });
     }
 
-    await tx.update(publicEvalTokensTable).set({
+    // Marca o link como usado de forma atômica: dois envios simultâneos
+    // passavam a checagem inicial e o segundo sobrescrevia o primeiro.
+    const claimed = await tx.update(publicEvalTokensTable).set({
       usedAt: new Date(),
       submitterName: submitterName.trim(),
-    }).where(eq(publicEvalTokensTable.id, tokenId));
+    }).where(and(eq(publicEvalTokensTable.id, tokenId), isNull(publicEvalTokensTable.usedAt)))
+      .returning({ id: publicEvalTokensTable.id });
+    if (claimed.length === 0) throw new TokenAlreadyUsedError();
 
     await tx.update(eventCriterionAssignmentsTable).set({
       status: "submitted",
@@ -436,10 +444,14 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
       await tx.insert(eventConformitiesTable).values(insertValues);
     }
 
-    await tx.update(publicEvalTokensTable).set({
+    // Marca o link como usado de forma atômica: dois envios simultâneos
+    // passavam a checagem inicial e o segundo sobrescrevia o primeiro.
+    const claimed = await tx.update(publicEvalTokensTable).set({
       usedAt: new Date(),
       submitterName: submitterName.trim(),
-    }).where(eq(publicEvalTokensTable.id, tokenId));
+    }).where(and(eq(publicEvalTokensTable.id, tokenId), isNull(publicEvalTokensTable.usedAt)))
+      .returning({ id: publicEvalTokensTable.id });
+    if (claimed.length === 0) throw new TokenAlreadyUsedError();
   });
 
   await recomputeIfEventCounts(token.eventId, token.createdByUserId ?? null);
@@ -483,6 +495,12 @@ router.delete("/public-eval-tokens/:tokenId", requireAuth, async (req, res) => {
 
   await db.delete(publicEvalTokensTable).where(eq(publicEvalTokensTable.id, tokenId));
   res.json({ ok: true });
+});
+
+// Erros lançados dentro das transações de submissão (link já usado).
+router.use((err: unknown, _req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
+  if (err instanceof TokenAlreadyUsedError) { res.status(409).json({ error: err.message }); return; }
+  next(err);
 });
 
 export default router;

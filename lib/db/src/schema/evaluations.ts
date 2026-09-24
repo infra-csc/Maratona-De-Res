@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, numeric, text, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, timestamp, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { eventsTable } from "./events";
@@ -20,7 +20,12 @@ export const evaluationsTable = pgTable("evaluations", {
   status: text("status").notNull().default("draft"),
   submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // Uma avaliação por (evento, critério, avaliador): duplo clique/duas abas
+  // criavam duas linhas e a média contava o avaliador em dobro.
+  // Antes do push em produção: rode scripts/sql/check-duplicates.sql.
+  eventCriterionEvaluatorUq: uniqueIndex("evaluations_event_criterion_evaluator_uq").on(t.eventId, t.criterionId, t.evaluatorUserId),
+}));
 
 // Calibração no nível do critério do evento/time (não por colaborador).
 export const calibrationsTable = pgTable("calibrations", {
@@ -32,7 +37,11 @@ export const calibrationsTable = pgTable("calibrations", {
   calibrationReason: text("calibration_reason"),
   calibratedByUserId: integer("calibrated_by_user_id").notNull().references(() => usersTable.id),
   calibratedAt: timestamp("calibrated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // Uma calibração por (evento, critério): duas linhas tornavam a nota
+  // oficial dependente da ordem em que o Postgres devolvia as linhas.
+  eventCriterionUq: uniqueIndex("calibrations_event_criterion_uq").on(t.eventId, t.criterionId),
+}));
 
 // Resultado do evento gravado por colaborador (mesma nota para todos do time),
 // para cálculo trimestral individual.
@@ -79,7 +88,10 @@ export const employeeEventResultsTable = pgTable("employee_event_results", {
   platoonProjected: text("platoon_projected"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  eventEmployeeUq: uniqueIndex("employee_event_results_event_employee_uq").on(t.eventId, t.employeeId),
+  employeeIdx: index("employee_event_results_employee_idx").on(t.employeeId),
+}));
 
 // Thread de comentários de calibração — múltiplos por critério/evento.
 export const calibrationCommentsTable = pgTable("calibration_comments", {

@@ -177,6 +177,7 @@ router.get("/ranking-detail", async (req, res) => {
       const historicalScore = p.importedScore != null ? parseFloat(p.importedScore as unknown as string) : 0;
       const platoon = getPlatoonByScore(historicalScore, platoonRulesMapped);
       return {
+        hasScore: p.importedScore != null,
         eventId: p.eventId!,
         eventName: p.eventName ?? "",
         city: p.eventCity ?? null,
@@ -199,8 +200,10 @@ router.get("/ranking-detail", async (req, res) => {
 
     const teamResult = teamResultMap.get(p.eventId!)!;
     const eventScore = teamResult.conformityScore;
-    const platoon = getPlatoonByScore(eventScore, platoonRulesMapped);
+    const hasScore = teamResult.criteriaDetails.some(cd => cd.scoreUsed != null);
+    const platoon = hasScore ? getPlatoonByScore(eventScore, platoonRulesMapped) : null;
     return {
+      hasScore,
       eventId: p.eventId!,
       eventName: p.eventName ?? "",
       city: p.eventCity ?? null,
@@ -265,7 +268,7 @@ router.get("/ranking-detail", async (req, res) => {
   // fechamento formal; o flag resultsConfirmed é o gate definitivo.
   // Alinhado ao recomputeCycleResults: participante marcado como ausente
   // (confirmed === false) não conta para nota — mesma regra dos dois lados.
-  const scored = events.filter(e => e.eventScore > 0 && e.countsForScore && e.resultsConfirmed && e.participationConfirmed !== false);
+  const scored = events.filter(e => e.hasScore && e.countsForScore && e.resultsConfirmed && e.participationConfirmed !== false);
   const scoreSum = Math.round(scored.reduce((s, e) => s + e.eventScore, 0) * 100) / 100;
   const grossAverage = scored.length > 0 ? Math.round(scoreSum / scored.length * 100) / 100 : null;
 

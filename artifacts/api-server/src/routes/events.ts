@@ -3,7 +3,7 @@ import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable,
 import { eq, and, sql, inArray, ilike, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
-import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
+import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria, calculateConformitySubtotal, calculateFinalEventScore } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
 import { generateCriterionAssignments } from "./routing.js";
 import { getCurrentCycle } from "../lib/cycle.js";
@@ -98,6 +98,21 @@ router.get("/events", async (req, res) => {
   const cycleEvents = cycleStartDate && cycleEndDate
     ? events.filter(ev => ev.endDate >= cycleStartDate && ev.endDate <= cycleEndDate)
     : events;
+
+  // Nota OFICIAL por evento (snapshot de employee_event_results, já com a
+  // penalidade da Matriz): para evento confirmado, a lista mostra o mesmo
+  // número que Resultados, Ranking e detalhe — antes calculava por outra regra.
+  const cycleEventIds = cycleEvents.map(ev => ev.id);
+  const officialScoreByEvent = new Map<number, number>();
+  if (cycleEventIds.length > 0) {
+    const officialRows = await db
+      .select({ eventId: employeeEventResultsTable.eventId, finalEventScore: employeeEventResultsTable.finalEventScore })
+      .from(employeeEventResultsTable)
+      .where(inArray(employeeEventResultsTable.eventId, cycleEventIds));
+    for (const r of officialRows) {
+      if (!officialScoreByEvent.has(r.eventId)) officialScoreByEvent.set(r.eventId, parseFloat(r.finalEventScore as unknown as string));
+    }
+  }
 
   const enriched = cycleEvents.map((ev) => {
     const participantCount = participants.filter(p => p.eventId === ev.id && participantCountsForScore(p)).length;
@@ -276,7 +291,16 @@ router.get("/events", async (req, res) => {
       criteriaRaw.push({ criterionId: ch.criterionId as number, weight: chWeight, averageScore: chAvg, calibratedScore: chCalibrated, isEventScoped: true, sourceCriterionId: ch.criterionSourceCriterionId as number | null });
     }
     const criteriaForCalc = mergeEventScopedCriteria(criteriaRaw);
-    const teamScore = criteriaWithProgress > 0 ? calculateEventResult(criteriaForCalc) : null;
+    // Projeção ao vivo com a MESMA regra do cálculo oficial (média ponderada +
+    // penalidade da Matriz de Conformidade); se o evento já está confirmado e
+    // tem linha oficial, ela prevalece.
+    const confRow = conformityRows.find(c => c.eventId === ev.id);
+    const conformitySubtotal = confRow
+      ? calculateConformitySubtotal([confRow.epi, confRow.estaiamentos, confRow.guardaEquipamentos, confRow.conduta])
+      : 100;
+    const liveScore = criteriaWithProgress > 0 ? calculateFinalEventScore(calculateEventResult(criteriaForCalc), conformitySubtotal) : null;
+    const officialScore = ev.resultsConfirmed ? officialScoreByEvent.get(ev.id) : undefined;
+    const teamScore = officialScore ?? liveScore;
 
     // Critérios com peso > 0 são os únicos que entram nos contadores de calibração.
     // Usa scorableCount (por evento, pós-merge) e NÃO globalScorable, para que
@@ -627,6 +651,11 @@ router.patch("/events/:id", requireRole("admin", "rh", "operador"), async (req, 
     ...(endDate !== undefined && { endDate }),
   }).where(eq(eventsTable.id, id)).returning();
   await audit(req.user!.userId, "update", "events", id, before, ev);
+  // Data define a ordem dos eventos extras do bônus e a janela do ciclo.
+  const datesChanged = ev.startDate !== before.startDate || ev.endDate !== before.endDate;
+  if (datesChanged && (ev.resultsConfirmed || ev.status === "closed")) {
+    await recomputeCycleResults(ev.cycleId, req.user!.userId);
+  }
   res.json(ev);
 });
 

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, integer, numeric, timestamp, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, numeric, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areasTable } from "./areas";
@@ -40,7 +40,11 @@ export const eventCriteriaTable = pgTable("event_criteria", {
   // Auditoria de publicação: quem publicou parcial/final
   partialPublishedByUserId: integer("partial_published_by_user_id").references(() => usersTable.id),
   finalPublishedByUserId: integer("final_published_by_user_id").references(() => usersTable.id),
-});
+}, (t) => ({
+  // Um vínculo por (evento, critério): corrida entre resync e seeding da
+  // integração criava duas linhas e o critério contava duas vezes na nota.
+  eventCriterionUq: uniqueIndex("event_criteria_event_criterion_uq").on(t.eventId, t.criterionId),
+}));
 
 export const insertCriterionSchema = createInsertSchema(criteriaTable).omit({ id: true });
 export const insertEventCriterionSchema = createInsertSchema(eventCriteriaTable).omit({ id: true });

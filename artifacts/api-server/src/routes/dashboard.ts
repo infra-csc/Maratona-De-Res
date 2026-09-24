@@ -79,6 +79,7 @@ router.get("/dashboard/summary", async (req, res) => {
       bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
     }));
     totalBonusPreview = quarterResults.reduce((s, r) => {
+      if (r.eligible === false) return s;
       const snapshotBonus = parseFloat(r.bonusValue as unknown as string);
       if (snapshotBonus > 0) return s + snapshotBonus;
       const fr = parseFloat(r.finalResult as unknown as string);

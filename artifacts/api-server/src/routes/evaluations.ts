@@ -249,6 +249,11 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
       comments: comments ?? null,
       commentVisibility: commentVisibility ?? "internal",
       audioUrl: audioUrl ?? null,
+    }).onConflictDoUpdate({
+      // Duplo clique/duas abas: a segunda inserção do mesmo (evento, critério,
+      // avaliador) vira atualização do rascunho em vez de uma linha duplicada.
+      target: [evaluationsTable.eventId, evaluationsTable.criterionId, evaluationsTable.evaluatorUserId],
+      set: { score: String(numScore), comments: comments ?? null, commentVisibility: commentVisibility ?? "internal", audioUrl: audioUrl ?? null },
     }).returning();
   }
   res.status(201).json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });

@@ -391,6 +391,12 @@ router.post("/integration/sync", async (req, res) => {
       }
     });
 
+    // A escalação define participação e elegibilidade: os outros importadores
+    // recalculam ao final; este não recalculava e deixava o ciclo defasado.
+    {
+      const cycleNow = await getCurrentCycle();
+      if (cycleNow) await recomputeCycleResults(cycleNow.id, req.user!.userId);
+    }
     const message = `Sincronização concluída: ${employeesSync} colaboradores, ${eventsSync} eventos, ${participantsSync} participações.`;
     log(message);
     lastSyncAt = new Date().toISOString();
