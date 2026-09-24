@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { CheckCircle2, ClipboardCheck, AlertTriangle, ShieldAlert, Sun, Moon } from "lucide-react";
+import { CONDENSED, BODY, WARNING, darkTokens, lightTokens } from "@/lib/premium-theme";
 
 type TokenType = "criteria" | "conformity_cenografia" | "conformity_ferramentas" | "criteria_with_conformity";
 
@@ -36,7 +37,8 @@ interface ConformityAnswers {
   epiComment: string;
   estaiamentosComment: string;
   condutaComment: string;
-  absencesResponse: boolean | null;
+  // `absencesResponse` não tem controle na tela (a pergunta é texto livre
+  // obrigatório); o payload envia `true` fixo — ver handleSubmit*.
   absencesReport: string;
   standoutResponse: boolean | null;
   standoutJustification: string;
@@ -48,42 +50,11 @@ const scoreLabels: Record<number, string> = {
   10: "Perfeição, atendeu completamente e sem erros",
 };
 
-// Identidade visual própria desta página (freelancer, sem conta no sistema) —
-// tokens de tema aplicados via CSS custom properties, independentes do
-// brutalismo usado no resto do app.
-const CONDENSED = "'Barlow Condensed', sans-serif";
-const BODY = "'Barlow', sans-serif";
-const WARNING = "#e5484d";
-
-const darkTokens: React.CSSProperties = {
-  ["--background" as string]: "#0c0c0c",
-  ["--foreground" as string]: "#f0ede8",
-  ["--card" as string]: "#141414",
-  ["--card-foreground" as string]: "#f0ede8",
-  ["--primary" as string]: "#d4ff00",
-  ["--primary-foreground" as string]: "#0c0c0c",
-  ["--secondary" as string]: "#1e1e1e",
-  ["--muted-foreground" as string]: "#7a7a7a",
-  ["--accent" as string]: "#d4ff00",
-  ["--accent-foreground" as string]: "#0c0c0c",
-  ["--border" as string]: "rgba(255,255,255,0.08)",
-  ["--ring" as string]: "#d4ff00",
-};
-
-const lightTokens: React.CSSProperties = {
-  ["--background" as string]: "#f2f1ec",
-  ["--foreground" as string]: "#111111",
-  ["--card" as string]: "#ffffff",
-  ["--card-foreground" as string]: "#111111",
-  ["--primary" as string]: "#111111",
-  ["--primary-foreground" as string]: "#ffffff",
-  ["--secondary" as string]: "#e8e6e0",
-  ["--muted-foreground" as string]: "#888880",
-  ["--accent" as string]: "#9ab000",
-  ["--accent-foreground" as string]: "#111111",
-  ["--border" as string]: "rgba(0,0,0,0.1)",
-  ["--ring" as string]: "#111111",
-};
+// Página externa (freelancer, sem conta no sistema): fica fora do AppLayout,
+// então não recebe a classe `.dark` do provider. Os tokens vêm do mesmo
+// espelho usado pelo app (`darkTokens`/`lightTokens` em premium-theme) e são
+// injetados inline no shell — mantém a identidade escura/lima própria desta
+// tela sem duplicar valores.
 
 /** Botão pill Sim/Não reutilizado nos três formulários. "Não" usa uma cor de
  * alerta fixa (não faz parte do tema) porque sinaliza uma penalidade real. */
@@ -110,7 +81,7 @@ function YesNoToggle({ value, onChange }: { value: boolean | null; onChange: (v:
         style={{
           fontFamily: CONDENSED,
           backgroundColor: value === false ? WARNING : "transparent",
-          color: value === false ? "#ffffff" : "var(--muted-foreground)",
+          color: value === false ? "var(--destructive-foreground)" : "var(--muted-foreground)",
           border: value === false ? `1px solid ${WARNING}` : "1px solid var(--border)",
         }}
       >
@@ -150,7 +121,7 @@ export default function PublicEvalPage() {
   const [cenoAnswers, setCenoAnswers] = useState<ConformityAnswers>({
     epi: null, estaiamentos: null, conduta: null,
     epiComment: "", estaiamentosComment: "", condutaComment: "",
-    absencesResponse: null, absencesReport: "", standoutResponse: null, standoutJustification: "",
+    absencesReport: "", standoutResponse: null, standoutJustification: "",
   });
 
   // Ferramentas conformity state
@@ -235,6 +206,9 @@ export default function PublicEvalPage() {
           epiComment: cenoAnswers.epiComment || null,
           estaiamentosComment: cenoAnswers.estaiamentosComment || null,
           condutaComment: cenoAnswers.condutaComment || null,
+          // Não há Sim/Não para faltas na tela: o relato em texto é obrigatório,
+          // então a resposta é sempre "respondido" (true) — mesma regra do
+          // fluxo interno do avaliador.
           absencesResponse: true,
           absencesReport: cenoAnswers.absencesReport,
           standoutResponse: cenoAnswers.standoutResponse,
@@ -272,6 +246,7 @@ export default function PublicEvalPage() {
           epiComment: cenoAnswers.epiComment || null,
           estaiamentosComment: cenoAnswers.estaiamentosComment || null,
           condutaComment: cenoAnswers.condutaComment || null,
+          // Sem controle Sim/Não na tela: relato em texto obrigatório => true fixo.
           absencesResponse: true,
           absencesReport: cenoAnswers.absencesReport,
           standoutResponse: cenoAnswers.standoutResponse,
@@ -382,6 +357,55 @@ export default function PublicEvalPage() {
     allCriteriaScored
   );
 
+  // Link de critérios sem nenhum critério: antes o botão ficava cinza para
+  // sempre (allCriteriaScored exige length > 0). Diz na cara o que fazer.
+  if (showCriteria && criteria.length === 0) {
+    return (
+      <div style={shellStyle} className="min-h-screen flex items-center justify-center p-6">
+        <Card className="max-w-md w-full p-8 text-center">
+          <AlertTriangle size={40} className="mx-auto mb-4" style={{ color: WARNING }} />
+          <h1 className="font-black text-2xl uppercase tracking-wide mb-2" style={{ fontFamily: CONDENSED }}>Link sem critérios</h1>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            Este link não tem critérios para avaliar{info.eventName ? <> em <strong style={{ color: "var(--foreground)" }}>{info.eventName}</strong></> : null} — peça outro ao responsável pelo evento.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  // O que ainda falta para liberar o envio — espelha exatamente as regras de
+  // `canSubmit`. Vira a lista acima do botão e a âncora de rolagem/foco.
+  const pending: { label: string; targetId: string }[] = [];
+  if (!submitterName.trim()) pending.push({ label: "Seu nome completo", targetId: "field-submitter-name" });
+  if (showCriteria) {
+    for (const c of criteria) {
+      const ans = answers[c.criterionId];
+      if (ans?.score === null || ans?.score === undefined) pending.push({ label: `Nota do critério ${c.criterionName}`, targetId: `crit-${c.criterionId}-score` });
+      if (!ans?.comments?.trim()) pending.push({ label: `Comentário do critério ${c.criterionName}`, targetId: `crit-${c.criterionId}-comment` });
+    }
+  }
+  if (showCenografiaConformity) {
+    const cenoLabels = { epi: "EPI", estaiamentos: "Estaiamento e aterramento", conduta: "Conduta" } as const;
+    for (const k of cenoItems) {
+      if (cenoAnswers[k] === null) pending.push({ label: cenoLabels[k], targetId: `ceno-${k}` });
+      else if (cenoAnswers[k] === false && !cenoAnswers[cenoCommentKeyOf[k]].trim()) pending.push({ label: `Comentário de ${cenoLabels[k]} (resposta Não)`, targetId: `ceno-${k}-comment` });
+    }
+    if (cenoAbsencesMissing) pending.push({ label: "Faltas e atrasos", targetId: "ceno-absences" });
+    if (cenoStandoutMissing) pending.push({ label: "Detalhe do destaque", targetId: "ceno-standout-justification" });
+  }
+  if (isConformityFerramentas) {
+    if (ferramentasAnswer === null) pending.push({ label: "Retorno de equipamentos e ferramentas", targetId: "ferr-answer" });
+    else if (ferramentasAnswer === false && !ferramentasComment.trim()) pending.push({ label: "Comentário de ferramentas (resposta Não)", targetId: "ferr-comment" });
+  }
+
+  function focusPending(targetId: string) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const focusable = el.matches("input, textarea, button") ? el : el.querySelector<HTMLElement>("input, textarea, button");
+    focusable?.focus({ preventScroll: true });
+  }
+
   return (
     <div style={shellStyle} className="min-h-screen flex flex-col items-center justify-start px-4 py-8">
       <div className="w-full max-w-md space-y-4">
@@ -422,6 +446,7 @@ export default function PublicEvalPage() {
             Seu nome completo <span style={{ color: WARNING }}>*</span>
           </label>
           <input
+            id="field-submitter-name"
             type="text"
             value={submitterName}
             onChange={(e) => setSubmitterName(e.target.value)}
@@ -455,13 +480,15 @@ export default function PublicEvalPage() {
                       <span className="ml-2 normal-case font-semibold" style={{ color: "var(--accent)" }}>— {scoreLabels[selectedScore]}</span>
                     )}
                   </p>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1" id={`crit-${c.criterionId}-score`} role="group" aria-label={`Nota do critério ${c.criterionName}`}>
                     {[0,1,2,3,4,5,6,7,8,9,10].map((s) => (
                       <button
                         key={s}
                         type="button"
+                        aria-label={`Nota ${s}`}
+                        aria-pressed={selectedScore === s}
                         onClick={() => setScore(c.criterionId, s)}
-                        className="flex-1 rounded-lg py-2.5 text-sm font-black transition-all"
+                        className="flex-1 rounded-lg min-h-10 py-2.5 text-sm font-black transition-all"
                         style={{
                           fontFamily: CONDENSED,
                           backgroundColor: selectedScore === s ? "var(--primary)" : "transparent",
@@ -486,6 +513,7 @@ export default function PublicEvalPage() {
                     <span className="ml-1 text-[10px] font-medium normal-case" style={{ color: "var(--muted-foreground)" }}>(obrigatório)</span>
                   </label>
                   <textarea
+                    id={`crit-${c.criterionId}-comment`}
                     rows={3}
                     value={comment}
                     onChange={e => setComments(c.criterionId, e.target.value)}
@@ -523,7 +551,7 @@ export default function PublicEvalPage() {
                   const val = cenoAnswers[item.key];
                   const isNao = val === false;
                   return (
-                    <div key={item.key} className="px-5 py-4" style={i < items.length - 1 ? { borderBottom: "1px solid var(--border)" } : {}}>
+                    <div key={item.key} id={`ceno-${item.key}`} className="px-5 py-4" style={i < items.length - 1 ? { borderBottom: "1px solid var(--border)" } : {}}>
                       <div className="flex items-center justify-between gap-4">
                         <p className="text-sm leading-snug flex-1">{item.question}</p>
                         <div className="flex items-center gap-2 shrink-0">
@@ -537,6 +565,7 @@ export default function PublicEvalPage() {
                             Comentário {isNao ? <span className="normal-case font-semibold" style={{ color: WARNING }}>* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
                           </label>
                           <textarea
+                            id={`ceno-${item.key}-comment`}
                             rows={2}
                             placeholder={isNao ? "Descreva o que aconteceu..." : "Alguma observação? (opcional)"}
                             value={cenoAnswers[item.commentKey]}
@@ -559,6 +588,7 @@ export default function PublicEvalPage() {
                   Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span style={{ color: WARNING }}>*</span> obrigatório
                 </label>
                 <textarea
+                  id="ceno-absences"
                   rows={3}
                   placeholder='Ex.: "João Silva — faltou sem aviso." Se ninguém faltou/atrasou, escreva "Ninguém faltou ou atrasou".'
                   value={cenoAnswers.absencesReport}
@@ -599,6 +629,7 @@ export default function PublicEvalPage() {
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Detalhe o destaque <span>*</span> obrigatório</label>
                     <textarea
+                      id="ceno-standout-justification"
                       rows={2}
                       placeholder="Nome do profissional e por que se destacou..."
                       value={cenoAnswers.standoutJustification}
@@ -622,7 +653,7 @@ export default function PublicEvalPage() {
               <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
                 <span className="text-[11px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Ferramentas e Case</span>
               </div>
-              <div className="px-5 py-4">
+              <div className="px-5 py-4" id="ferr-answer">
                 <div className="flex items-center justify-between gap-4">
                   <p className="text-sm leading-snug flex-1">Todos os equipamentos e ferramentas retornaram?</p>
                   <div className="flex items-center gap-2 shrink-0">
@@ -636,6 +667,7 @@ export default function PublicEvalPage() {
                       Comentário {isNao ? <span className="normal-case font-semibold" style={{ color: WARNING }}>* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
                     </label>
                     <textarea
+                      id="ferr-comment"
                       rows={2}
                       placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
                       value={ferramentasComment}
@@ -659,10 +691,37 @@ export default function PublicEvalPage() {
             {submitError}
           </div>
         )}
+        {pending.length > 0 && (
+          <div className="rounded-lg px-4 py-3" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }} aria-live="polite">
+            <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-1.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+              Falta preencher ({pending.length})
+            </p>
+            <ul className="space-y-1">
+              {pending.map((p) => (
+                <li key={p.targetId}>
+                  <button
+                    type="button"
+                    onClick={() => focusPending(p.targetId)}
+                    className="text-left text-xs underline underline-offset-2 hover:opacity-80"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    {p.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <button
           type="button"
-          disabled={!canSubmit}
-          onClick={isConformity ? handleSubmitConformity : handleSubmitCriteria}
+          disabled={isSubmitting}
+          aria-disabled={!canSubmit}
+          onClick={() => {
+            // "Desabilitado" só visualmente: o clique leva ao primeiro campo
+            // pendente (os handlers já recusam envio incompleto por conta própria).
+            if (!canSubmit) { if (pending[0]) focusPending(pending[0].targetId); return; }
+            if (isConformity) void handleSubmitConformity(); else void handleSubmitCriteria();
+          }}
           className="w-full rounded-xl py-4 font-black text-sm tracking-[0.2em] uppercase transition-all active:scale-[0.98]"
           style={{
             fontFamily: CONDENSED,
@@ -672,7 +731,7 @@ export default function PublicEvalPage() {
             cursor: canSubmit ? "pointer" : "not-allowed",
           }}
         >
-          {isSubmitting ? "Enviando..." : "Enviar Respostas"}
+          {isSubmitting ? "Enviando..." : canSubmit ? "Enviar Respostas" : `Enviar Respostas — ${pending.length} ${pending.length === 1 ? "pendência" : "pendências"}`}
         </button>
         <p className="text-center text-xs italic pb-4" style={{ color: "var(--muted-foreground)" }}>
           Este formulário é de uso único e expira após o envio.

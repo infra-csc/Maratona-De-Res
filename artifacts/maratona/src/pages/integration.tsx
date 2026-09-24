@@ -14,6 +14,14 @@ import { getAuthToken } from "@/lib/custom-fetch";
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { CONDENSED, BODY, AMBER, INFO } from "@/lib/premium-theme";
+
+// AMBER (atenção) e INFO (informativo) não têm classe de token no index.css;
+// entram como CSS vars locais para as classes `text-[var(--amber)]` etc.
+// Dialogs renderizam em portal (fora da raiz da página), então recebem as
+// mesmas vars via DIALOG_STYLE.
+const THEME_VARS = { ["--amber" as string]: AMBER, ["--info" as string]: INFO } as React.CSSProperties;
+const DIALOG_STYLE: React.CSSProperties = { ...THEME_VARS, backgroundColor: "var(--card)", color: "var(--foreground)" };
 
 const RESET_CONFIRM_PHRASE = "ZERAR TUDO";
 
@@ -476,59 +484,59 @@ export default function IntegrationPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto bg-slate-50/30 min-h-full">
+    <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto bg-background text-foreground min-h-full" style={{ fontFamily: BODY, ...THEME_VARS }}>
       <div>
-        <h1 data-testid="text-page-title" className="text-3xl font-bold flex items-center gap-3 tracking-tight text-foreground">
+        <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase flex items-center gap-3 tracking-tight text-foreground" style={{ fontFamily: CONDENSED }}>
           <Database size={28} className="text-primary" /> Integração & Dados
         </h1>
         <p className="text-muted-foreground text-sm mt-1">Conexão com sistemas externos e importação em lote.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
+        <Card className="bg-card border border-border shadow-none overflow-hidden">
+          <CardHeader className="bg-secondary border-b border-border pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
               <RefreshCw size={18} className="text-primary" /> API Externa (ERP)
             </CardTitle>
             <CardDescription>Sincronização automática de eventos e participações.</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="flex items-center gap-3 mb-6 p-3 rounded-lg border bg-slate-50">
-              <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Status da Conexão</span>
+            <div className="flex items-center gap-3 mb-6 p-3 rounded-lg border bg-secondary">
+              <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Status da Conexão</span>
               {isLoading ? (
-                <div className="h-5 w-24 bg-slate-200 animate-pulse rounded"></div>
+                <div className="h-5 w-24 bg-secondary animate-pulse rounded"></div>
               ) : status?.configured ? (
-                <span className="flex items-center gap-1.5 text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                <span className="flex items-center gap-1.5 text-sm font-bold text-accent-text bg-accent/10 px-2 py-0.5 rounded-full border border-accent/40">
                   <CheckCircle2 size={14} /> Operante
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 text-sm font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                <span className="flex items-center gap-1.5 text-sm font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/30">
                   <XCircle size={14} /> Não Configurada
                 </span>
               )}
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <Calendar size={18} className="mx-auto text-slate-400 mb-2" />
-                <p className="text-2xl font-black text-slate-800">{status?.eventsImported ?? "0"}</p>
-                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos</p>
+              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
+                <Calendar size={18} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.eventsImported ?? "0"}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
               </div>
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <Users size={18} className="mx-auto text-slate-400 mb-2" />
-                <p className="text-2xl font-black text-slate-800">{status?.employeesImported ?? "0"}</p>
-                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores</p>
+              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
+                <Users size={18} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.employeesImported ?? "0"}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
               </div>
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <Briefcase size={18} className="mx-auto text-slate-400 mb-2" />
-                <p className="text-2xl font-black text-slate-800">{status?.participantsImported ?? "0"}</p>
-                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Participações</p>
+              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
+                <Briefcase size={18} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.participantsImported ?? "0"}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
               </div>
             </div>
 
             <Button
               data-testid="button-trigger-sync"
-              className="w-full shadow-sm"
+              className="w-full"
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending || !status?.configured}
             >
@@ -538,26 +546,26 @@ export default function IntegrationPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <FileSpreadsheet size={18} className="text-green-600" /> Importação Manual
+        <Card className="bg-card border border-border shadow-none overflow-hidden">
+          <CardHeader className="bg-secondary border-b border-border pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+              <FileSpreadsheet size={18} className="text-accent-text" /> Importação Manual
             </CardTitle>
             <CardDescription>Carga em lote via arquivo CSV.</CardDescription>
           </CardHeader>
           <CardContent className="p-6 flex flex-col h-full">
             <div className="flex-1">
-              <h4 className="font-bold text-slate-800 mb-2">Colaboradores</h4>
-              <p className="text-sm text-slate-600 leading-relaxed mb-4">
+              <h4 className="font-bold text-foreground mb-2">Colaboradores</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                 Faça upload de uma planilha contendo a base de funcionários para popular o sistema rapidamente.
               </p>
               
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 font-mono text-xs text-slate-600 mb-6">
-                <p className="text-[10px] uppercase font-bold text-slate-400 mb-2 font-sans tracking-widest">Colunas Obrigatórias (Header)</p>
+              <div className="bg-secondary border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground mb-6">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas Obrigatórias (Header)</p>
                 <div className="flex flex-wrap gap-2">
-                  <span className="bg-white px-2 py-1 rounded border shadow-sm">nome</span>
-                  <span className="bg-white px-2 py-1 rounded border shadow-sm">departamento</span>
-                  <span className="bg-white px-2 py-1 rounded border shadow-sm">funcao</span>
+                  <span className="bg-card px-2 py-1 rounded border border-border">nome</span>
+                  <span className="bg-card px-2 py-1 rounded border border-border">departamento</span>
+                  <span className="bg-card px-2 py-1 rounded border border-border">funcao</span>
                 </div>
               </div>
             </div>
@@ -574,7 +582,7 @@ export default function IntegrationPage() {
               <Button
                 data-testid="button-import-employees"
                 variant="outline" 
-                className="w-full bg-white shadow-sm border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-colors"
+                className="w-full bg-card border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-colors"
                 onClick={() => fileRef.current?.click()}
                 disabled={importMutation.isPending}
               >
@@ -586,28 +594,28 @@ export default function IntegrationPage() {
         </Card>
       </div>
 
-      <Card className="border-none shadow-sm bg-white overflow-hidden">
-        <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <History size={18} className="text-amber-600" /> Resultados Históricos
+      <Card className="bg-card border border-border shadow-none overflow-hidden">
+        <CardHeader className="bg-secondary border-b border-border pb-4">
+          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+            <History size={18} className="text-[var(--amber)]" /> Resultados Históricos
           </CardTitle>
           <CardDescription>
             Importa provas antigas cuja nota final já veio pronta/calibrada de fora (sem avaliação por critério).
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
             Cria eventos já <strong>fechados</strong> com a nota informada aplicada diretamente ao time.
             Sempre mostra uma <strong>pré-visualização</strong> antes de gravar qualquer coisa.
           </p>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 font-mono text-xs text-slate-600 mb-6">
-            <p className="text-[10px] uppercase font-bold text-slate-400 mb-2 font-sans tracking-widest">Colunas (Header opcional)</p>
+          <div className="bg-secondary border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground mb-6">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas (Header opcional)</p>
             <div className="flex flex-wrap gap-2">
-              <span className="bg-white px-2 py-1 rounded border shadow-sm">nome</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-sm">nota</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-sm">evento</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-sm">data</span>
+              <span className="bg-card px-2 py-1 rounded border border-border">nome</span>
+              <span className="bg-card px-2 py-1 rounded border border-border">nota</span>
+              <span className="bg-card px-2 py-1 rounded border border-border">evento</span>
+              <span className="bg-card px-2 py-1 rounded border border-border">data</span>
             </div>
           </div>
 
@@ -622,27 +630,27 @@ export default function IntegrationPage() {
           <Button
             data-testid="button-import-historical"
             variant="outline"
-            className="w-full bg-white shadow-sm border-dashed border-2 border-amber-300 hover:border-amber-500 hover:bg-amber-50 transition-colors"
+            className="w-full bg-card border-dashed border-2 border-[var(--amber)]/50 hover:border-[var(--amber)] hover:bg-[var(--amber)]/10 transition-colors"
             onClick={() => historicalFileRef.current?.click()}
             disabled={historicalPreviewMutation.isPending}
           >
-            <Upload size={16} className="mr-2 text-amber-600" />
+            <Upload size={16} className="mr-2 text-[var(--amber)]" />
             {historicalPreviewMutation.isPending ? "Lendo arquivo..." : "Selecionar arquivo (pré-visualizar)"}
           </Button>
         </CardContent>
       </Card>
 
-      <Card className="border-none shadow-sm bg-white overflow-hidden">
-        <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <ClipboardList size={18} className="text-blue-600" /> Pesquisa de Avaliadores
+      <Card className="bg-card border border-border shadow-none overflow-hidden">
+        <CardHeader className="bg-secondary border-b border-border pb-4">
+          <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+            <ClipboardList size={18} className="text-[var(--info)]" /> Pesquisa de Avaliadores
           </CardTitle>
           <CardDescription>
             Importa a planilha de respostas da pesquisa (uma linha por avaliador/evento) — cria avaliadores, vincula a eventos já cadastrados e grava notas por critério e conformidade.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
             Cada evento da planilha precisa ser <strong>vinculado manualmente</strong> a um evento já existente no sistema — esta importação nunca cria eventos novos.
             Também atualiza o catálogo de critérios (ativa "Carga na Saída do Galpão" e desativa 3 critérios antigos). Sempre mostra uma <strong>pré-visualização</strong> antes de gravar qualquer coisa.
           </p>
@@ -658,39 +666,39 @@ export default function IntegrationPage() {
           <Button
             data-testid="button-import-survey"
             variant="outline"
-            className="w-full bg-white shadow-sm border-dashed border-2 border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+            className="w-full bg-card border-dashed border-2 border-[var(--info)]/50 hover:border-[var(--info)] hover:bg-[var(--info)]/10 transition-colors"
             onClick={() => surveyFileRef.current?.click()}
             disabled={surveyPreviewMutation.isPending}
           >
-            <Upload size={16} className="mr-2 text-blue-600" />
+            <Upload size={16} className="mr-2 text-[var(--info)]" />
             {surveyPreviewMutation.isPending ? "Lendo planilha..." : "Selecionar planilha (pré-visualizar)"}
           </Button>
         </CardContent>
       </Card>
 
       {isAdmin && (
-        <Card className="border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <Eraser size={18} className="text-violet-600" /> Limpar Avaliações Duplicadas
+        <Card className="bg-card border border-border shadow-none overflow-hidden">
+          <CardHeader className="bg-secondary border-b border-border pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+              <Eraser size={18} className="text-foreground" /> Limpar Avaliações Duplicadas
             </CardTitle>
             <CardDescription>
               Remove cópias exatas de avaliações (mesmo evento, quesito, avaliador, nota e comentário), mantendo a primeira gravada. Útil após uma importação repetida.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Avaliações com <strong>conteúdo diferente</strong> nunca são tocadas. Após a limpeza, os resultados dos ciclos afetados são <strong>recalculados automaticamente</strong>.
               Sempre mostra uma <strong>pré-visualização</strong> antes de apagar qualquer coisa.
             </p>
             <Button
               data-testid="button-dedupe-evaluations"
               variant="outline"
-              className="w-full bg-white shadow-sm border-dashed border-2 border-violet-300 hover:border-violet-500 hover:bg-violet-50 transition-colors"
+              className="w-full bg-card border-dashed border-2 border-border hover:border-foreground/40 hover:bg-secondary transition-colors"
               onClick={() => dedupePreviewMutation.mutate({ data: { dryRun: true } })}
               disabled={dedupePreviewMutation.isPending}
             >
-              <Eraser size={16} className="mr-2 text-violet-600" />
+              <Eraser size={16} className="mr-2 text-foreground" />
               {dedupePreviewMutation.isPending ? "Verificando..." : "Verificar duplicatas (pré-visualizar)"}
             </Button>
           </CardContent>
@@ -698,28 +706,28 @@ export default function IntegrationPage() {
       )}
 
       {isAdmin && (
-        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-amber-500">
-          <CardHeader className="bg-amber-50 border-b border-amber-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2 text-amber-800">
+        <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-[var(--amber)]">
+          <CardHeader className="bg-[var(--amber)]/10 border-b border-[var(--amber)]/30 pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-[var(--amber)]" style={{ fontFamily: CONDENSED }}>
               <Wrench size={18} /> Corrigir Calibrações (Migração de Quesitos)
             </CardTitle>
-            <CardDescription className="text-amber-800/80">
+            <CardDescription className="text-[var(--amber)]/80">
               Recupera calibrações feitas com os quesitos antigos (nomes longos) e remapeia para os equivalentes atuais.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Quando o catálogo de quesitos foi migrado (nomes longos → curtos), as calibrações gravadas ficaram referenciando os IDs antigos e deixaram de aparecer na tela.
               Este botão corrige os IDs de todas as calibrações afetadas de uma vez. <strong>Operação segura e idempotente</strong> — pode ser executada mais de uma vez sem problema.
             </p>
             <Button
               data-testid="button-fix-calibration-criteria"
               variant="outline"
-              className="w-full bg-white shadow-sm border-dashed border-2 border-amber-400 hover:border-amber-600 hover:bg-amber-50 transition-colors"
+              className="w-full bg-card border-dashed border-2 border-[var(--amber)]/50 hover:border-[var(--amber)] hover:bg-[var(--amber)]/10 transition-colors"
               onClick={() => fixCalMutation.mutate()}
               disabled={fixCalMutation.isPending}
             >
-              <Wrench size={16} className="mr-2 text-amber-600" />
+              <Wrench size={16} className="mr-2 text-[var(--amber)]" />
               {fixCalMutation.isPending ? "Corrigindo..." : "Corrigir calibrações agora"}
             </Button>
           </CardContent>
@@ -727,17 +735,17 @@ export default function IntegrationPage() {
       )}
 
       {isAdmin && (
-        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-purple-500">
-          <CardHeader className="bg-purple-50 border-b border-purple-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2 text-purple-800">
+        <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-border">
+          <CardHeader className="bg-secondary border-b border-border pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-foreground" style={{ fontFamily: CONDENSED }}>
               <Wrench size={18} /> Migrar Catálogo de Quesitos
             </CardTitle>
-            <CardDescription className="text-purple-800/80">
+            <CardDescription className="text-muted-foreground">
               Relaciona os 5 quesitos ativos da Matriz de Performance com todos os eventos e remapeia avaliações que ainda referenciam quesitos antigos — incluindo históricos e confirmados.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Aplica a migração do catálogo de critérios sem precisar importar uma planilha.
               Desfaz a vinculação com quesitos antigos e ativa os novos em <strong>todos os eventos</strong>.
               <strong> Operação idempotente</strong> — segura de executar mais de uma vez.
@@ -745,11 +753,11 @@ export default function IntegrationPage() {
             <Button
               data-testid="button-migrate-criteria-catalog"
               variant="outline"
-              className="w-full bg-white shadow-sm border-dashed border-2 border-purple-400 hover:border-purple-600 hover:bg-purple-50 transition-colors"
+              className="w-full bg-card border-dashed border-2 border-border hover:border-foreground/40 hover:bg-secondary transition-colors"
               onClick={() => migrateCriteriaMutation.mutate()}
               disabled={migrateCriteriaMutation.isPending}
             >
-              <Wrench size={16} className="mr-2 text-purple-600" />
+              <Wrench size={16} className="mr-2 text-foreground" />
               {migrateCriteriaMutation.isPending ? "Migrando..." : "Executar migração de quesitos"}
             </Button>
           </CardContent>
@@ -757,28 +765,28 @@ export default function IntegrationPage() {
       )}
 
       {isAdmin && (
-        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-teal-500">
-          <CardHeader className="bg-teal-50 border-b border-teal-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2 text-teal-800">
+        <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-border">
+          <CardHeader className="bg-secondary border-b border-border pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-foreground" style={{ fontFamily: CONDENSED }}>
               <Wrench size={18} /> Corrigir Avaliações Órfãs
             </CardTitle>
-            <CardDescription className="text-teal-800/80">
+            <CardDescription className="text-muted-foreground">
               Reativa quesitos desativados que ainda têm avaliações submetidas — evitando que notas desapareçam do evento.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Quando o catálogo de quesitos é migrado <strong>depois</strong> que avaliadores já submeteram respostas, as avaliações ficam vinculadas a quesitos inativos e somem da visualização do evento.
               Este botão detecta e reativa automaticamente esses vínculos. <strong>Operação segura e idempotente.</strong>
             </p>
             <Button
               data-testid="button-fix-orphaned-evaluations"
               variant="outline"
-              className="w-full bg-white shadow-sm border-dashed border-2 border-teal-400 hover:border-teal-600 hover:bg-teal-50 transition-colors"
+              className="w-full bg-card border-dashed border-2 border-border hover:border-foreground/40 hover:bg-secondary transition-colors"
               onClick={() => fixOrphanedMutation.mutate()}
               disabled={fixOrphanedMutation.isPending}
             >
-              <Wrench size={16} className="mr-2 text-teal-600" />
+              <Wrench size={16} className="mr-2 text-foreground" />
               {fixOrphanedMutation.isPending ? "Corrigindo..." : "Reativar quesitos com avaliações"}
             </Button>
           </CardContent>
@@ -786,49 +794,49 @@ export default function IntegrationPage() {
       )}
 
       {isAdmin && (
-        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-blue-500">
-          <CardHeader className="bg-blue-50 border-b border-blue-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2 text-blue-800">
+        <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-[var(--info)]">
+          <CardHeader className="bg-[var(--info)]/10 border-b border-[var(--info)]/30 pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-[var(--info)]" style={{ fontFamily: CONDENSED }}>
               <CalendarCheck size={18} /> Atualizar Datas dos Eventos
             </CardTitle>
-            <CardDescription className="text-blue-800/80">
+            <CardDescription className="text-[var(--info)]/80">
               Importa a planilha de eventos (colunas: SKU, ID Evento, Evento, Data Evento) e define a data de cada evento usando o ID externo como chave.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               Útil quando os eventos têm data única (não período). O sistema iguala <strong>início = fim = data da planilha</strong> para cada evento localizado pelo ID externo.
             </p>
 
             <input ref={dateSyncFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleDateSyncFileUpload} />
             <Button
               variant="outline"
-              className="w-full bg-white shadow-sm border-dashed border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-50 transition-colors"
+              className="w-full bg-card border-dashed border-2 border-[var(--info)]/50 hover:border-[var(--info)] hover:bg-[var(--info)]/10 transition-colors"
               onClick={() => { setDateSyncPreview(null); setDateSyncResult(null); dateSyncFileRef.current?.click(); }}
             >
-              <Upload size={16} className="mr-2 text-blue-600" />
+              <Upload size={16} className="mr-2 text-[var(--info)]" />
               Selecionar planilha .xlsx
             </Button>
 
             {dateSyncPreview && (
               <div className="space-y-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm font-bold text-blue-800">{dateSyncPreview.length} evento(s) encontrado(s) na planilha</span>
-                  <span className="text-xs text-blue-600">{dateSyncPreview[0]?.date} → {dateSyncPreview[dateSyncPreview.length - 1]?.date}</span>
+                <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm font-bold text-[var(--info)]">{dateSyncPreview.length} evento(s) encontrado(s) na planilha</span>
+                  <span className="text-xs text-[var(--info)]">{dateSyncPreview[0]?.date} → {dateSyncPreview[dateSyncPreview.length - 1]?.date}</span>
                 </div>
                 <div className="max-h-40 overflow-y-auto border rounded-lg divide-y text-xs">
                   {dateSyncPreview.slice(0, 10).map(e => (
-                    <div key={e.externalId} className="px-3 py-1.5 flex items-center justify-between gap-2 bg-white">
-                      <span className="text-slate-600 truncate">{e.name}</span>
-                      <span className="font-mono font-bold text-blue-700 shrink-0">{e.date}</span>
+                    <div key={e.externalId} className="px-3 py-1.5 flex items-center justify-between gap-2 bg-card">
+                      <span className="text-muted-foreground truncate">{e.name}</span>
+                      <span className="font-mono font-bold text-[var(--info)] shrink-0">{e.date}</span>
                     </div>
                   ))}
                   {dateSyncPreview.length > 10 && (
-                    <div className="px-3 py-1.5 text-slate-400 text-center">+{dateSyncPreview.length - 10} mais…</div>
+                    <div className="px-3 py-1.5 text-muted-foreground text-center">+{dateSyncPreview.length - 10} mais…</div>
                   )}
                 </div>
                 <Button
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full bg-primary hover:opacity-90 text-primary-foreground"
                   disabled={dateSyncPending}
                   onClick={handleDateSyncApply}
                 >
@@ -839,7 +847,7 @@ export default function IntegrationPage() {
             )}
 
             {dateSyncResult && (
-              <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${dateSyncResult.notFound > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+              <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${dateSyncResult.notFound > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
                 <div>
                   <p>{dateSyncResult.updated} evento(s) atualizado(s){dateSyncResult.notFound > 0 ? `, ${dateSyncResult.notFound} ID(s) não encontrado(s) no banco` : " com sucesso."}.</p>
@@ -854,9 +862,9 @@ export default function IntegrationPage() {
       )}
 
       {(isAdmin || currentUser?.role === "rh") && (
-        <Card className="border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
+        <Card className="bg-card border border-border shadow-none overflow-hidden">
+          <CardHeader className="bg-secondary border-b border-border pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
               <RefreshCw size={18} className="text-primary" /> Recalcular Ciclo
             </CardTitle>
             <CardDescription>Refaz o snapshot de ranking, elegibilidade e bônus para o ciclo atual. Use após ajustes de critérios, exclusão de participantes Sup Ceno ou outras correções manuais.</CardDescription>
@@ -871,7 +879,7 @@ export default function IntegrationPage() {
               {recomputePending ? "Recalculando…" : "Recalcular Resultados do Ciclo"}
             </Button>
             {recomputeResult && (
-              <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${recomputeResult.warnings.length > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+              <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${recomputeResult.warnings.length > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
                 {recomputeResult.warnings.length > 0 ? <AlertTriangle size={16} className="shrink-0 mt-0.5" /> : <CheckCircle2 size={16} className="shrink-0 mt-0.5" />}
                 <div>
                   <p>{(recomputeResult as unknown as { totalProcessed: number }).totalProcessed ?? (recomputeResult as { processed?: number }).processed} colaborador(es) processado(s).</p>
@@ -886,17 +894,17 @@ export default function IntegrationPage() {
       )}
 
       {isAdmin && (
-        <Card className="border-none shadow-sm bg-white overflow-hidden border-l-4 border-l-red-500">
-          <CardHeader className="bg-red-50 border-b border-red-100 pb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2 text-red-700">
+        <Card className="bg-card border border-border shadow-none overflow-hidden border-l-4 border-l-destructive">
+          <CardHeader className="bg-destructive/10 border-b border-destructive/30 pb-4">
+            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-destructive" style={{ fontFamily: CONDENSED }}>
               <ShieldAlert size={18} /> Zona de Risco
             </CardTitle>
-            <CardDescription className="text-red-700/80">
+            <CardDescription className="text-destructive/80">
               Reset de dados operacionais de produção. Ação irreversível.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Apaga <strong>eventos, avaliações/notas, colaboradores e usuários</strong> (exceto o seu próprio login).
               Áreas, quesitos, ciclo atual e faixas de bônus <strong>são preservados</strong>.
               Use para reiniciar o cadastro de produção do zero.
@@ -914,9 +922,9 @@ export default function IntegrationPage() {
       )}
 
       {status?.logs && status.logs.length > 0 && (
-        <Card className="border-none shadow-sm bg-black text-slate-300 font-mono text-xs overflow-hidden">
-          <CardHeader className="border-b border-white/10 pb-3 py-3 px-4 bg-white/5">
-            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+        <Card className="bg-secondary text-foreground border border-border shadow-none font-mono text-xs overflow-hidden">
+          <CardHeader className="border-b border-border pb-3 py-3 px-4 bg-card">
+            <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
               Terminal de Execução
             </CardTitle>
           </CardHeader>
@@ -925,8 +933,8 @@ export default function IntegrationPage() {
               {status.logs.map((log, i) => {
                 const isError = log.toLowerCase().includes("erro") || log.toLowerCase().includes("fail");
                 return (
-                  <p key={i} className={`flex items-start gap-2 ${isError ? 'text-red-400' : ''}`}>
-                    <span className="text-slate-600 shrink-0">{format(new Date(), "HH:mm:ss", { locale: ptBR })}</span>
+                  <p key={i} className={`flex items-start gap-2 ${isError ? 'text-destructive' : ''}`}>
+                    <span className="text-muted-foreground shrink-0">{format(new Date(), "HH:mm:ss", { locale: ptBR })}</span>
                     <span className="break-all">{log}</span>
                   </p>
                 );
@@ -937,20 +945,20 @@ export default function IntegrationPage() {
       )}
 
       <Dialog open={!!result} onOpenChange={(open) => { if (!open) setResult(null); }}>
-        <DialogContent className="sm:max-w-md" data-testid="dialog-sync-result">
+        <DialogContent className="sm:max-w-md rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-sync-result">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {result?.success ? (
                 <>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100">
-                    <CheckCircle2 className="text-green-600" size={20} />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15">
+                    <CheckCircle2 className="text-accent-text" size={20} />
                   </span>
                   Sincronização concluída
                 </>
               ) : (
                 <>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100">
-                    <AlertTriangle className="text-red-600" size={20} />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
+                    <AlertTriangle className="text-destructive" size={20} />
                   </span>
                   Falha na sincronização
                 </>
@@ -965,20 +973,20 @@ export default function IntegrationPage() {
 
           {result?.success && (
             <div className="grid grid-cols-3 gap-3 py-2">
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <Calendar size={18} className="mx-auto text-slate-400 mb-2" />
-                <p className="text-2xl font-black text-slate-800" data-testid="text-result-events">{result.eventsSync ?? 0}</p>
-                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos</p>
+              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
+                <Calendar size={18} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-events">{result.eventsSync ?? 0}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
               </div>
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <Users size={18} className="mx-auto text-slate-400 mb-2" />
-                <p className="text-2xl font-black text-slate-800" data-testid="text-result-employees">{result.employeesSync ?? 0}</p>
-                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores</p>
+              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
+                <Users size={18} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-employees">{result.employeesSync ?? 0}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
               </div>
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <Briefcase size={18} className="mx-auto text-slate-400 mb-2" />
-                <p className="text-2xl font-black text-slate-800" data-testid="text-result-participants">{result.participantsSync ?? 0}</p>
-                <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Participações</p>
+              <div className="text-center p-4 bg-secondary rounded-xl border border-border">
+                <Briefcase size={18} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-participants">{result.participantsSync ?? 0}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
               </div>
             </div>
           )}
@@ -992,10 +1000,10 @@ export default function IntegrationPage() {
       </Dialog>
 
       <Dialog open={resetDialogOpen} onOpenChange={(open) => { setResetDialogOpen(open); if (!open) setResetConfirmText(""); }}>
-        <DialogContent className="sm:max-w-md" data-testid="dialog-reset-confirm">
+        <DialogContent className="sm:max-w-md rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-reset-confirm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-700">
-              <ShieldAlert className="text-red-600" size={20} />
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="text-destructive" size={20} />
               Confirmar reset de dados
             </DialogTitle>
             <DialogDescription>
@@ -1005,7 +1013,7 @@ export default function IntegrationPage() {
           </DialogHeader>
 
           <div className="space-y-2 py-2">
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               Digite <span className="font-mono font-bold">{RESET_CONFIRM_PHRASE}</span> para confirmar
             </label>
             <Input
@@ -1039,10 +1047,10 @@ export default function IntegrationPage() {
       </Dialog>
 
       <Dialog open={fixOrphanedDialogOpen} onOpenChange={(open) => { setFixOrphanedDialogOpen(open); if (!open) setFixOrphanedResult(null); }}>
-        <DialogContent className="sm:max-w-md" data-testid="dialog-fix-orphaned-result">
+        <DialogContent className="sm:max-w-md rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-fix-orphaned-result">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wrench size={20} className="text-teal-600" />
+              <Wrench size={20} className="text-foreground" />
               Avaliações órfãs corrigidas
             </DialogTitle>
             <DialogDescription>
@@ -1058,10 +1066,10 @@ export default function IntegrationPage() {
       </Dialog>
 
       <Dialog open={fixCalDialogOpen} onOpenChange={(open) => { setFixCalDialogOpen(open); if (!open) setFixCalResult(null); }}>
-        <DialogContent className="sm:max-w-lg" data-testid="dialog-fix-cal-result">
+        <DialogContent className="sm:max-w-lg rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-fix-cal-result">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wrench size={20} className="text-amber-600" />
+              <Wrench size={20} className="text-[var(--amber)]" />
               Calibrações corrigidas
             </DialogTitle>
             <DialogDescription>
@@ -1071,9 +1079,9 @@ export default function IntegrationPage() {
             </DialogDescription>
           </DialogHeader>
           {fixCalResult && (fixCalResult.results?.length ?? 0) > 0 && (
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="border border-border rounded-lg overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
                   <tr>
                     <th className="text-left p-2">De (quesito antigo)</th>
                     <th className="text-left p-2">Para (quesito atual)</th>
@@ -1082,9 +1090,9 @@ export default function IntegrationPage() {
                 </thead>
                 <tbody>
                   {fixCalResult.results?.map((r, i) => (
-                    <tr key={i} className="border-t border-slate-100">
-                      <td className="p-2 text-slate-600">{r.from}</td>
-                      <td className="p-2 font-medium text-slate-800">{r.to}</td>
+                    <tr key={i} className="border-t border-border">
+                      <td className="p-2 text-muted-foreground">{r.from}</td>
+                      <td className="p-2 font-medium text-foreground">{r.to}</td>
                       <td className="p-2 text-right font-bold">{r.updated}</td>
                     </tr>
                   ))}
@@ -1093,7 +1101,7 @@ export default function IntegrationPage() {
             </div>
           )}
           <DialogFooter>
-            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => setFixCalDialogOpen(false)}>
+            <Button className="bg-primary hover:opacity-90 text-primary-foreground" onClick={() => setFixCalDialogOpen(false)}>
               Fechar
             </Button>
           </DialogFooter>
@@ -1101,10 +1109,10 @@ export default function IntegrationPage() {
       </Dialog>
 
       <Dialog open={dedupeDialogOpen} onOpenChange={(open) => { setDedupeDialogOpen(open); if (!open) setDedupePreview(null); }}>
-        <DialogContent className="sm:max-w-md" data-testid="dialog-dedupe-confirm">
+        <DialogContent className="sm:max-w-md rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-dedupe-confirm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eraser size={20} className="text-violet-600" />
+              <Eraser size={20} className="text-foreground" />
               Avaliações duplicadas encontradas
             </DialogTitle>
             <DialogDescription>
@@ -1115,22 +1123,22 @@ export default function IntegrationPage() {
           {dedupePreview && (
             dedupePreview.duplicatesFound === 0 ? (
               <div className="py-4 text-center">
-                <CheckCircle2 size={32} className="mx-auto text-green-600 mb-2" />
-                <p className="text-sm font-medium text-slate-700" data-testid="text-dedupe-none">Nenhuma avaliação duplicada encontrada. Está tudo limpo!</p>
+                <CheckCircle2 size={32} className="mx-auto text-accent-text mb-2" />
+                <p className="text-sm font-medium text-foreground" data-testid="text-dedupe-none">Nenhuma avaliação duplicada encontrada. Está tudo limpo!</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-3 py-2">
-                <div className="bg-violet-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-black text-violet-700" data-testid="text-dedupe-found">{dedupePreview.duplicatesFound}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Cópias a apagar</p>
+                <div className="bg-secondary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-found">{dedupePreview.duplicatesFound}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Cópias a apagar</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-black text-slate-800" data-testid="text-dedupe-groups">{dedupePreview.groupsAffected}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Notas afetadas</p>
+                <div className="bg-secondary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-groups">{dedupePreview.groupsAffected}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Notas afetadas</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-black text-slate-800" data-testid="text-dedupe-events">{dedupePreview.eventsAffected}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos</p>
+                <div className="bg-secondary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-events">{dedupePreview.eventsAffected}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
                 </div>
               </div>
             )
@@ -1165,10 +1173,10 @@ export default function IntegrationPage() {
       </Dialog>
 
       <Dialog open={historicalDialogOpen} onOpenChange={(open) => { setHistoricalDialogOpen(open); if (!open) { setHistoricalPreview(null); setHistoricalCsvData(null); } }}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="dialog-historical-preview">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border-border" style={DIALOG_STYLE} data-testid="dialog-historical-preview">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History size={20} className="text-amber-600" />
+              <History size={20} className="text-[var(--amber)]" />
               Pré-visualização da importação
             </DialogTitle>
             <DialogDescription>
@@ -1184,69 +1192,69 @@ export default function IntegrationPage() {
             return (
             <div className="space-y-4 py-2">
               <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-slate-800" data-testid="text-preview-total-rows">{historicalPreview.totalRows}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Linhas na planilha</p>
+                <div className="text-center p-3 bg-secondary rounded-xl border border-border">
+                  <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-preview-total-rows">{historicalPreview.totalRows}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Linhas na planilha</p>
                 </div>
-                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-slate-800" data-testid="text-preview-matched">{historicalPreview.matched}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores já cadastrados</p>
+                <div className="text-center p-3 bg-secondary rounded-xl border border-border">
+                  <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-preview-matched">{historicalPreview.matched}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores já cadastrados</p>
                 </div>
-                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-blue-700">{historicalPreview.employeesToCreate?.length ?? 0}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Colaboradores novos</p>
+                <div className="text-center p-3 bg-secondary rounded-xl border border-border">
+                  <p className="text-xl font-black text-[var(--info)]" style={{ fontFamily: CONDENSED }}>{historicalPreview.employeesToCreate?.length ?? 0}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores novos</p>
                 </div>
-                <div className="text-center p-3 bg-green-50 rounded-xl border border-green-100">
-                  <p className="text-xl font-black text-green-700">{eventsToCreate}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos a criar</p>
+                <div className="text-center p-3 bg-accent/10 rounded-xl border border-accent/40">
+                  <p className="text-xl font-black text-accent-text" style={{ fontFamily: CONDENSED }}>{eventsToCreate}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos a criar</p>
                 </div>
-                <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-100">
-                  <p className="text-xl font-black text-amber-700">{eventsToUpdate}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos a atualizar</p>
+                <div className="text-center p-3 bg-[var(--amber)]/10 rounded-xl border border-[var(--amber)]/30">
+                  <p className="text-xl font-black text-[var(--amber)]" style={{ fontFamily: CONDENSED }}>{eventsToUpdate}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos a atualizar</p>
                 </div>
-                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-slate-800">{participantsToLink}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Participações a vincular</p>
+                <div className="text-center p-3 bg-secondary rounded-xl border border-border">
+                  <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{participantsToLink}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Participações a vincular</p>
                 </div>
               </div>
 
               {eventsBlocked > 0 && (
-                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2">
                   <strong>{eventsBlocked} evento(s) não serão importados</strong> por causa dos erros listados abaixo — corrija a planilha e reenvie.
                 </p>
               )}
 
               {historicalPreview.errors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-red-700 uppercase mb-1 flex items-center gap-1.5">
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-destructive uppercase mb-1 flex items-center gap-1.5">
                     <AlertTriangle size={14} /> Erros ({historicalPreview.errors.length}) — bloqueiam a importação
                   </p>
-                  <p className="text-[11px] text-red-600 mb-2">Enquanto houver erros abaixo, o botão de confirmar fica desabilitado. Corrija a planilha (ou os cadastros) e envie novamente.</p>
-                  <ul className="text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                  <p className="text-[11px] text-destructive mb-2">Enquanto houver erros abaixo, o botão de confirmar fica desabilitado. Corrija a planilha (ou os cadastros) e envie novamente.</p>
+                  <ul className="text-xs text-destructive space-y-1 max-h-40 overflow-y-auto">
                     {historicalPreview.errors.map((err, i) => <li key={i}>• {err}</li>)}
                   </ul>
                 </div>
               )}
 
               {historicalPreview.employeesToCreate && historicalPreview.employeesToCreate.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
+                <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
                     <Users size={14} /> {historicalPreview.employeesToCreate.length} colaborador(es) novo(s) serão cadastrados
                   </p>
-                  <p className="text-[11px] text-blue-600 mb-2">Esses nomes não bateram com nenhum colaborador já cadastrado. Ao confirmar, eles serão criados automaticamente (cadastro básico, sem área/função definida) e já entram participando do evento correspondente na tabela abaixo. Se algum nome estiver digitado errado, cancele e corrija a planilha antes de confirmar.</p>
-                  <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
+                  <p className="text-[11px] text-[var(--info)] mb-2">Esses nomes não bateram com nenhum colaborador já cadastrado. Ao confirmar, eles serão criados automaticamente (cadastro básico, sem área/função definida) e já entram participando do evento correspondente na tabela abaixo. Se algum nome estiver digitado errado, cancele e corrija a planilha antes de confirmar.</p>
+                  <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">
                     {historicalPreview.employeesToCreate.map((name, i) => <li key={i}>• {name}</li>)}
                   </ul>
                 </div>
               )}
 
               {historicalPreview.cycleFallback && historicalPreview.cycleFallback.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
+                <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
                     <Calendar size={14} /> {historicalPreview.cycleFallback.length} evento(s) fora do período do ciclo cadastrado
                   </p>
-                  <p className="text-[11px] text-blue-600 mb-2">A data desses eventos não cai dentro do período de nenhum ciclo configurado. Em vez de bloquear, eles serão vinculados ao ciclo atual (indicado na tabela abaixo) para que os resultados entrem normalmente nos relatórios.</p>
-                  <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
+                  <p className="text-[11px] text-[var(--info)] mb-2">A data desses eventos não cai dentro do período de nenhum ciclo configurado. Em vez de bloquear, eles serão vinculados ao ciclo atual (indicado na tabela abaixo) para que os resultados entrem normalmente nos relatórios.</p>
+                  <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">
                     {historicalPreview.cycleFallback.map((msg, i) => <li key={i}>• {msg}</li>)}
                   </ul>
                 </div>
@@ -1254,10 +1262,10 @@ export default function IntegrationPage() {
 
               {historicalPreview.events.length > 0 && (
                 <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase mb-2">Detalhe evento por evento</p>
-                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Detalhe evento por evento</p>
+                  <div className="border border-border rounded-lg overflow-hidden">
                     <table className="w-full text-xs">
-                      <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                      <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
                         <tr>
                           <th className="text-left p-2">Evento</th>
                           <th className="text-left p-2">Data</th>
@@ -1269,32 +1277,32 @@ export default function IntegrationPage() {
                       </thead>
                       <tbody>
                         {historicalPreview.events.map((ev, i) => (
-                          <tr key={i} className="border-t border-slate-100 align-top" data-testid={`row-preview-event-${i}`}>
-                            <td className="p-2 font-medium text-slate-800">{ev.eventName}</td>
-                            <td className="p-2 text-slate-600">{ev.date}</td>
-                            <td className="p-2 text-slate-600">{ev.score ?? "—"}</td>
-                            <td className="p-2 text-slate-600">
+                          <tr key={i} className="border-t border-border align-top" data-testid={`row-preview-event-${i}`}>
+                            <td className="p-2 font-medium text-foreground">{ev.eventName}</td>
+                            <td className="p-2 text-muted-foreground">{ev.date}</td>
+                            <td className="p-2 text-muted-foreground">{ev.score ?? "—"}</td>
+                            <td className="p-2 text-muted-foreground">
                               {ev.matchedCount}/{ev.participantsCount}
                               {ev.newEmployeeNames && ev.newEmployeeNames.length > 0 && (
-                                <div className="text-[10px] text-blue-600 mt-0.5">
+                                <div className="text-[10px] text-[var(--info)] mt-0.5">
                                   {ev.newEmployeeNames.length} novo(s): {ev.newEmployeeNames.join(", ")}
                                 </div>
                               )}
                             </td>
-                            <td className="p-2 text-slate-600">
+                            <td className="p-2 text-muted-foreground">
                               {ev.cycleName ?? "—"}
                               {ev.cycleFallback && (
-                                <div className="text-[10px] text-blue-600 mt-0.5">fora do período (ciclo atual)</div>
+                                <div className="text-[10px] text-[var(--info)] mt-0.5">fora do período (ciclo atual)</div>
                               )}
                             </td>
                             <td className="p-2">
-                              {ev.action === "create" && !linkOverrides[ev.groupKey] && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Criar</Badge>}
-                              {ev.action === "create" && linkOverrides[ev.groupKey] && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Vincular</Badge>}
-                              {ev.action === "update" && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Atualizar</Badge>}
-                              {ev.action === "conflict" && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Conflito</Badge>}
+                              {ev.action === "create" && !linkOverrides[ev.groupKey] && <Badge className="bg-accent/15 text-accent-text hover:bg-accent/15">Criar</Badge>}
+                              {ev.action === "create" && linkOverrides[ev.groupKey] && <Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15">Vincular</Badge>}
+                              {ev.action === "update" && <Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15">Atualizar</Badge>}
+                              {ev.action === "conflict" && <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/10">Conflito</Badge>}
                               {ev.action === "create" && ev.overlapCandidates && ev.overlapCandidates.length > 0 && (
                                 <div className="mt-1.5 min-w-[220px]" data-testid={`select-link-override-${i}`}>
-                                  <p className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-1 mb-1 flex items-start gap-1">
+                                  <p className="text-[10px] text-[var(--amber)] bg-[var(--amber)]/10 border border-[var(--amber)]/30 rounded px-1.5 py-1 mb-1 flex items-start gap-1">
                                     <AlertTriangle size={11} className="shrink-0 mt-0.5" />
                                     Já existe {ev.overlapCandidates.length === 1 ? "1 evento" : `${ev.overlapCandidates.length} eventos`} nessa data — pode ser a mesma corrida com nome diferente.
                                   </p>
@@ -1329,11 +1337,11 @@ export default function IntegrationPage() {
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-2 space-y-0.5">
-                    <span className="block"><Badge className="bg-green-100 text-green-700 hover:bg-green-100 mr-1">Criar</Badge>evento novo, ainda não existe no sistema.</span>
-                    <span className="block"><Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 mr-1">Atualizar</Badge>já existe um evento histórico com este nome/data — a nota será substituída pela da planilha.</span>
-                    <span className="block"><Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 mr-1">Vincular</Badge>você escolheu ligar esse evento a um já existente (veja o alerta laranja e o seletor na linha) em vez de criar um novo.</span>
-                    <span className="block"><Badge className="bg-red-100 text-red-700 hover:bg-red-100 mr-1">Conflito</Badge>não será importado (veja o motivo nos erros acima).</span>
+                  <p className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
+                    <span className="block"><Badge className="bg-accent/15 text-accent-text hover:bg-accent/15 mr-1">Criar</Badge>evento novo, ainda não existe no sistema.</span>
+                    <span className="block"><Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15 mr-1">Atualizar</Badge>já existe um evento histórico com este nome/data — a nota será substituída pela da planilha.</span>
+                    <span className="block"><Badge className="bg-[var(--amber)]/15 text-[var(--amber)] hover:bg-[var(--amber)]/15 mr-1">Vincular</Badge>você escolheu ligar esse evento a um já existente (veja o alerta laranja e o seletor na linha) em vez de criar um novo.</span>
+                    <span className="block"><Badge className="bg-destructive/10 text-destructive hover:bg-destructive/10 mr-1">Conflito</Badge>não será importado (veja o motivo nos erros acima).</span>
                   </p>
                 </div>
               )}
@@ -1347,7 +1355,7 @@ export default function IntegrationPage() {
             </Button>
             <Button
               data-testid="button-confirm-historical-import"
-              className="bg-amber-600 hover:bg-amber-700"
+              className="bg-primary hover:opacity-90 text-primary-foreground"
               disabled={!historicalPreview?.success || historicalPreview.errors.length > 0 || historicalCommitMutation.isPending}
               onClick={handleHistoricalConfirm}
             >
@@ -1359,10 +1367,10 @@ export default function IntegrationPage() {
       </Dialog>
 
       <Dialog open={surveyDialogOpen} onOpenChange={(open) => { setSurveyDialogOpen(open); if (!open) { setSurveyPreview(null); setSurveyRows(null); setSurveyLinkOverrides({}); } }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto rounded-xl border-border" style={DIALOG_STYLE}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ClipboardList size={20} className="text-blue-600" />
+              <ClipboardList size={20} className="text-[var(--info)]" />
               Pré-visualização da pesquisa de avaliadores
             </DialogTitle>
             <DialogDescription>
@@ -1373,43 +1381,43 @@ export default function IntegrationPage() {
           {surveyPreview && (
             <div className="space-y-4 py-2">
               <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-slate-800" data-testid="text-survey-total-rows">{surveyPreview.totalRows}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Linhas na planilha</p>
+                <div className="text-center p-3 bg-secondary rounded-xl border border-border">
+                  <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-survey-total-rows">{surveyPreview.totalRows}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Linhas na planilha</p>
                 </div>
-                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-slate-800">{surveyPreview.groups.length}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Eventos na planilha</p>
+                <div className="text-center p-3 bg-secondary rounded-xl border border-border">
+                  <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{surveyPreview.groups.length}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos na planilha</p>
                 </div>
-                <div className="text-center p-3 bg-blue-50 rounded-xl border border-blue-100">
-                  <p className="text-xl font-black text-blue-700">{surveyPreview.avaliadoresToCreate.length}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Avaliadores novos</p>
+                <div className="text-center p-3 bg-[var(--info)]/10 rounded-xl border border-[var(--info)]/30">
+                  <p className="text-xl font-black text-[var(--info)]" style={{ fontFamily: CONDENSED }}>{surveyPreview.avaliadoresToCreate.length}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Avaliadores novos</p>
                 </div>
               </div>
 
               {surveyPreview.errors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-red-700 uppercase mb-1 flex items-center gap-1.5">
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-destructive uppercase mb-1 flex items-center gap-1.5">
                     <AlertTriangle size={14} /> Erros ({surveyPreview.errors.length}) — bloqueiam a importação
                   </p>
-                  <ul className="text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                  <ul className="text-xs text-destructive space-y-1 max-h-40 overflow-y-auto">
                     {surveyPreview.errors.map((err, i) => <li key={i}>• {err}</li>)}
                   </ul>
                 </div>
               )}
 
               {(surveyPreview.catalogChanges.toDeactivate.length > 0 || surveyPreview.catalogChanges.toCreateOrActivate.length > 0) && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-purple-700 uppercase mb-1 flex items-center gap-1.5">
+                <div className="bg-secondary border border-border rounded-lg p-3">
+                  <p className="text-xs font-bold text-foreground uppercase mb-1 flex items-center gap-1.5">
                     <Briefcase size={14} /> Mudanças no catálogo de critérios
                   </p>
                   {surveyPreview.catalogChanges.toCreateOrActivate.length > 0 && (
-                    <p className="text-[11px] text-purple-700 mb-1">
+                    <p className="text-[11px] text-foreground mb-1">
                       <strong>Ativar/criar:</strong> {surveyPreview.catalogChanges.toCreateOrActivate.join(", ")}
                     </p>
                   )}
                   {surveyPreview.catalogChanges.toDeactivate.length > 0 && (
-                    <p className="text-[11px] text-purple-700">
+                    <p className="text-[11px] text-foreground">
                       <strong>Desativar:</strong> {surveyPreview.catalogChanges.toDeactivate.join(", ")}
                     </p>
                   )}
@@ -1417,33 +1425,33 @@ export default function IntegrationPage() {
               )}
 
               {surveyPreview.avaliadoresToCreate.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
+                <div className="bg-[var(--info)]/10 border border-[var(--info)]/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-[var(--info)] uppercase mb-1 flex items-center gap-1.5">
                     <Users size={14} /> {surveyPreview.avaliadoresToCreate.length} avaliador(es) novo(s) serão cadastrados
                   </p>
-                  <p className="text-[11px] text-blue-600 mb-2">Ao confirmar, cada um recebe um usuário com senha provisória (mostrada uma única vez logo após a importação).</p>
-                  <ul className="text-xs text-blue-700 space-y-1 max-h-32 overflow-y-auto">
+                  <p className="text-[11px] text-[var(--info)] mb-2">Ao confirmar, cada um recebe um usuário com senha provisória (mostrada uma única vez logo após a importação).</p>
+                  <ul className="text-xs text-[var(--info)] space-y-1 max-h-32 overflow-y-auto">
                     {surveyPreview.avaliadoresToCreate.map((name, i) => <li key={i}>• {name}</li>)}
                   </ul>
                 </div>
               )}
 
               {surveyPreview.warnings.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-amber-700 uppercase mb-1 flex items-center gap-1.5">
+                <div className="bg-[var(--amber)]/10 border border-[var(--amber)]/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-[var(--amber)] uppercase mb-1 flex items-center gap-1.5">
                     <AlertTriangle size={14} /> Avisos ({surveyPreview.warnings.length})
                   </p>
-                  <ul className="text-xs text-amber-700 space-y-1 max-h-32 overflow-y-auto">
+                  <ul className="text-xs text-[var(--amber)] space-y-1 max-h-32 overflow-y-auto">
                     {surveyPreview.warnings.map((w, i) => <li key={i}>• {w}</li>)}
                   </ul>
                 </div>
               )}
 
               <div>
-                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Vincular cada evento da planilha</p>
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Vincular cada evento da planilha</p>
+                <div className="border border-border rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
-                    <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                    <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
                       <tr>
                         <th className="text-left p-2">Evento (planilha)</th>
                         <th className="text-left p-2">Linhas</th>
@@ -1459,10 +1467,10 @@ export default function IntegrationPage() {
                           ? (g.suggestions.find(s => s.id === selectedId) ?? eventLinkOptions.find(e => e.id === selectedId))
                           : undefined;
                         return (
-                          <tr key={g.groupKey} className="border-t border-slate-100 align-top" data-testid={`row-survey-group-${i}`}>
-                            <td className="p-2 font-medium text-slate-800">{g.eventLabel}</td>
-                            <td className="p-2 text-slate-600">{g.rowCount}</td>
-                            <td className="p-2 text-slate-600">{g.distinctEvaluators}</td>
+                          <tr key={g.groupKey} className="border-t border-border align-top" data-testid={`row-survey-group-${i}`}>
+                            <td className="p-2 font-medium text-foreground">{g.eventLabel}</td>
+                            <td className="p-2 text-muted-foreground">{g.rowCount}</td>
+                            <td className="p-2 text-muted-foreground">{g.distinctEvaluators}</td>
                             <td className="p-2">
                               <Select
                                 value={selectedId ? String(selectedId) : "none"}
@@ -1494,13 +1502,13 @@ export default function IntegrationPage() {
                                 </SelectContent>
                               </Select>
                               {!selectedId && (
-                                <p className="text-[10px] text-red-600 mt-1">Obrigatório — selecione um evento ou "Ignorar".</p>
+                                <p className="text-[10px] text-destructive mt-1">Obrigatório — selecione um evento ou "Ignorar".</p>
                               )}
                               {isIgnored && (
-                                <p className="text-[10px] text-slate-500 mt-1">Estas respostas serão ignoradas na importação.</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Estas respostas serão ignoradas na importação.</p>
                               )}
                               {selectedEvent?.isHistorical && (
-                                <p className="text-[10px] text-amber-700 mt-1">Evento histórico: só os comentários serão salvos como referência, sem notas.</p>
+                                <p className="text-[10px] text-[var(--amber)] mt-1">Evento histórico: só os comentários serão salvos como referência, sem notas.</p>
                               )}
                             </td>
                           </tr>
@@ -1509,7 +1517,7 @@ export default function IntegrationPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-2">★ = sugestão por semelhança de nome/cidade/data.</p>
+                <p className="text-[11px] text-muted-foreground mt-2">★ = sugestão por semelhança de nome/cidade/data.</p>
               </div>
             </div>
           )}
@@ -1520,7 +1528,7 @@ export default function IntegrationPage() {
             </Button>
             <Button
               data-testid="button-confirm-survey-import"
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-primary hover:opacity-90 text-primary-foreground"
               disabled={!surveyPreview?.success || surveyPreview.errors.length > 0 || !surveyAllResolved || surveyCommitMutation.isPending}
               onClick={handleSurveyConfirm}
             >
@@ -1532,10 +1540,10 @@ export default function IntegrationPage() {
       </Dialog>
 
       <Dialog open={!!surveyCommitResult} onOpenChange={(open) => { if (!open) setSurveyCommitResult(null); }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border-border" style={DIALOG_STYLE}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <KeyRound size={20} className="text-blue-600" />
+              <KeyRound size={20} className="text-[var(--info)]" />
               Credenciais dos avaliadores criados
             </DialogTitle>
             <DialogDescription>
@@ -1543,9 +1551,9 @@ export default function IntegrationPage() {
             </DialogDescription>
           </DialogHeader>
           {surveyCommitResult?.createdAvaliadores && (
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="border border-border rounded-lg overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
                   <tr>
                     <th className="text-left p-2">Nome</th>
                     <th className="text-left p-2">E-mail</th>
@@ -1554,10 +1562,10 @@ export default function IntegrationPage() {
                 </thead>
                 <tbody>
                   {surveyCommitResult.createdAvaliadores.map((a, i) => (
-                    <tr key={i} className="border-t border-slate-100" data-testid={`row-created-avaliador-${i}`}>
-                      <td className="p-2 font-medium text-slate-800">{a.name}</td>
-                      <td className="p-2 text-slate-600 font-mono">{a.email}</td>
-                      <td className="p-2 text-slate-600 font-mono">{a.tempPassword}</td>
+                    <tr key={i} className="border-t border-border" data-testid={`row-created-avaliador-${i}`}>
+                      <td className="p-2 font-medium text-foreground">{a.name}</td>
+                      <td className="p-2 text-muted-foreground font-mono">{a.email}</td>
+                      <td className="p-2 text-muted-foreground font-mono">{a.tempPassword}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1565,7 +1573,7 @@ export default function IntegrationPage() {
             </div>
           )}
           <DialogFooter>
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setSurveyCommitResult(null)}>
+            <Button className="bg-primary hover:opacity-90 text-primary-foreground" onClick={() => setSurveyCommitResult(null)}>
               Já distribuí as senhas
             </Button>
           </DialogFooter>
