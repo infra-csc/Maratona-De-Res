@@ -308,7 +308,7 @@ export default function ComoFuncionaPage() {
               </div>
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Eventos extras</span>
-                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Cada evento confirmado acima do mínimo pode gerar bônus adicional. O valor extra depende da nota daquele evento específico e da faixa de pelotão correspondente.</span>
+                <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Cada evento confirmado acima do mínimo pode gerar bônus adicional. O valor extra depende da nota daquele evento específico e da faixa correspondente.</span>
               </div>
             </div>
             <p className="text-[11px] text-[rgba(204,255,0,0.6)] mt-3">

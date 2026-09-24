@@ -7,7 +7,7 @@ import { AudioPlayer } from "@/components/audio-recorder";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -17,20 +17,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { cn, fmtDate } from "@/lib/utils";
-import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
+import { cn, fmtDate, fmtDateTime } from "@/lib/utils";
+import { CONDENSED, BODY, WARNING, GOOD, AMBER } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
 
-const GOOD = "#9ab000";
-const AMBER = "#e8a23d";
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
-
-function splitImportedNoteLines(note: string): string[] {
-  return note
-    .split(/(?<=[.;])\s+|\s*\|\s*|\n+/)
-    .map(s => s.trim())
-    .filter(Boolean);
-}
 
 function parseImportedConformityRatio(notes: string): { sim: number; total: number } | null {
   const m = notes.match(/Conformidade:\s*(\d+)\s*\/\s*(\d+)\s*itens/i);
@@ -181,10 +172,7 @@ const COMMENT_ROLE_LABELS: Record<string, string> = {
   admin: "Admin", rh: "RH", diretoria: "Diretoria", gestor: "Gestor", avaliador: "Avaliador", visualizador: "Visualizador",
 };
 
-function formatCommentTimestamp(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
+const COMMENT_TS_OPTS: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
 
 function EventCommentsPanel({ eventId }: { eventId: number }) {
   const { user } = useAuth();
@@ -250,7 +238,7 @@ function EventCommentsPanel({ eventId }: { eventId: number }) {
                           {COMMENT_ROLE_LABELS[c.userRole] ?? c.userRole}
                         </span>
                       )}
-                      <span className="text-[10px] font-semibold" style={{ color: "var(--muted-foreground)" }}>{formatCommentTimestamp(c.createdAt)}</span>
+                      <span className="text-[10px] font-semibold" style={{ color: "var(--muted-foreground)" }}>{fmtDateTime(c.createdAt, COMMENT_TS_OPTS)}</span>
                     </div>
                     <p className="text-sm whitespace-pre-wrap mt-1 break-words">{c.message}</p>
                   </div>
@@ -260,11 +248,12 @@ function EventCommentsPanel({ eventId }: { eventId: number }) {
                       data-testid={`button-delete-comment-${c.id}`}
                       onClick={() => deleteComment.mutate({ id: eventId, commentId: c.id })}
                       disabled={deleteComment.isPending}
-                      className="p-1 transition-colors opacity-0 group-hover:opacity-100 shrink-0 disabled:opacity-40 hover:opacity-70"
+                      className="p-1 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 disabled:opacity-40 hover:opacity-70"
                       style={{ color: WARNING }}
                       title="Excluir comentário"
+                      aria-label="Excluir comentário"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -686,7 +675,6 @@ export default function EventDetailPage() {
   }
 
   const fmt = (v: number) => `${v.toFixed(1)}`;
-  const evaluationProgress = Math.round((event.evaluationProgress ?? 0) * 100);
   const activeCriteriaCount = (event.criteria ?? []).filter(c => c.active).length;
 
   return (
@@ -722,7 +710,22 @@ export default function EventDetailPage() {
             </p>
           </div>
           <div className="flex gap-2 shrink-0 items-center">
-            <Link href={`/calibrations?eventId=${event.id}`} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors hover:opacity-80" style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}>
+            <Link
+              href={`/evaluations?eventId=${event.id}`}
+              data-testid="link-event-evaluations"
+              title="Critérios, avaliadores e avaliações deste evento"
+              className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors hover:opacity-80"
+              style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
+            >
+              Avaliações
+            </Link>
+            <Link
+              href={`/calibrations?eventId=${event.id}`}
+              data-testid="link-event-calibrations"
+              title="Calibrar e publicar as notas deste evento"
+              className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors hover:opacity-80"
+              style={{ fontFamily: CONDENSED, border: "1px solid var(--border)" }}
+            >
               Calibração
             </Link>
             {canManage && (
@@ -791,6 +794,10 @@ export default function EventDetailPage() {
             ? (result.conformityScore != null ? result.conformityScore : result.eventScore) as number
             : null;
           const nonConformCount = conformityItems.filter(i => conformityForm[i.key] === false).length;
+          const matrixAnswered = conformityItems.filter(i => conformityForm[i.key] !== null).length;
+          const evaluatedCount = result?.evaluatedCriteria ?? 0;
+          const criteriaTotal = result?.totalCriteria ?? activeCriteriaCount;
+          const criteriaTooltip = `${evaluatedCount} de ${criteriaTotal} critérios com avaliação completa · Matriz ${matrixAnswered}/${conformityItems.length}`;
           return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
               <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
@@ -801,8 +808,8 @@ export default function EventDetailPage() {
                 <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{event.participants?.filter(p => p.countsForScore !== false).length ?? 0}</div>
                 <div className="text-[10px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Participantes</div>
               </div>
-              <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{result?.evaluatedCriteria ?? 0}/{result?.totalCriteria ?? activeCriteriaCount}</div>
+              <div className="rounded-xl p-4" title={criteriaTooltip} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+                <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{evaluatedCount}/{criteriaTotal}</div>
                 <div className="text-[10px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Critérios Avaliados</div>
               </div>
               <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
@@ -947,8 +954,9 @@ export default function EventDetailPage() {
                                 className="p-1.5 rounded-lg transition-colors hover:opacity-80"
                                 style={isInactive ? { border: "1px solid var(--border)" } : { backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}
                                 title={isInactive ? "Reativar colaborador" : "Marcar como inativo (não compareceu)"}
+                                aria-label={isInactive ? `Reativar ${p.employeeName}` : `Marcar ${p.employeeName} como inativo (não compareceu)`}
                               >
-                                {isInactive ? <UserCheck size={13} /> : <UserX size={13} />}
+                                {isInactive ? <UserCheck size={13} aria-hidden="true" /> : <UserX size={13} aria-hidden="true" />}
                               </button>
                               <button
                                 data-testid={`button-remove-participant-${p.employeeId}`}
@@ -956,8 +964,9 @@ export default function EventDetailPage() {
                                 className="p-1.5 rounded-lg transition-colors hover:opacity-80"
                                 style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}
                                 title="Remover do evento"
+                                aria-label={`Remover ${p.employeeName} do evento`}
                               >
-                                <Trash2 size={13} />
+                                <Trash2 size={13} aria-hidden="true" />
                               </button>
                             </div>
                           )}
@@ -1241,6 +1250,8 @@ export default function EventDetailPage() {
                             <button
                               type="button"
                               title={comment ? "Ver / editar comentário" : "Adicionar comentário"}
+                              aria-label={`${comment ? "Ver / editar comentário" : "Adicionar comentário"}: ${item.label}`}
+                              aria-expanded={expandedComments.has(item.key)}
                               onClick={() => setExpandedComments(prev => { const next = new Set(prev); if (next.has(item.key)) next.delete(item.key); else next.add(item.key); return next; })}
                               className="p-1.5 rounded-lg transition-colors hover:opacity-80"
                               style={needsComment ? { color: WARNING, backgroundColor: "rgba(229,72,77,0.10)" } : comment ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)", color: "var(--muted-foreground)" }}

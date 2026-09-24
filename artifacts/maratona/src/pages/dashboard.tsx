@@ -4,23 +4,7 @@ import { CheckCircle2, Trophy, DollarSign, History, AlertTriangle, ChevronRight,
 import { Link } from "wouter";
 import { formatCyclePeriod } from "@/components/cycle-badge";
 import { PremiumCard, CONDENSED, WARNING } from "@/lib/premium-theme";
-
-function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
-  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
-  const result: { sat: string; sun: string; label: string }[] = [];
-  const end = new Date(endDate + "T12:00:00");
-  const d = new Date(startDate + "T12:00:00");
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-  while (d <= end) {
-    const sat = d.toISOString().split("T")[0];
-    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
-    const sun = sunD.toISOString().split("T")[0];
-    const label = `${String(d.getDate()).padStart(2, "0")}–${String(sunD.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-    result.push({ sat, sun, label });
-    d.setDate(d.getDate() + 7);
-  }
-  return result;
-}
+import { getCycleWeekends } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { data: summary } = useGetDashboardSummary({

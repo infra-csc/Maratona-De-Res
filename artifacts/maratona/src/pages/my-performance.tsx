@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useGetCurrentCycle } from "@workspace/api-client-react";
-import { formatCyclePeriod, CycleBadge } from "@/components/cycle-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { CycleBadge } from "@/components/cycle-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -11,7 +9,8 @@ import {
   CheckCircle2, Clock, ChevronDown, ChevronRight,
   MapPin, Search, Award,
 } from "lucide-react";
-import { cn, fmtDate } from "@/lib/utils";
+import { cn, fmtDate, fmtDateTime } from "@/lib/utils";
+import { INFO } from "@/lib/premium-theme";
 import { useQuery } from "@tanstack/react-query";
 
 interface PerformanceData {
@@ -100,10 +99,6 @@ interface CriterionDetail {
   finalPublishedAt?: string | null;
 }
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
 
 function contrastingTextColor(hex: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -154,7 +149,7 @@ function EventCard({ event }: { event: EventSummary }) {
             ?? null))
     : null;
   const publishLabel = isAvaliadoFinal
-    ? `Avaliado · Final${avaliadoDate ? ` · ${formatDateTime(avaliadoDate)}` : ""}`
+    ? `Avaliado · Final${avaliadoDate ? ` · ${fmtDateTime(avaliadoDate)}` : ""}`
     : isAvaliadoParcial
       ? "Avaliado · Parcial"
       : isEmAvaliacao
@@ -277,14 +272,14 @@ function EventCard({ event }: { event: EventSummary }) {
                       <span className="text-[9px] font-bold uppercase text-muted-foreground px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Peso {c.weight}</span>
                       {event.feedbackReleased || c.finalPublishedAt ? (
                         <span
-                          title={c.finalPublishedAt ? `Avaliado em ${formatDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Avaliado em ${formatDateTime(event.feedbackReleasedAt)}` : undefined}
+                          title={c.finalPublishedAt ? `Avaliado em ${fmtDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Avaliado em ${fmtDateTime(event.feedbackReleasedAt)}` : undefined}
                           className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#191c1e] text-[#ccff00] flex items-center gap-1"
                         >
-                          <CheckCircle2 size={11}/> Avaliado{c.finalPublishedAt ? ` · ${formatDateTime(c.finalPublishedAt)}` : ""}
+                          <CheckCircle2 size={11}/> Avaliado{c.finalPublishedAt ? ` · ${fmtDateTime(c.finalPublishedAt)}` : ""}
                         </span>
                       ) : c.partialPublishedAt ? (
                         <span
-                          title={`Publicação parcial em ${formatDateTime(c.partialPublishedAt)}`}
+                          title={`Publicação parcial em ${fmtDateTime(c.partialPublishedAt)}`}
                           className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#ccff00] text-[#191c1e]"
                         >
                           Projeção Parcial
@@ -324,7 +319,7 @@ function EventCard({ event }: { event: EventSummary }) {
                 {c.calibrationReason && (
                   <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
                     <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Comentário de calibração</p>
-                    <div className="text-xs text-foreground p-3 rounded border-l-2" style={{ backgroundColor: "var(--muted)", borderLeftColor: "#5b8def" }}>
+                    <div className="text-xs text-foreground p-3 rounded border-l-2" style={{ backgroundColor: "var(--muted)", borderLeftColor: INFO }}>
                       <span className="italic leading-relaxed">"{c.calibrationReason}"</span>
                     </div>
                   </div>
@@ -340,7 +335,8 @@ function EventCard({ event }: { event: EventSummary }) {
 
 export default function MyPerformancePage() {
   const { user } = useAuth();
-  const { data: currentCycle } = useGetCurrentCycle();
+  // Mantém o cache do ciclo aquecido para o CycleBadge; o resultado não é lido aqui.
+  useGetCurrentCycle();
   const [eventFilter, setEventFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "avaliado" | "em_avaliacao">("all");
 
@@ -378,6 +374,10 @@ export default function MyPerformancePage() {
 
   const summary = data?.summary;
   const result = summary?.finalResult ?? summary?.grossAverage ?? null;
+
+  // Eventos ainda sem confirmação do RH ficam fora da lista e da nota; contamos
+  // para avisar o colaborador em vez de escondê-los em silêncio.
+  const pendingConfirmationCount = (data?.events ?? []).filter(ev => !ev.resultsConfirmed).length;
 
   const filteredEvents = (data?.events ?? []).filter(ev => {
     if (!ev.resultsConfirmed) return false;
@@ -511,7 +511,7 @@ export default function MyPerformancePage() {
                 );
               })()}
 
-              {/* Pelotão — 3ª coluna da grade de resumo */}
+              {/* Faixa — 3ª coluna da grade de resumo */}
               {summary.currentPlatoon && (() => {
                 const score = summary.finalResult;
                 const min = summary.currentPlatoonMinScore;
@@ -531,7 +531,7 @@ export default function MyPerformancePage() {
                       borderLeft: `4px solid ${summary.currentPlatoonColor ?? "var(--accent)"}`,
                     }}
                   >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pelotão</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Faixa</span>
                     <div className="mt-1.5 flex items-center gap-2">
                       {summary.currentPlatoonColor && (
                         <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: summary.currentPlatoonColor }} />
@@ -567,7 +567,7 @@ export default function MyPerformancePage() {
                       </div>
                     )}
 
-                    {/* Falta para o próximo pelotão */}
+                    {/* Falta para a próxima faixa */}
                     {gapToNext !== null && summary.nextPlatoon && (
                       <p className="text-[10px] font-semibold mt-2 leading-tight" style={{ color: summary.nextPlatoonColor ?? "var(--muted-foreground)" }}>
                         +{gapToNext.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pts → {summary.nextPlatoon}
@@ -918,7 +918,8 @@ export default function MyPerformancePage() {
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg flex-1" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                     <Search size={12} className="text-muted-foreground shrink-0" />
                     <input
-                      type="text"
+                      type="search"
+                      aria-label="Buscar evento por nome, cidade ou UF"
                       value={eventFilter}
                       onChange={(e) => setEventFilter(e.target.value)}
                       placeholder="Buscar evento..."
@@ -926,6 +927,17 @@ export default function MyPerformancePage() {
                     />
                   </div>
                 </div>
+                {pendingConfirmationCount > 0 && (
+                  <p
+                    data-testid="text-pending-confirmation"
+                    className="text-[11px] font-semibold flex items-center gap-1.5"
+                    title="Estes eventos só entram na sua nota e na elegibilidade depois que o RH confirmar os resultados."
+                    style={{ color: "var(--muted-foreground)" }}
+                  >
+                    <Clock size={12} className="shrink-0" aria-hidden="true" />
+                    {pendingConfirmationCount} evento(s) aguardando confirmação do RH — ainda não aparecem na lista nem contam na nota.
+                  </p>
+                )}
               </div>
 
               {filteredEvents.length === 0 ? (() => {
