@@ -52,3 +52,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Anexos das conversas com o agente do Replit (capturas, planilhas e PDFs com
+# dados pessoais de colaboradores). Nunca versionar; ver replit.md.
+attached_assets/
