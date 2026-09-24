@@ -9,29 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { Target, AlertCircle, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Copy, Clock, History, Trash2, Plus } from "lucide-react";
 import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
-import { formatEventSubtitle } from "@/lib/utils";
-import { CONDENSED, BODY, WARNING, usePremiumTheme } from "@/lib/premium-theme";
+import { formatEventSubtitle, getCycleWeekends } from "@/lib/utils";
+import { CONDENSED, BODY, WARNING, GOOD, AMBER, INFO, usePremiumTheme } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
-
-const GOOD = "#9ab000";
-const AMBER = "#e8a23d";
-
-function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
-  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
-  const result: { sat: string; sun: string; label: string }[] = [];
-  const end = new Date(endDate + "T12:00:00");
-  const d = new Date(startDate + "T12:00:00");
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-  while (d <= end) {
-    const sat = d.toISOString().split("T")[0];
-    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
-    const sun = sunD.toISOString().split("T")[0];
-    const label = `${String(d.getDate()).padStart(2,"0")}–${String(sunD.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
-    result.push({ sat, sun, label });
-    d.setDate(d.getDate() + 7);
-  }
-  return result;
-}
 
 // Badge do seletor de eventos: prioridade pub. final > pub. parcial > calibrado > fechado > em avaliação > aguardando.
 // Eventos históricos e fechados sem calibração mostram "Fechado"; demais mostram o estado real.
@@ -53,7 +33,7 @@ function calibrationEventChip(ev: {
   if (ev.partialPublishedAt || finalCount > 0)
     return { label: "Pub. Parcial", bg: "rgba(232,162,61,0.14)", fg: AMBER };
   if ((ev.calibratedCriteriaCount ?? 0) > 0)
-    return { label: "Calibrado", bg: "rgba(91,141,239,0.14)", fg: "#5b8def" };
+    return { label: "Calibrado", bg: "rgba(91,141,239,0.14)", fg: INFO };
   if (ev.status === "closed" || ev.isHistorical)
     return { label: "Fechado", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
   if ((ev.evaluatedCriteria ?? 0) > 0)

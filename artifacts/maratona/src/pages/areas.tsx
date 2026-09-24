@@ -27,6 +27,11 @@ import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
+/** Campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
+const requiredText = (message: string) => ({
+  validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,
+});
+
 export default function AreasPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -43,23 +48,28 @@ export default function AreasPage() {
   const { data: criteria } = useGetCriteria({ query: { queryKey: criteriaKey } });
   const { data: users } = useGetUsers({ query: { queryKey: usersKey } });
 
-  const { register, handleSubmit, reset } = useForm<AreaInput>();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<AreaInput>();
+  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
+  function setCreateOpen(o: boolean) {
+    setOpen(o);
+    if (!o) reset();
+  }
 
   const createMutation = useCreateArea({
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: qKey });
         toast({ title: "Área criada com sucesso" });
-        setOpen(false);
-        reset();
+        setCreateOpen(false);
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível criar a área", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
   const updateMutation = useUpdateArea({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível atualizar a área", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
@@ -110,7 +120,7 @@ export default function AreasPage() {
             </p>
           </div>
 
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <button
                 data-testid="button-create-area"
@@ -127,14 +137,15 @@ export default function AreasPage() {
               <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
                 <div className="space-y-1.5">
                   <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome da Área <span style={{ color: WARNING }}>*</span></Label>
-                  <Input data-testid="input-area-name" {...register("name", { required: true })} placeholder="Ex: Cenografia, Comercial..." className="h-11 rounded-lg" style={fieldStyle} />
+                  <Input data-testid="input-area-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome da área."))} placeholder="Ex: Cenografia, Comercial..." className="h-11 rounded-lg" style={fieldStyle} />
+                  {errors.name?.message && <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{errors.name.message}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Descrição</Label>
                   <Input data-testid="input-area-desc" {...register("description")} placeholder="Opcional..." className="h-11 rounded-lg" style={fieldStyle} />
                 </div>
                 <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-                  <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
+                  <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
                   <button
                     data-testid="button-submit-area"
                     type="submit"
@@ -172,6 +183,7 @@ export default function AreasPage() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
             <input
               data-testid="input-search-areas"
+              aria-label="Buscar departamento"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 h-10 rounded-lg text-sm outline-none"
@@ -230,9 +242,11 @@ export default function AreasPage() {
                         <span className="px-2.5 py-1 rounded-full font-bold text-[10px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativa</span>
                       )}
                       <button
+                        type="button"
                         data-testid={`button-manage-area-${a.id}`}
                         onClick={() => setManageArea(a)}
                         title="Relacionar critérios e usuários"
+                        aria-label={`Relacionar critérios e usuários de ${a.name}`}
                         className="p-2 rounded-lg transition-colors hover:opacity-80"
                         style={{ border: "1px solid var(--border)" }}
                       >

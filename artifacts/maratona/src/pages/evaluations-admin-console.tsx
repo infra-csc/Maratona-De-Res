@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useGetEvents, useGetEvent, useGetUsers, useGetAreas, useConfirmEventResults, useGetCurrentCycle,
@@ -19,12 +19,11 @@ import {
 } from "@/lib/routing-api";
 import { customFetch } from "@/lib/custom-fetch";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, cn, getCycleWeekends } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { Search, MapPin, CheckCircle2, ClipboardCheck, Table2, Users, Clock, Link2, Copy, X, CheckCircle, SlidersHorizontal, Info, Lock, Unlock, AlertCircle, Save, RefreshCw, Trash2, RotateCcw, ChevronUp, ChevronDown, Check, UserCheck, Calendar, AlertTriangle, UserX } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { CONDENSED, WARNING } from "@/lib/premium-theme";
+import { CONDENSED, WARNING, AMBER, GOOD } from "@/lib/premium-theme";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -39,27 +38,16 @@ function fmtDT(v: string | null | undefined): string {
   return `${date} ${time}`;
 }
 
-function getCycleWeekends(startDate?: string | null, endDate?: string | null) {
-  if (!startDate || !endDate) return [] as { sat: string; sun: string; label: string }[];
-  const result: { sat: string; sun: string; label: string }[] = [];
-  const end = new Date(endDate + "T12:00:00");
-  const d = new Date(startDate + "T12:00:00");
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-  while (d <= end) {
-    const sat = d.toISOString().split("T")[0];
-    const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
-    const sun = sunD.toISOString().split("T")[0];
-    const label = `${String(d.getDate()).padStart(2,"0")}–${String(sunD.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
-    result.push({ sat, sun, label });
-    d.setDate(d.getDate() + 7);
-  }
-  return result;
-}
-
 const CENOGRAFIA_AREA_ID = 13;
 const FERRAMENTAS_AREA_ID = 16;
-const AMBER = "#e8a23d";
-const GOOD = "#9ab000";
+
+/** Lê `?eventId=N` da URL atual (deep-link vindo da tela de Eventos). */
+function readEventIdFromUrl(): number | null {
+  const raw = new URLSearchParams(window.location.search).get("eventId");
+  if (!raw) return null;
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
 
 type CritState = "unassigned" | "pending" | "partial" | "done";
 
@@ -303,13 +291,33 @@ export function AdminEvaluationsConsole() {
 
   // Evento selecionado: estado explícito, inicializado quando a lista chega
   // (e re-apontado para o primeiro se o evento atual sair da lista). Nada de
-  // cair silenciosamente em `enrichedEvents[0]`.
+  // cair silenciosamente em `enrichedEvents[0]`. Na primeira carga, `?eventId=`
+  // da URL (link "Avaliações" na tela de Eventos) tem prioridade sobre o primeiro.
+  const urlEventIdApplied = useRef(false);
   useEffect(() => {
     if (configuredEvents.length === 0) return;
+    if (!urlEventIdApplied.current) {
+      urlEventIdApplied.current = true;
+      const fromUrl = readEventIdFromUrl();
+      if (fromUrl != null && configuredEvents.some(e => e.id === fromUrl)) {
+        setSelectedEventId(fromUrl);
+        return;
+      }
+    }
     if (selectedEventId == null || !configuredEvents.some(e => e.id === selectedEventId)) {
       setSelectedEventId(configuredEvents[0].id);
     }
   }, [configuredEvents, selectedEventId]);
+
+  // Espelha a seleção na URL (replaceState: não empilha histórico a cada clique
+  // na fila), para que recarregar/compartilhar a página abra o mesmo evento.
+  useEffect(() => {
+    if (selectedEventId == null) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("eventId") === String(selectedEventId)) return;
+    url.searchParams.set("eventId", String(selectedEventId));
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [selectedEventId]);
 
   // ---- Dados de TODOS os eventos (fundo, 5 min) ----
   // Critérios e atribuições por evento continuam sendo N + N requisições

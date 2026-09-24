@@ -18,8 +18,17 @@ const INPUT_BG = "#181818";
 const INPUT_BORDER = "rgba(255,255,255,0.12)";
 const LABEL_COLOR = ACCENT;
 const TEXT_COLOR = "rgba(255,255,255,0.9)";
-const MUTED_COLOR = "#ccff0055";
+// Lima opaca e dessaturada: "#ccff0055" (lima a 33%) dava só 2,7:1 sobre #0b1200; este tom passa de 4,5:1.
+const MUTED_COLOR = "#c9d97a";
 const HINT_COLOR = "rgba(255,255,255,0.35)";
+
+/** Traduz a resposta do login para uma frase que o colaborador entende (sem "HTTP 401"). */
+function loginErrorMessage(status: number, serverError: string | undefined): string {
+  if (status === 401 || status === 403 || status === 404) return serverError ?? "CPF não encontrado ou sem acesso à plataforma.";
+  if (status === 429) return "Muitas tentativas seguidas. Aguarde um instante e tente de novo.";
+  if (status >= 500) return "O sistema está indisponível no momento. Tente novamente em alguns minutos.";
+  return serverError ?? "Não foi possível entrar. Verifique o CPF e tente novamente.";
+}
 
 export default function LoginPage() {
   const [cpf, setCpf] = useState("");
@@ -40,14 +49,16 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: cpf, password: cpf }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "CPF não encontrado ou sem acesso");
-      login(data.token, data.user);
+      // O corpo pode não ser JSON (proxy, queda do servidor): nunca deixar o parse quebrar a mensagem.
+      const data = await res.json().catch(() => ({})) as { error?: string; token?: string; user?: { mustChangePassword?: boolean } };
+      if (!res.ok) throw new Error(loginErrorMessage(res.status, typeof data.error === "string" ? data.error : undefined));
+      if (!data.token || !data.user) throw new Error("Não foi possível entrar. Tente novamente.");
+      login(data.token, data.user as Parameters<typeof login>[1]);
       setLocation(data.user.mustChangePassword ? "/trocar-senha" : "/");
     } catch (err: unknown) {
       toast({
-        title: "Acesso negado",
-        description: err instanceof Error ? err.message : "CPF inválido",
+        title: "Não foi possível entrar",
+        description: err instanceof Error ? err.message : "Sem conexão com o servidor. Verifique sua internet e tente de novo.",
         variant: "destructive",
       });
     } finally {
@@ -88,14 +99,18 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="px-6 py-8 space-y-5">
             <div>
               <label
+                htmlFor="login-cpf"
                 className="block text-[11px] font-black uppercase tracking-widest mb-2"
                 style={{ fontFamily: CONDENSED, color: LABEL_COLOR }}
               >
                 CPF
               </label>
               <input
+                id="login-cpf"
+                name="cpf"
                 type="text"
                 inputMode="numeric"
+                aria-describedby="login-cpf-hint"
                 maxLength={11}
                 value={cpf}
                 onChange={e => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
@@ -119,6 +134,7 @@ export default function LoginPage() {
                 onBlur={e => (e.currentTarget.style.borderColor = INPUT_BORDER)}
               />
               <p
+                id="login-cpf-hint"
                 className="text-[10px] mt-1.5"
                 style={{ fontFamily: CONDENSED, color: HINT_COLOR }}
               >

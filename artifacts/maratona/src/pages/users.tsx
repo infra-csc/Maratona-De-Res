@@ -11,12 +11,29 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Zap, Filter, Eye, Pencil, LineChart, GitMerge, X } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
-import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
+import { useAuth, hasRole } from "@/lib/auth-context";
+import { CONDENSED, BODY, WARNING, GOOD, AMBER, INFO, PremiumCard } from "@/lib/premium-theme";
 
-const GOOD = "#9ab000";
-const AMBER = "#e8a23d";
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
+
+/** Regra de campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
+const requiredText = (message: string) => ({
+  validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,
+});
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+}
+
+/** Lê `{ error }` do corpo da resposta sem quebrar quando o corpo não é JSON. */
+async function readServerError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    if (typeof body?.error === "string" && body.error.trim()) return body.error;
+  } catch { /* corpo vazio ou não-JSON */ }
+  return fallback;
+}
 
 const ROLES: { value: string; label: string; bg: string; fg: string }[] = [
   { value: "admin", label: "Administrador", bg: "var(--primary)", fg: "var(--primary-foreground)" },
@@ -26,7 +43,7 @@ const ROLES: { value: string; label: string; bg: string; fg: string }[] = [
   { value: "visualizador", label: "Visualizador", bg: "rgba(232,162,61,0.14)", fg: AMBER },
   // Confirma equipes por evento e envia avaliação (qualquer área), cadastra/edita
   // colaboradores — mas nunca vê nota, resposta enviada ou matriz de conformidade.
-  { value: "operador", label: "Operador", bg: "rgba(91,141,239,0.14)", fg: "#5b8def" },
+  { value: "operador", label: "Operador", bg: "rgba(91,141,239,0.14)", fg: INFO },
 ];
 
 function initials(name: string) {
@@ -35,7 +52,8 @@ function initials(name: string) {
 
 export default function UsersPage() {
   const { user: currentUser, impersonate } = useAuth();
-  const isAdmin = currentUser?.role === "admin";
+  // Espelha o backend: criar/editar/redefinir senha = admin|rh; remover, impersonar e migrar e-mails = admin.
+  const isAdmin = hasRole(currentUser, "admin");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -60,9 +78,14 @@ export default function UsersPage() {
   const { data: employees } = useGetEmployees({ active: true });
   const sortedEmployees = [...(employees ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
-  const { register, handleSubmit, reset, setValue } = useForm<UserInput & { role: string }>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<UserInput & { role: string }>({
     defaultValues: { role: "avaliador" },
   });
+  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
+  function setCreateOpen(o: boolean) {
+    setOpen(o);
+    if (!o) reset();
+  }
 
   const createMutation = useCreateUser({
     mutation: {
@@ -146,18 +169,18 @@ export default function UsersPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ dryRun }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Erro ao migrar emails");
+      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível migrar os e-mails. Tente novamente."));
+      const data = await res.json().catch(() => ({})) as { updated?: number; preview?: NonNullable<typeof emailMigPreview> };
       if (!dryRun) {
-        toast({ title: `${data.updated} email(s) atualizados com sucesso` });
+        toast({ title: `${data.updated ?? 0} e-mail(s) atualizado(s) com sucesso` });
         qc.invalidateQueries({ queryKey: qKey });
         setEmailMigOpen(false);
         setEmailMigPreview(null);
       } else {
-        setEmailMigPreview(data.preview);
+        setEmailMigPreview(data.preview ?? []);
       }
     } catch (e: unknown) {
-      toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
+      toast({ title: "Não foi possível migrar os e-mails", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
     } finally {
       setEmailMigLoading(false);
     }
@@ -278,7 +301,7 @@ export default function UsersPage() {
                 <GitMerge size={16} /> {mergeMode ? "Cancelar Mescla" : "Mesclar Avaliadores"}
               </button>
             )}
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
                 <button
                   data-testid="button-create-user"
@@ -297,22 +320,25 @@ export default function UsersPage() {
                     <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
                     <div className="relative">
                       <UserCircle size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-                      <Input data-testid="input-user-name" {...register("name", { required: true })} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+                      <Input data-testid="input-user-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome completo."))} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
                     </div>
+                    <FieldError message={errors.name?.message} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: WARNING }}>*</span></Label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-                      <Input data-testid="input-user-email" type="email" {...register("email", { required: true })} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+                      <Input data-testid="input-user-email" type="email" aria-invalid={!!errors.email} {...register("email", requiredText("Informe o e-mail."))} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
                     </div>
+                    <FieldError message={errors.email?.message} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Senha Inicial <span style={{ color: WARNING }}>*</span></Label>
                     <div className="relative">
                       <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-                      <Input data-testid="input-user-password" type="password" {...register("password", { required: true })} placeholder="••••••••" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+                      <Input data-testid="input-user-password" type="password" aria-invalid={!!errors.password} {...register("password", requiredText("Informe a senha inicial."))} placeholder="••••••••" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
                     </div>
+                    <FieldError message={errors.password?.message} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
@@ -358,7 +384,7 @@ export default function UsersPage() {
                     <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Necessário para o usuário ver a página "Meu Desempenho" com os próprios resultados.</p>
                   </div>
                   <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-                    <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
+                    <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
                     <button
                       data-testid="button-submit-user"
                       type="submit"
@@ -418,6 +444,7 @@ export default function UsersPage() {
                 <input
                   type="text"
                   data-testid="input-search-users"
+                  aria-label="Buscar usuário por nome, CPF ou e-mail"
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   placeholder="Buscar por nome, CPF ou e-mail..."
@@ -487,6 +514,7 @@ export default function UsersPage() {
                               <input
                                 type="checkbox"
                                 className="w-4 h-4 cursor-pointer"
+                                aria-label={`Selecionar ${u.name} para mescla`}
                                 checked={isSelected}
                                 onChange={() => {
                                   setSelectedIds(prev => {
@@ -606,10 +634,11 @@ export default function UsersPage() {
                             >
                               <KeyRound size={14} />
                             </button>}
-                            {!mergeMode && u.id !== currentUser?.id && (
+                            {!mergeMode && isAdmin && u.id !== currentUser?.id && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <button
+                                    type="button"
                                     data-testid={`button-delete-user-${u.id}`}
                                     title="Remover acesso"
                                     className="p-2 rounded-lg transition-colors hover:opacity-80"
@@ -628,11 +657,12 @@ export default function UsersPage() {
                                   <AlertDialogFooter>
                                     <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
                                     <AlertDialogAction
-                                      className="rounded-lg font-bold uppercase text-xs"
+                                      className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
                                       style={{ backgroundColor: WARNING, color: "#fff" }}
+                                      disabled={deleteMutation.isPending}
                                       onClick={() => deleteMutation.mutate({ id: u.id })}
                                     >
-                                      Remover Acesso
+                                      {deleteMutation.isPending ? "Removendo..." : "Remover Acesso"}
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
@@ -692,8 +722,9 @@ export default function UsersPage() {
               <AlertDialogFooter>
                 <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
-                  className="rounded-lg font-bold uppercase text-xs"
+                  className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
                   style={{ backgroundColor: GOOD, color: "#fff" }}
+                  disabled={mergeMutation.isPending}
                   onClick={() => {
                     if (!canonicalId) return;
                     const dups = [...selectedIds].filter(id => id !== canonicalId);
@@ -841,7 +872,7 @@ function EditUserForm({
   onCancel: () => void;
   onSubmit: (data: EditUserFormValues) => void;
 }) {
-  const { register, handleSubmit, setValue, watch } = useForm<EditUserFormValues>({
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<EditUserFormValues>({
     defaultValues: {
       name: user.name,
       email: user.email ?? "",
@@ -859,15 +890,17 @@ function EditUserForm({
         <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
         <div className="relative">
           <UserCircle size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-          <Input data-testid="input-edit-user-name" {...register("name", { required: true })} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+          <Input data-testid="input-edit-user-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome completo."))} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
         </div>
+        <FieldError message={errors.name?.message} />
       </div>
       <div className="space-y-1.5">
         <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: WARNING }}>*</span></Label>
         <div className="relative">
           <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
-          <Input data-testid="input-edit-user-email" type="email" {...register("email", { required: true })} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
+          <Input data-testid="input-edit-user-email" type="email" aria-invalid={!!errors.email} {...register("email", requiredText("Informe o e-mail."))} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
         </div>
+        <FieldError message={errors.email?.message} />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">

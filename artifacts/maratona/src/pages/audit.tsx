@@ -3,9 +3,8 @@ import { useGetAuditLogs, getGetAuditLogsQueryKey } from "@workspace/api-client-
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FolderLock, ChevronLeft, ChevronRight, Filter } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Card, CardContent } from "@/components/ui/card";
+import { fmtDateTime } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
 
 const ACTION_COLORS: Record<string, string> = {
   create: "bg-green-50 text-green-700 border-green-200",
@@ -14,6 +13,26 @@ const ACTION_COLORS: Record<string, string> = {
   login: "bg-slate-100 text-slate-600 border-slate-200",
   close: "bg-orange-50 text-orange-700 border-orange-200",
   calibrate: "bg-purple-50 text-purple-700 border-purple-200",
+};
+
+// Os códigos internos (`create`, `users`) viram rótulos legíveis; um valor
+// desconhecido cai no próprio código, para nunca esconder informação.
+const ACTION_LABELS: Record<string, string> = {
+  create: "Criar",
+  update: "Atualizar",
+  delete: "Remover",
+  login: "Login",
+  close: "Fechar",
+  calibrate: "Calibrar",
+};
+const ENTITY_LABELS: Record<string, string> = {
+  users: "Usuários",
+  events: "Eventos",
+  employees: "Colaboradores",
+  evaluations: "Avaliações",
+  calibrations: "Calibrações",
+  absences: "Faltas",
+  rules: "Regras",
 };
 
 export default function AuditPage() {
@@ -27,15 +46,7 @@ export default function AuditPage() {
     { query: { queryKey: qKey } }
   );
 
-  const totalPages = data ? Math.ceil(data.total / 50) : 1;
-
-  function fmtDate(d: string) {
-    try {
-      return format(new Date(d), "dd/MM/yyyy HH:mm", { locale: ptBR });
-    } catch {
-      return d;
-    }
-  }
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / 50)) : 1;
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-6xl mx-auto bg-slate-50/30 min-h-full">
@@ -54,7 +65,7 @@ export default function AuditPage() {
             <Filter size={18} />
           </div>
           <Select value={entity || "all"} onValueChange={v => { setEntity(v === "all" ? "" : v); setPage(1); }}>
-            <SelectTrigger data-testid="select-audit-entity" className="w-full sm:w-48 h-10 font-medium">
+            <SelectTrigger data-testid="select-audit-entity" aria-label="Filtrar por entidade" className="w-full sm:w-48 h-10 font-medium">
               <SelectValue placeholder="Entidade" />
             </SelectTrigger>
             <SelectContent>
@@ -69,7 +80,7 @@ export default function AuditPage() {
             </SelectContent>
           </Select>
           <Select value={action || "all"} onValueChange={v => { setAction(v === "all" ? "" : v); setPage(1); }}>
-            <SelectTrigger data-testid="select-audit-action" className="w-full sm:w-40 h-10 font-medium">
+            <SelectTrigger data-testid="select-audit-action" aria-label="Filtrar por ação" className="w-full sm:w-40 h-10 font-medium">
               <SelectValue placeholder="Ação" />
             </SelectTrigger>
             <SelectContent>
@@ -86,13 +97,13 @@ export default function AuditPage() {
         
         {data && (
           <div className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border">
-            {data.total} registros encontrados
+            {data.total} registro{data.total !== 1 ? "s" : ""} encontrado{data.total !== 1 ? "s" : ""}
           </div>
         )}
       </div>
 
       {isLoading ? (
-        <div className="text-center py-20 text-muted-foreground">Carregando logs de auditoria...</div>
+        <div className="text-center py-20 text-muted-foreground">Carregando registros de auditoria...</div>
       ) : (
         <Card className="border-none shadow-sm overflow-hidden bg-white">
           <div className="overflow-x-auto">
@@ -109,13 +120,13 @@ export default function AuditPage() {
               <tbody className="divide-y divide-slate-100">
                 {(data?.data ?? []).map(log => (
                   <tr key={log.id} data-testid={`row-audit-${log.id}`} className="hover:bg-slate-50/50 transition-colors font-mono text-sm">
-                    <td className="px-6 py-3 text-slate-500 whitespace-nowrap">{fmtDate(log.createdAt)}</td>
+                    <td className="px-6 py-3 text-slate-500 whitespace-nowrap">{fmtDateTime(log.createdAt)}</td>
                     <td className="px-6 py-3">
                       <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold border tracking-wider ${ACTION_COLORS[log.action] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        {log.action}
+                        {ACTION_LABELS[log.action] ?? log.action}
                       </span>
                     </td>
-                    <td className="px-6 py-3 font-semibold text-slate-700">{log.entity}</td>
+                    <td className="px-6 py-3 font-semibold text-slate-700">{ENTITY_LABELS[log.entity] ?? log.entity}</td>
                     <td className="px-6 py-3 text-slate-400">{log.entityId ?? "—"}</td>
                     <td className="px-6 py-3 text-right font-sans">
                       <div className="inline-flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-md border text-slate-700 font-semibold text-xs">
@@ -125,7 +136,7 @@ export default function AuditPage() {
                   </tr>
                 ))}
                 {(!data?.data || data.data.length === 0) && (
-                  <tr><td colSpan={5} className="text-center py-16 text-slate-400 font-sans text-base">Nenhum log encontrado para os filtros selecionados.</td></tr>
+                  <tr><td colSpan={5} className="text-center py-16 text-slate-400 font-sans text-base">Nenhum registro encontrado para os filtros selecionados.</td></tr>
                 )}
               </tbody>
             </table>

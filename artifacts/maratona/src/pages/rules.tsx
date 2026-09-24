@@ -15,8 +15,12 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
+import { usePremiumTheme, CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
 import { getAuthToken } from "@/lib/custom-fetch";
+import { useAuth, hasRole } from "@/lib/auth-context";
+
+/** Campo numérico em edição: NaN (campo apagado) vira "" para o input não exibir "NaN". */
+const numOrEmpty = (v: number | string | undefined | null): number | string => (typeof v === "number" && Number.isNaN(v) ? "" : (v ?? ""));
 
 // Faixas fechadas nas duas pontas, com folga decimal de 0,01 entre elas
 // (ex: 74,99 / 75,00) — evita a ambiguidade de duas faixas “tocando” no
@@ -97,8 +101,11 @@ const GROUP_META = {
 
 export default function RulesPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   usePremiumTheme();
   const qc = useQueryClient();
+  // Espelha o backend: DELETE /platoon-rules/:id é admin|rh (diretoria edita, mas não remove faixas).
+  const canDeleteBand = hasRole(user, "admin") || hasRole(user, "rh");
 
   const rulesQKey = getGetRulesQueryKey();
   const platoonQKey = getGetPlatoonRulesQueryKey();
@@ -122,6 +129,7 @@ export default function RulesPage() {
   const updatePlatoonMutation = useUpdatePlatoonRule({
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: platoonQKey }); toast({ title: "Faixa atualizada com sucesso" }); },
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível salvar a faixa", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
@@ -141,7 +149,7 @@ export default function RulesPage() {
   const deletePlatoonMutation = useDeletePlatoonRule({
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: platoonQKey }); setDeleteTargetId(null); toast({ title: "Faixa removida" }); },
-      onError: () => toast({ title: "Erro ao remover faixa", variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível remover a faixa", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
@@ -159,7 +167,7 @@ export default function RulesPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Erro desconhecido");
+        throw new Error((body as { error?: string }).error ?? "Não foi possível substituir as faixas. Tente novamente.");
       }
       qc.invalidateQueries({ queryKey: platoonQKey });
       setPlatoonValues({});
@@ -177,12 +185,18 @@ export default function RulesPage() {
   }
 
   function handleCreateBand() {
-    if (newBand.minScore === "" || newBand.maxScore === "") {
+    if (newBand.minScore.trim() === "" || newBand.maxScore.trim() === "") {
       toast({ title: "Preencha nota mínima e máxima", variant: "destructive" });
       return;
     }
     const min = parseFloat(newBand.minScore);
     const max = parseFloat(newBand.maxScore);
+    const bonus = newBand.bonusValue.trim() === "" ? 0 : parseFloat(newBand.bonusValue);
+    const extra = newBand.bonusPerExtraEvent.trim() === "" ? 0 : parseFloat(newBand.bonusPerExtraEvent);
+    if (![min, max, bonus, extra].every(Number.isFinite)) {
+      toast({ title: "Valores inválidos", description: "Nota mínima, nota máxima e valores em R$ precisam ser números.", variant: "destructive" });
+      return;
+    }
     if (min > max) {
       toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" });
       return;
@@ -199,8 +213,8 @@ export default function RulesPage() {
         color: "#94a3b8",
         minScore: min,
         maxScore: max,
-        bonusValue: parseFloat(newBand.bonusValue || "0"),
-        bonusPerExtraEvent: parseFloat(newBand.bonusPerExtraEvent || "0"),
+        bonusValue: bonus,
+        bonusPerExtraEvent: extra,
       },
     });
   }
@@ -327,26 +341,26 @@ export default function RulesPage() {
                         <div className="flex flex-col gap-1.5">
                           <Input placeholder="Nome (opcional)" className="w-36 h-8 rounded-lg text-xs font-bold" value={currentName} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], name: e.target.value } }))} />
                           <div className="flex items-center gap-1">
-                            <Input data-testid={`input-platoon-min-${p.id}`} type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.minScore ?? p.minScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))} />
+                            <Input data-testid={`input-platoon-min-${p.id}`} aria-label="Nota mínima da faixa" type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={numOrEmpty(platoonValues[p.id]?.minScore ?? p.minScore)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], minScore: parseFloat(e.target.value) } }))} />
                             <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>–</span>
-                            <Input data-testid={`input-platoon-max-${p.id}`} type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={platoonValues[p.id]?.maxScore ?? p.maxScore} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))} />
+                            <Input data-testid={`input-platoon-max-${p.id}`} aria-label="Nota máxima da faixa" type="number" min="0" max="100" step="0.01" className="w-16 text-center h-8 rounded-lg text-sm font-black" value={numOrEmpty(platoonValues[p.id]?.maxScore ?? p.maxScore)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], maxScore: parseFloat(e.target.value) } }))} />
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <div className="relative max-w-[120px] mx-auto">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent)" }}>R$</span>
-                          <Input data-testid={`input-platoon-bonus-${p.id}`} type="number" min="0" step="100" className="w-full text-right h-10 rounded-lg font-black" value={currentBonus} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusValue: parseFloat(e.target.value) } }))} />
+                          <Input data-testid={`input-platoon-bonus-${p.id}`} aria-label="Prêmio base da faixa em reais" type="number" min="0" step="100" className="w-full text-right h-10 rounded-lg font-black" value={numOrEmpty(currentBonus)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusValue: parseFloat(e.target.value) } }))} />
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <div className="relative max-w-[120px] mx-auto">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent)" }}>R$</span>
-                          <Input data-testid={`input-platoon-extra-${p.id}`} type="number" min="0" step="50" className="w-full text-right h-10 rounded-lg font-black" value={currentExtra} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusPerExtraEvent: parseFloat(e.target.value) } }))} />
+                          <Input data-testid={`input-platoon-extra-${p.id}`} aria-label="Bônus por evento extra em reais" type="number" min="0" step="50" className="w-full text-right h-10 rounded-lg font-black" value={numOrEmpty(currentExtra)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusPerExtraEvent: parseFloat(e.target.value) } }))} />
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-center">
-                        <span className="text-sm font-black" style={{ color: "var(--foreground)" }}>{fmtBRL(total3)}</span>
+                        <span className="text-sm font-black" style={{ color: "var(--foreground)" }}>{Number.isFinite(total3) ? fmtBRL(total3) : "—"}</span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -356,28 +370,40 @@ export default function RulesPage() {
                             style={{ backgroundColor: isDirty ? "var(--accent)" : "var(--secondary)", color: isDirty ? "var(--accent-foreground)" : "var(--muted-foreground)", border: "1px solid var(--border)" }}
                             disabled={!isDirty || updatePlatoonMutation.isPending}
                             onClick={() => {
-                              if (!platoonValues[p.id]) return;
-                              const min = platoonValues[p.id]?.minScore ?? Number(p.minScore);
-                              const max = platoonValues[p.id]?.maxScore ?? Number(p.maxScore);
+                              const edits = platoonValues[p.id];
+                              if (!edits) return;
+                              // Campo apagado vira NaN no estado — rejeita antes de mandar para a API.
+                              const hasInvalidNumber = (["minScore", "maxScore", "bonusValue", "bonusPerExtraEvent"] as const)
+                                .some(k => edits[k] !== undefined && !Number.isFinite(edits[k]));
+                              if (hasInvalidNumber) {
+                                toast({ title: "Preencha os valores da faixa", description: "Nota mínima, nota máxima e valores em R$ precisam ser números.", variant: "destructive" });
+                                return;
+                              }
+                              const min = edits.minScore ?? Number(p.minScore);
+                              const max = edits.maxScore ?? Number(p.maxScore);
                               if (min > max) { toast({ title: "Nota mínima não pode ser maior que a máxima", variant: "destructive" }); return; }
                               const conflict = findOverlappingBand(min, max, p.id);
                               if (conflict) { toast({ title: "Faixa sobreposta", description: `O intervalo ${min}–${max} sobrepõe a faixa "${conflict.name}" (${conflict.minScore}–${conflict.maxScore}).`, variant: "destructive" }); return; }
-                              updatePlatoonMutation.mutate({ id: p.id, data: platoonValues[p.id] });
+                              updatePlatoonMutation.mutate({ id: p.id, data: edits });
                             }}
                           >
                             <Save size={13} className="mr-1" /> Salvar
                           </button>
-                          <button
-                            data-testid={`button-delete-platoon-${p.id}`}
-                            className="p-1.5 rounded transition-colors"
-                            style={{ color: "var(--muted-foreground)" }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e5484d"; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)"; }}
-                            onClick={() => setDeleteTargetId(p.id)}
-                            title="Remover faixa"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canDeleteBand && (
+                            <button
+                              type="button"
+                              data-testid={`button-delete-platoon-${p.id}`}
+                              className="p-1.5 rounded transition-colors"
+                              style={{ color: "var(--muted-foreground)" }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = WARNING; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)"; }}
+                              onClick={() => setDeleteTargetId(p.id)}
+                              title="Remover faixa"
+                              aria-label={`Remover faixa ${currentName || `${p.minScore}–${p.maxScore}`}`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -398,7 +424,7 @@ export default function RulesPage() {
               ].map(f => (
                 <div key={f.label} className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
-                  <Input type={f.type} value={f.val} onChange={e => f.onChange(e.target.value)} className={`h-10 ${f.w} rounded-lg font-bold`} placeholder={f.placeholder} />
+                  <Input type={f.type} aria-label={f.label} value={f.val} onChange={e => f.onChange(e.target.value)} className={`h-10 ${f.w} rounded-lg font-bold`} placeholder={f.placeholder} />
                 </div>
               ))}
               <div className="flex flex-col gap-1">
@@ -460,8 +486,13 @@ export default function RulesPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteTargetId && deletePlatoonMutation.mutate({ id: deleteTargetId })} className="rounded-lg font-bold uppercase text-xs" style={{ backgroundColor: "#e5484d", color: "white", border: "none" }}>
-              Sim, remover
+            <AlertDialogAction
+              disabled={deletePlatoonMutation.isPending}
+              onClick={() => deleteTargetId && deletePlatoonMutation.mutate({ id: deleteTargetId })}
+              className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
+              style={{ backgroundColor: WARNING, color: "white", border: "none" }}
+            >
+              {deletePlatoonMutation.isPending ? "Removendo…" : "Sim, remover"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

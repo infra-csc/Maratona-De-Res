@@ -24,12 +24,9 @@ import {
   Search, Trophy, Crown, Award, AlertTriangle, MapPin, ChevronRight, Table2, ListOrdered,
   ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, BarChart3,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn, fmtDate } from "@/lib/utils";
-import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
-
-const AMBER = "#e8a23d";
-const GOOD = "#9ab000";
+import { CONDENSED, BODY, WARNING, AMBER, GOOD } from "@/lib/premium-theme";
 
 const BONUS_STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
   projected: { label: "Projetado", bg: "var(--secondary)", color: "var(--muted-foreground)" },
@@ -43,16 +40,28 @@ const BONUS_STATUS_OPTIONS = ["projected", "approved", "scheduled", "paid", "blo
 
 type SortDir = "asc" | "desc";
 
-function useSort<T extends Record<string, any>>(items: T[], key: keyof T | null, dir: SortDir) {
-  if (!key) return items;
-  const sorted = [...items].sort((a, b) => {
-    const av = a[key];
-    const bv = b[key];
-    if (typeof av === "string" && typeof bv === "string") return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
-    if (typeof av === "number" && typeof bv === "number") return dir === "asc" ? av - bv : bv - av;
-    return 0;
-  });
-  return sorted;
+/** Ordena `items` por `key` (strings e números; outros tipos mantêm a ordem). Hook: memoriza entre renders. */
+function useSort<T extends object>(items: T[], key: keyof T | null, dir: SortDir): T[] {
+  return useMemo(() => {
+    if (!key) return items;
+    return [...items].sort((a, b) => {
+      const av: unknown = a[key];
+      const bv: unknown = b[key];
+      if (typeof av === "string" && typeof bv === "string") return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      if (typeof av === "number" && typeof bv === "number") return dir === "asc" ? av - bv : bv - av;
+      return 0;
+    });
+  }, [items, key, dir]);
+}
+
+/** Enter/Espaço acionam elementos com role="button" (linhas clicáveis das tabelas). */
+function onKeyActivate(fn: () => void) {
+  return (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fn();
+    }
+  };
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -824,7 +833,7 @@ function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
       <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
         <BarChart3 size={16} style={{ color: "var(--accent)" }} />
         <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
-          Distribuição por Pelotão
+          Distribuição por Faixa
         </span>
         <span className="ml-auto text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
           {rows.length} colaborador{rows.length !== 1 ? "es" : ""}
@@ -870,8 +879,8 @@ function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
         {/* Summary table */}
         <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
           <div className="grid grid-cols-[1.4fr_0.6fr_0.7fr_1fr]" style={{ backgroundColor: "var(--secondary)" }}>
-            {(["Pelotão", "Qtd", "Média", "Bônus Total"] as const).map(h => (
-              <div key={h} className="px-3 py-2.5 text-[9px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Pelotão" ? "left" : "center" }}>{h}</div>
+            {(["Faixa", "Qtd", "Média", "Bônus Total"] as const).map(h => (
+              <div key={h} className="px-3 py-2.5 text-[9px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Faixa" ? "left" : "center" }}>{h}</div>
             ))}
           </div>
           {groups.map((g, i) => (
@@ -949,14 +958,20 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
 
   const headerCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center") => (
     <div
-      className={cn("px-4 py-3 text-[10px] font-bold uppercase cursor-pointer select-none transition-colors hover:opacity-70", align === "center" && "text-center")}
+      role="columnheader"
+      aria-sort={sortKey === key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+      className={cn("px-4 py-3 text-[10px] font-bold uppercase select-none", align === "center" && "text-center")}
       style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}
-      onClick={() => handleSort(key)}
     >
-      <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => handleSort(key)}
+        className="inline-flex items-center gap-1 uppercase transition-colors hover:opacity-70 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        style={{ fontFamily: CONDENSED, color: "inherit" }}
+      >
         {label}
         <SortIcon active={sortKey === key} dir={sortDir} />
-      </span>
+      </button>
     </div>
   );
 
@@ -996,9 +1011,11 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                 className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
                 style={fieldStyle}
                 placeholder="Buscar colaborador..."
+                aria-label="Buscar colaborador na consolidação"
               />
             </div>
             <select
+              aria-label="Filtrar por elegibilidade"
               value={filterEligible}
               onChange={e => setFilterEligible(e.target.value as "all" | "eligible" | "ineligible")}
               className="h-11 rounded-lg px-3 text-sm font-bold"
@@ -1034,9 +1051,13 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                     <div
                       key={r.employeeId}
                       data-testid={`row-consolidation-${r.employeeId}`}
-                      className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center transition-colors cursor-pointer hover:opacity-90"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Ver detalhamento de ${r.employeeName}`}
+                      className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center transition-colors cursor-pointer hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
                       style={{ borderTop: "1px solid var(--border)" }}
                       onClick={() => setSelectedId(r.employeeId)}
+                      onKeyDown={onKeyActivate(() => setSelectedId(r.employeeId))}
                     >
                       <div className="px-4 py-3.5">
                         <div className="font-bold uppercase text-sm">{r.employeeName}</div>
@@ -1206,22 +1227,30 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
     return matchSearch;
   });
 
-  const totalBonus = filteredRows.reduce((acc, r) => acc + (r.bonusValue ?? 0), 0);
-  const eligibleCount = filteredRows.filter(r => r.eligible !== false).length;
-  const eligibilityPct = filteredRows.length > 0 ? Math.round((eligibleCount / filteredRows.length) * 100) : 0;
+  // Cards de resumo: sempre sobre o ciclo inteiro (`rows`), independentes da busca/filtro da tabela,
+  // para que numerador, denominador e o card "Colaboradores" falem do mesmo conjunto.
+  const totalBonus = rows.reduce((acc, r) => acc + (r.bonusValue ?? 0), 0);
+  const eligibleCount = rows.filter(r => r.eligible !== false).length;
+  const eligibilityPct = rows.length > 0 ? Math.round((eligibleCount / rows.length) * 100) : 0;
   const sortedRows = useSort(filteredRows, sortKey, sortDir);
 
   const payHeaderCell = (label: string, key: keyof QuarterlyResult, align: "left" | "center" = "center", title?: string) => (
     <div
-      className={cn("px-4 py-3 text-[10px] font-bold uppercase cursor-pointer select-none transition-colors hover:opacity-70", align === "center" && "text-center")}
+      role="columnheader"
+      aria-sort={sortKey === key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+      className={cn("px-4 py-3 text-[10px] font-bold uppercase select-none", align === "center" && "text-center")}
       style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}
-      onClick={() => handleSort(key)}
       title={title}
     >
-      <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => handleSort(key)}
+        className="inline-flex items-center gap-1 uppercase transition-colors hover:opacity-70 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        style={{ fontFamily: CONDENSED, color: "inherit" }}
+      >
         {label}
         <SortIcon active={sortKey === key} dir={sortDir} />
-      </span>
+      </button>
     </div>
   );
 
@@ -1332,7 +1361,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
               <p className="font-bold uppercase text-xs tracking-wide">Elegibilidade</p>
             </div>
             <h3 className="text-3xl font-black mt-2" style={{ fontFamily: CONDENSED }}>{eligibilityPct}%</h3>
-            <span className="inline-block mt-2.5 font-black uppercase text-[10px] px-2 py-1 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{eligibleCount} de {rows.length}</span>
+            <span className="inline-block mt-2.5 font-black uppercase text-[10px] px-2 py-1 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{eligibleCount} de {rows.length} colaborador{rows.length !== 1 ? "es" : ""}</span>
           </div>
           <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
@@ -1364,9 +1393,10 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                 className="w-full pl-9 h-11 rounded-lg text-sm outline-none"
                 style={fieldStyle}
                 placeholder="Buscar colaborador..."
+                aria-label="Buscar colaborador em bônus e pagamentos"
               />
             </div>
-            <select value={filterEligible} onChange={e => setFilterEligible(e.target.value as any)} className="h-11 rounded-lg px-3 text-sm font-bold" style={fieldStyle}>
+            <select aria-label="Filtrar por elegibilidade" value={filterEligible} onChange={e => setFilterEligible(e.target.value as "all" | "eligible" | "ineligible")} className="h-11 rounded-lg px-3 text-sm font-bold" style={fieldStyle}>
               <option value="all">Todos</option>
               <option value="eligible">Elegíveis</option>
               <option value="ineligible">Não elegíveis</option>
@@ -1397,9 +1427,13 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                     <div
                       key={r.employeeId}
                       data-testid={`row-result-${r.employeeId}`}
-                      className="grid items-center transition-colors cursor-pointer group hover:opacity-90"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Ver detalhamento de ${r.employeeName}`}
+                      className="grid items-center transition-colors cursor-pointer group hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
                       style={{ borderTop: "1px solid var(--border)", gridTemplateColumns: canManage ? "1.6fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 0.7fr" : "1.6fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr" }}
                       onClick={() => setSelectedId(r.employeeId)}
+                      onKeyDown={onKeyActivate(() => setSelectedId(r.employeeId))}
                     >
                       <div className="px-4 py-3.5">
                         <div className="font-bold uppercase text-sm">{r.employeeName}</div>
@@ -1456,7 +1490,9 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                         <div className="px-4 py-3.5 text-center">
                           {r.id != null && (
                             <button
+                              type="button"
                               data-testid={`button-payment-${r.employeeId}`}
+                              aria-label={`Gerir pagamento de ${r.employeeName}`}
                               className="p-2 rounded-lg transition-colors hover:opacity-80"
                               style={{ color: "var(--muted-foreground)", border: "1px solid transparent" }}
                               onClick={(e) => { e.stopPropagation(); openPayment(r); }}
@@ -1548,8 +1584,8 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
 
 export default function ResultsPage() {
   const { user } = useAuth();
-  const isManager = !!user && ["admin", "rh", "diretoria"].includes(user.role);
-  const canManage = !!user && ["admin", "rh", "diretoria"].includes(user.role);
+  // Um só flag: quem gerencia resultados (exporta consolidação, fecha/recalcula ciclo, edita pagamentos).
+  const isManager = ["admin", "rh", "diretoria"].some(r => hasRole(user, r));
   const [tab, setTab] = useState("ranking");
 
   return (
@@ -1603,7 +1639,7 @@ export default function ResultsPage() {
           </TabsContent>
           {isManager && (
             <TabsContent value="bonus" className="mt-0">
-              <PaymentsTab canManage={canManage} />
+              <PaymentsTab canManage={isManager} />
             </TabsContent>
           )}
         </Tabs>

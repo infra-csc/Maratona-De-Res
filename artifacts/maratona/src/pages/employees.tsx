@@ -19,11 +19,39 @@ import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import { useForm } from "react-hook-form";
 import { Plus, Search, Building2, Users, Zap, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Lock, Eye, Wifi, WifiOff, Hash, Copy, Check, Link, CreditCard } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
-import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
+import { useAuth, hasRole } from "@/lib/auth-context";
+import { CONDENSED, BODY, WARNING, GOOD, PremiumCard } from "@/lib/premium-theme";
 
-const GOOD = "#9ab000";
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
+
+/** Campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
+const requiredText = (message: string) => ({
+  validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,
+});
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+}
+
+/** Lê `{ error }` do corpo da resposta sem quebrar quando o corpo não é JSON. */
+async function readServerError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    if (typeof body?.error === "string" && body.error.trim()) return body.error;
+  } catch { /* corpo vazio ou não-JSON */ }
+  return fallback;
+}
+
+/** Enter/Espaço acionam linhas com role="checkbox". */
+function onKeyToggle(fn: () => void) {
+  return (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fn();
+    }
+  };
+}
 
 function downloadCredentialsCsv(created: GeneratedCredential[]) {
   const header = "Nome,CPF (login),Senha";
@@ -95,13 +123,13 @@ export default function EmployeesPage() {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ userId: emp.linkedUserId }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível abrir a visão deste colaborador. Tente novamente."));
       const { token: newToken, user: impUser } = await res.json() as { token: string; user: import("@workspace/api-client-react").User };
       impersonate(newToken, impUser);
       const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
       window.location.assign(`${base}/`);
     } catch (e) {
-      toast({ title: "Não foi possível visualizar como este colaborador", description: (e as Error).message, variant: "destructive" });
+      toast({ title: "Não foi possível visualizar como este colaborador", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
       setPreviewingId(null);
     }
   }, [impersonate, toast, token]);
@@ -155,15 +183,12 @@ export default function EmployeesPage() {
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(parsedCpfRows),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(err.error ?? `Falha ao importar (HTTP ${res.status})`);
-      }
+      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível importar os CPFs. Tente novamente."));
       const data = await res.json() as BulkCpfResult;
       setBulkCpfResult(data);
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
     } catch (e) {
-      toast({ title: "Erro ao importar CPFs", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+      toast({ title: "Não foi possível importar os CPFs", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
     } finally {
       setBulkCpfLoading(false);
     }
@@ -202,13 +227,13 @@ export default function EmployeesPage() {
         // No ids → backend generates for ALL active casa employees regardless of frontend filters
         body: JSON.stringify({}),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível definir as senhas. Tente novamente."));
       const data = await res.json() as { results: BulkPinEntry[]; skipped: BulkPinSkip[] };
       setBulkPinResult(data);
       setBulkPinSource("generated");
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
     } catch (e) {
-      toast({ title: "Erro ao gerar PINs", description: (e as Error).message, variant: "destructive" });
+      toast({ title: "Não foi possível definir as senhas", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
     } finally {
       setBulkPinLoading(false);
     }
@@ -221,13 +246,13 @@ export default function EmployeesPage() {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível gerar a senha. Tente novamente."));
       const data = await res.json() as { pin: string; cpfLogin: string; userCreated: boolean };
       setPinDialog({ empName: emp.name, pin: data.pin, cpfLogin: data.cpfLogin, created: data.userCreated });
       setPinCopied(false);
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
     } catch (e) {
-      toast({ title: "Erro ao gerar PIN", description: (e as Error).message, variant: "destructive" });
+      toast({ title: "Não foi possível gerar a senha", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
     } finally {
       setGeneratingPinId(null);
     }
@@ -259,22 +284,26 @@ export default function EmployeesPage() {
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
 
-  const { register, handleSubmit, reset } = useForm<EmployeeInput>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<EmployeeInput>({
     defaultValues: { department: "Geral", functionName: "Colaborador", employmentType: "casa" },
   });
+  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
+  function setCreateOpen(o: boolean) {
+    setOpen(o);
+    if (!o) reset();
+  }
 
   const createMutation = useCreateEmployee({
     mutation: {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: qKey });
         toast({ title: "Colaborador criado" });
-        setOpen(false);
-        reset();
+        setCreateOpen(false);
         if (data.generatedAccess?.cpfLogin && data.generatedAccess?.password) {
           setNewAccess({ cpfLogin: data.generatedAccess.cpfLogin, password: data.generatedAccess.password });
         }
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível criar o colaborador", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
@@ -320,6 +349,7 @@ export default function EmployeesPage() {
     reset: resetEdit,
     setValue: setValueEdit,
     watch: watchEdit,
+    formState: { errors: editErrors },
   } = useForm<EmployeeInput>();
   const watchedEditEmploymentType = watchEdit("employmentType");
   const watchedEditFunctionName = watchEdit("functionName");
@@ -344,11 +374,16 @@ export default function EmployeesPage() {
         toast({ title: "Colaborador atualizado" });
         setEditingEmployee(null);
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível salvar o colaborador", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
-  const canEdit = user && ["admin", "rh"].includes(user.role);
+  // Espelha o backend (routes/employees.ts): criar/editar = admin|rh|operador;
+  // mesclar, acessos em massa, PINs, redefinir tipos e importar CPFs = admin|rh;
+  // "Ver visão" (POST /auth/impersonate) = só admin.
+  const isAdmin = hasRole(user, "admin");
+  const canBulk = isAdmin || hasRole(user, "rh");
+  const canEdit = canBulk || hasRole(user, "operador");
   const filtered = (employees ?? []).filter(e =>
     (filterType === "all" || (e.employmentType ?? "casa") === filterType) &&
     (e.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -365,6 +400,15 @@ export default function EmployeesPage() {
     // No cycle data yet: fall back to admin flag
     return e.eligibleForBonus === false ? "not_eligible" : "pending";
   };
+
+  function toggleMergeSelection(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); if (canonicalId === id) setCanonicalId(null); }
+      else next.add(id);
+      return next;
+    });
+  }
 
   const stats = {
     total: employees?.length ?? 0,
@@ -384,50 +428,58 @@ export default function EmployeesPage() {
           </div>
           {canEdit && (
             <div className="flex flex-col sm:flex-row gap-2.5">
-              <button
-                onClick={() => { setMergeMode(v => !v); setSelectedIds(new Set()); setCanonicalId(null); }}
-                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-85"
-                style={mergeMode ? { backgroundColor: WARNING, color: "#fff" } : { border: "1px solid var(--border)" }}
-              >
-                {mergeMode ? <><X size={16} /> Cancelar Mesclagem</> : <><GitMerge size={16} /> Mesclar Duplicatas</>}
-              </button>
-              <button
-                data-testid="button-bulk-generate-access"
-                onClick={() => { setBulkOpen(true); setBulkResult(null); }}
-                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
-                style={{ border: "1px solid var(--border)" }}
-              >
-                <KeyRound size={16} /> Gerar Acessos em Massa
-              </button>
-              <button
-                onClick={() => { setBulkPinOpen(true); setBulkPinResult(null); }}
-                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-90"
-                style={{ backgroundColor: "var(--accent)", color: "#000" }}
-                title="Gera um PIN de 4 dígitos para todos os colaboradores casa"
-              >
-                <Hash size={16} /> Gerar Senhas (Casa)
-              </button>
-              <button
-                onClick={() => setResetTypeOpen(true)}
-                className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
-                style={{ border: "1px solid var(--border)" }}
-                title="Define quais colaboradores contam no ranking (Casa vs Freela)"
-              >
-                <RefreshCw size={15} /> Redefinir Tipos
-              </button>
-              {user?.role === "admin" && (
-                <button
-                  onClick={() => { setBulkCpfOpen(true); setBulkCpfResult(null); }}
-                  className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
-                  style={{ border: "1px solid var(--border)" }}
-                  title="Importar CPFs para os colaboradores listados"
-                >
-                  <CreditCard size={15} /> Importar CPFs
-                </button>
+              {canBulk && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setMergeMode(v => !v); setSelectedIds(new Set()); setCanonicalId(null); }}
+                    className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-85"
+                    style={mergeMode ? { backgroundColor: WARNING, color: "#fff" } : { border: "1px solid var(--border)" }}
+                  >
+                    {mergeMode ? <><X size={16} /> Cancelar Mesclagem</> : <><GitMerge size={16} /> Mesclar Duplicatas</>}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="button-bulk-generate-access"
+                    onClick={() => { setBulkOpen(true); setBulkResult(null); }}
+                    className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+                    style={{ border: "1px solid var(--border)" }}
+                  >
+                    <KeyRound size={16} /> Gerar Acessos em Massa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setBulkPinOpen(true); setBulkPinResult(null); }}
+                    className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-90"
+                    style={{ backgroundColor: "var(--accent)", color: "#000" }}
+                    title="Define a senha (CPF) de todos os colaboradores casa"
+                  >
+                    <Hash size={16} /> Gerar Senhas (Casa)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResetTypeOpen(true)}
+                    className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+                    style={{ border: "1px solid var(--border)" }}
+                    title="Define quais colaboradores contam no ranking (Casa vs Freela)"
+                  >
+                    <RefreshCw size={15} /> Redefinir Tipos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setBulkCpfOpen(true); setBulkCpfResult(null); }}
+                    className="h-10 px-4 rounded-lg font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-colors hover:opacity-80"
+                    style={{ border: "1px solid var(--border)" }}
+                    title="Importar CPFs para os colaboradores listados"
+                  >
+                    <CreditCard size={15} /> Importar CPFs
+                  </button>
+                </>
               )}
-              <Dialog open={open} onOpenChange={setOpen}>
+              <Dialog open={open} onOpenChange={setCreateOpen}>
                 <DialogTrigger asChild>
                   <button
+                    type="button"
                     data-testid="button-create-employee"
                     className="h-10 px-4 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 transition-opacity hover:opacity-90"
                     style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
@@ -440,12 +492,13 @@ export default function EmployeesPage() {
                     <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Colaborador</DialogTitle>
                   </DialogHeader>
                   <form
-                    onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, department: "Geral", functionName: "Colaborador", employmentType: "casa" } }))}
+                    onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, name: d.name.trim(), department: "Geral", functionName: "Colaborador", employmentType: "casa" } }))}
                     className="space-y-5 pt-4"
                   >
                     <div className="space-y-1.5">
                       <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
-                      <Input data-testid="input-employee-name" {...register("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
+                      <Input data-testid="input-employee-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome completo."))} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
+                      <FieldError message={errors.name?.message} />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>CPF</Label>
@@ -469,7 +522,7 @@ export default function EmployeesPage() {
                       Cadastro manual é sempre "Casa" — colaboradores Freela vêm pela sincronização. Para alterar depois, edite o colaborador.
                     </p>
                     <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-                      <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
+                      <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
                       <button
                         data-testid="button-submit-employee"
                         type="submit"
@@ -496,13 +549,14 @@ export default function EmployeesPage() {
             <form
               onSubmit={handleEditSubmit(d => {
                 if (!editingEmployee) return;
-                updateMutation.mutate({ id: editingEmployee.id, data: d });
+                updateMutation.mutate({ id: editingEmployee.id, data: { ...d, name: d.name.trim() } });
               })}
               className="space-y-5 pt-4"
             >
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
-                <Input data-testid="input-edit-employee-name" {...registerEdit("name", { required: true })} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
+                <Input data-testid="input-edit-employee-name" aria-invalid={!!editErrors.name} {...registerEdit("name", requiredText("Informe o nome completo."))} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
+                <FieldError message={editErrors.name?.message} />
               </div>
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>CPF</Label>
@@ -583,6 +637,7 @@ export default function EmployeesPage() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
             <input
               data-testid="input-search-employees"
+              aria-label="Buscar colaborador por nome, função ou departamento"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 h-10 rounded-lg text-sm outline-none"
@@ -644,7 +699,7 @@ export default function EmployeesPage() {
                     <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
                     <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
                     <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
-                    {canEdit && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Acesso</th>}
+                    {canBulk && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Acesso</th>}
                     {canEdit && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
                   </tr>
                 </thead>
@@ -656,14 +711,7 @@ export default function EmployeesPage() {
                     <tr
                       key={emp.id}
                       data-testid={`row-employee-${emp.id}`}
-                      onClick={mergeMode ? () => {
-                        setSelectedIds(prev => {
-                          const next = new Set(prev);
-                          if (next.has(emp.id)) { next.delete(emp.id); if (canonicalId === emp.id) setCanonicalId(null); }
-                          else next.add(emp.id);
-                          return next;
-                        });
-                      } : undefined}
+                      onClick={mergeMode ? () => toggleMergeSelection(emp.id) : undefined}
                       className="transition-colors group"
                       style={{
                         borderTop: i > 0 ? "1px solid var(--border)" : "none",
@@ -672,10 +720,16 @@ export default function EmployeesPage() {
                       }}
                     >
                       {mergeMode && (
-                        <td className="px-4 py-3.5 text-center">
-                          <div className="w-5 h-5 rounded inline-flex items-center justify-center" style={{ border: "1px solid var(--border)", backgroundColor: isSelected ? GOOD : "transparent" }}>
-                            {isSelected && <span className="text-white text-[10px] font-black">✓</span>}
-                          </div>
+                        <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
+                          {/* Checkbox real: a linha inteira continua clicável como atalho, mas o teclado e o leitor de tela usam este controle. */}
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 cursor-pointer align-middle"
+                            style={{ accentColor: GOOD }}
+                            aria-label={`Selecionar ${toTitleCase(emp.name)} para mesclagem`}
+                            checked={isSelected}
+                            onChange={() => toggleMergeSelection(emp.id)}
+                          />
                         </td>
                       )}
                       <td className="px-5 py-3.5">
@@ -733,26 +787,30 @@ export default function EmployeesPage() {
                           })()}
                         </div>
                       </td>
-                      {canEdit && !mergeMode && (
+                      {canBulk && !mergeMode && (
                         <td className="px-5 py-3.5 text-center">
                           {emp.hasAccess ? (
                             <div className="flex flex-col items-center gap-1">
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: GOOD }}>
                                 <Wifi size={11} /> Com acesso
                               </span>
-                              <button
-                                title={`Visualizar app como ${emp.name}`}
-                                disabled={previewingId === emp.id}
-                                onClick={() => handlePreviewAs(emp)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
-                                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                              >
-                                {previewingId === emp.id
-                                  ? <><Eye size={11} className="animate-pulse" /> Abrindo…</>
-                                  : <><Eye size={11} /> Ver visão</>}
-                              </button>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  title={`Visualizar app como ${emp.name}`}
+                                  disabled={previewingId === emp.id}
+                                  onClick={() => handlePreviewAs(emp)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                  style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                                >
+                                  {previewingId === emp.id
+                                    ? <><Eye size={11} className="animate-pulse" /> Abrindo…</>
+                                    : <><Eye size={11} /> Ver visão</>}
+                                </button>
+                              )}
                               {emp.employmentType === "casa" && (
                                 <button
+                                  type="button"
                                   title={`Gerar novo PIN para ${emp.name}`}
                                   disabled={generatingPinId === emp.id}
                                   onClick={() => handleGeneratePin(emp)}
@@ -771,6 +829,7 @@ export default function EmployeesPage() {
                                 <WifiOff size={11} /> Sem acesso
                               </span>
                               <button
+                                type="button"
                                 title={`Criar acesso com PIN para ${emp.name}`}
                                 disabled={generatingPinId === emp.id}
                                 onClick={() => handleGeneratePin(emp)}
@@ -792,7 +851,9 @@ export default function EmployeesPage() {
                       {canEdit && !mergeMode && (
                         <td className="px-5 py-3.5 text-center">
                           <button
+                            type="button"
                             data-testid={`button-edit-employee-${emp.id}`}
+                            aria-label={`Editar ${toTitleCase(emp.name)}`}
                             onClick={() => setEditingEmployee(emp)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase transition-colors hover:opacity-80"
                             style={{ border: "1px solid var(--border)" }}
@@ -805,7 +866,7 @@ export default function EmployeesPage() {
                     );
                   })}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={(canEdit && !mergeMode) ? 7 : mergeMode ? 7 : 6} className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador encontrado com os filtros atuais.</td></tr>
+                    <tr><td colSpan={6 + (mergeMode ? 1 : 0) + (!mergeMode && canBulk ? 1 : 0) + (!mergeMode && canEdit ? 1 : 0)} className="text-center py-16 font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador encontrado com os filtros atuais.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -967,11 +1028,12 @@ export default function EmployeesPage() {
             </div>
             <Input
               placeholder="Buscar colaborador..."
+              aria-label="Buscar colaborador para definir o tipo"
               value={resetTypeSearch}
               onChange={e => setResetTypeSearch(e.target.value)}
               style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}
             />
-            <div className="rounded-lg max-h-64 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
+            <div role="group" aria-label="Colaboradores marcados como Casa" className="rounded-lg max-h-64 overflow-y-auto" style={{ border: "1px solid var(--border)" }}>
               {(employees ?? [])
                 .filter(e => e.active !== false)
                 .filter(e => !resetTypeSearch || e.name.toLowerCase().includes(resetTypeSearch.toLowerCase()))
@@ -985,14 +1047,20 @@ export default function EmployeesPage() {
                   return (
                     <div
                       key={emp.id}
+                      role="checkbox"
+                      aria-checked={isCasa}
+                      aria-label={`${toTitleCase(emp.name)} — ${isCasa ? "Casa" : "Freela"}`}
+                      tabIndex={0}
                       onClick={toggle}
-                      className="flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors"
+                      onKeyDown={onKeyToggle(toggle)}
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
                       style={{
                         borderTop: i > 0 ? "1px solid var(--border)" : undefined,
                         backgroundColor: isCasa ? "rgba(154,176,0,0.07)" : undefined,
                       }}
                     >
                       <div
+                        aria-hidden="true"
                         className="w-4 h-4 rounded border flex items-center justify-center shrink-0"
                         style={{ backgroundColor: isCasa ? GOOD : "transparent", borderColor: isCasa ? GOOD : "var(--border)" }}
                       >
@@ -1038,12 +1106,12 @@ export default function EmployeesPage() {
                       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                       body: JSON.stringify({ casaIds: Array.from(casaSelection) }),
                     });
-                    if (!res.ok) throw new Error((await res.json()).error ?? "Erro");
+                    if (!res.ok) throw new Error(await readServerError(res, "Não foi possível atualizar os tipos. Tente novamente."));
                     await qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
                     toast({ title: "Tipos atualizados", description: `${casaSelection.size} colaborador(es) Casa. Demais marcados como Freela. Ranking recalculado.` });
                     setResetTypeOpen(false);
                   } catch (e) {
-                    toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
+                    toast({ title: "Não foi possível atualizar os tipos", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
                   } finally {
                     setResetTypePending(false);
                   }
@@ -1174,7 +1242,7 @@ export default function EmployeesPage() {
                     </thead>
                     <tbody>
                       {bulkPinResult.results.map((r, i) => (
-                        <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "hsl(var(--secondary))" }}>
+                        <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "var(--secondary)" }}>
                           <td className="px-4 py-2.5 font-medium">{r.name}</td>
                           <td className="px-4 py-2.5 text-center">
                             <span className="text-sm font-black font-mono" style={{ color: "#ccff00" }}>

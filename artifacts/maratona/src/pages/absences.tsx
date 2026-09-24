@@ -22,10 +22,17 @@ import { useForm } from "react-hook-form";
 import { Plus, Trash2, Pencil, UserMinus, Download, Search, AlertTriangle, Award, ChevronsUpDown, Check, X, Filter } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
-import { cn } from "@/lib/utils";
-import { usePremiumTheme, CONDENSED, BODY } from "@/lib/premium-theme";
+import { cn, fmtDate } from "@/lib/utils";
+import { usePremiumTheme, CONDENSED, BODY, WARNING, GOOD } from "@/lib/premium-theme";
 
 type EntryKind = "penalty" | "merit";
+
+const DATE_FULL: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+}
 
 interface AbsenceFormData {
   penaltyType: string;
@@ -72,7 +79,7 @@ export default function AbsencesPage() {
 
   const defaultType = activeTypes[0]?.slug ?? "falta";
 
-  const { register, handleSubmit, reset, setValue, watch } = useForm<AbsenceFormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<AbsenceFormData>({
     defaultValues: { quantity: 1, penaltyType: defaultType, employeeId: null, eventId: null, date: "", date2: "", reason: "" },
   });
 
@@ -109,7 +116,7 @@ export default function AbsencesPage() {
 
   const createMutation = useCreateAbsence({
     mutation: {
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível registrar o lançamento", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
@@ -155,6 +162,13 @@ export default function AbsencesPage() {
   function openEdit(a: Absence) {
     setEditingAbsence(a);
     setOpen(true);
+  }
+
+  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
+  function closeDialog() {
+    setOpen(false);
+    setEditingAbsence(null);
+    reset();
   }
 
   async function onSubmit(d: AbsenceFormData) {
@@ -273,6 +287,7 @@ export default function AbsencesPage() {
                 className="pl-9 h-10 w-full rounded-lg text-sm font-medium outline-none"
                 style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                 placeholder="Buscar colaborador..."
+                aria-label="Buscar colaborador nos lançamentos"
               />
             </div>
             <Select value={filterKind} onValueChange={v => setFilterKind(v as typeof filterKind)}>
@@ -349,6 +364,7 @@ export default function AbsencesPage() {
                 className="h-10 rounded-lg px-3 text-sm outline-none w-[148px]"
                 style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                 title="Data início"
+                aria-label="Filtrar a partir da data"
               />
               <span className="font-bold text-xs" style={{ color: "var(--muted-foreground)" }}>–</span>
               <input
@@ -358,11 +374,12 @@ export default function AbsencesPage() {
                 className="h-10 rounded-lg px-3 text-sm outline-none w-[148px]"
                 style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                 title="Data fim"
+                aria-label="Filtrar até a data"
               />
             </div>
           </div>
           <div className="flex gap-3 flex-wrap items-center">
-            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.15)", color: "#e5484d" }}>
+            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.15)", color: WARNING }}>
               <AlertTriangle size={13} /> Desconto: <span className="text-sm font-black">−{totalPenaltyPoints}</span> pts
             </div>
             <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(154,176,0,0.15)", color: "var(--accent)" }}>
@@ -418,7 +435,7 @@ export default function AbsencesPage() {
                         key={a.id}
                         data-testid={`row-absence-${a.id}`}
                         className="transition-colors group"
-                        style={{ borderTop: "1px solid var(--border)", borderLeft: `3px solid ${isMerit ? "#9ab000" : "#e84000"}` }}
+                        style={{ borderTop: "1px solid var(--border)", borderLeft: `3px solid ${isMerit ? GOOD : "#e84000"}` }}
                         onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "var(--secondary)"; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent"; }}
                       >
@@ -438,7 +455,7 @@ export default function AbsencesPage() {
                           {a.eventName || <span className="text-xs opacity-50">Ciclo</span>}
                         </td>
                         <td className="px-5 py-3.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
-                          {new Date(a.date + "T12:00:00").toLocaleDateString("pt-BR")}
+                          {fmtDate(a.date, DATE_FULL)}
                         </td>
                         <td className="px-5 py-3.5 text-center">
                           <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>
@@ -446,7 +463,7 @@ export default function AbsencesPage() {
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-center">
-                          <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: isMerit ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)", color: isMerit ? "#9ab000" : "#e5484d" }}>
+                          <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: isMerit ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)", color: isMerit ? GOOD : WARNING }}>
                             {isMerit ? "+" : "−"}{a.points * a.quantity}
                           </span>
                         </td>
@@ -474,22 +491,26 @@ export default function AbsencesPage() {
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button
+                                type="button"
                                 data-testid={`button-edit-absence-${a.id}`}
                                 className="p-1.5 rounded transition-opacity hover:opacity-60"
                                 style={{ color: "var(--muted-foreground)" }}
                                 onClick={() => openEdit(a)}
                                 title="Editar"
+                                aria-label={`Editar lançamento de ${a.employeeName ?? "colaborador"}`}
                               >
                                 <Pencil size={14} />
                               </button>
                               <button
+                                type="button"
                                 data-testid={`button-delete-absence-${a.id}`}
                                 className="p-1.5 rounded transition-colors"
                                 style={{ color: "var(--muted-foreground)" }}
-                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e5484d"; }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = WARNING; }}
                                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)"; }}
                                 onClick={() => setDeleteTargetId(a.id)}
                                 title="Excluir"
+                                aria-label={`Excluir lançamento de ${a.employeeName ?? "colaborador"}`}
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -514,7 +535,7 @@ export default function AbsencesPage() {
       </div>
 
       {/* ── Create / Edit modal ── */}
-      <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) setEditingAbsence(null); }}>
+      <Dialog open={open} onOpenChange={v => { if (!v) closeDialog(); else setOpen(true); }}>
         <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
@@ -524,7 +545,7 @@ export default function AbsencesPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
             <div className="space-y-1.5">
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                Tipo de Lançamento <span style={{ color: "#e5484d" }}>*</span>
+                Tipo de Lançamento <span style={{ color: WARNING }}>*</span>
               </Label>
               <Select
                 value={selectedType || defaultType}
@@ -536,7 +557,7 @@ export default function AbsencesPage() {
                 <SelectContent>
                   {activeTypes.filter(t => t.kind === "penalty").length > 0 && (
                     <>
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#e5484d" }}>Penalidades (−)</div>
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: WARNING }}>Penalidades (−)</div>
                       {activeTypes.filter(t => t.kind === "penalty").map(t => (
                         <SelectItem key={t.slug} value={t.slug}>{t.label} — −{t.points} pts{t.requiresEvent ? " 📍" : ""}</SelectItem>
                       ))}
@@ -544,7 +565,7 @@ export default function AbsencesPage() {
                   )}
                   {activeTypes.filter(t => t.kind === "merit").length > 0 && (
                     <>
-                      <div className="px-2 py-1 mt-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#9ab000" }}>Méritos (+)</div>
+                      <div className="px-2 py-1 mt-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: GOOD }}>Méritos (+)</div>
                       {activeTypes.filter(t => t.kind === "merit").map(t => (
                         <SelectItem key={t.slug} value={t.slug}>{t.label} — +{t.points} pts{t.requiresEvent ? " 📍" : ""}</SelectItem>
                       ))}
@@ -553,7 +574,7 @@ export default function AbsencesPage() {
                 </SelectContent>
               </Select>
               {requiresEvent && (
-                <p className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: "#e5484d" }}>
+                <p className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: WARNING }}>
                   📍 Este tipo exige um evento vinculado
                 </p>
               )}
@@ -563,35 +584,44 @@ export default function AbsencesPage() {
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
                 Evento{" "}
                 {requiresEvent
-                  ? <span style={{ color: "#e5484d" }}>*</span>
+                  ? <span style={{ color: WARNING }}>*</span>
                   : <span className="normal-case font-normal text-xs">(opcional para lançamentos no ciclo)</span>
                 }
               </Label>
               <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    role="combobox"
-                    data-testid="select-penalty-event"
-                    className="h-11 w-full flex items-center justify-between gap-2 px-3 rounded-lg text-left"
-                    style={{
-                      backgroundColor: "var(--secondary)",
-                      border: requiresEvent && !watchedEventId ? "1px solid #e5484d" : "1px solid var(--border)",
-                      color: "var(--foreground)",
-                    }}
-                  >
-                    <span className={cn("truncate text-sm", selectedEvent ? "font-bold" : "font-medium text-xs")} style={{ color: selectedEvent ? "var(--foreground)" : "var(--muted-foreground)" }}>
-                      {selectedEvent ? `${selectedEvent.name}${selectedEvent.cycleName ? ` (${selectedEvent.cycleName})` : ""}` : "Selecione o evento..."}
-                    </span>
-                    <span className="flex items-center gap-1 shrink-0">
-                      {selectedEvent && (
-                        <X size={13} style={{ color: "var(--muted-foreground)" }}
-                          onClick={e => { e.stopPropagation(); setValue("eventId", null); }} />
-                      )}
-                      <ChevronsUpDown size={14} style={{ color: "var(--muted-foreground)" }} />
-                    </span>
-                  </button>
-                </PopoverTrigger>
+                {/* O botão "Remover" fica FORA do gatilho (button dentro de button é inválido e inacessível). */}
+                <div className="relative">
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      role="combobox"
+                      data-testid="select-penalty-event"
+                      className={cn("h-11 w-full flex items-center justify-between gap-2 pl-3 rounded-lg text-left", selectedEvent ? "pr-14" : "pr-3")}
+                      style={{
+                        backgroundColor: "var(--secondary)",
+                        border: requiresEvent && !watchedEventId ? `1px solid ${WARNING}` : "1px solid var(--border)",
+                        color: "var(--foreground)",
+                      }}
+                    >
+                      <span className={cn("truncate text-sm", selectedEvent ? "font-bold" : "font-medium text-xs")} style={{ color: selectedEvent ? "var(--foreground)" : "var(--muted-foreground)" }}>
+                        {selectedEvent ? `${selectedEvent.name}${selectedEvent.cycleName ? ` (${selectedEvent.cycleName})` : ""}` : "Selecione o evento..."}
+                      </span>
+                      <ChevronsUpDown size={14} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
+                    </button>
+                  </PopoverTrigger>
+                  {selectedEvent && (
+                    <button
+                      type="button"
+                      aria-label="Remover evento selecionado"
+                      title="Remover evento"
+                      onClick={() => setValue("eventId", null)}
+                      className="absolute right-8 top-1/2 -translate-y-1/2 p-1 rounded transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
                 <PopoverContent align="start" className="p-0 rounded-xl w-[var(--radix-popover-trigger-width)]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                   <Command>
                     <CommandInput placeholder="Buscar por evento..." />
@@ -618,14 +648,14 @@ export default function AbsencesPage() {
                 </PopoverContent>
               </Popover>
               {requiresEvent && !watchedEventId && (
-                <p className="text-[11px] font-bold" style={{ color: "#e5484d" }}>Selecione um evento para continuar.</p>
+                <p className="text-[11px] font-bold" style={{ color: WARNING }}>Selecione um evento para continuar.</p>
               )}
             </div>
 
             {!editingAbsence && (
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                  Colaborador <span style={{ color: "#e5484d" }}>*</span>
+                  Colaborador <span style={{ color: WARNING }}>*</span>
                 </Label>
                 <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
                   <PopoverTrigger asChild>
@@ -670,15 +700,28 @@ export default function AbsencesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                  Data <span style={{ color: "#e5484d" }}>*</span>
+                  Data <span style={{ color: WARNING }}>*</span>
                 </Label>
-                <Input type="date" {...register("date", { required: true })} className="h-11 rounded-lg" />
+                <Input
+                  type="date"
+                  aria-invalid={!!errors.date}
+                  {...register("date", { validate: v => (typeof v === "string" && v.trim().length > 0) || "Informe a data." })}
+                  className="h-11 rounded-lg"
+                />
+                <FieldError message={errors.date?.message} />
               </div>
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                  Quantidade <span style={{ color: "#e5484d" }}>*</span>
+                  Quantidade <span style={{ color: WARNING }}>*</span>
                 </Label>
-                <Input type="number" min="1" {...register("quantity", { valueAsNumber: true })} className="h-11 rounded-lg" />
+                <Input
+                  type="number"
+                  min="1"
+                  aria-invalid={!!errors.quantity}
+                  {...register("quantity", { valueAsNumber: true, validate: v => (Number.isInteger(v) && v >= 1) || "Informe uma quantidade inteira a partir de 1." })}
+                  className="h-11 rounded-lg"
+                />
+                <FieldError message={errors.quantity?.message} />
               </div>
             </div>
 
@@ -691,13 +734,22 @@ export default function AbsencesPage() {
                     opcional — cria 2 registros
                   </span>
                 </Label>
-                <Input type="date" {...register("date2")} className="h-11 rounded-lg" />
+                <Input
+                  type="date"
+                  aria-invalid={!!errors.date2}
+                  {...register("date2", {
+                    // A 2ª data não pode ser anterior à 1ª (datas ISO "YYYY-MM-DD" comparam como texto).
+                    validate: (v, form) => !v?.trim() || !form.date || v >= form.date || "A 2ª data deve ser igual ou posterior à data principal.",
+                  })}
+                  className="h-11 rounded-lg"
+                />
+                <FieldError message={errors.date2?.message} />
               </div>
             )}
 
             <div className="flex items-center justify-between px-4 py-3 rounded-lg font-black uppercase tracking-tight" style={{
               backgroundColor: previewKind === "merit" ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)",
-              color: previewKind === "merit" ? "#9ab000" : "#e5484d",
+              color: previewKind === "merit" ? GOOD : WARNING,
               border: `1px solid ${previewKind === "merit" ? "rgba(154,176,0,0.3)" : "rgba(229,72,77,0.3)"}`,
             }}>
               <span className="text-xs">{!editingAbsence && watchedDate2?.trim() ? "Total a lançar (×2 datas):" : "Total a lançar:"}</span>
@@ -712,7 +764,7 @@ export default function AbsencesPage() {
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
               <button
                 type="button"
-                onClick={() => { setOpen(false); setEditingAbsence(null); }}
+                onClick={closeDialog}
                 className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-opacity hover:opacity-70"
                 style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
               >
@@ -751,7 +803,7 @@ export default function AbsencesPage() {
               disabled={deleteMutation.isPending}
               onClick={() => deleteTargetId && deleteMutation.mutate({ id: deleteTargetId })}
               className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
-              style={{ backgroundColor: "#e5484d", color: "white", border: "none" }}
+              style={{ backgroundColor: WARNING, color: "white", border: "none" }}
             >
               Sim, excluir
             </AlertDialogAction>

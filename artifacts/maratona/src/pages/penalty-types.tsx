@@ -19,12 +19,20 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Trash2, Pencil, AlertTriangle, Award, Settings2, RefreshCw } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
-import { CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
+import { useAuth, hasRole } from "@/lib/auth-context";
+import { CONDENSED, BODY, WARNING, GOOD } from "@/lib/premium-theme";
 
-const GOOD = "#9ab000";
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
+
+/** Campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
+const requiredText = (message: string) => ({
+  validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,
+});
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+}
 
 interface TypeFormData {
   slug: string;
@@ -51,7 +59,7 @@ export default function PenaltyTypesPage() {
   const qKey = getGetPenaltyTypesQueryKey();
   const { data: types, isLoading } = useGetPenaltyTypes({ query: { queryKey: qKey } });
 
-  const { register, handleSubmit, reset, setValue, watch } = useForm<TypeFormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<TypeFormData>({
     defaultValues: { slug: "", label: "", points: 10, kind: "penalty", requiresEvent: false, active: true, displayOrder: 0 },
   });
 
@@ -105,8 +113,15 @@ export default function PenaltyTypesPage() {
     },
   });
 
-  const canEdit = user && ["admin", "rh"].includes(user.role);
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasRole(user, "admin");
+  const canEdit = isAdmin || hasRole(user, "rh");
+
+  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
+  function closeDialog() {
+    setOpen(false);
+    setEditingType(null);
+    reset();
+  }
 
   function openCreate() {
     setEditingType(null);
@@ -205,7 +220,7 @@ export default function PenaltyTypesPage() {
               </div>
               <div>
                 {penaltyTypes.map((t, i) => (
-                  <TypeRow key={t.id} type={t} canEdit={!!canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
+                  <TypeRow key={t.id} type={t} canEdit={canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
                 ))}
                 {penaltyTypes.length === 0 && (
                   <p className="text-center py-10 font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhuma penalidade cadastrada.</p>
@@ -222,7 +237,7 @@ export default function PenaltyTypesPage() {
               </div>
               <div>
                 {meritTypes.map((t, i) => (
-                  <TypeRow key={t.id} type={t} canEdit={!!canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
+                  <TypeRow key={t.id} type={t} canEdit={canEdit} onEdit={openEdit} onDelete={setDeleteTargetId} isFirst={i === 0} />
                 ))}
                 {meritTypes.length === 0 && (
                   <p className="text-center py-10 font-bold uppercase text-sm" style={{ color: "var(--muted-foreground)" }}>Nenhum mérito cadastrado.</p>
@@ -244,7 +259,7 @@ export default function PenaltyTypesPage() {
       </div>
 
       {/* Create / Edit modal */}
-      <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) setEditingType(null); }}>
+      <Dialog open={open} onOpenChange={v => { if (!v) closeDialog(); else setOpen(true); }}>
         <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
@@ -255,22 +270,33 @@ export default function PenaltyTypesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5 col-span-2">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: WARNING }}>*</span></Label>
-                <Input {...register("label", { required: true })} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-lg" style={fieldStyle} />
+                <Input aria-invalid={!!errors.label} {...register("label", requiredText("Informe o nome do tipo."))} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-lg" style={fieldStyle} />
+                <FieldError message={errors.label?.message} />
               </div>
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Slug <span style={{ color: WARNING }}>*</span></Label>
                 <Input
-                  {...register("slug", { required: !editingType })}
+                  aria-invalid={!!errors.slug}
+                  {...register("slug", editingType ? {} : requiredText("Informe o slug (identificador)."))}
                   placeholder="ex: atraso"
                   className="h-11 rounded-lg font-mono text-sm"
                   style={fieldStyle}
                   disabled={!!editingType}
                 />
                 {editingType && <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Slug não pode ser alterado.</p>}
+                <FieldError message={errors.slug?.message} />
               </div>
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pontos <span style={{ color: WARNING }}>*</span></Label>
-                <Input type="number" min="0" {...register("points", { valueAsNumber: true, required: true })} className="h-11 rounded-lg" style={fieldStyle} />
+                <Input
+                  type="number"
+                  min="0"
+                  aria-invalid={!!errors.points}
+                  {...register("points", { valueAsNumber: true, validate: v => (Number.isFinite(v) && v >= 0) || "Informe um número de pontos maior ou igual a zero." })}
+                  className="h-11 rounded-lg"
+                  style={fieldStyle}
+                />
+                <FieldError message={errors.points?.message} />
               </div>
             </div>
 
@@ -348,7 +374,7 @@ export default function PenaltyTypesPage() {
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
               <button
                 type="button"
-                onClick={() => { setOpen(false); setEditingType(null); }}
+                onClick={closeDialog}
                 className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-colors hover:opacity-80"
                 style={{ border: "1px solid var(--border)" }}
               >
@@ -381,11 +407,12 @@ export default function PenaltyTypesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)" }}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              disabled={deleteMutation.isPending}
               onClick={() => deleteTargetId && deleteMutation.mutate({ id: deleteTargetId })}
-              className="rounded-lg font-bold uppercase text-xs"
+              className="rounded-lg font-bold uppercase text-xs disabled:opacity-50"
               style={{ backgroundColor: WARNING, color: "#fff" }}
             >
-              Sim, remover
+              {deleteMutation.isPending ? "Removendo..." : "Sim, remover"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -426,18 +453,22 @@ function TypeRow({ type, canEdit, onEdit, onDelete, isFirst }: {
       {canEdit && (
         <div className="flex items-center gap-1 shrink-0">
           <button
+            type="button"
             className="p-2 rounded-lg transition-colors hover:opacity-80"
             style={{ color: "var(--muted-foreground)" }}
             onClick={() => onEdit(type)}
             title="Editar"
+            aria-label={`Editar ${type.label}`}
           >
             <Pencil size={14} />
           </button>
           <button
+            type="button"
             className="p-2 rounded-lg transition-colors hover:opacity-80"
             style={{ color: WARNING }}
             onClick={() => onDelete(type.id)}
             title="Remover"
+            aria-label={`Remover ${type.label}`}
           >
             <Trash2 size={14} />
           </button>

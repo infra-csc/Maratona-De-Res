@@ -14,10 +14,20 @@ import { useForm } from "react-hook-form";
 import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, ChevronDown, ChevronUp, Users, AlertCircle, Settings2, Search, Calendar, Copy } from "lucide-react";
 import { useAllCriterionRoutings, useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
-import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
+import { useAuth, hasRole } from "@/lib/auth-context";
+import { CONDENSED, BODY, WARNING, GOOD, PremiumCard } from "@/lib/premium-theme";
 
-const GOOD = "#9ab000";
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
+
+/** Campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
+const requiredText = (message: string) => ({
+  validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,
+});
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+}
 
 function CriterionWeightCell({
   criterionId, weight, isSaving, onSave,
@@ -416,6 +426,9 @@ function RoutingConfigDialog({
 
 export default function CriteriaPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  // Espelha o backend: POST/PATCH /criteria exigem admin|rh (diretoria só visualiza).
+  const canEdit = hasRole(user, "admin") || hasRole(user, "rh");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [routingDialogId, setRoutingDialogId] = useState<number | null>(null);
@@ -439,19 +452,23 @@ export default function CriteriaPage() {
 
   const routingMap = new Map((routings ?? []).map(r => [r.criterionId, r]));
 
-  const { register, handleSubmit, reset, setValue } = useForm<CriterionInput>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<CriterionInput>({
     defaultValues: { defaultWeight: 3 },
   });
+  // Fechar o diálogo (X, Esc, Cancelar) descarta o rascunho e os erros — não só no sucesso.
+  function setCreateOpen(o: boolean) {
+    setOpen(o);
+    if (!o) reset();
+  }
 
   const createMutation = useCreateCriterion({
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: qKey });
         toast({ title: "Critério criado" });
-        setOpen(false);
-        reset();
+        setCreateOpen(false);
       },
-      onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+      onError: (e: { message?: string }) => toast({ title: "Não foi possível criar o critério", description: e.message ?? "Tente novamente.", variant: "destructive" }),
     },
   });
 
@@ -621,20 +638,23 @@ export default function CriteriaPage() {
             <p className="text-[10px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Aplica critérios ativos a todos os eventos abertos</p>
           </div>
 
-          <div className="flex flex-col items-center gap-1">
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <button
-                  data-testid="button-create-criterion"
-                  className="h-10 px-4 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 transition-opacity hover:opacity-90"
-                  style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                >
-                  <Plus size={16} /> Novo Critério
-                </button>
-              </DialogTrigger>
-            </Dialog>
-            <p className="text-[10px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Adiciona um critério de avaliação com nota e peso</p>
-          </div>
+          {canEdit && (
+            <div className="flex flex-col items-center gap-1">
+              <Dialog open={open} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    data-testid="button-create-criterion"
+                    className="h-10 px-4 rounded-lg font-black text-xs uppercase tracking-wide flex items-center gap-2 transition-opacity hover:opacity-90"
+                    style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                  >
+                    <Plus size={16} /> Novo Critério
+                  </button>
+                </DialogTrigger>
+              </Dialog>
+              <p className="text-[10px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Adiciona um critério de avaliação com nota e peso</p>
+            </div>
+          )}
         </section>
 
         {/* Table */}
@@ -648,6 +668,7 @@ export default function CriteriaPage() {
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
                 <input
                   type="text"
+                  aria-label="Buscar critério ou descrição"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Buscar critério ou descrição..."
@@ -656,6 +677,7 @@ export default function CriteriaPage() {
                 />
               </div>
               <select
+                aria-label="Filtrar por área"
                 value={filterAreaId}
                 onChange={e => setFilterAreaId(e.target.value)}
                 className="rounded-lg px-3 py-2 text-xs font-bold outline-none min-w-[160px]"
@@ -848,15 +870,16 @@ export default function CriteriaPage() {
       </div>
 
       {/* Create Criterion Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Critério de Avaliação</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, defaultWeight: Number(d.defaultWeight) } }))} className="space-y-5 pt-4">
+          <form onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, name: d.name.trim(), defaultWeight: Number(d.defaultWeight) } }))} className="space-y-5 pt-4">
             <div className="space-y-1.5">
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: WARNING }}>*</span></Label>
-              <Input data-testid="input-criterion-name" {...register("name", { required: true })} placeholder="Ex: Pontualidade" className="h-11 rounded-lg" style={fieldStyle} />
+              <Input data-testid="input-criterion-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome do critério."))} placeholder="Ex: Pontualidade" className="h-11 rounded-lg" style={fieldStyle} />
+              <FieldError message={errors.name?.message} />
             </div>
             <div className="space-y-1.5">
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Descrição do que é avaliado</Label>
@@ -864,7 +887,17 @@ export default function CriteriaPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Peso Padrão</Label>
-              <Input data-testid="input-criterion-weight" type="number" min="0" step="1" {...register("defaultWeight", { valueAsNumber: true })} className="h-11 rounded-lg" style={fieldStyle} />
+              <Input
+                data-testid="input-criterion-weight"
+                type="number"
+                min="0"
+                step="1"
+                aria-invalid={!!errors.defaultWeight}
+                {...register("defaultWeight", { valueAsNumber: true, validate: v => (v == null || (Number.isFinite(v) && v >= 0)) || "Informe um peso maior ou igual a zero." })}
+                className="h-11 rounded-lg"
+                style={fieldStyle}
+              />
+              <FieldError message={errors.defaultWeight?.message} />
             </div>
             <div className="space-y-1.5">
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Área Responsável (Opcional)</Label>
@@ -880,7 +913,7 @@ export default function CriteriaPage() {
               </Select>
             </div>
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
+              <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
               <button
                 data-testid="button-submit-criterion"
                 type="submit"
