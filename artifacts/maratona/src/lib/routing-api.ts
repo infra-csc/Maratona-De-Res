@@ -68,12 +68,19 @@ export interface RouteUser {
 // Query keys
 // ---------------------------------------------------------------------------
 
-export const criterionRoutingKey = (criterionId: number) => ["criterion-routing", criterionId];
+// Chaves aceitam `null` explícito quando ainda não há evento/critério
+// selecionado (query desabilitada). Antes usávamos `?? 0`, o que fazia telas
+// diferentes compartilharem a MESMA entrada de cache `[..., 0]`.
+export const criterionRoutingKey = (criterionId: number | null) => ["criterion-routing", criterionId];
 export const allCriterionRoutingsKey = () => ["criterion-routing-all"];
-export const eventCriterionAssignmentsKey = (eventId: number) => ["event-criterion-assignments", eventId];
-export const redirectOptionsKey = (eventId: number, criterionId: number) => ["redirect-options", eventId, criterionId];
-export const publicTokensKey = (eventId: number) => ["public-tokens", eventId];
-export const publicLinkEligibleCriteriaKey = (eventId: number) => ["public-link-eligible-criteria", eventId];
+export const eventCriterionAssignmentsKey = (eventId: number | null) => ["event-criterion-assignments", eventId];
+export const redirectOptionsKey = (eventId: number | null, criterionId: number | null) => ["redirect-options", eventId, criterionId];
+export const publicTokensKey = (eventId: number | null) => ["public-tokens", eventId];
+export const publicLinkEligibleCriteriaKey = (eventId: number | null) => ["public-link-eligible-criteria", eventId];
+export const allPublicTokensKey = (eventId: number | null) => ["all-public-tokens", eventId];
+export const conformityPublicTokensKey = (eventId: number | null) => ["conformity-public-tokens", eventId];
+export const ferramentasPublicTokensKey = (eventId: number | null) => ["conformity-ferramentas-public-tokens", eventId];
+export const usersByAreaKey = (areaId: number | null) => ["users-by-area", areaId];
 
 // ---------------------------------------------------------------------------
 // Fetch helpers
@@ -114,7 +121,7 @@ export function useAllCriterionRoutings() {
 /** Roteamento de um critério específico (admin/rh). */
 export function useCriterionRouting(criterionId: number | null) {
   return useQuery<CriterionRouting | null>({
-    queryKey: criterionRoutingKey(criterionId ?? 0),
+    queryKey: criterionRoutingKey(criterionId),
     queryFn: () => apiFetch<CriterionRouting | null>(`/api/criteria/${criterionId}/routing`),
     enabled: criterionId != null,
   });
@@ -146,9 +153,22 @@ export function getEventCriterionAssignments(eventId: number) {
 /** Atribuições de critérios para um evento. */
 export function useEventCriterionAssignments(eventId: number | null) {
   return useQuery<CriterionAssignment[]>({
-    queryKey: eventCriterionAssignmentsKey(eventId ?? 0),
-    queryFn: () => getEventCriterionAssignments(eventId ?? 0),
+    queryKey: eventCriterionAssignmentsKey(eventId),
+    queryFn: () => getEventCriterionAssignments(eventId as number),
     enabled: eventId != null,
+  });
+}
+
+/** PATCH cru (sem hook) de uma atribuição — usado em laços sequenciais
+ *  (atribuição em lote) onde a tela invalida o cache UMA vez ao final,
+ *  em vez de uma invalidação por critério. */
+export function patchCriterionAssignment(
+  eventId: number,
+  { criterionId, ...body }: { criterionId: number; assignedToId?: number | null; action?: "confirm" | "redirect" | "assign" },
+) {
+  return apiFetch<CriterionAssignment>(`/api/events/${eventId}/criterion-assignments/${criterionId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
   });
 }
 
@@ -182,11 +202,7 @@ export function usePatchCriterionAssignment(eventId: number) {
     Error,
     { criterionId: number; assignedToId?: number | null; action?: "confirm" | "redirect" | "assign" }
   >({
-    mutationFn: ({ criterionId, ...body }) =>
-      apiFetch<CriterionAssignment>(`/api/events/${eventId}/criterion-assignments/${criterionId}`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (vars) => patchCriterionAssignment(eventId, vars),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: eventCriterionAssignmentsKey(eventId) });
     },
@@ -196,7 +212,7 @@ export function usePatchCriterionAssignment(eventId: number) {
 /** Opções de redirecionamento para um critério (filtradas pelo routing). */
 export function useRedirectOptions(eventId: number | null, criterionId: number | null) {
   return useQuery<RouteUser[]>({
-    queryKey: redirectOptionsKey(eventId ?? 0, criterionId ?? 0),
+    queryKey: redirectOptionsKey(eventId, criterionId),
     queryFn: () => apiFetch<RouteUser[]>(
       `/api/events/${eventId}/criterion-assignments/redirect-options/${criterionId}`,
     ),
@@ -207,7 +223,7 @@ export function useRedirectOptions(eventId: number | null, criterionId: number |
 /** Critérios do questionário deste avaliador no evento que podem entrar num link público. */
 export function usePublicLinkEligibleCriteria(eventId: number | null) {
   return useQuery<{ criterionId: number; criterionName: string | null }[]>({
-    queryKey: publicLinkEligibleCriteriaKey(eventId ?? 0),
+    queryKey: publicLinkEligibleCriteriaKey(eventId),
     queryFn: () => apiFetch<{ criterionId: number; criterionName: string | null }[]>(
       `/api/events/${eventId}/public-link-eligible-criteria`,
     ),
@@ -227,7 +243,10 @@ export function useCreatePublicToken(eventId: number) {
         { method: "POST", body: JSON.stringify(body) },
       ),
     onSuccess: () => {
+      // A lista do avaliador e a lista global (admin) mostram o mesmo token —
+      // as duas precisam ser invalidadas, senão uma delas fica defasada.
       qc.invalidateQueries({ queryKey: publicTokensKey(eventId) });
+      qc.invalidateQueries({ queryKey: allPublicTokensKey(eventId) });
     },
   });
 }
@@ -235,7 +254,7 @@ export function useCreatePublicToken(eventId: number) {
 /** Lista tokens de avaliação pública (critérios) gerados pelo avaliador logado para o evento. */
 export function usePublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
-    queryKey: publicTokensKey(eventId ?? 0),
+    queryKey: publicTokensKey(eventId),
     queryFn: () =>
       apiFetch<PublicToken[]>(
         `/api/events/${eventId}/public-tokens`,
@@ -254,7 +273,8 @@ export function useCreateConformityPublicToken(eventId: number) {
         { method: "POST", body: JSON.stringify(body) },
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["conformity-public-tokens", eventId] });
+      qc.invalidateQueries({ queryKey: conformityPublicTokensKey(eventId) });
+      qc.invalidateQueries({ queryKey: allPublicTokensKey(eventId) });
     },
   });
 }
@@ -269,7 +289,8 @@ export function useCreateFerramentasPublicToken(eventId: number) {
         { method: "POST", body: JSON.stringify(body) },
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["conformity-ferramentas-public-tokens", eventId] });
+      qc.invalidateQueries({ queryKey: ferramentasPublicTokensKey(eventId) });
+      qc.invalidateQueries({ queryKey: allPublicTokensKey(eventId) });
     },
   });
 }
@@ -277,7 +298,7 @@ export function useCreateFerramentasPublicToken(eventId: number) {
 /** Lista tokens de conformidade Cenografia gerados pelo avaliador logado. */
 export function useConformityPublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
-    queryKey: ["conformity-public-tokens", eventId ?? 0],
+    queryKey: conformityPublicTokensKey(eventId),
     queryFn: () =>
       apiFetch<PublicToken[]>(`/api/events/${eventId}/public-tokens/conformity`),
     enabled: eventId != null,
@@ -287,17 +308,20 @@ export function useConformityPublicTokens(eventId: number | null) {
 /** Lista tokens de conformidade Ferramentas gerados pelo avaliador logado. */
 export function useFerramentasPublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
-    queryKey: ["conformity-ferramentas-public-tokens", eventId ?? 0],
+    queryKey: ferramentasPublicTokensKey(eventId),
     queryFn: () =>
       apiFetch<PublicToken[]>(`/api/events/${eventId}/public-tokens/conformity-ferramentas`),
     enabled: eventId != null,
   });
 }
 
+export type PublicTokenType = "criteria" | "criteria_with_conformity" | "conformity_cenografia" | "conformity_ferramentas";
+export type AdminPublicToken = PublicToken & { tokenType: PublicTokenType };
+
 /** Admin/RH: todos os links públicos gerados para o evento, de qualquer avaliador/formulário. */
 export function useAllPublicTokens(eventId: number | null) {
-  return useQuery<(PublicToken & { tokenType: "criteria" | "criteria_with_conformity" | "conformity_cenografia" | "conformity_ferramentas" })[]>({
-    queryKey: ["all-public-tokens", eventId ?? 0],
+  return useQuery<AdminPublicToken[]>({
+    queryKey: allPublicTokensKey(eventId),
     queryFn: () => apiFetch(`/api/events/${eventId}/public-tokens/all`),
     enabled: eventId != null,
   });
@@ -312,7 +336,10 @@ export function useCreateAdminPublicToken(eventId: number) {
       body: JSON.stringify(data),
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["all-public-tokens", eventId] });
+      // O token admin também aparece na lista "meus links" do avaliador
+      // designado (createdByUserId = assignedToUserId) — invalida as duas.
+      qc.invalidateQueries({ queryKey: allPublicTokensKey(eventId) });
+      qc.invalidateQueries({ queryKey: publicTokensKey(eventId) });
     },
   });
 }
@@ -325,9 +352,9 @@ export function useDeletePublicToken(eventId: number) {
       apiFetch<void>(`/api/public-eval-tokens/${tokenId}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: publicTokensKey(eventId) });
-      qc.invalidateQueries({ queryKey: ["conformity-public-tokens", eventId] });
-      qc.invalidateQueries({ queryKey: ["conformity-ferramentas-public-tokens", eventId] });
-      qc.invalidateQueries({ queryKey: ["all-public-tokens", eventId] });
+      qc.invalidateQueries({ queryKey: conformityPublicTokensKey(eventId) });
+      qc.invalidateQueries({ queryKey: ferramentasPublicTokensKey(eventId) });
+      qc.invalidateQueries({ queryKey: allPublicTokensKey(eventId) });
     },
   });
 }
@@ -335,7 +362,7 @@ export function useDeletePublicToken(eventId: number) {
 /** Usuários de uma área (para popular pickers). */
 export function useUsersByArea(areaId: number | null) {
   return useQuery<RouteUser[]>({
-    queryKey: ["users-by-area", areaId ?? 0],
+    queryKey: usersByAreaKey(areaId),
     queryFn: () => apiFetch<RouteUser[]>(`/api/users/by-area/${areaId}`),
     enabled: areaId != null,
   });

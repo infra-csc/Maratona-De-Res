@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useGetEvents, useGetEvent, useGetUsers, useGetAreas, useConfirmEventResults, useGetCurrentCycle,
+  useGetEvaluations,
   useSetConformityEvaluator, useSetConformityEvaluatorFerramentas,
   useUpdateEventCriteria, useConfirmEventCriteria, useResyncEventCriteria,
   useDuplicateEventCriterion, useDeleteEventCriterion, useUpdateCriterion, useUpdateEventAssignments,
-  getEventCriteria, getEvaluations, getGetEvaluationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey,
+  getEventCriteria, getGetEvaluationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey,
+  type Evaluation,
 } from "@workspace/api-client-react";
 import {
-  getEventCriterionAssignments, eventCriterionAssignmentsKey,
+  getEventCriterionAssignments, eventCriterionAssignmentsKey, patchCriterionAssignment,
   usePatchCriterionAssignment, useUsersByArea, useAllCriterionRoutings,
   useCreateAdminPublicToken, useAllPublicTokens,
   useCreateConformityPublicToken, useCreateFerramentasPublicToken,
   useGenerateCriterionAssignments,
-  type PublicToken,
+  type AdminPublicToken,
 } from "@/lib/routing-api";
 import { customFetch } from "@/lib/custom-fetch";
 import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
@@ -100,7 +102,11 @@ interface EnrichedEvent {
   pct: number;
   areaNames: string[];
   evaluatorNames: string[];
+  /** Concluído = TODOS os critérios ativos completos. Publicação (parcial ou
+   *  final) NÃO conclui o evento — vira apenas um badge informativo. */
   isDone: boolean;
+  partialPublishedCount: number;
+  finalCalibratedCriteria: number;
   conformityNeeded: boolean;
   conformityComplete: boolean;
   // Avaliadores da Matriz de Conformidade (incluídos na vista global de avaliadores)
@@ -183,7 +189,7 @@ function EventCombobox({ events, value, onChange, accentStyle }: {
   );
 }
 
-function InlinePicker({ areaId, excludeId, onPick }: { areaId: number; excludeId?: number | null; onPick: (userId: number, name: string) => void }) {
+function InlinePicker({ areaId, excludeId, onPick, disabled }: { areaId: number; excludeId?: number | null; onPick: (userId: number, name: string) => void; disabled?: boolean }) {
   const { data: users, isLoading } = useUsersByArea(areaId);
   const candidates = (users ?? []).filter(u => u.id !== excludeId);
   if (isLoading) return <p className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Carregando avaliadores...</p>;
@@ -194,8 +200,10 @@ function InlinePicker({ areaId, excludeId, onPick }: { areaId: number; excludeId
         <button
           key={u.id}
           type="button"
+          disabled={disabled}
+          aria-busy={disabled || undefined}
           onClick={() => onPick(u.id, u.name)}
-          className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors hover:opacity-80"
+          className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors hover:opacity-80 disabled:opacity-50 disabled:cursor-wait"
           style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}
         >
           + {u.name}
@@ -203,6 +211,32 @@ function InlinePicker({ areaId, excludeId, onPick }: { areaId: number; excludeId
       ))}
     </div>
   );
+}
+
+/** Consultas de fundo (todos os eventos do ciclo): mudam pouco e alimentam
+ *  só a fila/KPIs. 5 min de validade e sem refetch ao focar a janela — antes
+ *  eram refeitas a cada 30 s e a cada foco (3 × N requisições). O evento
+ *  SELECIONADO tem observadores próprios com a validade padrão (30 s). */
+const BACKGROUND_QUERY = { staleTime: 5 * 60_000, refetchOnWindowFocus: false } as const;
+
+/** Índice evento → critério → avaliações, para não varrer o array inteiro
+ *  com `find` linear por critério (era O(eventos × critérios × avaliações)). */
+function indexEvaluations(rows: Evaluation[] | undefined): Map<number, Map<number, Evaluation[]>> {
+  const byEvent = new Map<number, Map<number, Evaluation[]>>();
+  for (const e of rows ?? []) {
+    let byCrit = byEvent.get(e.eventId);
+    if (!byCrit) { byCrit = new Map(); byEvent.set(e.eventId, byCrit); }
+    const list = byCrit.get(e.criterionId);
+    if (list) list.push(e); else byCrit.set(e.criterionId, [e]);
+  }
+  return byEvent;
+}
+
+/** Mesmo conjunto de ids (ordem irrelevante). */
+function sameIdSet(a: number[], b: number[]) {
+  const sa = new Set(a);
+  const sb = new Set(b);
+  return sa.size === sb.size && [...sa].every(id => sb.has(id));
 }
 
 export function AdminEvaluationsConsole() {
@@ -230,6 +264,7 @@ export function AdminEvaluationsConsole() {
   const [conformityFilter, setConformityFilter] = useState<"all" | "pending" | "done">("all");
   const [noEvaluatorFilter, setNoEvaluatorFilter] = useState(false);
   const [bulkAssignAreaId, setBulkAssignAreaId] = useState<number | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [critFilter, setCritFilter] = useState<"all" | "unassigned" | "pending" | "partial" | "done">("all");
   const [viewEvalCrit, setViewEvalCrit] = useState<CritRow | null>(null);
   const [viewConformity, setViewConformity] = useState<"cenografia" | "ferramentas" | null>(null);
@@ -243,7 +278,7 @@ export function AdminEvaluationsConsole() {
   const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   // --- "Gerar todos os links" (um por avaliador/área, Cenografia já combina critério + matriz) ---
-  interface BatchLink { key: string; evaluatorName: string; areaName: string; criterionNames: string[]; includeConformity: boolean; url: string | null; error: string | null; }
+  interface BatchLink { key: string; evaluatorName: string; areaName: string; criterionNames: string[]; includeConformity: boolean; url: string | null; error: string | null; /** true = link PENDENTE já existente, reaproveitado em vez de criar outro */ reused: boolean; }
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchLinks, setBatchLinks] = useState<BatchLink[]>([]);
@@ -259,26 +294,90 @@ export function AdminEvaluationsConsole() {
   const { data: cycle } = useGetCurrentCycle();
   const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
 
-  const configuredEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
+  // Memoizado sobre `events`: antes era um `.filter()` novo a cada render, o
+  // que invalidava o useMemo de `enrichedEvents` em TODO render.
+  const configuredEvents = useMemo(
+    () => (events ?? []).filter(e => e.status === "open" || e.status === "closed"),
+    [events],
+  );
 
+  // Evento selecionado: estado explícito, inicializado quando a lista chega
+  // (e re-apontado para o primeiro se o evento atual sair da lista). Nada de
+  // cair silenciosamente em `enrichedEvents[0]`.
+  useEffect(() => {
+    if (configuredEvents.length === 0) return;
+    if (selectedEventId == null || !configuredEvents.some(e => e.id === selectedEventId)) {
+      setSelectedEventId(configuredEvents[0].id);
+    }
+  }, [configuredEvents, selectedEventId]);
+
+  // ---- Dados de TODOS os eventos (fundo, 5 min) ----
+  // Critérios e atribuições por evento continuam sendo N + N requisições
+  // porque a fila (contagem de critérios sem avaliador, filtros por área e
+  // por avaliador, "Concluídos") e o KPI/aba global "Avaliadores pendentes"
+  // dependem de dados POR CRITÉRIO de cada evento — os agregados de /events
+  // (evaluatedCriteria, unassignedAreaNames) têm semântica diferente (por
+  // área; exige todos os avaliadores da área) e não substituem isso.
+  // As N consultas de avaliações viraram UMA (/evaluations sem eventId).
   const criteriaQueries = useQueries({
     queries: configuredEvents.map(ev => ({
       queryKey: ["event-criteria", ev.id] as unknown[],
       queryFn: () => getEventCriteria(ev.id),
+      ...BACKGROUND_QUERY,
     })),
   });
   const assignQueries = useQueries({
     queries: configuredEvents.map(ev => ({
       queryKey: eventCriterionAssignmentsKey(ev.id),
       queryFn: () => getEventCriterionAssignments(ev.id),
+      ...BACKGROUND_QUERY,
     })),
   });
-  const evalQueries = useQueries({
-    queries: configuredEvents.map(ev => ({
-      queryKey: getGetEvaluationsQueryKey({ eventId: ev.id }),
-      queryFn: () => getEvaluations({ eventId: ev.id }),
-    })),
+  const { data: allEvaluations } = useGetEvaluations(undefined, {
+    query: { queryKey: getGetEvaluationsQueryKey(), ...BACKGROUND_QUERY },
   });
+
+  // ---- Evento selecionado (fresco, validade padrão de 30 s) ----
+  // Critérios/atribuições usam a MESMA chave das consultas de fundo (cache
+  // compartilhado, sem requisição duplicada); só a política de refetch é
+  // mais agressiva. As avaliações do evento selecionado têm chave própria.
+  useQuery({
+    queryKey: ["event-criteria", selectedEventId] as unknown[],
+    queryFn: () => getEventCriteria(selectedEventId as number),
+    enabled: selectedEventId != null,
+  });
+  useQuery({
+    queryKey: eventCriterionAssignmentsKey(selectedEventId),
+    queryFn: () => getEventCriterionAssignments(selectedEventId as number),
+    enabled: selectedEventId != null,
+  });
+  const { data: selectedEvaluationsData } = useGetEvaluations(
+    { eventId: selectedEventId ?? undefined },
+    {
+      query: {
+        enabled: selectedEventId != null,
+        queryKey: (selectedEventId != null
+          ? getGetEvaluationsQueryKey({ eventId: selectedEventId })
+          : ["/evaluations", { eventId: null }]) as unknown[],
+      },
+    },
+  );
+
+  // Índice evento → critério → avaliações. Para o evento selecionado, usa a
+  // consulta fresca (quando já carregou) no lugar da cópia de fundo.
+  const evalIndex = useMemo(() => {
+    const idx = indexEvaluations(allEvaluations);
+    if (selectedEventId != null && selectedEvaluationsData) {
+      const fresh = indexEvaluations(selectedEvaluationsData).get(selectedEventId) ?? new Map<number, Evaluation[]>();
+      idx.set(selectedEventId, fresh);
+    }
+    return idx;
+  }, [allEvaluations, selectedEvaluationsData, selectedEventId]);
+
+  // Assinaturas estáveis: os arrays de useQueries são novos a cada render,
+  // mas `dataUpdatedAt` só muda quando algum dado realmente chegou.
+  const criteriaSig = criteriaQueries.map(q => q.dataUpdatedAt).join(",");
+  const assignSig = assignQueries.map(q => q.dataUpdatedAt).join(",");
 
   // Enriquece cada evento com o status real de cada critério (atribuído +
   // enviado), combinando roteamento (quem está designado) com o envio de
@@ -289,21 +388,22 @@ export function AdminEvaluationsConsole() {
       const criteria = (criteriaQueries[i]?.data ?? []).filter(c => c.active);
       const assignments = assignQueries[i]?.data ?? [];
       const assignByCrit = new Map(assignments.map(a => [a.criterionId, a]));
-      const evalsForEvent = evalQueries[i]?.data ?? [];
+      const evalsByCrit = evalIndex.get(ev.id);
       const rows: CritRow[] = criteria.map(c => {
         const a = assignByCrit.get(c.criterionId);
         const assignedToId = a?.assignedToId ?? null;
         const assignedToName = a?.assignedToName ?? null;
+        const critEvals = evalsByCrit?.get(c.criterionId) ?? [];
         const evalRow = assignedToId != null
-          ? (evalsForEvent.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === assignedToId && e.status === "submitted")
-             ?? evalsForEvent.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === assignedToId)
-             ?? evalsForEvent.find(e => e.criterionId === c.criterionId && e.status === "submitted"))
-          : evalsForEvent.find(e => e.criterionId === c.criterionId && e.status === "submitted");
+          ? (critEvals.find(e => e.evaluatorUserId === assignedToId && e.status === "submitted")
+             ?? critEvals.find(e => e.evaluatorUserId === assignedToId)
+             ?? critEvals.find(e => e.status === "submitted"))
+          : critEvals.find(e => e.status === "submitted");
         // Se o assignedToId não corresponde ao evaluatorUserId real (ex: avaliador
         // chegou pelo event_area_assignments enquanto o criterion_routing aponta outro
         // default), a avaliação ainda existe mas o lookup acima não encontra.
         // Verificar se qualquer avaliação submetida existe para o critério.
-        const anySubmitted = evalsForEvent.some(e => e.criterionId === c.criterionId && e.status === "submitted");
+        const anySubmitted = critEvals.some(e => e.status === "submitted");
         let state: CritState;
         if (assignedToId == null) state = "unassigned";
         else if (anySubmitted || c.partialPublishedAt != null || c.finalPublishedAt != null) state = "done";
@@ -334,7 +434,9 @@ export function AdminEvaluationsConsole() {
         criteria: rows, total, done, unassigned, pct,
         areaNames: [...new Set(rows.map(r => r.areaName))],
         evaluatorNames: [...new Set(rows.map(r => r.assignedToName).filter((n): n is string => !!n))],
-        isDone: (total > 0 && done === total) || (ev.partialPublishedCount ?? 0) > 0 || (ev.finalCalibratedCriteria ?? 0) > 0,
+        isDone: total > 0 && done === total,
+        partialPublishedCount: ev.partialPublishedCount ?? 0,
+        finalCalibratedCriteria: ev.finalCalibratedCriteria ?? 0,
         conformityNeeded: !!evC.conformityNeeded,
         conformityComplete: !!evC.conformityComplete,
         conformityEvaluatorUserId: evC.conformityEvaluatorUserId ?? null,
@@ -343,9 +445,12 @@ export function AdminEvaluationsConsole() {
         conformityEvaluatorFerramentasName: evC.conformityEvaluatorFerramentasName ?? null,
       };
     });
-  }, [configuredEvents, criteriaQueries, assignQueries, evalQueries]);
+  // criteriaQueries/assignQueries são lidos via índice; as assinaturas
+  // (dataUpdatedAt) representam o conteúdo deles de forma estável.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configuredEvents, criteriaSig, assignSig, evalIndex]);
 
-  const selected = enrichedEvents.find(e => e.id === selectedEventId) ?? enrichedEvents[0] ?? null;
+  const selected = enrichedEvents.find(e => e.id === selectedEventId) ?? null;
   // Cabeçalho usado em todo texto copiado (links): "NOME DO EVENTO · dd/mm" —
   // quem recebe a mensagem precisa saber de qual evento é o link.
   const batchEventHeader = selected
@@ -403,19 +508,25 @@ export function AdminEvaluationsConsole() {
     });
 
   // ---- Selected event detail (matriz de conformidade + confirmar resultados) ----
-  const { data: selectedDetail } = useGetEvent(selected?.id ?? 0, {
-    query: { enabled: !!selected, queryKey: getGetEventQueryKey(selected?.id ?? 0) },
+  const { data: selectedDetail } = useGetEvent(selectedEventId ?? 0, {
+    query: {
+      enabled: selectedEventId != null,
+      queryKey: (selectedEventId != null ? getGetEventQueryKey(selectedEventId) : ["/events", null]) as unknown[],
+    },
   });
-  const patchAssignment = usePatchCriterionAssignment(selected?.id ?? 0);
+  const patchAssignment = usePatchCriterionAssignment(selectedEventId ?? 0);
+  // Nas mutações abaixo o id do evento vem das VARIÁVEIS da própria mutação
+  // (vars.id), não de `selected!` — o usuário pode trocar de evento enquanto
+  // a requisição está em voo, e `selected` pode ser null.
   const setConformityEvaluatorMutation = useSetConformityEvaluator({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); setOpenConformityPicker(null); toast({ title: "Avaliador de Cenografia atualizado" }); },
+      onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) }); qc.invalidateQueries({ queryKey: getGetEventsQueryKey() }); setOpenConformityPicker(null); toast({ title: "Avaliador de Cenografia atualizado" }); },
       onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
     },
   });
   const setConformityEvaluatorFerramentasMutation = useSetConformityEvaluatorFerramentas({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); setOpenConformityPicker(null); toast({ title: "Avaliador de Ferramentas atualizado" }); },
+      onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) }); qc.invalidateQueries({ queryKey: getGetEventsQueryKey() }); setOpenConformityPicker(null); toast({ title: "Avaliador de Ferramentas atualizado" }); },
       onError: () => toast({ title: "Erro ao atribuir avaliador", variant: "destructive" }),
     },
   });
@@ -441,8 +552,12 @@ export function AdminEvaluationsConsole() {
   const { data: allRoutings } = useAllCriterionRoutings();
   const evaluatorsAll = (allUsers ?? []).filter(u => u.role === "avaliador" && u.active);
   const evaluatorsForArea = (areaId: number) => evaluatorsAll.filter(u => u.areaId === areaId);
-  const selectedIdx = configuredEvents.findIndex(e => e.id === selected?.id);
-  const selectedEvaluations = selectedIdx >= 0 ? (evalQueries[selectedIdx]?.data ?? []) : [];
+  // Avaliações do evento selecionado: consulta fresca quando já carregou,
+  // senão a fatia da consulta global (mesmo índice usado no enriquecimento).
+  const selectedEvaluations: Evaluation[] = useMemo(
+    () => (selectedEventId != null ? [...(evalIndex.get(selectedEventId)?.values() ?? [])].flat() : []),
+    [evalIndex, selectedEventId],
+  );
 
   useEffect(() => {
     if (selectedDetail?.criteria) {
@@ -488,9 +603,9 @@ export function AdminEvaluationsConsole() {
 
   const updateCriteria = useUpdateEventCriteria({
     mutation: {
-      onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) });
-        qc.invalidateQueries({ queryKey: ["event-criteria", selected!.id] });
+      onSuccess: (data, vars) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) });
+        qc.invalidateQueries({ queryKey: ["event-criteria", vars.id] });
         qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
         if (data.warnings && data.warnings.length > 0) toast({ title: "Pesos salvos", description: data.warnings.join(" "), variant: "destructive" });
         else toast({ title: "Pesos salvos" });
@@ -500,15 +615,25 @@ export function AdminEvaluationsConsole() {
   });
   const confirmCriteriaMutation = useConfirmEventCriteria({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); qc.invalidateQueries({ queryKey: getGetEventsQueryKey() }); },
+      onSuccess: (_d, vars) => {
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        // Liberar a avaliação gera as atribuições sugeridas no servidor.
+        qc.invalidateQueries({ queryKey: eventCriterionAssignmentsKey(vars.id) });
+      },
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
     },
   });
   const resyncCriteria = useResyncEventCriteria({
     mutation: {
-      onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) });
-        qc.invalidateQueries({ queryKey: ["event-criteria", selected!.id] });
+      onSuccess: (data, vars) => {
+        // Sincronizar muda o conjunto de critérios do evento: além do detalhe
+        // e da lista de critérios, a fila (/events: totais, áreas sem avaliador)
+        // e as atribuições por critério precisam ser recarregadas.
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) });
+        qc.invalidateQueries({ queryKey: ["event-criteria", vars.id] });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        qc.invalidateQueries({ queryKey: eventCriterionAssignmentsKey(vars.id) });
         const removed = data.removedStale ?? 0;
         const added = data.addedNew ?? 0;
         const reactivated = (data as { reactivated?: number }).reactivated ?? 0;
@@ -527,32 +652,39 @@ export function AdminEvaluationsConsole() {
   });
   const duplicateCriterion = useDuplicateEventCriterion({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Quesito duplicado" }); },
+      onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) }); qc.invalidateQueries({ queryKey: ["event-criteria", vars.id] }); toast({ title: "Quesito duplicado" }); },
       onError: (e: { message?: string }) => toast({ title: "Erro ao duplicar", description: e.message, variant: "destructive" }),
     },
   });
   const deleteCriterion = useDeleteEventCriterion({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Quesito excluído" }); },
+      onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) }); qc.invalidateQueries({ queryKey: ["event-criteria", vars.id] }); toast({ title: "Quesito excluído" }); },
       // "Não encontrado" no delete significa que o servidor já não tem esse quesito
       // (foi excluído em outra ação, ou a lista ficou dessincronizada após um
       // "Sincronizar Critérios"). Sem isso, a linha "fantasma" ficava presa na
       // tela para sempre — recarrega para o cliente refletir o estado real.
-      onError: (e: { message?: string }) => {
+      onError: (e: { message?: string }, vars) => {
         toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" });
-        qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) });
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) });
       },
     },
   });
   const renameCriterion = useUpdateCriterion({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Nome atualizado" }); },
+      // vars.id aqui é o CRITÉRIO, não o evento — usa o evento selecionado com guarda.
+      onSuccess: () => {
+        if (selectedEventId != null) {
+          qc.invalidateQueries({ queryKey: getGetEventQueryKey(selectedEventId) });
+          qc.invalidateQueries({ queryKey: ["event-criteria", selectedEventId] });
+        }
+        toast({ title: "Nome atualizado" });
+      },
       onError: (e: { message?: string }) => toast({ title: "Erro ao renomear", description: e.message, variant: "destructive" }),
     },
   });
   const updateAssignments = useUpdateEventAssignments({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) }); toast({ title: "Avaliadores atribuídos" }); },
+      onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) }); qc.invalidateQueries({ queryKey: getGetEventsQueryKey() }); toast({ title: "Avaliadores atribuídos" }); },
       onError: (e: { message?: string }) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
     },
   });
@@ -574,9 +706,14 @@ export function AdminEvaluationsConsole() {
     selectedEvaluations.some(e => e.criterionId === criterionId && e.status === "submitted");
   const setCriterionWeight = (criterionId: number, weight: number) =>
     setConfig(cfg => cfg.map(c => (c.criterionId === criterionId ? { ...c, weight } : c)));
-  const handleSaveCriteria = () =>
-    updateCriteria.mutate({ id: selected!.id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
-  const handleConfirmCriteria = (value: boolean) => confirmCriteriaMutation.mutate({ id: selected!.id, data: { confirmed: value } });
+  const handleSaveCriteria = () => {
+    if (!selected) return;
+    updateCriteria.mutate({ id: selected.id, data: { criteria: config.map(c => ({ criterionId: c.criterionId, active: c.active, weight: Number(c.weight) || 0 })) } });
+  };
+  const handleConfirmCriteria = (value: boolean) => {
+    if (!selected) return;
+    confirmCriteriaMutation.mutate({ id: selected.id, data: { confirmed: value } });
+  };
   const computeSequentialName = (baseName: string): string => {
     const root = baseName.replace(/\s*\(\d+\)$/, "");
     const existing = (selectedDetail?.criteria ?? []).map(c => c.criterionName ?? "");
@@ -657,8 +794,10 @@ export function AdminEvaluationsConsole() {
       return { ...prev, [areaId]: next };
     });
   const buildAssignmentsPayload = () => assignAreas.map(a => ({ areaId: a.areaId, evaluatorUserIds: buildOrderedEvaluatorIds(a.areaId) }));
-  const handleSaveAssignments = () =>
-    updateAssignments.mutate({ id: selected!.id, data: { assignments: buildAssignmentsPayload() } });
+  const handleSaveAssignments = () => {
+    if (!selected) return;
+    updateAssignments.mutate({ id: selected.id, data: { assignments: buildAssignmentsPayload() } });
+  };
   const handleSaveAllCriteria = () => {
     handleSaveCriteria();
     if (assignmentsDirty) handleSaveAssignments();
@@ -679,9 +818,9 @@ export function AdminEvaluationsConsole() {
   const fmtW = (v: number) => v.toFixed(1);
   const confirmResults = useConfirmEventResults({
     mutation: {
-      onSuccess: (data) => {
+      onSuccess: (data, vars) => {
         qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetEventQueryKey(selected!.id) });
+        qc.invalidateQueries({ queryKey: getGetEventQueryKey(vars.id) });
         toast({
           title: "Resultados confirmados",
           description: data.warnings && data.warnings.length > 0 ? data.warnings.join(" ") : "O evento agora conta na elegibilidade dos colaboradores.",
@@ -691,10 +830,14 @@ export function AdminEvaluationsConsole() {
     },
   });
 
-  const createAdminToken = useCreateAdminPublicToken(selected?.id ?? 0);
-  const { data: allTokens, refetch: refetchAllTokens } = useAllPublicTokens(linkDialog != null ? (selected?.id ?? null) : null);
-  const createConformityToken = useCreateConformityPublicToken(selected?.id ?? 0);
-  const createFerramentasToken = useCreateFerramentasPublicToken(selected?.id ?? 0);
+  const createAdminToken = useCreateAdminPublicToken(selectedEventId ?? 0);
+  // Tokens de TODOS os formulários do evento selecionado — sempre carregados
+  // (1 requisição por evento selecionado) para que "Gerar Todos os Links"
+  // reaproveite links pendentes em vez de criar tokens novos a cada clique.
+  const { data: allTokens, refetch: refetchAllTokens } = useAllPublicTokens(selectedEventId);
+  const createConformityToken = useCreateConformityPublicToken(selectedEventId ?? 0);
+  const createFerramentasToken = useCreateFerramentasPublicToken(selectedEventId ?? 0);
+  const evalUrl = (tokenId: string) => `${window.location.origin}/eval/${tokenId}`;
 
   function openLinkDialog(c: CritRow) {
     if (!c.assignedToId || !c.assignedToName) return;
@@ -718,8 +861,7 @@ export function AdminEvaluationsConsole() {
       { assignedToUserId: linkDialog.assignedToId, criterionIds: linkDialog.criterionIds, recipientName: linkRecipientName.trim() || undefined, includeConformity: linkDialog.includeConformity },
       {
         onSuccess: (data) => {
-          const url = `${window.location.origin}/eval/${data.tokenId}`;
-          setGeneratedLinkUrl(url);
+          setGeneratedLinkUrl(evalUrl(data.tokenId));
           refetchAllTokens();
         },
         onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
@@ -748,26 +890,44 @@ export function AdminEvaluationsConsole() {
     setBatchRunning(true);
     setBatchOpen(true);
     setBatchAllCopied(false);
+    // Lista atual de tokens do evento (refetch garante que não decidimos
+    // reaproveitar com base numa cópia velha do cache).
+    const tokensNow: AdminPublicToken[] = (await refetchAllTokens()).data ?? allTokens ?? [];
+    const pendingTokens = tokensNow.filter(t => t.usedAt == null);
     const results: BatchLink[] = [];
     for (const [key, rows] of groups) {
       const first = rows[0];
       const includeConformity = first.areaId === CENOGRAFIA_AREA_ID;
-      const base: Omit<BatchLink, "url" | "error"> = {
+      const criterionIds = rows.map(r => r.criterionId);
+      const base: Omit<BatchLink, "url" | "error" | "reused"> = {
         key,
         evaluatorName: first.assignedToName ?? "Avaliador",
         areaName: first.areaName,
         criterionNames: rows.map(r => r.criterionName),
         includeConformity,
       };
+      // Reuso: já existe um link PENDENTE deste mesmo avaliador (o token admin
+      // grava createdByUserId = avaliador designado) cobrindo EXATAMENTE estes
+      // critérios, com o mesmo formato (com/sem matriz)? Então é o mesmo link —
+      // não faz sentido gerar outro e deixar o anterior órfão.
+      const existing = pendingTokens.find(t =>
+        t.tokenType === (includeConformity ? "criteria_with_conformity" : "criteria")
+        && t.createdByUserId === first.assignedToId
+        && sameIdSet(t.criterionIds ?? [], criterionIds),
+      );
+      if (existing) {
+        results.push({ ...base, url: evalUrl(existing.id), error: null, reused: true });
+        continue;
+      }
       try {
         const data = await createAdminToken.mutateAsync({
           assignedToUserId: first.assignedToId!,
-          criterionIds: rows.map(r => r.criterionId),
+          criterionIds,
           includeConformity,
         });
-        results.push({ ...base, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
+        results.push({ ...base, url: evalUrl(data.tokenId), error: null, reused: false });
       } catch (e) {
-        results.push({ ...base, url: null, error: (e as Error).message });
+        results.push({ ...base, url: null, error: (e as Error).message, reused: false });
       }
     }
     // Matriz de Cenografia: normalmente já vai combinada no link do critério da
@@ -776,28 +936,44 @@ export function AdminEvaluationsConsole() {
     const hadCenoGroup = [...groups.values()].some(rows => rows[0].areaId === CENOGRAFIA_AREA_ID);
     if (!hadCenoGroup) {
       const cenoEvaluatorName = selectedDetail?.conformityEvaluatorName ?? "Sem avaliador";
-      try {
-        const data = await createConformityToken.mutateAsync({ recipientName: "Matriz Cenografia" });
-        results.push({ key: "ceno-matrix", evaluatorName: cenoEvaluatorName, areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
-      } catch (e) {
-        results.push({ key: "ceno-matrix", evaluatorName: cenoEvaluatorName, areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true, url: null, error: (e as Error).message });
+      const cenoBase: Omit<BatchLink, "url" | "error" | "reused"> = { key: "ceno-matrix", evaluatorName: cenoEvaluatorName, areaName: "Cenografia", criterionNames: ["EPI · Estaiamentos · Conduta · Faltas · Destaque"], includeConformity: true };
+      const existingCeno = pendingTokens.find(t => t.tokenType === "conformity_cenografia");
+      if (existingCeno) {
+        results.push({ ...cenoBase, url: evalUrl(existingCeno.id), error: null, reused: true });
+      } else {
+        try {
+          const data = await createConformityToken.mutateAsync({ recipientName: "Matriz Cenografia" });
+          results.push({ ...cenoBase, url: evalUrl(data.tokenId), error: null, reused: false });
+        } catch (e) {
+          results.push({ ...cenoBase, url: null, error: (e as Error).message, reused: false });
+        }
       }
     }
     // Matriz de Ferramentas (Guarda de Equipamentos): 1 item, sempre com link
     // próprio — não tem critério pra combinar.
     const ferramentasEvaluatorName = selectedDetail?.conformityEvaluatorFerramentasName ?? "Sem avaliador";
-    try {
-      const data = await createFerramentasToken.mutateAsync({ recipientName: "Matriz Ferramentas" });
-      results.push({ key: "ferr-matrix", evaluatorName: ferramentasEvaluatorName, areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: `${window.location.origin}/eval/${data.tokenId}`, error: null });
-    } catch (e) {
-      results.push({ key: "ferr-matrix", evaluatorName: ferramentasEvaluatorName, areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true, url: null, error: (e as Error).message });
+    const ferrBase: Omit<BatchLink, "url" | "error" | "reused"> = { key: "ferr-matrix", evaluatorName: ferramentasEvaluatorName, areaName: "Ferramentas", criterionNames: ["Guarda de Equipamentos"], includeConformity: true };
+    const existingFerr = pendingTokens.find(t => t.tokenType === "conformity_ferramentas");
+    if (existingFerr) {
+      results.push({ ...ferrBase, url: evalUrl(existingFerr.id), error: null, reused: true });
+    } else {
+      try {
+        const data = await createFerramentasToken.mutateAsync({ recipientName: "Matriz Ferramentas" });
+        results.push({ ...ferrBase, url: evalUrl(data.tokenId), error: null, reused: false });
+      } catch (e) {
+        results.push({ ...ferrBase, url: null, error: (e as Error).message, reused: false });
+      }
     }
 
     setBatchLinks(results);
     setBatchRunning(false);
     refetchAllTokens();
     const ok = results.filter(r => r.url).length;
-    toast({ title: `${ok} link(s) gerado(s)${ok < results.length ? ` · ${results.length - ok} com erro` : ""}` });
+    const reused = results.filter(r => r.reused).length;
+    const created = ok - reused;
+    toast({
+      title: `${created} link(s) gerado(s)${reused > 0 ? ` · ${reused} reaproveitado(s)` : ""}${ok < results.length ? ` · ${results.length - ok} com erro` : ""}`,
+    });
   }
 
   function handleGenerateConformityLink() {
@@ -809,8 +985,7 @@ export function AdminEvaluationsConsole() {
       { recipientName },
       {
         onSuccess: (data) => {
-          const url = `${window.location.origin}/eval/${data.tokenId}`;
-          setConformityLinkUrl(url);
+          setConformityLinkUrl(evalUrl(data.tokenId));
         },
         onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
       },
@@ -832,26 +1007,38 @@ export function AdminEvaluationsConsole() {
     );
   }
 
+  // Atribuição em lote por área: laço SEQUENCIAL com a chamada crua (sem o
+  // hook), `bulkBusy` trava o picker enquanto roda e o cache é invalidado
+  // UMA vez ao final — antes eram N `mutate` em paralelo no mesmo hook
+  // (isPending inútil) com N invalidações.
   async function handleBulkAssign(areaId: number, userId: number) {
-    if (!selected) return;
+    if (!selected || bulkBusy) return;
+    const eventId = selected.id;
     const unassigned = selected.criteria.filter(c => c.areaId === areaId && c.state === "unassigned");
     if (unassigned.length === 0) { setBulkAssignAreaId(null); return; }
-    try {
-      await Promise.all(
-        unassigned.map(c =>
-          new Promise<void>((resolve, reject) => {
-            patchAssignment.mutate(
-              { criterionId: c.criterionId, assignedToId: userId, action: "assign" },
-              { onSuccess: () => resolve(), onError: (e) => reject(e) },
-            );
-          })
-        )
-      );
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    setBulkBusy(true);
+    let okCount = 0;
+    let firstError: string | null = null;
+    for (const c of unassigned) {
+      try {
+        await patchCriterionAssignment(eventId, { criterionId: c.criterionId, assignedToId: userId, action: "assign" });
+        okCount++;
+      } catch (e) {
+        firstError ??= (e as Error).message;
+      }
+    }
+    qc.invalidateQueries({ queryKey: eventCriterionAssignmentsKey(eventId) });
+    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    setBulkBusy(false);
+    if (firstError == null) {
       setBulkAssignAreaId(null);
-      toast({ title: `${unassigned.length} critério(s) atribuído(s)` });
-    } catch {
-      toast({ title: "Erro ao atribuir critérios", variant: "destructive" });
+      toast({ title: `${okCount} critério(s) atribuído(s)` });
+    } else {
+      toast({
+        title: okCount > 0 ? `${okCount} de ${unassigned.length} critério(s) atribuído(s)` : "Erro ao atribuir critérios",
+        description: firstError,
+        variant: "destructive",
+      });
     }
   }
 
@@ -1223,6 +1410,17 @@ export function AdminEvaluationsConsole() {
                       <span className="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].bg, color: STATE_CFG[selected.isDone ? "done" : selected.done > 0 ? "partial" : "pending"].color }}>
                         {selected.isDone ? "Concluído" : selected.done > 0 ? "Em andamento" : "A fazer"}
                       </span>
+                      {(selected.finalCalibratedCriteria > 0 || selected.partialPublishedCount > 0) && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full"
+                          style={{ background: "rgba(154,176,0,0.14)", color: GOOD }}
+                          title={selected.finalCalibratedCriteria > 0
+                            ? `${selected.finalCalibratedCriteria} de ${selected.total} critério(s) com publicação final`
+                            : `${selected.partialPublishedCount} de ${selected.total} critério(s) com publicação parcial`}
+                        >
+                          <CheckCircle size={9} /> {selected.finalCalibratedCriteria > 0 ? "Publicação final" : "Publicação parcial"}
+                        </span>
+                      )}
                       {selected.isDone && selected.unassigned > 0 && !!selected.endDate && selected.endDate < todayStr && (
                         <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: `rgba(232,162,61,0.16)`, color: AMBER }}>
                           <AlertTriangle size={9} /> Sem avaliador
@@ -1368,8 +1566,10 @@ export function AdminEvaluationsConsole() {
                               </div>
                               {open && (
                                 <div className="px-3 py-2.5">
-                                  <p className="text-[9.5px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--muted-foreground)" }}>Escolha o avaliador para todos os {a.count} critério(s) sem atribuição em {a.areaName}:</p>
-                                  <InlinePicker areaId={a.areaId} onPick={(uid) => handleBulkAssign(a.areaId, uid)} />
+                                  <p className="text-[9.5px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--muted-foreground)" }}>
+                                    {bulkBusy ? "Atribuindo..." : `Escolha o avaliador para todos os ${a.count} critério(s) sem atribuição em ${a.areaName}:`}
+                                  </p>
+                                  <InlinePicker areaId={a.areaId} disabled={bulkBusy} onPick={(uid) => handleBulkAssign(a.areaId, uid)} />
                                 </div>
                               )}
                             </div>
@@ -1404,7 +1604,13 @@ export function AdminEvaluationsConsole() {
                               <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-bold" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-                                    <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.state === "done" ? GOOD : c.state === "partial" ? AMBER : "var(--border)" }} />
+                                    <span
+                                      role="img"
+                                      aria-label={`Status: ${STATE_CFG[c.state].label}`}
+                                      title={STATE_CFG[c.state].label}
+                                      className="w-2 h-2 rounded-full inline-block"
+                                      style={{ background: c.state === "done" ? GOOD : c.state === "partial" ? AMBER : "var(--border)" }}
+                                    />
                                     {c.assignedToName}
                                   </span>
                                   <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: STATE_CFG[c.state].bg, color: STATE_CFG[c.state].color }}>
@@ -1649,7 +1855,7 @@ export function AdminEvaluationsConsole() {
                                       className="h-9 rounded-lg font-black text-sm"
                                       style={fieldStyle}
                                     />
-                                    <button type="button" data-testid={`button-save-name-${item.criterionId}`} onClick={() => handleRename(item.criterionId)} title="Salvar nome" className="h-9 w-9 flex items-center justify-center rounded-lg transition-opacity hover:opacity-90" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                                    <button type="button" data-testid={`button-save-name-${item.criterionId}`} onClick={() => handleRename(item.criterionId)} title="Salvar nome" aria-label="Salvar nome" className="h-9 w-9 flex items-center justify-center rounded-lg transition-opacity hover:opacity-90" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
                                       <Check size={16} />
                                     </button>
                                   </div>
@@ -1797,6 +2003,7 @@ export function AdminEvaluationsConsole() {
                                     disabled={editLocked || duplicateCriterion.isPending}
                                     onClick={() => handleDuplicate(item.criterionId, item.name)}
                                     title="Duplicar quesito"
+                                    aria-label="Duplicar quesito"
                                     className="h-9 w-9 flex items-center justify-center rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
                                     style={{ border: "1px solid var(--border)" }}
                                   >
@@ -1809,6 +2016,7 @@ export function AdminEvaluationsConsole() {
                                       disabled={editLocked || deleteCriterion.isPending}
                                       onClick={() => setPendingDelete(item.id)}
                                       title="Excluir cópia"
+                                      aria-label="Excluir cópia"
                                       className="h-9 w-9 flex items-center justify-center rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
                                       style={{ border: "1px solid var(--border)", color: WARNING }}
                                     >
@@ -1821,6 +2029,7 @@ export function AdminEvaluationsConsole() {
                                       disabled={editLocked && criterionHasEvals(item.criterionId)}
                                       onClick={() => setPendingRemoval(item.criterionId)}
                                       title={editLocked && !criterionHasEvals(item.criterionId) ? "Desativar critério sem avaliações" : "Remover critério"}
+                                      aria-label={editLocked && !criterionHasEvals(item.criterionId) ? "Desativar critério sem avaliações" : "Remover critério"}
                                       className="h-9 w-9 flex items-center justify-center rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-80"
                                       style={{ border: "1px solid var(--border)", color: WARNING }}
                                     >
@@ -2404,7 +2613,7 @@ export function AdminEvaluationsConsole() {
                     <Copy size={12} /> {batchAllCopied ? "Copiado!" : "Copiar Todos"}
                   </button>
                 )}
-                <button type="button" onClick={() => setBatchOpen(false)} className="rounded-lg p-1.5 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
+                <button type="button" onClick={() => setBatchOpen(false)} aria-label="Fechar lista de links" title="Fechar" className="rounded-lg p-1.5 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>
                   <X size={14} />
                 </button>
               </div>
@@ -2420,6 +2629,15 @@ export function AdminEvaluationsConsole() {
                     <span className="text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--card)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{l.areaName}</span>
                     {l.includeConformity && (
                       <span className="text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>+ Matriz</span>
+                    )}
+                    {l.reused && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER }}
+                        title="Já existia um link pendente com estes mesmos critérios para este avaliador — nenhum token novo foi criado."
+                      >
+                        <RotateCcw size={9} /> Link já existente (reaproveitado)
+                      </span>
                     )}
                   </div>
                   <p className="text-[10px] leading-snug mb-2" style={{ color: "var(--muted-foreground)" }}>{l.criterionNames.join(" · ")}</p>
@@ -2463,7 +2681,7 @@ export function AdminEvaluationsConsole() {
                 <p className="text-[9px] font-bold uppercase tracking-wide mb-0.5" style={{ color: "var(--muted-foreground)" }}>{viewEvalCrit.areaName}</p>
                 <h3 className="font-black uppercase text-[16px] leading-tight truncate" style={{ fontFamily: CONDENSED }}>{viewEvalCrit.criterionName}</h3>
               </div>
-              <button type="button" onClick={() => setViewEvalCrit(null)} className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
+              <button type="button" onClick={() => setViewEvalCrit(null)} aria-label="Fechar avaliação" title="Fechar" className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
             </div>
             <div className="px-5 py-4 space-y-4">
               {/* Avaliador + data */}
@@ -2536,7 +2754,7 @@ export function AdminEvaluationsConsole() {
                   {viewConformity === "cenografia" ? "Matriz de Conformidade" : "Guarda de Ferramentas"}
                 </h3>
               </div>
-              <button type="button" onClick={() => setViewConformity(null)} className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
+              <button type="button" onClick={() => setViewConformity(null)} aria-label="Fechar matriz de conformidade" title="Fechar" className="ml-3 shrink-0 rounded-lg p-1.5 hover:opacity-70 transition-opacity" style={{ border: "1px solid var(--border)" }}><X size={14} /></button>
             </div>
             <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
               {/* Avaliador */}
@@ -2642,6 +2860,8 @@ export function AdminEvaluationsConsole() {
               <button
                 type="button"
                 onClick={() => { setLinkDialog(null); setGeneratedLinkUrl(null); }}
+                aria-label="Fechar diálogo de link"
+                title="Fechar"
                 className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80"
                 style={{ border: "1px solid var(--border)" }}
               >
@@ -2714,7 +2934,7 @@ export function AdminEvaluationsConsole() {
 
               {/* history */}
               {(() => {
-                const relevantTokens: (PublicToken & { tokenType: string })[] = (allTokens ?? []).filter(t =>
+                const relevantTokens: AdminPublicToken[] = (allTokens ?? []).filter(t =>
                   (t.tokenType === "criteria" || t.tokenType === "criteria_with_conformity")
                   && (t.criterionIds ?? []).some(id => linkDialog.criterionIds.includes(id)),
                 );
@@ -2772,6 +2992,8 @@ export function AdminEvaluationsConsole() {
               <button
                 type="button"
                 onClick={() => setConformityLinkDialog(null)}
+                aria-label="Fechar diálogo de link de conformidade"
+                title="Fechar"
                 className="shrink-0 ml-3 transition-colors hover:opacity-70"
                 style={{ color: "var(--muted-foreground)" }}
               >
