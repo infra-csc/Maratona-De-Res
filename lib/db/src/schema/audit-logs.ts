@@ -6,6 +6,9 @@ import { usersTable } from "./users";
 export const auditLogsTable = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => usersTable.id),
+  // Admin que de fato agiu quando a sessão era de impersonação ("Modo Dev");
+  // userId continua sendo o usuário impersonado.
+  impersonatorUserId: integer("impersonator_user_id").references(() => usersTable.id),
   action: text("action").notNull(),
   entity: text("entity").notNull(),
   entityId: text("entity_id"),

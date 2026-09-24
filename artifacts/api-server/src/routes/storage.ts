@@ -5,7 +5,15 @@ import {
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, requireRole } from "../lib/auth";
+
+// Os objetos privados hoje são só áudios de justificativa de avaliação. Quem
+// grava: os papéis que podem lançar avaliação (POST /evaluations). Quem ouve:
+// os papéis que recebem audioUrl em GET /evaluations (operador recebe null e
+// visualizador recebe lista vazia). Os caminhos são /objects/uploads/<UUID v4>
+// (randomUUID), portanto imprevisíveis; o papel é a segunda barreira.
+const AUDIO_UPLOAD_ROLES = ["admin", "rh", "avaliador"] as const;
+const AUDIO_READ_ROLES = ["admin", "rh", "diretoria", "avaliador"] as const;
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -17,7 +25,7 @@ const objectStorageService = new ObjectStorageService();
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
  */
-router.post("/storage/uploads/request-url", requireAuth, async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireAuth, requireRole(...AUDIO_UPLOAD_ROLES), async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
@@ -84,10 +92,11 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
  * (evaluation audio justifications), so the route requires authentication.
  * The browser can't send an Authorization header on an <audio src>, so the
  * frontend fetches the bytes with its Bearer token and plays them via a blob URL
- * (see fetchAudioObjectUrl in the web app). Any authenticated user may read;
- * finer-grained per-object ACL is a known follow-up.
+ * (see fetchAudioObjectUrl in the web app). Leitura restrita a AUDIO_READ_ROLES;
+ * ACL por objeto (ex.: avaliador só ouvir áudios das áreas que enxerga) segue
+ * como melhoria futura.
  */
-router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Response) => {
+router.get("/storage/objects/*path", requireAuth, requireRole(...AUDIO_READ_ROLES), async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;

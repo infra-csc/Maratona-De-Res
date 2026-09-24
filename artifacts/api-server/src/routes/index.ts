@@ -34,7 +34,8 @@ router.use(authRouter);
 // requireRole (audit, integration use requireRole("admin","rh")). Those guards
 // run for every fall-through request and would otherwise 403 audio
 // uploads/playback used by avaliadores. Storage has its own guards: requireAuth
-// on the upload-URL endpoint, public GET for <audio> playback.
+// on the upload-URL endpoint and on the audio download (only roles that can
+// see evaluations; the web fetches it with Authorization and plays a blob URL).
 router.use(storageRouter);
 router.use(publicEvalRouter);
 // cyclesRouter mounted early for the same reason as storageRouter: it must come

@@ -99,13 +99,25 @@ async function freezeEventCriteriaWeights(eventId: number) {
  * O resultado do evento é aplicado a todos os participantes do time.
  *
  * GET /evaluations
- * - admin/rh/diretoria: veem tudo (mas nunca retornam avaliadorName para visualizador)
- * - avaliador: veem apenas avaliações de critérios da sua área
- * - visualizador: veem avaliações sem nome do avaliador
+ * - admin/rh/diretoria: veem tudo
+ * - avaliador: as próprias e as das áreas designadas/principais
+ * - operador: vê só o status (nota, comentário e áudio redigidos)
+ * - visualizador: lista vazia (o colaborador usa GET /my-performance)
  */
 router.get("/evaluations", async (req, res) => {
   const { eventId, status } = req.query;
   const user = req.user!;
+
+  // Visualizador (colaborador) não recebe avaliação de ninguém: nota por
+  // avaliador, comentários internos e caminho do áudio são dados de RH. O que
+  // lhe cabe (média do time, comentários marcados "public", matriz resumida)
+  // chega por GET /my-performance. Devolve lista vazia em vez de 403 porque a
+  // tela /evaluations (alcançável por URL) trata o papel como "consulta" e
+  // renderiza o estado vazio sem erro nem toast.
+  if (isRole(user.role, "visualizador")) {
+    res.json([]);
+    return;
+  }
 
   let query = db.select({
     id: evaluationsTable.id,
@@ -142,7 +154,7 @@ router.get("/evaluations", async (req, res) => {
   // designado neste evento (atribuição evento→área→avaliador) e as das áreas
   // em que é avaliador PRINCIPAL — o principal precisa ver quem respondeu
   // cada quesito da área dele (inclusive delegados) e quando.
-  if (user.role === "avaliador") {
+  if (isRole(user.role, "avaliador")) {
     const [assignedAreas, principalAreaIds] = await Promise.all([
       db.select({ areaId: eventAreaAssignmentsTable.areaId })
         .from(eventAreaAssignmentsTable)
@@ -160,7 +172,8 @@ router.get("/evaluations", async (req, res) => {
 
   const evaluations = await query;
 
-  const hideEvaluatorName = user.role === "visualizador";
+  // Defensivo: o visualizador já saiu acima com lista vazia.
+  const hideEvaluatorName = isRole(user.role, "visualizador");
   // "operador" atribui/envia avaliações mas nunca deve ver o CONTEÚDO de uma
   // resposta já enviada (nota, comentário, áudio) — só se foi respondida ou
   // não. Redact aqui, na origem, em vez de confiar só na UI escondendo o

@@ -1,8 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable, areasTable, employeesTable, evaluationsTable, calibrationsTable, eventConformitiesTable, eventsTable, eventAreaAssignmentsTable } from "@workspace/db";
-import { eq, and, isNull, inArray } from "drizzle-orm";
-import { requireAuth, requireRole, isRole } from "../lib/auth.js";
+import { eq, and, isNull, inArray, sql } from "drizzle-orm";
+import { requireAuth, requireRole, isRole, bumpTokenVersion, invalidateSessionCache } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
 
@@ -160,6 +160,13 @@ function isAllowedRole(role: unknown): role is (typeof ALLOWED_ROLES)[number] {
 function canManageAdmin(requesterRole: string | undefined): boolean {
   return isRole(requesterRole, "admin");
 }
+// Linha de users sem segredos nem controle interno: o hash, o PIN (que é o CPF
+// usado como senha dos colaboradores) e a versão de sessão não saem na
+// resposta nem na trilha de auditoria.
+function publicUser(u: typeof usersTable.$inferSelect) {
+  const { passwordHash: _h, pinValue: _p, tokenVersion: _t, failedLoginAttempts: _f, lockedUntil: _l, ...rest } = u;
+  return rest;
+}
 
 router.post("/users", requireRole("admin", "rh"), async (req, res) => {
   const { name, email, role, areaId, password, employeeId } = req.body;
@@ -184,7 +191,7 @@ router.post("/users", requireRole("admin", "rh"), async (req, res) => {
     employeeId: employeeId ?? null,
   }).returning();
   await audit(req.user!.userId, "create", "users", user.id, null, { email, role, employeeId: employeeId ?? null });
-  res.status(201).json({ ...user, passwordHash: undefined });
+  res.status(201).json(publicUser(user));
 });
 
 router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
@@ -200,6 +207,13 @@ router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
     const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
     if (!emp) { res.status(400).json({ error: "Colaborador não encontrado" }); return; }
   }
+  // Revoga as sessões abertas quando o que o token carrega deixa de valer:
+  // desativação, troca de papel ou de colaborador vinculado (employeeId é usado
+  // como escopo em rotas do colaborador).
+  const revokeSessions =
+    (active !== undefined && active === false && before.active) ||
+    (role !== undefined && !isRole(before.role, role)) ||
+    (employeeId !== undefined && (employeeId ?? null) !== (before.employeeId ?? null));
   const [user] = await db.update(usersTable).set({
     ...(name !== undefined && { name }),
     ...(email !== undefined && { email: email.toLowerCase() }),
@@ -207,9 +221,11 @@ router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
     ...(areaId !== undefined && { areaId }),
     ...(active !== undefined && { active }),
     ...(employeeId !== undefined && { employeeId }),
+    ...(revokeSessions && { tokenVersion: sql`${usersTable.tokenVersion} + 1` }),
   }).where(eq(usersTable.id, id)).returning();
-  await audit(req.user!.userId, "update", "users", id, before, { ...user, passwordHash: undefined });
-  res.json({ ...user, passwordHash: undefined });
+  invalidateSessionCache(id);
+  await audit(req.user!.userId, "update", "users", id, publicUser(before), publicUser(user));
+  res.json(publicUser(user));
 });
 
 router.delete("/users/:id", requireRole("admin"), async (req, res) => {
@@ -231,6 +247,7 @@ router.delete("/users/:id", requireRole("admin"), async (req, res) => {
     }
     throw err;
   }
+  invalidateSessionCache(id);
   await audit(req.user!.userId, "delete", "users", id);
   res.status(204).end();
 });
@@ -313,7 +330,10 @@ router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => 
     await tx.update(usersTable)
       .set({ active: false })
       .where(inArray(usersTable.id, dupIds));
+    // Derruba as sessões abertas dos duplicados desativados.
+    await bumpTokenVersion(dupIds, tx);
   });
+  invalidateSessionCache(dupIds);
 
   await audit(req.user!.userId, "merge", "users", canonicalId, { duplicateIds: dupIds }, { movedEvaluations, movedCalibrations, movedConformities, movedAssignments });
   res.json({ canonicalId, merged: dupIds, movedEvaluations, movedCalibrations, movedConformities, movedAssignments });
@@ -400,7 +420,11 @@ router.post("/users/:id/reset-password", requireRole("admin", "rh"), async (req,
     res.status(403).json({ error: "Somente admin pode redefinir a senha de um admin" }); return;
   }
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  await db.update(usersTable).set({ passwordHash, mustChangePassword: true }).where(eq(usersTable.id, id));
+  // Senha redefinida por RH/admin: sessões abertas com a senha antiga caem.
+  await db.update(usersTable)
+    .set({ passwordHash, mustChangePassword: true, tokenVersion: sql`${usersTable.tokenVersion} + 1` })
+    .where(eq(usersTable.id, id));
+  invalidateSessionCache(id);
   await audit(req.user!.userId, "reset_password", "users", id);
   res.json({ message: "Senha redefinida com sucesso" });
 });

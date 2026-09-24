@@ -2,8 +2,8 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db, usersTable, areasTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
-import { signToken, requireAuth, requireRole } from "../lib/auth.js";
+import { eq, and, sql } from "drizzle-orm";
+import { signToken, requireAuth, requireRole, invalidateSessionCache } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES } from "../lib/credentials.js";
 
@@ -32,14 +32,23 @@ function pinFailed(key: string): void {
   entry.count += 1;
 }
 
-async function buildAuthResponse(user: typeof usersTable.$inferSelect) {
+// impersonator: presente só no "Modo Dev" (admin vendo o app como outro usuário).
+// O token carrega impersonatorId para que requireAuth/audit saibam quem de fato
+// age; a troca obrigatória de senha do impersonado não se aplica ao admin.
+async function buildAuthResponse(
+  user: typeof usersTable.$inferSelect,
+  impersonator?: { id: number; name: string },
+) {
+  const mustChangePassword = impersonator ? false : user.mustChangePassword;
   const token = signToken({
     userId: user.id,
     email: user.email,
     role: user.role,
     areaId: user.areaId ?? null,
     employeeId: user.employeeId ?? null,
-    mustChangePassword: user.mustChangePassword,
+    mustChangePassword,
+    tv: user.tokenVersion ?? 0,
+    impersonatorId: impersonator?.id,
   });
   let areaName: string | null = null;
   if (user.areaId) {
@@ -58,8 +67,9 @@ async function buildAuthResponse(user: typeof usersTable.$inferSelect) {
       areaName,
       employeeId: user.employeeId ?? null,
       active: user.active,
-      mustChangePassword: user.mustChangePassword,
+      mustChangePassword,
       createdAt: user.createdAt,
+      ...(impersonator ? { impersonatorId: impersonator.id, impersonatorName: impersonator.name } : {}),
     },
   };
 }
@@ -153,6 +163,13 @@ router.get("/auth/me", requireAuth, async (req, res) => {
     const [area] = await db.select({ name: areasTable.name }).from(areasTable).where(eq(areasTable.id, user.areaId)).limit(1);
     areaName = area?.name ?? null;
   }
+  // Sessão de "Modo Dev": informa quem é o admin real por trás do token.
+  let impersonator: { impersonatorId: number; impersonatorName: string | null } | null = null;
+  const impersonatorId = req.user!.impersonatorId;
+  if (impersonatorId != null) {
+    const [imp] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, impersonatorId)).limit(1);
+    impersonator = { impersonatorId, impersonatorName: imp?.name ?? null };
+  }
   res.json({
     id: user.id,
     name: user.name,
@@ -163,8 +180,11 @@ router.get("/auth/me", requireAuth, async (req, res) => {
     areaName,
     employeeId: user.employeeId ?? null,
     active: user.active,
-    mustChangePassword: user.mustChangePassword,
+    // No Modo Dev a troca obrigatória é do impersonado, não do admin (o token
+    // de impersonação é emitido com mustChangePassword=false).
+    mustChangePassword: impersonator ? false : user.mustChangePassword,
     createdAt: user.createdAt,
+    ...(impersonator ?? {}),
   });
 });
 
@@ -182,6 +202,12 @@ router.post("/auth/change-password", requireAuth, async (req, res) => {
     res.status(400).json({ error: "As senhas não coincidem" });
     return;
   }
+  // No Modo Dev o admin não troca a senha de quem está impersonando (o fluxo
+  // de troca obrigatória nem pede a senha atual).
+  if (req.user!.impersonatorId != null) {
+    res.status(403).json({ error: "Não é possível trocar a senha no Modo Dev" });
+    return;
+  }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.userId)).limit(1);
   if (!user) {
     res.status(404).json({ error: "Usuário não encontrado" });
@@ -195,12 +221,16 @@ router.post("/auth/change-password", requireAuth, async (req, res) => {
     if (!ok) { res.status(401).json({ error: "Senha atual incorreta" }); return; }
   }
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  await db
+  // Nova versão de sessão: tokens anteriores (outros dispositivos, token
+  // vazado) param de valer; esta sessão recebe um token novo na resposta.
+  const [updated] = await db
     .update(usersTable)
-    .set({ passwordHash, mustChangePassword: false })
-    .where(eq(usersTable.id, user.id));
+    .set({ passwordHash, mustChangePassword: false, tokenVersion: sql`${usersTable.tokenVersion} + 1` })
+    .where(eq(usersTable.id, user.id))
+    .returning();
+  invalidateSessionCache(user.id);
   await audit(user.id, "change_password", "users", user.id);
-  res.json(await buildAuthResponse({ ...user, passwordHash, mustChangePassword: false }));
+  res.json(await buildAuthResponse(updated));
 });
 
 // SSO vindo do portal NORTE — valida JWT externo e emite token Maratona
@@ -258,13 +288,21 @@ router.post("/auth/impersonate", requireAuth, requireRole("admin"), async (req, 
     res.status(400).json({ error: "Você já está autenticado como este usuário" });
     return;
   }
+  // Se o admin já está no Modo Dev (impersonando outro admin), o ator real
+  // continua sendo o admin original.
+  const realAdminId = req.user!.impersonatorId ?? req.user!.userId;
+  const [realAdmin] = await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable).where(eq(usersTable.id, realAdminId)).limit(1);
+  if (!realAdmin) {
+    res.status(401).json({ error: "Sessão inválida" });
+    return;
+  }
   const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
   if (!target || !target.active) {
     res.status(404).json({ error: "Usuário não encontrado ou inativo" });
     return;
   }
-  await audit(req.user!.userId, "impersonate", "users", target.id);
-  res.json(await buildAuthResponse(target));
+  await audit(req.user!.userId, "impersonate", "users", target.id, undefined, { impersonatedUserId: target.id, realAdminId });
+  res.json(await buildAuthResponse(target, realAdmin));
 });
 
 export default router;

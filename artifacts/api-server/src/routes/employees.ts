@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
 import { eq, and, inArray, notInArray, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireRole, isRole } from "../lib/auth.js";
+import { requireAuth, requireRole, isRole, bumpTokenVersion } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
@@ -276,6 +276,8 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
         await tx.update(usersTable)
           .set({ employeeId: null, active: false })
           .where(eq(usersTable.id, dupUser.id));
+        // Conta desativada: derruba as sessões abertas dela.
+        await bumpTokenVersion(dupUser.id, tx);
         removedUsers++;
       }
     }
@@ -473,6 +475,7 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
       await db.update(usersTable)
         .set({ passwordHash, pinValue: pin, mustChangePassword: false, cpfLogin: cpfDigits, role: "visualizador" })
         .where(eq(usersTable.id, byEmpId.id));
+      await bumpTokenVersion(byEmpId.id);
     } else {
       const [byCpf] = await db.select({ id: usersTable.id })
         .from(usersTable).where(eq(usersTable.cpfLogin, cpfDigits)).limit(1);
@@ -480,6 +483,7 @@ router.post("/employees/bulk-generate-pins", requireRole("admin", "rh"), async (
         await db.update(usersTable)
           .set({ passwordHash, pinValue: pin, mustChangePassword: false, employeeId: emp.id, role: "visualizador" })
           .where(eq(usersTable.id, byCpf.id));
+        await bumpTokenVersion(byCpf.id);
       } else {
         await db.insert(usersTable).values({
           name: emp.name,
@@ -535,6 +539,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
     await db.update(usersTable)
       .set({ passwordHash, pinValue: pin!, mustChangePassword: false, cpfLogin: cpfDigits, role: "visualizador" })
       .where(eq(usersTable.id, userId));
+    await bumpTokenVersion(userId);
   } else {
     const [byCpf] = await db.select({ id: usersTable.id })
       .from(usersTable).where(eq(usersTable.cpfLogin, cpfDigits)).limit(1);
@@ -543,6 +548,7 @@ router.post("/employees/:id/generate-pin", requireRole("admin", "rh"), async (re
       await db.update(usersTable)
         .set({ passwordHash, pinValue: pin!, mustChangePassword: false, employeeId: id })
         .where(eq(usersTable.id, userId));
+      await bumpTokenVersion(userId);
     } else {
       const [newUser] = await db.insert(usersTable).values({
         name: emp.name,

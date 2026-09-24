@@ -50,12 +50,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetch(`${apiBase}/auth/me`, {
       headers: { "Authorization": `Bearer ${savedToken}` },
     })
-      .then(r => {
+      .then(async r => {
         if (r.ok) {
           try {
             setToken(savedToken);
             setUser(JSON.parse(savedUser));
-            if (savedRealUser) setRealUser(JSON.parse(savedRealUser));
+            if (savedRealUser) {
+              setRealUser(JSON.parse(savedRealUser));
+            } else {
+              // O servidor marca tokens de "Modo Dev" (impersonatorId). Se a
+              // sessão real do admin se perdeu do localStorage, ainda assim
+              // mostra o banner — "Sair" então encerra a sessão por completo.
+              const me = (await r.json().catch(() => null)) as { impersonatorId?: number | null; impersonatorName?: string | null } | null;
+              if (me?.impersonatorId != null) {
+                setRealUser({ id: me.impersonatorId, name: me.impersonatorName ?? "Admin", role: "admin" } as User);
+              }
+            }
           } catch {
             localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem(USER_KEY);

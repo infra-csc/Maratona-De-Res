@@ -8,39 +8,25 @@ Histórico versionado do schema (Drizzle). Até 23/09/2026 o schema só existia 
 
 1. Altere `lib/db/src/schema/*.ts`.
 2. `pnpm --filter db generate` gera o próximo arquivo em `migrations/`.
-3. Revise o SQL e commite junto com a mudança de código.
-4. Em produção: `pnpm --filter db migrate` aplica só o que falta.
+3. Revise o SQL (prefira DDL aditivo e idempotente, ex.: `ADD COLUMN IF NOT
+   EXISTS`) e commite junto com a mudança de código.
+4. No Replit, o `git pull` roda `scripts/post-merge.sh`, que chama
+   `pnpm --filter @workspace/db run migrate:deploy` e aplica só o que falta.
+   Para outro banco: `DATABASE_URL=... pnpm --filter @workspace/db run migrate:deploy`.
 
-`push` continua útil em desenvolvimento local, mas não gera histórico.
+`push` continua útil em desenvolvimento local, mas não gera histórico. No
+pós-merge ele roda DEPOIS das migrações só como rede de segurança contra
+divergência: sem `--force`, não apaga coluna nem tabela.
 
-## Primeira vez em um banco que JÁ existe (produção hoje)
+## Banco que já existia antes das migrações (produção)
 
-O baseline recria todas as tabelas; num banco existente ele não pode ser
-executado. Marque-o como aplicado e siga com as migrações seguintes:
+Não é preciso nada manual. `scripts/migrate-deploy.mjs` detecta um banco com as
+tabelas do app e sem `drizzle.__drizzle_migrations`, registra o baseline
+`0000` como aplicado (mesmo hash e data que o migrador do Drizzle usaria) e
+segue para as migrações seguintes. Testado em banco vazio e em banco criado
+por `push` (PGlite), inclusive rodando duas vezes.
 
-1. Rode `scripts/sql/check-duplicates.sql`. Se devolver linhas, rode
-   `scripts/sql/dedupe-before-unique.sql` (dentro de uma transação, conferindo
-   antes do COMMIT).
-2. Aplique manualmente só os índices novos do baseline (são as linhas
-   `CREATE UNIQUE INDEX` / `CREATE INDEX` de `0000_baseline.sql` cujos nomes
-   ainda não existem no banco) — ou deixe o `pnpm --filter db push` do
-   `scripts/post-merge.sh` criá-los, o que hoje acontece automaticamente após
-   o `git pull` no Replit.
-3. Marque o baseline como aplicado, para que `migrate` não tente recriá-lo:
-
-   ```sql
-   CREATE SCHEMA IF NOT EXISTS drizzle;
-   CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
-     id serial PRIMARY KEY, hash text NOT NULL, created_at bigint
-   );
-   INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-   SELECT '<hash>', <when>
-   -- <hash> e <when> vêm de migrations/meta/_journal.json (campo "tag" e "when")
-   -- combinados com o conteúdo do arquivo: use `pnpm --filter db migrate` num
-   -- banco vazio de teste para ver o valor gravado, ou mantenha `push` até a
-   -- próxima migração real.
-   ;
-   ```
-
-Enquanto o passo 3 não for feito, continue usando `push` (post-merge). A partir
-da primeira migração incremental, troque o `post-merge.sh` para `migrate`.
+Antes do primeiro pull que traz índices únicos novos, rode
+`scripts/sql/check-duplicates.sql`; se devolver linhas, rode
+`scripts/sql/dedupe-before-unique.sql` dentro de uma transação, conferindo
+antes do COMMIT.

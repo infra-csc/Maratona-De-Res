@@ -603,8 +603,17 @@ async function resyncEventCriteriaOnce(eventId: number, options: { force?: boole
 
 router.get("/events/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const detail = await loadEventDetail(id, isRole(req.user?.role, "operador"));
+  // Visualizador (colaborador) recebe a mesma redação do operador na matriz de
+  // conformidade (só "respondido ou não", sem Sim/Não nem texto livre) e sem o
+  // comentário por participante — texto livre de RH sobre pessoas. Redação em
+  // vez de 403 para a tela de detalhe (alcançável por URL) não quebrar.
+  const isViewer = isRole(req.user?.role, "visualizador");
+  const detail = await loadEventDetail(id, isRole(req.user?.role, "operador") || isViewer);
   if (!detail) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (isViewer) {
+    res.json({ ...detail, participants: detail.participants.map(p => ({ ...p, comment: null })) });
+    return;
+  }
   res.json(detail);
 });
 
@@ -695,6 +704,35 @@ router.patch("/events/:id/historical-result", requireRole("admin", "rh"), async 
   res.json({ ...ev, warnings });
 });
 
+// ── Rotas one-shot que reescrevem datas em massa ─────────────────────────────
+// Sempre em dois passos: `dryRun: true` devolve a prévia (nada é gravado) e a
+// aplicação exige `confirm: "APLICAR"` explícito no corpo. Sem isso → 400.
+const APPLY_CONFIRMATION = "APLICAR";
+
+type EventDateChange = {
+  eventId: number;
+  eventName: string;
+  newName: string | null;
+  startDateBefore: string;
+  endDateBefore: string;
+  startDateAfter: string;
+  endDateAfter: string;
+  reason: string | null;
+};
+
+/** Lê dryRun/confirm do corpo. Devolve null (e já responde 400) quando falta a confirmação. */
+function readDryRunOrConfirm(body: unknown, res: import("express").Response): { dryRun: boolean } | null {
+  const b = (body ?? {}) as { dryRun?: unknown; confirm?: unknown };
+  const dryRun = b.dryRun === true;
+  if (!dryRun && b.confirm !== APPLY_CONFIRMATION) {
+    res.status(400).json({
+      error: `Operação em massa: gere a prévia com dryRun: true e, para aplicar, envie confirm: "${APPLY_CONFIRMATION}".`,
+    });
+    return null;
+  }
+  return { dryRun };
+}
+
 // Atualiza startDate, endDate e name dos eventos em lote.
 // Busca todos os eventos de uma vez e faz matching em JavaScript (sem unaccent).
 router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => {
@@ -703,10 +741,15 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
     res.status(400).json({ error: "Campo updates (array {externalId, name, date}) é obrigatório." });
     return;
   }
+  const mode = readDryRunOrConfirm(req.body, res);
+  if (!mode) return;
 
   // Busca todos os eventos de uma vez — mais eficiente que N*8 queries SQL
   // e não depende de extensão unaccent (não disponível em todos os ambientes).
-  const allEvents = await db.select({ id: eventsTable.id, name: eventsTable.name, externalId: eventsTable.externalId })
+  const allEvents = await db.select({
+    id: eventsTable.id, name: eventsTable.name, externalId: eventsTable.externalId,
+    startDate: eventsTable.startDate, endDate: eventsTable.endDate,
+  })
     .from(eventsTable);
 
   // Normaliza: remove acentos, lowercase, normaliza hífens e espaços
@@ -794,22 +837,52 @@ router.post("/events/bulk-date-sync", requireRole("admin"), async (req, res) => 
     return undefined;
   }
 
-  const updated: string[] = [];
+  // 1) Planeja: o que muda em cada evento localizado (nada é gravado aqui).
+  const changes: EventDateChange[] = [];
   const notFound: string[] = [];
+  let unchanged = 0;
   for (const { externalId, name, date } of updates) {
-    if (!date) continue;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     const ev = findEvent(externalId, name);
     if (!ev) {
       notFound.push(name || externalId);
-    } else {
-      const setFields: Record<string, unknown> = { startDate: date, endDate: date };
-      if (name) setFields.name = name.trim();
-      await db.update(eventsTable).set(setFields).where(eq(eventsTable.id, ev.id));
-      updated.push(name || externalId);
+      continue;
     }
+    const newName = name?.trim() ? name.trim() : null;
+    const nameChanges = newName !== null && newName !== ev.name;
+    if (ev.startDate === date && ev.endDate === date && !nameChanges) {
+      unchanged++;
+      continue;
+    }
+    changes.push({
+      eventId: ev.id,
+      eventName: ev.name,
+      newName: nameChanges ? newName : null,
+      startDateBefore: ev.startDate,
+      endDateBefore: ev.endDate,
+      startDateAfter: date,
+      endDateAfter: date,
+      reason: null,
+    });
   }
-  await audit(req.user!.userId, "update", "events", 0, null, { bulkDateSync: updates.length });
-  res.json({ updated: updated.length, notFound: notFound.length, notFoundIds: notFound });
+
+  if (mode.dryRun) {
+    res.json({ dryRun: true, updated: 0, changeCount: changes.length, unchanged, notFound: notFound.length, notFoundIds: notFound, changes });
+    return;
+  }
+
+  // 2) Aplica tudo numa transação (ou nada).
+  await db.transaction(async (tx) => {
+    for (const c of changes) {
+      await tx.update(eventsTable)
+        .set({ startDate: c.startDateAfter, endDate: c.endDateAfter, ...(c.newName !== null && { name: c.newName }) })
+        .where(eq(eventsTable.id, c.eventId));
+    }
+  });
+  await audit(req.user!.userId, "bulk_date_sync", "events", undefined,
+    changes.map(c => ({ eventId: c.eventId, name: c.eventName, startDate: c.startDateBefore, endDate: c.endDateBefore })),
+    { rows: updates.length, updated: changes.length, unchanged, notFound, changes: changes.map(c => ({ eventId: c.eventId, date: c.startDateAfter, name: c.newName })) });
+  res.json({ dryRun: false, updated: changes.length, changeCount: changes.length, unchanged, notFound: notFound.length, notFoundIds: notFound, changes });
 });
 
 router.delete("/events/:id", requireRole("admin", "operador"), async (req, res) => {
@@ -1061,7 +1134,9 @@ router.get("/events/:id/participants", async (req, res) => {
     .from(eventParticipantsTable)
     .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
     .where(eq(eventParticipantsTable.eventId, id));
-  res.json(participants.map(p => ({ ...p, countsForScore: participantCountsForScore(p) })));
+  // Comentário por participante é anotação interna de RH: fora para o colaborador.
+  const hideComment = isRole(req.user?.role, "visualizador");
+  res.json(participants.map(p => ({ ...p, comment: hideComment ? null : p.comment, countsForScore: participantCountsForScore(p) })));
 });
 
 router.post("/events/:id/participants", requireRole("admin", "rh", "operador"), async (req, res) => {
@@ -1230,6 +1305,21 @@ router.get("/events/:id/conformity", async (req, res) => {
   if (conformity.createdByUserId) {
     const [u] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, conformity.createdByUserId)).limit(1);
     createdByUserName = u?.name ?? null;
+  }
+  // Mesma redação do GET /events/:id: operador e visualizador só sabem se foi
+  // respondido, sem Sim/Não nem texto livre sobre pessoas.
+  if (isRole(req.user?.role, "operador") || isRole(req.user?.role, "visualizador")) {
+    const answered = (v: boolean | null) => (v != null ? true : null);
+    res.json({
+      ...conformity, createdByUserName,
+      epi: answered(conformity.epi), estaiamentos: answered(conformity.estaiamentos),
+      conduta: answered(conformity.conduta), guardaEquipamentos: answered(conformity.guardaEquipamentos),
+      absencesResponse: answered(conformity.absencesResponse), standoutResponse: answered(conformity.standoutResponse),
+      epiComment: null, estaiamentosComment: null, condutaComment: null, guardaEquipamentosComment: null,
+      absencesReport: conformity.absencesReport?.trim() ? "•••" : conformity.absencesReport,
+      standoutJustification: null,
+    });
+    return;
   }
   res.json({ ...conformity, createdByUserName });
 });
@@ -2072,6 +2162,9 @@ router.delete("/events/:id/comments/:commentId", async (req, res) => {
 // de origem ainda existe nas calibrações).
 // ---------------------------------------------------------------------------
 router.post("/events/admin/normalize-dates", requireRole("admin"), async (req, res) => {
+  const mode = readDryRunOrConfirm(req.body, res);
+  if (!mode) return;
+
   // 1. Corrige os 4 eventos com datas erradas (confirmadas pelo usuário)
   const fixes: { id: number; date: string }[] = [
     { id: 127, date: "2026-07-26" }, // Bravus Speed RJ – datas invertidas
@@ -2079,32 +2172,60 @@ router.post("/events/admin/normalize-dates", requireRole("admin"), async (req, r
     { id: 96,  date: "2026-06-27" }, // Night Run Manaus
     { id: 873, date: "2026-08-23" }, // Netshoes Run SP
   ];
-  let fixedCount = 0;
-  for (const fix of fixes) {
-    await db.update(eventsTable)
-      .set({ startDate: fix.date, endDate: fix.date })
-      .where(eq(eventsTable.id, fix.id));
-    fixedCount++;
-  }
   const fixedIds = fixes.map(f => f.id);
 
-  // 2. Para todos os demais eventos multi-dia: startDate = endDate (data única)
-  const multiDay = await db.select({ id: eventsTable.id, endDate: eventsTable.endDate })
+  // Planeja as mudanças (só entra o que de fato muda) — nada é gravado aqui.
+  const fixRows = await db.select({ id: eventsTable.id, name: eventsTable.name, startDate: eventsTable.startDate, endDate: eventsTable.endDate })
     .from(eventsTable)
-    .where(sql`start_date <> end_date AND id NOT IN (${sql.join(fixedIds.map(id => sql`${id}`), sql`, `)})`);
+    .where(inArray(eventsTable.id, fixedIds));
+  const fixById = new Map(fixRows.map(r => [r.id, r]));
+  const changes: EventDateChange[] = [];
+  for (const fix of fixes) {
+    const ev = fixById.get(fix.id);
+    if (!ev || (ev.startDate === fix.date && ev.endDate === fix.date)) continue;
+    changes.push({
+      eventId: ev.id, eventName: ev.name, newName: null,
+      startDateBefore: ev.startDate, endDateBefore: ev.endDate,
+      startDateAfter: fix.date, endDateAfter: fix.date,
+      reason: "fix",
+    });
+  }
+  const fixedCount = changes.length;
 
-  let normalizedCount = 0;
+  // 2. Para todos os demais eventos multi-dia: startDate = endDate (data única)
+  const multiDay = await db.select({ id: eventsTable.id, name: eventsTable.name, startDate: eventsTable.startDate, endDate: eventsTable.endDate })
+    .from(eventsTable)
+    .where(sql`start_date <> end_date AND id NOT IN (${sql.join(fixedIds.map(id => sql`${id}`), sql`, `)})`)
+    .orderBy(eventsTable.startDate);
   for (const ev of multiDay) {
-    await db.update(eventsTable)
-      .set({ startDate: ev.endDate })
-      .where(eq(eventsTable.id, ev.id));
-    normalizedCount++;
+    changes.push({
+      eventId: ev.id, eventName: ev.name, newName: null,
+      startDateBefore: ev.startDate, endDateBefore: ev.endDate,
+      startDateAfter: ev.endDate, endDateAfter: ev.endDate,
+      reason: "normalize",
+    });
+  }
+  const normalizedCount = multiDay.length;
+
+  if (mode.dryRun) {
+    res.json({ dryRun: true, ok: true, fixedCount, normalizedCount, changes });
+    return;
   }
 
-  await audit(req.user!.userId, "normalize_event_dates", "events", undefined,
-    { fixedCount, normalizedCount, fixedIds, normalizedIds: multiDay.map(e => e.id) }, undefined);
+  // Aplica tudo numa transação (ou nada).
+  await db.transaction(async (tx) => {
+    for (const c of changes) {
+      await tx.update(eventsTable)
+        .set({ startDate: c.startDateAfter, endDate: c.endDateAfter })
+        .where(eq(eventsTable.id, c.eventId));
+    }
+  });
 
-  res.json({ ok: true, fixedCount, normalizedCount });
+  await audit(req.user!.userId, "normalize_event_dates", "events", undefined,
+    changes.map(c => ({ eventId: c.eventId, startDate: c.startDateBefore, endDate: c.endDateBefore })),
+    { fixedCount, normalizedCount, fixedIds: changes.filter(c => c.reason === "fix").map(c => c.eventId), normalizedIds: multiDay.map(e => e.id) });
+
+  res.json({ dryRun: false, ok: true, fixedCount, normalizedCount, changes });
 });
 
 router.post("/events/admin/fix-calibration-criteria", requireRole("admin"), async (req, res) => {

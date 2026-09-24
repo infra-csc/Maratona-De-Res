@@ -310,6 +310,8 @@ router.post("/public-eval/:token/submit", async (req, res) => {
     }
   });
 
+  // As notas enviadas pelo link entram na nota oficial se o evento já conta.
+  await recomputeIfEventCounts(token.eventId, token.createdByUserId ?? null);
   res.json({ ok: true });
 });
 

@@ -18,6 +18,9 @@ export const usersTable = pgTable("users", {
   pinValue: text("pin_value").unique(),
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until"),
+  // Versão das sessões: incrementada ao desativar, trocar papel ou senha. O JWT
+  // carrega "tv"; se divergir do banco, requireAuth recusa o token.
+  tokenVersion: integer("token_version").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
