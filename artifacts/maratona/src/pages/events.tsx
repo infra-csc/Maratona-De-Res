@@ -91,6 +91,9 @@ export default function EventsPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  // Congela a lista no momento em que o diálogo abre: a tela atualiza a cada
+  // 15 s e a lista filtrada podia mudar entre abrir e confirmar.
+  const [bulkConfirmIds, setBulkConfirmIds] = useState<{ id: number; name: string; startDate: string }[]>([]);
   const [editingEvent, setEditingEvent] = useState<{ id: number; name: string; startDate: string; endDate: string; clientName?: string | null; city?: string | null; state?: string | null; location?: string | null } | null>(null);
 
   const queryKey = getGetEventsQueryKey();
@@ -225,9 +228,11 @@ export default function EventsPage() {
   });
 
   const all = events ?? [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isPastOrClosed = (e: typeof all[0]) => e.status === "closed" || (!!e.endDate && new Date(e.endDate) < today);
+  // Datas vêm como "YYYY-MM-DD": comparar como string evita o deslocamento de
+  // fuso (new Date("YYYY-MM-DD") é meia-noite UTC = 21h do dia anterior no Brasil,
+  // o que marcava o evento como "passado" no próprio dia).
+  const todayStr = new Date().toLocaleDateString("sv-SE");
+  const isPastOrClosed = (e: typeof all[0]) => e.status === "closed" || (!!e.endDate && e.endDate < todayStr);
   const isInEvaluation = (e: typeof all[0]) =>
     !!e.criteriaConfirmed &&
     (e.evaluationProgress ?? 0) > 0 &&
@@ -240,6 +245,7 @@ export default function EventsPage() {
   // Pub. Final = TODOS os quesitos com publicação final (ou o evento já liberado),
   // e nenhum quesito ainda só-parcial. Mesma regra usada no badge, no filtro e no contador.
   const isPubFinal = (e: typeof all[0]) => {
+    if (e.isHistorical) return true;
     if (hasPartialPublication(e)) return false;
     const totalC = e.totalCriteria ?? 0;
     const finalC = e.finalCalibratedCriteria ?? 0;
@@ -617,7 +623,7 @@ export default function EventsPage() {
               <button
                 type="button"
                 data-testid="button-bulk-confirm"
-                onClick={() => setBulkConfirmOpen(true)}
+                onClick={() => { setBulkConfirmIds(filtered.map(ev => ({ id: ev.id, name: ev.name, startDate: ev.startDate }))); setBulkConfirmOpen(true); }}
                 disabled={bulkConfirmMutation.isPending}
                 className="h-9 px-4 rounded-lg text-[12px] font-bold uppercase tracking-wide inline-flex items-center gap-2 shrink-0 transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ fontFamily: CONDENSED, backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
@@ -727,12 +733,12 @@ export default function EventsPage() {
                 ? fmtDate(ev.startDate)
                 : `${fmtDate(ev.startDate)}–${fmtDate(ev.endDate)}`;
 
-              const badge = ev.isHistorical
+              // Mesma regra do chip/contador "Pub. Final" (isPubFinal): antes o badge
+              // usava outra fórmula e eventos com "Pub. Final" sumiam do filtro.
+              const badge = ev.isHistorical || isPubFinal(ev)
                 ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
                 : !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication
                 ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Ag. RH" }
-                : partialOnlyCount === 0 && ((total > 0 && finalPubCount >= total) || ev.feedbackReleased)
-                  ? { bg: "rgba(154,176,0,0.14)", fg: "#9ab000", label: "Pub. Final" }
                     : partialOnlyCount > 0
                       ? { bg: "rgba(232,162,61,0.14)", fg: "#e8a23d", label: "Pub. Parcial" }
                       : (calSaved > 0 || fc)
@@ -1044,14 +1050,14 @@ export default function EventsPage() {
         <DialogContent className="max-w-lg" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>
-              Confirmar {filtered.length} evento(s)
+              Confirmar {bulkConfirmIds.length} evento(s)
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
             Os resultados destes eventos passam a contar na elegibilidade e na nota dos colaboradores. Dá para desfazer depois, evento a evento.
           </p>
           <ul className="max-h-60 overflow-y-auto rounded-lg text-[12px] divide-y" style={{ border: "1px solid var(--border)" }}>
-            {filtered.map(ev => (
+            {bulkConfirmIds.map(ev => (
               <li key={ev.id} className="px-3 py-2 flex items-center justify-between gap-3" style={{ borderColor: "var(--border)" }}>
                 <span className="font-semibold truncate">{ev.name}</span>
                 <span className="shrink-0" style={{ color: "var(--muted-foreground)" }}>{fmtDate(ev.startDate)}</span>
@@ -1070,8 +1076,8 @@ export default function EventsPage() {
             </button>
             <button
               type="button"
-              onClick={() => bulkConfirmMutation.mutate(filtered.map(ev => ev.id))}
-              disabled={bulkConfirmMutation.isPending || filtered.length === 0}
+              onClick={() => bulkConfirmMutation.mutate(bulkConfirmIds.map(ev => ev.id))}
+              disabled={bulkConfirmMutation.isPending || bulkConfirmIds.length === 0}
               className="h-10 px-5 rounded-lg text-[12px] font-bold uppercase inline-flex items-center gap-2 disabled:opacity-50"
               style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
             >

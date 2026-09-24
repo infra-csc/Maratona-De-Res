@@ -1,4 +1,4 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200 } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, getGetEmployeesQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -251,11 +251,17 @@ export default function IntegrationPage() {
   const importMutation = useImportEmployeesCSV({
     mutation: {
       onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
         toast({ title: `${data.inserted} colaborador(es) importado(s)` });
         if (data.errors.length > 0) {
-          toast({ title: "Avisos de importação", description: data.errors.slice(0, 3).join(", "), variant: "destructive" });
+          toast({
+            title: `${data.errors.length} linha(s) com problema`,
+            description: data.errors.slice(0, 5).join(" · ") + (data.errors.length > 5 ? ` · e mais ${data.errors.length - 5}` : ""),
+            variant: "destructive",
+          });
         }
       },
+      onError: (e: { message?: string }) => toast({ title: "Falha na importação", description: e.message ?? "Nenhuma linha foi gravada.", variant: "destructive" }),
     },
   });
 
@@ -402,11 +408,17 @@ export default function IntegrationPage() {
       const parsed = rows.slice(1)
         .filter(r => r[1] && r[3])
         .map(r => {
-          const parts = String(r[3]).split("/");
+          const parts = String(r[3]).trim().split(/[\/.-]/);
           if (parts.length !== 3) return null;
-          const [m, d, y] = parts;
-          const year = parseInt(y) < 100 ? 2000 + parseInt(y) : parseInt(y);
-          const date = `${year}-${String(parseInt(m)).padStart(2,"0")}-${String(parseInt(d)).padStart(2,"0")}`;
+          // Planilha brasileira: DD/MM/AAAA. Se o primeiro campo passar de 12
+          // não há ambiguidade; se o segundo passar de 12 é MM/DD (americano).
+          let [a, b, y] = parts.map(p => parseInt(p, 10));
+          if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(y)) return null;
+          let d = a, m = b;
+          if (a <= 12 && b > 12) { d = b; m = a; }
+          if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+          const year = y < 100 ? 2000 + y : y;
+          const date = `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           return { externalId: String(r[1]).trim(), name: String(r[2]).trim(), date };
         })
         .filter((x): x is { externalId: string; name: string; date: string } => x !== null);

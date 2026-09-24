@@ -248,12 +248,14 @@ export default function EmployeesPage() {
   );
   const employees = employeesRaw as EmployeeWithCycle[] | undefined;
 
+  // Só ao ABRIR o diálogo: com "employees" nas dependências, qualquer refetch
+  // de fundo apagava a seleção que o usuário estava fazendo.
   useEffect(() => {
-    if (resetTypeOpen && employees) {
-      setCasaSelection(new Set(employees.filter(e => e.employmentType === "casa").map(e => e.id)));
-      setResetTypeSearch("");
-    }
-  }, [resetTypeOpen, employees]);
+    if (!resetTypeOpen) return;
+    setCasaSelection(new Set((employees ?? []).filter(e => e.employmentType === "casa").map(e => e.id)));
+    setResetTypeSearch("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetTypeOpen]);
   const [canonicalId, setCanonicalId] = useState<number | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeEmployeeResult | null>(null);
 

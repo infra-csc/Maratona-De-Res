@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
-import { useGetEvent, useGetEventResult, useGetEvaluations, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, useGetEventResult, useGetEvaluations, useGetUsers, useRemoveEventParticipant, useAddEventParticipant, useUpdateEventParticipant, useGetEmployees, useGetEventConformity, useSetEventConformity, useSetConformityEvaluator, useSetConformityEvaluatorFerramentas, useConfirmEventResults, useUnconfirmEventResults, useUpdateHistoricalResult, useGetEventComments, useCreateEventComment, useDeleteEventComment, getGetEventQueryKey, getGetEventCommentsQueryKey, getGetEventResultQueryKey, getGetEvaluationsQueryKey, getGetEventConformityQueryKey, getGetEmployeesQueryKey, getGetUsersQueryKey, getGetQuarterlyResultsQueryKey, getGetRankingQueryKey, getGetEventsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BarChart3, CheckCircle2, ShieldAlert, Unlock, AlertTriangle, Trash2, UserCheck, UserX, UserPlus, Check, ChevronsUpDown, MessageSquare } from "lucide-react";
 import { AudioPlayer } from "@/components/audio-recorder";
@@ -320,7 +320,7 @@ function HistoricalResultPanel({
       onSuccess: () => {
         toast({ title: "Resultado importado atualizado" });
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
-        qc.invalidateQueries({ queryKey: ["event-result", eventId] });
+        qc.invalidateQueries({ queryKey: getGetEventResultQueryKey(eventId) });
         setEditing(false);
       },
       onError: (err: unknown) => {
@@ -405,14 +405,14 @@ export default function EventDetailPage() {
   });
 
   const { data: result } = useGetEventResult(id, {
-    query: { enabled: !!id && canViewResult, queryKey: ["event-result", id] as unknown[] },
+    query: { enabled: !!id && canViewResult, queryKey: getGetEventResultQueryKey(id) },
   });
   const participantResults = result?.participants ?? [];
   const hasPerformanceTable = !!result && result.eventScore > 0 && participantResults.length > 0;
 
   const { data: evaluations } = useGetEvaluations(
     { eventId: id },
-    { query: { enabled: !!id && canViewResult, queryKey: ["evals", id] as unknown[] } }
+    { query: { enabled: !!id && canViewResult, queryKey: getGetEvaluationsQueryKey({ eventId: id }) } }
   );
   const justificationsFor = (critId: number) =>
     (evaluations ?? [])
@@ -454,15 +454,15 @@ export default function EventDetailPage() {
   });
 
   const { data: conformityData } = useGetEventConformity(id, {
-    query: { enabled: !!id, queryKey: ["event-conformity", id] as unknown[] },
+    query: { enabled: !!id, queryKey: getGetEventConformityQueryKey(id) },
   });
   const setConformity = useSetEventConformity({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["event-conformity", id] });
-        qc.invalidateQueries({ queryKey: ["event-result", id] });
+        qc.invalidateQueries({ queryKey: getGetEventConformityQueryKey(id) });
+        qc.invalidateQueries({ queryKey: getGetEventResultQueryKey(id) });
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
-        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: getGetRankingQueryKey() });
         qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         toast({ title: "Matriz de conformidade atualizada", variant: "default" });
       },
@@ -544,9 +544,10 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
-        qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
-        qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
-        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: getGetEventResultQueryKey(id) });
+        qc.invalidateQueries({ queryKey: getGetQuarterlyResultsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetRankingQueryKey() });
         qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         if (data.warnings && data.warnings.length > 0) {
           toast({ title: "Resultados confirmados", description: data.warnings.join(" "), variant: "destructive" });
@@ -561,9 +562,10 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
-        qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
-        qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
-        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: getGetEventResultQueryKey(id) });
+        qc.invalidateQueries({ queryKey: getGetQuarterlyResultsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetRankingQueryKey() });
         qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         toast({ title: "Confirmação revertida", description: "O evento deixou de contar na elegibilidade e na nota dos colaboradores." });
       },
@@ -584,9 +586,10 @@ export default function EventDetailPage() {
     mutation: {
       onSuccess: (_data, vars) => {
         qc.invalidateQueries({ queryKey: getGetEventQueryKey(id) });
-        qc.invalidateQueries({ queryKey: ["event-result", id] as unknown[] });
-        qc.invalidateQueries({ queryKey: ["results"] as unknown[] });
-        qc.invalidateQueries({ queryKey: ["/ranking"] as unknown[] });
+        qc.invalidateQueries({ queryKey: getGetEventResultQueryKey(id) });
+        qc.invalidateQueries({ queryKey: getGetQuarterlyResultsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetRankingQueryKey() });
         qc.invalidateQueries({ queryKey: ["/ranking-detail"] as unknown[] });
         if (vars.data.confirmed !== undefined) {
           toast({ title: vars.data.confirmed ? "Colaborador reativado" : "Colaborador marcado como inativo" });
@@ -609,7 +612,12 @@ export default function EventDetailPage() {
   ] as const;
   const DEFAULT_FUNCTION = "Cenotécnica";
 
-  /** Retorna a opção pré-definida que melhor corresponde ao functionName do colaborador. */
+  /**
+   * Retorna a opção pré-definida que melhor corresponde ao functionName do
+   * colaborador. Cargo gravado que não está na lista (ex.: "Motorista") é
+   * mantido como opção própria no select — antes caía em "Cenotécnica" e
+   * qualquer troca gravava o cargo errado.
+   */
   function matchParticipantFunction(fn?: string | null): string {
     if (!fn) return DEFAULT_FUNCTION;
     const norm = fn.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -620,14 +628,19 @@ export default function EventDetailPage() {
     const prefix = PARTICIPANT_FUNCTIONS.find(
       o => norm.startsWith(o.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())
     );
-    return prefix ?? DEFAULT_FUNCTION;
+    return prefix ?? fn.trim();
+  }
+  /** Opções do select: as padrão + o cargo atual quando ele não está na lista. */
+  function functionOptionsFor(fn?: string | null): string[] {
+    const current = matchParticipantFunction(fn);
+    return (PARTICIPANT_FUNCTIONS as readonly string[]).includes(current) ? [...PARTICIPANT_FUNCTIONS] : [current, ...PARTICIPANT_FUNCTIONS];
   }
 
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
   const [newParticipantEmployeeId, setNewParticipantEmployeeId] = useState<number | null>(null);
   const [newParticipantFunction, setNewParticipantFunction] = useState<string>(DEFAULT_FUNCTION);
-  const { data: allEmployees } = useGetEmployees({ active: true }, { query: { enabled: canManageTeam, queryKey: ["employees", "active"] as unknown[] } });
+  const { data: allEmployees } = useGetEmployees({ active: true }, { query: { enabled: canManageTeam, queryKey: getGetEmployeesQueryKey({ active: true }) } });
   const alreadyAllocatedIds = new Set((event?.participants ?? []).map(p => p.employeeId));
   const availableEmployees = (allEmployees ?? []).filter(e => !alreadyAllocatedIds.has(e.id));
   const selectedNewEmployee = availableEmployees.find(e => e.id === newParticipantEmployeeId);
@@ -645,7 +658,7 @@ export default function EventDetailPage() {
     },
   });
 
-  const { data: usersList } = useGetUsers({ query: { enabled: canManageTeam, queryKey: ["users"] as unknown[] } });
+  const { data: usersList } = useGetUsers({ query: { enabled: canManageTeam, queryKey: getGetUsersQueryKey() } });
   const evaluators = (usersList ?? []).filter(u => u.role === "avaliador" && u.active);
 
   if (isLoading) {
@@ -963,7 +976,7 @@ export default function EventDetailPage() {
                               style={{ color: "var(--muted-foreground)", borderBottomColor: "var(--border)" }}
                               title="Cargo/função deste colaborador neste evento"
                             >
-                              {PARTICIPANT_FUNCTIONS.map(fn => (
+                              {functionOptionsFor(p.functionName).map(fn => (
                                 <option key={fn} value={fn}>{fn}</option>
                               ))}
                             </select>

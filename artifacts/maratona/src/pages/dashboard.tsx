@@ -39,7 +39,8 @@ export default function DashboardPage() {
   const pending = summary?.pendingEvaluations ?? 0;
 
   // Próximos fins de semana com eventos
-  const today = new Date().toISOString().split("T")[0];
+  // Fuso local: toISOString() é UTC e escondia o fim de semana atual entre 21h e meia-noite.
+  const today = new Date().toLocaleDateString("sv-SE");
   const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
   const upcomingWeekends = cycleWeekends
     .filter(w => w.sun >= today)

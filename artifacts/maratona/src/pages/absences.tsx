@@ -102,7 +102,10 @@ export default function AbsencesPage() {
     } else {
       reset({ quantity: 1, penaltyType: defaultType, employeeId: null, eventId: null, date: "", date2: "", reason: "" });
     }
-  }, [open, editingAbsence, defaultType]);
+    // defaultType fora das dependências: quando /penalty-types respondia com o
+    // diálogo aberto, o formulário era zerado no meio do preenchimento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingAbsence]);
 
   const createMutation = useCreateAbsence({
     mutation: {

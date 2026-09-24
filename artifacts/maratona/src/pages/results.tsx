@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useGetRanking, getGetRankingQueryKey, exportRanking,
   useGetRankingDetail, getGetRankingDetailQueryKey,
@@ -191,8 +191,16 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
   const [filterEligible, setFilterEligible] = useState<"all" | "eligible" | "ineligible">("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const qKey = getGetRankingQueryKey({ search: search || undefined });
-  const { data: ranking, isLoading } = useGetRanking({ search: search || undefined }, { query: { queryKey: qKey } });
+  // Busca filtra no cliente: a lista tem dezenas de linhas e ir ao servidor a
+  // cada tecla gerava uma requisição (e uma entrada de cache) por caractere.
+  const qKey = getGetRankingQueryKey();
+  const { data: rankingAll, isLoading } = useGetRanking(undefined, { query: { queryKey: qKey } });
+  const ranking = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (!rankingAll) return rankingAll;
+    if (!s) return rankingAll;
+    return rankingAll.filter(r => (r.employeeName ?? "").toLowerCase().includes(s));
+  }, [rankingAll, search]);
 
   async function handleExport() {
     try {
@@ -1105,6 +1113,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
     mutation: {
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: qKey });
+        qc.invalidateQueries({ queryKey: getGetRankingQueryKey() });
         toast({ title: `Ciclo fechado! ${data.totalProcessed} colaborador(es) processado(s).` });
         setForceClose(false);
         setForceReason("");
