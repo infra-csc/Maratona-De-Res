@@ -255,7 +255,7 @@ export default function CyclesPage() {
               <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>Do mais recente ao mais antigo. Abra um ciclo para ver o ranking final, o bônus de cada colaborador e os eventos.</p>
             </header>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]" data-testid="table-cycles">
+              <table className="w-full min-w-[820px] text-[13px]" data-testid="table-cycles">
                 <thead>
                   <tr>
                     {["Ciclo", "Período", "Situação", "Eventos", "Ranking", "Bônus", "Nota média", ""].map((h, i) => (

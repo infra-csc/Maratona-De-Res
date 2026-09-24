@@ -23,7 +23,7 @@ export function EvaluatorSidebar({
   configuredEventsCount, relevantEventsCount, onSelectEvent,
 }: EvaluatorSidebarProps) {
   return (
-    <aside className="w-72 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden">
+    <aside className="w-full md:w-72 max-h-[40vh] md:max-h-none shrink-0 bg-card border-b md:border-b-0 md:border-r border-border flex flex-col overflow-hidden">
 
       {/* Evaluator: lista compacta A Fazer / Concluídas */}
       {isEvaluator && (

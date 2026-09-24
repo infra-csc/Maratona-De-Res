@@ -503,8 +503,8 @@ export default function EvaluationsPage() {
         </div>
       </div>
 
-      {/* ── Body: sidebar + main ── */}
-      <div className="flex flex-1 min-h-0">
+      {/* ── Body: sidebar + main (no celular empilha: lista em cima, avaliação embaixo) ── */}
+      <div className="flex flex-col md:flex-row flex-1 min-h-0">
 
         {/* ── Sidebar ── */}
         <EvaluatorSidebar

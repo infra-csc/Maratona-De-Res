@@ -168,7 +168,7 @@ function HistoryView({ history }: { history: CycleHistory }) {
           <div className="px-5 pb-5"><EmptyState compact icon={Search} title="Ninguém encontrado" description="Confira o nome digitado na busca." /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]" data-testid="table-history-ranking">
+            <table className="w-full min-w-[920px] text-[13px]" data-testid="table-history-ranking">
               <thead>
                 <tr>
                   <th scope="col" className={`${TH} text-right w-12`} style={thStyle}>#</th>
@@ -222,7 +222,7 @@ function HistoryView({ history }: { history: CycleHistory }) {
           <div className="px-5 pb-5"><EmptyState compact icon={CalendarRange} title="Nenhum evento neste ciclo" /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]" data-testid="table-history-events">
+            <table className="w-full min-w-[720px] text-[13px]" data-testid="table-history-events">
               <thead>
                 <tr>
                   <th scope="col" className={`${TH} text-left`} style={thStyle}>Data</th>
