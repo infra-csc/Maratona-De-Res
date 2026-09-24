@@ -1,17 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, usePublishAllCriteriaFinalFeedback, usePublishAllCriteriaPartialFeedback, useUpdateEventCriteria, useGetEventConformity, useSetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, useUpdateEventCriteria, useGetEventConformity, useSetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, Building2, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Copy, Clock, History, Trash2, Plus } from "lucide-react";
-import { getAuthToken } from "@/lib/custom-fetch";
+import { Target, AlertCircle, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Copy, Clock, History, Trash2, Plus } from "lucide-react";
 import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
-import { cn, formatEventSubtitle } from "@/lib/utils";
+import { formatEventSubtitle } from "@/lib/utils";
 import { CONDENSED, BODY, WARNING, usePremiumTheme } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
 
@@ -67,6 +65,33 @@ function formatDateTime(d: Date): string {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// Erros dos hooks gerados (ApiError) e do calibration-api.ts (ApiRequestError)
+// carregam `status`; os laços em lote usam isso para parar no primeiro 401/403.
+function errorStatus(e: unknown): number | undefined {
+  if (e && typeof e === "object" && "status" in e) {
+    const s = (e as { status?: unknown }).status;
+    if (typeof s === "number") return s;
+  }
+  return undefined;
+}
+function errorMessage(e: unknown): string | undefined {
+  if (e && typeof e === "object" && "message" in e) {
+    const m = (e as { message?: unknown }).message;
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  return undefined;
+}
+function isAuthError(e: unknown): boolean {
+  const s = errorStatus(e);
+  return s === 401 || s === 403;
+}
+const SESSION_EXPIRED_TOAST = {
+  title: "Sessão expirada",
+  description: "Sua sessão expirou ou foi trocada em outra aba. Entre novamente.",
+  variant: "destructive" as const,
+};
+const SAVED_REASON_FEEDBACK_MS = 2000;
+
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
 export default function CalibrationsPage() {
@@ -117,23 +142,30 @@ export default function CalibrationsPage() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [calScores, setCalScores] = useState<Record<number, string>>({});
   const [calReasons, setCalReasons] = useState<Record<number, string>>({});
+  // Feedback "Salvo" na justificativa: entra após gravação bem-sucedida e sai
+  // sozinho após SAVED_REASON_FEEDBACK_MS (um timer por critério).
   const [savedReasonIds, setSavedReasonIds] = useState<Set<number>>(new Set());
+  const savedReasonTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => () => { Object.values(savedReasonTimers.current).forEach(clearTimeout); }, []);
+  function markReasonSaved(critId: number) {
+    setSavedReasonIds(prev => new Set(prev).add(critId));
+    clearTimeout(savedReasonTimers.current[critId]);
+    savedReasonTimers.current[critId] = setTimeout(() => {
+      setSavedReasonIds(prev => { const n = new Set(prev); n.delete(critId); return n; });
+      delete savedReasonTimers.current[critId];
+    }, SAVED_REASON_FEEDBACK_MS);
+  }
   const [savingCritId, setSavingCritId] = useState<number | null>(null);
   const [weightEdits, setWeightEdits] = useState<Record<number, string>>({});
   const [savingWeightId, setSavingWeightId] = useState<number | null>(null);
   const [collapsedCriteria, setCollapsedCriteria] = useState<Set<number>>(new Set());
   const collapsedInitializedForEventId = useRef<number | null>(null);
-  const [publishingFinalCritId, setPublishingFinalCritId] = useState<number | null>(null);
-  const [publishingAllFinal, setPublishingAllFinal] = useState(false);
-  const [publishingAllPartial, setPublishingAllPartial] = useState(false);
   // Intenção de publicação por critério: "partial" | "final"
   const [publishIntents, setPublishIntents] = useState<Record<number, "partial" | "final">>({});
   const [publishingAll, setPublishingAll] = useState(false);
   const [criterionFilter, setCriterionFilter] = useState<"all" | "uncalibrated" | "calibrated">("all");
-  const [contextOpen, setContextOpen] = useState(false);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [newCommentTexts, setNewCommentTexts] = useState<Record<number, string>>({});
-  const [showAuditFor, setShowAuditFor] = useState<Set<number>>(new Set());
   const [expandedEvalComments, setExpandedEvalComments] = useState<Set<string>>(new Set());
   // O backend restringe a edição de pesos do evento a admin/RH.
   const canEditWeights = ["admin", "rh"].includes(user?.role ?? "");
@@ -185,7 +217,7 @@ export default function CalibrationsPage() {
     const evalCount = e.evaluatedCriteria ?? 0;
     const calCount  = e.calibratedCriteriaCount ?? 0;
     const total     = e.totalCriteria ?? 0;
-    const hasPub    = !!(e as unknown as Record<string, unknown>).partialPublishedAt || !!e.feedbackReleased || (e.finalCalibratedCriteria ?? 0) > 0;
+    const hasPub    = !!e.partialPublishedAt || !!e.feedbackReleased || (e.finalCalibratedCriteria ?? 0) > 0;
     const matchStatus = eventStatusFilter === "all"
       || (eventStatusFilter === "pending"     && evalCount === 0 && calCount === 0)
       || (eventStatusFilter === "inProgress"  && !!e.criteriaConfirmed && (evalCount > 0 || calCount > 0))
@@ -224,29 +256,6 @@ export default function CalibrationsPage() {
     }
     setEventIdFromUrlApplied(true);
   }, [events, search, eventIdFromUrlApplied]);
-
-  const createMutation = useCreateCalibration({
-    mutation: {
-      onSuccess: (data, variables) => {
-        const savedCritId = variables.data.criterionId;
-        setCalScores(prev => { const n = { ...prev }; delete n[savedCritId]; return n; });
-        setCalReasons(prev => { const n = { ...prev }; delete n[savedCritId]; return n; });
-        qc.invalidateQueries({ queryKey: calQKey });
-        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-        qc.invalidateQueries({ queryKey: fbQKey });
-        if (data.warnings && data.warnings.length > 0) {
-          toast({ title: "Calibração registrada", description: data.warnings.join(" "), variant: "destructive" });
-        } else {
-          toast({ title: "Calibração registrada" });
-        }
-        setSavingCritId(null);
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Erro", description: e.message, variant: "destructive" });
-        setSavingCritId(null);
-      },
-    },
-  });
 
   // Edição de peso por critério, direto na calibração. O PUT aceita payload
   // parcial (o backend mescla com as linhas não alteradas) e recalcula o
@@ -293,8 +302,9 @@ export default function CalibrationsPage() {
     });
   }
 
-  // Mutation usada na gravação em lote ("salvar todas") — sem toast por item,
-  // para não disparar uma notificação por critério. O resumo é exibido no fim.
+  // Única mutation de calibração da tela — sem toast por item. Cada fluxo
+  // (salvar um critério, salvar tudo, auto-preencher) aguarda as chamadas e
+  // emite UM resumo no fim, em vez de uma notificação por requisição.
   const bulkMutation = useCreateCalibration();
   const [savingAll, setSavingAll] = useState(false);
   const [savingAutoFill, setSavingAutoFill] = useState(false);
@@ -304,11 +314,8 @@ export default function CalibrationsPage() {
     query: { enabled: !!selectedEventId, queryKey: fbQKey },
   });
 
-  const [publishingCritId, setPublishingCritId] = useState<number | null>(null);
   const publishCriterionPartialMutation = usePublishCriterionPartialFeedback();
   const publishCriterionFinalMutation = usePublishCriterionFinalFeedback();
-  const publishAllFinalMutation = usePublishAllCriteriaFinalFeedback();
-  const publishAllPartialMutation = usePublishAllCriteriaPartialFeedback();
 
   // Conformidade
   const { data: conformity } = useGetEventConformity(selectedEventId!, {
@@ -329,8 +336,8 @@ export default function CalibrationsPage() {
   }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "", absencesReport: "", standoutResponse: null, standoutJustification: "" });
   const [conformityExpandedComments, setConformityExpandedComments] = useState<Set<string>>(new Set());
   const canManageConformity = ["admin", "rh", "diretoria"].includes(user?.role ?? "")
-    || !!(user && fullEvent && (user.id === (fullEvent as unknown as Record<string, unknown>).conformityEvaluatorUserId))
-    || !!(user && fullEvent && (user.id === (fullEvent as unknown as Record<string, unknown>).conformityEvaluatorFerramentasUserId));
+    || !!(user && fullEvent && user.id === fullEvent.conformityEvaluatorUserId)
+    || !!(user && fullEvent && user.id === fullEvent.conformityEvaluatorFerramentasUserId);
   useEffect(() => {
     setConformityExpandedComments(new Set());
     if (conformity) {
@@ -343,9 +350,9 @@ export default function CalibrationsPage() {
         estaiamentosComment: conformity.estaiamentosComment ?? "",
         guardaEquipamentosComment: conformity.guardaEquipamentosComment ?? "",
         condutaComment: conformity.condutaComment ?? "",
-        absencesReport: (conformity as unknown as Record<string, unknown>).absencesReport as string ?? "",
-        standoutResponse: (conformity as unknown as Record<string, unknown>).standoutResponse as boolean | null ?? null,
-        standoutJustification: (conformity as unknown as Record<string, unknown>).standoutJustification as string ?? "",
+        absencesReport: conformity.absencesReport ?? "",
+        standoutResponse: conformity.standoutResponse ?? null,
+        standoutJustification: conformity.standoutJustification ?? "",
       });
     } else {
       setConformityForm({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "", absencesReport: "", standoutResponse: null, standoutJustification: "" });
@@ -362,79 +369,24 @@ export default function CalibrationsPage() {
   const eventReviewRequests = (allReviewRequests ?? []).filter(r => r.eventId === selectedEventId);
   const pendingEventReviewRequests = eventReviewRequests.filter(r => r.status === "pending");
 
-  async function handlePublishCriterionPartial(criterionId: number) {
-    if (!selectedEventId) return;
-    setPublishingCritId(criterionId);
-    try {
-      await publishCriterionPartialMutation.mutateAsync({ id: selectedEventId, criterionId });
-      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
-      qc.invalidateQueries({ queryKey: fbQKey });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      toast({ title: "Critério publicado parcialmente", description: "Os funcionários agora veem esta prévia deste critério." });
-    } catch (e) {
-      const msg = (e as { message?: string })?.message;
-      toast({ title: "Não foi possível publicar", description: msg, variant: "destructive" });
-    } finally {
-      setPublishingCritId(null);
-    }
+  // Nome legível de um critério para as mensagens de erro em lote.
+  function criterionLabel(critId: number): string {
+    return (criteria ?? []).find(c => c.criterionId === critId)?.criterionName ?? `#${critId}`;
   }
-
-  async function handlePublishCriterionFinal(criterionId: number) {
-    if (!selectedEventId) return;
-    setPublishingFinalCritId(criterionId);
-    try {
-      await publishCriterionFinalMutation.mutateAsync({ id: selectedEventId, criterionId });
-      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
-      qc.invalidateQueries({ queryKey: fbQKey });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      toast({ title: "Nota Final publicada", description: "Os funcionários veem esta nota como definitiva para este critério." });
-    } catch (e) {
-      const msg = (e as { message?: string })?.message;
-      toast({ title: "Não foi possível publicar como Final", description: msg, variant: "destructive" });
-    } finally {
-      setPublishingFinalCritId(null);
-    }
-  }
-
-  async function handlePublishAllFinal() {
-    if (!selectedEventId) return;
-    setPublishingAllFinal(true);
-    try {
-      const result = await publishAllFinalMutation.mutateAsync({ id: selectedEventId });
-      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
-      qc.invalidateQueries({ queryKey: fbQKey });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      const count = (result as { published?: number })?.published ?? displayActiveCriteria.length;
-      toast({ title: `${count} critério(s) publicados como Final`, description: "Os funcionários veem todas as notas como definitivas." });
-    } catch (e) {
-      const msg = (e as { message?: string })?.message;
-      toast({ title: "Erro ao publicar todos como Final", description: msg, variant: "destructive" });
-    } finally {
-      setPublishingAllFinal(false);
-    }
-  }
-
-  async function handlePublishAllPartial() {
-    if (!selectedEventId) return;
-    setPublishingAllPartial(true);
-    try {
-      const result = await publishAllPartialMutation.mutateAsync({ id: selectedEventId });
-      qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
-      qc.invalidateQueries({ queryKey: fbQKey });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      const count = (result as { published?: number })?.published ?? displayActiveCriteria.length;
-      toast({ title: `${count} critério(s) publicados como Parcial`, description: "Os funcionários veem uma prévia de todas as notas." });
-    } catch (e) {
-      const msg = (e as { message?: string })?.message;
-      toast({ title: "Erro ao publicar todos como Parcial", description: msg, variant: "destructive" });
-    } finally {
-      setPublishingAllPartial(false);
-    }
+  function failedDescription(failedIds: number[], firstError: string | null): string {
+    const names = failedIds.map(criterionLabel).join(", ");
+    return firstError ? `Falhou em: ${names}. ${firstError}` : `Falhou em: ${names}.`;
   }
 
   // Publica todos os critérios calibrados de acordo com a intenção definida por critério
   async function handlePublishAll() {
     if (!selectedEventId) return;
+    // Publicar usa a nota que está NO SERVIDOR. Se há nota/justificativa/peso
+    // digitados e não salvos, publicaríamos a nota antiga — bloqueia e orienta.
+    if (unsavedEditsCount > 0) {
+      toast({ title: "Há notas não salvas", description: "Salve as alterações antes de publicar — a publicação usa a nota gravada no servidor.", variant: "destructive" });
+      return;
+    }
     // Inclui critérios inativos-mas-calibrados: eles aparecem na tela com o
     // toggle Parc./Final, então o Publicar deve poder aplicar o status neles
     // também (o backend permite publicar critério inativo já calibrado).
@@ -447,6 +399,7 @@ export default function CalibrationsPage() {
     let okFinal = 0, okPartial = 0;
     const failed: number[] = [];
     let firstError: string | null = null;
+    let sessionExpired = false;
     for (const c of calibrated) {
       const intent = publishIntents[c.criterionId] ?? "partial";
       try {
@@ -458,21 +411,26 @@ export default function CalibrationsPage() {
           okPartial++;
         }
       } catch (e) {
+        if (isAuthError(e)) { sessionExpired = true; break; }
         failed.push(c.criterionId);
-        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+        if (!firstError) firstError = errorMessage(e) ?? null;
       }
     }
     setPublishingAll(false);
     qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
     qc.invalidateQueries({ queryKey: fbQKey });
     qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+    if (sessionExpired) {
+      toast(SESSION_EXPIRED_TOAST);
+      return;
+    }
     if (failed.length === 0) {
       const parts: string[] = [];
       if (okFinal > 0) parts.push(`${okFinal} Final`);
       if (okPartial > 0) parts.push(`${okPartial} Parcial`);
       toast({ title: `Publicado — ${parts.join(", ")}` });
     } else {
-      toast({ title: `${okFinal + okPartial} publicado(s), ${failed.length} com erro`, description: firstError ?? undefined, variant: "destructive" });
+      toast({ title: `${okFinal + okPartial} publicado(s), ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
     }
   }
 
@@ -486,7 +444,8 @@ export default function CalibrationsPage() {
       .map(e => {
         const crit = activeCriteria.find(ac => ac.criterionId === e.criterionId);
         const respondedRaw = e.submittedAt ?? e.createdAt ?? null;
-        return { name: e.evaluatorName ?? "Avaliador", score: parseFloat(e.score as unknown as string), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId, respondedAt: respondedRaw ? new Date(respondedRaw as unknown as string) : null };
+        // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
+        return { name: e.evaluatorName ?? "Avaliador", score: Number(e.score), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId, respondedAt: respondedRaw ? new Date(respondedRaw) : null };
       });
   }
 
@@ -499,9 +458,13 @@ export default function CalibrationsPage() {
     return (calibrations ?? []).find(c => c.criterionId === critId);
   }
 
-  function saveCalibration(critId: number) {
+  // Salva UM critério (pai + cópias eventScoped filhas) aguardando todas as
+  // requisições: um único spinner e um único toast, independentemente de
+  // quantos filhos o critério tenha.
+  async function saveCalibration(critId: number) {
+    if (!selectedEventId) return;
     const existing = getCalibration(critId);
-    const raw = calScores[critId] ?? (existing ? String(parseFloat(existing.calibratedScore as unknown as string)) : "");
+    const raw = calScores[critId] ?? (existing ? String(Number(existing.calibratedScore)) : "");
     const reason = (calReasons[critId] ?? existing?.calibrationReason ?? "").trim();
     const score = Number(raw);
     if (!raw || isNaN(score) || score < 0 || score > 10) {
@@ -510,28 +473,35 @@ export default function CalibrationsPage() {
     }
     setSavingCritId(critId);
     const avg = getAvgScore(critId);
-    createMutation.mutate({
-      data: {
-        eventId: selectedEventId!,
-        criterionId: critId,
-        calibratedScore: score,
-        calibrationReason: reason,
-        originalAverageScore: avg ?? undefined,
-      },
-    });
-    // Propaga a mesma nota calibrada para critérios filhos (cópias eventScoped)
-    const children = childCriterionIdsMap.get(critId) ?? [];
-    children.forEach(childId => {
-      createMutation.mutate({
+    const targetIds = [critId, ...(childCriterionIdsMap.get(critId) ?? [])];
+    try {
+      const results = await Promise.all(targetIds.map(id => bulkMutation.mutateAsync({
         data: {
-          eventId: selectedEventId!,
-          criterionId: childId,
+          eventId: selectedEventId,
+          criterionId: id,
           calibratedScore: score,
           calibrationReason: reason,
           originalAverageScore: avg ?? undefined,
         },
-      });
-    });
+      })));
+      setCalScores(prev => { const n = { ...prev }; delete n[critId]; return n; });
+      setCalReasons(prev => { const n = { ...prev }; delete n[critId]; return n; });
+      markReasonSaved(critId);
+      qc.invalidateQueries({ queryKey: calQKey });
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
+      qc.invalidateQueries({ queryKey: fbQKey });
+      const warnings = Array.from(new Set(results.flatMap(r => r.warnings ?? [])));
+      if (warnings.length > 0) {
+        toast({ title: "Calibração registrada", description: warnings.join(" "), variant: "destructive" });
+      } else {
+        toast({ title: "Calibração registrada" });
+      }
+    } catch (e) {
+      if (isAuthError(e)) toast(SESSION_EXPIRED_TOAST);
+      else toast({ title: "Erro ao salvar calibração", description: errorMessage(e), variant: "destructive" });
+    } finally {
+      setSavingCritId(null);
+    }
   }
 
   // Inclui critérios com calibração salva mesmo se ec_active=F (foram calibrados antes de serem desativados no evento).
@@ -646,7 +616,10 @@ export default function CalibrationsPage() {
     return intent !== baseline;
   }).map(c => c.criterionId);
 
-  const totalDirtyCount = fillableCount + pendingReasonOnlyCrits.length + pendingWeightCritIds.length + pendingPublishCritIds.length;
+  // Edições de DADOS não salvas (nota, justificativa, peso). Não inclui a
+  // divergência de intenção Parc./Final — essa é justamente o que "Publicar" aplica.
+  const unsavedEditsCount = fillableCount + pendingReasonOnlyCrits.length + pendingWeightCritIds.length;
+  const totalDirtyCount = unsavedEditsCount + pendingPublishCritIds.length;
 
   // Quantos critérios já publicados como Final
   const finalPublishedCount = scorableActiveCriteria.filter(c => !!c.finalPublishedAt).length;
@@ -673,6 +646,7 @@ export default function CalibrationsPage() {
     let ok = 0;
     const failed: number[] = [];
     let firstError: string | null = null;
+    let sessionExpired = false;
     const allWarnings: string[] = [];
     for (const c of autoFillableCriteria) {
       const avg = getAvgScore(c.criterionId);
@@ -689,14 +663,19 @@ export default function CalibrationsPage() {
         if (result.warnings) allWarnings.push(...result.warnings);
         ok++;
       } catch (e) {
+        if (isAuthError(e)) { sessionExpired = true; break; }
         failed.push(c.criterionId);
-        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+        if (!firstError) firstError = errorMessage(e) ?? null;
       }
     }
     setSavingAutoFill(false);
     qc.invalidateQueries({ queryKey: calQKey });
     qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
     qc.invalidateQueries({ queryKey: fbQKey });
+    if (sessionExpired) {
+      toast(SESSION_EXPIRED_TOAST);
+      return;
+    }
     const uniqueWarnings = Array.from(new Set(allWarnings));
     if (failed.length === 0) {
       toast({
@@ -705,93 +684,23 @@ export default function CalibrationsPage() {
         variant: uniqueWarnings.length > 0 ? "destructive" : undefined,
       });
     } else {
-      toast({ title: `${ok} preenchida(s), ${failed.length} com erro`, description: firstError ?? "Revise os critérios e tente novamente.", variant: "destructive" });
-    }
-  }
-
-  // Grava TODAS as calibrações preenchidas de uma vez (a diretoria preenche tudo
-  // e salva em um clique, em vez de critério por critério).
-  async function saveAllCalibrations() {
-    // Salva apenas critérios de exibição (pais); os filhos são propagados abaixo.
-    const toSave = displayActiveCriteria
-      .map(c => ({ critId: c.criterionId, score: pendingScore(c.criterionId), reason: (calReasons[c.criterionId] ?? getCalibration(c.criterionId)?.calibrationReason ?? "").trim() }))
-      .filter((x): x is { critId: number; score: number; reason: string } => x.score != null);
-    if (toSave.length === 0) {
-      toast({ title: "Nada para salvar", description: "Preencha ao menos uma nota calibrada (1 a 10).", variant: "destructive" });
-      return;
-    }
-    setSavingAll(true);
-    let ok = 0;
-    const failed: number[] = [];
-    let firstError: string | null = null;
-    const allWarnings: string[] = [];
-    for (const x of toSave) {
-      try {
-        const result = await bulkMutation.mutateAsync({
-          data: {
-            eventId: selectedEventId!,
-            criterionId: x.critId,
-            calibratedScore: x.score,
-            calibrationReason: x.reason,
-            originalAverageScore: getAvgScore(x.critId) ?? undefined,
-          },
-        });
-        if (result.warnings) allWarnings.push(...result.warnings);
-        ok++;
-        // Propaga para critérios filhos (eventScoped) com a mesma nota
-        const children = childCriterionIdsMap.get(x.critId) ?? [];
-        for (const childId of children) {
-          await bulkMutation.mutateAsync({
-            data: {
-              eventId: selectedEventId!,
-              criterionId: childId,
-              calibratedScore: x.score,
-              calibrationReason: x.reason,
-              originalAverageScore: getAvgScore(x.critId) ?? undefined,
-            },
-          });
-        }
-      } catch (e) {
-        failed.push(x.critId);
-        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
-      }
-    }
-    setSavingAll(false);
-    if (failed.length === 0) {
-      // Limpa edições locais apenas quando tudo salvou — critérios com erro
-      // permanecem editáveis para nova tentativa.
-      setCalScores({});
-      setCalReasons({});
-    } else {
-      // Limpa só os que salvaram com sucesso; mantém os que falharam.
-      const savedIds = toSave.filter(x => !failed.includes(x.critId)).map(x => x.critId);
-      setCalScores(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
-      setCalReasons(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
-    }
-    qc.invalidateQueries({ queryKey: calQKey });
-    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-    qc.invalidateQueries({ queryKey: fbQKey });
-    const uniqueWarnings = Array.from(new Set(allWarnings));
-    if (failed.length === 0) {
-      toast({
-        title: `${ok} calibraç${ok === 1 ? "ão salva" : "ões salvas"}`,
-        description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined,
-        variant: uniqueWarnings.length > 0 ? "destructive" : undefined,
-      });
-    } else {
-      toast({ title: `${ok} salva(s), ${failed.length} com erro`, description: firstError ?? "Revise os critérios destacados e tente novamente.", variant: "destructive" });
+      toast({ title: `${ok} preenchida(s), ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
     }
   }
 
   // Salva TUDO de uma vez: calibrações com nota nova, comentários pendentes em
   // calibrações já salvas, e edições de peso.
   async function handleSaveAll() {
-    if (totalDirtyCount === 0) return;
+    if (totalDirtyCount === 0 || !selectedEventId) return;
+    const eventId = selectedEventId;
     setSavingAll(true);
-    let okCal = 0, okWeight = 0;
-    const failedCal: number[] = [], failedWeight: number[] = [];
+    let okCal = 0, okWeight = 0, okPublish = 0;
+    const failedCal: number[] = [], failedWeight: number[] = [], failedPublish: number[] = [];
     let firstError: string | null = null;
+    let sessionExpired = false;
     const allWarnings: string[] = [];
+    const savedScoreIds = new Set<number>();
+    const savedReasonOnlyIds: number[] = [];
 
     // 1. Calibrações com nota nova (+ comentário)
     const toSaveScores = displayActiveCriteria
@@ -800,68 +709,84 @@ export default function CalibrationsPage() {
     for (const x of toSaveScores) {
       try {
         const result = await bulkMutation.mutateAsync({
-          data: { eventId: selectedEventId!, criterionId: x.critId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined },
+          data: { eventId, criterionId: x.critId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined },
         });
         if (result.warnings) allWarnings.push(...result.warnings);
-        okCal++;
         for (const childId of (childCriterionIdsMap.get(x.critId) ?? [])) {
-          await bulkMutation.mutateAsync({ data: { eventId: selectedEventId!, criterionId: childId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined } });
+          await bulkMutation.mutateAsync({ data: { eventId, criterionId: childId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined } });
         }
+        // Só conta como salvo (e limpa a edição local) com pai E filhos gravados.
+        okCal++;
+        savedScoreIds.add(x.critId);
       } catch (e) {
+        if (isAuthError(e)) { sessionExpired = true; break; }
         failedCal.push(x.critId);
-        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+        if (!firstError) firstError = errorMessage(e) ?? null;
       }
     }
 
     // 2. Comentários pendentes em calibrações já salvas (sem nova nota)
-    for (const c of pendingReasonOnlyCrits) {
+    if (!sessionExpired) for (const c of pendingReasonOnlyCrits) {
       const existing = getCalibration(c.criterionId);
       if (!existing) continue;
-      const score = parseFloat(existing.calibratedScore as unknown as string);
+      const score = Number(existing.calibratedScore);
       const reason = (calReasons[c.criterionId] ?? "").trim();
       try {
         await bulkMutation.mutateAsync({
-          data: { eventId: selectedEventId!, criterionId: c.criterionId, calibratedScore: score, calibrationReason: reason, originalAverageScore: getAvgScore(c.criterionId) ?? undefined },
+          data: { eventId, criterionId: c.criterionId, calibratedScore: score, calibrationReason: reason, originalAverageScore: getAvgScore(c.criterionId) ?? undefined },
         });
         okCal++;
+        savedReasonOnlyIds.push(c.criterionId);
       } catch (e) {
+        if (isAuthError(e)) { sessionExpired = true; break; }
         failedCal.push(c.criterionId);
-        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+        if (!firstError) firstError = errorMessage(e) ?? null;
       }
     }
 
     // 3. Pesos editados
-    for (const critId of pendingWeightCritIds) {
+    if (!sessionExpired) for (const critId of pendingWeightCritIds) {
       const raw = (weightEdits[critId] ?? "").replace(",", ".").trim();
       const w = Number(raw);
       const crit = displayActiveCriteria.find(c => c.criterionId === critId);
       if (!crit || isNaN(w)) continue;
       try {
-        await updateWeightMutation.mutateAsync({ id: selectedEventId!, data: { criteria: [{ criterionId: critId, active: crit.active ?? true, weight: w }] } });
+        await updateWeightMutation.mutateAsync({ id: eventId, data: { criteria: [{ criterionId: critId, active: crit.active ?? true, weight: w }] } });
         okWeight++;
         setWeightEdits(prev => { const n = { ...prev }; delete n[critId]; return n; });
       } catch (e) {
+        if (isAuthError(e)) { sessionExpired = true; break; }
         failedWeight.push(critId);
-        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+        if (!firstError) firstError = errorMessage(e) ?? null;
       }
     }
 
-    // 4. Mudanças de status (Parc./Final) — publica/rebaixa cada critério cuja
-    // intenção diverge do que já está publicado no servidor.
-    let okPublish = 0;
-    const failedPublish: number[] = [];
-    for (const critId of pendingPublishCritIds) {
+    // 4. Mudanças de status (Parc./Final). Recalculado AQUI, depois da etapa 1:
+    // um critério que acabou de receber a primeira nota ainda não tinha
+    // calibração no render anterior e ficaria fora de `pendingPublishCritIds`,
+    // deixando a intenção "Final" sem efeito. Considera publicável todo critério
+    // salvo agora OU já calibrado no servidor cuja intenção diverge do publicado.
+    const publishTargets = displayActiveCriteria.filter(c => {
+      const hasCalibration = savedScoreIds.has(c.criterionId) || !!getCalibration(c.criterionId);
+      if (!hasCalibration) return false;
+      const intent = publishIntents[c.criterionId];
+      if (intent === undefined) return false;
+      const baseline = c.finalPublishedAt ? "final" : "partial";
+      return intent !== baseline;
+    }).map(c => c.criterionId);
+    if (!sessionExpired) for (const critId of publishTargets) {
       const intent = publishIntents[critId];
       try {
         if (intent === "final") {
-          await publishCriterionFinalMutation.mutateAsync({ id: selectedEventId!, criterionId: critId });
+          await publishCriterionFinalMutation.mutateAsync({ id: eventId, criterionId: critId });
         } else {
-          await publishCriterionPartialMutation.mutateAsync({ id: selectedEventId!, criterionId: critId });
+          await publishCriterionPartialMutation.mutateAsync({ id: eventId, criterionId: critId });
         }
         okPublish++;
       } catch (e) {
+        if (isAuthError(e)) { sessionExpired = true; break; }
         failedPublish.push(critId);
-        if (!firstError) firstError = (e as { message?: string })?.message ?? null;
+        if (!firstError) firstError = errorMessage(e) ?? null;
       }
     }
 
@@ -869,19 +794,22 @@ export default function CalibrationsPage() {
     const totalOk = okCal + okWeight + okPublish;
     const totalFailed = failedCal.length + failedWeight.length + failedPublish.length;
 
-    if (failedCal.length === 0) {
-      setCalScores({});
-      setCalReasons({});
-    } else {
-      const savedIds = [...toSaveScores.filter(x => !failedCal.includes(x.critId)).map(x => x.critId), ...pendingReasonOnlyCrits.filter(c => !failedCal.includes(c.criterionId)).map(c => c.criterionId)];
-      setCalScores(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
-      setCalReasons(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
-    }
+    // Limpa as edições locais apenas dos critérios efetivamente gravados; os
+    // que falharam (ou não chegaram a ser enviados) continuam editáveis.
+    const savedIds = [...savedScoreIds, ...savedReasonOnlyIds];
+    setCalScores(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
+    setCalReasons(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
+    savedReasonOnlyIds.forEach(markReasonSaved);
 
     qc.invalidateQueries({ queryKey: calQKey });
     qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
     qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
     qc.invalidateQueries({ queryKey: fbQKey });
+
+    if (sessionExpired) {
+      toast({ ...SESSION_EXPIRED_TOAST, description: `${SESSION_EXPIRED_TOAST.description}${totalOk > 0 ? ` ${totalOk} item(ns) já haviam sido salvos.` : ""}` });
+      return;
+    }
 
     const uniqueWarnings = Array.from(new Set(allWarnings));
     if (totalFailed === 0) {
@@ -891,7 +819,8 @@ export default function CalibrationsPage() {
       if (okPublish > 0) parts.push(`${okPublish} status`);
       toast({ title: `Tudo salvo — ${parts.join(", ")}`, description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined, variant: uniqueWarnings.length > 0 ? "destructive" : undefined });
     } else {
-      toast({ title: `${totalOk} salvo(s), ${totalFailed} com erro`, description: firstError ?? "Revise os itens destacados.", variant: "destructive" });
+      const failedIds = Array.from(new Set([...failedCal, ...failedWeight, ...failedPublish]));
+      toast({ title: `${totalOk} salvo(s), ${totalFailed} com erro`, description: failedDescription(failedIds, firstError), variant: "destructive" });
     }
   }
 
@@ -1234,6 +1163,8 @@ export default function CalibrationsPage() {
                     const isExpanded = conformityExpandedComments.has(item.key);
                     // Mostra quem realmente preencheu cada seção (gravado no momento do save).
                     // "Guarda Equip." = Ferramentas; demais = Cenografia.
+                    // TODO contrato: ferramentasSubmittedByName/cenografiaSubmittedByName ainda
+                    // não existem em EventConformity (api.schemas.ts) — cast mantido até o codegen.
                     const answeredByName = item.key === "guardaEquipamentos"
                       ? ((conformity as unknown as Record<string, unknown>)?.ferramentasSubmittedByName as string | null | undefined) ?? null
                       : ((conformity as unknown as Record<string, unknown>)?.cenografiaSubmittedByName as string | null | undefined) ?? null;
@@ -1249,10 +1180,11 @@ export default function CalibrationsPage() {
                             )}
                           </div>
                           {canManageConformity ? (
-                            <div className="flex items-center rounded overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
-                              <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: true }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: true } }); }} className="px-1.5 py-0.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === true ? "var(--primary)" : "transparent", color: value === true ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>S</button>
-                              <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: false }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: false } }); }} className="px-1.5 py-0.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === false ? WARNING : "transparent", color: value === false ? "#fff" : "var(--muted-foreground)" }}>N</button>
-                              <button type="button" onClick={() => { const next = { ...conformityForm, [item.key]: null }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: null } }); }} className="px-1.5 py-0.5 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: value === null ? "rgba(232,162,61,0.24)" : "transparent", color: value === null ? AMBER : "var(--muted-foreground)" }}>?</button>
+                            <div role="group" aria-label={`${item.label}: conformidade`} className="flex items-center rounded overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
+                              {/* Alvo mínimo de toque 28×28 px (WCAG 2.5.8) */}
+                              <button type="button" aria-label="Sim" aria-pressed={value === true} onClick={() => { const next = { ...conformityForm, [item.key]: true }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: true } }); }} className="min-w-[28px] min-h-[28px] px-1.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === true ? "var(--primary)" : "transparent", color: value === true ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>S</button>
+                              <button type="button" aria-label="Não" aria-pressed={value === false} onClick={() => { const next = { ...conformityForm, [item.key]: false }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: false } }); }} className="min-w-[28px] min-h-[28px] px-1.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === false ? WARNING : "transparent", color: value === false ? "#fff" : "var(--muted-foreground)" }}>N</button>
+                              <button type="button" aria-label="Não se aplica" aria-pressed={value === null} onClick={() => { const next = { ...conformityForm, [item.key]: null }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: null } }); }} className="min-w-[28px] min-h-[28px] px-1.5 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: value === null ? "rgba(232,162,61,0.24)" : "transparent", color: value === null ? AMBER : "var(--muted-foreground)" }}>?</button>
                             </div>
                           ) : (
                             <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: value === null ? "var(--secondary)" : value ? "var(--primary)" : WARNING, color: value === null ? "var(--muted-foreground)" : value ? "var(--primary-foreground)" : "#fff" }}>
@@ -1301,8 +1233,8 @@ export default function CalibrationsPage() {
                     {canManageConformity ? (
                       <div className="space-y-1">
                         <div className="flex items-center rounded overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-                          <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: false } }); }} className="flex-1 px-2 py-0.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === false ? "var(--primary)" : "transparent", color: conformityForm.standoutResponse === false ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Não</button>
-                          <button type="button" onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: true })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: true } }); }} className="flex-1 px-2 py-0.5 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: conformityForm.standoutResponse === true ? GOOD : "transparent", color: conformityForm.standoutResponse === true ? "#fff" : "var(--muted-foreground)" }}>Sim</button>
+                          <button type="button" aria-pressed={conformityForm.standoutResponse === false} onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: false } }); }} className="flex-1 min-h-[28px] px-2 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === false ? "var(--primary)" : "transparent", color: conformityForm.standoutResponse === false ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Não</button>
+                          <button type="button" aria-pressed={conformityForm.standoutResponse === true} onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: true })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: true } }); }} className="flex-1 min-h-[28px] px-2 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: conformityForm.standoutResponse === true ? GOOD : "transparent", color: conformityForm.standoutResponse === true ? "#fff" : "var(--muted-foreground)" }}>Sim</button>
                         </div>
                         {conformityForm.standoutResponse === true && (
                           <div className="flex gap-1">
@@ -1331,7 +1263,7 @@ export default function CalibrationsPage() {
                   {eventComments.map((c, i) => (
                     <div key={i} className="text-[11px] rounded-lg px-3 py-2" style={{ backgroundColor: "var(--secondary)" }}>
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-bold uppercase text-[10px]">{(c as { authorName?: string }).authorName ?? "Admin"}</span>
+                        <span className="font-bold uppercase text-[10px]">{c.userName || "Admin"}</span>
                         <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{c.createdAt ? formatDateTime(new Date(c.createdAt)) : ""}</span>
                       </div>
                       <p className="leading-snug whitespace-pre-wrap">{c.message}</p>
@@ -1420,8 +1352,9 @@ export default function CalibrationsPage() {
                       <button
                         data-testid="button-publish-all"
                         type="button"
-                        disabled={publishingAll || publishingAllPartial || publishingAllFinal}
+                        disabled={publishingAll || savingAll}
                         onClick={handlePublishAll}
+                        title={unsavedEditsCount > 0 ? "Há notas não salvas — salve antes de publicar" : "Publicar os critérios calibrados conforme a intenção Parc./Final de cada um"}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-colors hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ border: "1px solid var(--border)" }}
                       >
@@ -1453,13 +1386,14 @@ export default function CalibrationsPage() {
                         const areaScores = getAreaScores(c.criterionId);
                         const avg = getAvgScore(c.criterionId);
                         const cal = getCalibration(c.criterionId);
-                        const calVal = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
-                        const scoreVal = calScores[c.criterionId] ?? (cal ? String(parseFloat(cal.calibratedScore as unknown as string)) : "");
-                        const isSaving = savingCritId === c.criterionId && createMutation.isPending;
+                        // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
+                        const calVal = cal ? Number(cal.calibratedScore) : null;
+                        const scoreVal = calScores[c.criterionId] ?? (calVal != null ? String(calVal) : "");
+                        const isSaving = savingCritId === c.criterionId;
                         const isFinalPublished = !!c.finalPublishedAt;
                         const peso = c.weightOverride ?? c.originalWeight ?? 0;
                         const hasUnsaved = calScores[c.criterionId] !== undefined;
-                        const savedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+                        const savedScore = calVal;
                         const changedFromSaved = hasUnsaved && String(savedScore) !== calScores[c.criterionId];
                         const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
                         const reasonChanged = calReasons[c.criterionId] !== undefined && calReasons[c.criterionId] !== (cal?.calibrationReason ?? "");
@@ -1594,10 +1528,10 @@ export default function CalibrationsPage() {
                                   onFocus={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
                                   onBlur={e => {
                                     e.stopPropagation();
-                                    // Auto-save ao perder foco quando há uma calibração existente e razão mudou
+                                    // Auto-save ao perder foco quando há uma calibração existente e razão mudou.
+                                    // O indicador "Salvo" é ligado por saveCalibration só após sucesso.
                                     if (reasonChanged && cal && !isSaving) {
-                                      saveCalibration(c.criterionId);
-                                      setSavedReasonIds(prev => new Set(prev).add(c.criterionId));
+                                      void saveCalibration(c.criterionId);
                                     }
                                   }}
                                   placeholder="Escreva a justificativa e clique fora para salvar…"
@@ -1617,8 +1551,7 @@ export default function CalibrationsPage() {
                                         disabled={isSaving}
                                         onClick={e => {
                                           e.stopPropagation();
-                                          saveCalibration(c.criterionId);
-                                          setSavedReasonIds(prev => new Set(prev).add(c.criterionId));
+                                          void saveCalibration(c.criterionId);
                                         }}
                                         className="px-2.5 py-1 rounded font-black uppercase text-[10px] disabled:opacity-50 transition-opacity hover:opacity-90 flex items-center gap-1"
                                         style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
@@ -1828,7 +1761,7 @@ export default function CalibrationsPage() {
                                     data-testid={`button-save-cal-${c.criterionId}`}
                                     type="button"
                                     disabled={isSaving || savingAll}
-                                    onClick={() => saveCalibration(c.criterionId)}
+                                    onClick={() => void saveCalibration(c.criterionId)}
                                     title="Salvar calibração"
                                     className="h-7 w-7 rounded flex items-center justify-center disabled:opacity-50 transition-opacity hover:opacity-90"
                                     style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}

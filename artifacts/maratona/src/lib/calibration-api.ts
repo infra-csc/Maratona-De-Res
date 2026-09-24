@@ -36,6 +36,20 @@ export interface CalibrationAuditEntry {
 // Fetch helper
 // ---------------------------------------------------------------------------
 
+/**
+ * Erro HTTP com `status` — mesmo formato dos hooks gerados (ApiError), para
+ * que a tela possa distinguir 401/403 (sessão expirada) de falhas comuns.
+ */
+export class ApiRequestError extends Error {
+  readonly name = "ApiRequestError";
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.status = status;
+  }
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
@@ -45,9 +59,11 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
+    throw new ApiRequestError(res.status, (err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
