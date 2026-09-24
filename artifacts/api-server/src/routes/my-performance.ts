@@ -5,12 +5,13 @@ import {
   platoonRulesTable, employeesTable, areasTable, employeeCycleEligibilityTable,
   eventAreaAssignmentsTable, employeeEventResultsTable, eventConformitiesTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, calculateTieredBonus, calculateQuarterFinalResult, selectExtraEventScores, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
+import { heapOrder } from "../lib/cycle-data.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -122,6 +123,91 @@ router.get("/my-performance", async (req, res) => {
     bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
   }));
 
+  // Dados de TODOS os eventos do colaborador em lote: 5 consultas no total
+  // (antes eram 5 por evento). A ordem das linhas reproduz a consulta antiga
+  // por evento — ver a nota sobre ORDEM em lib/cycle-data.ts: critérios pela
+  // ordem do índice (event_id, criterion_id) e avaliações pela ordem física,
+  // que define a ordem dos comentários públicos e da soma das médias.
+  const countedEventIds = participations
+    .filter(p => p.eventId && p.participantConfirmed !== false)
+    .map(p => p.eventId!);
+  const hasEvents = countedEventIds.length > 0;
+  const groupByEvent = <T extends { eventId: number }>(rows: T[]) => {
+    const map = new Map<number, T[]>();
+    for (const r of rows) {
+      let list = map.get(r.eventId);
+      if (!list) { list = []; map.set(r.eventId, list); }
+      list.push(r);
+    }
+    return map;
+  };
+  // Todos os event_criteria destes eventos — SEM filtro active, pois critérios
+  // inativos que já foram calibrados ainda devem aparecer para o colaborador.
+  const criteriaRows = !hasEvents ? [] : await db
+    .select({
+      eventId: eventCriteriaTable.eventId,
+      criterionId: eventCriteriaTable.criterionId,
+      criterionName: criteriaTable.name,
+      criterionDescription: criteriaTable.description,
+      responsibleAreaId: criteriaTable.responsibleAreaId,
+      responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
+      responsibleAreaName: areasTable.name,
+      active: eventCriteriaTable.active,
+      weight: eventCriteriaTable.weightOverride,
+      defaultWeight: criteriaTable.defaultWeight,
+      partialPublishedAt: eventCriteriaTable.partialPublishedAt,
+      finalPublishedAt: eventCriteriaTable.finalPublishedAt,
+      eventScoped: criteriaTable.eventScoped,
+      sourceCriterionId: criteriaTable.sourceCriterionId,
+    })
+    .from(eventCriteriaTable)
+    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+    .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
+    .where(inArray(eventCriteriaTable.eventId, countedEventIds))
+    .orderBy(eventCriteriaTable.eventId, eventCriteriaTable.criterionId);
+
+  // Avaliações do TIME do evento (não por colaborador)
+  const evals = !hasEvents ? [] : await db.select({
+    eventId: evaluationsTable.eventId,
+    criterionId: evaluationsTable.criterionId,
+    score: evaluationsTable.score,
+    comments: evaluationsTable.comments,
+    commentVisibility: evaluationsTable.commentVisibility,
+    status: evaluationsTable.status,
+    evaluatorUserId: evaluationsTable.evaluatorUserId,
+  }).from(evaluationsTable).where(inArray(evaluationsTable.eventId, countedEventIds))
+    .orderBy(evaluationsTable.eventId, heapOrder(evaluationsTable));
+
+  const calibrations = !hasEvents ? [] : await db.select({
+    eventId: calibrationsTable.eventId,
+    criterionId: calibrationsTable.criterionId,
+    calibratedScore: calibrationsTable.calibratedScore,
+    calibrationReason: calibrationsTable.calibrationReason,
+  }).from(calibrationsTable).where(inArray(calibrationsTable.eventId, countedEventIds));
+
+  const assignments = !hasEvents ? [] : await db.select({ eventId: eventAreaAssignmentsTable.eventId, areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
+    .from(eventAreaAssignmentsTable).where(inArray(eventAreaAssignmentsTable.eventId, countedEventIds));
+
+  const conformities = !hasEvents ? [] : await db.select({
+    eventId: eventConformitiesTable.eventId,
+    epi: eventConformitiesTable.epi,
+    estaiamentos: eventConformitiesTable.estaiamentos,
+    guardaEquipamentos: eventConformitiesTable.guardaEquipamentos,
+    conduta: eventConformitiesTable.conduta,
+    epiComment: eventConformitiesTable.epiComment,
+    estaiamentosComment: eventConformitiesTable.estaiamentosComment,
+    guardaEquipamentosComment: eventConformitiesTable.guardaEquipamentosComment,
+    condutaComment: eventConformitiesTable.condutaComment,
+  }).from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, countedEventIds));
+
+  const criteriaByEvent = groupByEvent(criteriaRows);
+  const evalsByEvent = groupByEvent(evals);
+  const calibrationsByEvent = groupByEvent(calibrations);
+  const assignmentsByEvent = groupByEvent(assignments);
+  // Índice único por evento; a consulta antiga usava limit(1) (fica a primeira).
+  const conformityByEvent = new Map<number, typeof conformities[number]>();
+  for (const c of conformities) if (!conformityByEvent.has(c.eventId)) conformityByEvent.set(c.eventId, c);
+
   const eventSummaries = [];
   for (const p of participations) {
     if (!p.eventId) continue;
@@ -129,63 +215,13 @@ router.get("/my-performance", async (req, res) => {
     // conta para o colaborador — mesma regra do fechamento e do ranking da prova.
     if (p.participantConfirmed === false) continue;
 
-    // Todos os event_criteria deste evento — SEM filtro active, pois critérios
-    // inativos que já foram calibrados ainda devem aparecer para o colaborador.
-    const eventCriteriaRows = await db
-      .select({
-        criterionId: eventCriteriaTable.criterionId,
-        criterionName: criteriaTable.name,
-        criterionDescription: criteriaTable.description,
-        responsibleAreaId: criteriaTable.responsibleAreaId,
-        responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
-        responsibleAreaName: areasTable.name,
-        active: eventCriteriaTable.active,
-        weight: eventCriteriaTable.weightOverride,
-        defaultWeight: criteriaTable.defaultWeight,
-        partialPublishedAt: eventCriteriaTable.partialPublishedAt,
-        finalPublishedAt: eventCriteriaTable.finalPublishedAt,
-        eventScoped: criteriaTable.eventScoped,
-        sourceCriterionId: criteriaTable.sourceCriterionId,
-      })
-      .from(eventCriteriaTable)
-      .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-      .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
-      .where(eq(eventCriteriaTable.eventId, p.eventId));
-
-    // Avaliações do TIME do evento (não por colaborador)
-    const [allEvals, allCalibrations, areaAssignmentsRaw, conformityRow] = await Promise.all([
-      db.select({
-        criterionId: evaluationsTable.criterionId,
-        score: evaluationsTable.score,
-        comments: evaluationsTable.comments,
-        commentVisibility: evaluationsTable.commentVisibility,
-        status: evaluationsTable.status,
-        evaluatorUserId: evaluationsTable.evaluatorUserId,
-      }).from(evaluationsTable).where(eq(evaluationsTable.eventId, p.eventId)),
-
-      db.select({
-        criterionId: calibrationsTable.criterionId,
-        calibratedScore: calibrationsTable.calibratedScore,
-        calibrationReason: calibrationsTable.calibrationReason,
-      }).from(calibrationsTable).where(eq(calibrationsTable.eventId, p.eventId)),
-
-      db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
-        .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, p.eventId)),
-
-      db.select({
-        epi: eventConformitiesTable.epi,
-        estaiamentos: eventConformitiesTable.estaiamentos,
-        guardaEquipamentos: eventConformitiesTable.guardaEquipamentos,
-        conduta: eventConformitiesTable.conduta,
-        epiComment: eventConformitiesTable.epiComment,
-        estaiamentosComment: eventConformitiesTable.estaiamentosComment,
-        guardaEquipamentosComment: eventConformitiesTable.guardaEquipamentosComment,
-        condutaComment: eventConformitiesTable.condutaComment,
-      }).from(eventConformitiesTable).where(eq(eventConformitiesTable.eventId, p.eventId)).limit(1),
-    ]);
+    const eventCriteriaRows = criteriaByEvent.get(p.eventId) ?? [];
+    const allEvals = evalsByEvent.get(p.eventId) ?? [];
+    const allCalibrations = calibrationsByEvent.get(p.eventId) ?? [];
+    const areaAssignmentsRaw = assignmentsByEvent.get(p.eventId) ?? [];
 
     // Itens da Matriz de Conformidade que reprovaram (false = NÃO conforme)
-    const conformity = conformityRow[0] ?? null;
+    const conformity = conformityByEvent.get(p.eventId) ?? null;
     const CONFORMITY_ITEMS = [
       { key: "epi" as const,               label: "EPI",                   commentKey: "epiComment" as const },
       { key: "estaiamentos" as const,       label: "Estaiamentos",          commentKey: "estaiamentosComment" as const },

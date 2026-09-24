@@ -8,7 +8,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { getPlatoonByScore, calculateQuarterFinalResult } from "../lib/calculations.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
-import { computeEventTeamResult } from "./results.js";
+import { computeEventTeamResultsBatch } from "./results.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
 
 const router = Router();
@@ -158,13 +158,13 @@ router.get("/ranking-detail", async (req, res) => {
 
   const validParticipations = participations.filter(p => p.eventId);
 
-  // Rodar computeEventTeamResult em PARALELO para todos os eventos não-históricos
-  // (antes era sequencial — N×5 queries em série travava o pool de conexões).
+  // Nota do time de todos os eventos não-históricos EM LOTE: 5 consultas no
+  // total (antes eram 5 por evento, disparadas em paralelo — um colaborador com
+  // ~30 eventos ocupava o pool inteiro). Mesma saída de computeEventTeamResult.
   const nonHistoricalIds = validParticipations
     .filter(p => !p.isHistorical)
     .map(p => p.eventId!);
-  const teamResultsArr = await Promise.all(nonHistoricalIds.map(id => computeEventTeamResult(id)));
-  const teamResultMap = new Map(nonHistoricalIds.map((id, i) => [id, teamResultsArr[i]]));
+  const teamResultMap = await computeEventTeamResultsBatch(nonHistoricalIds);
 
   const events = validParticipations.map(p => {
     const countsForScore = participantCountsForScore({ employmentType: employee.employmentType, functionName: p.functionName, employeeFunction: employee.functionName });

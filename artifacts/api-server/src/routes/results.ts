@@ -1,22 +1,18 @@
 import { Router } from "express";
 import {
-  db, eventsTable, eventParticipantsTable, evaluationsTable, calibrationsTable,
-  eventCriteriaTable, criteriaTable, absencesTable, quarterlyResultsTable,
+  db, eventsTable, eventParticipantsTable, calibrationsTable,
+  eventCriteriaTable, criteriaTable, quarterlyResultsTable,
   platoonRulesTable, employeesTable, employeeEventResultsTable,
-  employeeCycleEligibilityTable, areasTable, cyclesTable, eventConformitiesTable,
-  eventAreaAssignmentsTable,
+  cyclesTable, type EventConformity,
 } from "@workspace/db";
 import { eq, and, inArray, exists, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import {
-  calculateEventResult, calculateQuarterGrossAverage, calculateQuarterFinalResult, getPlatoonByScore,
-  calculateTieredBonus, calculateExtraBonusValue, selectExtraEventScores, validateCalculationExample, calculateConformitySubtotal,
-  calculateConformityPenalty, calculateFinalEventScore, validateConformityCalculationExample,
-  buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria,
-} from "../lib/calculations.js";
-import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
+import { getPlatoonByScore, validateCalculationExample, validateConformityCalculationExample } from "../lib/calculations.js";
+import { getCurrentCycle } from "../lib/cycle.js";
 import { audit } from "../lib/audit.js";
-import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
+import { participantCountsForScore } from "../lib/participation.js";
+import { buildCycleResults, computeEventTeamResultFromData, emptyEventTeamData } from "../lib/cycle-compute.js";
+import { loadCycleRecomputeInput, loadEventTeamData, loadPlatoonRules } from "../lib/cycle-data.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -29,428 +25,64 @@ if (!validateConformityCalculationExample()) {
   console.error("❌ ERRO DE CÁLCULO: exemplo de conformidade+performance da especificação deveria retornar 60");
 }
 
-type PlatoonRuleMapped = {
-  name: string; color: string; minScore: number; maxScore: number;
-  minInclusive: boolean; maxInclusive: boolean; bonusValue: number; bonusPerExtraEvent: number;
-};
-
-async function loadPlatoonRules(): Promise<PlatoonRuleMapped[]> {
-  const rows = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
-  return rows.map(r => ({
-    name: r.name, color: r.color,
-    minScore: parseFloat(r.minScore as unknown as string),
-    maxScore: parseFloat(r.maxScore as unknown as string),
-    minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
-    bonusValue: parseFloat(r.bonusValue as unknown as string),
-    bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
-  }));
-}
-
 /**
  * Calcula o resultado do TIME de um evento (uma única nota por evento).
  * A nota é por critério do evento (média das avaliações), com calibração no
  * nível do critério substituindo a média. O resultado é o mesmo para todos.
+ *
+ * Carrega os dados do evento (5 consultas) e delega para o cálculo puro em
+ * lib/cycle-compute.ts. Para VÁRIOS eventos use computeEventTeamResultsBatch
+ * (as mesmas 5 consultas para todos, em vez de 5 por evento).
  */
 export async function computeEventTeamResult(eventId: number) {
-  const eventCriteriaRows = await db
-    .select({
-      criterionId: eventCriteriaTable.criterionId,
-      criterionName: criteriaTable.name,
-      criterionDescription: criteriaTable.description,
-      responsibleAreaId: criteriaTable.responsibleAreaId,
-      responsibleAreaLabel: criteriaTable.responsibleAreaLabel,
-      responsibleAreaName: areasTable.name,
-      active: eventCriteriaTable.active,
-      originalWeight: criteriaTable.defaultWeight,
-      weightOverride: eventCriteriaTable.weightOverride,
-      displayOrder: criteriaTable.displayOrder,
-      eventScoped: criteriaTable.eventScoped,
-      sourceCriterionId: criteriaTable.sourceCriterionId,
-    })
-    .from(eventCriteriaTable)
-    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-    .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
-    .where(eq(eventCriteriaTable.eventId, eventId));
+  const data = await loadEventTeamData([eventId]);
+  return computeEventTeamResultFromData(data.get(eventId) ?? emptyEventTeamData<EventConformity>());
+}
 
-  const allEvals = await db.select().from(evaluationsTable).where(eq(evaluationsTable.eventId, eventId));
-  const allCalibrations = await db.select().from(calibrationsTable).where(eq(calibrationsTable.eventId, eventId));
-  const areaAssignments = await db.select({ areaId: eventAreaAssignmentsTable.areaId, evaluatorUserId: eventAreaAssignmentsTable.evaluatorUserId })
-    .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, eventId));
-  const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments);
-
-  // Exibe os critérios ativos + os inativos que já foram calibrados: um critério
-  // pode ter sido desativado (sai do cálculo da nota) mas continua calibrado e
-  // deve permanecer visível no detalhe do evento, em vez de "sumir". O flag
-  // `active` diferencia quem entra no cálculo/contagem (só ativos).
-  const calibratedIds = new Set(allCalibrations.map(c => c.criterionId));
-  const displayCriteria = eventCriteriaRows
-    .filter(c => c.active || calibratedIds.has(c.criterionId))
-    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-
-  const criteriaDetails = displayCriteria.map(c => {
-    const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
-    const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
-    const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
-    const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
-    const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
-    const calibrationReason = calibration?.calibrationReason ?? null;
-    const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
-    const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
-    // "Avaliado" exige que TODOS os avaliadores designados para a área do
-    // critério tenham enviado (ou que exista calibração, que sempre finaliza).
-    const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
-    const isEvaluated = calibratedScore !== null || completion.isEvaluated;
-    return {
-      criterionId: c.criterionId!,
-      criterionName: c.criterionName ?? "",
-      criterionDescription: c.criterionDescription ?? null,
-      responsibleAreaLabel: c.responsibleAreaLabel ?? c.responsibleAreaName ?? null,
-      weight,
-      averageScore,
-      calibratedScore,
-      calibrationReason,
-      scoreUsed,
-      criterionTotal,
-      requiredEvaluators: completion.requiredEvaluators,
-      submittedEvaluators: completion.submittedEvaluators,
-      status: isEvaluated ? "avaliado" : "pendente",
-      active: !!c.active,
-    };
-  });
-
-  // Regra: TODO critério exibido (ativo OU inativo-mas-calibrado) entra no
-  // cálculo da nota e na contagem — se tem calibração, conta. Só ficam de fora
-  // os inativos sem nenhuma calibração (que nem aparecem em displayCriteria).
-  // Mescla critérios duplicados (eventScoped) nos seus pais antes do cálculo:
-  // cada membro contribui com seu scoreUsed; o grupo usa o peso do critério pai.
-  const criteriaForCalc = mergeEventScopedCriteria(criteriaDetails.map(cd => {
-    const row = displayCriteria.find(r => r.criterionId === cd.criterionId);
-    return {
-      criterionId: cd.criterionId,
-      weight: cd.weight,
-      averageScore: cd.averageScore,
-      calibratedScore: cd.calibratedScore,
-      isEventScoped: row?.eventScoped ?? false,
-      sourceCriterionId: row?.sourceCriterionId ?? null,
-    };
-  }));
-
-  let eventScore = calculateEventResult(criteriaForCalc);
-
-  // Matriz de Conformidade: SIM=25/NÃO=0 por item (0-100), penalidade =
-  // (100 - Subtotal Conformidade) × 0,40, aplicada sobre o Subtotal Performance.
-  const [conformity] = await db
-    .select()
-    .from(eventConformitiesTable)
-    .where(eq(eventConformitiesTable.eventId, eventId));
-  const conformitySubtotal = conformity
-    ? calculateConformitySubtotal([conformity.epi, conformity.estaiamentos, conformity.guardaEquipamentos, conformity.conduta])
-    : 100;
-  const conformityPenalty = calculateConformityPenalty(conformitySubtotal);
-  const conformityScore = calculateFinalEventScore(eventScore, conformitySubtotal);
-
-  const hasCalibration = criteriaDetails.some(cd => cd.calibratedScore !== null);
-  // Contagem considera todos os critérios exibidos (ativos + inativos-calibrados),
-  // já que todos entram na nota.
-  const pendingCriteria = criteriaDetails.filter(cd => cd.status === "pendente").length;
-  const evaluatedCriteria = criteriaDetails.length - pendingCriteria;
-  const isComplete = criteriaDetails.length > 0 && pendingCriteria === 0;
-
-  return { criteriaDetails, eventScore, conformity, conformityPenalty, conformityScore, hasCalibration, pendingCriteria, evaluatedCriteria, totalCriteria: criteriaDetails.length, isComplete };
+/**
+ * Variante em lote de computeEventTeamResult: mesma saída por evento, com um
+ * número fixo de consultas. Todo id pedido aparece no Map.
+ */
+export async function computeEventTeamResultsBatch(eventIds: number[]) {
+  const data = await loadEventTeamData(eventIds);
+  const out = new Map<number, ReturnType<typeof computeEventTeamResultFromData<EventConformity>>>();
+  for (const id of eventIds) {
+    out.set(id, computeEventTeamResultFromData(data.get(id) ?? emptyEventTeamData<EventConformity>()));
+  }
+  return out;
 }
 
 /**
  * Recalcula e regrava os resultados do ciclo (quarterly_results) e os resultados
- * por evento (employee_event_results) de um CICLO, a partir de TODOS os eventos
- * atualmente fechados (status="closed") naquele ciclo.
+ * por evento (employee_event_results) de um CICLO, a partir dos eventos com
+ * resultsConfirmed=true naquele ciclo (independente de status).
  *
  * É idempotente: limpa o ciclo e reconstrói. Preserva o estado de pagamento
  * já acionado manualmente (aprovado/agendado/pago/bloqueado ou já pago) para não
  * descartar decisões de bônus ao reprocessar quando um novo evento é fechado.
  *
- * Consolida TODOS os colaboradores que participaram de qualquer evento do ciclo
- * (mesmo sem nota), registrando separadamente:
- *  - eventsCount = eventos COM NOTA (score > 0) — base de Soma/Média;
+ * Consolida TODOS os colaboradores que participaram de qualquer evento
+ * confirmado do ciclo (mesmo sem nota), registrando separadamente:
+ *  - eventsCount = eventos COM NOTA (nota 0 legítima conta) — base de Soma/Média;
  *  - participatedEventsCount = eventos PARTICIPADOS no ciclo — base de elegibilidade.
+ *
+ * Leitura em lote (lib/cycle-data.ts, nº fixo de consultas) + cálculo puro em
+ * memória (lib/cycle-compute.ts). Antes eram ~5 consultas por evento + 3 por
+ * colaborador (~800 num ciclo de 96 eventos).
  *
  * Usado tanto pelo fechamento manual do ciclo quanto automaticamente quando
  * um evento é fechado/reaberto/liberado, mantendo dashboard, resultados e
  * ranking sempre atualizados.
  */
 export async function recomputeCycleResults(cycleId: number, userId: number) {
-  const cycleEvents = await db.select().from(eventsTable).where(eq(eventsTable.cycleId, cycleId));
-  // Trava mestra: eventos sem resultsConfirmed=true não contam para NADA —
-  // nem participatedEventsCount/elegibilidade, nem nota — mesmo se fechados.
-  // Filtra aqui, na origem, para que todo o resto da função (participação e
-  // pontuação) já opere só sobre eventos confirmados.
-  const confirmedCycleEvents = cycleEvents.filter(e => e.resultsConfirmed);
-  const allCycleEventIds = confirmedCycleEvents.map(e => e.id);
-  // Todos os IDs do ciclo (confirmados ou não) — usado só para limpar
-  // employee_event_results por completo no rebuild, senão eventos que
-  // ficaram desconfirmados deixariam linhas antigas "fantasma" para trás.
-  const allCycleEventIdsUnfiltered = cycleEvents.map(e => e.id);
-  // Eventos confirmados (resultsConfirmed=true) contam para nota independente
-  // de status — alguns eventos são confirmados enquanto ainda estão "open" porque
-  // o responsável confirmou os resultados sem fechar formalmente o evento.
-  const scoringEvents = confirmedCycleEvents;
-  const scoringEventIds = new Set(scoringEvents.map(e => e.id));
-  const platoonRules = await loadPlatoonRules();
-  const minEvents = await getMinEventsForEligibility();
-  const warnings: string[] = [];
-
-  // Snapshot do estado de pagamento atual para preservar decisões manuais.
-  const existingRows = await db.select().from(quarterlyResultsTable)
-    .where(eq(quarterlyResultsTable.cycleId, cycleId));
-  const PRESERVE_STATUSES = ["approved", "scheduled", "paid", "blocked"];
-  const paymentByEmployee = new Map<number, typeof existingRows[number]>();
-  for (const r of existingRows) paymentByEmployee.set(r.employeeId, r);
-
-  // FASE DE LEITURA — calcula tudo antes de escrever, para gravar dentro de uma
-  // única transação (rebuild atômico: nunca deixa o ciclo vazio em caso de erro).
-
-  // 1. Nota do TIME de cada evento confirmado + linhas por evento.
-  //    Eventos históricos (isHistorical=true) já trazem a nota final PRONTA
-  //    (calibrada), importada de fora — pulamos computeEventTeamResult (que
-  //    exigiria critérios/avaliações que esses eventos não têm) e usamos
-  //    importedScore diretamente para eventScore/calibratedEventScore/
-  //    finalEventScore, sem aplicar penalidade de conformidade.
-  const eventScoreById = new Map<number, number>();
-  const eventDateById = new Map<number, string>();
-  const eventResultInserts: (typeof employeeEventResultsTable.$inferInsert)[] = [];
-  for (const ev of scoringEvents) {
-    const eventParticipantsRaw = await db.select({
-      employeeId: eventParticipantsTable.employeeId,
-      functionName: eventParticipantsTable.functionName,
-      confirmed: eventParticipantsTable.confirmed,
-      employmentType: employeesTable.employmentType,
-      employeeFunction: employeesTable.functionName,
-    })
-      .from(eventParticipantsTable)
-      .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
-      .where(eq(eventParticipantsTable.eventId, ev.id));
-    // Freelancers e funções informativas ("Sup Ceno *") participam do evento
-    // (aparecem na Equipe Alocada) mas NUNCA contam para nota — não geram
-    // linha em employee_event_results (ver lib/participation.ts). Participante
-    // marcado como INATIVO no evento (confirmed === false, "não participou de
-    // fato") também fica de fora da nota e da elegibilidade.
-    const eventParticipants = eventParticipantsRaw.filter(p => p.confirmed !== false && participantCountsForScore(p));
-
-    if (ev.isHistorical) {
-      const historicalScore = parseFloat(ev.importedScore as unknown as string);
-      eventScoreById.set(ev.id, historicalScore);
-      eventDateById.set(ev.id, ev.startDate);
-      const platoonProj = getPlatoonByScore(historicalScore, platoonRules);
-      for (const p of eventParticipants) {
-        eventResultInserts.push({
-          eventId: ev.id,
-          employeeId: p.employeeId,
-          eventScore: String(historicalScore),
-          calibratedEventScore: String(historicalScore),
-          finalEventScore: String(historicalScore),
-          platoonProjected: platoonProj?.name ?? null,
-          updatedAt: new Date(),
-        });
-      }
-      continue;
-    }
-
-    const team = await computeEventTeamResult(ev.id);
-    // Só entra na média quem tem alguma nota de critério. Sem isso, um evento
-    // com avaliação real mas nota final 0 (ex.: 4 "Não" na matriz) sumia da
-    // média e o colaborador era premiado por ter ido mal.
-    const hasAnyScore = team.criteriaDetails.some(cd => cd.scoreUsed != null);
-    if (hasAnyScore) eventScoreById.set(ev.id, team.conformityScore);
-    eventDateById.set(ev.id, ev.startDate);
-    const platoonProj = getPlatoonByScore(team.conformityScore, platoonRules);
-
-    for (const p of eventParticipants) {
-      eventResultInserts.push({
-        eventId: ev.id,
-        employeeId: p.employeeId,
-        eventScore: String(team.eventScore),
-        calibratedEventScore: team.hasCalibration ? String(team.eventScore) : null,
-        finalEventScore: String(team.conformityScore),
-        platoonProjected: platoonProj?.name ?? null,
-        updatedAt: new Date(),
-      });
-    }
-  }
-
-  // 2. Participação por colaborador em TODOS os eventos do ciclo (qualquer status).
-  //    Mesma exclusão de freela/funções informativas: essas participações não
-  //    contam para participatedEventsCount nem para a elegibilidade por nº
-  //    mínimo de eventos, já que nunca recebem nota.
-  const participationRows = allCycleEventIds.length > 0
-    ? await db.select({
-        employeeId: eventParticipantsTable.employeeId,
-        eventId: eventParticipantsTable.eventId,
-        functionName: eventParticipantsTable.functionName,
-        confirmed: eventParticipantsTable.confirmed,
-        employmentType: employeesTable.employmentType,
-        employeeFunction: employeesTable.functionName,
-      })
-        .from(eventParticipantsTable)
-        .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
-        .where(inArray(eventParticipantsTable.eventId, allCycleEventIds))
-    : [];
-  // Colaboradores que participaram como "Sup Ceno *" em QUALQUER evento do
-  // ciclo (confirmado ou não) são inelegíveis para o ranking/bônus. Usamos
-  // allCycleEventIdsUnfiltered para não deixar passar quem tem papel de Sup
-  // Ceno apenas em eventos ainda sem resultsConfirmed.
-  const supCenoCheckRows = allCycleEventIdsUnfiltered.length > 0
-    ? await db.select({
-        employeeId: eventParticipantsTable.employeeId,
-        functionName: eventParticipantsTable.functionName,
-        employeeFunction: employeesTable.functionName,
-      })
-        .from(eventParticipantsTable)
-        .leftJoin(employeesTable, eq(eventParticipantsTable.employeeId, employeesTable.id))
-        .where(inArray(eventParticipantsTable.eventId, allCycleEventIdsUnfiltered))
-    : [];
-  const supCenoEmployeeIds = new Set<number>();
-  for (const r of supCenoCheckRows) {
-    if (!r.employeeId) continue;
-    if (isInformationalFunction(r.functionName) || isInformationalFunction(r.employeeFunction)) supCenoEmployeeIds.add(r.employeeId);
-  }
-
-  const participatedByEmployee = new Map<number, Set<number>>();
-  for (const r of participationRows) {
-    if (!r.employeeId) continue;
-    // MESMO predicado usado na gravação de employee_event_results (fase 1):
-    // participante marcado como INATIVO ("não participou de fato") não conta
-    // nem para participatedEventsCount nem para a média. Sem este filtro o
-    // colaborador herdava a nota do TIME do evento (eventScoreById é a nota do
-    // evento, não a linha dele), sendo creditado por um evento em que não foi.
-    if (r.confirmed === false) continue;
-    if (!participantCountsForScore(r)) continue;
-    if (!participatedByEmployee.has(r.employeeId)) participatedByEmployee.set(r.employeeId, new Set());
-    participatedByEmployee.get(r.employeeId)!.add(r.eventId);
-  }
-
-  // 3. Consolida o resultado do ciclo por colaborador.
-  const quarterlyInserts: (typeof quarterlyResultsTable.$inferInsert)[] = [];
-  for (const [employeeId, eventSet] of participatedByEmployee) {
-    const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
-    if (!employee) continue;
-
-    const participatedCount = eventSet.size;
-
-    // Eventos COM NOTA (score > 0) dentre os confirmados que o colaborador participou.
-    const eventScores: number[] = [];
-    const scoredEventsWithDate: { score: number; date: string }[] = [];
-    for (const eventId of eventSet) {
-      if (!scoringEventIds.has(eventId)) continue;
-      const s = eventScoreById.get(eventId);
-      if (s !== undefined) {
-        eventScores.push(s);
-        const date = eventDateById.get(eventId);
-        if (date) scoredEventsWithDate.push({ score: s, date });
-      }
-    }
-    const scoredCount = eventScores.length;
-    const scoreSum = Math.round(eventScores.reduce((a, b) => a + b, 0) * 100) / 100;
-
-    const absenceRows = await db.select().from(absencesTable)
-      .where(and(eq(absencesTable.employeeId, employeeId), eq(absencesTable.cycleId, cycleId)));
-    const penaltyRows = absenceRows.filter(a => a.kind !== "merit");
-    const meritRows = absenceRows.filter(a => a.kind === "merit");
-    const totalAbsences = penaltyRows.reduce((s, a) => s + a.quantity, 0);
-
-    const grossAverage = calculateQuarterGrossAverage(eventScores);
-    const penaltyPoints = penaltyRows.reduce((s, a) => s + a.points * a.quantity, 0);
-    const meritPoints = meritRows.reduce((s, a) => s + a.points * a.quantity, 0);
-    const absencePenalty = penaltyPoints;
-    // Méritos somam, penalidades subtraem do TOTAL (soma) dos eventos, depois divide pelo nº de eventos.
-    // finalResult = (scoreSum − netPenalty) / N = grossAverage − netPenalty / N  (travado entre 0 e 100).
-    const finalResult = calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, eventScores.length);
-    const platoon = getPlatoonByScore(finalResult, platoonRules);
-
-    const [cycleElig] = await db.select().from(employeeCycleEligibilityTable)
-      .where(and(
-        eq(employeeCycleEligibilityTable.employeeId, employeeId),
-        eq(employeeCycleEligibilityTable.cycleId, cycleId),
-      )).limit(1);
-
-    let eligible = (employee.eligibleForBonus ?? true) && (employee.eligibilityStatus ?? "eligible") === "eligible";
-    let eligibilityReason: string | null = null;
-    if (!eligible) {
-      eligibilityReason = employee.eligibilityReason ?? `Colaborador inelegível (${employee.eligibilityStatus})`;
-    }
-    if (cycleElig && !cycleElig.eligible) {
-      eligible = false;
-      eligibilityReason = cycleElig.reason ?? "Inelegível neste ciclo";
-    }
-    // Regra de participação: precisa ter participado de no mínimo N eventos no ciclo.
-    if (eligible && participatedCount < minEvents) {
-      eligible = false;
-      eligibilityReason = `Participou de ${participatedCount} de ${minEvents} eventos exigidos no ciclo`;
-    }
-    // Regra: participação como "Sup Ceno *" em qualquer evento do ciclo
-    // (confirmado ou não) desqualifica do ranking/bônus. Também verifica o
-    // cargo global do colaborador como segunda camada de proteção.
-    if (eligible && (supCenoEmployeeIds.has(employeeId) || isInformationalFunction(employee.functionName))) {
-      eligible = false;
-      eligibilityReason = "Participou como Sup Ceno em um ou mais eventos do ciclo";
-    }
-
-    const extraEventScores = eligible ? selectExtraEventScores(scoredEventsWithDate, minEvents) : [];
-    const bonusValue = eligible ? calculateTieredBonus(finalResult, extraEventScores, platoonRules) : 0;
-    const extraBonusValue = eligible ? calculateExtraBonusValue(finalResult, extraEventScores, platoonRules) : 0;
-    const autoStatus = eligible ? "projected" : "not_eligible";
-
-    // Preserva decisões de pagamento já acionadas manualmente.
-    const prev = paymentByEmployee.get(employeeId);
-    const keepPayment = !!prev && (!!prev.paidAt || PRESERVE_STATUSES.includes(prev.bonusStatus));
-    // Uma recalibração pode mudar o bônus calculado mesmo com o pagamento já
-    // decidido (aprovado/agendado/pago) — o status é preservado, mas o valor
-    // recalculado pode divergir do que já foi (ou será) efetivamente pago.
-    if (keepPayment && Math.abs(bonusValue - parseFloat(prev!.bonusValue as unknown as string)) > 0.01) {
-      warnings.push(
-        `${employee.name}: bônus recalculado para R$ ${bonusValue.toFixed(2)} diverge do valor com status "${prev!.bonusStatus}" (R$ ${parseFloat(prev!.bonusValue as unknown as string).toFixed(2)}). Revise o pagamento.`
-      );
-    }
-
-    quarterlyInserts.push({
-      employeeId,
-      cycleId,
-      eventsCount: scoredCount,
-      participatedEventsCount: participatedCount,
-      scoreSum: String(scoreSum),
-      grossAverage: String(grossAverage),
-      totalAbsences,
-      absencePenalty: String(absencePenalty),
-      meritPoints: String(meritPoints),
-      finalResult: String(finalResult),
-      platoon: platoon?.name ?? null,
-      platoonColor: platoon?.color ?? null,
-      bonusValue: String(bonusValue),
-      extraBonusValue: String(extraBonusValue),
-      eligible,
-      eligibilityReason,
-      bonusStatus: keepPayment ? prev!.bonusStatus : autoStatus,
-      paymentMethod: prev?.paymentMethod ?? "Caju Saldo Livre",
-      paymentDueDate: keepPayment ? prev!.paymentDueDate : null,
-      paidAt: keepPayment ? prev!.paidAt : null,
-      paymentNotes: keepPayment ? prev!.paymentNotes : null,
-      closedAt: new Date(),
-      closedByUserId: userId,
-    });
-  }
-
-  // Alerta: colaborador com pagamento já decidido (aprovado/agendado/pago) que
-  // ficou sem NENHUMA participação que conta para nota neste ciclo (ex.: virou
-  // freela, ou todas as suas participações passaram a ser função informativa
-  // tipo "Sup Ceno *"). O rebuild atômico abaixo removeria essa linha de
-  // quarterly_results silenciosamente — avisa em vez de apagar sem aviso.
-  for (const [employeeId, prev] of paymentByEmployee) {
-    if (participatedByEmployee.has(employeeId)) continue;
-    if (!prev.paidAt && !PRESERVE_STATUSES.includes(prev.bonusStatus)) continue;
-    const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
-    warnings.push(
-      `${employee?.name ?? `Colaborador #${employeeId}`}: pagamento com status "${prev.bonusStatus}" será removido deste ciclo — não há mais participações que contam para nota (verifique se o employmentType ou a função mudou).`
-    );
-  }
+  // FASE DE LEITURA — tudo antes de escrever, para gravar dentro de uma única
+  // transação (rebuild atômico: nunca deixa o ciclo vazio em caso de erro).
+  const input = await loadCycleRecomputeInput(cycleId, userId);
+  const { eventResultInserts, quarterlyInserts, warnings } = buildCycleResults(input);
+  // Todos os IDs do ciclo (confirmados ou não) — limpa employee_event_results
+  // por completo no rebuild, senão eventos que ficaram desconfirmados deixariam
+  // linhas antigas "fantasma" para trás.
+  const allCycleEventIdsUnfiltered = input.allCycleEventIds;
 
   // FASE DE ESCRITA — rebuild atômico de todo o ciclo. A trava por ciclo
   // serializa recálculos concorrentes (confirmação em lote × calibração):

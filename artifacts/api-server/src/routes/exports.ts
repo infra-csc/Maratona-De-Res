@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, quarterlyResultsTable, employeesTable, eventsTable, absencesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
-import { computeEventTeamResult } from "./results.js";
+import { computeEventTeamResult, computeEventTeamResultsBatch } from "./results.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 
 const router = Router();
@@ -150,8 +150,10 @@ router.get("/exports/absences", requireRole("admin", "rh", "diretoria"), async (
 router.get("/exports/pending-evaluations", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
   const openEvents = await db.select().from(eventsTable).where(eq(eventsTable.status, "open"));
   const rows: Record<string, unknown>[] = [];
+  // Um carregamento em lote para todos os eventos abertos (antes: N consultas por evento).
+  const teams = await computeEventTeamResultsBatch(openEvents.map(ev => ev.id));
   for (const ev of openEvents) {
-    const team = await computeEventTeamResult(ev.id);
+    const team = teams.get(ev.id)!;
     for (const cd of team.criteriaDetails) {
       if (cd.status !== "avaliado") {
         rows.push({
