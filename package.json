@@ -8,7 +8,9 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "test": "node --import ./scripts/test/register.mjs --test \"artifacts/api-server/src/**/*.test.ts\"",
-    "codegen": "pnpm --filter @workspace/api-spec run codegen"
+    "test:routes": "node --import ./scripts/test/register.mjs --test \"artifacts/api-server/src/**/*.route.test.ts\"",
+    "codegen": "pnpm --filter @workspace/api-spec run codegen",
+    "check:api-contract": "node scripts/check-api-contract.mjs"
   },
   "private": true,
   "devDependencies": {

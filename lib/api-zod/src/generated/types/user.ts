@@ -25,4 +25,11 @@ export interface User {
   active: boolean;
   mustChangePassword?: boolean;
   createdAt?: string;
+  /** Só no "Modo Dev" (sessão de impersonação) — id do admin real. */
+  impersonatorId?: number;
+  /**
+     * Só no "Modo Dev" — nome do admin real.
+     * @nullable
+     */
+  impersonatorName?: string | null;
 }

@@ -1,44 +1,39 @@
 /**
- * Hooks de raw fetch para comentários e logs de auditoria de calibração.
- * Não usa openapi.yaml/codegen — endpoints adicionados diretamente.
+ * Hooks de comentários e da trilha de auditoria de calibração.
+ *
+ * Os endpoints estão no contrato (lib/api-spec/openapi.yaml); as chamadas
+ * passam pelas funções geradas do @workspace/api-client-react. Este arquivo
+ * mantém os nomes/assinaturas que a tela de Calibração já usa.
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAuthToken } from "./custom-fetch";
+import {
+  ApiError,
+  getCalibrationComments,
+  getGetCalibrationCommentsQueryKey,
+  createCalibrationComment,
+  deleteCalibrationComment,
+  getCalibrationAudit,
+  getGetCalibrationAuditQueryKey,
+  type CalibrationComment as GeneratedCalibrationComment,
+  type CalibrationAuditEntry as GeneratedCalibrationAuditEntry,
+} from "@workspace/api-client-react";
 
 // ---------------------------------------------------------------------------
-// Tipos
+// Tipos (aliases dos tipos gerados a partir do openapi.yaml)
 // ---------------------------------------------------------------------------
 
-export interface CalibrationComment {
-  id: number;
-  eventId: number;
-  criterionId: number;
-  text: string;
-  createdByUserId: number;
-  createdByName: string | null;
-  createdAt: string;
-}
-
-export interface CalibrationAuditEntry {
-  id: number;
-  userId: number | null;
-  userName: string | null;
-  action: string;
-  criterionId: number | null;
-  criterionName: string | null;
-  beforeJson: string | null;
-  afterJson: string | null;
-  createdAt: string;
-}
+export type CalibrationComment = GeneratedCalibrationComment;
+export type CalibrationAuditEntry = GeneratedCalibrationAuditEntry;
 
 // ---------------------------------------------------------------------------
-// Fetch helper
+// Erros
 // ---------------------------------------------------------------------------
 
 /**
- * Erro HTTP com `status` — mesmo formato dos hooks gerados (ApiError), para
- * que a tela possa distinguir 401/403 (sessão expirada) de falhas comuns.
+ * Erro HTTP com `status` e a mensagem em pt-BR que o servidor mandou em
+ * `{ error }` — para que a tela possa distinguir 401/403 (sessão expirada) de
+ * falhas comuns e mostrar o texto do servidor sem o prefixo "HTTP 400 ...".
  */
 export class ApiRequestError extends Error {
   override readonly name = "ApiRequestError";
@@ -50,31 +45,30 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const token = getAuthToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(init?.headers as Record<string, string> | undefined),
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(url, { ...init, headers });
-  if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new CustomEvent("auth:unauthorized"));
-    const err = await res.json().catch(() => ({}));
-    throw new ApiRequestError(res.status, (err as { error?: string }).error ?? `HTTP ${res.status}`);
+/**
+ * Converte o `ApiError` do cliente gerado em `ApiRequestError` com a mensagem
+ * do servidor. Em 401 avisa o AuthProvider (sessão expirada), como antes.
+ */
+export async function withServerMessage<T>(request: Promise<T>): Promise<T> {
+  try {
+    return await request;
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 401) window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      const data = e.data as { error?: unknown } | null;
+      const message = typeof data?.error === "string" && data.error.trim() ? data.error : `HTTP ${e.status}`;
+      throw new ApiRequestError(e.status, message);
+    }
+    throw e;
   }
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
 }
 
 // ---------------------------------------------------------------------------
-// Query keys
+// Query keys (as chaves geradas)
 // ---------------------------------------------------------------------------
 
-export const calibrationCommentsKey = (eventId: number) =>
-  ["calibration-comments", eventId] as const;
-export const calibrationAuditKey = (eventId: number) =>
-  ["calibration-audit", eventId] as const;
+export const calibrationCommentsKey = (eventId: number) => getGetCalibrationCommentsQueryKey({ eventId });
+export const calibrationAuditKey = (eventId: number) => getGetCalibrationAuditQueryKey({ eventId });
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -83,7 +77,7 @@ export const calibrationAuditKey = (eventId: number) =>
 export function useCalibrationComments(eventId: number | null) {
   return useQuery<CalibrationComment[]>({
     queryKey: calibrationCommentsKey(eventId ?? 0),
-    queryFn: () => apiFetch<CalibrationComment[]>(`/api/calibrations/comments?eventId=${eventId}`),
+    queryFn: ({ signal }) => withServerMessage(getCalibrationComments({ eventId: eventId as number }, { signal })),
     enabled: !!eventId,
   });
 }
@@ -91,11 +85,7 @@ export function useCalibrationComments(eventId: number | null) {
 export function useAddCalibrationComment(eventId: number) {
   const qc = useQueryClient();
   return useMutation<CalibrationComment, Error, { criterionId: number; text: string }>({
-    mutationFn: (body) =>
-      apiFetch<CalibrationComment>("/api/calibrations/comments", {
-        method: "POST",
-        body: JSON.stringify({ eventId, ...body }),
-      }),
+    mutationFn: (body) => withServerMessage(createCalibrationComment({ eventId, ...body })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: calibrationCommentsKey(eventId) });
     },
@@ -105,8 +95,7 @@ export function useAddCalibrationComment(eventId: number) {
 export function useDeleteCalibrationComment(eventId: number) {
   const qc = useQueryClient();
   return useMutation<void, Error, number>({
-    mutationFn: (id) =>
-      apiFetch<void>(`/api/calibrations/comments/${id}`, { method: "DELETE" }),
+    mutationFn: (id) => withServerMessage(deleteCalibrationComment(id)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: calibrationCommentsKey(eventId) });
     },
@@ -116,7 +105,7 @@ export function useDeleteCalibrationComment(eventId: number) {
 export function useCalibrationAudit(eventId: number | null) {
   return useQuery<CalibrationAuditEntry[]>({
     queryKey: calibrationAuditKey(eventId ?? 0),
-    queryFn: () => apiFetch<CalibrationAuditEntry[]>(`/api/calibrations/audit?eventId=${eventId}`),
+    queryFn: ({ signal }) => withServerMessage(getCalibrationAudit({ eventId: eventId as number }, { signal })),
     enabled: !!eventId,
   });
 }

@@ -1879,45 +1879,6 @@ paths:
         "204":
           description: Deleted
 
-  /review-requests:
-    get:
-      operationId: getReviewRequests
-      tags: [review-requests]
-      summary: List event review requests raised by employees
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ReviewRequest"
-
-  /review-requests/{id}/resolve:
-    patch:
-      operationId: resolveReviewRequest
-      tags: [review-requests]
-      summary: Mark a review request as resolved
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReviewRequestResolve"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ReviewRequest"
-
   /rules:
     get:
       operationId: getRules
@@ -2779,6 +2740,1114 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  # ── Endpoints declarados na rodada de contrato completo (2026-09-24) ──────────
+
+  /auth/portal-sso:
+    post:
+      operationId: portalSso
+      tags: [auth]
+      summary: SSO do portal NORTE — troca o JWT do portal por uma sessão Maratona (público)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalSsoInput"
+      responses:
+        "200":
+          description: Sessão emitida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: token ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Token SSO inválido, expirado, sem prazo ou sem e-mail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Usuário não encontrado ou inativo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /users/my-principal-areas:
+    get:
+      operationId: getMyPrincipalAreas
+      tags: [users]
+      summary: Áreas em que o usuário logado é avaliador principal (default evaluator de algum critério)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PrincipalArea"
+
+  /users/bulk-update-emails:
+    post:
+      operationId: bulkUpdateUserEmails
+      tags: [users]
+      summary: Migração one-shot dos e-mails corporativos (Office 365) — admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUpdateEmailsInput"
+      responses:
+        "200":
+          description: Prévia (dryRun) ou resultado da migração
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkUpdateEmailsResult"
+
+  /criterion-routing:
+    get:
+      operationId: getAllCriterionRoutings
+      tags: [criteria]
+      summary: Roteamento de todos os critérios (admin/rh/operador)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CriterionRouting"
+
+  /criteria/{id}/routing:
+    get:
+      operationId: getCriterionRouting
+      tags: [criteria]
+      summary: Roteamento de um critério (null quando ainda não configurado)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/CriterionRouting"
+                  - type: "null"
+    put:
+      operationId: saveCriterionRouting
+      tags: [criteria]
+      summary: Cria ou atualiza o roteamento de um critério
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CriterionRoutingInput"
+      responses:
+        "200":
+          description: Linha gravada em criterion_routing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CriterionRoutingRow"
+
+  /criteria/admin/sync-area-labels:
+    post:
+      operationId: syncCriteriaAreaLabels
+      tags: [criteria]
+      summary: Admin — sincroniza responsibleAreaLabel com o nome real da área (idempotente)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatedCount"
+
+  /calibrations/audit:
+    get:
+      operationId: getCalibrationAudit
+      tags: [calibrations]
+      summary: Trilha de auditoria das calibrações de um evento
+      parameters:
+        - name: eventId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalibrationAuditEntry"
+        "400":
+          description: eventId ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /calibrations/comments:
+    get:
+      operationId: getCalibrationComments
+      tags: [calibrations]
+      summary: Comentários de calibração de um evento
+      parameters:
+        - name: eventId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalibrationComment"
+        "400":
+          description: eventId ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      operationId: createCalibrationComment
+      tags: [calibrations]
+      summary: Adiciona comentário de calibração
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalibrationCommentInput"
+      responses:
+        "201":
+          description: Criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationComment"
+        "400":
+          description: Campos obrigatórios ausentes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /calibrations/comments/{id}:
+    delete:
+      operationId: deleteCalibrationComment
+      tags: [calibrations]
+      summary: Exclui comentário de calibração
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Excluído
+        "404":
+          description: Comentário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /employees/bulk-employment-reset:
+    post:
+      operationId: bulkEmploymentReset
+      tags: [employees]
+      summary: Redefine tipos em massa (IDs informados → casa, demais → freela) e recalcula o ciclo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkEmploymentResetInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkEmploymentResetResult"
+        "400":
+          description: Lista inválida ou vazia
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /employees/bulk-set-cpf:
+    post:
+      operationId: bulkSetEmployeeCpf
+      tags: [employees]
+      summary: Atualiza CPF (document) em lote casando pelo nome normalizado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/BulkSetCpfEntry"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkSetCpfResult"
+        "400":
+          description: Lista vazia
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /employees/casa-pins:
+    get:
+      operationId: getCasaPins
+      tags: [employees]
+      summary: Senhas (PIN = CPF) atuais dos colaboradores casa ativos
+      parameters:
+        - name: ids
+          in: query
+          required: false
+          description: IDs de colaborador separados por vírgula (ex. 1,2,3). Ausente = todos.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CasaPinsResult"
+
+  /employees/bulk-generate-pins:
+    post:
+      operationId: bulkGenerateCasaPins
+      tags: [employees]
+      summary: Gera/redefine o acesso (senha = CPF) dos colaboradores casa ativos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkGeneratePinsInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkGeneratePinsResult"
+
+  /employees/{id}/generate-pin:
+    post:
+      operationId: generateEmployeePin
+      tags: [employees]
+      summary: Gera/redefine o acesso (senha = CPF) de um colaborador casa
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratePinResult"
+        "400":
+          description: Colaborador não é casa ou está sem CPF válido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Colaborador não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/bulk-date-sync:
+    post:
+      operationId: bulkSyncEventDates
+      tags: [events]
+      summary: Define a data (início = fim) e o nome de eventos em lote a partir da planilha
+      description: |
+        Com `dryRun: true` devolve a lista do que mudaria, sem gravar. Para
+        aplicar é obrigatório enviar `confirm: "APLICAR"`; sem isso responde 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkDateSyncInput"
+      responses:
+        "200":
+          description: Prévia (dryRun) ou resultado aplicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkDateSyncResult"
+        "400":
+          description: updates ausente ou confirmação ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/confirm-results-bulk:
+    post:
+      operationId: confirmEventResultsBulk
+      tags: [events]
+      summary: Confirma os resultados de vários eventos (admin), recalculando uma vez por ciclo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmResultsBulkInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmResultsBulkResult"
+        "400":
+          description: Lista inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/admin/normalize-dates:
+    post:
+      operationId: normalizeEventDates
+      tags: [events]
+      summary: Admin one-shot — corrige 4 eventos conhecidos e unifica eventos multi-dia (início = fim)
+      description: |
+        Com `dryRun: true` devolve a lista do que mudaria, sem gravar. Para
+        aplicar é obrigatório enviar `confirm: "APLICAR"`; sem isso responde 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NormalizeDatesInput"
+      responses:
+        "200":
+          description: Prévia (dryRun) ou resultado aplicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizeDatesResult"
+        "400":
+          description: Confirmação ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/criteria/{ecId}/swap-source:
+    patch:
+      operationId: swapEventCriterionSource
+      tags: [events]
+      summary: Admin — troca o critério de origem de um quesito duplicado (eventScoped)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: ecId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapCriterionSourceInput"
+      responses:
+        "200":
+          description: Detalhe atualizado do evento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+        "400":
+          description: Quesito não duplicado ou origem inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Critério do evento (ou de origem) não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/activity-log:
+    get:
+      operationId: getEventActivityLog
+      tags: [events]
+      summary: Log consolidado de atividades do evento (até 300 entradas, mais recentes primeiro)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventActivityEntry"
+
+  /events/{id}/unrelease:
+    post:
+      operationId: unreleaseEventFeedback
+      tags: [events]
+      summary: Desfaz a liberação final do feedback do evento (admin/rh)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Evento ainda não liberado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Evento não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/criterion-assignments:
+    get:
+      operationId: getEventCriterionAssignments
+      tags: [events]
+      summary: Atribuições por critério do evento (avaliador vê as próprias e as da área em que é principal)
+      description: |
+        Para o avaliador principal, critérios da área ainda sem linha em
+        event_criterion_assignments aparecem como linhas "virtuais" (id null, status pending).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventCriterionAssignment"
+
+  /events/{id}/criterion-assignments/generate:
+    post:
+      operationId: generateCriterionAssignments
+      tags: [events]
+      summary: Gera atribuições sugeridas a partir do roteamento padrão (idempotente)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateAssignmentsResult"
+
+  /events/{id}/criterion-assignments/{criterionId}:
+    patch:
+      operationId: updateCriterionAssignment
+      tags: [events]
+      summary: Confirma, reatribui, redireciona ou atribui (principal da área) um critério do evento
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: criterionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CriterionAssignmentUpdate"
+      responses:
+        "200":
+          description: Linha gravada em event_criterion_assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventCriterionAssignmentRow"
+        "400":
+          description: Regra de redirecionamento/atribuição violada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Sem permissão
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/criterion-assignments/redirect-options/{criterionId}:
+    get:
+      operationId: getCriterionRedirectOptions
+      tags: [events]
+      summary: Usuários para os quais o critério pode ser redirecionado (conforme o roteamento)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: criterionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdName"
+
+  /events/{id}/public-link-eligible-criteria:
+    get:
+      operationId: getPublicLinkEligibleCriteria
+      tags: [events]
+      summary: Critérios do questionário do avaliador logado que podem entrar num link público
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicLinkEligibleCriterion"
+
+  /events/{id}/public-token:
+    post:
+      operationId: createPublicToken
+      tags: [events]
+      summary: Gera link público do questionário do avaliador logado
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicTokenInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicTokenCreated"
+        "400":
+          description: Nome ausente ou nenhum critério elegível
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/admin-public-token:
+    post:
+      operationId: createAdminPublicToken
+      tags: [events]
+      summary: Admin/RH/Diretoria/Operador — gera link público para o questionário de um avaliador designado
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminPublicTokenInput"
+      responses:
+        "200":
+          description: OK (reused=true quando um link pendente equivalente foi reaproveitado)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicTokenCreated"
+        "400":
+          description: Parâmetros ausentes ou nenhum critério válido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/public-tokens:
+    get:
+      operationId: getPublicTokens
+      tags: [events]
+      summary: Links públicos (critérios) gerados pelo avaliador logado no evento
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicToken"
+
+  /events/{id}/public-token/conformity:
+    post:
+      operationId: createConformityPublicToken
+      tags: [events]
+      summary: Gera (ou reaproveita) o link público do formulário de conformidade Cenografia
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConformityPublicTokenInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicTokenCreated"
+        "400":
+          description: Nome ausente ou evento fechado para avaliações
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Usuário não é o avaliador de conformidade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Evento não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Formulário já respondido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/public-token/conformity-ferramentas:
+    post:
+      operationId: createFerramentasPublicToken
+      tags: [events]
+      summary: Gera (ou reaproveita) o link público do formulário de conformidade Ferramentas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConformityPublicTokenInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicTokenCreated"
+        "400":
+          description: Nome ausente ou evento fechado para avaliações
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Usuário não é o avaliador de conformidade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Evento não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Formulário já respondido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /events/{id}/public-tokens/conformity:
+    get:
+      operationId: getConformityPublicTokens
+      tags: [events]
+      summary: Links de conformidade Cenografia gerados pelo avaliador logado
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK (sem createdByName)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicToken"
+
+  /events/{id}/public-tokens/conformity-ferramentas:
+    get:
+      operationId: getFerramentasPublicTokens
+      tags: [events]
+      summary: Links de conformidade Ferramentas gerados pelo avaliador logado
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK (sem createdByName)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicToken"
+
+  /events/{id}/public-tokens/all:
+    get:
+      operationId: getAllPublicTokens
+      tags: [events]
+      summary: Admin/RH/Operador — todos os links públicos do evento (qualquer avaliador/formulário)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminPublicToken"
+
+  /public-eval/{token}:
+    get:
+      operationId: getPublicEval
+      tags: [evaluations]
+      summary: Dados do link público de avaliação (público, sem autenticação)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicEvalInfo"
+        "404":
+          description: Link não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /public-eval/{token}/submit:
+    post:
+      operationId: submitPublicEval
+      tags: [evaluations]
+      summary: Envia as notas do questionário pelo link público (público, sem autenticação)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicEvalSubmitInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Dados inválidos ou evento fechado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Link não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Link já utilizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /public-eval/{token}/submit-conformity:
+    post:
+      operationId: submitPublicEvalConformity
+      tags: [evaluations]
+      summary: Envia o formulário de conformidade pelo link público (público, sem autenticação)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicEvalConformityInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Dados inválidos ou evento fechado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Link não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Link já utilizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /public-eval-tokens/{tokenId}:
+    delete:
+      operationId: deletePublicEvalToken
+      tags: [evaluations]
+      summary: Exclui um link público ainda não respondido (dono do link ou admin/rh)
+      parameters:
+        - name: tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "403":
+          description: Sem permissão
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Token não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Link já respondido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /platoon-rules/replace-all:
+    post:
+      operationId: replaceAllPlatoonRules
+      tags: [platoon-rules]
+      summary: Substitui todas as faixas de bônus de uma vez (valida sobreposição e cobertura)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceAllPlatoonRulesInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplaceAllPlatoonRulesResult"
+        "400":
+          description: Lista vazia ou faixas inconsistentes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /my-performance:
+    get:
+      operationId: getMyPerformance
+      tags: [results]
+      summary: Desempenho do colaborador logado no ciclo atual
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyPerformance"
+        "404":
+          description: Usuário sem colaborador vinculado, sem ciclo ativo ou colaborador inexistente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   schemas:
     UploadUrlRequest:
@@ -2901,6 +3970,12 @@ components:
           type: boolean
         createdAt:
           type: string
+        impersonatorId:
+          type: integer
+          description: Só no "Modo Dev" (sessão de impersonação) — id do admin real.
+        impersonatorName:
+          type: ["string", "null"]
+          description: Só no "Modo Dev" — nome do admin real.
 
     UserInput:
       type: object
@@ -4101,42 +5176,6 @@ components:
           type: ["string", "null"]
         createdAt:
           type: string
-
-    ReviewRequest:
-      type: object
-      required: [id, eventId, employeeId, comment, status, createdAt]
-      properties:
-        id:
-          type: integer
-        eventId:
-          type: integer
-        eventName:
-          type: ["string", "null"]
-        employeeId:
-          type: integer
-        employeeName:
-          type: ["string", "null"]
-        comment:
-          type: string
-        status:
-          type: string
-          enum: [pending, resolved, approved, denied]
-        createdAt:
-          type: string
-        resolvedAt:
-          type: ["string", "null"]
-        resolutionNotes:
-          type: ["string", "null"]
-
-    ReviewRequestResolve:
-      type: object
-      properties:
-        resolution:
-          type: string
-          enum: [approved, denied]
-          description: Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido).
-        resolutionNotes:
-          type: ["string", "null"]
 
     AbsenceInput:
       type: object
@@ -5743,3 +6782,1092 @@ components:
           type: string
         data:
           type: string
+
+    # ── Schemas dos endpoints declarados em 2026-09-24 ──────────────────────────
+
+    IdName:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    UpdatedCount:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+
+    PortalSsoInput:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: JWT HS256 emitido pelo portal NORTE (issuer "norte-portal").
+
+    PrincipalArea:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    BulkUpdateEmailsInput:
+      type: object
+      properties:
+        dryRun:
+          type: boolean
+          description: true = só devolve a prévia, sem gravar.
+
+    EmailMigrationPreviewItem:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [not_found, will_update, no_change]
+        name:
+          type: string
+          description: Ausente quando status = not_found.
+        email:
+          type: string
+          description: Presente só quando status = not_found (e-mail do mapa).
+        emailFrom:
+          type: ["string", "null"]
+        emailTo:
+          type: string
+
+    BulkUpdateEmailsResult:
+      type: object
+      required: [dryRun, preview]
+      properties:
+        dryRun:
+          type: boolean
+        updated:
+          type: integer
+          description: Presente só quando dryRun = false.
+        preview:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailMigrationPreviewItem"
+
+    CriterionRoutingRedirectMode:
+      type: string
+      enum: [none, area, specific]
+
+    CriterionRouting:
+      type: object
+      description: |
+        Roteamento de um critério. `id` e `redirectUsers` só vêm no GET de um
+        critério específico; a listagem geral não os inclui.
+      required: [criterionId, defaultEvaluatorId, defaultEvaluatorName, conformityEvaluatorId, conformityEvaluatorName, commentRequired, redirectMode, redirectAreaId, redirectAreaName, allowPublicLink]
+      properties:
+        id:
+          type: integer
+        criterionId:
+          type: integer
+        defaultEvaluatorId:
+          type: ["integer", "null"]
+        defaultEvaluatorName:
+          type: ["string", "null"]
+        conformityEvaluatorId:
+          type: ["integer", "null"]
+        conformityEvaluatorName:
+          type: ["string", "null"]
+        commentRequired:
+          type: boolean
+        redirectMode:
+          $ref: "#/components/schemas/CriterionRoutingRedirectMode"
+        redirectAreaId:
+          type: ["integer", "null"]
+        redirectAreaName:
+          type: ["string", "null"]
+        allowPublicLink:
+          type: boolean
+        redirectUsers:
+          type: array
+          items:
+            $ref: "#/components/schemas/IdName"
+
+    CriterionRoutingInput:
+      type: object
+      properties:
+        defaultEvaluatorId:
+          type: ["integer", "null"]
+        conformityEvaluatorId:
+          type: ["integer", "null"]
+        commentRequired:
+          type: boolean
+          description: Padrão true (só false explícito desliga).
+        redirectMode:
+          $ref: "#/components/schemas/CriterionRoutingRedirectMode"
+        redirectAreaId:
+          type: ["integer", "null"]
+        allowPublicLink:
+          type: boolean
+        redirectUserIds:
+          type: array
+          description: Usado só com redirectMode = specific (substitui a lista).
+          items:
+            type: integer
+
+    CriterionRoutingRow:
+      type: object
+      required: [id, criterionId, defaultEvaluatorId, conformityEvaluatorId, commentRequired, redirectMode, redirectAreaId, allowPublicLink, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        criterionId:
+          type: integer
+        defaultEvaluatorId:
+          type: ["integer", "null"]
+        conformityEvaluatorId:
+          type: ["integer", "null"]
+        commentRequired:
+          type: boolean
+        redirectMode:
+          $ref: "#/components/schemas/CriterionRoutingRedirectMode"
+        redirectAreaId:
+          type: ["integer", "null"]
+        allowPublicLink:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CriterionAssignmentStatus:
+      type: string
+      enum: [pending, suggested, confirmed, submitted]
+
+    EventCriterionAssignment:
+      type: object
+      required: [id, eventId, criterionId, criterionName, criterionAreaId, assignedToId, assignedToName, status, redirectedFromId, redirectedFromName, confirmedAt, updatedAt, createdAt]
+      properties:
+        id:
+          type: ["integer", "null"]
+          description: null nas linhas "virtuais" do avaliador principal (critério ainda sem atribuição gravada).
+        eventId:
+          type: integer
+        criterionId:
+          type: integer
+        criterionName:
+          type: ["string", "null"]
+        criterionAreaId:
+          type: ["integer", "null"]
+        assignedToId:
+          type: ["integer", "null"]
+        assignedToName:
+          type: ["string", "null"]
+        status:
+          $ref: "#/components/schemas/CriterionAssignmentStatus"
+        redirectedFromId:
+          type: ["integer", "null"]
+        redirectedFromName:
+          type: ["string", "null"]
+        confirmedAt:
+          type: ["string", "null"]
+          format: date-time
+        updatedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: ["string", "null"]
+          format: date-time
+
+    EventCriterionAssignmentRow:
+      type: object
+      required: [id, eventId, criterionId, assignedToId, status, redirectedFromId, confirmedByUserId, confirmedAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        criterionId:
+          type: integer
+        assignedToId:
+          type: ["integer", "null"]
+        status:
+          $ref: "#/components/schemas/CriterionAssignmentStatus"
+        redirectedFromId:
+          type: ["integer", "null"]
+        confirmedByUserId:
+          type: ["integer", "null"]
+        confirmedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CriterionAssignmentUpdate:
+      type: object
+      properties:
+        assignedToId:
+          type: ["integer", "null"]
+        action:
+          type: string
+          enum: [confirm, redirect, assign]
+          description: Ausente = confirmação/reatribuição por admin/rh.
+
+    GenerateAssignmentsResult:
+      type: object
+      required: [generated, skipped]
+      properties:
+        generated:
+          type: integer
+        skipped:
+          type: integer
+
+    PublicLinkEligibleCriterion:
+      type: object
+      required: [criterionId, criterionName]
+      properties:
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+
+    PublicTokenInput:
+      type: object
+      required: [recipientName]
+      properties:
+        recipientName:
+          type: string
+        criterionIds:
+          type: array
+          description: Restringe o link a estes critérios (interseção com os elegíveis).
+          items:
+            type: integer
+        includeConformity:
+          type: boolean
+
+    AdminPublicTokenInput:
+      type: object
+      required: [assignedToUserId, criterionIds]
+      properties:
+        assignedToUserId:
+          type: integer
+        criterionIds:
+          type: array
+          items:
+            type: integer
+        recipientName:
+          type: string
+        includeConformity:
+          type: boolean
+
+    ConformityPublicTokenInput:
+      type: object
+      required: [recipientName]
+      properties:
+        recipientName:
+          type: string
+
+    PublicTokenCreated:
+      type: object
+      required: [tokenId]
+      properties:
+        tokenId:
+          type: string
+        reused:
+          type: boolean
+          description: true quando um link pendente equivalente foi devolvido em vez de criar outro.
+
+    PublicToken:
+      type: object
+      required: [id, recipientName, submitterName, usedAt, createdAt]
+      properties:
+        id:
+          type: string
+        recipientName:
+          type: ["string", "null"]
+        submitterName:
+          type: ["string", "null"]
+        usedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        createdByName:
+          type: ["string", "null"]
+          description: Só na lista de links de critérios (as listas de conformidade não trazem).
+
+    PublicTokenType:
+      type: string
+      enum: [criteria, criteria_with_conformity, conformity_cenografia, conformity_ferramentas]
+
+    AdminPublicToken:
+      type: object
+      required: [id, tokenType, recipientName, submitterName, usedAt, createdAt, createdByName, createdByUserId, criterionIds]
+      properties:
+        id:
+          type: string
+        tokenType:
+          $ref: "#/components/schemas/PublicTokenType"
+        recipientName:
+          type: ["string", "null"]
+        submitterName:
+          type: ["string", "null"]
+        usedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        createdByName:
+          type: ["string", "null"]
+        createdByUserId:
+          type: ["integer", "null"]
+        criterionIds:
+          type: array
+          items:
+            type: integer
+
+    PublicEvalCriterion:
+      type: object
+      required: [criterionId, criterionName, criterionDescription]
+      properties:
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        criterionDescription:
+          type: ["string", "null"]
+
+    PublicEvalInfo:
+      type: object
+      required: [tokenId, tokenType, isUsed, usedAt, recipientName, submitterName, eventName, eventStatus, criteria]
+      properties:
+        tokenId:
+          type: string
+        tokenType:
+          $ref: "#/components/schemas/PublicTokenType"
+        isUsed:
+          type: boolean
+        usedAt:
+          type: ["string", "null"]
+          format: date-time
+        recipientName:
+          type: ["string", "null"]
+        submitterName:
+          type: ["string", "null"]
+        eventName:
+          type: ["string", "null"]
+        eventStatus:
+          type: ["string", "null"]
+        criteria:
+          type: array
+          description: Vazio nos links de conformidade.
+          items:
+            $ref: "#/components/schemas/PublicEvalCriterion"
+
+    PublicEvalAnswer:
+      type: object
+      required: [criterionId, score]
+      properties:
+        criterionId:
+          type: integer
+        score:
+          type: number
+          minimum: 0
+          maximum: 10
+        comments:
+          type: string
+
+    PublicEvalSubmitInput:
+      type: object
+      required: [submitterName, evaluations]
+      description: |
+        Nos links `criteria_with_conformity` também exige os campos da
+        conformidade Cenografia (epi, estaiamentos, conduta, absencesReport,
+        standoutResponse e comentários quando a resposta é Não).
+      properties:
+        submitterName:
+          type: string
+        evaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicEvalAnswer"
+        epi:
+          type: ["boolean", "null"]
+        estaiamentos:
+          type: ["boolean", "null"]
+        conduta:
+          type: ["boolean", "null"]
+        epiComment:
+          type: ["string", "null"]
+        estaiamentosComment:
+          type: ["string", "null"]
+        condutaComment:
+          type: ["string", "null"]
+        absencesResponse:
+          type: ["boolean", "null"]
+        absencesReport:
+          type: ["string", "null"]
+        standoutResponse:
+          type: ["boolean", "null"]
+        standoutJustification:
+          type: ["string", "null"]
+
+    PublicEvalConformityInput:
+      type: object
+      required: [submitterName]
+      description: |
+        Cenografia: epi, estaiamentos e conduta obrigatórios (comentário quando Não).
+        Ferramentas: guardaEquipamentos obrigatório (comentário quando Não).
+      properties:
+        submitterName:
+          type: string
+        epi:
+          type: ["boolean", "null"]
+        estaiamentos:
+          type: ["boolean", "null"]
+        conduta:
+          type: ["boolean", "null"]
+        epiComment:
+          type: ["string", "null"]
+        estaiamentosComment:
+          type: ["string", "null"]
+        condutaComment:
+          type: ["string", "null"]
+        absencesResponse:
+          type: ["boolean", "null"]
+        absencesReport:
+          type: ["string", "null"]
+        standoutResponse:
+          type: ["boolean", "null"]
+        standoutJustification:
+          type: ["string", "null"]
+        guardaEquipamentos:
+          type: ["boolean", "null"]
+        guardaEquipamentosComment:
+          type: ["string", "null"]
+
+    CalibrationAuditEntry:
+      type: object
+      required: [id, userId, userName, action, entityId, beforeJson, afterJson, createdAt, criterionId, criterionName]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        userName:
+          type: ["string", "null"]
+        action:
+          type: string
+        entityId:
+          type: ["string", "null"]
+          description: ID da calibração (texto, como gravado em audit_logs).
+        beforeJson:
+          type: ["string", "null"]
+        afterJson:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        criterionId:
+          type: ["integer", "null"]
+        criterionName:
+          type: ["string", "null"]
+
+    CalibrationComment:
+      type: object
+      required: [id, eventId, criterionId, text, createdByUserId, createdByName, createdAt]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        criterionId:
+          type: integer
+        text:
+          type: string
+        createdByUserId:
+          type: integer
+        createdByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    CalibrationCommentInput:
+      type: object
+      required: [eventId, criterionId, text]
+      properties:
+        eventId:
+          type: integer
+        criterionId:
+          type: integer
+        text:
+          type: string
+
+    BulkEmploymentResetInput:
+      type: object
+      required: [casaIds]
+      properties:
+        casaIds:
+          type: array
+          items:
+            type: integer
+
+    BulkEmploymentResetResult:
+      type: object
+      required: [ok, casaCount]
+      properties:
+        ok:
+          type: boolean
+        casaCount:
+          type: integer
+          description: Colaboradores casa ativos após a operação.
+
+    BulkSetCpfEntry:
+      type: object
+      required: [name, document]
+      properties:
+        name:
+          type: string
+        document:
+          type: string
+
+    BulkSetCpfResult:
+      type: object
+      required: [updated, notFound]
+      properties:
+        updated:
+          type: array
+          items:
+            $ref: "#/components/schemas/IdName"
+        notFound:
+          type: array
+          items:
+            type: string
+
+    CasaPin:
+      type: object
+      required: [name, cpfLogin, pin]
+      properties:
+        name:
+          type: string
+        cpfLogin:
+          type: ["string", "null"]
+        pin:
+          type: string
+
+    CasaPinsResult:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CasaPin"
+
+    BulkGeneratePinsInput:
+      type: object
+      properties:
+        ids:
+          type: array
+          description: Restringe aos colaboradores informados. Ausente/vazio = todos os casa ativos.
+          items:
+            type: integer
+
+    GeneratedPin:
+      type: object
+      required: [name, cpfLogin, pin]
+      properties:
+        name:
+          type: string
+        cpfLogin:
+          type: string
+        pin:
+          type: string
+
+    SkippedPin:
+      type: object
+      required: [name, reason]
+      properties:
+        name:
+          type: string
+        reason:
+          type: string
+
+    BulkGeneratePinsResult:
+      type: object
+      required: [results, skipped]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedPin"
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkippedPin"
+
+    GeneratePinResult:
+      type: object
+      required: [pin, cpfLogin, userCreated]
+      properties:
+        pin:
+          type: string
+        cpfLogin:
+          type: string
+        userCreated:
+          type: boolean
+
+    EventDateChange:
+      type: object
+      required: [eventId, eventName, newName, startDateBefore, endDateBefore, startDateAfter, endDateAfter, reason]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+          description: Nome atual do evento.
+        newName:
+          type: ["string", "null"]
+          description: Novo nome (bulk-date-sync), ou null quando o nome não muda.
+        startDateBefore:
+          type: string
+        endDateBefore:
+          type: string
+        startDateAfter:
+          type: string
+        endDateAfter:
+          type: string
+        reason:
+          type: ["string", "null"]
+          description: normalize-dates — "fix" (correção pontual) ou "normalize" (multi-dia → data única).
+
+    BulkDateSyncRow:
+      type: object
+      required: [externalId, name, date]
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        date:
+          type: string
+          description: AAAA-MM-DD
+
+    BulkDateSyncInput:
+      type: object
+      required: [updates]
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkDateSyncRow"
+        dryRun:
+          type: boolean
+          description: true = só devolve a prévia, sem gravar.
+        confirm:
+          type: string
+          description: Precisa ser exatamente "APLICAR" para gravar.
+
+    BulkDateSyncResult:
+      type: object
+      required: [dryRun, updated, changeCount, unchanged, notFound, notFoundIds, changes]
+      properties:
+        dryRun:
+          type: boolean
+        updated:
+          type: integer
+          description: Eventos gravados (0 no dryRun).
+        changeCount:
+          type: integer
+          description: Linhas da planilha que mudam algum evento.
+        unchanged:
+          type: integer
+          description: Linhas localizadas cujo evento já está com a data/nome informados.
+        notFound:
+          type: integer
+        notFoundIds:
+          type: array
+          items:
+            type: string
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventDateChange"
+
+    NormalizeDatesInput:
+      type: object
+      properties:
+        dryRun:
+          type: boolean
+          description: true = só devolve a prévia, sem gravar.
+        confirm:
+          type: string
+          description: Precisa ser exatamente "APLICAR" para gravar.
+
+    NormalizeDatesResult:
+      type: object
+      required: [dryRun, ok, fixedCount, normalizedCount, changes]
+      properties:
+        dryRun:
+          type: boolean
+        ok:
+          type: boolean
+        fixedCount:
+          type: integer
+        normalizedCount:
+          type: integer
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventDateChange"
+
+    ConfirmResultsBulkInput:
+      type: object
+      required: [eventIds]
+      properties:
+        eventIds:
+          type: array
+          maxItems: 200
+          items:
+            type: integer
+
+    ConfirmResultsBulkResult:
+      type: object
+      required: [confirmed, skipped, warnings]
+      properties:
+        confirmed:
+          type: integer
+        skipped:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+
+    SwapCriterionSourceInput:
+      type: object
+      required: [sourceCriterionId]
+      properties:
+        sourceCriterionId:
+          type: integer
+
+    EventActivityEntry:
+      type: object
+      required: [id, kind, label, userName, criterionName, score, detail, createdAt]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          description: eval | calibration | cal_comment | event_comment | publish | publish_final | conformity | audit
+        label:
+          type: string
+        userName:
+          type: ["string", "null"]
+        criterionName:
+          type: ["string", "null"]
+        score:
+          type: ["number", "null"]
+        detail:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    ReplaceAllPlatoonRuleItem:
+      type: object
+      required: [minScore, maxScore]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+        minScore:
+          type: number
+        maxScore:
+          type: number
+        minInclusive:
+          type: boolean
+        maxInclusive:
+          type: boolean
+        bonusValue:
+          type: number
+        bonusPerExtraEvent:
+          type: number
+        description:
+          type: ["string", "null"]
+
+    ReplaceAllPlatoonRulesInput:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ReplaceAllPlatoonRuleItem"
+
+    ReplaceAllPlatoonRulesResult:
+      type: object
+      required: [replaced]
+      properties:
+        replaced:
+          type: integer
+
+    MyPerformanceEmployee:
+      type: object
+      required: [id, name, department, functionName, eligible, eligibilityStatus]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        department:
+          type: string
+        functionName:
+          type: string
+        eligible:
+          type: boolean
+        eligibilityStatus:
+          type: string
+
+    MyPerformanceSummary:
+      type: object
+      required: [grossAverage, currentPlatoon, currentPlatoonColor, currentPlatoonMinScore, currentPlatoonMaxScore, nextPlatoon, nextPlatoonColor, nextPlatoonMinScore, projectedBonus, bonusStatus, eligible, totalEvents, closedEvents, openEvents, confirmedEvents, scoredEventsCount, participatedEventsCount, minEventsForEligibility, totalAbsences, penaltyPoints, meritPoints, isQuarterClosed, finalResult, absencePenalty, paymentMethod, hasQuarterSnapshot]
+      properties:
+        grossAverage:
+          type: ["number", "null"]
+        currentPlatoon:
+          type: ["string", "null"]
+        currentPlatoonColor:
+          type: ["string", "null"]
+        currentPlatoonMinScore:
+          type: ["number", "null"]
+        currentPlatoonMaxScore:
+          type: ["number", "null"]
+        nextPlatoon:
+          type: ["string", "null"]
+        nextPlatoonColor:
+          type: ["string", "null"]
+        nextPlatoonMinScore:
+          type: ["number", "null"]
+        projectedBonus:
+          type: ["number", "null"]
+        bonusStatus:
+          type: ["string", "null"]
+        eligible:
+          type: boolean
+        totalEvents:
+          type: integer
+        closedEvents:
+          type: integer
+        openEvents:
+          type: integer
+        confirmedEvents:
+          type: integer
+        scoredEventsCount:
+          type: integer
+        participatedEventsCount:
+          type: integer
+        minEventsForEligibility:
+          type: integer
+        totalAbsences:
+          type: integer
+        penaltyPoints:
+          type: number
+        meritPoints:
+          type: number
+        isQuarterClosed:
+          type: boolean
+        finalResult:
+          type: ["number", "null"]
+        absencePenalty:
+          type: ["number", "null"]
+        paymentMethod:
+          type: string
+        hasQuarterSnapshot:
+          type: boolean
+
+    MyPerformanceAdjustment:
+      type: object
+      required: [id, kind, penaltyType, points, quantity, totalPoints, date, reason, eventName]
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [penalty, merit]
+        penaltyType:
+          type: string
+          description: Rótulo do tipo de penalidade/mérito.
+        points:
+          type: number
+        quantity:
+          type: integer
+        totalPoints:
+          type: number
+        date:
+          type: string
+        reason:
+          type: ["string", "null"]
+        eventName:
+          type: ["string", "null"]
+
+    MyPerformanceConformityItem:
+      type: object
+      required: [label, comment]
+      properties:
+        label:
+          type: string
+        comment:
+          type: ["string", "null"]
+
+    MyPerformanceCriterion:
+      type: object
+      required: [criterionId, criterionName, criterionDescription, responsibleAreaLabel, weight, scoreUsed, criterionTotal, publicComments, calibrationReason, evaluated, status, partialPublishedAt, finalPublishedAt]
+      properties:
+        criterionId:
+          type: integer
+        criterionName:
+          type: string
+        criterionDescription:
+          type: ["string", "null"]
+        responsibleAreaLabel:
+          type: ["string", "null"]
+        weight:
+          type: number
+        scoreUsed:
+          type: ["number", "null"]
+        criterionTotal:
+          type: ["number", "null"]
+        publicComments:
+          type: array
+          items:
+            type: string
+        calibrationReason:
+          type: ["string", "null"]
+          description: Só preenchido depois da publicação (parcial ou final).
+        evaluated:
+          type: boolean
+        status:
+          type: string
+          enum: [avaliado, pendente]
+        partialPublishedAt:
+          type: ["string", "null"]
+          format: date-time
+        finalPublishedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    MyPerformanceEvent:
+      type: object
+      required: [eventId, eventName, city, state, location, startDate, endDate, status, hasScore, feedbackReleased, feedbackReleasedAt, criteriaConfirmed, criteriaConfirmedAt, partialPublishedAt, eventScore, teamScore, rawTeamScore, conformityPenalty, conformityFailedItems, projectedPlatoon, projectedPlatoonColor, evaluatedCriteria, totalCriteria, criteriaDetails, countsForScore, resultsConfirmed, isHistorical]
+      properties:
+        eventId:
+          type: integer
+        eventName:
+          type: string
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        status:
+          type: string
+        hasScore:
+          type: boolean
+        feedbackReleased:
+          type: boolean
+        feedbackReleasedAt:
+          type: ["string", "null"]
+          format: date-time
+        criteriaConfirmed:
+          type: boolean
+        criteriaConfirmedAt:
+          type: ["string", "null"]
+          format: date-time
+        partialPublishedAt:
+          type: ["string", "null"]
+          format: date-time
+        eventScore:
+          type: number
+        teamScore:
+          type: number
+        rawTeamScore:
+          type: ["number", "null"]
+          description: Nota bruta do snapshot oficial (antes da penalidade da Matriz).
+        conformityPenalty:
+          type: number
+        conformityFailedItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyPerformanceConformityItem"
+        projectedPlatoon:
+          type: ["string", "null"]
+        projectedPlatoonColor:
+          type: ["string", "null"]
+        evaluatedCriteria:
+          type: integer
+        totalCriteria:
+          type: integer
+        criteriaDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyPerformanceCriterion"
+        countsForScore:
+          type: boolean
+        resultsConfirmed:
+          type: boolean
+        isHistorical:
+          type: boolean
+
+    MyPerformance:
+      type: object
+      required: [employee, cycle, summary, adjustments, events]
+      properties:
+        employee:
+          $ref: "#/components/schemas/MyPerformanceEmployee"
+        cycle:
+          $ref: "#/components/schemas/IdName"
+        summary:
+          $ref: "#/components/schemas/MyPerformanceSummary"
+        adjustments:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyPerformanceAdjustment"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyPerformanceEvent"

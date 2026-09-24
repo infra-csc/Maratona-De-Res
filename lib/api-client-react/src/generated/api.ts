@@ -23,6 +23,8 @@ import type {
   Absence,
   AbsenceInput,
   AbsenceUpdate,
+  AdminPublicToken,
+  AdminPublicTokenInput,
   AnalyticsOverview,
   Area,
   AreaConformityRouting,
@@ -33,18 +35,39 @@ import type {
   AuditLogPage,
   AuthResponse,
   BonusPaymentInput,
+  BulkDateSyncInput,
+  BulkDateSyncResult,
+  BulkEmploymentResetInput,
+  BulkEmploymentResetResult,
   BulkGenerateAccessInput,
   BulkGenerateAccessResult,
+  BulkGeneratePinsInput,
+  BulkGeneratePinsResult,
+  BulkSetCpfEntry,
+  BulkSetCpfResult,
+  BulkUpdateEmailsInput,
+  BulkUpdateEmailsResult,
   Calibration,
+  CalibrationAuditEntry,
+  CalibrationComment,
+  CalibrationCommentInput,
   CalibrationInput,
+  CasaPinsResult,
   ChangePasswordInput,
   CloseQuarterInput,
   CollaboratorsWithoutAccessPreview,
+  ConfirmResultsBulkInput,
+  ConfirmResultsBulkResult,
   ConformityEvaluatorInput,
   ConformityEvaluatorRedirectInput,
+  ConformityPublicTokenInput,
   CreateCycleInput,
   Criterion,
+  CriterionAssignmentUpdate,
   CriterionInput,
+  CriterionRouting,
+  CriterionRoutingInput,
+  CriterionRoutingRow,
   CriterionUpdate,
   CsvExport,
   CsvImportInput,
@@ -63,6 +86,7 @@ import type {
   EvaluationInput,
   EvaluationUpdate,
   Event,
+  EventActivityEntry,
   EventAssignmentsUpdate,
   EventComment,
   EventCommentInput,
@@ -71,6 +95,8 @@ import type {
   EventCriteriaConfirm,
   EventCriteriaUpdate,
   EventCriterion,
+  EventCriterionAssignment,
+  EventCriterionAssignmentRow,
   EventCriterionDuplicate,
   EventDetail,
   EventFeedback,
@@ -85,9 +111,14 @@ import type {
   FixCalibrationCriteria200,
   FixOrphanedEvaluations200,
   ForceCloseInput,
+  GenerateAssignmentsResult,
+  GeneratePinResult,
   GetAbsencesParams,
   GetAuditLogsParams,
+  GetCalibrationAuditParams,
+  GetCalibrationCommentsParams,
   GetCalibrationsParams,
+  GetCasaPinsParams,
   GetCollaboratorsWithoutAccessParams,
   GetCycleEligibilityParams,
   GetEmployeesParams,
@@ -100,6 +131,7 @@ import type {
   HistoricalImportInput,
   HistoricalImportResult,
   HistoricalResultUpdate,
+  IdName,
   ImpersonateInput,
   ImportResult,
   IntegrationStatus,
@@ -111,12 +143,25 @@ import type {
   MergeUserInput,
   MergeUserResult,
   MigrateCriteriaCatalog200,
+  MyPerformance,
+  NormalizeDatesInput,
+  NormalizeDatesResult,
+  OkResponse,
   PenaltyType,
   PenaltyTypeInput,
   PlatoonDistribution,
   PlatoonRule,
   PlatoonRuleInput,
   PlatoonRuleUpdate,
+  PortalSsoInput,
+  PrincipalArea,
+  PublicEvalConformityInput,
+  PublicEvalInfo,
+  PublicEvalSubmitInput,
+  PublicLinkEligibleCriterion,
+  PublicToken,
+  PublicTokenCreated,
+  PublicTokenInput,
   PublishAllCriteriaFinalFeedback200,
   PublishAllCriteriaPartialFeedback200,
   PublishCriterionFinalFeedback200,
@@ -127,20 +172,23 @@ import type {
   QuarterlyResult,
   RankingDetail,
   RankingEntry,
+  ReplaceAllPlatoonRulesInput,
+  ReplaceAllPlatoonRulesResult,
   ResetDataInput,
   ResetPasswordInput,
   ResyncAllEventsCriteria200,
   ResyncEventCriteria200,
-  ReviewRequest,
-  ReviewRequestResolve,
   Rule,
   RuleUpdate,
   SeedDefaultPenaltyTypes200,
+  SuccessResponse,
   SurveyImportInput,
   SurveyImportResult,
+  SwapCriterionSourceInput,
   SyncResult,
   UpdateCycleInput,
   UpdateEventCriteria200,
+  UpdatedCount,
   UploadUrlRequest,
   UploadUrlResponse,
   User,
@@ -7401,172 +7449,6 @@ export const useDeletePenaltyType = <TError = ErrorType<unknown>,
       return useMutation(getDeletePenaltyTypeMutationOptions(options));
     }
 
-export const getGetReviewRequestsUrl = () => {
-
-
-
-
-  return `/review-requests`
-}
-
-/**
- * @summary List event review requests raised by employees
- */
-export const getReviewRequests = async ( options?: Parameters<typeof customFetch>[1]): Promise<ReviewRequest[]> => {
-
-  return customFetch<ReviewRequest[]>(getGetReviewRequestsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetReviewRequestsQueryKey = () => {
-    return [
-    `/review-requests`
-    ] as const;
-    }
-
-
-export const getGetReviewRequestsQueryOptions = <TData = Awaited<ReturnType<typeof getReviewRequests>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReviewRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetReviewRequestsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReviewRequests>>> = ({ signal }) => getReviewRequests({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReviewRequests>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetReviewRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof getReviewRequests>>>
-export type GetReviewRequestsQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List event review requests raised by employees
- */
-
-export function useGetReviewRequests<TData = Awaited<ReturnType<typeof getReviewRequests>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReviewRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetReviewRequestsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getResolveReviewRequestUrl = (id: number,) => {
-
-
-
-
-  return `/review-requests/${id}/resolve`
-}
-
-/**
- * @summary Mark a review request as resolved
- */
-export const resolveReviewRequest = async (id: number,
-    reviewRequestResolve?: ReviewRequestResolve, options?: Parameters<typeof customFetch>[1]): Promise<ReviewRequest> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<ReviewRequest>(getResolveReviewRequestUrl(id),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(reviewRequestResolve)
-  }
-);}
-
-
-
-
-
-export const getResolveReviewRequestMutationKey = () => ['resolveReviewRequest'] as const;
-
-export const getResolveReviewRequestMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveReviewRequest>>, TError,ResolveReviewRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof resolveReviewRequest>>, TError,ResolveReviewRequestMutationVariables, TContext> => {
-
-const mutationKey = getResolveReviewRequestMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveReviewRequest>>, ResolveReviewRequestMutationVariables> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  resolveReviewRequest(id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ResolveReviewRequestMutationResult = NonNullable<Awaited<ReturnType<typeof resolveReviewRequest>>>
-    export type ResolveReviewRequestMutationBody = BodyType<ReviewRequestResolve> | undefined
-    export type ResolveReviewRequestMutationError = ErrorType<unknown>
-    export type ResolveReviewRequestMutationVariables = {id: number;data?: BodyType<ReviewRequestResolve>}
-
-    /**
- * @summary Mark a review request as resolved
- */
-export const useResolveReviewRequest = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveReviewRequest>>, TError,ResolveReviewRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof resolveReviewRequest>>,
-        TError,
-        ResolveReviewRequestMutationVariables,
-        TContext
-      > => {
-      return useMutation(getResolveReviewRequestMutationOptions(options));
-    }
-
 export const getGetRulesUrl = () => {
 
 
@@ -11155,6 +11037,3399 @@ export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorage
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStorageObjectQueryOptions(objectPath,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPortalSsoUrl = () => {
+
+
+
+
+  return `/auth/portal-sso`
+}
+
+/**
+ * @summary SSO do portal NORTE — troca o JWT do portal por uma sessão Maratona (público)
+ */
+export const portalSso = async (portalSsoInput: PortalSsoInput, options?: Parameters<typeof customFetch>[1]): Promise<AuthResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AuthResponse>(getPortalSsoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(portalSsoInput)
+  }
+);}
+
+
+
+
+
+export const getPortalSsoMutationKey = () => ['portalSso'] as const;
+
+export const getPortalSsoMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof portalSso>>, TError,PortalSsoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof portalSso>>, TError,PortalSsoMutationVariables, TContext> => {
+
+const mutationKey = getPortalSsoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof portalSso>>, PortalSsoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  portalSso(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PortalSsoMutationResult = NonNullable<Awaited<ReturnType<typeof portalSso>>>
+    export type PortalSsoMutationBody = BodyType<PortalSsoInput>
+    export type PortalSsoMutationError = ErrorType<ErrorEnvelope>
+    export type PortalSsoMutationVariables = {data: BodyType<PortalSsoInput>}
+
+    /**
+ * @summary SSO do portal NORTE — troca o JWT do portal por uma sessão Maratona (público)
+ */
+export const usePortalSso = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof portalSso>>, TError,PortalSsoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof portalSso>>,
+        TError,
+        PortalSsoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPortalSsoMutationOptions(options));
+    }
+
+export const getGetMyPrincipalAreasUrl = () => {
+
+
+
+
+  return `/users/my-principal-areas`
+}
+
+/**
+ * @summary Áreas em que o usuário logado é avaliador principal (default evaluator de algum critério)
+ */
+export const getMyPrincipalAreas = async ( options?: Parameters<typeof customFetch>[1]): Promise<PrincipalArea[]> => {
+
+  return customFetch<PrincipalArea[]>(getGetMyPrincipalAreasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyPrincipalAreasQueryKey = () => {
+    return [
+    `/users/my-principal-areas`
+    ] as const;
+    }
+
+
+export const getGetMyPrincipalAreasQueryOptions = <TData = Awaited<ReturnType<typeof getMyPrincipalAreas>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyPrincipalAreas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyPrincipalAreasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyPrincipalAreas>>> = ({ signal }) => getMyPrincipalAreas({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyPrincipalAreas>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyPrincipalAreasQueryResult = NonNullable<Awaited<ReturnType<typeof getMyPrincipalAreas>>>
+export type GetMyPrincipalAreasQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Áreas em que o usuário logado é avaliador principal (default evaluator de algum critério)
+ */
+
+export function useGetMyPrincipalAreas<TData = Awaited<ReturnType<typeof getMyPrincipalAreas>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyPrincipalAreas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyPrincipalAreasQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBulkUpdateUserEmailsUrl = () => {
+
+
+
+
+  return `/users/bulk-update-emails`
+}
+
+/**
+ * @summary Migração one-shot dos e-mails corporativos (Office 365) — admin
+ */
+export const bulkUpdateUserEmails = async (bulkUpdateEmailsInput: BulkUpdateEmailsInput, options?: Parameters<typeof customFetch>[1]): Promise<BulkUpdateEmailsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BulkUpdateEmailsResult>(getBulkUpdateUserEmailsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bulkUpdateEmailsInput)
+  }
+);}
+
+
+
+
+
+export const getBulkUpdateUserEmailsMutationKey = () => ['bulkUpdateUserEmails'] as const;
+
+export const getBulkUpdateUserEmailsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateUserEmails>>, TError,BulkUpdateUserEmailsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateUserEmails>>, TError,BulkUpdateUserEmailsMutationVariables, TContext> => {
+
+const mutationKey = getBulkUpdateUserEmailsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkUpdateUserEmails>>, BulkUpdateUserEmailsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkUpdateUserEmails(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkUpdateUserEmailsMutationResult = NonNullable<Awaited<ReturnType<typeof bulkUpdateUserEmails>>>
+    export type BulkUpdateUserEmailsMutationBody = BodyType<BulkUpdateEmailsInput>
+    export type BulkUpdateUserEmailsMutationError = ErrorType<unknown>
+    export type BulkUpdateUserEmailsMutationVariables = {data: BodyType<BulkUpdateEmailsInput>}
+
+    /**
+ * @summary Migração one-shot dos e-mails corporativos (Office 365) — admin
+ */
+export const useBulkUpdateUserEmails = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateUserEmails>>, TError,BulkUpdateUserEmailsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkUpdateUserEmails>>,
+        TError,
+        BulkUpdateUserEmailsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBulkUpdateUserEmailsMutationOptions(options));
+    }
+
+export const getGetAllCriterionRoutingsUrl = () => {
+
+
+
+
+  return `/criterion-routing`
+}
+
+/**
+ * @summary Roteamento de todos os critérios (admin/rh/operador)
+ */
+export const getAllCriterionRoutings = async ( options?: Parameters<typeof customFetch>[1]): Promise<CriterionRouting[]> => {
+
+  return customFetch<CriterionRouting[]>(getGetAllCriterionRoutingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAllCriterionRoutingsQueryKey = () => {
+    return [
+    `/criterion-routing`
+    ] as const;
+    }
+
+
+export const getGetAllCriterionRoutingsQueryOptions = <TData = Awaited<ReturnType<typeof getAllCriterionRoutings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAllCriterionRoutings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAllCriterionRoutingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAllCriterionRoutings>>> = ({ signal }) => getAllCriterionRoutings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAllCriterionRoutings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAllCriterionRoutingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAllCriterionRoutings>>>
+export type GetAllCriterionRoutingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Roteamento de todos os critérios (admin/rh/operador)
+ */
+
+export function useGetAllCriterionRoutings<TData = Awaited<ReturnType<typeof getAllCriterionRoutings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAllCriterionRoutings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAllCriterionRoutingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCriterionRoutingUrl = (id: number,) => {
+
+
+
+
+  return `/criteria/${id}/routing`
+}
+
+/**
+ * @summary Roteamento de um critério (null quando ainda não configurado)
+ */
+export const getCriterionRouting = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CriterionRouting | null> => {
+
+  return customFetch<CriterionRouting | null>(getGetCriterionRoutingUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCriterionRoutingQueryKey = (id: number,) => {
+    return [
+    `/criteria/${id}/routing`
+    ] as const;
+    }
+
+
+export const getGetCriterionRoutingQueryOptions = <TData = Awaited<ReturnType<typeof getCriterionRouting>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCriterionRouting>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCriterionRoutingQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCriterionRouting>>> = ({ signal }) => getCriterionRouting(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCriterionRouting>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCriterionRoutingQueryResult = NonNullable<Awaited<ReturnType<typeof getCriterionRouting>>>
+export type GetCriterionRoutingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Roteamento de um critério (null quando ainda não configurado)
+ */
+
+export function useGetCriterionRouting<TData = Awaited<ReturnType<typeof getCriterionRouting>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCriterionRouting>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCriterionRoutingQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveCriterionRoutingUrl = (id: number,) => {
+
+
+
+
+  return `/criteria/${id}/routing`
+}
+
+/**
+ * @summary Cria ou atualiza o roteamento de um critério
+ */
+export const saveCriterionRouting = async (id: number,
+    criterionRoutingInput: CriterionRoutingInput, options?: Parameters<typeof customFetch>[1]): Promise<CriterionRoutingRow> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CriterionRoutingRow>(getSaveCriterionRoutingUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(criterionRoutingInput)
+  }
+);}
+
+
+
+
+
+export const getSaveCriterionRoutingMutationKey = () => ['saveCriterionRouting'] as const;
+
+export const getSaveCriterionRoutingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCriterionRouting>>, TError,SaveCriterionRoutingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveCriterionRouting>>, TError,SaveCriterionRoutingMutationVariables, TContext> => {
+
+const mutationKey = getSaveCriterionRoutingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveCriterionRouting>>, SaveCriterionRoutingMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  saveCriterionRouting(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveCriterionRoutingMutationResult = NonNullable<Awaited<ReturnType<typeof saveCriterionRouting>>>
+    export type SaveCriterionRoutingMutationBody = BodyType<CriterionRoutingInput>
+    export type SaveCriterionRoutingMutationError = ErrorType<unknown>
+    export type SaveCriterionRoutingMutationVariables = {id: number;data: BodyType<CriterionRoutingInput>}
+
+    /**
+ * @summary Cria ou atualiza o roteamento de um critério
+ */
+export const useSaveCriterionRouting = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCriterionRouting>>, TError,SaveCriterionRoutingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveCriterionRouting>>,
+        TError,
+        SaveCriterionRoutingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveCriterionRoutingMutationOptions(options));
+    }
+
+export const getSyncCriteriaAreaLabelsUrl = () => {
+
+
+
+
+  return `/criteria/admin/sync-area-labels`
+}
+
+/**
+ * @summary Admin — sincroniza responsibleAreaLabel com o nome real da área (idempotente)
+ */
+export const syncCriteriaAreaLabels = async ( options?: Parameters<typeof customFetch>[1]): Promise<UpdatedCount> => {
+
+  return customFetch<UpdatedCount>(getSyncCriteriaAreaLabelsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSyncCriteriaAreaLabelsMutationKey = () => ['syncCriteriaAreaLabels'] as const;
+
+export const getSyncCriteriaAreaLabelsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncCriteriaAreaLabels>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncCriteriaAreaLabels>>, TError,void, TContext> => {
+
+const mutationKey = getSyncCriteriaAreaLabelsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncCriteriaAreaLabels>>, void> = () => {
+
+
+          return  syncCriteriaAreaLabels(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncCriteriaAreaLabelsMutationResult = NonNullable<Awaited<ReturnType<typeof syncCriteriaAreaLabels>>>
+
+    export type SyncCriteriaAreaLabelsMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Admin — sincroniza responsibleAreaLabel com o nome real da área (idempotente)
+ */
+export const useSyncCriteriaAreaLabels = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncCriteriaAreaLabels>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof syncCriteriaAreaLabels>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSyncCriteriaAreaLabelsMutationOptions(options));
+    }
+
+export const getGetCalibrationAuditUrl = (params: GetCalibrationAuditParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/calibrations/audit?${stringifiedParams}` : `/calibrations/audit`
+}
+
+/**
+ * @summary Trilha de auditoria das calibrações de um evento
+ */
+export const getCalibrationAudit = async (params: GetCalibrationAuditParams, options?: Parameters<typeof customFetch>[1]): Promise<CalibrationAuditEntry[]> => {
+
+  return customFetch<CalibrationAuditEntry[]>(getGetCalibrationAuditUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCalibrationAuditQueryKey = (params?: GetCalibrationAuditParams,) => {
+    return [
+    `/calibrations/audit`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCalibrationAuditQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationAudit>>, TError = ErrorType<ErrorEnvelope>>(params: GetCalibrationAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationAuditQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationAudit>>> = ({ signal }) => getCalibrationAudit(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationAudit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCalibrationAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationAudit>>>
+export type GetCalibrationAuditQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Trilha de auditoria das calibrações de um evento
+ */
+
+export function useGetCalibrationAudit<TData = Awaited<ReturnType<typeof getCalibrationAudit>>, TError = ErrorType<ErrorEnvelope>>(
+ params: GetCalibrationAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCalibrationAuditQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCalibrationCommentsUrl = (params: GetCalibrationCommentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/calibrations/comments?${stringifiedParams}` : `/calibrations/comments`
+}
+
+/**
+ * @summary Comentários de calibração de um evento
+ */
+export const getCalibrationComments = async (params: GetCalibrationCommentsParams, options?: Parameters<typeof customFetch>[1]): Promise<CalibrationComment[]> => {
+
+  return customFetch<CalibrationComment[]>(getGetCalibrationCommentsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCalibrationCommentsQueryKey = (params?: GetCalibrationCommentsParams,) => {
+    return [
+    `/calibrations/comments`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCalibrationCommentsQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationComments>>, TError = ErrorType<ErrorEnvelope>>(params: GetCalibrationCommentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationComments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationCommentsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationComments>>> = ({ signal }) => getCalibrationComments(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationComments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCalibrationCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationComments>>>
+export type GetCalibrationCommentsQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Comentários de calibração de um evento
+ */
+
+export function useGetCalibrationComments<TData = Awaited<ReturnType<typeof getCalibrationComments>>, TError = ErrorType<ErrorEnvelope>>(
+ params: GetCalibrationCommentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationComments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCalibrationCommentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateCalibrationCommentUrl = () => {
+
+
+
+
+  return `/calibrations/comments`
+}
+
+/**
+ * @summary Adiciona comentário de calibração
+ */
+export const createCalibrationComment = async (calibrationCommentInput: CalibrationCommentInput, options?: Parameters<typeof customFetch>[1]): Promise<CalibrationComment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CalibrationComment>(getCreateCalibrationCommentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(calibrationCommentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCalibrationCommentMutationKey = () => ['createCalibrationComment'] as const;
+
+export const getCreateCalibrationCommentMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCalibrationComment>>, TError,CreateCalibrationCommentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCalibrationComment>>, TError,CreateCalibrationCommentMutationVariables, TContext> => {
+
+const mutationKey = getCreateCalibrationCommentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCalibrationComment>>, CreateCalibrationCommentMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCalibrationComment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCalibrationCommentMutationResult = NonNullable<Awaited<ReturnType<typeof createCalibrationComment>>>
+    export type CreateCalibrationCommentMutationBody = BodyType<CalibrationCommentInput>
+    export type CreateCalibrationCommentMutationError = ErrorType<ErrorEnvelope>
+    export type CreateCalibrationCommentMutationVariables = {data: BodyType<CalibrationCommentInput>}
+
+    /**
+ * @summary Adiciona comentário de calibração
+ */
+export const useCreateCalibrationComment = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCalibrationComment>>, TError,CreateCalibrationCommentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCalibrationComment>>,
+        TError,
+        CreateCalibrationCommentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateCalibrationCommentMutationOptions(options));
+    }
+
+export const getDeleteCalibrationCommentUrl = (id: number,) => {
+
+
+
+
+  return `/calibrations/comments/${id}`
+}
+
+/**
+ * @summary Exclui comentário de calibração
+ */
+export const deleteCalibrationComment = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteCalibrationCommentUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteCalibrationCommentMutationKey = () => ['deleteCalibrationComment'] as const;
+
+export const getDeleteCalibrationCommentMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCalibrationComment>>, TError,DeleteCalibrationCommentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCalibrationComment>>, TError,DeleteCalibrationCommentMutationVariables, TContext> => {
+
+const mutationKey = getDeleteCalibrationCommentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCalibrationComment>>, DeleteCalibrationCommentMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCalibrationComment(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCalibrationCommentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCalibrationComment>>>
+
+    export type DeleteCalibrationCommentMutationError = ErrorType<ErrorEnvelope>
+    export type DeleteCalibrationCommentMutationVariables = {id: number}
+
+    /**
+ * @summary Exclui comentário de calibração
+ */
+export const useDeleteCalibrationComment = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCalibrationComment>>, TError,DeleteCalibrationCommentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCalibrationComment>>,
+        TError,
+        DeleteCalibrationCommentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteCalibrationCommentMutationOptions(options));
+    }
+
+export const getBulkEmploymentResetUrl = () => {
+
+
+
+
+  return `/employees/bulk-employment-reset`
+}
+
+/**
+ * @summary Redefine tipos em massa (IDs informados → casa, demais → freela) e recalcula o ciclo
+ */
+export const bulkEmploymentReset = async (bulkEmploymentResetInput: BulkEmploymentResetInput, options?: Parameters<typeof customFetch>[1]): Promise<BulkEmploymentResetResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BulkEmploymentResetResult>(getBulkEmploymentResetUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bulkEmploymentResetInput)
+  }
+);}
+
+
+
+
+
+export const getBulkEmploymentResetMutationKey = () => ['bulkEmploymentReset'] as const;
+
+export const getBulkEmploymentResetMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkEmploymentReset>>, TError,BulkEmploymentResetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkEmploymentReset>>, TError,BulkEmploymentResetMutationVariables, TContext> => {
+
+const mutationKey = getBulkEmploymentResetMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkEmploymentReset>>, BulkEmploymentResetMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkEmploymentReset(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkEmploymentResetMutationResult = NonNullable<Awaited<ReturnType<typeof bulkEmploymentReset>>>
+    export type BulkEmploymentResetMutationBody = BodyType<BulkEmploymentResetInput>
+    export type BulkEmploymentResetMutationError = ErrorType<ErrorEnvelope>
+    export type BulkEmploymentResetMutationVariables = {data: BodyType<BulkEmploymentResetInput>}
+
+    /**
+ * @summary Redefine tipos em massa (IDs informados → casa, demais → freela) e recalcula o ciclo
+ */
+export const useBulkEmploymentReset = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkEmploymentReset>>, TError,BulkEmploymentResetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkEmploymentReset>>,
+        TError,
+        BulkEmploymentResetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBulkEmploymentResetMutationOptions(options));
+    }
+
+export const getBulkSetEmployeeCpfUrl = () => {
+
+
+
+
+  return `/employees/bulk-set-cpf`
+}
+
+/**
+ * @summary Atualiza CPF (document) em lote casando pelo nome normalizado
+ */
+export const bulkSetEmployeeCpf = async (bulkSetCpfEntry: BulkSetCpfEntry[], options?: Parameters<typeof customFetch>[1]): Promise<BulkSetCpfResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BulkSetCpfResult>(getBulkSetEmployeeCpfUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bulkSetCpfEntry)
+  }
+);}
+
+
+
+
+
+export const getBulkSetEmployeeCpfMutationKey = () => ['bulkSetEmployeeCpf'] as const;
+
+export const getBulkSetEmployeeCpfMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSetEmployeeCpf>>, TError,BulkSetEmployeeCpfMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkSetEmployeeCpf>>, TError,BulkSetEmployeeCpfMutationVariables, TContext> => {
+
+const mutationKey = getBulkSetEmployeeCpfMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkSetEmployeeCpf>>, BulkSetEmployeeCpfMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkSetEmployeeCpf(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkSetEmployeeCpfMutationResult = NonNullable<Awaited<ReturnType<typeof bulkSetEmployeeCpf>>>
+    export type BulkSetEmployeeCpfMutationBody = BodyType<BulkSetCpfEntry[]>
+    export type BulkSetEmployeeCpfMutationError = ErrorType<ErrorEnvelope>
+    export type BulkSetEmployeeCpfMutationVariables = {data: BodyType<BulkSetCpfEntry[]>}
+
+    /**
+ * @summary Atualiza CPF (document) em lote casando pelo nome normalizado
+ */
+export const useBulkSetEmployeeCpf = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSetEmployeeCpf>>, TError,BulkSetEmployeeCpfMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkSetEmployeeCpf>>,
+        TError,
+        BulkSetEmployeeCpfMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBulkSetEmployeeCpfMutationOptions(options));
+    }
+
+export const getGetCasaPinsUrl = (params?: GetCasaPinsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/employees/casa-pins?${stringifiedParams}` : `/employees/casa-pins`
+}
+
+/**
+ * @summary Senhas (PIN = CPF) atuais dos colaboradores casa ativos
+ */
+export const getCasaPins = async (params?: GetCasaPinsParams, options?: Parameters<typeof customFetch>[1]): Promise<CasaPinsResult> => {
+
+  return customFetch<CasaPinsResult>(getGetCasaPinsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCasaPinsQueryKey = (params?: GetCasaPinsParams,) => {
+    return [
+    `/employees/casa-pins`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCasaPinsQueryOptions = <TData = Awaited<ReturnType<typeof getCasaPins>>, TError = ErrorType<unknown>>(params?: GetCasaPinsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCasaPins>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCasaPinsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCasaPins>>> = ({ signal }) => getCasaPins(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCasaPins>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCasaPinsQueryResult = NonNullable<Awaited<ReturnType<typeof getCasaPins>>>
+export type GetCasaPinsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Senhas (PIN = CPF) atuais dos colaboradores casa ativos
+ */
+
+export function useGetCasaPins<TData = Awaited<ReturnType<typeof getCasaPins>>, TError = ErrorType<unknown>>(
+ params?: GetCasaPinsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCasaPins>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCasaPinsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBulkGenerateCasaPinsUrl = () => {
+
+
+
+
+  return `/employees/bulk-generate-pins`
+}
+
+/**
+ * @summary Gera/redefine o acesso (senha = CPF) dos colaboradores casa ativos
+ */
+export const bulkGenerateCasaPins = async (bulkGeneratePinsInput: BulkGeneratePinsInput, options?: Parameters<typeof customFetch>[1]): Promise<BulkGeneratePinsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BulkGeneratePinsResult>(getBulkGenerateCasaPinsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bulkGeneratePinsInput)
+  }
+);}
+
+
+
+
+
+export const getBulkGenerateCasaPinsMutationKey = () => ['bulkGenerateCasaPins'] as const;
+
+export const getBulkGenerateCasaPinsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCasaPins>>, TError,BulkGenerateCasaPinsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCasaPins>>, TError,BulkGenerateCasaPinsMutationVariables, TContext> => {
+
+const mutationKey = getBulkGenerateCasaPinsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkGenerateCasaPins>>, BulkGenerateCasaPinsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkGenerateCasaPins(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkGenerateCasaPinsMutationResult = NonNullable<Awaited<ReturnType<typeof bulkGenerateCasaPins>>>
+    export type BulkGenerateCasaPinsMutationBody = BodyType<BulkGeneratePinsInput>
+    export type BulkGenerateCasaPinsMutationError = ErrorType<unknown>
+    export type BulkGenerateCasaPinsMutationVariables = {data: BodyType<BulkGeneratePinsInput>}
+
+    /**
+ * @summary Gera/redefine o acesso (senha = CPF) dos colaboradores casa ativos
+ */
+export const useBulkGenerateCasaPins = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkGenerateCasaPins>>, TError,BulkGenerateCasaPinsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkGenerateCasaPins>>,
+        TError,
+        BulkGenerateCasaPinsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBulkGenerateCasaPinsMutationOptions(options));
+    }
+
+export const getGenerateEmployeePinUrl = (id: number,) => {
+
+
+
+
+  return `/employees/${id}/generate-pin`
+}
+
+/**
+ * @summary Gera/redefine o acesso (senha = CPF) de um colaborador casa
+ */
+export const generateEmployeePin = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<GeneratePinResult> => {
+
+  return customFetch<GeneratePinResult>(getGenerateEmployeePinUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getGenerateEmployeePinMutationKey = () => ['generateEmployeePin'] as const;
+
+export const getGenerateEmployeePinMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateEmployeePin>>, TError,GenerateEmployeePinMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateEmployeePin>>, TError,GenerateEmployeePinMutationVariables, TContext> => {
+
+const mutationKey = getGenerateEmployeePinMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateEmployeePin>>, GenerateEmployeePinMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  generateEmployeePin(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateEmployeePinMutationResult = NonNullable<Awaited<ReturnType<typeof generateEmployeePin>>>
+
+    export type GenerateEmployeePinMutationError = ErrorType<ErrorEnvelope>
+    export type GenerateEmployeePinMutationVariables = {id: number}
+
+    /**
+ * @summary Gera/redefine o acesso (senha = CPF) de um colaborador casa
+ */
+export const useGenerateEmployeePin = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateEmployeePin>>, TError,GenerateEmployeePinMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateEmployeePin>>,
+        TError,
+        GenerateEmployeePinMutationVariables,
+        TContext
+      > => {
+      return useMutation(getGenerateEmployeePinMutationOptions(options));
+    }
+
+export const getBulkSyncEventDatesUrl = () => {
+
+
+
+
+  return `/events/bulk-date-sync`
+}
+
+/**
+ * Com `dryRun: true` devolve a lista do que mudaria, sem gravar. Para
+ * aplicar é obrigatório enviar `confirm: "APLICAR"`; sem isso responde 400.
+ * @summary Define a data (início = fim) e o nome de eventos em lote a partir da planilha
+ */
+export const bulkSyncEventDates = async (bulkDateSyncInput: BulkDateSyncInput, options?: Parameters<typeof customFetch>[1]): Promise<BulkDateSyncResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BulkDateSyncResult>(getBulkSyncEventDatesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bulkDateSyncInput)
+  }
+);}
+
+
+
+
+
+export const getBulkSyncEventDatesMutationKey = () => ['bulkSyncEventDates'] as const;
+
+export const getBulkSyncEventDatesMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSyncEventDates>>, TError,BulkSyncEventDatesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkSyncEventDates>>, TError,BulkSyncEventDatesMutationVariables, TContext> => {
+
+const mutationKey = getBulkSyncEventDatesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkSyncEventDates>>, BulkSyncEventDatesMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkSyncEventDates(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkSyncEventDatesMutationResult = NonNullable<Awaited<ReturnType<typeof bulkSyncEventDates>>>
+    export type BulkSyncEventDatesMutationBody = BodyType<BulkDateSyncInput>
+    export type BulkSyncEventDatesMutationError = ErrorType<ErrorEnvelope>
+    export type BulkSyncEventDatesMutationVariables = {data: BodyType<BulkDateSyncInput>}
+
+    /**
+ * @summary Define a data (início = fim) e o nome de eventos em lote a partir da planilha
+ */
+export const useBulkSyncEventDates = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSyncEventDates>>, TError,BulkSyncEventDatesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkSyncEventDates>>,
+        TError,
+        BulkSyncEventDatesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBulkSyncEventDatesMutationOptions(options));
+    }
+
+export const getConfirmEventResultsBulkUrl = () => {
+
+
+
+
+  return `/events/confirm-results-bulk`
+}
+
+/**
+ * @summary Confirma os resultados de vários eventos (admin), recalculando uma vez por ciclo
+ */
+export const confirmEventResultsBulk = async (confirmResultsBulkInput: ConfirmResultsBulkInput, options?: Parameters<typeof customFetch>[1]): Promise<ConfirmResultsBulkResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ConfirmResultsBulkResult>(getConfirmEventResultsBulkUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(confirmResultsBulkInput)
+  }
+);}
+
+
+
+
+
+export const getConfirmEventResultsBulkMutationKey = () => ['confirmEventResultsBulk'] as const;
+
+export const getConfirmEventResultsBulkMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmEventResultsBulk>>, TError,ConfirmEventResultsBulkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmEventResultsBulk>>, TError,ConfirmEventResultsBulkMutationVariables, TContext> => {
+
+const mutationKey = getConfirmEventResultsBulkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmEventResultsBulk>>, ConfirmEventResultsBulkMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmEventResultsBulk(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmEventResultsBulkMutationResult = NonNullable<Awaited<ReturnType<typeof confirmEventResultsBulk>>>
+    export type ConfirmEventResultsBulkMutationBody = BodyType<ConfirmResultsBulkInput>
+    export type ConfirmEventResultsBulkMutationError = ErrorType<ErrorEnvelope>
+    export type ConfirmEventResultsBulkMutationVariables = {data: BodyType<ConfirmResultsBulkInput>}
+
+    /**
+ * @summary Confirma os resultados de vários eventos (admin), recalculando uma vez por ciclo
+ */
+export const useConfirmEventResultsBulk = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmEventResultsBulk>>, TError,ConfirmEventResultsBulkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmEventResultsBulk>>,
+        TError,
+        ConfirmEventResultsBulkMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConfirmEventResultsBulkMutationOptions(options));
+    }
+
+export const getNormalizeEventDatesUrl = () => {
+
+
+
+
+  return `/events/admin/normalize-dates`
+}
+
+/**
+ * Com `dryRun: true` devolve a lista do que mudaria, sem gravar. Para
+ * aplicar é obrigatório enviar `confirm: "APLICAR"`; sem isso responde 400.
+ * @summary Admin one-shot — corrige 4 eventos conhecidos e unifica eventos multi-dia (início = fim)
+ */
+export const normalizeEventDates = async (normalizeDatesInput: NormalizeDatesInput, options?: Parameters<typeof customFetch>[1]): Promise<NormalizeDatesResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<NormalizeDatesResult>(getNormalizeEventDatesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(normalizeDatesInput)
+  }
+);}
+
+
+
+
+
+export const getNormalizeEventDatesMutationKey = () => ['normalizeEventDates'] as const;
+
+export const getNormalizeEventDatesMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof normalizeEventDates>>, TError,NormalizeEventDatesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof normalizeEventDates>>, TError,NormalizeEventDatesMutationVariables, TContext> => {
+
+const mutationKey = getNormalizeEventDatesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof normalizeEventDates>>, NormalizeEventDatesMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  normalizeEventDates(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type NormalizeEventDatesMutationResult = NonNullable<Awaited<ReturnType<typeof normalizeEventDates>>>
+    export type NormalizeEventDatesMutationBody = BodyType<NormalizeDatesInput>
+    export type NormalizeEventDatesMutationError = ErrorType<ErrorEnvelope>
+    export type NormalizeEventDatesMutationVariables = {data: BodyType<NormalizeDatesInput>}
+
+    /**
+ * @summary Admin one-shot — corrige 4 eventos conhecidos e unifica eventos multi-dia (início = fim)
+ */
+export const useNormalizeEventDates = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof normalizeEventDates>>, TError,NormalizeEventDatesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof normalizeEventDates>>,
+        TError,
+        NormalizeEventDatesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getNormalizeEventDatesMutationOptions(options));
+    }
+
+export const getSwapEventCriterionSourceUrl = (id: number,
+    ecId: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/${ecId}/swap-source`
+}
+
+/**
+ * @summary Admin — troca o critério de origem de um quesito duplicado (eventScoped)
+ */
+export const swapEventCriterionSource = async (id: number,
+    ecId: number,
+    swapCriterionSourceInput: SwapCriterionSourceInput, options?: Parameters<typeof customFetch>[1]): Promise<EventDetail> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EventDetail>(getSwapEventCriterionSourceUrl(id,ecId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(swapCriterionSourceInput)
+  }
+);}
+
+
+
+
+
+export const getSwapEventCriterionSourceMutationKey = () => ['swapEventCriterionSource'] as const;
+
+export const getSwapEventCriterionSourceMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof swapEventCriterionSource>>, TError,SwapEventCriterionSourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof swapEventCriterionSource>>, TError,SwapEventCriterionSourceMutationVariables, TContext> => {
+
+const mutationKey = getSwapEventCriterionSourceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof swapEventCriterionSource>>, SwapEventCriterionSourceMutationVariables> = (props) => {
+          const {id,ecId,data} = props ?? {};
+
+          return  swapEventCriterionSource(id,ecId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SwapEventCriterionSourceMutationResult = NonNullable<Awaited<ReturnType<typeof swapEventCriterionSource>>>
+    export type SwapEventCriterionSourceMutationBody = BodyType<SwapCriterionSourceInput>
+    export type SwapEventCriterionSourceMutationError = ErrorType<ErrorEnvelope>
+    export type SwapEventCriterionSourceMutationVariables = {id: number;ecId: number;data: BodyType<SwapCriterionSourceInput>}
+
+    /**
+ * @summary Admin — troca o critério de origem de um quesito duplicado (eventScoped)
+ */
+export const useSwapEventCriterionSource = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof swapEventCriterionSource>>, TError,SwapEventCriterionSourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof swapEventCriterionSource>>,
+        TError,
+        SwapEventCriterionSourceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSwapEventCriterionSourceMutationOptions(options));
+    }
+
+export const getGetEventActivityLogUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/activity-log`
+}
+
+/**
+ * @summary Log consolidado de atividades do evento (até 300 entradas, mais recentes primeiro)
+ */
+export const getEventActivityLog = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<EventActivityEntry[]> => {
+
+  return customFetch<EventActivityEntry[]>(getGetEventActivityLogUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEventActivityLogQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/activity-log`
+    ] as const;
+    }
+
+
+export const getGetEventActivityLogQueryOptions = <TData = Awaited<ReturnType<typeof getEventActivityLog>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventActivityLog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEventActivityLogQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEventActivityLog>>> = ({ signal }) => getEventActivityLog(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEventActivityLog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEventActivityLogQueryResult = NonNullable<Awaited<ReturnType<typeof getEventActivityLog>>>
+export type GetEventActivityLogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Log consolidado de atividades do evento (até 300 entradas, mais recentes primeiro)
+ */
+
+export function useGetEventActivityLog<TData = Awaited<ReturnType<typeof getEventActivityLog>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventActivityLog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEventActivityLogQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUnreleaseEventFeedbackUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/unrelease`
+}
+
+/**
+ * @summary Desfaz a liberação final do feedback do evento (admin/rh)
+ */
+export const unreleaseEventFeedback = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getUnreleaseEventFeedbackUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnreleaseEventFeedbackMutationKey = () => ['unreleaseEventFeedback'] as const;
+
+export const getUnreleaseEventFeedbackMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unreleaseEventFeedback>>, TError,UnreleaseEventFeedbackMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unreleaseEventFeedback>>, TError,UnreleaseEventFeedbackMutationVariables, TContext> => {
+
+const mutationKey = getUnreleaseEventFeedbackMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unreleaseEventFeedback>>, UnreleaseEventFeedbackMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  unreleaseEventFeedback(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnreleaseEventFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof unreleaseEventFeedback>>>
+
+    export type UnreleaseEventFeedbackMutationError = ErrorType<ErrorEnvelope>
+    export type UnreleaseEventFeedbackMutationVariables = {id: number}
+
+    /**
+ * @summary Desfaz a liberação final do feedback do evento (admin/rh)
+ */
+export const useUnreleaseEventFeedback = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unreleaseEventFeedback>>, TError,UnreleaseEventFeedbackMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unreleaseEventFeedback>>,
+        TError,
+        UnreleaseEventFeedbackMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUnreleaseEventFeedbackMutationOptions(options));
+    }
+
+export const getGetEventCriterionAssignmentsUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criterion-assignments`
+}
+
+/**
+ * Para o avaliador principal, critérios da área ainda sem linha em
+ * event_criterion_assignments aparecem como linhas "virtuais" (id null, status pending).
+ * @summary Atribuições por critério do evento (avaliador vê as próprias e as da área em que é principal)
+ */
+export const getEventCriterionAssignments = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<EventCriterionAssignment[]> => {
+
+  return customFetch<EventCriterionAssignment[]>(getGetEventCriterionAssignmentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEventCriterionAssignmentsQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/criterion-assignments`
+    ] as const;
+    }
+
+
+export const getGetEventCriterionAssignmentsQueryOptions = <TData = Awaited<ReturnType<typeof getEventCriterionAssignments>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventCriterionAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEventCriterionAssignmentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEventCriterionAssignments>>> = ({ signal }) => getEventCriterionAssignments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEventCriterionAssignments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEventCriterionAssignmentsQueryResult = NonNullable<Awaited<ReturnType<typeof getEventCriterionAssignments>>>
+export type GetEventCriterionAssignmentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Atribuições por critério do evento (avaliador vê as próprias e as da área em que é principal)
+ */
+
+export function useGetEventCriterionAssignments<TData = Awaited<ReturnType<typeof getEventCriterionAssignments>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEventCriterionAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEventCriterionAssignmentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGenerateCriterionAssignmentsUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criterion-assignments/generate`
+}
+
+/**
+ * @summary Gera atribuições sugeridas a partir do roteamento padrão (idempotente)
+ */
+export const generateCriterionAssignments = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<GenerateAssignmentsResult> => {
+
+  return customFetch<GenerateAssignmentsResult>(getGenerateCriterionAssignmentsUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getGenerateCriterionAssignmentsMutationKey = () => ['generateCriterionAssignments'] as const;
+
+export const getGenerateCriterionAssignmentsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCriterionAssignments>>, TError,GenerateCriterionAssignmentsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateCriterionAssignments>>, TError,GenerateCriterionAssignmentsMutationVariables, TContext> => {
+
+const mutationKey = getGenerateCriterionAssignmentsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateCriterionAssignments>>, GenerateCriterionAssignmentsMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  generateCriterionAssignments(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateCriterionAssignmentsMutationResult = NonNullable<Awaited<ReturnType<typeof generateCriterionAssignments>>>
+
+    export type GenerateCriterionAssignmentsMutationError = ErrorType<unknown>
+    export type GenerateCriterionAssignmentsMutationVariables = {id: number}
+
+    /**
+ * @summary Gera atribuições sugeridas a partir do roteamento padrão (idempotente)
+ */
+export const useGenerateCriterionAssignments = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCriterionAssignments>>, TError,GenerateCriterionAssignmentsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateCriterionAssignments>>,
+        TError,
+        GenerateCriterionAssignmentsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getGenerateCriterionAssignmentsMutationOptions(options));
+    }
+
+export const getUpdateCriterionAssignmentUrl = (id: number,
+    criterionId: number,) => {
+
+
+
+
+  return `/events/${id}/criterion-assignments/${criterionId}`
+}
+
+/**
+ * @summary Confirma, reatribui, redireciona ou atribui (principal da área) um critério do evento
+ */
+export const updateCriterionAssignment = async (id: number,
+    criterionId: number,
+    criterionAssignmentUpdate: CriterionAssignmentUpdate, options?: Parameters<typeof customFetch>[1]): Promise<EventCriterionAssignmentRow> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EventCriterionAssignmentRow>(getUpdateCriterionAssignmentUrl(id,criterionId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(criterionAssignmentUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateCriterionAssignmentMutationKey = () => ['updateCriterionAssignment'] as const;
+
+export const getUpdateCriterionAssignmentMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCriterionAssignment>>, TError,UpdateCriterionAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCriterionAssignment>>, TError,UpdateCriterionAssignmentMutationVariables, TContext> => {
+
+const mutationKey = getUpdateCriterionAssignmentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCriterionAssignment>>, UpdateCriterionAssignmentMutationVariables> = (props) => {
+          const {id,criterionId,data} = props ?? {};
+
+          return  updateCriterionAssignment(id,criterionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCriterionAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof updateCriterionAssignment>>>
+    export type UpdateCriterionAssignmentMutationBody = BodyType<CriterionAssignmentUpdate>
+    export type UpdateCriterionAssignmentMutationError = ErrorType<ErrorEnvelope>
+    export type UpdateCriterionAssignmentMutationVariables = {id: number;criterionId: number;data: BodyType<CriterionAssignmentUpdate>}
+
+    /**
+ * @summary Confirma, reatribui, redireciona ou atribui (principal da área) um critério do evento
+ */
+export const useUpdateCriterionAssignment = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCriterionAssignment>>, TError,UpdateCriterionAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCriterionAssignment>>,
+        TError,
+        UpdateCriterionAssignmentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateCriterionAssignmentMutationOptions(options));
+    }
+
+export const getGetCriterionRedirectOptionsUrl = (id: number,
+    criterionId: number,) => {
+
+
+
+
+  return `/events/${id}/criterion-assignments/redirect-options/${criterionId}`
+}
+
+/**
+ * @summary Usuários para os quais o critério pode ser redirecionado (conforme o roteamento)
+ */
+export const getCriterionRedirectOptions = async (id: number,
+    criterionId: number, options?: Parameters<typeof customFetch>[1]): Promise<IdName[]> => {
+
+  return customFetch<IdName[]>(getGetCriterionRedirectOptionsUrl(id,criterionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCriterionRedirectOptionsQueryKey = (id: number,
+    criterionId: number,) => {
+    return [
+    `/events/${id}/criterion-assignments/redirect-options/${criterionId}`
+    ] as const;
+    }
+
+
+export const getGetCriterionRedirectOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getCriterionRedirectOptions>>, TError = ErrorType<unknown>>(id: number,
+    criterionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCriterionRedirectOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCriterionRedirectOptionsQueryKey(id,criterionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCriterionRedirectOptions>>> = ({ signal }) => getCriterionRedirectOptions(id,criterionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && criterionId !== null && criterionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCriterionRedirectOptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCriterionRedirectOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getCriterionRedirectOptions>>>
+export type GetCriterionRedirectOptionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Usuários para os quais o critério pode ser redirecionado (conforme o roteamento)
+ */
+
+export function useGetCriterionRedirectOptions<TData = Awaited<ReturnType<typeof getCriterionRedirectOptions>>, TError = ErrorType<unknown>>(
+ id: number,
+    criterionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCriterionRedirectOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCriterionRedirectOptionsQueryOptions(id,criterionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPublicLinkEligibleCriteriaUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-link-eligible-criteria`
+}
+
+/**
+ * @summary Critérios do questionário do avaliador logado que podem entrar num link público
+ */
+export const getPublicLinkEligibleCriteria = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PublicLinkEligibleCriterion[]> => {
+
+  return customFetch<PublicLinkEligibleCriterion[]>(getGetPublicLinkEligibleCriteriaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicLinkEligibleCriteriaQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/public-link-eligible-criteria`
+    ] as const;
+    }
+
+
+export const getGetPublicLinkEligibleCriteriaQueryOptions = <TData = Awaited<ReturnType<typeof getPublicLinkEligibleCriteria>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicLinkEligibleCriteria>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicLinkEligibleCriteriaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicLinkEligibleCriteria>>> = ({ signal }) => getPublicLinkEligibleCriteria(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicLinkEligibleCriteria>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicLinkEligibleCriteriaQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicLinkEligibleCriteria>>>
+export type GetPublicLinkEligibleCriteriaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Critérios do questionário do avaliador logado que podem entrar num link público
+ */
+
+export function useGetPublicLinkEligibleCriteria<TData = Awaited<ReturnType<typeof getPublicLinkEligibleCriteria>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicLinkEligibleCriteria>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicLinkEligibleCriteriaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePublicTokenUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-token`
+}
+
+/**
+ * @summary Gera link público do questionário do avaliador logado
+ */
+export const createPublicToken = async (id: number,
+    publicTokenInput: PublicTokenInput, options?: Parameters<typeof customFetch>[1]): Promise<PublicTokenCreated> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PublicTokenCreated>(getCreatePublicTokenUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(publicTokenInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePublicTokenMutationKey = () => ['createPublicToken'] as const;
+
+export const getCreatePublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicToken>>, TError,CreatePublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPublicToken>>, TError,CreatePublicTokenMutationVariables, TContext> => {
+
+const mutationKey = getCreatePublicTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPublicToken>>, CreatePublicTokenMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createPublicToken(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePublicTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createPublicToken>>>
+    export type CreatePublicTokenMutationBody = BodyType<PublicTokenInput>
+    export type CreatePublicTokenMutationError = ErrorType<ErrorEnvelope>
+    export type CreatePublicTokenMutationVariables = {id: number;data: BodyType<PublicTokenInput>}
+
+    /**
+ * @summary Gera link público do questionário do avaliador logado
+ */
+export const useCreatePublicToken = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicToken>>, TError,CreatePublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPublicToken>>,
+        TError,
+        CreatePublicTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePublicTokenMutationOptions(options));
+    }
+
+export const getCreateAdminPublicTokenUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/admin-public-token`
+}
+
+/**
+ * @summary Admin/RH/Diretoria/Operador — gera link público para o questionário de um avaliador designado
+ */
+export const createAdminPublicToken = async (id: number,
+    adminPublicTokenInput: AdminPublicTokenInput, options?: Parameters<typeof customFetch>[1]): Promise<PublicTokenCreated> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PublicTokenCreated>(getCreateAdminPublicTokenUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminPublicTokenInput)
+  }
+);}
+
+
+
+
+
+export const getCreateAdminPublicTokenMutationKey = () => ['createAdminPublicToken'] as const;
+
+export const getCreateAdminPublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminPublicToken>>, TError,CreateAdminPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAdminPublicToken>>, TError,CreateAdminPublicTokenMutationVariables, TContext> => {
+
+const mutationKey = getCreateAdminPublicTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAdminPublicToken>>, CreateAdminPublicTokenMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createAdminPublicToken(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAdminPublicTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createAdminPublicToken>>>
+    export type CreateAdminPublicTokenMutationBody = BodyType<AdminPublicTokenInput>
+    export type CreateAdminPublicTokenMutationError = ErrorType<ErrorEnvelope>
+    export type CreateAdminPublicTokenMutationVariables = {id: number;data: BodyType<AdminPublicTokenInput>}
+
+    /**
+ * @summary Admin/RH/Diretoria/Operador — gera link público para o questionário de um avaliador designado
+ */
+export const useCreateAdminPublicToken = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminPublicToken>>, TError,CreateAdminPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAdminPublicToken>>,
+        TError,
+        CreateAdminPublicTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateAdminPublicTokenMutationOptions(options));
+    }
+
+export const getGetPublicTokensUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-tokens`
+}
+
+/**
+ * @summary Links públicos (critérios) gerados pelo avaliador logado no evento
+ */
+export const getPublicTokens = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PublicToken[]> => {
+
+  return customFetch<PublicToken[]>(getGetPublicTokensUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicTokensQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/public-tokens`
+    ] as const;
+    }
+
+
+export const getGetPublicTokensQueryOptions = <TData = Awaited<ReturnType<typeof getPublicTokens>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicTokensQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicTokens>>> = ({ signal }) => getPublicTokens(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicTokens>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicTokensQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicTokens>>>
+export type GetPublicTokensQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Links públicos (critérios) gerados pelo avaliador logado no evento
+ */
+
+export function useGetPublicTokens<TData = Awaited<ReturnType<typeof getPublicTokens>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicTokensQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateConformityPublicTokenUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-token/conformity`
+}
+
+/**
+ * @summary Gera (ou reaproveita) o link público do formulário de conformidade Cenografia
+ */
+export const createConformityPublicToken = async (id: number,
+    conformityPublicTokenInput: ConformityPublicTokenInput, options?: Parameters<typeof customFetch>[1]): Promise<PublicTokenCreated> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PublicTokenCreated>(getCreateConformityPublicTokenUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(conformityPublicTokenInput)
+  }
+);}
+
+
+
+
+
+export const getCreateConformityPublicTokenMutationKey = () => ['createConformityPublicToken'] as const;
+
+export const getCreateConformityPublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConformityPublicToken>>, TError,CreateConformityPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createConformityPublicToken>>, TError,CreateConformityPublicTokenMutationVariables, TContext> => {
+
+const mutationKey = getCreateConformityPublicTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createConformityPublicToken>>, CreateConformityPublicTokenMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createConformityPublicToken(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateConformityPublicTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createConformityPublicToken>>>
+    export type CreateConformityPublicTokenMutationBody = BodyType<ConformityPublicTokenInput>
+    export type CreateConformityPublicTokenMutationError = ErrorType<ErrorEnvelope>
+    export type CreateConformityPublicTokenMutationVariables = {id: number;data: BodyType<ConformityPublicTokenInput>}
+
+    /**
+ * @summary Gera (ou reaproveita) o link público do formulário de conformidade Cenografia
+ */
+export const useCreateConformityPublicToken = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConformityPublicToken>>, TError,CreateConformityPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createConformityPublicToken>>,
+        TError,
+        CreateConformityPublicTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateConformityPublicTokenMutationOptions(options));
+    }
+
+export const getCreateFerramentasPublicTokenUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-token/conformity-ferramentas`
+}
+
+/**
+ * @summary Gera (ou reaproveita) o link público do formulário de conformidade Ferramentas
+ */
+export const createFerramentasPublicToken = async (id: number,
+    conformityPublicTokenInput: ConformityPublicTokenInput, options?: Parameters<typeof customFetch>[1]): Promise<PublicTokenCreated> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PublicTokenCreated>(getCreateFerramentasPublicTokenUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(conformityPublicTokenInput)
+  }
+);}
+
+
+
+
+
+export const getCreateFerramentasPublicTokenMutationKey = () => ['createFerramentasPublicToken'] as const;
+
+export const getCreateFerramentasPublicTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFerramentasPublicToken>>, TError,CreateFerramentasPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFerramentasPublicToken>>, TError,CreateFerramentasPublicTokenMutationVariables, TContext> => {
+
+const mutationKey = getCreateFerramentasPublicTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFerramentasPublicToken>>, CreateFerramentasPublicTokenMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createFerramentasPublicToken(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFerramentasPublicTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createFerramentasPublicToken>>>
+    export type CreateFerramentasPublicTokenMutationBody = BodyType<ConformityPublicTokenInput>
+    export type CreateFerramentasPublicTokenMutationError = ErrorType<ErrorEnvelope>
+    export type CreateFerramentasPublicTokenMutationVariables = {id: number;data: BodyType<ConformityPublicTokenInput>}
+
+    /**
+ * @summary Gera (ou reaproveita) o link público do formulário de conformidade Ferramentas
+ */
+export const useCreateFerramentasPublicToken = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFerramentasPublicToken>>, TError,CreateFerramentasPublicTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFerramentasPublicToken>>,
+        TError,
+        CreateFerramentasPublicTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateFerramentasPublicTokenMutationOptions(options));
+    }
+
+export const getGetConformityPublicTokensUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-tokens/conformity`
+}
+
+/**
+ * @summary Links de conformidade Cenografia gerados pelo avaliador logado
+ */
+export const getConformityPublicTokens = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PublicToken[]> => {
+
+  return customFetch<PublicToken[]>(getGetConformityPublicTokensUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConformityPublicTokensQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/public-tokens/conformity`
+    ] as const;
+    }
+
+
+export const getGetConformityPublicTokensQueryOptions = <TData = Awaited<ReturnType<typeof getConformityPublicTokens>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConformityPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConformityPublicTokensQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConformityPublicTokens>>> = ({ signal }) => getConformityPublicTokens(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConformityPublicTokens>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConformityPublicTokensQueryResult = NonNullable<Awaited<ReturnType<typeof getConformityPublicTokens>>>
+export type GetConformityPublicTokensQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Links de conformidade Cenografia gerados pelo avaliador logado
+ */
+
+export function useGetConformityPublicTokens<TData = Awaited<ReturnType<typeof getConformityPublicTokens>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConformityPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConformityPublicTokensQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetFerramentasPublicTokensUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-tokens/conformity-ferramentas`
+}
+
+/**
+ * @summary Links de conformidade Ferramentas gerados pelo avaliador logado
+ */
+export const getFerramentasPublicTokens = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PublicToken[]> => {
+
+  return customFetch<PublicToken[]>(getGetFerramentasPublicTokensUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFerramentasPublicTokensQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/public-tokens/conformity-ferramentas`
+    ] as const;
+    }
+
+
+export const getGetFerramentasPublicTokensQueryOptions = <TData = Awaited<ReturnType<typeof getFerramentasPublicTokens>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFerramentasPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFerramentasPublicTokensQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFerramentasPublicTokens>>> = ({ signal }) => getFerramentasPublicTokens(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFerramentasPublicTokens>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFerramentasPublicTokensQueryResult = NonNullable<Awaited<ReturnType<typeof getFerramentasPublicTokens>>>
+export type GetFerramentasPublicTokensQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Links de conformidade Ferramentas gerados pelo avaliador logado
+ */
+
+export function useGetFerramentasPublicTokens<TData = Awaited<ReturnType<typeof getFerramentasPublicTokens>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFerramentasPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFerramentasPublicTokensQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAllPublicTokensUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/public-tokens/all`
+}
+
+/**
+ * @summary Admin/RH/Operador — todos os links públicos do evento (qualquer avaliador/formulário)
+ */
+export const getAllPublicTokens = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminPublicToken[]> => {
+
+  return customFetch<AdminPublicToken[]>(getGetAllPublicTokensUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAllPublicTokensQueryKey = (id: number,) => {
+    return [
+    `/events/${id}/public-tokens/all`
+    ] as const;
+    }
+
+
+export const getGetAllPublicTokensQueryOptions = <TData = Awaited<ReturnType<typeof getAllPublicTokens>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAllPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAllPublicTokensQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAllPublicTokens>>> = ({ signal }) => getAllPublicTokens(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAllPublicTokens>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAllPublicTokensQueryResult = NonNullable<Awaited<ReturnType<typeof getAllPublicTokens>>>
+export type GetAllPublicTokensQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Admin/RH/Operador — todos os links públicos do evento (qualquer avaliador/formulário)
+ */
+
+export function useGetAllPublicTokens<TData = Awaited<ReturnType<typeof getAllPublicTokens>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAllPublicTokens>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAllPublicTokensQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPublicEvalUrl = (token: string,) => {
+
+
+
+
+  return `/public-eval/${token}`
+}
+
+/**
+ * @summary Dados do link público de avaliação (público, sem autenticação)
+ */
+export const getPublicEval = async (token: string, options?: Parameters<typeof customFetch>[1]): Promise<PublicEvalInfo> => {
+
+  return customFetch<PublicEvalInfo>(getGetPublicEvalUrl(token),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicEvalQueryKey = (token: string,) => {
+    return [
+    `/public-eval/${token}`
+    ] as const;
+    }
+
+
+export const getGetPublicEvalQueryOptions = <TData = Awaited<ReturnType<typeof getPublicEval>>, TError = ErrorType<ErrorEnvelope>>(token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicEval>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicEvalQueryKey(token);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicEval>>> = ({ signal }) => getPublicEval(token, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: token !== null && token !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicEval>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicEvalQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicEval>>>
+export type GetPublicEvalQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Dados do link público de avaliação (público, sem autenticação)
+ */
+
+export function useGetPublicEval<TData = Awaited<ReturnType<typeof getPublicEval>>, TError = ErrorType<ErrorEnvelope>>(
+ token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicEval>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicEvalQueryOptions(token,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSubmitPublicEvalUrl = (token: string,) => {
+
+
+
+
+  return `/public-eval/${token}/submit`
+}
+
+/**
+ * @summary Envia as notas do questionário pelo link público (público, sem autenticação)
+ */
+export const submitPublicEval = async (token: string,
+    publicEvalSubmitInput: PublicEvalSubmitInput, options?: Parameters<typeof customFetch>[1]): Promise<OkResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OkResponse>(getSubmitPublicEvalUrl(token),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(publicEvalSubmitInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitPublicEvalMutationKey = () => ['submitPublicEval'] as const;
+
+export const getSubmitPublicEvalMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEval>>, TError,SubmitPublicEvalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitPublicEval>>, TError,SubmitPublicEvalMutationVariables, TContext> => {
+
+const mutationKey = getSubmitPublicEvalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitPublicEval>>, SubmitPublicEvalMutationVariables> = (props) => {
+          const {token,data} = props ?? {};
+
+          return  submitPublicEval(token,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitPublicEvalMutationResult = NonNullable<Awaited<ReturnType<typeof submitPublicEval>>>
+    export type SubmitPublicEvalMutationBody = BodyType<PublicEvalSubmitInput>
+    export type SubmitPublicEvalMutationError = ErrorType<ErrorEnvelope>
+    export type SubmitPublicEvalMutationVariables = {token: string;data: BodyType<PublicEvalSubmitInput>}
+
+    /**
+ * @summary Envia as notas do questionário pelo link público (público, sem autenticação)
+ */
+export const useSubmitPublicEval = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEval>>, TError,SubmitPublicEvalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitPublicEval>>,
+        TError,
+        SubmitPublicEvalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitPublicEvalMutationOptions(options));
+    }
+
+export const getSubmitPublicEvalConformityUrl = (token: string,) => {
+
+
+
+
+  return `/public-eval/${token}/submit-conformity`
+}
+
+/**
+ * @summary Envia o formulário de conformidade pelo link público (público, sem autenticação)
+ */
+export const submitPublicEvalConformity = async (token: string,
+    publicEvalConformityInput: PublicEvalConformityInput, options?: Parameters<typeof customFetch>[1]): Promise<OkResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OkResponse>(getSubmitPublicEvalConformityUrl(token),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(publicEvalConformityInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitPublicEvalConformityMutationKey = () => ['submitPublicEvalConformity'] as const;
+
+export const getSubmitPublicEvalConformityMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEvalConformity>>, TError,SubmitPublicEvalConformityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitPublicEvalConformity>>, TError,SubmitPublicEvalConformityMutationVariables, TContext> => {
+
+const mutationKey = getSubmitPublicEvalConformityMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitPublicEvalConformity>>, SubmitPublicEvalConformityMutationVariables> = (props) => {
+          const {token,data} = props ?? {};
+
+          return  submitPublicEvalConformity(token,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitPublicEvalConformityMutationResult = NonNullable<Awaited<ReturnType<typeof submitPublicEvalConformity>>>
+    export type SubmitPublicEvalConformityMutationBody = BodyType<PublicEvalConformityInput>
+    export type SubmitPublicEvalConformityMutationError = ErrorType<ErrorEnvelope>
+    export type SubmitPublicEvalConformityMutationVariables = {token: string;data: BodyType<PublicEvalConformityInput>}
+
+    /**
+ * @summary Envia o formulário de conformidade pelo link público (público, sem autenticação)
+ */
+export const useSubmitPublicEvalConformity = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitPublicEvalConformity>>, TError,SubmitPublicEvalConformityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitPublicEvalConformity>>,
+        TError,
+        SubmitPublicEvalConformityMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitPublicEvalConformityMutationOptions(options));
+    }
+
+export const getDeletePublicEvalTokenUrl = (tokenId: string,) => {
+
+
+
+
+  return `/public-eval-tokens/${tokenId}`
+}
+
+/**
+ * @summary Exclui um link público ainda não respondido (dono do link ou admin/rh)
+ */
+export const deletePublicEvalToken = async (tokenId: string, options?: Parameters<typeof customFetch>[1]): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getDeletePublicEvalTokenUrl(tokenId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeletePublicEvalTokenMutationKey = () => ['deletePublicEvalToken'] as const;
+
+export const getDeletePublicEvalTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePublicEvalToken>>, TError,DeletePublicEvalTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePublicEvalToken>>, TError,DeletePublicEvalTokenMutationVariables, TContext> => {
+
+const mutationKey = getDeletePublicEvalTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePublicEvalToken>>, DeletePublicEvalTokenMutationVariables> = (props) => {
+          const {tokenId} = props ?? {};
+
+          return  deletePublicEvalToken(tokenId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePublicEvalTokenMutationResult = NonNullable<Awaited<ReturnType<typeof deletePublicEvalToken>>>
+
+    export type DeletePublicEvalTokenMutationError = ErrorType<ErrorEnvelope>
+    export type DeletePublicEvalTokenMutationVariables = {tokenId: string}
+
+    /**
+ * @summary Exclui um link público ainda não respondido (dono do link ou admin/rh)
+ */
+export const useDeletePublicEvalToken = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePublicEvalToken>>, TError,DeletePublicEvalTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePublicEvalToken>>,
+        TError,
+        DeletePublicEvalTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeletePublicEvalTokenMutationOptions(options));
+    }
+
+export const getReplaceAllPlatoonRulesUrl = () => {
+
+
+
+
+  return `/platoon-rules/replace-all`
+}
+
+/**
+ * @summary Substitui todas as faixas de bônus de uma vez (valida sobreposição e cobertura)
+ */
+export const replaceAllPlatoonRules = async (replaceAllPlatoonRulesInput: ReplaceAllPlatoonRulesInput, options?: Parameters<typeof customFetch>[1]): Promise<ReplaceAllPlatoonRulesResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReplaceAllPlatoonRulesResult>(getReplaceAllPlatoonRulesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(replaceAllPlatoonRulesInput)
+  }
+);}
+
+
+
+
+
+export const getReplaceAllPlatoonRulesMutationKey = () => ['replaceAllPlatoonRules'] as const;
+
+export const getReplaceAllPlatoonRulesMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replaceAllPlatoonRules>>, TError,ReplaceAllPlatoonRulesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof replaceAllPlatoonRules>>, TError,ReplaceAllPlatoonRulesMutationVariables, TContext> => {
+
+const mutationKey = getReplaceAllPlatoonRulesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof replaceAllPlatoonRules>>, ReplaceAllPlatoonRulesMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  replaceAllPlatoonRules(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReplaceAllPlatoonRulesMutationResult = NonNullable<Awaited<ReturnType<typeof replaceAllPlatoonRules>>>
+    export type ReplaceAllPlatoonRulesMutationBody = BodyType<ReplaceAllPlatoonRulesInput>
+    export type ReplaceAllPlatoonRulesMutationError = ErrorType<ErrorEnvelope>
+    export type ReplaceAllPlatoonRulesMutationVariables = {data: BodyType<ReplaceAllPlatoonRulesInput>}
+
+    /**
+ * @summary Substitui todas as faixas de bônus de uma vez (valida sobreposição e cobertura)
+ */
+export const useReplaceAllPlatoonRules = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replaceAllPlatoonRules>>, TError,ReplaceAllPlatoonRulesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof replaceAllPlatoonRules>>,
+        TError,
+        ReplaceAllPlatoonRulesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReplaceAllPlatoonRulesMutationOptions(options));
+    }
+
+export const getGetMyPerformanceUrl = () => {
+
+
+
+
+  return `/my-performance`
+}
+
+/**
+ * @summary Desempenho do colaborador logado no ciclo atual
+ */
+export const getMyPerformance = async ( options?: Parameters<typeof customFetch>[1]): Promise<MyPerformance> => {
+
+  return customFetch<MyPerformance>(getGetMyPerformanceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyPerformanceQueryKey = () => {
+    return [
+    `/my-performance`
+    ] as const;
+    }
+
+
+export const getGetMyPerformanceQueryOptions = <TData = Awaited<ReturnType<typeof getMyPerformance>>, TError = ErrorType<ErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyPerformance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyPerformanceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyPerformance>>> = ({ signal }) => getMyPerformance({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyPerformance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyPerformanceQueryResult = NonNullable<Awaited<ReturnType<typeof getMyPerformance>>>
+export type GetMyPerformanceQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Desempenho do colaborador logado no ciclo atual
+ */
+
+export function useGetMyPerformance<TData = Awaited<ReturnType<typeof getMyPerformance>>, TError = ErrorType<ErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyPerformance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyPerformanceQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

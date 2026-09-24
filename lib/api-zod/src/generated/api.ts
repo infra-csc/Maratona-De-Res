@@ -38,7 +38,9 @@ export const LoginResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 })
 
@@ -58,7 +60,9 @@ export const GetMeResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 
 
@@ -91,7 +95,9 @@ export const ChangePasswordResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 })
 
@@ -117,7 +123,9 @@ export const ImpersonateResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 })
 
@@ -137,7 +145,9 @@ export const GetUsersResponseItem = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 export const GetUsersResponse = zod.array(GetUsersResponseItem)
 
@@ -166,7 +176,9 @@ export const CreateUserResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 
 
@@ -204,7 +216,9 @@ export const GetUserResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 
 
@@ -236,7 +250,9 @@ export const UpdateUserResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "active": zod.boolean(),
   "mustChangePassword": zod.boolean().optional(),
-  "createdAt": zod.string().optional()
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
 })
 
 
@@ -3443,50 +3459,6 @@ export const DeletePenaltyTypeResponse = zod.void()
 
 
 /**
- * @summary List event review requests raised by employees
- */
-export const GetReviewRequestsResponseItem = zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "eventName": zod.string().nullish(),
-  "employeeId": zod.int(),
-  "employeeName": zod.string().nullish(),
-  "comment": zod.string(),
-  "status": zod.enum(['pending', 'resolved', 'approved', 'denied']),
-  "createdAt": zod.string(),
-  "resolvedAt": zod.string().nullish(),
-  "resolutionNotes": zod.string().nullish()
-})
-export const GetReviewRequestsResponse = zod.array(GetReviewRequestsResponseItem)
-
-
-/**
- * @summary Mark a review request as resolved
- */
-export const ResolveReviewRequestParams = zod.object({
-  "id": zod.coerce.number().int()
-})
-
-export const ResolveReviewRequestBody = zod.object({
-  "resolution": zod.enum(['approved', 'denied']).optional().describe('Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido).'),
-  "resolutionNotes": zod.string().nullish()
-})
-
-export const ResolveReviewRequestResponse = zod.object({
-  "id": zod.int(),
-  "eventId": zod.int(),
-  "eventName": zod.string().nullish(),
-  "employeeId": zod.int(),
-  "employeeName": zod.string().nullish(),
-  "comment": zod.string(),
-  "status": zod.enum(['pending', 'resolved', 'approved', 'denied']),
-  "createdAt": zod.string(),
-  "resolvedAt": zod.string().nullish(),
-  "resolutionNotes": zod.string().nullish()
-})
-
-
-/**
  * @summary Get system rules
  */
 export const GetRulesResponseItem = zod.object({
@@ -4622,5 +4594,1027 @@ export const GetStorageObjectParams = zod.object({
 })
 
 export const GetStorageObjectResponse = zod.unknown()
+
+
+/**
+ * @summary SSO do portal NORTE — troca o JWT do portal por uma sessão Maratona (público)
+ */
+export const PortalSsoBody = zod.object({
+  "token": zod.string().describe('JWT HS256 emitido pelo portal NORTE (issuer "norte-portal").')
+})
+
+export const PortalSsoResponse = zod.object({
+  "token": zod.string(),
+  "user": zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "email": zod.string().nullish(),
+  "cpfLogin": zod.string().nullish(),
+  "role": zod.string(),
+  "areaId": zod.int().nullish(),
+  "areaName": zod.string().nullish(),
+  "employeeId": zod.int().nullish(),
+  "employeeName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
+  "createdAt": zod.string().optional(),
+  "impersonatorId": zod.int().optional().describe('Só no "Modo Dev" (sessão de impersonação) — id do admin real.'),
+  "impersonatorName": zod.string().nullish().describe('Só no "Modo Dev" — nome do admin real.')
+})
+})
+
+
+/**
+ * @summary Áreas em que o usuário logado é avaliador principal (default evaluator de algum critério)
+ */
+export const GetMyPrincipalAreasResponseItem = zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+})
+export const GetMyPrincipalAreasResponse = zod.array(GetMyPrincipalAreasResponseItem)
+
+
+/**
+ * @summary Migração one-shot dos e-mails corporativos (Office 365) — admin
+ */
+export const BulkUpdateUserEmailsBody = zod.object({
+  "dryRun": zod.boolean().optional().describe('true = só devolve a prévia, sem gravar.')
+})
+
+export const BulkUpdateUserEmailsResponse = zod.object({
+  "dryRun": zod.boolean(),
+  "updated": zod.int().optional().describe('Presente só quando dryRun = false.'),
+  "preview": zod.array(zod.object({
+  "id": zod.int(),
+  "status": zod.enum(['not_found', 'will_update', 'no_change']),
+  "name": zod.string().optional().describe('Ausente quando status = not_found.'),
+  "email": zod.string().optional().describe('Presente só quando status = not_found (e-mail do mapa).'),
+  "emailFrom": zod.string().nullish(),
+  "emailTo": zod.string().optional()
+}))
+})
+
+
+/**
+ * @summary Roteamento de todos os critérios (admin/rh/operador)
+ */
+export const GetAllCriterionRoutingsResponseItem = zod.object({
+  "id": zod.int().optional(),
+  "criterionId": zod.int(),
+  "defaultEvaluatorId": zod.int().nullable(),
+  "defaultEvaluatorName": zod.string().nullable(),
+  "conformityEvaluatorId": zod.int().nullable(),
+  "conformityEvaluatorName": zod.string().nullable(),
+  "commentRequired": zod.boolean(),
+  "redirectMode": zod.enum(['none', 'area', 'specific']),
+  "redirectAreaId": zod.int().nullable(),
+  "redirectAreaName": zod.string().nullable(),
+  "allowPublicLink": zod.boolean(),
+  "redirectUsers": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+})).optional()
+}).describe('Roteamento de um critério. `id` e `redirectUsers` só vêm no GET de um\ncritério específico; a listagem geral não os inclui.\n')
+export const GetAllCriterionRoutingsResponse = zod.array(GetAllCriterionRoutingsResponseItem)
+
+
+/**
+ * @summary Roteamento de um critério (null quando ainda não configurado)
+ */
+export const GetCriterionRoutingParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetCriterionRoutingResponse = zod.union([zod.object({
+  "id": zod.int().optional(),
+  "criterionId": zod.int(),
+  "defaultEvaluatorId": zod.int().nullable(),
+  "defaultEvaluatorName": zod.string().nullable(),
+  "conformityEvaluatorId": zod.int().nullable(),
+  "conformityEvaluatorName": zod.string().nullable(),
+  "commentRequired": zod.boolean(),
+  "redirectMode": zod.enum(['none', 'area', 'specific']),
+  "redirectAreaId": zod.int().nullable(),
+  "redirectAreaName": zod.string().nullable(),
+  "allowPublicLink": zod.boolean(),
+  "redirectUsers": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+})).optional()
+}).describe('Roteamento de um critério. `id` e `redirectUsers` só vêm no GET de um\ncritério específico; a listagem geral não os inclui.\n'),zod.null()])
+
+
+/**
+ * @summary Cria ou atualiza o roteamento de um critério
+ */
+export const SaveCriterionRoutingParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const SaveCriterionRoutingBody = zod.object({
+  "defaultEvaluatorId": zod.int().nullish(),
+  "conformityEvaluatorId": zod.int().nullish(),
+  "commentRequired": zod.boolean().optional().describe('Padrão true (só false explícito desliga).'),
+  "redirectMode": zod.enum(['none', 'area', 'specific']).optional(),
+  "redirectAreaId": zod.int().nullish(),
+  "allowPublicLink": zod.boolean().optional(),
+  "redirectUserIds": zod.array(zod.int()).optional().describe('Usado só com redirectMode = specific (substitui a lista).')
+})
+
+export const SaveCriterionRoutingResponse = zod.object({
+  "id": zod.int(),
+  "criterionId": zod.int(),
+  "defaultEvaluatorId": zod.int().nullable(),
+  "conformityEvaluatorId": zod.int().nullable(),
+  "commentRequired": zod.boolean(),
+  "redirectMode": zod.enum(['none', 'area', 'specific']),
+  "redirectAreaId": zod.int().nullable(),
+  "allowPublicLink": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Admin — sincroniza responsibleAreaLabel com o nome real da área (idempotente)
+ */
+export const SyncCriteriaAreaLabelsResponse = zod.object({
+  "updated": zod.int()
+})
+
+
+/**
+ * @summary Trilha de auditoria das calibrações de um evento
+ */
+export const GetCalibrationAuditQueryParams = zod.object({
+  "eventId": zod.coerce.number().int()
+})
+
+export const GetCalibrationAuditResponseItem = zod.object({
+  "id": zod.int(),
+  "userId": zod.int().nullable(),
+  "userName": zod.string().nullable(),
+  "action": zod.string(),
+  "entityId": zod.string().nullable().describe('ID da calibração (texto, como gravado em audit_logs).'),
+  "beforeJson": zod.string().nullable(),
+  "afterJson": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "criterionId": zod.int().nullable(),
+  "criterionName": zod.string().nullable()
+})
+export const GetCalibrationAuditResponse = zod.array(GetCalibrationAuditResponseItem)
+
+
+/**
+ * @summary Comentários de calibração de um evento
+ */
+export const GetCalibrationCommentsQueryParams = zod.object({
+  "eventId": zod.coerce.number().int()
+})
+
+export const GetCalibrationCommentsResponseItem = zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "text": zod.string(),
+  "createdByUserId": zod.int(),
+  "createdByName": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const GetCalibrationCommentsResponse = zod.array(GetCalibrationCommentsResponseItem)
+
+
+/**
+ * @summary Adiciona comentário de calibração
+ */
+export const CreateCalibrationCommentBody = zod.object({
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "text": zod.string()
+})
+
+export const CreateCalibrationCommentResponse = zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "text": zod.string(),
+  "createdByUserId": zod.int(),
+  "createdByName": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Exclui comentário de calibração
+ */
+export const DeleteCalibrationCommentParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const DeleteCalibrationCommentResponse = zod.void()
+
+
+/**
+ * @summary Redefine tipos em massa (IDs informados → casa, demais → freela) e recalcula o ciclo
+ */
+export const BulkEmploymentResetBody = zod.object({
+  "casaIds": zod.array(zod.int())
+})
+
+export const BulkEmploymentResetResponse = zod.object({
+  "ok": zod.boolean(),
+  "casaCount": zod.int().describe('Colaboradores casa ativos após a operação.')
+})
+
+
+/**
+ * @summary Atualiza CPF (document) em lote casando pelo nome normalizado
+ */
+export const BulkSetEmployeeCpfBodyItem = zod.object({
+  "name": zod.string(),
+  "document": zod.string()
+})
+export const BulkSetEmployeeCpfBody = zod.array(BulkSetEmployeeCpfBodyItem)
+
+export const BulkSetEmployeeCpfResponse = zod.object({
+  "updated": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+})),
+  "notFound": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Senhas (PIN = CPF) atuais dos colaboradores casa ativos
+ */
+export const GetCasaPinsQueryParams = zod.object({
+  "ids": zod.coerce.string().optional().describe('IDs de colaborador separados por vírgula (ex. 1,2,3). Ausente = todos.')
+})
+
+export const GetCasaPinsResponse = zod.object({
+  "results": zod.array(zod.object({
+  "name": zod.string(),
+  "cpfLogin": zod.string().nullable(),
+  "pin": zod.string()
+}))
+})
+
+
+/**
+ * @summary Gera/redefine o acesso (senha = CPF) dos colaboradores casa ativos
+ */
+export const BulkGenerateCasaPinsBody = zod.object({
+  "ids": zod.array(zod.int()).optional().describe('Restringe aos colaboradores informados. Ausente/vazio = todos os casa ativos.')
+})
+
+export const BulkGenerateCasaPinsResponse = zod.object({
+  "results": zod.array(zod.object({
+  "name": zod.string(),
+  "cpfLogin": zod.string(),
+  "pin": zod.string()
+})),
+  "skipped": zod.array(zod.object({
+  "name": zod.string(),
+  "reason": zod.string()
+}))
+})
+
+
+/**
+ * @summary Gera/redefine o acesso (senha = CPF) de um colaborador casa
+ */
+export const GenerateEmployeePinParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GenerateEmployeePinResponse = zod.object({
+  "pin": zod.string(),
+  "cpfLogin": zod.string(),
+  "userCreated": zod.boolean()
+})
+
+
+/**
+ * Com `dryRun: true` devolve a lista do que mudaria, sem gravar. Para
+ * aplicar é obrigatório enviar `confirm: "APLICAR"`; sem isso responde 400.
+ * @summary Define a data (início = fim) e o nome de eventos em lote a partir da planilha
+ */
+export const BulkSyncEventDatesBody = zod.object({
+  "updates": zod.array(zod.object({
+  "externalId": zod.string(),
+  "name": zod.string(),
+  "date": zod.string().describe('AAAA-MM-DD')
+})),
+  "dryRun": zod.boolean().optional().describe('true = só devolve a prévia, sem gravar.'),
+  "confirm": zod.string().optional().describe('Precisa ser exatamente "APLICAR" para gravar.')
+})
+
+export const BulkSyncEventDatesResponse = zod.object({
+  "dryRun": zod.boolean(),
+  "updated": zod.int().describe('Eventos gravados (0 no dryRun).'),
+  "changeCount": zod.int().describe('Linhas da planilha que mudam algum evento.'),
+  "unchanged": zod.int().describe('Linhas localizadas cujo evento já está com a data/nome informados.'),
+  "notFound": zod.int(),
+  "notFoundIds": zod.array(zod.string()),
+  "changes": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string().describe('Nome atual do evento.'),
+  "newName": zod.string().nullable().describe('Novo nome (bulk-date-sync), ou null quando o nome não muda.'),
+  "startDateBefore": zod.string(),
+  "endDateBefore": zod.string(),
+  "startDateAfter": zod.string(),
+  "endDateAfter": zod.string(),
+  "reason": zod.string().nullable().describe('normalize-dates — "fix" (correção pontual) ou "normalize" (multi-dia → data única).')
+}))
+})
+
+
+/**
+ * @summary Confirma os resultados de vários eventos (admin), recalculando uma vez por ciclo
+ */
+export const confirmEventResultsBulkBodyEventIdsMax = 200;
+
+
+
+export const ConfirmEventResultsBulkBody = zod.object({
+  "eventIds": zod.array(zod.int()).max(confirmEventResultsBulkBodyEventIdsMax)
+})
+
+export const ConfirmEventResultsBulkResponse = zod.object({
+  "confirmed": zod.int(),
+  "skipped": zod.int(),
+  "warnings": zod.array(zod.string())
+})
+
+
+/**
+ * Com `dryRun: true` devolve a lista do que mudaria, sem gravar. Para
+ * aplicar é obrigatório enviar `confirm: "APLICAR"`; sem isso responde 400.
+ * @summary Admin one-shot — corrige 4 eventos conhecidos e unifica eventos multi-dia (início = fim)
+ */
+export const NormalizeEventDatesBody = zod.object({
+  "dryRun": zod.boolean().optional().describe('true = só devolve a prévia, sem gravar.'),
+  "confirm": zod.string().optional().describe('Precisa ser exatamente "APLICAR" para gravar.')
+})
+
+export const NormalizeEventDatesResponse = zod.object({
+  "dryRun": zod.boolean(),
+  "ok": zod.boolean(),
+  "fixedCount": zod.int(),
+  "normalizedCount": zod.int(),
+  "changes": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string().describe('Nome atual do evento.'),
+  "newName": zod.string().nullable().describe('Novo nome (bulk-date-sync), ou null quando o nome não muda.'),
+  "startDateBefore": zod.string(),
+  "endDateBefore": zod.string(),
+  "startDateAfter": zod.string(),
+  "endDateAfter": zod.string(),
+  "reason": zod.string().nullable().describe('normalize-dates — "fix" (correção pontual) ou "normalize" (multi-dia → data única).')
+}))
+})
+
+
+/**
+ * @summary Admin — troca o critério de origem de um quesito duplicado (eventScoped)
+ */
+export const SwapEventCriterionSourceParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "ecId": zod.coerce.number().int()
+})
+
+export const SwapEventCriterionSourceBody = zod.object({
+  "sourceCriterionId": zod.int()
+})
+
+export const SwapEventCriterionSourceResponse = zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.int(),
+  "cycleName": zod.string().optional(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
+  "resultsConfirmed": zod.boolean().optional(),
+  "resultsConfirmedAt": zod.string().nullish(),
+  "resultsConfirmedBy": zod.int().nullish(),
+  "participants": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.int().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('LEGADO — a validação de diárias foi removida do app. Mantido apenas como leitura de dados históricos; não é mais escrito. A presença é controlada exclusivamente pelo campo `confirmed`.'),
+  "actualDiariaCount": zod.int().nullish().describe('LEGADO — ver actualDiariaDates. Não é mais escrito.'),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('LEGADO — o modo rápido de confirmação não existe mais.'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('LEGADO — timestamp histórico da confirmação rápida.'),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de inatividade).'),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade.')
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaId": zod.int().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional(),
+  "sourceCriterionId": zod.int().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "areaId": zod.int(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.int(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "eventId": zod.int(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional(),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.int(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Log consolidado de atividades do evento (até 300 entradas, mais recentes primeiro)
+ */
+export const GetEventActivityLogParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetEventActivityLogResponseItem = zod.object({
+  "id": zod.string(),
+  "kind": zod.string().describe('eval | calibration | cal_comment | event_comment | publish | publish_final | conformity | audit'),
+  "label": zod.string(),
+  "userName": zod.string().nullable(),
+  "criterionName": zod.string().nullable(),
+  "score": zod.number().nullable(),
+  "detail": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const GetEventActivityLogResponse = zod.array(GetEventActivityLogResponseItem)
+
+
+/**
+ * @summary Desfaz a liberação final do feedback do evento (admin/rh)
+ */
+export const UnreleaseEventFeedbackParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const UnreleaseEventFeedbackResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * Para o avaliador principal, critérios da área ainda sem linha em
+ * event_criterion_assignments aparecem como linhas "virtuais" (id null, status pending).
+ * @summary Atribuições por critério do evento (avaliador vê as próprias e as da área em que é principal)
+ */
+export const GetEventCriterionAssignmentsParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetEventCriterionAssignmentsResponseItem = zod.object({
+  "id": zod.int().nullable().describe('null nas linhas "virtuais" do avaliador principal (critério ainda sem atribuição gravada).'),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "criterionName": zod.string().nullable(),
+  "criterionAreaId": zod.int().nullable(),
+  "assignedToId": zod.int().nullable(),
+  "assignedToName": zod.string().nullable(),
+  "status": zod.enum(['pending', 'suggested', 'confirmed', 'submitted']),
+  "redirectedFromId": zod.int().nullable(),
+  "redirectedFromName": zod.string().nullable(),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date().nullable()
+})
+export const GetEventCriterionAssignmentsResponse = zod.array(GetEventCriterionAssignmentsResponseItem)
+
+
+/**
+ * @summary Gera atribuições sugeridas a partir do roteamento padrão (idempotente)
+ */
+export const GenerateCriterionAssignmentsParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GenerateCriterionAssignmentsResponse = zod.object({
+  "generated": zod.int(),
+  "skipped": zod.int()
+})
+
+
+/**
+ * @summary Confirma, reatribui, redireciona ou atribui (principal da área) um critério do evento
+ */
+export const UpdateCriterionAssignmentParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "criterionId": zod.coerce.number().int()
+})
+
+export const UpdateCriterionAssignmentBody = zod.object({
+  "assignedToId": zod.int().nullish(),
+  "action": zod.enum(['confirm', 'redirect', 'assign']).optional().describe('Ausente = confirmação/reatribuição por admin/rh.')
+})
+
+export const UpdateCriterionAssignmentResponse = zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "assignedToId": zod.int().nullable(),
+  "status": zod.enum(['pending', 'suggested', 'confirmed', 'submitted']),
+  "redirectedFromId": zod.int().nullable(),
+  "confirmedByUserId": zod.int().nullable(),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Usuários para os quais o critério pode ser redirecionado (conforme o roteamento)
+ */
+export const GetCriterionRedirectOptionsParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "criterionId": zod.coerce.number().int()
+})
+
+export const GetCriterionRedirectOptionsResponseItem = zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+})
+export const GetCriterionRedirectOptionsResponse = zod.array(GetCriterionRedirectOptionsResponseItem)
+
+
+/**
+ * @summary Critérios do questionário do avaliador logado que podem entrar num link público
+ */
+export const GetPublicLinkEligibleCriteriaParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetPublicLinkEligibleCriteriaResponseItem = zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string()
+})
+export const GetPublicLinkEligibleCriteriaResponse = zod.array(GetPublicLinkEligibleCriteriaResponseItem)
+
+
+/**
+ * @summary Gera link público do questionário do avaliador logado
+ */
+export const CreatePublicTokenParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CreatePublicTokenBody = zod.object({
+  "recipientName": zod.string(),
+  "criterionIds": zod.array(zod.int()).optional().describe('Restringe o link a estes critérios (interseção com os elegíveis).'),
+  "includeConformity": zod.boolean().optional()
+})
+
+export const CreatePublicTokenResponse = zod.object({
+  "tokenId": zod.string(),
+  "reused": zod.boolean().optional().describe('true quando um link pendente equivalente foi devolvido em vez de criar outro.')
+})
+
+
+/**
+ * @summary Admin/RH/Diretoria/Operador — gera link público para o questionário de um avaliador designado
+ */
+export const CreateAdminPublicTokenParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CreateAdminPublicTokenBody = zod.object({
+  "assignedToUserId": zod.int(),
+  "criterionIds": zod.array(zod.int()),
+  "recipientName": zod.string().optional(),
+  "includeConformity": zod.boolean().optional()
+})
+
+export const CreateAdminPublicTokenResponse = zod.object({
+  "tokenId": zod.string(),
+  "reused": zod.boolean().optional().describe('true quando um link pendente equivalente foi devolvido em vez de criar outro.')
+})
+
+
+/**
+ * @summary Links públicos (critérios) gerados pelo avaliador logado no evento
+ */
+export const GetPublicTokensParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetPublicTokensResponseItem = zod.object({
+  "id": zod.string(),
+  "recipientName": zod.string().nullable(),
+  "submitterName": zod.string().nullable(),
+  "usedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByName": zod.string().nullish().describe('Só na lista de links de critérios (as listas de conformidade não trazem).')
+})
+export const GetPublicTokensResponse = zod.array(GetPublicTokensResponseItem)
+
+
+/**
+ * @summary Gera (ou reaproveita) o link público do formulário de conformidade Cenografia
+ */
+export const CreateConformityPublicTokenParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CreateConformityPublicTokenBody = zod.object({
+  "recipientName": zod.string()
+})
+
+export const CreateConformityPublicTokenResponse = zod.object({
+  "tokenId": zod.string(),
+  "reused": zod.boolean().optional().describe('true quando um link pendente equivalente foi devolvido em vez de criar outro.')
+})
+
+
+/**
+ * @summary Gera (ou reaproveita) o link público do formulário de conformidade Ferramentas
+ */
+export const CreateFerramentasPublicTokenParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CreateFerramentasPublicTokenBody = zod.object({
+  "recipientName": zod.string()
+})
+
+export const CreateFerramentasPublicTokenResponse = zod.object({
+  "tokenId": zod.string(),
+  "reused": zod.boolean().optional().describe('true quando um link pendente equivalente foi devolvido em vez de criar outro.')
+})
+
+
+/**
+ * @summary Links de conformidade Cenografia gerados pelo avaliador logado
+ */
+export const GetConformityPublicTokensParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetConformityPublicTokensResponseItem = zod.object({
+  "id": zod.string(),
+  "recipientName": zod.string().nullable(),
+  "submitterName": zod.string().nullable(),
+  "usedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByName": zod.string().nullish().describe('Só na lista de links de critérios (as listas de conformidade não trazem).')
+})
+export const GetConformityPublicTokensResponse = zod.array(GetConformityPublicTokensResponseItem)
+
+
+/**
+ * @summary Links de conformidade Ferramentas gerados pelo avaliador logado
+ */
+export const GetFerramentasPublicTokensParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetFerramentasPublicTokensResponseItem = zod.object({
+  "id": zod.string(),
+  "recipientName": zod.string().nullable(),
+  "submitterName": zod.string().nullable(),
+  "usedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByName": zod.string().nullish().describe('Só na lista de links de critérios (as listas de conformidade não trazem).')
+})
+export const GetFerramentasPublicTokensResponse = zod.array(GetFerramentasPublicTokensResponseItem)
+
+
+/**
+ * @summary Admin/RH/Operador — todos os links públicos do evento (qualquer avaliador/formulário)
+ */
+export const GetAllPublicTokensParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetAllPublicTokensResponseItem = zod.object({
+  "id": zod.string(),
+  "tokenType": zod.enum(['criteria', 'criteria_with_conformity', 'conformity_cenografia', 'conformity_ferramentas']),
+  "recipientName": zod.string().nullable(),
+  "submitterName": zod.string().nullable(),
+  "usedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByName": zod.string().nullable(),
+  "createdByUserId": zod.int().nullable(),
+  "criterionIds": zod.array(zod.int())
+})
+export const GetAllPublicTokensResponse = zod.array(GetAllPublicTokensResponseItem)
+
+
+/**
+ * @summary Dados do link público de avaliação (público, sem autenticação)
+ */
+export const GetPublicEvalParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const GetPublicEvalResponse = zod.object({
+  "tokenId": zod.string(),
+  "tokenType": zod.enum(['criteria', 'criteria_with_conformity', 'conformity_cenografia', 'conformity_ferramentas']),
+  "isUsed": zod.boolean(),
+  "usedAt": zod.coerce.date().nullable(),
+  "recipientName": zod.string().nullable(),
+  "submitterName": zod.string().nullable(),
+  "eventName": zod.string().nullable(),
+  "eventStatus": zod.string().nullable(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullable()
+})).describe('Vazio nos links de conformidade.')
+})
+
+
+/**
+ * @summary Envia as notas do questionário pelo link público (público, sem autenticação)
+ */
+export const SubmitPublicEvalParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const submitPublicEvalBodyEvaluationsItemScoreMin = 0;
+export const submitPublicEvalBodyEvaluationsItemScoreMax = 10;
+
+
+
+export const SubmitPublicEvalBody = zod.object({
+  "submitterName": zod.string(),
+  "evaluations": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "score": zod.number().min(submitPublicEvalBodyEvaluationsItemScoreMin).max(submitPublicEvalBodyEvaluationsItemScoreMax),
+  "comments": zod.string().optional()
+})),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish()
+}).describe('Nos links `criteria_with_conformity` também exige os campos da\nconformidade Cenografia (epi, estaiamentos, conduta, absencesReport,\nstandoutResponse e comentários quando a resposta é Não).\n')
+
+export const SubmitPublicEvalResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Envia o formulário de conformidade pelo link público (público, sem autenticação)
+ */
+export const SubmitPublicEvalConformityParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const SubmitPublicEvalConformityBody = zod.object({
+  "submitterName": zod.string(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish()
+}).describe('Cenografia: epi, estaiamentos e conduta obrigatórios (comentário quando Não).\nFerramentas: guardaEquipamentos obrigatório (comentário quando Não).\n')
+
+export const SubmitPublicEvalConformityResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Exclui um link público ainda não respondido (dono do link ou admin/rh)
+ */
+export const DeletePublicEvalTokenParams = zod.object({
+  "tokenId": zod.coerce.string()
+})
+
+export const DeletePublicEvalTokenResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Substitui todas as faixas de bônus de uma vez (valida sobreposição e cobertura)
+ */
+
+
+
+export const ReplaceAllPlatoonRulesBody = zod.object({
+  "rules": zod.array(zod.object({
+  "name": zod.string().optional(),
+  "color": zod.string().optional(),
+  "minScore": zod.number(),
+  "maxScore": zod.number(),
+  "minInclusive": zod.boolean().optional(),
+  "maxInclusive": zod.boolean().optional(),
+  "bonusValue": zod.number().optional(),
+  "bonusPerExtraEvent": zod.number().optional(),
+  "description": zod.string().nullish()
+})).min(1)
+})
+
+export const ReplaceAllPlatoonRulesResponse = zod.object({
+  "replaced": zod.int()
+})
+
+
+/**
+ * @summary Desempenho do colaborador logado no ciclo atual
+ */
+export const GetMyPerformanceResponse = zod.object({
+  "employee": zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "department": zod.string(),
+  "functionName": zod.string(),
+  "eligible": zod.boolean(),
+  "eligibilityStatus": zod.string()
+}),
+  "cycle": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}),
+  "summary": zod.object({
+  "grossAverage": zod.number().nullable(),
+  "currentPlatoon": zod.string().nullable(),
+  "currentPlatoonColor": zod.string().nullable(),
+  "currentPlatoonMinScore": zod.number().nullable(),
+  "currentPlatoonMaxScore": zod.number().nullable(),
+  "nextPlatoon": zod.string().nullable(),
+  "nextPlatoonColor": zod.string().nullable(),
+  "nextPlatoonMinScore": zod.number().nullable(),
+  "projectedBonus": zod.number().nullable(),
+  "bonusStatus": zod.string().nullable(),
+  "eligible": zod.boolean(),
+  "totalEvents": zod.int(),
+  "closedEvents": zod.int(),
+  "openEvents": zod.int(),
+  "confirmedEvents": zod.int(),
+  "scoredEventsCount": zod.int(),
+  "participatedEventsCount": zod.int(),
+  "minEventsForEligibility": zod.int(),
+  "totalAbsences": zod.int(),
+  "penaltyPoints": zod.number(),
+  "meritPoints": zod.number(),
+  "isQuarterClosed": zod.boolean(),
+  "finalResult": zod.number().nullable(),
+  "absencePenalty": zod.number().nullable(),
+  "paymentMethod": zod.string(),
+  "hasQuarterSnapshot": zod.boolean()
+}),
+  "adjustments": zod.array(zod.object({
+  "id": zod.int(),
+  "kind": zod.enum(['penalty', 'merit']),
+  "penaltyType": zod.string().describe('Rótulo do tipo de penalidade/mérito.'),
+  "points": zod.number(),
+  "quantity": zod.int(),
+  "totalPoints": zod.number(),
+  "date": zod.string(),
+  "reason": zod.string().nullable(),
+  "eventName": zod.string().nullable()
+})),
+  "events": zod.array(zod.object({
+  "eventId": zod.int(),
+  "eventName": zod.string(),
+  "city": zod.string().nullable(),
+  "state": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "status": zod.string(),
+  "hasScore": zod.boolean(),
+  "feedbackReleased": zod.boolean(),
+  "feedbackReleasedAt": zod.coerce.date().nullable(),
+  "criteriaConfirmed": zod.boolean(),
+  "criteriaConfirmedAt": zod.coerce.date().nullable(),
+  "partialPublishedAt": zod.coerce.date().nullable(),
+  "eventScore": zod.number(),
+  "teamScore": zod.number(),
+  "rawTeamScore": zod.number().nullable().describe('Nota bruta do snapshot oficial (antes da penalidade da Matriz).'),
+  "conformityPenalty": zod.number(),
+  "conformityFailedItems": zod.array(zod.object({
+  "label": zod.string(),
+  "comment": zod.string().nullable()
+})),
+  "projectedPlatoon": zod.string().nullable(),
+  "projectedPlatoonColor": zod.string().nullable(),
+  "evaluatedCriteria": zod.int(),
+  "totalCriteria": zod.int(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullable(),
+  "responsibleAreaLabel": zod.string().nullable(),
+  "weight": zod.number(),
+  "scoreUsed": zod.number().nullable(),
+  "criterionTotal": zod.number().nullable(),
+  "publicComments": zod.array(zod.string()),
+  "calibrationReason": zod.string().nullable().describe('Só preenchido depois da publicação (parcial ou final).'),
+  "evaluated": zod.boolean(),
+  "status": zod.enum(['avaliado', 'pendente']),
+  "partialPublishedAt": zod.coerce.date().nullable(),
+  "finalPublishedAt": zod.coerce.date().nullable()
+})),
+  "countsForScore": zod.boolean(),
+  "resultsConfirmed": zod.boolean(),
+  "isHistorical": zod.boolean()
+}))
+})
 
 

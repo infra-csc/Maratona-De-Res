@@ -75,6 +75,13 @@ export interface User {
   active: boolean;
   mustChangePassword?: boolean;
   createdAt?: string;
+  /** Só no "Modo Dev" (sessão de impersonação) — id do admin real. */
+  impersonatorId?: number;
+  /**
+     * Só no "Modo Dev" — nome do admin real.
+     * @nullable
+     */
+  impersonatorName?: string | null;
 }
 
 export interface AuthResponse {
@@ -933,51 +940,6 @@ export interface Absence {
   /** @nullable */
   registeredByUserName?: string | null;
   createdAt?: string;
-}
-
-export type ReviewRequestStatus = typeof ReviewRequestStatus[keyof typeof ReviewRequestStatus];
-
-
-export const ReviewRequestStatus = {
-  pending: 'pending',
-  resolved: 'resolved',
-  approved: 'approved',
-  denied: 'denied',
-} as const;
-
-export interface ReviewRequest {
-  id: number;
-  eventId: number;
-  /** @nullable */
-  eventName?: string | null;
-  employeeId: number;
-  /** @nullable */
-  employeeName?: string | null;
-  comment: string;
-  status: ReviewRequestStatus;
-  createdAt: string;
-  /** @nullable */
-  resolvedAt?: string | null;
-  /** @nullable */
-  resolutionNotes?: string | null;
-}
-
-/**
- * Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido).
- */
-export type ReviewRequestResolveResolution = typeof ReviewRequestResolveResolution[keyof typeof ReviewRequestResolveResolution];
-
-
-export const ReviewRequestResolveResolution = {
-  approved: 'approved',
-  denied: 'denied',
-} as const;
-
-export interface ReviewRequestResolve {
-  /** Desfecho da revisão — aprovada (algo foi corrigido) ou negada (revisado, mantido). */
-  resolution?: ReviewRequestResolveResolution;
-  /** @nullable */
-  resolutionNotes?: string | null;
 }
 
 export interface AbsenceInput {
@@ -1943,6 +1905,757 @@ export interface CsvExport {
   data: string;
 }
 
+export interface IdName {
+  id: number;
+  name: string;
+}
+
+export interface OkResponse {
+  ok: boolean;
+}
+
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface UpdatedCount {
+  updated: number;
+}
+
+export interface PortalSsoInput {
+  /** JWT HS256 emitido pelo portal NORTE (issuer "norte-portal"). */
+  token: string;
+}
+
+export interface PrincipalArea {
+  id: number;
+  name: string;
+}
+
+export interface BulkUpdateEmailsInput {
+  /** true = só devolve a prévia, sem gravar. */
+  dryRun?: boolean;
+}
+
+export type EmailMigrationPreviewItemStatus = typeof EmailMigrationPreviewItemStatus[keyof typeof EmailMigrationPreviewItemStatus];
+
+
+export const EmailMigrationPreviewItemStatus = {
+  not_found: 'not_found',
+  will_update: 'will_update',
+  no_change: 'no_change',
+} as const;
+
+export interface EmailMigrationPreviewItem {
+  id: number;
+  status: EmailMigrationPreviewItemStatus;
+  /** Ausente quando status = not_found. */
+  name?: string;
+  /** Presente só quando status = not_found (e-mail do mapa). */
+  email?: string;
+  /** @nullable */
+  emailFrom?: string | null;
+  emailTo?: string;
+}
+
+export interface BulkUpdateEmailsResult {
+  dryRun: boolean;
+  /** Presente só quando dryRun = false. */
+  updated?: number;
+  preview: EmailMigrationPreviewItem[];
+}
+
+export type CriterionRoutingRedirectMode = typeof CriterionRoutingRedirectMode[keyof typeof CriterionRoutingRedirectMode];
+
+
+export const CriterionRoutingRedirectMode = {
+  none: 'none',
+  area: 'area',
+  specific: 'specific',
+} as const;
+
+/**
+ * Roteamento de um critério. `id` e `redirectUsers` só vêm no GET de um
+ * critério específico; a listagem geral não os inclui.
+ */
+export interface CriterionRouting {
+  id?: number;
+  criterionId: number;
+  /** @nullable */
+  defaultEvaluatorId: number | null;
+  /** @nullable */
+  defaultEvaluatorName: string | null;
+  /** @nullable */
+  conformityEvaluatorId: number | null;
+  /** @nullable */
+  conformityEvaluatorName: string | null;
+  commentRequired: boolean;
+  redirectMode: CriterionRoutingRedirectMode;
+  /** @nullable */
+  redirectAreaId: number | null;
+  /** @nullable */
+  redirectAreaName: string | null;
+  allowPublicLink: boolean;
+  redirectUsers?: IdName[];
+}
+
+export interface CriterionRoutingInput {
+  /** @nullable */
+  defaultEvaluatorId?: number | null;
+  /** @nullable */
+  conformityEvaluatorId?: number | null;
+  /** Padrão true (só false explícito desliga). */
+  commentRequired?: boolean;
+  redirectMode?: CriterionRoutingRedirectMode;
+  /** @nullable */
+  redirectAreaId?: number | null;
+  allowPublicLink?: boolean;
+  /** Usado só com redirectMode = specific (substitui a lista). */
+  redirectUserIds?: number[];
+}
+
+export interface CriterionRoutingRow {
+  id: number;
+  criterionId: number;
+  /** @nullable */
+  defaultEvaluatorId: number | null;
+  /** @nullable */
+  conformityEvaluatorId: number | null;
+  commentRequired: boolean;
+  redirectMode: CriterionRoutingRedirectMode;
+  /** @nullable */
+  redirectAreaId: number | null;
+  allowPublicLink: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CriterionAssignmentStatus = typeof CriterionAssignmentStatus[keyof typeof CriterionAssignmentStatus];
+
+
+export const CriterionAssignmentStatus = {
+  pending: 'pending',
+  suggested: 'suggested',
+  confirmed: 'confirmed',
+  submitted: 'submitted',
+} as const;
+
+export interface EventCriterionAssignment {
+  /**
+     * null nas linhas "virtuais" do avaliador principal (critério ainda sem atribuição gravada).
+     * @nullable
+     */
+  id: number | null;
+  eventId: number;
+  criterionId: number;
+  /** @nullable */
+  criterionName: string | null;
+  /** @nullable */
+  criterionAreaId: number | null;
+  /** @nullable */
+  assignedToId: number | null;
+  /** @nullable */
+  assignedToName: string | null;
+  status: CriterionAssignmentStatus;
+  /** @nullable */
+  redirectedFromId: number | null;
+  /** @nullable */
+  redirectedFromName: string | null;
+  /** @nullable */
+  confirmedAt: string | null;
+  /** @nullable */
+  updatedAt: string | null;
+  /** @nullable */
+  createdAt: string | null;
+}
+
+export interface EventCriterionAssignmentRow {
+  id: number;
+  eventId: number;
+  criterionId: number;
+  /** @nullable */
+  assignedToId: number | null;
+  status: CriterionAssignmentStatus;
+  /** @nullable */
+  redirectedFromId: number | null;
+  /** @nullable */
+  confirmedByUserId: number | null;
+  /** @nullable */
+  confirmedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ausente = confirmação/reatribuição por admin/rh.
+ */
+export type CriterionAssignmentUpdateAction = typeof CriterionAssignmentUpdateAction[keyof typeof CriterionAssignmentUpdateAction];
+
+
+export const CriterionAssignmentUpdateAction = {
+  confirm: 'confirm',
+  redirect: 'redirect',
+  assign: 'assign',
+} as const;
+
+export interface CriterionAssignmentUpdate {
+  /** @nullable */
+  assignedToId?: number | null;
+  /** Ausente = confirmação/reatribuição por admin/rh. */
+  action?: CriterionAssignmentUpdateAction;
+}
+
+export interface GenerateAssignmentsResult {
+  generated: number;
+  skipped: number;
+}
+
+export interface PublicLinkEligibleCriterion {
+  criterionId: number;
+  criterionName: string;
+}
+
+export interface PublicTokenInput {
+  recipientName: string;
+  /** Restringe o link a estes critérios (interseção com os elegíveis). */
+  criterionIds?: number[];
+  includeConformity?: boolean;
+}
+
+export interface AdminPublicTokenInput {
+  assignedToUserId: number;
+  criterionIds: number[];
+  recipientName?: string;
+  includeConformity?: boolean;
+}
+
+export interface ConformityPublicTokenInput {
+  recipientName: string;
+}
+
+export interface PublicTokenCreated {
+  tokenId: string;
+  /** true quando um link pendente equivalente foi devolvido em vez de criar outro. */
+  reused?: boolean;
+}
+
+export interface PublicToken {
+  id: string;
+  /** @nullable */
+  recipientName: string | null;
+  /** @nullable */
+  submitterName: string | null;
+  /** @nullable */
+  usedAt: string | null;
+  createdAt: string;
+  /**
+     * Só na lista de links de critérios (as listas de conformidade não trazem).
+     * @nullable
+     */
+  createdByName?: string | null;
+}
+
+export type PublicTokenType = typeof PublicTokenType[keyof typeof PublicTokenType];
+
+
+export const PublicTokenType = {
+  criteria: 'criteria',
+  criteria_with_conformity: 'criteria_with_conformity',
+  conformity_cenografia: 'conformity_cenografia',
+  conformity_ferramentas: 'conformity_ferramentas',
+} as const;
+
+export interface AdminPublicToken {
+  id: string;
+  tokenType: PublicTokenType;
+  /** @nullable */
+  recipientName: string | null;
+  /** @nullable */
+  submitterName: string | null;
+  /** @nullable */
+  usedAt: string | null;
+  createdAt: string;
+  /** @nullable */
+  createdByName: string | null;
+  /** @nullable */
+  createdByUserId: number | null;
+  criterionIds: number[];
+}
+
+export interface PublicEvalCriterion {
+  criterionId: number;
+  criterionName: string;
+  /** @nullable */
+  criterionDescription: string | null;
+}
+
+export interface PublicEvalInfo {
+  tokenId: string;
+  tokenType: PublicTokenType;
+  isUsed: boolean;
+  /** @nullable */
+  usedAt: string | null;
+  /** @nullable */
+  recipientName: string | null;
+  /** @nullable */
+  submitterName: string | null;
+  /** @nullable */
+  eventName: string | null;
+  /** @nullable */
+  eventStatus: string | null;
+  /** Vazio nos links de conformidade. */
+  criteria: PublicEvalCriterion[];
+}
+
+export interface PublicEvalAnswer {
+  criterionId: number;
+  /**
+     * @minimum 0
+     * @maximum 10
+     */
+  score: number;
+  comments?: string;
+}
+
+/**
+ * Nos links `criteria_with_conformity` também exige os campos da
+ * conformidade Cenografia (epi, estaiamentos, conduta, absencesReport,
+ * standoutResponse e comentários quando a resposta é Não).
+ */
+export interface PublicEvalSubmitInput {
+  submitterName: string;
+  evaluations: PublicEvalAnswer[];
+  /** @nullable */
+  epi?: boolean | null;
+  /** @nullable */
+  estaiamentos?: boolean | null;
+  /** @nullable */
+  conduta?: boolean | null;
+  /** @nullable */
+  epiComment?: string | null;
+  /** @nullable */
+  estaiamentosComment?: string | null;
+  /** @nullable */
+  condutaComment?: string | null;
+  /** @nullable */
+  absencesResponse?: boolean | null;
+  /** @nullable */
+  absencesReport?: string | null;
+  /** @nullable */
+  standoutResponse?: boolean | null;
+  /** @nullable */
+  standoutJustification?: string | null;
+}
+
+/**
+ * Cenografia: epi, estaiamentos e conduta obrigatórios (comentário quando Não).
+ * Ferramentas: guardaEquipamentos obrigatório (comentário quando Não).
+ */
+export interface PublicEvalConformityInput {
+  submitterName: string;
+  /** @nullable */
+  epi?: boolean | null;
+  /** @nullable */
+  estaiamentos?: boolean | null;
+  /** @nullable */
+  conduta?: boolean | null;
+  /** @nullable */
+  epiComment?: string | null;
+  /** @nullable */
+  estaiamentosComment?: string | null;
+  /** @nullable */
+  condutaComment?: string | null;
+  /** @nullable */
+  absencesResponse?: boolean | null;
+  /** @nullable */
+  absencesReport?: string | null;
+  /** @nullable */
+  standoutResponse?: boolean | null;
+  /** @nullable */
+  standoutJustification?: string | null;
+  /** @nullable */
+  guardaEquipamentos?: boolean | null;
+  /** @nullable */
+  guardaEquipamentosComment?: string | null;
+}
+
+export interface CalibrationAuditEntry {
+  id: number;
+  /** @nullable */
+  userId: number | null;
+  /** @nullable */
+  userName: string | null;
+  action: string;
+  /**
+     * ID da calibração (texto, como gravado em audit_logs).
+     * @nullable
+     */
+  entityId: string | null;
+  /** @nullable */
+  beforeJson: string | null;
+  /** @nullable */
+  afterJson: string | null;
+  createdAt: string;
+  /** @nullable */
+  criterionId: number | null;
+  /** @nullable */
+  criterionName: string | null;
+}
+
+export interface CalibrationComment {
+  id: number;
+  eventId: number;
+  criterionId: number;
+  text: string;
+  createdByUserId: number;
+  /** @nullable */
+  createdByName: string | null;
+  createdAt: string;
+}
+
+export interface CalibrationCommentInput {
+  eventId: number;
+  criterionId: number;
+  text: string;
+}
+
+export interface BulkEmploymentResetInput {
+  casaIds: number[];
+}
+
+export interface BulkEmploymentResetResult {
+  ok: boolean;
+  /** Colaboradores casa ativos após a operação. */
+  casaCount: number;
+}
+
+export interface BulkSetCpfEntry {
+  name: string;
+  document: string;
+}
+
+export interface BulkSetCpfResult {
+  updated: IdName[];
+  notFound: string[];
+}
+
+export interface CasaPin {
+  name: string;
+  /** @nullable */
+  cpfLogin: string | null;
+  pin: string;
+}
+
+export interface CasaPinsResult {
+  results: CasaPin[];
+}
+
+export interface BulkGeneratePinsInput {
+  /** Restringe aos colaboradores informados. Ausente/vazio = todos os casa ativos. */
+  ids?: number[];
+}
+
+export interface GeneratedPin {
+  name: string;
+  cpfLogin: string;
+  pin: string;
+}
+
+export interface SkippedPin {
+  name: string;
+  reason: string;
+}
+
+export interface BulkGeneratePinsResult {
+  results: GeneratedPin[];
+  skipped: SkippedPin[];
+}
+
+export interface GeneratePinResult {
+  pin: string;
+  cpfLogin: string;
+  userCreated: boolean;
+}
+
+export interface EventDateChange {
+  eventId: number;
+  /** Nome atual do evento. */
+  eventName: string;
+  /**
+     * Novo nome (bulk-date-sync), ou null quando o nome não muda.
+     * @nullable
+     */
+  newName: string | null;
+  startDateBefore: string;
+  endDateBefore: string;
+  startDateAfter: string;
+  endDateAfter: string;
+  /**
+     * normalize-dates — "fix" (correção pontual) ou "normalize" (multi-dia → data única).
+     * @nullable
+     */
+  reason: string | null;
+}
+
+export interface BulkDateSyncRow {
+  externalId: string;
+  name: string;
+  /** AAAA-MM-DD */
+  date: string;
+}
+
+export interface BulkDateSyncInput {
+  updates: BulkDateSyncRow[];
+  /** true = só devolve a prévia, sem gravar. */
+  dryRun?: boolean;
+  /** Precisa ser exatamente "APLICAR" para gravar. */
+  confirm?: string;
+}
+
+export interface BulkDateSyncResult {
+  dryRun: boolean;
+  /** Eventos gravados (0 no dryRun). */
+  updated: number;
+  /** Linhas da planilha que mudam algum evento. */
+  changeCount: number;
+  /** Linhas localizadas cujo evento já está com a data/nome informados. */
+  unchanged: number;
+  notFound: number;
+  notFoundIds: string[];
+  changes: EventDateChange[];
+}
+
+export interface NormalizeDatesInput {
+  /** true = só devolve a prévia, sem gravar. */
+  dryRun?: boolean;
+  /** Precisa ser exatamente "APLICAR" para gravar. */
+  confirm?: string;
+}
+
+export interface NormalizeDatesResult {
+  dryRun: boolean;
+  ok: boolean;
+  fixedCount: number;
+  normalizedCount: number;
+  changes: EventDateChange[];
+}
+
+export interface ConfirmResultsBulkInput {
+  /** @maxItems 200 */
+  eventIds: number[];
+}
+
+export interface ConfirmResultsBulkResult {
+  confirmed: number;
+  skipped: number;
+  warnings: string[];
+}
+
+export interface SwapCriterionSourceInput {
+  sourceCriterionId: number;
+}
+
+export interface EventActivityEntry {
+  id: string;
+  /** eval | calibration | cal_comment | event_comment | publish | publish_final | conformity | audit */
+  kind: string;
+  label: string;
+  /** @nullable */
+  userName: string | null;
+  /** @nullable */
+  criterionName: string | null;
+  /** @nullable */
+  score: number | null;
+  /** @nullable */
+  detail: string | null;
+  createdAt: string;
+}
+
+export interface ReplaceAllPlatoonRuleItem {
+  name?: string;
+  color?: string;
+  minScore: number;
+  maxScore: number;
+  minInclusive?: boolean;
+  maxInclusive?: boolean;
+  bonusValue?: number;
+  bonusPerExtraEvent?: number;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface ReplaceAllPlatoonRulesInput {
+  /** @minItems 1 */
+  rules: ReplaceAllPlatoonRuleItem[];
+}
+
+export interface ReplaceAllPlatoonRulesResult {
+  replaced: number;
+}
+
+export interface MyPerformanceEmployee {
+  id: number;
+  name: string;
+  department: string;
+  functionName: string;
+  eligible: boolean;
+  eligibilityStatus: string;
+}
+
+export interface MyPerformanceSummary {
+  /** @nullable */
+  grossAverage: number | null;
+  /** @nullable */
+  currentPlatoon: string | null;
+  /** @nullable */
+  currentPlatoonColor: string | null;
+  /** @nullable */
+  currentPlatoonMinScore: number | null;
+  /** @nullable */
+  currentPlatoonMaxScore: number | null;
+  /** @nullable */
+  nextPlatoon: string | null;
+  /** @nullable */
+  nextPlatoonColor: string | null;
+  /** @nullable */
+  nextPlatoonMinScore: number | null;
+  /** @nullable */
+  projectedBonus: number | null;
+  /** @nullable */
+  bonusStatus: string | null;
+  eligible: boolean;
+  totalEvents: number;
+  closedEvents: number;
+  openEvents: number;
+  confirmedEvents: number;
+  scoredEventsCount: number;
+  participatedEventsCount: number;
+  minEventsForEligibility: number;
+  totalAbsences: number;
+  penaltyPoints: number;
+  meritPoints: number;
+  isQuarterClosed: boolean;
+  /** @nullable */
+  finalResult: number | null;
+  /** @nullable */
+  absencePenalty: number | null;
+  paymentMethod: string;
+  hasQuarterSnapshot: boolean;
+}
+
+export type MyPerformanceAdjustmentKind = typeof MyPerformanceAdjustmentKind[keyof typeof MyPerformanceAdjustmentKind];
+
+
+export const MyPerformanceAdjustmentKind = {
+  penalty: 'penalty',
+  merit: 'merit',
+} as const;
+
+export interface MyPerformanceAdjustment {
+  id: number;
+  kind: MyPerformanceAdjustmentKind;
+  /** Rótulo do tipo de penalidade/mérito. */
+  penaltyType: string;
+  points: number;
+  quantity: number;
+  totalPoints: number;
+  date: string;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  eventName: string | null;
+}
+
+export interface MyPerformanceConformityItem {
+  label: string;
+  /** @nullable */
+  comment: string | null;
+}
+
+export type MyPerformanceCriterionStatus = typeof MyPerformanceCriterionStatus[keyof typeof MyPerformanceCriterionStatus];
+
+
+export const MyPerformanceCriterionStatus = {
+  avaliado: 'avaliado',
+  pendente: 'pendente',
+} as const;
+
+export interface MyPerformanceCriterion {
+  criterionId: number;
+  criterionName: string;
+  /** @nullable */
+  criterionDescription: string | null;
+  /** @nullable */
+  responsibleAreaLabel: string | null;
+  weight: number;
+  /** @nullable */
+  scoreUsed: number | null;
+  /** @nullable */
+  criterionTotal: number | null;
+  publicComments: string[];
+  /**
+     * Só preenchido depois da publicação (parcial ou final).
+     * @nullable
+     */
+  calibrationReason: string | null;
+  evaluated: boolean;
+  status: MyPerformanceCriterionStatus;
+  /** @nullable */
+  partialPublishedAt: string | null;
+  /** @nullable */
+  finalPublishedAt: string | null;
+}
+
+export interface MyPerformanceEvent {
+  eventId: number;
+  eventName: string;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  state: string | null;
+  /** @nullable */
+  location: string | null;
+  startDate: string;
+  endDate: string;
+  status: string;
+  hasScore: boolean;
+  feedbackReleased: boolean;
+  /** @nullable */
+  feedbackReleasedAt: string | null;
+  criteriaConfirmed: boolean;
+  /** @nullable */
+  criteriaConfirmedAt: string | null;
+  /** @nullable */
+  partialPublishedAt: string | null;
+  eventScore: number;
+  teamScore: number;
+  /**
+     * Nota bruta do snapshot oficial (antes da penalidade da Matriz).
+     * @nullable
+     */
+  rawTeamScore: number | null;
+  conformityPenalty: number;
+  conformityFailedItems: MyPerformanceConformityItem[];
+  /** @nullable */
+  projectedPlatoon: string | null;
+  /** @nullable */
+  projectedPlatoonColor: string | null;
+  evaluatedCriteria: number;
+  totalCriteria: number;
+  criteriaDetails: MyPerformanceCriterion[];
+  countsForScore: boolean;
+  resultsConfirmed: boolean;
+  isHistorical: boolean;
+}
+
+export interface MyPerformance {
+  employee: MyPerformanceEmployee;
+  cycle: IdName;
+  summary: MyPerformanceSummary;
+  adjustments: MyPerformanceAdjustment[];
+  events: MyPerformanceEvent[];
+}
+
 export type GetCollaboratorsWithoutAccessParams = {
 employmentType?: GetCollaboratorsWithoutAccessEmploymentType;
 };
@@ -2085,5 +2798,20 @@ limit?: number;
 
 export type ExportEventResultsParams = {
 eventId: number;
+};
+
+export type GetCalibrationAuditParams = {
+eventId: number;
+};
+
+export type GetCalibrationCommentsParams = {
+eventId: number;
+};
+
+export type GetCasaPinsParams = {
+/**
+ * IDs de colaborador separados por vírgula (ex. 1,2,3). Ausente = todos.
+ */
+ids?: string;
 };
 
