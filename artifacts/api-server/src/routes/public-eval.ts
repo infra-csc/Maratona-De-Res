@@ -11,8 +11,17 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
+import { recomputeCycleResults } from "./results.js";
 
 const router = Router();
+
+// Submissão por link público também muda a nota; se o evento já conta para o
+// ciclo, recalcula o snapshot oficial (autor = quem gerou o link).
+async function recomputeIfEventCounts(eventId: number, userId: number | null): Promise<void> {
+  const [ev] = await db.select({ cycleId: eventsTable.cycleId, resultsConfirmed: eventsTable.resultsConfirmed, status: eventsTable.status })
+    .from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (ev && (ev.resultsConfirmed || ev.status === "closed")) await recomputeCycleResults(ev.cycleId, userId ?? 0);
+}
 
 // ---------------------------------------------------------------------------
 // GET /public-eval/:token
@@ -433,6 +442,7 @@ router.post("/public-eval/:token/submit-conformity", async (req, res) => {
     }).where(eq(publicEvalTokensTable.id, tokenId));
   });
 
+  await recomputeIfEventCounts(token.eventId, token.createdByUserId ?? null);
   res.json({ ok: true });
 });
 

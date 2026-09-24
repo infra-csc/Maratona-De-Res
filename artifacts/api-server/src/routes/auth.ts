@@ -9,6 +9,29 @@ import { normalizeCpf, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES } from "../lib/creden
 
 const router = Router();
 
+// Limite de tentativas do login por PIN (sem identificador de usuário, o
+// lockout por conta não se aplica): por origem, 10 falhas em 15 minutos.
+const PIN_MAX_FAILURES = 10;
+const PIN_WINDOW_MS = 15 * 60_000;
+const pinFailures = new Map<string, { count: number; resetAt: number }>();
+function clientKey(req: { headers: Record<string, unknown>; ip?: string }): string {
+  const fwd = req.headers["x-forwarded-for"];
+  const first = typeof fwd === "string" ? fwd.split(",")[0]?.trim() : undefined;
+  return first || req.ip || "unknown";
+}
+function pinBlocked(key: string): number | null {
+  const entry = pinFailures.get(key);
+  if (!entry) return null;
+  if (entry.resetAt <= Date.now()) { pinFailures.delete(key); return null; }
+  return entry.count >= PIN_MAX_FAILURES ? Math.ceil((entry.resetAt - Date.now()) / 60000) : null;
+}
+function pinFailed(key: string): void {
+  const now = Date.now();
+  const entry = pinFailures.get(key);
+  if (!entry || entry.resetAt <= now) { pinFailures.set(key, { count: 1, resetAt: now + PIN_WINDOW_MS }); return; }
+  entry.count += 1;
+}
+
 async function buildAuthResponse(user: typeof usersTable.$inferSelect) {
   const token = signToken({
     userId: user.id,
@@ -46,11 +69,19 @@ router.post("/auth/login", async (req, res) => {
 
   // PIN-only path for casa employees (lookup by stored pinValue)
   if (pin && /^\d{4}$/.test(pin)) {
+    const key = clientKey(req as unknown as { headers: Record<string, unknown>; ip?: string });
+    const blockedMinutes = pinBlocked(key);
+    if (blockedMinutes != null) {
+      res.status(429).json({ error: `Muitas tentativas. Tente novamente em ${blockedMinutes} min.` });
+      return;
+    }
     const [user] = await db.select().from(usersTable).where(eq(usersTable.pinValue, pin)).limit(1);
     if (!user || !user.active) {
+      pinFailed(key);
       res.status(401).json({ error: "Senha inválida" });
       return;
     }
+    pinFailures.delete(key);
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
       const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
       res.status(429).json({ error: `Conta bloqueada. Tente em ${minutesLeft} min.` });
@@ -142,7 +173,7 @@ router.post("/auth/logout", requireAuth, async (_req, res) => {
 });
 
 router.post("/auth/change-password", requireAuth, async (req, res) => {
-  const { newPassword, confirmPassword } = req.body as { newPassword?: string; confirmPassword?: string };
+  const { newPassword, confirmPassword, currentPassword } = req.body as { newPassword?: string; confirmPassword?: string; currentPassword?: string };
   if (!newPassword || newPassword.length < 6) {
     res.status(400).json({ error: "A nova senha deve ter ao menos 6 caracteres" });
     return;
@@ -155,6 +186,13 @@ router.post("/auth/change-password", requireAuth, async (req, res) => {
   if (!user) {
     res.status(404).json({ error: "Usuário não encontrado" });
     return;
+  }
+  // Fora do fluxo de "troca obrigatória", exige a senha atual: um token
+  // vazado não pode virar posse permanente da conta.
+  if (!user.mustChangePassword) {
+    if (!currentPassword) { res.status(400).json({ error: "Informe a senha atual" }); return; }
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) { res.status(401).json({ error: "Senha atual incorreta" }); return; }
   }
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await db
@@ -177,7 +215,7 @@ router.post("/auth/portal-sso", async (req, res) => {
     res.status(400).json({ error: "token obrigatório" });
     return;
   }
-  let payload: { email?: string; name?: string; role?: string; iss?: string };
+  let payload: { email?: string; name?: string; role?: string; iss?: string; exp?: number };
   try {
     payload = jwt.verify(token, SESSION_SECRET, {
       algorithms: ["HS256"],
@@ -185,6 +223,11 @@ router.post("/auth/portal-sso", async (req, res) => {
     }) as typeof payload;
   } catch {
     res.status(401).json({ error: "Token SSO inválido ou expirado" });
+    return;
+  }
+  // Token SSO sem prazo valeria para sempre se fosse capturado.
+  if (!payload.exp) {
+    res.status(401).json({ error: "Token SSO sem prazo de validade" });
     return;
   }
   if (!payload.email) {

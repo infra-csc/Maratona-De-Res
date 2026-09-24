@@ -14,7 +14,7 @@ import { participantCountsForScore, isInformationalFunction } from "../lib/parti
 const router = Router();
 router.use(requireAuth);
 
-router.get("/ranking", async (req, res) => {
+router.get("/ranking", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const { search } = req.query;
   const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const cycle = await getCurrentCycle();
@@ -109,6 +109,10 @@ router.get("/ranking-detail", async (req, res) => {
   const isManager = !!req.user && ["admin", "rh", "diretoria"].includes(req.user.role);
   const employeeId = parseInt(req.query.employeeId as string);
   if (!employeeId) { res.status(400).json({ error: "employeeId obrigatório" }); return; }
+  // Não gestor só pode abrir o próprio detalhamento (IDOR).
+  if (!isManager && req.user?.employeeId !== employeeId) {
+    res.status(403).json({ error: "Acesso negado" }); return;
+  }
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(404).json({ error: "Nenhum ciclo ativo" }); return; }
 

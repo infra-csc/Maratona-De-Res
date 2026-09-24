@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, absencesTable, employeesTable, eventsTable, penaltyTypesTable, usersTable } from "@workspace/db";
 import { eq, and, asc, aliasedTable } from "drizzle-orm";
-import { requireAuth, requireRole } from "../lib/auth.js";
+import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
@@ -47,7 +47,17 @@ router.get("/absences", async (req, res) => {
   .$dynamic();
 
   const conditions = [eq(absencesTable.cycleId, cycle.id)];
-  if (employeeId) conditions.push(eq(absencesTable.employeeId, parseInt(employeeId as string)));
+  // Penalidade é dado disciplinar: gestores veem tudo; qualquer outro papel só
+  // enxerga os próprios lançamentos (ou nada, se não estiver vinculado a colaborador).
+  const isManager = ["admin", "rh", "diretoria"].some(r => isRole(req.user?.role, r));
+  if (!isManager) {
+    if (req.user?.employeeId == null) { res.json([]); return; }
+    conditions.push(eq(absencesTable.employeeId, req.user.employeeId));
+  } else if (employeeId) {
+    const parsed = parseInt(employeeId as string);
+    if (Number.isNaN(parsed)) { res.status(400).json({ error: "employeeId inválido" }); return; }
+    conditions.push(eq(absencesTable.employeeId, parsed));
+  }
   query = query.where(and(...conditions));
 
   res.json(await query);

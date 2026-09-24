@@ -7,9 +7,20 @@ import {
   quarterlyResultsTable, employeeEventResultsTable, employeeCycleEligibilityTable,
   cyclesTable,
 } from "@workspace/db";
+import { randomBytes } from "node:crypto";
 import { calculateEventResult } from "./lib/calculations";
 
 async function seed() {
+  // Guarda de ambiente: este seed APAGA 17 tabelas. Só roda fora de produção e
+  // com opt-in explícito, para um DATABASE_URL errado nunca zerar o histórico.
+  if (process.env.NODE_ENV === "production" || process.env.ALLOW_DESTRUCTIVE_SEED !== "true") {
+    console.error(
+      "⛔ Seed bloqueado: defina ALLOW_DESTRUCTIVE_SEED=true (e nunca em produção) para popular um banco de demonstração. " +
+      "Este comando apaga TODAS as tabelas do banco apontado por DATABASE_URL.",
+    );
+    process.exitCode = 1;
+    return;
+  }
   console.log("🌱 Iniciando seed...");
 
   // GUARD ABSOLUTO: o seed NUNCA apaga dados vindos da integração (ERP).
@@ -71,7 +82,10 @@ async function seed() {
 
   console.log(`✓ ${areas.length} áreas criadas`);
 
-  const hash = await bcrypt.hash("123456", 12);
+  // Senha dos usuários de demonstração: vem de SEED_PASSWORD ou é gerada; nunca
+  // uma constante conhecida que sobreviva num banco que depois vire produção.
+  const seedPassword = process.env.SEED_PASSWORD || randomBytes(6).toString("hex");
+  const hash = await bcrypt.hash(seedPassword, 12);
   const users = await db.insert(usersTable).values([
     { name: "Admin Sistema", email: "admin@cenografica.com.br", passwordHash: hash, role: "admin" },
     { name: "Ana Paula RH", email: "rh@cenografica.com.br", passwordHash: hash, role: "rh" },
@@ -367,7 +381,7 @@ async function seed() {
     console.log(`   Pesos: [${exWeights.join(",")}], Notas: [${exScores.join(",")}]`);
     console.log(`   Esperado: 72 | Resultado: ${exResult}`);
   }
-  console.log("\n👤 Usuários criados (senha: 123456):");
+  console.log(`\n👤 Usuários criados (senha: ${seedPassword} — troque no primeiro acesso):`);
   users.forEach((u: typeof users[number]) => console.log(`   ${u.email} — ${u.role}`));
 }
 

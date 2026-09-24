@@ -4,6 +4,15 @@ import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getPrincipalAreaIds } from "./routing.js";
+import { recomputeCycleResults } from "./results.js";
+
+// Submissão/reabertura muda a média do critério; se o evento já conta para o
+// ciclo (resultsConfirmed ou fechado), o snapshot oficial precisa acompanhar.
+async function recomputeIfEventCounts(eventId: number, userId: number): Promise<void> {
+  const [ev] = await db.select({ cycleId: eventsTable.cycleId, resultsConfirmed: eventsTable.resultsConfirmed, status: eventsTable.status })
+    .from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+  if (ev && (ev.resultsConfirmed || ev.status === "closed")) await recomputeCycleResults(ev.cycleId, userId);
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -316,6 +325,7 @@ router.post("/evaluations/:id/submit", async (req, res) => {
     submittedAt: new Date(),
   }).where(eq(evaluationsTable.id, id)).returning();
   await audit(req.user!.userId, "submit", "evaluations", id, existing, evaluation);
+  await recomputeIfEventCounts(existing.eventId, req.user!.userId);
   res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
 });
 
@@ -328,6 +338,7 @@ router.post("/evaluations/:id/reopen", requireRole("admin", "rh"), async (req, r
     submittedAt: null,
   }).where(eq(evaluationsTable.id, id)).returning();
   await audit(req.user!.userId, "reopen", "evaluations", id, existing, evaluation);
+  await recomputeIfEventCounts(existing.eventId, req.user!.userId);
   res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
 });
 

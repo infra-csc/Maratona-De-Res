@@ -26,7 +26,7 @@ if (!basePath) {
   );
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: basePath,
   plugins: [
     react(),
@@ -57,7 +57,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    sourcemap: true,
+    // Sourcemap completo expõe o código-fonte a qualquer visitante; só no dev server.
+    sourcemap: command !== "build",
   },
   server: {
     port,
@@ -79,4 +80,4 @@ export default defineConfig({
     host: "0.0.0.0",
     allowedHosts: true,
   },
-});
+}));

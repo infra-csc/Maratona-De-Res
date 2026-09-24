@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, employeesTable, quarterlyResultsTable, usersTable, eventParticipantsTable, absencesTable, employeeEventResultsTable, employeeCycleEligibilityTable, eventReviewRequestsTable, evaluationsTable } from "@workspace/db";
 import { eq, and, inArray, ne, notInArray, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireRole } from "../lib/auth.js";
+import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
@@ -10,6 +10,17 @@ import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/cr
 
 const router = Router();
 router.use(requireAuth);
+
+// Quem pode ver dados pessoais do cadastro (CPF, e-mail, telefone, PIN).
+// Avaliador e colaborador só precisam de id/nome/função para montar equipe e
+// exibir nomes — nunca do documento de outra pessoa.
+const EMPLOYEE_PII_ROLES = ["admin", "rh", "operador", "diretoria"];
+function canSeeEmployeePii(role: string | undefined): boolean {
+  return EMPLOYEE_PII_ROLES.some(r => isRole(role, r));
+}
+function publicEmployeeView<T extends { id: number; name: string; active: boolean; department?: string | null; functionName?: string | null; employmentType?: string | null; sourceType?: string | null }>(e: T) {
+  return { id: e.id, name: e.name, active: e.active, department: e.department ?? null, functionName: e.functionName ?? null, employmentType: e.employmentType ?? null, sourceType: e.sourceType ?? null };
+}
 
 router.get("/employees", async (req, res) => {
   const activeFilter = req.query.active;
@@ -49,6 +60,10 @@ router.get("/employees", async (req, res) => {
     : [];
   const linkedByEmpId = new Map(linkedUsers.map(u => [u.employeeId!, u]));
 
+  if (!canSeeEmployeePii(req.user?.role)) {
+    res.json(employees.map(publicEmployeeView));
+    return;
+  }
   res.json(employees.map(e => {
     const linked = e.id != null ? linkedByEmpId.get(e.id) : undefined;
     return {
@@ -65,7 +80,7 @@ router.get("/employees/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
   if (!employee) { res.status(404).json({ error: "Não encontrado" }); return; }
-  res.json(employee);
+  res.json(canSeeEmployeePii(req.user?.role) ? employee : publicEmployeeView(employee));
 });
 
 const EMPLOYMENT_TYPES = ["casa", "freela"];
@@ -374,8 +389,9 @@ router.post("/employees/bulk-set-cpf", requireRole("admin", "rh"), async (req, r
   res.json({ updated, notFound });
 });
 
-router.get("/employees/:id/history", async (req, res) => {
+router.get("/employees/:id/history", requireRole("admin", "rh", "diretoria"), async (req, res) => {
   const id = parseInt(req.params.id as string);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "ID inválido." }); return; }
   const results = await db.select().from(quarterlyResultsTable)
     .where(eq(quarterlyResultsTable.employeeId, id))
     .orderBy(quarterlyResultsTable.cycleId);

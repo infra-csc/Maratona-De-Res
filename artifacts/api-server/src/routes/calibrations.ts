@@ -108,7 +108,7 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
   );
 
   let warnings: string[] = [];
-  if (event.status === "closed") {
+  if (event.resultsConfirmed || event.status === "closed") {
     const recompute = await recomputeCycleResults(event.cycleId, req.user!.userId);
     warnings = recompute.warnings;
   }

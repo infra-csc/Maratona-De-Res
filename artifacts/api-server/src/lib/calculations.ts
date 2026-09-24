@@ -90,14 +90,18 @@ export interface CriterionWithDuplicates extends CriterionData {
  * Critérios sem duplicados passam inalterados.
  */
 export function mergeEventScopedCriteria(criteria: CriterionWithDuplicates[]): CriterionData[] {
-  const childIds = new Set(
-    criteria.filter(c => c.isEventScoped && c.sourceCriterionId != null).map(c => c.criterionId)
-  );
+  // Um filho só é "absorvido" se o pai estiver na lista; filho cujo pai não
+  // entrou (pai desativado sem calibração, ou sem vínculo no evento) continua
+  // contando sozinho, com o próprio peso — antes ele sumia da nota em silêncio.
+  const presentIds = new Set(criteria.map(c => c.criterionId));
+  const isAbsorbedChild = (c: CriterionWithDuplicates) =>
+    !!c.isEventScoped && c.sourceCriterionId != null && presentIds.has(c.sourceCriterionId);
+  const childIds = new Set(criteria.filter(isAbsorbedChild).map(c => c.criterionId));
   const childrenByParent = new Map<number, CriterionWithDuplicates[]>();
   for (const c of criteria) {
-    if (c.isEventScoped && c.sourceCriterionId != null) {
-      if (!childrenByParent.has(c.sourceCriterionId)) childrenByParent.set(c.sourceCriterionId, []);
-      childrenByParent.get(c.sourceCriterionId)!.push(c);
+    if (isAbsorbedChild(c)) {
+      if (!childrenByParent.has(c.sourceCriterionId!)) childrenByParent.set(c.sourceCriterionId!, []);
+      childrenByParent.get(c.sourceCriterionId!)!.push(c);
     }
   }
   return criteria

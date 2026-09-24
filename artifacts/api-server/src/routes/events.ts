@@ -247,10 +247,13 @@ router.get("/events", async (req, res) => {
       if (chStatus.requiredEvaluators > 0) {
         submittedEvaluatorCount += chStatus.submittedEvaluators;
       }
-      // Critério eventScoped ÓRFÃO (source_criterion_id=null) não tem pai para ser fundido:
-      // usa seu próprio peso e contribui de forma independente (como um critério regular).
-      // Critério eventScoped COM pai: usa weight=0 aqui pois o merge absorve o filho no pai.
-      const isOrphan = ch.criterionSourceCriterionId == null;
+      // Critério eventScoped ÓRFÃO (source_criterion_id=null, ou pai fora dos
+      // critérios ativos deste evento) não tem pai para ser fundido: usa seu
+      // próprio peso e contribui de forma independente (como um critério regular).
+      // Critério eventScoped COM pai presente: usa weight=0 aqui pois o merge
+      // absorve o filho no pai (mesma regra de mergeEventScopedCriteria).
+      const isOrphan = ch.criterionSourceCriterionId == null
+        || !activeCriteria.some(c => c.criterionId === ch.criterionSourceCriterionId);
       const chWeight = isOrphan
         ? parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string)
         : 0;
@@ -789,15 +792,27 @@ router.delete("/events/:id", requireRole("admin", "operador"), async (req, res) 
   try {
     const [before] = await db.select().from(eventsTable).where(eq(eventsTable.id, id)).limit(1);
     if (!before) { res.status(404).json({ error: "Evento não encontrado." }); return; }
-    // absences.event_id não tem onDelete cascade — anular antes de deletar
-    await db.update(absencesTable).set({ eventId: null }).where(eq(absencesTable.eventId, id));
-    await db.delete(eventsTable).where(eq(eventsTable.id, id));
-    await audit(req.user!.userId, "delete", "events", id);
+    // Operador só exclui evento ainda sem avaliação/calibração — apagar histórico
+    // avaliado (cascata em avaliações, calibrações e resultados) fica com admin.
+    if (!isRole(req.user!.role, "admin")) {
+      const [{ evals }] = await db.select({ evals: sql<number>`count(*)` }).from(evaluationsTable).where(eq(evaluationsTable.eventId, id));
+      const [{ cals }] = await db.select({ cals: sql<number>`count(*)` }).from(calibrationsTable).where(eq(calibrationsTable.eventId, id));
+      if (Number(evals) > 0 || Number(cals) > 0) {
+        res.status(409).json({ error: "Este evento já tem avaliações ou calibrações. Só um admin pode excluí-lo." });
+        return;
+      }
+    }
+    await db.transaction(async (tx) => {
+      // absences.event_id não tem onDelete cascade — anular antes de deletar
+      await tx.update(absencesTable).set({ eventId: null }).where(eq(absencesTable.eventId, id));
+      await tx.delete(eventsTable).where(eq(eventsTable.id, id));
+    });
+    await audit(req.user!.userId, "delete", "events", id, before, null);
     await recomputeCycleResults(before.cycleId, req.user!.userId);
     res.status(204).end();
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: `Falha ao excluir evento: ${msg}` });
+    req.log?.error?.({ err }, "Falha ao excluir evento");
+    res.status(500).json({ error: "Falha ao excluir evento. Tente novamente ou avise o suporte." });
   }
 });
 
@@ -1046,7 +1061,7 @@ router.delete("/events/:id/participants/:participantId", requireRole("admin", "r
   if (!existing) { res.status(404).json({ error: "Participante não encontrado neste evento" }); return; }
   await db.delete(eventParticipantsTable).where(eq(eventParticipantsTable.id, participantId));
   const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
-  if (ev?.status === "closed") await recomputeCycleResults(ev.cycleId, req.user!.userId);
+  if (ev && (ev.resultsConfirmed || ev.status === "closed")) await recomputeCycleResults(ev.cycleId, req.user!.userId);
   res.status(204).end();
 });
 
@@ -1094,7 +1109,7 @@ router.patch("/events/:id/participants/:participantId", requireRole("admin", "rh
 
   if (confirmed !== undefined || functionName !== undefined) {
     const [ev] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
-    if (ev?.status === "closed") await recomputeCycleResults(ev.cycleId, req.user!.userId);
+    if (ev && (ev.resultsConfirmed || ev.status === "closed")) await recomputeCycleResults(ev.cycleId, req.user!.userId);
   }
 
   // Sincroniza o cargo GLOBAL do colaborador com o cargo deste evento,
@@ -1207,6 +1222,7 @@ router.post("/events/:id/conformity", async (req, res) => {
   const [evRow] = await db.select({
     cycleId: eventsTable.cycleId,
     status: eventsTable.status,
+    resultsConfirmed: eventsTable.resultsConfirmed,
     conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId,
     conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId,
   }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
@@ -1263,7 +1279,7 @@ router.post("/events/:id/conformity", async (req, res) => {
       .where(eq(eventConformitiesTable.eventId, eventId))
       .returning();
     await audit(userId, "update_conformity", "events", eventId, existing[0], updated);
-    if (evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
+    if (evRow.resultsConfirmed || evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
     res.json(updated);
   } else {
     const [created] = await db.insert(eventConformitiesTable)
@@ -1285,7 +1301,7 @@ router.post("/events/:id/conformity", async (req, res) => {
       })
       .returning();
     await audit(userId, "create_conformity", "events", eventId, null, created);
-    if (evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
+    if (evRow.resultsConfirmed || evRow.status === "closed") await recomputeCycleResults(evRow.cycleId, userId);
     res.status(201).json(created);
   }
 });
@@ -1413,7 +1429,7 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
   // ciclo (dashboard/ranking/pagamentos), que foi calculado com os pesos
   // anteriores — recalcula na hora para refletir o ajuste imediatamente.
   let warnings: string[] = [];
-  if (event.status === "closed") {
+  if (event.resultsConfirmed || event.status === "closed") {
     await audit(req.user!.userId, "update_weights_after_evaluations", "events", eventId);
     const recompute = await recomputeCycleResults(event.cycleId, req.user!.userId);
     warnings = recompute.warnings;

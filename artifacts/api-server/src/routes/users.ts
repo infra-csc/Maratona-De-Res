@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable, areasTable, employeesTable, evaluationsTable, calibrationsTable, eventConformitiesTable, eventsTable, eventAreaAssignmentsTable } from "@workspace/db";
 import { eq, and, isNull, inArray, ne } from "drizzle-orm";
-import { requireAuth, requireRole } from "../lib/auth.js";
+import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
 
@@ -152,11 +152,27 @@ router.get("/users/:id", requireRole("admin", "rh"), async (req, res) => {
   res.json(user);
 });
 
+const ALLOWED_ROLES = ["admin", "rh", "diretoria", "operador", "avaliador", "visualizador"] as const;
+function isAllowedRole(role: unknown): role is (typeof ALLOWED_ROLES)[number] {
+  return typeof role === "string" && (ALLOWED_ROLES as readonly string[]).includes(role.trim().toLowerCase());
+}
+// Só admin cria, promove, altera ou redefine a senha de outro admin.
+function canManageAdmin(requesterRole: string | undefined): boolean {
+  return isRole(requesterRole, "admin");
+}
+
 router.post("/users", requireRole("admin", "rh"), async (req, res) => {
   const { name, email, role, areaId, password, employeeId } = req.body;
   if (!name || !email || !role || !password) {
     res.status(400).json({ error: "Campos obrigatórios: name, email, role, password" });
     return;
+  }
+  if (!isAllowedRole(role)) { res.status(400).json({ error: "Papel inválido" }); return; }
+  if (isRole(role, "admin") && !canManageAdmin(req.user?.role)) {
+    res.status(403).json({ error: "Somente admin pode criar outro admin" }); return;
+  }
+  if (typeof password !== "string" || password.length < 6) {
+    res.status(400).json({ error: "A senha deve ter ao menos 6 caracteres" }); return;
   }
   if (employeeId != null) {
     const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
@@ -176,6 +192,10 @@ router.patch("/users/:id", requireRole("admin", "rh"), async (req, res) => {
   const { name, email, role, areaId, active, employeeId } = req.body;
   const [before] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
   if (!before) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (role !== undefined && !isAllowedRole(role)) { res.status(400).json({ error: "Papel inválido" }); return; }
+  if ((isRole(before.role, "admin") || (role !== undefined && isRole(role, "admin"))) && !canManageAdmin(req.user?.role)) {
+    res.status(403).json({ error: "Somente admin pode alterar um usuário admin" }); return;
+  }
   if (employeeId != null) {
     const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
     if (!emp) { res.status(400).json({ error: "Colaborador não encontrado" }); return; }
@@ -373,7 +393,12 @@ router.post("/users/bulk-update-emails", requireRole("admin"), async (req, res) 
 router.post("/users/:id/reset-password", requireRole("admin", "rh"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const { newPassword } = req.body;
-  if (!newPassword) { res.status(400).json({ error: "newPassword obrigatório" }); return; }
+  if (!newPassword || typeof newPassword !== "string" || newPassword.length < 6) { res.status(400).json({ error: "newPassword obrigatório (mínimo 6 caracteres)" }); return; }
+  const [target] = await db.select({ role: usersTable.role }).from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  if (!target) { res.status(404).json({ error: "Não encontrado" }); return; }
+  if (isRole(target.role, "admin") && !canManageAdmin(req.user?.role)) {
+    res.status(403).json({ error: "Somente admin pode redefinir a senha de um admin" }); return;
+  }
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await db.update(usersTable).set({ passwordHash, mustChangePassword: true }).where(eq(usersTable.id, id));
   await audit(req.user!.userId, "reset_password", "users", id);

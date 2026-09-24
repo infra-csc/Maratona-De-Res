@@ -123,7 +123,7 @@ router.get("/exports/caju-bonuses", requireRole("admin", "rh", "diretoria"), asy
   res.json({ filename: `bonus-caju-${cycleSlug(cycle.name)}.csv`, data: toCsv(rows as never) });
 });
 
-router.get("/exports/absences", async (_req, res) => {
+router.get("/exports/absences", requireRole("admin", "rh", "diretoria"), async (_req, res) => {
   const cycle = await getCurrentCycle();
   if (!cycle) { res.json({ filename: `penalidades.csv`, data: "" }); return; }
 
