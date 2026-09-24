@@ -25,15 +25,15 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, BarChart3,
 } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { cn, fmtDate } from "@/lib/utils";
-import { CONDENSED, BODY, WARNING, AMBER, GOOD } from "@/lib/premium-theme";
+import { cn, fmtDate, fmtNum } from "@/lib/utils";
+import { CONDENSED, BODY, WARNING, AMBER, GOOD, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 
 const BONUS_STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
   projected: { label: "Projetado", bg: "var(--secondary)", color: "var(--muted-foreground)" },
-  approved: { label: "Aprovado", bg: "rgba(154,176,0,0.14)", color: GOOD },
-  scheduled: { label: "Agendado", bg: "rgba(232,162,61,0.14)", color: AMBER },
+  approved: { label: "Aprovado", bg: "rgba(154,176,0,0.14)", color: GOOD_TEXT },
+  scheduled: { label: "Agendado", bg: "rgba(232,162,61,0.14)", color: AMBER_TEXT },
   paid: { label: "Pago", bg: "var(--primary)", color: "var(--primary-foreground)" },
-  blocked: { label: "Bloqueado", bg: "rgba(229,72,77,0.12)", color: WARNING },
+  blocked: { label: "Bloqueado", bg: "rgba(229,72,77,0.12)", color: DANGER_TEXT },
   not_eligible: { label: "Não elegível", bg: "var(--secondary)", color: "var(--muted-foreground)" },
 };
 const BONUS_STATUS_OPTIONS = ["projected", "approved", "scheduled", "paid", "blocked", "not_eligible"];
@@ -73,7 +73,7 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? "").join("");
 }
 
-const fmtScore = (v: number) => v.toFixed(1);
+const fmtScore = (v: number) => fmtNum(v, 1);
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtBRLShort = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -101,11 +101,11 @@ function FaixaBadge({ name, minScore, maxScore, color, compact = false }: { name
   const secondary = name && range && !compact ? range : null;
   return (
     <span
-      className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full"
+      className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full"
       style={{ backgroundColor: bg, color: fg }}
     >
       <span>{primary}</span>
-      {secondary && <span className="opacity-55 text-[9px] font-bold">{secondary}</span>}
+      {secondary && <span className="opacity-55 text-[11px] font-bold">{secondary}</span>}
     </span>
   );
 }
@@ -115,9 +115,9 @@ function FaixaBadge({ name, minScore, maxScore, color, compact = false }: { name
 /* ------------------------------------------------------------------ */
 
 const MEDAL: Record<1 | 2 | 3, { color: string; dimColor: string; bg: string; border: string; platformH: number; label: string }> = {
-  1: { color: "#FFD700", dimColor: "#B8860B", bg: "rgba(255,215,0,0.13)", border: "rgba(255,215,0,0.55)", platformH: 60, label: "Ouro" },
-  2: { color: "#D0D0D0", dimColor: "#888",    bg: "rgba(192,192,192,0.10)", border: "rgba(192,192,192,0.45)", platformH: 40, label: "Prata" },
-  3: { color: "#CD7F32", dimColor: "#8B4513", bg: "rgba(205,127,50,0.11)", border: "rgba(205,127,50,0.45)", platformH: 26, label: "Bronze" },
+  1: { color: "#FFD700", dimColor: "#B8860B", bg: "rgba(255,215,0,0.13)", border: "rgba(255,215,0,0.55)", platformH: 72, label: "Ouro" },
+  2: { color: "#D0D0D0", dimColor: "#888",    bg: "rgba(192,192,192,0.10)", border: "rgba(192,192,192,0.45)", platformH: 56, label: "Prata" },
+  3: { color: "#CD7F32", dimColor: "#8B4513", bg: "rgba(205,127,50,0.11)", border: "rgba(205,127,50,0.45)", platformH: 46, label: "Bronze" },
 };
 
 function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; canViewDetail: boolean; onSelect: (id: number) => void }) {
@@ -157,14 +157,14 @@ function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; canViewDe
               {/* Score */}
               <span className="font-black leading-none mt-1.5"
                 data-testid={`text-podium-result-${entry.employeeId}`}
-                style={{ fontFamily: CONDENSED, fontSize: isFirst ? 22 : 17, color: med.color }}>
-                {entry.finalResult.toFixed(1)}
+                style={{ fontFamily: CONDENSED, fontSize: isFirst ? 22 : 17, color: "var(--foreground)" }}>
+                {fmtNum(entry.finalResult, 1)}
               </span>
 
               {/* Tier badge */}
               {(entry as any).platoonColor && (
                 <span
-                  className="inline-flex items-center text-[8px] font-black uppercase px-2 py-0.5 rounded-full mt-0.5"
+                  className="inline-flex items-center text-[11px] font-black uppercase px-2 py-0.5 rounded-full mt-0.5"
                   style={{ backgroundColor: (entry as any).platoonColor, color: contrastingTextColor((entry as any).platoonColor) }}
                 >
                   {(entry as any).platoon ?? `${(entry as any).platoonMinScore}–${(entry as any).platoonMaxScore}`}
@@ -173,7 +173,7 @@ function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; canViewDe
 
               {/* Name (first two words) */}
               <p data-testid={`text-podium-name-${entry.employeeId}`}
-                className="text-[9px] font-bold uppercase text-center w-full px-1 mt-0.5 mb-2 leading-tight"
+                className="text-[11px] font-bold uppercase text-center w-full px-1 mt-0.5 mb-2 leading-tight"
                 style={{ color: "var(--muted-foreground)" }}>
                 {entry.employeeName.split(" ").slice(0, 2).join(" ")}
               </p>
@@ -181,10 +181,10 @@ function PodiumStage({ top3, canViewDetail, onSelect }: { top3: any[]; canViewDe
               {/* Platform block */}
               <div className="w-full flex flex-col items-center justify-center rounded-t-sm"
                 style={{ height: med.platformH, backgroundColor: med.bg, borderTop: `2px solid ${med.border}` }}>
-                <span style={{ fontFamily: CONDENSED, fontWeight: 900, fontSize: isFirst ? 26 : 20, color: med.color, lineHeight: 1 }}>
+                <span style={{ fontFamily: CONDENSED, fontWeight: 900, fontSize: isFirst ? 26 : 20, color: "var(--foreground)", lineHeight: 1 }}>
                   #{rank}
                 </span>
-                <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: med.dimColor }}>{med.label}</span>
+                <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>{med.label}</span>
               </div>
             </button>
           );
@@ -254,11 +254,11 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
         {ranking && ranking.length > 0 && (
           <>
             <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--primary)" }}>
-              <span className="text-[10px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}><Trophy size={12} /> Nota Média</span>
-              <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="stat-avg-result">{avgResult.toFixed(1)}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}><Trophy size={12} /> Nota Média</span>
+              <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="stat-avg-result">{fmtNum(avgResult, 1)}</span>
             </div>
             <div className="rounded-xl px-5 py-3.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <span className="text-[10px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}><Users size={12} /> Competidores</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide block flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}><Users size={12} /> Competidores</span>
               <span className="font-black text-2xl block" style={{ fontFamily: CONDENSED }} data-testid="stat-active-runners">{activeRunners}</span>
             </div>
           </>
@@ -319,7 +319,7 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 
             <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
               <div className="px-5 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Classificação Geral</h3>
+                <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Classificação Geral</h3>
               </div>
               <div>
                 {filteredRanking.length === 0 && allResults.length > 0 && filterEligible === "eligible" && (
@@ -346,22 +346,22 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                       style={{ borderTop: "1px solid var(--border)" }}
                     >
                       <div className="w-11 h-11 rounded-lg flex flex-col items-center justify-center shrink-0" style={{ backgroundColor: "var(--secondary)" }}>
-                        <span className="text-[8px] font-bold uppercase leading-none" style={{ color: "var(--muted-foreground)" }}>Pos</span>
+                        <span className="text-[11px] font-bold uppercase leading-none" style={{ color: "var(--muted-foreground)" }}>Pos</span>
                         <span className="text-base font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED }}>{String(actualRank).padStart(2, "0")}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold uppercase text-sm truncate" data-testid={`text-employee-name-${entry.employeeId}`}>{entry.employeeName}</p>
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
+                          <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
                             {entry.eventsCount} eventos
                           </span>
                           {entry.eligible === false && (
-                            <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>
+                            <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>
                               Inelegível
                             </span>
                           )}
                           {entry.absences > 0 && (
-                            <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>
+                            <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>
                               {entry.absences} penalidades
                             </span>
                           )}
@@ -376,13 +376,13 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
                       </div>
                       <div className="flex items-center gap-3 shrink-0 sm:pl-3 sm:w-[15rem] sm:justify-end">
                         <div className="text-right">
-                          <span className="block text-[9px] uppercase font-bold leading-none mb-1" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
-                          <p className="font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }} data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</p>
+                          <span className="block text-[11px] uppercase font-bold leading-none mb-1" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
+                          <p className="font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }} data-testid={`text-final-result-${entry.employeeId}`}>{fmtScore(entry.finalResult)}</p>
                         </div>
                         <div className="text-right hidden sm:block w-24 shrink-0">
                           {entry.bonusValue > 0 && (
                             <div className="rounded-lg px-2.5 py-1.5" style={{ backgroundColor: "var(--primary)" }}>
-                              <span className="block text-[8px] uppercase font-bold leading-none mb-1" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus</span>
+                              <span className="block text-[11px] uppercase font-bold leading-none mb-1" style={{ color: "var(--primary-foreground)", opacity: 0.75 }}>Bônus</span>
                               <p className="font-black text-sm leading-none" style={{ color: "var(--primary-foreground)" }}>{fmtBRLShort(entry.bonusValue)}</p>
                             </div>
                           )}
@@ -398,8 +398,8 @@ function RankingTab({ canViewDetail }: { canViewDetail: boolean }) {
 
           <aside className="space-y-2.5">
             <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <Trophy size={15} style={{ color: "var(--accent)" }} />
-              <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Pódio da Maratona</h3>
+              <Trophy size={15} style={{ color: "var(--accent-text)" }} />
+              <h3 className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Pódio da Maratona</h3>
             </div>
             {top3.length > 0 && (
               <PodiumStage top3={top3} canViewDetail={canViewDetail} onSelect={openDetail} />
@@ -437,7 +437,7 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
   const zeroMsg = bd.zeroReason === "not_eligible"
     ? "Não elegível ao bônus: " + (bd.eligibilityReason ?? "motivo não informado") + "."
     : bd.zeroReason === "no_bonus_platoon"
-    ? "Nota final " + (bd.baseScore != null ? bd.baseScore.toFixed(2) : "—") + " está na faixa “" + (bd.basePlatoon ?? "sem faixa") + "”, que não paga bônus. Nesse caso os eventos extras também não são pagos."
+    ? "Nota final " + (bd.baseScore != null ? fmtNum(bd.baseScore, 2) : "—") + " está na faixa “" + (bd.basePlatoon ?? "sem faixa") + "”, que não paga bônus. Nesse caso os eventos extras também não são pagos."
     : bd.zeroReason === "no_result"
     ? "Resultado do ciclo ainda não calculado para este colaborador (nenhum evento confirmado que conte para nota)."
     : null;
@@ -461,7 +461,7 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
         <div className="flex items-start gap-3 px-3 py-3" style={rowStyle}>
           <div className="flex-1 min-w-0">
             <p className="font-black uppercase text-[12px] leading-tight">Prêmio base da faixa</p>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-bold" style={muted}>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] font-bold" style={muted}>
               {bd.basePlatoon ? (
                 <span className="px-1.5 py-0.5 rounded font-black uppercase" style={{ backgroundColor: bd.basePlatoonColor ?? "var(--secondary)", color: bd.basePlatoonColor ? contrastingTextColor(bd.basePlatoonColor) : "var(--muted-foreground)" }}>
                   {bd.basePlatoon}
@@ -470,7 +470,7 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
                   )}
                 </span>
               ) : <span>Sem faixa</span>}
-              <span>· nota final {bd.baseScore != null ? bd.baseScore.toFixed(2) : "—"}</span>
+              <span>· nota final {bd.baseScore != null ? fmtNum(bd.baseScore, 2) : "—"}</span>
             </div>
           </div>
           <span className={cn("font-black text-lg shrink-0", !bd.applied && "line-through opacity-50")} style={{ fontFamily: CONDENSED }}>{fmtBRL(bd.baseValue)}</span>
@@ -481,7 +481,7 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
               <p className="font-black uppercase text-[12px] leading-tight">Bônus por evento extra</p>
-              <p className="mt-1 text-[10px] font-bold" style={muted}>
+              <p className="mt-1 text-[11px] font-bold" style={muted}>
                 {bd.scoredEventsCount} prova(s) pontuada(s) · mínimo {bd.minEvents} · {bd.extraEvents.length} extra(s) × {fmtBRL(bd.extraEvents[0]?.value ?? 0)}, o valor por evento adicional da faixa da média. Extras contados a partir da {bd.minEvents + 1}ª prova, em ordem de data.
               </p>
             </div>
@@ -491,12 +491,12 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
             <div className="mt-2.5 rounded-md overflow-hidden" style={{ border: "1px solid var(--border)" }}>
               {bd.extraEvents.map((ev, idx) => (
                 <div key={ev.eventId} data-testid={"detail-bonus-extra-" + ev.eventId} className="flex items-center gap-2.5 px-2.5 py-2" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--secondary)" }}>
-                  <span className="text-[10px] font-black shrink-0 w-7 text-center" style={muted}>{ev.position}ª</span>
+                  <span className="text-[11px] font-black shrink-0 w-7 text-center" style={muted}>{ev.position}ª</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold uppercase text-[11px] leading-tight truncate" title={ev.eventName}>{ev.eventName}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] font-bold" style={muted}>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] font-bold" style={muted}>
                       {ev.startDate && <span>{fmtDate(ev.startDate, dateFull)}</span>}
-                      <span>· nota {ev.eventScore.toFixed(1)}</span>
+                      <span>· nota {fmtNum(ev.eventScore, 1)}</span>
                     </div>
                   </div>
                   <span className="font-black text-[12px] shrink-0" style={{ color: ev.value > 0 ? GOOD : "var(--muted-foreground)" }}>
@@ -517,7 +517,7 @@ function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
           <div>
             <span className="text-xs font-black uppercase tracking-widest block" style={{ fontFamily: CONDENSED, color: bd.applied ? "var(--primary-foreground)" : "var(--muted-foreground)", opacity: 0.8 }}>Bônus do Ciclo</span>
             {bd.applied && (
-              <span className="text-[10px] font-bold block mt-0.5" style={{ color: "var(--primary-foreground)", opacity: 0.65 }}>
+              <span className="text-[11px] font-bold block mt-0.5" style={{ color: "var(--primary-foreground)", opacity: 0.65 }}>
                 {fmtBRLShort(bd.baseValue)} base + {fmtBRLShort(bd.extraValue)} extra
               </span>
             )}
@@ -572,9 +572,9 @@ function EmployeeDetailSheet({
               <div className="px-6 pt-6 pb-4 pr-14 rounded-t-xl" style={{ backgroundColor: "var(--secondary)" }}>
                 <div className="flex flex-wrap items-center gap-1.5 mb-2">
                   {detail.employee.functionName && (
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--accent)", color: "#191c1e" }}>{detail.employee.functionName}</span>
+                    <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--accent)", color: "#191c1e" }}>{detail.employee.functionName}</span>
                   )}
-                  <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{detail.cycle.name}</span>
+                  <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{detail.cycle.name}</span>
                 </div>
                 <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>
                   {detail.employee.name}
@@ -591,7 +591,7 @@ function EmployeeDetailSheet({
                     >
                       {(detail.summary as any).platoon}
                       {(detail.summary as any).platoonMinScore != null && (detail.summary as any).platoonMaxScore != null && (
-                        <span className="opacity-60 text-[9px] font-bold">
+                        <span className="opacity-60 text-[11px] font-bold">
                           {(detail.summary as any).platoonMinScore}–{(detail.summary as any).platoonMaxScore}
                         </span>
                       )}
@@ -606,60 +606,60 @@ function EmployeeDetailSheet({
               {/* Stats grid — brutalist */}
               <section className="grid grid-cols-2 gap-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
                 <div className="p-4" style={{ backgroundColor: "var(--primary)", borderRight: "2px solid var(--border)" }}>
-                  <span className="text-[9px] font-black uppercase tracking-wider block" style={{ color: "var(--primary-foreground)", opacity: 0.7 }}>Nota Final</span>
+                  <span className="text-[11px] font-black uppercase tracking-wider block" style={{ color: "var(--primary-foreground)", opacity: 0.7 }}>Nota Final</span>
                   <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--primary-foreground)" }} data-testid="detail-final-result">
-                    {detail.summary.finalResult != null ? detail.summary.finalResult.toFixed(1) : "—"}
+                    {detail.summary.finalResult != null ? fmtNum(detail.summary.finalResult, 1) : "—"}
                   </p>
                   {detail.summary.finalResult != null && detail.summary.grossAverage != null &&
                    (detail.summary.penaltyPoints > 0 || detail.summary.meritPoints > 0) && (
-                    <p className="text-[10px] font-bold mt-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.6 }}>
+                    <p className="text-[11px] font-bold mt-1.5" style={{ color: "var(--primary-foreground)", opacity: 0.6 }}>
                       {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null ? (
                         <>
-                          ({detail.summary.scoreSum.toFixed(1)}
+                          ({fmtNum(detail.summary.scoreSum, 1)}
                           {detail.summary.penaltyPoints > 0 && <> − {detail.summary.penaltyPoints}</>}
                           {detail.summary.meritPoints > 0 && <> + {detail.summary.meritPoints}</>}
                           ) ÷ {detail.summary.confirmedEventCount}
                         </>
                       ) : (
                         <>
-                          {detail.summary.grossAverage.toFixed(1)}
-                          {detail.summary.penaltyPoints > 0 && <> − {(detail.summary.penaltyPoints / (detail.summary.confirmedEventCount ?? 1)).toFixed(1)}</>}
-                          {detail.summary.meritPoints > 0 && <> + {(detail.summary.meritPoints / (detail.summary.confirmedEventCount ?? 1)).toFixed(1)}</>}
+                          {fmtNum(detail.summary.grossAverage, 1)}
+                          {detail.summary.penaltyPoints > 0 && <> − {fmtNum((detail.summary.penaltyPoints / (detail.summary.confirmedEventCount ?? 1)), 1)}</>}
+                          {detail.summary.meritPoints > 0 && <> + {fmtNum((detail.summary.meritPoints / (detail.summary.confirmedEventCount ?? 1)), 1)}</>}
                         </>
                       )}
-                      {" "}= {detail.summary.finalResult.toFixed(1)}
+                      {" "}= {fmtNum(detail.summary.finalResult, 1)}
                     </p>
                   )}
                 </div>
                 <div className="p-4" style={{ backgroundColor: "var(--card)" }}>
-                  <span className="text-[9px] font-black uppercase tracking-wider block" style={{ color: "var(--muted-foreground)" }}>Média Bruta</span>
-                  <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
-                    {detail.summary.grossAverage != null ? detail.summary.grossAverage.toFixed(1) : "—"}
+                  <span className="text-[11px] font-black uppercase tracking-wider block" style={{ color: "var(--muted-foreground)" }}>Média Bruta</span>
+                  <p className="text-4xl font-black leading-none mt-1" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
+                    {detail.summary.grossAverage != null ? fmtNum(detail.summary.grossAverage, 1) : "—"}
                   </p>
                   {detail.summary.scoreSum != null && detail.summary.confirmedEventCount != null && (
-                    <p className="text-[10px] font-bold mt-1.5" style={{ color: "var(--muted-foreground)" }}>
-                      Soma: {detail.summary.scoreSum.toFixed(1)} ÷ {detail.summary.confirmedEventCount} provas
+                    <p className="text-[11px] font-bold mt-1.5" style={{ color: "var(--muted-foreground)" }}>
+                      Soma: {fmtNum(detail.summary.scoreSum, 1)} ÷ {detail.summary.confirmedEventCount} provas
                     </p>
                   )}
                 </div>
                 <div className="p-3 flex items-center gap-2" style={{ borderTop: "2px solid var(--border)", borderRight: "2px solid var(--border)", backgroundColor: "var(--card)" }}>
-                  <AlertTriangle size={16} className="shrink-0" style={{ color: WARNING }} />
+                  <AlertTriangle size={16} className="shrink-0" style={{ color: DANGER_TEXT }} />
                   <div>
-                    <span className="text-[9px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Penalidades</span>
-                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: WARNING }}>-{detail.summary.penaltyPoints}</p>
+                    <span className="text-[11px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Penalidades</span>
+                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>-{detail.summary.penaltyPoints}</p>
                   </div>
                 </div>
                 <div className="p-3 flex items-center gap-2" style={{ borderTop: "2px solid var(--border)", backgroundColor: "var(--card)" }}>
-                  <Award size={16} className="shrink-0" style={{ color: GOOD }} />
+                  <Award size={16} className="shrink-0" style={{ color: GOOD_TEXT }} />
                   <div>
-                    <span className="text-[9px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Méritos</span>
-                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: GOOD }}>+{detail.summary.meritPoints}</p>
+                    <span className="text-[11px] font-black uppercase block leading-none" style={{ color: "var(--muted-foreground)" }}>Méritos</span>
+                    <p className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: CONDENSED, color: GOOD_TEXT }}>+{detail.summary.meritPoints}</p>
                   </div>
                 </div>
               </section>
 
               {!detail.summary.isQuarterClosed && (
-                <div className="px-4 py-3 text-xs font-black uppercase" style={{ border: "2px solid " + AMBER, color: AMBER, backgroundColor: "rgba(232,162,61,0.08)" }}>
+                <div className="px-4 py-3 text-xs font-black uppercase" style={{ border: "2px solid " + AMBER, color: AMBER_TEXT, backgroundColor: "rgba(232,162,61,0.08)" }}>
                   ⚠ Ciclo ainda não fechado — valores parciais.
                 </div>
               )}
@@ -681,15 +681,15 @@ function EmployeeDetailSheet({
                       >
                         <div className="flex-1 min-w-0">
                           <p className="font-bold uppercase text-[12px] leading-tight">{ev.eventName}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             {(ev.city || ev.state) && (
                               <span className="inline-flex items-center gap-1"><MapPin size={10} />{[ev.city, ev.state].filter(Boolean).join(" / ")}</span>
                             )}
                             {!ev.countsForScore && (
                               <span
                                 data-testid={`detail-event-no-score-${ev.eventId}`}
-                                className="px-1.5 py-0.5 font-bold text-[9px] uppercase shrink-0"
-                                style={{ border: "1px solid " + AMBER, color: AMBER }}
+                                className="px-1.5 py-0.5 font-bold text-[11px] uppercase shrink-0"
+                                style={{ border: "1px solid " + AMBER, color: AMBER_TEXT }}
                                 title={(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno" ? `Função: ${(ev as { participationFunction?: string }).participationFunction ?? "Sup Ceno"} — participação informativa, não entra na nota.` : (ev as { noScoreReason?: string }).noScoreReason === "freela" ? "Freela — não entra na nota." : "Participação informativa — não entra na nota."}
                               >
                                 {(ev as { noScoreReason?: string }).noScoreReason === "sup_ceno"
@@ -702,8 +702,8 @@ function EmployeeDetailSheet({
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="block text-[9px] uppercase font-bold leading-none mb-0.5" style={{ color: "var(--muted-foreground)" }}>Nota Time</span>
-                          <p className="text-xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{ev.eventScore.toFixed(1)}</p>
+                          <span className="block text-[11px] uppercase font-bold leading-none mb-0.5" style={{ color: "var(--muted-foreground)" }}>Nota Time</span>
+                          <p className="text-xl font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtNum(ev.eventScore, 1)}</p>
                         </div>
                       </div>
                     ))}
@@ -732,7 +732,7 @@ function EmployeeDetailSheet({
 
               {detail.penalties.length > 0 && (
                 <section className="space-y-2.5">
-                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: WARNING }}>
+                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>
                     <AlertTriangle size={14} /> Penalidades
                   </h4>
                   <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
@@ -740,7 +740,7 @@ function EmployeeDetailSheet({
                       <div key={p.id} data-testid={`detail-penalty-${p.id}`} className="flex items-center gap-3 px-3 py-2.5" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}>
                         <div className="flex-1 min-w-0">
                           <p className="font-bold uppercase text-[12px]">{p.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             <span>{fmtDate(p.date, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
                             {p.eventName && <span>· {p.eventName}</span>}
                             {p.quantity > 1 && <span>· {p.quantity}×</span>}
@@ -755,7 +755,7 @@ function EmployeeDetailSheet({
 
               {detail.merits.length > 0 && (
                 <section className="space-y-2.5">
-                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: GOOD }}>
+                  <h4 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ fontFamily: CONDENSED, color: GOOD_TEXT }}>
                     <Award size={14} /> Méritos
                   </h4>
                   <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--border)" }}>
@@ -763,13 +763,13 @@ function EmployeeDetailSheet({
                       <div key={m.id} data-testid={`detail-merit-${m.id}`} className="flex items-center gap-3 px-3 py-2.5" style={{ borderTop: idx > 0 ? "1px solid var(--border)" : undefined, backgroundColor: "var(--card)" }}>
                         <div className="flex-1 min-w-0">
                           <p className="font-bold uppercase text-[12px]">{m.label}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                             <span>{fmtDate(m.date, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
                             {m.eventName && <span>· {m.eventName}</span>}
                             {m.quantity > 1 && <span>· {m.quantity}×</span>}
                           </div>
                         </div>
-                        <span className="font-black px-2.5 py-1 text-xs shrink-0" style={{ border: "2px solid " + GOOD, color: GOOD }}>+{m.total}</span>
+                        <span className="font-black px-2.5 py-1 text-xs shrink-0" style={{ border: "2px solid " + GOOD, color: GOOD_TEXT }}>+{m.total}</span>
                       </div>
                     ))}
                   </div>
@@ -831,11 +831,11 @@ function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
   return (
     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
       <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-        <BarChart3 size={16} style={{ color: "var(--accent)" }} />
-        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+        <BarChart3 size={16} style={{ color: "var(--accent-text)" }} />
+        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
           Distribuição por Faixa
         </span>
-        <span className="ml-auto text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+        <span className="ml-auto text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
           {rows.length} colaborador{rows.length !== 1 ? "es" : ""}
         </span>
       </div>
@@ -850,7 +850,7 @@ function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
                 type="category"
                 dataKey="name"
                 width={80}
-                tick={{ fontSize: 10, fontWeight: 700, fill: "var(--foreground)", fontFamily: CONDENSED }}
+                tick={{ fontSize: 11, fontWeight: 700, fill: "var(--foreground)", fontFamily: CONDENSED }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -880,7 +880,7 @@ function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
         <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
           <div className="grid grid-cols-[1.4fr_0.6fr_0.7fr_1fr]" style={{ backgroundColor: "var(--secondary)" }}>
             {(["Faixa", "Qtd", "Média", "Bônus Total"] as const).map(h => (
-              <div key={h} className="px-3 py-2.5 text-[9px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Faixa" ? "left" : "center" }}>{h}</div>
+              <div key={h} className="px-3 py-2.5 text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", textAlign: h === "Faixa" ? "left" : "center" }}>{h}</div>
             ))}
           </div>
           {groups.map((g, i) => (
@@ -892,7 +892,7 @@ function PlatoonDistributionPanel({ rows }: { rows: QuarterlyResult[] }) {
                 <span className="font-black text-sm" style={{ fontFamily: CONDENSED }}>{g.count}</span>
               </div>
               <div className="px-3 py-2.5 text-center">
-                <span className="font-black text-sm" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{g.avgScore.toFixed(1)}</span>
+                <span className="font-black text-sm" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtNum(g.avgScore, 1)}</span>
               </div>
               <div className="px-3 py-2.5 text-center">
                 <span className="font-black text-xs" style={{ fontFamily: CONDENSED, color: "var(--primary)" }}>{fmtBRLShort(g.totalBonus)}</span>
@@ -960,7 +960,7 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
     <div
       role="columnheader"
       aria-sort={sortKey === key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-      className={cn("px-4 py-3 text-[10px] font-bold uppercase select-none", align === "center" && "text-center")}
+      className={cn("px-4 py-3 text-[11px] font-bold uppercase select-none", align === "center" && "text-center")}
       style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}
     >
       <button
@@ -1029,8 +1029,8 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
 
           <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-              <Table2 size={16} style={{ color: "var(--accent)" }} />
-              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Planilha de Consolidação</span>
+              <Table2 size={16} style={{ color: "var(--accent-text)" }} />
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Planilha de Consolidação</span>
             </div>
             <div className="overflow-x-auto">
               <div className="min-w-[820px]">
@@ -1062,7 +1062,7 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                       <div className="px-4 py-3.5">
                         <div className="font-bold uppercase text-sm">{r.employeeName}</div>
                       </div>
-                      <div className="px-4 py-3.5 text-center font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{fmtScore(r.scoreSum ?? 0)}</div>
+                      <div className="px-4 py-3.5 text-center font-black" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmtScore(r.scoreSum ?? 0)}</div>
                       <div className="px-4 py-3.5 text-center">
                         <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>{r.eventsCount ?? 0}</span>
                       </div>
@@ -1090,7 +1090,7 @@ function ConsolidationTab({ isManager }: { isManager: boolean }) {
                       <div className="px-4 py-3.5 text-center">
                         <div className="inline-flex items-baseline gap-1">
                           <span className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{fmtScore(r.finalResult)}</span>
-                          <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>/100</span>
+                          <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>/100</span>
                         </div>
                       </div>
                       <div className="px-4 py-3.5 text-center">
@@ -1238,7 +1238,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
     <div
       role="columnheader"
       aria-sort={sortKey === key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-      className={cn("px-4 py-3 text-[10px] font-bold uppercase select-none", align === "center" && "text-center")}
+      className={cn("px-4 py-3 text-[11px] font-bold uppercase select-none", align === "center" && "text-center")}
       style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}
       title={title}
     >
@@ -1316,7 +1316,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                 </div>
                 {forceClose && (
                   <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2">
-                    <Label htmlFor="force-reason" className="text-xs font-black uppercase tracking-wide" style={{ color: WARNING }}>Justificativa Obrigatória</Label>
+                    <Label htmlFor="force-reason" className="text-xs font-black uppercase tracking-wide" style={{ color: DANGER_TEXT }}>Justificativa Obrigatória</Label>
                     <Textarea
                       id="force-reason"
                       data-testid="input-force-reason"
@@ -1361,7 +1361,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
               <p className="font-bold uppercase text-xs tracking-wide">Elegibilidade</p>
             </div>
             <h3 className="text-3xl font-black mt-2" style={{ fontFamily: CONDENSED }}>{eligibilityPct}%</h3>
-            <span className="inline-block mt-2.5 font-black uppercase text-[10px] px-2 py-1 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{eligibleCount} de {rows.length} colaborador{rows.length !== 1 ? "es" : ""}</span>
+            <span className="inline-block mt-2.5 font-black uppercase text-[11px] px-2 py-1 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{eligibleCount} de {rows.length} colaborador{rows.length !== 1 ? "es" : ""}</span>
           </div>
           <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
@@ -1405,8 +1405,8 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
 
           <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-              <Wallet size={16} style={{ color: "var(--accent)" }} />
-              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Bônus & Pagamentos</span>
+              <Wallet size={16} style={{ color: "var(--accent-text)" }} />
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Bônus & Pagamentos</span>
             </div>
             <div className="overflow-x-auto">
               <div className={cn("min-w-[900px]", canManage && "min-w-[980px]")}>
@@ -1419,7 +1419,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                   {payHeaderCell("Bônus", "bonusValue", "center", "Valor total do bônus, já incluindo a parcela extra")}
                   {payHeaderCell("Bônus Extra", "extraBonusValue", "center", "Parcela do Bônus referente a eventos extras — já está incluída no total da coluna Bônus, não some as duas")}
                   {payHeaderCell("Status do Pagamento", "bonusStatus")}
-                  {canManage && <div className="px-4 py-3 text-[10px] font-bold uppercase text-center" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Ação</div>}
+                  {canManage && <div className="px-4 py-3 text-[11px] font-bold uppercase text-center" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Ação</div>}
                 </div>
                 {sortedRows.map((r) => {
                   const statusInfo = r.bonusStatus ? (BONUS_STATUS_LABELS[r.bonusStatus] ?? { label: r.bonusStatus, bg: "var(--secondary)", color: "var(--muted-foreground)" }) : null;
@@ -1440,15 +1440,15 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                       </div>
                       <div className="px-4 py-3.5 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>{r.eventsCount ?? 0} c/ nota</span>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{r.participatedEventsCount ?? 0} participados</span>
-                          {(r.totalAbsences ?? 0) > 0 && <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>{r.totalAbsences} penalidades</span>}
+                          <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>{r.eventsCount ?? 0} c/ nota</span>
+                          <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>{r.participatedEventsCount ?? 0} participados</span>
+                          {(r.totalAbsences ?? 0) > 0 && <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>{r.totalAbsences} penalidades</span>}
                         </div>
                       </div>
                       <div className="px-4 py-3.5 text-center">
                         <div className="inline-flex items-baseline gap-1">
                           <span className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{fmtScore(r.finalResult)}</span>
-                          <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>/100</span>
+                          <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>/100</span>
                         </div>
                       </div>
                       <div className="px-4 py-3.5 text-center">
@@ -1456,11 +1456,11 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                       </div>
                       <div className="px-4 py-3.5 text-center">
                         {r.eligible === false ? (
-                          <span className="inline-block text-[10px] uppercase font-black px-2 py-1 rounded-full cursor-help" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }} title={r.eligibilityReason ?? undefined}>
+                          <span className="inline-block text-[11px] uppercase font-black px-2 py-1 rounded-full cursor-help" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }} title={r.eligibilityReason ?? undefined}>
                             Não Elegível
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>
+                          <span className="inline-flex items-center gap-1 text-[11px] uppercase font-black px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>
                             <CheckCircle2 size={10} /> Elegível
                           </span>
                         )}
@@ -1481,7 +1481,7 @@ function PaymentsTab({ canManage }: { canManage: boolean }) {
                       </div>
                       <div className="px-4 py-3.5 text-center">
                         {statusInfo ? (
-                          <span className="text-[10px] uppercase font-black px-2.5 py-1 rounded-full" style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}>{statusInfo.label}</span>
+                          <span className="text-[11px] uppercase font-black px-2.5 py-1 rounded-full" style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}>{statusInfo.label}</span>
                         ) : (
                           <span style={{ color: "var(--muted-foreground)" }}>—</span>
                         )}

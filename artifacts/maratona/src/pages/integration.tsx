@@ -1,4 +1,4 @@
-import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, getGetEmployeesQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200 } from "@workspace/api-client-react";
+import { useGetIntegrationStatus, useTriggerSync, useImportEmployeesCSV, useImportHistoricalResults, useImportSurvey, useGetEvents, getGetEventsQueryKey, getGetEmployeesQueryKey, useResetAllData, useDedupeEvaluations, useFixCalibrationCriteria, useMigrateCriteriaCatalog, useFixOrphanedEvaluations, getGetIntegrationStatusQueryKey, type HistoricalImportResult, type SurveyImportResult, type DedupeEvaluationsResult, type FixCalibrationCriteria200, type FixOrphanedEvaluations200, bulkSyncEventDates, recomputeQuarter, ApiError, type BulkDateSyncResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { Database, RefreshCw, Upload, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Users, Briefcase, AlertTriangle, Trash2, ShieldAlert, History, ClipboardList, KeyRound, Eraser, Wrench, CalendarCheck } from "lucide-react";
-import { getAuthToken } from "@/lib/custom-fetch";
+import { ConfirmDialog } from "@/components/shared";
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -24,6 +24,18 @@ const THEME_VARS = { ["--amber" as string]: AMBER, ["--info" as string]: INFO } 
 const DIALOG_STYLE: React.CSSProperties = { ...THEME_VARS, backgroundColor: "var(--card)", color: "var(--foreground)" };
 
 const RESET_CONFIRM_PHRASE = "ZERAR TUDO";
+
+/** Quantas mudanças de data mostrar na prévia antes do "+N mais". */
+const DATE_PREVIEW_LIMIT = 10;
+
+/** Mensagem do servidor (`{ error }`), o texto padrão quando o corpo não traz um, ou a falha de rede. */
+function serverErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) {
+    const data = e.data as { error?: unknown } | null;
+    return typeof data?.error === "string" && data.error.trim() ? data.error : fallback;
+  }
+  return e instanceof Error ? e.message : "Tente novamente.";
+}
 
 // -----------------------------------------------------------------------------
 // Leitura da planilha da pesquisa de avaliadores (export do MS Forms).
@@ -221,6 +233,7 @@ export default function IntegrationPage() {
   const [dateSyncPreview, setDateSyncPreview] = useState<{ externalId: string; name: string; date: string }[] | null>(null);
   const [dateSyncPending, setDateSyncPending] = useState(false);
   const [dateSyncResult, setDateSyncResult] = useState<{ updated: number; notFound: number; notFoundIds: string[] } | null>(null);
+  const [dateSyncServerPreview, setDateSyncServerPreview] = useState<BulkDateSyncResult | null>(null);
   const dateSyncFileRef = useRef<HTMLInputElement>(null);
 
   const [fixCalResult, setFixCalResult] = useState<FixCalibrationCriteria200 | null>(null);
@@ -436,48 +449,63 @@ export default function IntegrationPage() {
     e.target.value = "";
   }
 
+  // Atualização de datas em dois passos: a planilha vira uma prévia calculada
+  // pelo SERVIDOR (dryRun: o que muda de fato, o que já está certo, o que não
+  // foi achado); só depois de digitar APLICAR o lote é gravado.
+  const dateSyncRows = () => (dateSyncPreview ?? []).map(e => ({ externalId: e.externalId, name: e.name, date: e.date }));
+
+  async function handleDateSyncPreview() {
+    if (!dateSyncPreview) return;
+    setDateSyncPending(true);
+    try {
+      const data = await bulkSyncEventDates({ updates: dateSyncRows(), dryRun: true });
+      if (data.changeCount === 0) {
+        setDateSyncServerPreview(null);
+        toast({
+          title: "Nenhuma data para atualizar",
+          description: `As ${data.unchanged} data(s) localizada(s) já estão corretas${data.notFound > 0 ? `; ${data.notFound} evento(s) não encontrado(s) no banco` : ""}.`,
+        });
+        return;
+      }
+      setDateSyncServerPreview(data);
+    } catch (err: unknown) {
+      toast({ title: "Falha ao gerar a prévia", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
+    } finally {
+      setDateSyncPending(false);
+    }
+  }
+
   async function handleDateSyncApply() {
     if (!dateSyncPreview) return;
     setDateSyncPending(true);
     try {
-      const token = getAuthToken();
-      const res = await fetch("/api/events/bulk-date-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ updates: dateSyncPreview.map(e => ({ externalId: e.externalId, name: e.name, date: e.date })) }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
-      const data = await res.json() as { updated: number; notFound: number; notFoundIds: string[] };
-      setDateSyncResult(data);
+      const data = await bulkSyncEventDates({ updates: dateSyncRows(), confirm: "APLICAR" });
+      setDateSyncResult({ updated: data.updated, notFound: data.notFound, notFoundIds: data.notFoundIds });
+      setDateSyncServerPreview(null);
       setDateSyncPreview(null);
+      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
       toast({ title: `${data.updated} evento(s) atualizado(s)${data.notFound > 0 ? `, ${data.notFound} não encontrado(s)` : ""}` });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Tente novamente.";
-      toast({ title: "Falha ao atualizar datas", description: msg, variant: "destructive" });
+      toast({ title: "Falha ao atualizar datas", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
     } finally {
       setDateSyncPending(false);
     }
   }
 
   const [recomputePending, setRecomputePending] = useState(false);
-  const [recomputeResult, setRecomputeResult] = useState<{ processed: number; warnings: string[] } | null>(null);
+  const [recomputeResult, setRecomputeResult] = useState<{ totalProcessed: number; warnings: string[] } | null>(null);
 
   async function handleRecompute() {
     setRecomputePending(true);
     setRecomputeResult(null);
     try {
-      const token = getAuthToken();
-      const res = await fetch("/api/results/quarterly/recompute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erro desconhecido");
-      const data = await res.json() as { totalProcessed: number; warnings: string[] };
-      setRecomputeResult(data as unknown as { processed: number; warnings: string[] });
+      const data = await recomputeQuarter();
+      const warnings = data.warnings ?? [];
+      setRecomputeResult({ totalProcessed: data.totalProcessed, warnings });
       await qc.resetQueries();
-      toast({ title: `Ciclo recalculado — ${data.totalProcessed} colaborador(es) processado(s)${data.warnings.length > 0 ? ` · ${data.warnings.length} aviso(s)` : ""}` });
+      toast({ title: `Ciclo recalculado — ${data.totalProcessed} colaborador(es) processado(s)${warnings.length > 0 ? ` · ${warnings.length} aviso(s)` : ""}` });
     } catch (err: unknown) {
-      toast({ title: "Falha ao recalcular", description: err instanceof Error ? err.message : "Tente novamente.", variant: "destructive" });
+      toast({ title: "Falha ao recalcular", description: serverErrorMessage(err, "Erro desconhecido"), variant: "destructive" });
     } finally {
       setRecomputePending(false);
     }
@@ -520,17 +548,17 @@ export default function IntegrationPage() {
               <div className="text-center p-4 bg-secondary rounded-xl border border-border">
                 <Calendar size={18} className="mx-auto text-muted-foreground mb-2" />
                 <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.eventsImported ?? "0"}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
+                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
               </div>
               <div className="text-center p-4 bg-secondary rounded-xl border border-border">
                 <Users size={18} className="mx-auto text-muted-foreground mb-2" />
                 <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.employeesImported ?? "0"}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
+                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
               </div>
               <div className="text-center p-4 bg-secondary rounded-xl border border-border">
                 <Briefcase size={18} className="mx-auto text-muted-foreground mb-2" />
                 <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{status?.participantsImported ?? "0"}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
+                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
               </div>
             </div>
 
@@ -561,7 +589,7 @@ export default function IntegrationPage() {
               </p>
               
               <div className="bg-secondary border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground mb-6">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas Obrigatórias (Header)</p>
+                <p className="text-[11px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas Obrigatórias (Header)</p>
                 <div className="flex flex-wrap gap-2">
                   <span className="bg-card px-2 py-1 rounded border border-border">nome</span>
                   <span className="bg-card px-2 py-1 rounded border border-border">departamento</span>
@@ -610,7 +638,7 @@ export default function IntegrationPage() {
           </p>
 
           <div className="bg-secondary border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground mb-6">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas (Header opcional)</p>
+            <p className="text-[11px] uppercase font-bold text-muted-foreground mb-2 font-sans tracking-widest">Colunas (Header opcional)</p>
             <div className="flex flex-wrap gap-2">
               <span className="bg-card px-2 py-1 rounded border border-border">nome</span>
               <span className="bg-card px-2 py-1 rounded border border-border">nota</span>
@@ -838,13 +866,47 @@ export default function IntegrationPage() {
                 <Button
                   className="w-full bg-primary hover:opacity-90 text-primary-foreground"
                   disabled={dateSyncPending}
-                  onClick={handleDateSyncApply}
+                  onClick={handleDateSyncPreview}
                 >
                   <CalendarCheck size={16} className="mr-2" />
-                  {dateSyncPending ? "Atualizando…" : `Aplicar ${dateSyncPreview.length} datas em produção`}
+                  {dateSyncPending ? "Conferindo…" : `Conferir o que muda no banco (${dateSyncPreview.length} linhas)`}
                 </Button>
               </div>
             )}
+
+            <ConfirmDialog
+              open={!!dateSyncServerPreview}
+              onOpenChange={(open) => { if (!open) setDateSyncServerPreview(null); }}
+              title={`Atualizar datas de ${dateSyncServerPreview?.changeCount ?? 0} evento(s)`}
+              description={dateSyncServerPreview
+                ? `Grava direto em produção: início = fim = data da planilha${dateSyncServerPreview.unchanged > 0 ? `; ${dateSyncServerPreview.unchanged} evento(s) já estão corretos e ficam como estão` : ""}${dateSyncServerPreview.notFound > 0 ? `; ${dateSyncServerPreview.notFound} linha(s) sem evento correspondente serão ignoradas` : ""}.`
+                : undefined}
+              confirmLabel="Aplicar"
+              confirmText="APLICAR"
+              destructive
+              isPending={dateSyncPending}
+              onConfirm={handleDateSyncApply}
+              data-testid="dialog-bulk-date-sync"
+            >
+              {dateSyncServerPreview && (
+                <ul className="max-h-60 overflow-y-auto rounded-lg text-xs divide-y border border-border">
+                  {dateSyncServerPreview.changes.slice(0, DATE_PREVIEW_LIMIT).map((c, i) => (
+                    <li key={`${c.eventId}-${i}`} className="px-3 py-1.5 flex items-center justify-between gap-2">
+                      <span className="truncate">
+                        {c.eventName}
+                        {c.newName && <span className="text-muted-foreground"> → {c.newName}</span>}
+                      </span>
+                      <span className="font-mono shrink-0 text-muted-foreground">
+                        {c.startDateBefore}{c.endDateBefore !== c.startDateBefore ? `…${c.endDateBefore}` : ""} → <span className="font-bold text-foreground">{c.startDateAfter}</span>
+                      </span>
+                    </li>
+                  ))}
+                  {dateSyncServerPreview.changes.length > DATE_PREVIEW_LIMIT && (
+                    <li className="px-3 py-1.5 text-muted-foreground text-center">+{dateSyncServerPreview.changes.length - DATE_PREVIEW_LIMIT} mais…</li>
+                  )}
+                </ul>
+              )}
+            </ConfirmDialog>
 
             {dateSyncResult && (
               <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${dateSyncResult.notFound > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
@@ -882,7 +944,7 @@ export default function IntegrationPage() {
               <div className={`rounded-lg px-4 py-3 border text-sm font-medium flex items-start gap-2 ${recomputeResult.warnings.length > 0 ? "bg-[var(--amber)]/10 border-[var(--amber)]/30 text-[var(--amber)]" : "bg-accent/10 border-accent/40 text-accent-text"}`}>
                 {recomputeResult.warnings.length > 0 ? <AlertTriangle size={16} className="shrink-0 mt-0.5" /> : <CheckCircle2 size={16} className="shrink-0 mt-0.5" />}
                 <div>
-                  <p>{(recomputeResult as unknown as { totalProcessed: number }).totalProcessed ?? (recomputeResult as { processed?: number }).processed} colaborador(es) processado(s).</p>
+                  <p>{recomputeResult.totalProcessed} colaborador(es) processado(s).</p>
                   {recomputeResult.warnings.map((w, i) => (
                     <p key={i} className="text-xs mt-1 opacity-80">{w}</p>
                   ))}
@@ -976,17 +1038,17 @@ export default function IntegrationPage() {
               <div className="text-center p-4 bg-secondary rounded-xl border border-border">
                 <Calendar size={18} className="mx-auto text-muted-foreground mb-2" />
                 <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-events">{result.eventsSync ?? 0}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
+                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
               </div>
               <div className="text-center p-4 bg-secondary rounded-xl border border-border">
                 <Users size={18} className="mx-auto text-muted-foreground mb-2" />
                 <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-employees">{result.employeesSync ?? 0}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
+                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores</p>
               </div>
               <div className="text-center p-4 bg-secondary rounded-xl border border-border">
                 <Briefcase size={18} className="mx-auto text-muted-foreground mb-2" />
                 <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-result-participants">{result.participantsSync ?? 0}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
+                <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Participações</p>
               </div>
             </div>
           )}
@@ -1081,7 +1143,7 @@ export default function IntegrationPage() {
           {fixCalResult && (fixCalResult.results?.length ?? 0) > 0 && (
             <div className="border border-border rounded-lg overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
+                <thead className="bg-secondary text-muted-foreground uppercase text-[11px] font-bold">
                   <tr>
                     <th className="text-left p-2">De (quesito antigo)</th>
                     <th className="text-left p-2">Para (quesito atual)</th>
@@ -1130,15 +1192,15 @@ export default function IntegrationPage() {
               <div className="grid grid-cols-3 gap-3 py-2">
                 <div className="bg-secondary rounded-lg p-3 text-center">
                   <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-found">{dedupePreview.duplicatesFound}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Cópias a apagar</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Cópias a apagar</p>
                 </div>
                 <div className="bg-secondary rounded-lg p-3 text-center">
                   <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-groups">{dedupePreview.groupsAffected}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Notas afetadas</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Notas afetadas</p>
                 </div>
                 <div className="bg-secondary rounded-lg p-3 text-center">
                   <p className="text-2xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-dedupe-events">{dedupePreview.eventsAffected}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos</p>
                 </div>
               </div>
             )
@@ -1194,27 +1256,27 @@ export default function IntegrationPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center p-3 bg-secondary rounded-xl border border-border">
                   <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-preview-total-rows">{historicalPreview.totalRows}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Linhas na planilha</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Linhas na planilha</p>
                 </div>
                 <div className="text-center p-3 bg-secondary rounded-xl border border-border">
                   <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-preview-matched">{historicalPreview.matched}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores já cadastrados</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores já cadastrados</p>
                 </div>
                 <div className="text-center p-3 bg-secondary rounded-xl border border-border">
                   <p className="text-xl font-black text-[var(--info)]" style={{ fontFamily: CONDENSED }}>{historicalPreview.employeesToCreate?.length ?? 0}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Colaboradores novos</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Colaboradores novos</p>
                 </div>
                 <div className="text-center p-3 bg-accent/10 rounded-xl border border-accent/40">
                   <p className="text-xl font-black text-accent-text" style={{ fontFamily: CONDENSED }}>{eventsToCreate}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos a criar</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos a criar</p>
                 </div>
                 <div className="text-center p-3 bg-[var(--amber)]/10 rounded-xl border border-[var(--amber)]/30">
                   <p className="text-xl font-black text-[var(--amber)]" style={{ fontFamily: CONDENSED }}>{eventsToUpdate}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos a atualizar</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos a atualizar</p>
                 </div>
                 <div className="text-center p-3 bg-secondary rounded-xl border border-border">
                   <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{participantsToLink}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Participações a vincular</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Participações a vincular</p>
                 </div>
               </div>
 
@@ -1265,7 +1327,7 @@ export default function IntegrationPage() {
                   <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Detalhe evento por evento</p>
                   <div className="border border-border rounded-lg overflow-hidden">
                     <table className="w-full text-xs">
-                      <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
+                      <thead className="bg-secondary text-muted-foreground uppercase text-[11px] font-bold">
                         <tr>
                           <th className="text-left p-2">Evento</th>
                           <th className="text-left p-2">Data</th>
@@ -1284,7 +1346,7 @@ export default function IntegrationPage() {
                             <td className="p-2 text-muted-foreground">
                               {ev.matchedCount}/{ev.participantsCount}
                               {ev.newEmployeeNames && ev.newEmployeeNames.length > 0 && (
-                                <div className="text-[10px] text-[var(--info)] mt-0.5">
+                                <div className="text-[11px] text-[var(--info)] mt-0.5">
                                   {ev.newEmployeeNames.length} novo(s): {ev.newEmployeeNames.join(", ")}
                                 </div>
                               )}
@@ -1292,7 +1354,7 @@ export default function IntegrationPage() {
                             <td className="p-2 text-muted-foreground">
                               {ev.cycleName ?? "—"}
                               {ev.cycleFallback && (
-                                <div className="text-[10px] text-[var(--info)] mt-0.5">fora do período (ciclo atual)</div>
+                                <div className="text-[11px] text-[var(--info)] mt-0.5">fora do período (ciclo atual)</div>
                               )}
                             </td>
                             <td className="p-2">
@@ -1302,7 +1364,7 @@ export default function IntegrationPage() {
                               {ev.action === "conflict" && <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/10">Conflito</Badge>}
                               {ev.action === "create" && ev.overlapCandidates && ev.overlapCandidates.length > 0 && (
                                 <div className="mt-1.5 min-w-[220px]" data-testid={`select-link-override-${i}`}>
-                                  <p className="text-[10px] text-[var(--amber)] bg-[var(--amber)]/10 border border-[var(--amber)]/30 rounded px-1.5 py-1 mb-1 flex items-start gap-1">
+                                  <p className="text-[11px] text-[var(--amber)] bg-[var(--amber)]/10 border border-[var(--amber)]/30 rounded px-1.5 py-1 mb-1 flex items-start gap-1">
                                     <AlertTriangle size={11} className="shrink-0 mt-0.5" />
                                     Já existe {ev.overlapCandidates.length === 1 ? "1 evento" : `${ev.overlapCandidates.length} eventos`} nessa data — pode ser a mesma corrida com nome diferente.
                                   </p>
@@ -1383,15 +1445,15 @@ export default function IntegrationPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center p-3 bg-secondary rounded-xl border border-border">
                   <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }} data-testid="text-survey-total-rows">{surveyPreview.totalRows}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Linhas na planilha</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Linhas na planilha</p>
                 </div>
                 <div className="text-center p-3 bg-secondary rounded-xl border border-border">
                   <p className="text-xl font-black text-foreground" style={{ fontFamily: CONDENSED }}>{surveyPreview.groups.length}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Eventos na planilha</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Eventos na planilha</p>
                 </div>
                 <div className="text-center p-3 bg-[var(--info)]/10 rounded-xl border border-[var(--info)]/30">
                   <p className="text-xl font-black text-[var(--info)]" style={{ fontFamily: CONDENSED }}>{surveyPreview.avaliadoresToCreate.length}</p>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Avaliadores novos</p>
+                  <p className="text-[11px] uppercase font-bold text-muted-foreground mt-1">Avaliadores novos</p>
                 </div>
               </div>
 
@@ -1451,7 +1513,7 @@ export default function IntegrationPage() {
                 <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Vincular cada evento da planilha</p>
                 <div className="border border-border rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
-                    <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
+                    <thead className="bg-secondary text-muted-foreground uppercase text-[11px] font-bold">
                       <tr>
                         <th className="text-left p-2">Evento (planilha)</th>
                         <th className="text-left p-2">Linhas</th>
@@ -1502,13 +1564,13 @@ export default function IntegrationPage() {
                                 </SelectContent>
                               </Select>
                               {!selectedId && (
-                                <p className="text-[10px] text-destructive mt-1">Obrigatório — selecione um evento ou "Ignorar".</p>
+                                <p className="text-[11px] text-destructive mt-1">Obrigatório — selecione um evento ou "Ignorar".</p>
                               )}
                               {isIgnored && (
-                                <p className="text-[10px] text-muted-foreground mt-1">Estas respostas serão ignoradas na importação.</p>
+                                <p className="text-[11px] text-muted-foreground mt-1">Estas respostas serão ignoradas na importação.</p>
                               )}
                               {selectedEvent?.isHistorical && (
-                                <p className="text-[10px] text-[var(--amber)] mt-1">Evento histórico: só os comentários serão salvos como referência, sem notas.</p>
+                                <p className="text-[11px] text-[var(--amber)] mt-1">Evento histórico: só os comentários serão salvos como referência, sem notas.</p>
                               )}
                             </td>
                           </tr>
@@ -1553,7 +1615,7 @@ export default function IntegrationPage() {
           {surveyCommitResult?.createdAvaliadores && (
             <div className="border border-border rounded-lg overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-secondary text-muted-foreground uppercase text-[10px] font-bold">
+                <thead className="bg-secondary text-muted-foreground uppercase text-[11px] font-bold">
                   <tr>
                     <th className="text-left p-2">Nome</th>
                     <th className="text-left p-2">E-mail</th>

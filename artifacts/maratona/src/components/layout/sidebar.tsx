@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { usePremiumTheme, CONDENSED, WARNING, ACCENT_TEXT } from "@/lib/premium-theme";
+import { usePremiumTheme, CONDENSED, ACCENT_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 
 interface NavItem {
   label: string;
@@ -142,7 +142,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
             return (
               <div key={group.name} className="space-y-1.5">
                 {(!collapsed || isMobile) && (
-                  <p className="px-2 text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+                  <p className="px-2 text-[11px] font-bold uppercase tracking-[0.15em] mb-2" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
                     {group.name}
                   </p>
                 )}
@@ -204,7 +204,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               {(!collapsed || isMobile) && (
                 <div className="min-w-0">
                   <p className="text-sm font-bold truncate">{user.name}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest mt-0.5 truncate" style={{ color: "var(--muted-foreground)" }}>{user.role}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest mt-0.5 truncate" style={{ color: "var(--muted-foreground)" }}>{user.role}</p>
                 </div>
               )}
             </div>
@@ -218,7 +218,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold uppercase text-[13px] tracking-tight transition-all hover:opacity-70",
                 collapsed && !isMobile ? "justify-center w-full" : "w-full"
               )}
-              style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: WARNING }}
+              style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: DANGER_TEXT }}
             >
               <LogOut size={18} className="shrink-0" aria-hidden="true" />
               {(!collapsed || isMobile) && <span>Encerrar Sessão</span>}

@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Search, Building2, LayoutGrid, Settings, ListChecks, Users, ArrowRightLeft } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { CONDENSED, BODY, WARNING, PremiumCard } from "@/lib/premium-theme";
+import { CONDENSED, BODY, PremiumCard, DANGER_TEXT } from "@/lib/premium-theme";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
@@ -136,9 +136,9 @@ export default function AreasPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
                 <div className="space-y-1.5">
-                  <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome da Área <span style={{ color: WARNING }}>*</span></Label>
+                  <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome da Área <span style={{ color: DANGER_TEXT }}>*</span></Label>
                   <Input data-testid="input-area-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome da área."))} placeholder="Ex: Cenografia, Comercial..." className="h-11 rounded-lg" style={fieldStyle} />
-                  {errors.name?.message && <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{errors.name.message}</p>}
+                  {errors.name?.message && <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{errors.name.message}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Descrição</Label>
@@ -216,7 +216,7 @@ export default function AreasPage() {
                         <Building2 size={22} style={{ color: "var(--primary-foreground)" }} />
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Status</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Status</span>
                         <Switch checked={a.active} onCheckedChange={v => updateMutation.mutate({ id: a.id, data: { active: v } })} />
                       </div>
                     </div>
@@ -237,9 +237,9 @@ export default function AreasPage() {
 
                     <div className="pt-4 mt-auto flex items-center justify-between" style={{ borderTop: "1px solid var(--border)" }}>
                       {a.active ? (
-                        <span className="px-2.5 py-1 rounded-full font-bold text-[10px] uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Ativa</span>
+                        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Ativa</span>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-full font-bold text-[10px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativa</span>
+                        <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativa</span>
                       )}
                       <button
                         type="button"
@@ -266,7 +266,7 @@ export default function AreasPage() {
         <DialogContent className="max-w-xl rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Building2 size={22} style={{ color: "var(--accent)" }} /> {manageArea?.name}
+              <Building2 size={22} style={{ color: "var(--accent-text)" }} /> {manageArea?.name}
             </DialogTitle>
             <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Relacione os critérios e usuários que pertencem a esta área.</p>
           </DialogHeader>
@@ -304,12 +304,12 @@ export default function AreasPage() {
                           <div className="min-w-0 flex-1">
                             <p className="font-bold uppercase text-sm truncate">{c.name}</p>
                             {elsewhere && (
-                              <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: WARNING }}>
+                              <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: DANGER_TEXT }}>
                                 <ArrowRightLeft size={11} /> Atualmente em: {c.responsibleAreaName}
                               </p>
                             )}
                           </div>
-                          {!c.active && <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Inativo</span>}
+                          {!c.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Inativo</span>}
                         </label>
                       );
                     })}
@@ -343,12 +343,12 @@ export default function AreasPage() {
                             <p className="font-bold text-sm break-words">{u.name}</p>
                             <p className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>{u.email}</p>
                             {elsewhere && (
-                              <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: WARNING }}>
+                              <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: DANGER_TEXT }}>
                                 <ArrowRightLeft size={11} /> Atualmente em: {u.areaName}
                               </p>
                             )}
                           </div>
-                          {!u.active && <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Inativo</span>}
+                          {!u.active && <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Inativo</span>}
                         </label>
                       );
                     })}

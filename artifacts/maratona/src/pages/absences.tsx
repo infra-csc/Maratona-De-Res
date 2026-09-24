@@ -23,7 +23,7 @@ import { Plus, Trash2, Pencil, UserMinus, Download, Search, AlertTriangle, Award
 import { useAuth } from "@/lib/auth-context";
 import { CycleBadge } from "@/components/cycle-badge";
 import { cn, fmtDate } from "@/lib/utils";
-import { usePremiumTheme, CONDENSED, BODY, WARNING, GOOD } from "@/lib/premium-theme";
+import { usePremiumTheme, CONDENSED, BODY, WARNING, GOOD, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 
 type EntryKind = "penalty" | "merit";
 
@@ -31,7 +31,7 @@ const DATE_FULL: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit"
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{message}</p>;
 }
 
 interface AbsenceFormData {
@@ -246,7 +246,7 @@ export default function AbsencesPage() {
             </div>
             <div>
               <h1 data-testid="text-page-title" className="font-black uppercase leading-none" style={{ fontFamily: CONDENSED, fontSize: "clamp(2rem,5vw,3.2rem)", letterSpacing: "-0.02em" }}>
-                Penalidades e <span style={{ color: "var(--accent)" }}>Méritos</span>
+                Penalidades e <span style={{ color: "var(--accent-text)" }}>Méritos</span>
               </h1>
               <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>
                 Penalidades descontam e méritos somam pontos na nota final do colaborador.
@@ -379,10 +379,10 @@ export default function AbsencesPage() {
             </div>
           </div>
           <div className="flex gap-3 flex-wrap items-center">
-            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.15)", color: WARNING }}>
+            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(229,72,77,0.15)", color: DANGER_TEXT }}>
               <AlertTriangle size={13} /> Desconto: <span className="text-sm font-black">−{totalPenaltyPoints}</span> pts
             </div>
-            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(154,176,0,0.15)", color: "var(--accent)" }}>
+            <div className="px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 shrink-0" style={{ backgroundColor: "rgba(154,176,0,0.15)", color: "var(--accent-text)" }}>
               <Award size={13} /> Bônus: <span className="text-sm font-black">+{totalMeritPoints}</span> pts
             </div>
             {(filterKind !== "all" || filterEventId !== "__all" || filterDateFrom || filterDateTo || search) && (
@@ -472,7 +472,7 @@ export default function AbsencesPage() {
                             {a.reason || <span className="text-xs opacity-50">Sem justificativa</span>}
                           </span>
                           {((a as Absence & { registeredByUserName?: string | null }).registeredByUserName || a.createdAt) && (
-                            <span className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px] opacity-60">
+                            <span className="mt-1 flex items-center gap-1.5 flex-wrap text-[11px] opacity-60">
                               {(a as Absence & { registeredByUserName?: string | null }).registeredByUserName && (
                                 <>
                                   <span className="font-bold uppercase tracking-wide">por</span>
@@ -545,7 +545,7 @@ export default function AbsencesPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
             <div className="space-y-1.5">
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                Tipo de Lançamento <span style={{ color: WARNING }}>*</span>
+                Tipo de Lançamento <span style={{ color: DANGER_TEXT }}>*</span>
               </Label>
               <Select
                 value={selectedType || defaultType}
@@ -557,7 +557,7 @@ export default function AbsencesPage() {
                 <SelectContent>
                   {activeTypes.filter(t => t.kind === "penalty").length > 0 && (
                     <>
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: WARNING }}>Penalidades (−)</div>
+                      <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: DANGER_TEXT }}>Penalidades (−)</div>
                       {activeTypes.filter(t => t.kind === "penalty").map(t => (
                         <SelectItem key={t.slug} value={t.slug}>{t.label} — −{t.points} pts{t.requiresEvent ? " 📍" : ""}</SelectItem>
                       ))}
@@ -565,7 +565,7 @@ export default function AbsencesPage() {
                   )}
                   {activeTypes.filter(t => t.kind === "merit").length > 0 && (
                     <>
-                      <div className="px-2 py-1 mt-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: GOOD }}>Méritos (+)</div>
+                      <div className="px-2 py-1 mt-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: GOOD_TEXT }}>Méritos (+)</div>
                       {activeTypes.filter(t => t.kind === "merit").map(t => (
                         <SelectItem key={t.slug} value={t.slug}>{t.label} — +{t.points} pts{t.requiresEvent ? " 📍" : ""}</SelectItem>
                       ))}
@@ -574,7 +574,7 @@ export default function AbsencesPage() {
                 </SelectContent>
               </Select>
               {requiresEvent && (
-                <p className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: WARNING }}>
+                <p className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: DANGER_TEXT }}>
                   📍 Este tipo exige um evento vinculado
                 </p>
               )}
@@ -584,7 +584,7 @@ export default function AbsencesPage() {
               <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
                 Evento{" "}
                 {requiresEvent
-                  ? <span style={{ color: WARNING }}>*</span>
+                  ? <span style={{ color: DANGER_TEXT }}>*</span>
                   : <span className="normal-case font-normal text-xs">(opcional para lançamentos no ciclo)</span>
                 }
               </Label>
@@ -648,14 +648,14 @@ export default function AbsencesPage() {
                 </PopoverContent>
               </Popover>
               {requiresEvent && !watchedEventId && (
-                <p className="text-[11px] font-bold" style={{ color: WARNING }}>Selecione um evento para continuar.</p>
+                <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Selecione um evento para continuar.</p>
               )}
             </div>
 
             {!editingAbsence && (
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                  Colaborador <span style={{ color: WARNING }}>*</span>
+                  Colaborador <span style={{ color: DANGER_TEXT }}>*</span>
                 </Label>
                 <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
                   <PopoverTrigger asChild>
@@ -700,7 +700,7 @@ export default function AbsencesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                  Data <span style={{ color: WARNING }}>*</span>
+                  Data <span style={{ color: DANGER_TEXT }}>*</span>
                 </Label>
                 <Input
                   type="date"
@@ -712,7 +712,7 @@ export default function AbsencesPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                  Quantidade <span style={{ color: WARNING }}>*</span>
+                  Quantidade <span style={{ color: DANGER_TEXT }}>*</span>
                 </Label>
                 <Input
                   type="number"
@@ -730,7 +730,7 @@ export default function AbsencesPage() {
               <div className="space-y-1.5">
                 <Label className="font-bold uppercase text-xs tracking-wider flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
                   2ª Data
-                  <span className="normal-case font-medium text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
+                  <span className="normal-case font-medium text-[11px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
                     opcional — cria 2 registros
                   </span>
                 </Label>

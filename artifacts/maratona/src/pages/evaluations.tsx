@@ -1,95 +1,25 @@
 import { useState, useEffect } from "react";
-import { useGetEvents, useGetEvaluations, useGetEventCriteria, useGetEvent, useCreateEvaluation, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetCurrentCycle, getGetEvaluationsQueryKey, getGetEventQueryKey, getEventCriteria, getEvent, getEvaluations, createEvaluation, submitEvaluation } from "@workspace/api-client-react";
-import { useQueryClient, useQueries } from "@tanstack/react-query";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Textarea } from "@/components/ui/textarea";
+import { useGetEvents, useGetEvaluations, useGetEventCriteria, useGetEvent, useCreateEvaluation, useGetEventConformity, useSetEventConformity, useRedirectConformityEvaluator, useRedirectConformityEvaluatorFerramentas, useGetUsersByArea, useGetCurrentCycle, getGetEvaluationsQueryKey, getGetEventQueryKey, createEvaluation, submitEvaluation, type EventConformityInput } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
-import { CheckCircle, Clock, Users, Calendar, MapPin, Building2, Save, Flag, Target, Lock, Check, ArrowRight, Rocket, CornerDownRight, ShieldAlert, Link2, Copy, CheckCheck, Trash2, Loader2, AlertCircle, Send } from "lucide-react";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth-context";
-import { AudioRecorder, AudioPlayer } from "@/components/audio-recorder";
-import { cn, fmtDate } from "@/lib/utils";
-import { useEventCriterionAssignments, getEventCriterionAssignments, eventCriterionAssignmentsKey, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useDeletePublicToken, type PublicToken } from "@/lib/routing-api";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectOptions, useCreatePublicToken, usePublicTokens, usePublicLinkEligibleCriteria, useCreateConformityPublicToken, useCreateFerramentasPublicToken, useConformityPublicTokens, useFerramentasPublicTokens, useMyPrincipalAreas, useUsersByArea, useDeletePublicToken } from "@/lib/routing-api";
 import { AdminEvaluationsConsole } from "./evaluations-admin-console";
-import { CONDENSED, BODY, WARNING, AMBER, INFO } from "@/lib/premium-theme";
-
-// Estados semânticos fixos (iguais nos dois temas) onde não existe classe de
-// token: pendente / em andamento = AMBER, informativo = INFO, erro = WARNING.
-const AMBER_TINT: React.CSSProperties = { backgroundColor: "rgba(232,162,61,0.12)", color: AMBER, borderColor: AMBER };
-const INFO_TINT: React.CSSProperties = { backgroundColor: "rgba(91,141,239,0.12)", color: INFO, borderColor: INFO };
-
-function ScoreButton({ score, current, onClick, disabled, label }: { score: number, current: number | null, onClick: () => void, disabled: boolean, label?: string }) {
-  const isSelected = current === score;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      title={label}
-      className={cn(
-        "border border-border rounded-lg py-3 flex items-center justify-center transition-all w-full",
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:-translate-y-1 active:translate-y-0",
-        isSelected
-          ? "bg-primary text-primary-foreground border-primary"
-          : "bg-card text-foreground"
-      )}
-    >
-      <span className="text-lg md:text-xl font-black" style={{ fontFamily: CONDENSED }}>{score}</span>
-    </button>
-  );
-}
-
-// Uma vez que um link foi enviado para um freelancer preencher um formulário
-// de conformidade, o avaliador titular deixa de ver o formulário interativo
-// (evita sobrescrever a resposta do freelancer) e passa a ver só este
-// histórico de envios — respondido ou não, e quando.
-function fmtDT(v: string | null | undefined): string {
-  if (!v) return "—";
-  const d = new Date(v);
-  const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  return `${date} ${time}`;
-}
-
-function ConformityLinkHistory({ history }: { history: PublicToken[] }) {
-  return (
-    <div className="bg-card border border-border rounded-lg divide-y divide-border overflow-hidden">
-      {history.map(t => (
-        <div key={t.id} className="flex items-start justify-between px-4 py-3 gap-3">
-          <div className="min-w-0 space-y-0.5">
-            <p className="text-sm font-bold truncate">
-              {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
-            </p>
-            {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
-              <p className="text-[10px] text-muted-foreground truncate">Para: {t.recipientName}</p>
-            )}
-            <p className="text-[10px] text-muted-foreground">
-              Enviado: {fmtDT(t.createdAt)}
-            </p>
-            {t.usedAt && (
-              <p className="text-[10px] font-bold text-accent-text">
-                Respondido: {fmtDT(t.usedAt)}
-              </p>
-            )}
-          </div>
-          {t.usedAt ? (
-            <span className="shrink-0 text-[10px] font-bold uppercase bg-primary text-primary-foreground border border-primary rounded-lg px-2 py-0.5 flex items-center gap-1 mt-0.5">
-              <CheckCircle size={10} /> Respondido
-            </span>
-          ) : (
-            <span className="shrink-0 text-[10px] font-bold uppercase bg-secondary text-muted-foreground border border-border rounded-lg px-2 py-0.5 mt-0.5">
-              Pendente
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
+import { CONDENSED, BODY } from "@/lib/premium-theme";
+import { CENOGRAFIA_AREA_ID, FERRAMENTAS_AREA_ID } from "./evaluations/constants";
+import { conformityFormFromData, emptyConformityForm, groupCriteriaByArea, publicEvalBaseUrl } from "./evaluations/helpers";
+import type { AreaAssignTarget, AreaGroup, ConformityEvalForm, ConformityLinkType, EvalTab, RedirectDialogArea } from "./evaluations/types";
+import { useEvaluatorOverview } from "./evaluations/use-evaluator-overview";
+import { EvaluatorSidebar } from "./evaluations/evaluator-sidebar";
+import { PrincipalAreaCriteriaSection, AreaAssignDialog } from "./evaluations/principal-area-criteria";
+import { NoEventSelected, EventHeaderStrip } from "./evaluations/event-header";
+import { CriteriaColumn } from "./evaluations/criteria-column";
+import { FerramentasConformitySection } from "./evaluations/ferramentas-conformity-section";
+import { CenografiaConformitySection } from "./evaluations/cenografia-conformity-section";
+import { EvaluationSummaryPanel } from "./evaluations/evaluation-summary-panel";
+import { RedirectFormDialog } from "./evaluations/redirect-form-dialog";
+import { PublicLinkDialog } from "./evaluations/public-link-dialog";
+import { ConformityPublicLinkDialog } from "./evaluations/conformity-public-link-dialog";
 
 export default function EvaluationsPage() {
   const { user } = useAuth();
@@ -100,7 +30,7 @@ export default function EvaluationsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [activeEvalTab, setActiveEvalTab] = useState<"todo" | "done">("todo");
+  const [activeEvalTab, setActiveEvalTab] = useState<EvalTab>("todo");
   const [scores, setScores] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   // Per-criterion audio override (objectPath). "" means the user cleared a
@@ -109,15 +39,7 @@ export default function EvaluationsPage() {
   // Confirmation modal + in-flight state for the one-click "Lançar Avaliação" flow.
   const [confirmLaunchOpen, setConfirmLaunchOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [conformityEvalForm, setConformityEvalForm] = useState<{
-    epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
-    epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
-    absencesResponse: boolean | null; absencesReport: string; standoutResponse: boolean | null; standoutJustification: string;
-  }>({
-    epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null,
-    epiComment: '', estaiamentosComment: '', guardaEquipamentosComment: '', condutaComment: '',
-    absencesResponse: null, absencesReport: '', standoutResponse: null, standoutJustification: '',
-  });
+  const [conformityEvalForm, setConformityEvalForm] = useState<ConformityEvalForm>(emptyConformityForm());
   const [redirectConformityOpen, setRedirectConformityOpen] = useState(false);
   const [redirectConformityTargetId, setRedirectConformityTargetId] = useState<number | null>(null);
   const [redirectFerramentasOpen, setRedirectFerramentasOpen] = useState(false);
@@ -149,8 +71,6 @@ export default function EvaluationsPage() {
     },
   });
   // Users for redirect popups (loaded lazily)
-  const CENOGRAFIA_AREA_ID = 13;
-  const FERRAMENTAS_AREA_ID = 16;
   const { data: cenografiaUsers } = useGetUsersByArea(CENOGRAFIA_AREA_ID, {
     query: { enabled: isConformityEvaluatorForEvent, queryKey: ["users-by-area", CENOGRAFIA_AREA_ID] as unknown[] },
   });
@@ -171,26 +91,9 @@ export default function EvaluationsPage() {
   });
   useEffect(() => {
     if (myConformityData) {
-      setConformityEvalForm({
-        epi: myConformityData.epi ?? null,
-        estaiamentos: myConformityData.estaiamentos ?? null,
-        guardaEquipamentos: myConformityData.guardaEquipamentos ?? null,
-        conduta: myConformityData.conduta ?? null,
-        epiComment: myConformityData.epiComment ?? '',
-        estaiamentosComment: myConformityData.estaiamentosComment ?? '',
-        guardaEquipamentosComment: myConformityData.guardaEquipamentosComment ?? '',
-        condutaComment: myConformityData.condutaComment ?? '',
-        absencesResponse: myConformityData.absencesResponse ?? null,
-        absencesReport: myConformityData.absencesReport ?? '',
-        standoutResponse: myConformityData.standoutResponse ?? null,
-        standoutJustification: myConformityData.standoutJustification ?? '',
-      });
+      setConformityEvalForm(conformityFormFromData(myConformityData));
     } else {
-      setConformityEvalForm({
-        epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null,
-        epiComment: '', estaiamentosComment: '', guardaEquipamentosComment: '', condutaComment: '',
-        absencesResponse: null, absencesReport: '', standoutResponse: null, standoutJustification: '',
-      });
+      setConformityEvalForm(emptyConformityForm());
     }
   }, [myConformityData?.id, selectedEventId]);
 
@@ -206,9 +109,9 @@ export default function EvaluationsPage() {
   // Áreas em que o usuário logado é avaliador principal — dá visibilidade
   // completa dos quesitos da área e permite atribuir/tomar/mover entre colegas.
   const { data: myPrincipalAreas } = useMyPrincipalAreas();
-  const [areaAssignTarget, setAreaAssignTarget] = useState<{ criterionId: number; criterionName: string; areaId: number } | null>(null);
+  const [areaAssignTarget, setAreaAssignTarget] = useState<AreaAssignTarget | null>(null);
   const { data: areaAssignUsers } = useUsersByArea(areaAssignTarget?.areaId ?? null);
-  const [redirectDialogArea, setRedirectDialogArea] = useState<{ areaId: number; areaName: string; criteriaIds: number[]; firstCriterionId: number } | null>(null);
+  const [redirectDialogArea, setRedirectDialogArea] = useState<RedirectDialogArea | null>(null);
   const [redirectTargetId, setRedirectTargetId] = useState<number | null>(null);
   const [publicLinkDialogCriteriaIds, setPublicLinkDialogCriteriaIds] = useState<number[] | null>(null);
   const [publicLinkDialogAreaName, setPublicLinkDialogAreaName] = useState<string | null>(null);
@@ -221,7 +124,7 @@ export default function EvaluationsPage() {
   const [generatedPublicUrl, setGeneratedPublicUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   // Conformity public link dialog state (shared for cenografia + ferramentas)
-  const [conformityPublicLinkType, setConformityPublicLinkType] = useState<"cenografia" | "ferramentas" | null>(null);
+  const [conformityPublicLinkType, setConformityPublicLinkType] = useState<ConformityLinkType | null>(null);
   const [conformityPublicRecipientName, setConformityPublicRecipientName] = useState("");
   const [generatedConformityUrl, setGeneratedConformityUrl] = useState<string | null>(null);
   const [conformityLinkCopied, setConformityLinkCopied] = useState(false);
@@ -258,138 +161,10 @@ export default function EvaluationsPage() {
   });
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
-  const activeEvents = (events ?? []).filter(e => e.status === "open" || e.status === "closed");
-  // Only events whose criteria the RH has already confirmed can be evaluated.
-  const configuredEvents = activeEvents.filter(e => e.criteriaConfirmed);
 
-  // For evaluators: fetch criteria for every selectable event so the overview
-  // only lists events that actually have work for their area (and so the empty
-  // state is accurate). Same query key as the per-event fetch → deduped/cached.
-  const evaluatorCriteriaQueries = useQueries({
-    queries: isEvaluator
-      ? configuredEvents.map(ev => ({
-          queryKey: ["event-criteria", ev.id] as unknown[],
-          queryFn: () => getEventCriteria(ev.id),
-        }))
-      : [],
-  });
-  const evaluatorEventDetailQueries = useQueries({
-    queries: isEvaluator
-      ? configuredEvents.map(ev => ({
-          queryKey: getGetEventQueryKey(ev.id),
-          queryFn: () => getEvent(ev.id),
-        }))
-      : [],
-  });
-  // Atribuição por critério (redirecionamento) manda sobre a atribuição por
-  // área — sem isso, um critério redirecionado para outra pessoa da área
-  // continuava marcando o evento como "a fazer" pra quem redirecionou.
-  const evaluatorCriterionAssignmentQueries = useQueries({
-    queries: isEvaluator
-      ? configuredEvents.map(ev => ({
-          queryKey: eventCriterionAssignmentsKey(ev.id),
-          queryFn: () => getEventCriterionAssignments(ev.id),
-        }))
-      : [],
-  });
-  function myCriteriaForEvent(i: number) {
-    const myAreaIds = new Set(
-      (evaluatorEventDetailQueries[i]?.data?.areaAssignments ?? [])
-        .filter(a => a.evaluatorUserId === user?.id)
-        .map(a => a.areaId),
-    );
-    const assignmentByCriterionId = new Map(
-      (evaluatorCriterionAssignmentQueries[i]?.data ?? []).map(a => [a.criterionId, a]),
-    );
-    return (evaluatorCriteriaQueries[i]?.data ?? []).filter(c => {
-      if (!c.active) return false;
-      const assignment = assignmentByCriterionId.get(c.criterionId);
-      // Linha pending sem assignedToId não corta o fallback por área (mesma
-      // regra do backend em isAssignedForCriterion).
-      if (assignment?.assignedToId != null) return assignment.assignedToId === user?.id;
-      return c.responsibleAreaId != null && myAreaIds.has(c.responsibleAreaId);
-    });
-  }
-  const principalAreaIds = new Set((myPrincipalAreas ?? []).map(a => a.id));
-  // Quesitos da(s) área(s) em que o usuário é avaliador PRINCIPAL mas que
-  // estão com outra pessoa (delegados/redirecionados). O principal acompanha
-  // esses quesitos: o evento só vai para "Concluídas" quando a área inteira
-  // respondeu, e ele vê quem respondeu e quando.
-  function delegatedAreaCriteriaForEvent(i: number) {
-    if (principalAreaIds.size === 0) return [];
-    const mineIds = new Set(myCriteriaForEvent(i).map(c => c.criterionId));
-    return (evaluatorCriteriaQueries[i]?.data ?? []).filter(c =>
-      c.active && c.responsibleAreaId != null && principalAreaIds.has(c.responsibleAreaId) && !mineIds.has(c.criterionId),
-    );
-  }
-  const relevantEvaluatorEvents = isEvaluator
-    ? configuredEvents.filter((_, i) => {
-        const hasCriteria = myCriteriaForEvent(i).length > 0;
-        const isConformityEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorUserId === user?.id;
-        const isFerramentasEval = evaluatorEventDetailQueries[i]?.data?.conformityEvaluatorFerramentasUserId === user?.id;
-        return hasCriteria || isConformityEval || isFerramentasEval || delegatedAreaCriteriaForEvent(i).length > 0;
-      })
-    : [];
-
-  // Fetch this avaliador's evaluations for every configured event so the
-  // overview can split events into "A Fazer" vs "Concluídas". Same query key as
-  // the per-event/card fetch → deduped/cached, no extra network.
-  const evaluatorEvalQueries = useQueries({
-    queries: isEvaluator
-      ? configuredEvents.map(ev => ({
-          queryKey: getGetEvaluationsQueryKey({ eventId: ev.id }),
-          queryFn: () => getEvaluations({ eventId: ev.id }),
-        }))
-      : [],
-  });
-  // Per-event completion stats for the avaliador (only events that actually
-  // have criteria assigned to their area count as theirs).
-  const evaluatorEventStats = isEvaluator
-    ? configuredEvents.map((ev, i) => {
-        const myCrit = myCriteriaForEvent(i);
-        const evs = evaluatorEvalQueries[i]?.data ?? [];
-        const submitted = myCrit.filter(
-          c => evs.find(e => e.criterionId === c.criterionId && e.evaluatorUserId === user?.id)?.status === "submitted",
-        ).length;
-        const total = myCrit.length;
-        // Só conta como concluído para o avaliador depois que os resultados do
-        // evento forem confirmados por RH/Admin — enviar tudo não basta.
-        const detail = evaluatorEventDetailQueries[i]?.data;
-        const isConformityEval = detail?.conformityEvaluatorUserId === user?.id;
-        const isFerramentasEval2 = detail?.conformityEvaluatorFerramentasUserId === user?.id;
-        // Quesitos da área principal com outra pessoa: contam para o "concluído"
-        // do principal — respondidos por QUALQUER avaliador designado.
-        const delegated = delegatedAreaCriteriaForEvent(i);
-        const delegatedPending = delegated.filter(
-          c => !evs.some(e => e.criterionId === c.criterionId && e.status === "submitted"),
-        ).length;
-        // Matriz de Conformidade conta como trabalho deste avaliador — mesma
-        // contagem do card e do "Resumo da Avaliação" (Cenografia 5, Ferramentas 1).
-        const conf = detail?.conformity;
-        const confTotal = (isConformityEval ? 5 : 0) + (isFerramentasEval2 ? 1 : 0);
-        const confDone =
-          (isConformityEval
-            ? [conf?.epi, conf?.estaiamentos, conf?.conduta, conf?.standoutResponse].filter(v => v != null).length
-              + (conf?.absencesReport?.trim() ? 1 : 0)
-            : 0)
-          + (isFerramentasEval2 && conf?.guardaEquipamentos != null ? 1 : 0);
-        // Respondido = concluído (não depende da confirmação de resultados do RH).
-        const allWorkDone = (total > 0 || confTotal > 0 || delegated.length > 0)
-          && submitted === total
-          && delegatedPending === 0
-          && confDone === confTotal;
-        return { event: ev, total, submitted, done: allWorkDone, relevant: total > 0 || isConformityEval || isFerramentasEval2 || delegated.length > 0 };
-      }).filter(s => s.relevant)
-    : [];
-  // Eventos com qualquer publicação (parcial ou final) mas onde o avaliador
-  // ainda não concluiu — ficam numa seção própria "Publicado" e NÃO aparecem
-  // mais em "A Fazer" para não pressionar o avaliador após a publicação.
-  const publishedNotDoneEvents = evaluatorEventStats.filter(
-    s => !s.done && ((s.event as { partialPublishedAt?: string | null; feedbackReleased?: boolean }).partialPublishedAt || (s.event as { feedbackReleased?: boolean }).feedbackReleased),
-  ).map(s => s.event);
-  const publishedNotDoneIds = new Set(publishedNotDoneEvents.map(e => e.id));
-  const todoEvents = evaluatorEventStats.filter(s => !s.done && !publishedNotDoneIds.has(s.event.id)).map(s => s.event);
-  const doneEvents = evaluatorEventStats.filter(s => s.done).map(s => s.event);
+  // Sidebar do avaliador (A Fazer / Publicado / Concluídas) — useQueries por evento liberado.
+  const { configuredEvents, relevantEvaluatorEvents, evaluatorEventStats, publishedNotDoneEvents, todoEvents, doneEvents } =
+    useEvaluatorOverview({ isEvaluator, events, userId: user?.id, myPrincipalAreas });
 
   // If the selected event stops being selectable (closed or criteria unconfirmed
   // server-side), clear the selection so trigger text and loaded data stay in sync.
@@ -443,19 +218,7 @@ export default function EvaluationsPage() {
 
   // Agrupa os critérios do avaliador logado por área — inclui areaId para
   // suportar botões de redirecionar/link-público por formulário (grupo de área).
-  const myAreaGroups = (() => {
-    const map = new Map<number, { areaId: number; areaName: string; criteria: typeof myCriteria }>();
-    for (const c of myCriteria) {
-      const key = c.responsibleAreaId ?? -1;
-      const existing = map.get(key);
-      if (existing) {
-        existing.criteria.push(c);
-      } else {
-        map.set(key, { areaId: key, areaName: c.responsibleAreaName ?? "Sem área definida", criteria: [c] });
-      }
-    }
-    return Array.from(map.values());
-  })();
+  const myAreaGroups = groupCriteriaByArea(myCriteria);
 
   function getEval(criterionId: number) {
     return (evaluations ?? []).find(e => e.criterionId === criterionId && e.evaluatorUserId === user?.id);
@@ -490,6 +253,14 @@ export default function EvaluationsPage() {
 
   function handleScoreClick(criterionId: number, score: number) {
     setScores(s => ({ ...s, [criterionId]: score }));
+  }
+
+  function handleCommentChange(criterionId: number, value: string) {
+    setComments(s => ({ ...s, [criterionId]: value }));
+  }
+
+  function handleAudioChange(criterionId: number, path: string | null) {
+    setAudioOverrides(s => ({ ...s, [criterionId]: path ?? "" }));
   }
 
   // A criterion is "ready to launch" if it's already submitted, OR fully filled
@@ -594,10 +365,113 @@ export default function EvaluationsPage() {
 
   const progressPct = totalItems ? (totalCompleted / totalItems) * 100 : 0;
 
-  const labels: Record<number, string> = {
-    0: "Crítico, não atendeu ao básico",
-    10: "Perfeição, atendeu completamente e sem erros",
-  };
+  // ── Handlers repassados aos componentes (mesma sequência de setState de antes) ──
+  function selectEvaluatorEvent(tab: EvalTab, eventId: number) {
+    setActiveEvalTab(tab); setSelectedEventId(eventId); setScores({}); setComments({}); setAudioOverrides({});
+  }
+
+  function takeCriterion(criterionId: number) {
+    patchCriterionAssignment.mutate(
+      { criterionId, assignedToId: user!.id, action: "assign" },
+      { onError: (e) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }) },
+    );
+  }
+
+  function assignCriterionToUser(userId: number) {
+    if (!areaAssignTarget) return;
+    patchCriterionAssignment.mutate(
+      { criterionId: areaAssignTarget.criterionId, assignedToId: userId, action: "assign" },
+      {
+        onError: (e) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
+        onSuccess: () => setAreaAssignTarget(null),
+      },
+    );
+  }
+
+  function openRedirectDialog(g: AreaGroup) {
+    setRedirectDialogArea({ areaId: g.areaId, areaName: g.areaName, criteriaIds: g.criteria.map(c => c.criterionId), firstCriterionId: g.criteria[0]?.criterionId ?? 0 }); setRedirectTargetId(null);
+  }
+
+  function closeRedirectDialog() {
+    setRedirectDialogArea(null); setRedirectTargetId(null);
+  }
+
+  async function confirmRedirect() {
+    if (!redirectDialogArea || !redirectTargetId) return;
+    try {
+      for (const criterionId of redirectDialogArea.criteriaIds) {
+        await patchCriterionAssignment.mutateAsync({ criterionId, assignedToId: redirectTargetId, action: "redirect" });
+      }
+      toast({ title: "Formulário redirecionado com sucesso" });
+      setRedirectDialogArea(null);
+      setRedirectTargetId(null);
+    } catch (e) {
+      toast({ title: "Erro ao redirecionar", description: (e as Error).message, variant: "destructive" });
+    }
+  }
+
+  function openPublicLinkDialog(g: AreaGroup, areaEligible: number[]) {
+    const isCeno = g.areaId === CENOGRAFIA_AREA_ID; setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); setPublicLinkIncludeConformity(isCeno); setPublicLinkForceConformity(isCeno); refetchTokenHistory();
+  }
+
+  function closePublicLinkDialog() {
+    setPublicLinkDialogCriteriaIds(null);
+    setPublicLinkDialogAreaName(null);
+    setPublicLinkRecipientName("");
+    setPublicLinkIncludeConformity(false);
+    setPublicLinkForceConformity(false);
+    setGeneratedPublicUrl(null);
+    setLinkCopied(false);
+  }
+
+  function generatePublicLink(linkCriterionIds: number[]) {
+    createPublicToken.mutate(
+      { recipientName: publicLinkRecipientName.trim(), criterionIds: linkCriterionIds, includeConformity: publicLinkIncludeConformity || undefined },
+      {
+        onSuccess: ({ tokenId }) => {
+          const base = publicEvalBaseUrl();
+          setGeneratedPublicUrl(`${base}/eval/${tokenId}`);
+          refetchTokenHistory();
+        },
+        onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+      },
+    );
+  }
+
+  function deletePublicLinkToken(tokenId: string) {
+    deletePublicToken.mutate(
+      { tokenId },
+      { onSuccess: () => refetchTokenHistory() },
+    );
+  }
+
+  function openConformityLinkDialog(type: ConformityLinkType) {
+    setConformityPublicLinkType(type); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false);
+    if (type === "cenografia") refetchConformityTokenHistory(); else refetchFerramentasTokenHistory();
+  }
+
+  function closeConformityLinkDialog() {
+    setConformityPublicLinkType(null); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false);
+  }
+
+  function generateConformityLink(base: string) {
+    const mutation = conformityPublicLinkType === "cenografia" ? createConformityPublicToken : createFerramentasPublicToken;
+    mutation.mutate(
+      { recipientName: conformityPublicRecipientName.trim() },
+      {
+        onSuccess: ({ tokenId }) => {
+          setGeneratedConformityUrl(`${base}/eval/${tokenId}`);
+          if (conformityPublicLinkType === "cenografia") refetchConformityTokenHistory();
+          else refetchFerramentasTokenHistory();
+        },
+        onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
+      },
+    );
+  }
+
+  function saveConformity(data: EventConformityInput, successTitle: string) {
+    if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data }, { onSuccess: () => toast({ title: successTitle }) });
+  }
 
   // Redesign: admin/rh/diretoria ganham uma central dedicada de atribuição
   // (progresso + quem-falta-avaliar + atribuição de avaliadores), separada do
@@ -622,7 +496,7 @@ export default function EvaluationsPage() {
             Central de <span className="text-accent-text">Avaliações</span>
           </h1>
           {cycle && (
-            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-border text-muted-foreground hidden sm:inline-block">
+            <span className="text-[11px] font-bold uppercase px-2 py-0.5 rounded border border-border text-muted-foreground hidden sm:inline-block">
               {cycle.name}
             </span>
           )}
@@ -633,1107 +507,135 @@ export default function EvaluationsPage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── Sidebar ── */}
-        <aside className="w-72 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden">
-
-          {/* Evaluator: lista compacta A Fazer / Concluídas */}
-          {isEvaluator && (
-            <div className="flex-1 overflow-y-auto">
-              {/* Cabeçalho da sidebar do avaliador */}
-              <div className="bg-secondary px-4 py-2.5 flex items-center justify-between border-b border-border">
-                <span className="text-[11px] font-black uppercase tracking-widest text-accent-text flex items-center gap-1.5" style={{ fontFamily: CONDENSED }}>
-                  <Target size={11} /> Minhas Avaliações
-                </span>
-                {evaluatorEventStats.length > 0 && (
-                  <span className="text-[10px] font-black text-muted-foreground tabular-nums">
-                    {doneEvents.length}<span className="opacity-60">/{evaluatorEventStats.length}</span>
-                  </span>
-                )}
-              </div>
-              {configuredEvents.length === 0 ? (
-                <div className="p-6 text-center space-y-2">
-                  <div className="w-10 h-10 bg-secondary border border-border rounded-lg flex items-center justify-center mx-auto">
-                    <Clock size={18} className="text-muted-foreground" />
-                  </div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Nenhum evento liberado no momento.</p>
-                </div>
-              ) : relevantEvaluatorEvents.length === 0 ? (
-                <div className="p-6 text-center space-y-2">
-                  <div className="w-10 h-10 bg-secondary border border-border rounded-lg flex items-center justify-center mx-auto">
-                    <Building2 size={18} className="text-muted-foreground" />
-                  </div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Nenhuma avaliação atribuída à sua área.</p>
-                </div>
-              ) : (
-                <>
-                  {todoEvents.length > 0 && (
-                    <>
-                      <div className="px-4 pt-4 pb-1.5 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1" style={{ color: AMBER }}>
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: AMBER }} /> A Fazer
-                        </span>
-                        <span className="text-[10px] font-black text-muted-foreground">{todoEvents.length}</span>
-                      </div>
-                      {todoEvents.map(ev => {
-                        const stats = evaluatorEventStats.find(s => s.event.id === ev.id);
-                        const pct = stats && stats.total > 0 ? Math.round((stats.submitted / stats.total) * 100) : 0;
-                        const active = selectedEventId === ev.id;
-                        return (
-                          <button key={ev.id} type="button" data-testid={`evaluator-event-${ev.id}`}
-                            onClick={() => { setActiveEvalTab("todo"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                            className={cn("w-full text-left px-4 py-3 border-l-4 border-b border-border flex flex-col gap-1.5 transition-colors", active ? "bg-secondary" : "hover:bg-secondary/60")}
-                            style={{ borderLeftColor: AMBER }}
-                          >
-                            <span className={cn("text-[11px] font-black uppercase leading-snug truncate", active ? "text-foreground" : "text-muted-foreground")}>{ev.name}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: `${pct}%`, transition: "width 0.3s", backgroundColor: AMBER }} />
-                              </div>
-                              <span className="text-[11px] font-black text-muted-foreground shrink-0 tabular-nums">{stats?.submitted ?? 0}/{stats?.total ?? 0}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </>
-                  )}
-                  {publishedNotDoneEvents.length > 0 && (
-                    <>
-                      <div className="px-4 pt-4 pb-1.5 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1" style={{ color: INFO }}>
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: INFO }} /> Publicado
-                        </span>
-                        <span className="text-[10px] font-black text-muted-foreground">{publishedNotDoneEvents.length}</span>
-                      </div>
-                      {publishedNotDoneEvents.map(ev => {
-                        const isFinal = (ev as { feedbackReleased?: boolean }).feedbackReleased;
-                        const active = selectedEventId === ev.id;
-                        return (
-                          <button key={ev.id} type="button" data-testid={`evaluator-event-published-${ev.id}`}
-                            onClick={() => { setActiveEvalTab("todo"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                            className={cn("w-full text-left px-4 py-3 border-l-4 border-b border-border flex flex-col gap-1.5 transition-colors", active ? "bg-secondary" : "opacity-80 hover:opacity-100 hover:bg-secondary/60")}
-                            style={{ borderLeftColor: INFO }}
-                          >
-                            <span className="text-[11px] font-black uppercase leading-snug truncate text-foreground">{ev.name}</span>
-                            <span className="text-[11px] font-black uppercase flex items-center gap-1" style={{ color: INFO }}>
-                              {isFinal ? <><CheckCircle size={9} /> Feedback final publicado</> : <><Send size={9} /> Publicação parcial</>}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </>
-                  )}
-                  {doneEvents.length > 0 && (
-                    <>
-                      <div className="px-4 pt-4 pb-1.5 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-accent-text flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 bg-accent" /> Concluídas
-                        </span>
-                        <span className="text-[10px] font-black text-muted-foreground">{doneEvents.length}</span>
-                      </div>
-                      {doneEvents.map(ev => {
-                        const active = selectedEventId === ev.id;
-                        return (
-                          <button key={ev.id} type="button" data-testid={`evaluator-event-done-${ev.id}`}
-                            onClick={() => { setActiveEvalTab("done"); setSelectedEventId(ev.id); setScores({}); setComments({}); setAudioOverrides({}); }}
-                            className={cn("w-full text-left px-4 py-3 border-l-4 border-l-accent border-b border-border flex flex-col gap-1.5 transition-colors", active ? "bg-accent/10" : "opacity-75 hover:opacity-100 hover:bg-accent/10")}
-                          >
-                            <span className="text-[11px] font-black uppercase leading-snug truncate text-accent-text">{ev.name}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 bg-accent/25 overflow-hidden">
-                                <div className="h-full bg-accent" style={{ width: "100%" }} />
-                              </div>
-                              <span className="text-[11px] font-black text-accent-text shrink-0">100%</span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </>
-                  )}
-                  {todoEvents.length === 0 && doneEvents.length === 0 && (
-                    <div className="p-6 text-center text-[10px] font-bold uppercase text-muted-foreground">Nenhuma avaliação.</div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </aside>
+        <EvaluatorSidebar
+          isEvaluator={isEvaluator}
+          selectedEventId={selectedEventId}
+          evaluatorEventStats={evaluatorEventStats}
+          todoEvents={todoEvents}
+          publishedNotDoneEvents={publishedNotDoneEvents}
+          doneEvents={doneEvents}
+          configuredEventsCount={configuredEvents.length}
+          relevantEventsCount={relevantEvaluatorEvents.length}
+          onSelectEvent={selectEvaluatorEvent}
+        />
 
         {/* ── Main content ── */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <div className="flex-1 overflow-auto p-5 space-y-5">
 
-        {isEvaluator && selectedEventId && activeEvalTab === "todo" && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (() => {
-          const principalAreaIds = new Set(myPrincipalAreas.map(a => a.id));
-          // Deriva a partir dos critérios ATIVOS do evento (não das atribuições já
-          // geradas) — assim a área principal enxerga e gerencia seus quesitos desde
-          // o primeiro momento, mesmo que ninguém tenha rodado "Gerar Sugestões"
-          // ainda para este evento (a linha de atribuição é criada na hora, no
-          // primeiro "Pegar para mim"/"Atribuir a...", como já acontece no backend).
-          const assignmentByCriterionId = new Map((criterionAssignments ?? []).map(a => [a.criterionId, a]));
-          const areaCriteria = activeCriteria
-            .filter(c => c.responsibleAreaId != null && principalAreaIds.has(c.responsibleAreaId))
-            .map(c => {
-              const a = assignmentByCriterionId.get(c.criterionId);
-              return {
-                criterionId: c.criterionId,
-                criterionName: c.criterionName,
-                criterionAreaId: c.responsibleAreaId as number,
-                assignedToId: a?.assignedToId ?? null,
-                assignedToName: a?.assignedToName ?? null,
-                status: a?.status ?? "pending",
-              };
-            });
-          if (areaCriteria.length === 0) return null;
-          const areaNameById = new Map(myPrincipalAreas.map(a => [a.id, a.name]));
-          return (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <Users size={22} />
-                <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>Quesitos da Minha Área</h3>
-              </div>
-              <p className="text-sm text-muted-foreground px-1 -mt-1">
-                Como avaliador principal, você vê todos os quesitos da sua área neste evento e pode atribuir, tomar para si ou passar para outro colega.
-              </p>
-              <div className="bg-card border border-border rounded-lg overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-border bg-secondary">
-                      <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground">Critério</th>
-                      <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground">Área</th>
-                      <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground">Avaliador Atual</th>
-                      <th className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {areaCriteria.map(a => {
-                      const isMine = a.assignedToId === user?.id;
-                      const isSubmitted = a.status === "submitted";
-                      return (
-                        <tr key={a.criterionId} className={isMine ? "bg-accent/10" : ""}>
-                          <td className="px-4 py-3 font-bold text-sm">{a.criterionName}</td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{areaNameById.get(a.criterionAreaId!)}</td>
-                          <td className="px-4 py-3 text-sm">
-                            {a.assignedToName ?? <span className="text-muted-foreground/50">Sem avaliador</span>}
-                            {isSubmitted && <span className="ml-2 text-[10px] font-black uppercase text-accent-text">Enviada</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right w-px">
-                            {isSubmitted ? (
-                              <span className="text-[11px] text-muted-foreground">—</span>
-                            ) : (
-                              <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                                {!isMine && (
-                                  <button
-                                    type="button"
-                                    data-testid={`button-take-criterion-${a.criterionId}`}
-                                    onClick={() => patchCriterionAssignment.mutate(
-                                      { criterionId: a.criterionId, assignedToId: user!.id, action: "assign" },
-                                      { onError: (e) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }) },
-                                    )}
-                                    className="text-[11px] font-black uppercase border border-border rounded-lg px-2 py-1 hover:bg-primary hover:text-primary-foreground whitespace-nowrap"
-                                  >
-                                    Pegar para mim
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  data-testid={`button-assign-criterion-${a.criterionId}`}
-                                  onClick={() => setAreaAssignTarget({ criterionId: a.criterionId, criterionName: a.criterionName ?? "", areaId: a.criterionAreaId! })}
-                                  className="text-[11px] font-black uppercase border border-border rounded-lg px-2 py-1 hover:bg-secondary whitespace-nowrap"
-                                >
-                                  Atribuir a...
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          );
-        })()}
+        {isEvaluator && selectedEventId && activeEvalTab === "todo" && !!myPrincipalAreas && myPrincipalAreas.length > 0 && (
+          <PrincipalAreaCriteriaSection
+            myPrincipalAreas={myPrincipalAreas}
+            criterionAssignments={criterionAssignments}
+            activeCriteria={activeCriteria}
+            userId={user?.id}
+            onTakeCriterion={takeCriterion}
+            onAssignCriterion={setAreaAssignTarget}
+          />
+        )}
 
-        <Dialog open={!!areaAssignTarget} onOpenChange={(open) => { if (!open) setAreaAssignTarget(null); }}>
-          <DialogContent className="rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-            <DialogHeader>
-              <DialogTitle className="text-xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>Atribuir "{areaAssignTarget?.criterionName}"</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground">Escolha o avaliador da área</Label>
-              <div className="space-y-1 max-h-64 overflow-y-auto">
-                {(areaAssignUsers ?? []).map(u => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    data-testid={`option-assign-user-${u.id}`}
-                    onClick={() => {
-                      if (!areaAssignTarget) return;
-                      patchCriterionAssignment.mutate(
-                        { criterionId: areaAssignTarget.criterionId, assignedToId: u.id, action: "assign" },
-                        {
-                          onError: (e) => toast({ title: "Erro ao atribuir", description: e.message, variant: "destructive" }),
-                          onSuccess: () => setAreaAssignTarget(null),
-                        },
-                      );
-                    }}
-                    className={`w-full text-left px-3 py-2 border border-border rounded-lg text-sm hover:bg-primary hover:text-primary-foreground ${u.id === user?.id ? "font-bold" : ""}`}
-                  >
-                    {u.name}{u.id === user?.id ? " (você)" : ""}
-                  </button>
-                ))}
-                {areaAssignUsers?.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhum usuário ativo encontrado nesta área.</p>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AreaAssignDialog
+          target={areaAssignTarget}
+          users={areaAssignUsers}
+          userId={user?.id}
+          onClose={() => setAreaAssignTarget(null)}
+          onPickUser={assignCriterionToUser}
+        />
 
         {!selectedEventId ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-8">
-            <div className="border border-border rounded-xl bg-card p-10 max-w-sm w-full flex flex-col items-center gap-4">
-              <div className="w-20 h-20 rounded-xl bg-primary flex items-center justify-center">
-                <Rocket className="text-primary-foreground" size={36} />
-              </div>
-              <div>
-                <h2 className="text-2xl uppercase font-black tracking-tight text-foreground leading-tight" style={{ fontFamily: CONDENSED }}>
-                  Pronto para avaliar
-                </h2>
-                <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">
-                  Selecione um evento ao lado para iniciar ou continuar sua avaliação.
-                </p>
-              </div>
-            </div>
-          </div>
+          <NoEventSelected />
         ) : (
           <div className="space-y-5">
             {/* Header strip compacto */}
-            {currentEvent && (
-              <div className="border border-border rounded-xl overflow-hidden">
-                {/* Faixa de título do evento */}
-                <div className="bg-card px-5 py-3 flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-lg font-black uppercase tracking-tight text-foreground leading-tight" style={{ fontFamily: CONDENSED }}>{currentEvent.name}</h2>
-                      {currentEvent.cycleName && (
-                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-border text-muted-foreground bg-secondary">{currentEvent.cycleName}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
-                      {currentEvent.clientName && <span className="text-foreground font-bold">{currentEvent.clientName}</span>}
-                      {(currentEvent.city || currentEvent.location) && (
-                        <span className="flex items-center gap-1"><MapPin size={9} />{currentEvent.city ? `${currentEvent.city}${currentEvent.state ? `, ${currentEvent.state}` : ""}` : currentEvent.location}</span>
-                      )}
-                      <span className="flex items-center gap-1"><Calendar size={9} />{fmtDate(currentEvent.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })} — {fmtDate(currentEvent.endDate, { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded bg-accent text-accent-foreground">Aberto</span>
-                    <span className="text-[10px] font-black text-muted-foreground flex items-center gap-1"><Users size={11} />{currentEvent.participantCount} part.</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            {currentEvent && <EventHeaderStrip currentEvent={currentEvent} />}
 
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
 
               {/* Criteria Column / Evaluation Form */}
-              <div className="space-y-4 order-2 lg:order-none">
-                <div className="flex items-center justify-between gap-4 px-1">
-                  <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-                    <Target size={20} /> Critérios de Avaliação
-                  </h3>
-                </div>
-
-                {criteriaLocked ? (
-                  <div data-testid="notice-criteria-locked" className="text-center py-14 rounded-xl px-6" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: `1px solid ${AMBER}` }}>
-                    <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: AMBER, color: "var(--accent-foreground)" }}>
-                      <Lock size={26} />
-                    </div>
-                    <h2 className="text-2xl uppercase font-black tracking-tight mb-1" style={{ fontFamily: CONDENSED, color: AMBER }}>Avaliação bloqueada</h2>
-                    <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">Os critérios deste evento ainda não foram confirmados pelo RH. Aguarde a liberação para iniciar a avaliação da equipe.</p>
-                  </div>
-                ) : myCriteria.length === 0 ? (
-                  <div data-testid="notice-no-area-criteria" className="text-center py-12 bg-card border border-border rounded-lg px-6">
-                    <div className="w-14 h-14 border border-border rounded-lg bg-secondary text-muted-foreground flex items-center justify-center mx-auto mb-4">
-                      <Building2 size={24} />
-                    </div>
-                    <p className="uppercase font-bold text-muted-foreground max-w-md mx-auto">Nenhum critério atribuído à sua área neste evento.</p>
-                  </div>
-                ) : (
-                  <div className="bg-card border border-border rounded-xl p-6 md:p-8">
-                    <div className="space-y-12">
-                      {myAreaGroups.map(g => {
-                        const eligibleIds = new Set((publicLinkEligibleCriteria ?? []).map(ec => ec.criterionId));
-                        const areaEligible = g.criteria.filter(c => eligibleIds.has(c.criterionId)).map(c => c.criterionId);
-                        const allGroupDone = g.criteria.every(c => getEval(c.criterionId)?.status === "submitted");
-                        return (
-                          <div key={g.areaId} className="space-y-10">
-                            {/* Header do formulário com botões de redirecionar e link público por grupo/área */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-l-4 border-accent pl-4">
-                              <div>
-                                <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Formulário</p>
-                                <h3 className="text-xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>{g.areaName}</h3>
-                              </div>
-                              {!allGroupDone && (
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <button
-                                    type="button"
-                                    onClick={() => { setRedirectDialogArea({ areaId: g.areaId, areaName: g.areaName, criteriaIds: g.criteria.map(c => c.criterionId), firstCriterionId: g.criteria[0]?.criterionId ?? 0 }); setRedirectTargetId(null); }}
-                                    className="border border-border rounded-lg bg-card px-3 py-2 font-bold text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-secondary transition-all"
-                                  >
-                                    <CornerDownRight size={13} /> Redirecionar Formulário
-                                  </button>
-                                  {areaEligible.length > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => { const isCeno = g.areaId === CENOGRAFIA_AREA_ID; setPublicLinkDialogCriteriaIds(areaEligible); setPublicLinkDialogAreaName(g.areaName); setPublicLinkRecipientName(""); setGeneratedPublicUrl(null); setLinkCopied(false); setPublicLinkIncludeConformity(isCeno); setPublicLinkForceConformity(isCeno); refetchTokenHistory(); }}
-                                      className="border border-border rounded-lg bg-card px-3 py-2 font-bold text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-secondary transition-all"
-                                    >
-                                      <Link2 size={13} /> Link Freelancer
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            {g.criteria.map((c, index) => {
-                        const ev = getEval(c.criterionId);
-                        const submitted = ev?.status === "submitted";
-                        const isDraft = ev?.status === "draft";
-                        const score = currentScore(c.criterionId);
-                        const comment = comments[c.criterionId] ?? ev?.comments ?? "";
-                        const audio = currentAudio(c.criterionId);
-
-                        return (
-                          <div key={c.criterionId} className="criterion-row border-l-4 pl-6 py-2" style={{ borderLeftColor: submitted ? "var(--accent)" : isDraft ? AMBER : score != null ? "var(--accent)" : "var(--border)" }}>
-                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                  <span className="bg-secondary border border-border rounded-lg px-2 py-0.5 text-[11px] font-black uppercase">Peso {c.weightOverride ?? c.originalWeight ?? 0}</span>
-                                  {Number(c.weightOverride ?? c.originalWeight ?? 0) === 0 && !c.eventScoped && (
-                                    <span className="bg-destructive/10 border border-destructive rounded-lg text-destructive px-2 py-0.5 text-[11px] font-black uppercase">Peso 0 — não conta na média</span>
-                                  )}
-                                  {c.eventScoped && (
-                                    <span className="bg-accent/10 border border-accent rounded-lg text-accent-text px-2 py-0.5 text-[11px] font-black uppercase">Entra na média do critério pai</span>
-                                  )}
-                                  {c.responsibleAreaName && (
-                                    <span className="bg-secondary text-foreground border border-border rounded-lg px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
-                                      <Building2 size={11} /> {c.responsibleAreaName}
-                                    </span>
-                                  )}
-                                  {submitted && (
-                                    <span className="bg-accent/15 text-accent-text border border-accent rounded px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1">
-                                      <CheckCircle size={12} /> Submetido
-                                    </span>
-                                  )}
-                                  {isDraft && (
-                                    <span className="border rounded px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1" style={AMBER_TINT}>
-                                      <Clock size={12} /> Rascunho
-                                    </span>
-                                  )}
-                                  {(() => {
-                                    const a = criterionAssignments?.find(x => x.criterionId === c.criterionId);
-                                    if (!a?.redirectedFromId) return null;
-                                    const date = a.updatedAt
-                                      ? new Date(a.updatedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-                                      : null;
-                                    const fromFirst = a.redirectedFromName?.split(" ")[0] ?? "?";
-                                    return (
-                                      <span
-                                        title={`Redirecionado de ${a.redirectedFromName ?? "?"}${date ? ` em ${date}` : ""}`}
-                                        className="border rounded px-2 py-0.5 text-[11px] font-bold uppercase flex items-center gap-1"
-                                        style={INFO_TINT}
-                                      >
-                                        <CornerDownRight size={11} /> De {fromFirst}{date ? <span className="opacity-70">· {date}</span> : null}
-                                      </span>
-                                    );
-                                  })()}
-                                </div>
-                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-wider mb-0.5">
-                                  Critério {index + 1} de {g.criteria.length}
-                                </p>
-                                <h4 className="text-xl md:text-2xl uppercase font-black tracking-tight" style={{ fontFamily: CONDENSED }}>{index + 1}. {c.criterionName}</h4>
-                                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                                  {c.criterionDescription && c.criterionDescription.trim().length > 0
-                                    ? c.criterionDescription
-                                    : "Avalie o desempenho da equipe considerando este critério específico para o evento atual."}
-                                </p>
-                              </div>
-
-                              <div className="shrink-0 text-right">
-                                <p className="text-[11px] font-bold uppercase text-muted-foreground">Ritmo Atual</p>
-                                <p className="text-[40px] leading-none font-black" style={{ fontFamily: CONDENSED }}>{score != null ? score : "-"}</p>
-                              </div>
-                            </div>
-
-                            <div className="mb-4">
-                              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-11 gap-1">
-                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
-                                  <ScoreButton
-                                    key={val}
-                                    score={val}
-                                    current={score}
-                                    label={labels[val]}
-                                    onClick={() => handleScoreClick(c.criterionId, val)}
-                                    disabled={submitted}
-                                  />
-                                ))}
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 mt-2">
-                                <div className="flex items-start gap-1.5 text-[11px] text-destructive">
-                                  <span className="font-black shrink-0">0 —</span>
-                                  <span className="font-bold leading-tight">{labels[0]}</span>
-                                </div>
-                                <div className="flex items-start gap-1.5 text-[11px] text-accent-text justify-self-end text-right">
-                                  <span className="font-bold leading-tight">{labels[10]}</span>
-                                  <span className="font-black shrink-0">— 10</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {!submitted && (
-                              <div className="mt-4 border border-border rounded-lg p-4 bg-secondary">
-                                <div className="flex items-center justify-between gap-2 mb-2">
-                                  <label className="text-xs font-black uppercase flex items-center gap-2">
-                                    Justificativa / Feedback
-                                    <span className="text-[10px] text-destructive-foreground bg-destructive rounded px-2 py-0.5 font-bold uppercase">Obrigatório</span>
-                                  </label>
-                                  <span className="text-[10px] font-bold text-muted-foreground tabular-nums shrink-0">{comment.length}/300</span>
-                                </div>
-                                <Textarea
-                                  placeholder="Descreva o desempenho da equipe para este critério (será compartilhado anonimamente)..."
-                                  value={comment}
-                                  maxLength={300}
-                                  onChange={e => setComments(s => ({ ...s, [c.criterionId]: e.target.value }))}
-                                  className="bg-card rounded-lg border resize-y min-h-24 focus-visible:ring-0 border-border"
-                                />
-
-                                <div className="mt-4 border border-border rounded-lg p-4 bg-card">
-                                  <label className="text-xs font-black uppercase flex items-center gap-2 mb-2">
-                                    Áudio da avaliação
-                                    <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 font-bold uppercase">Opcional</span>
-                                  </label>
-                                  <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
-                                    Grave um áudio explicando a nota, se quiser complementar o comentário escrito.
-                                  </p>
-                                  <AudioRecorder
-                                    value={audio}
-                                    onChange={path => setAudioOverrides(s => ({ ...s, [c.criterionId]: path ?? "" }))}
-                                  />
-                                </div>
-
-                                <div className="flex items-center justify-end pt-3 gap-3 flex-wrap">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSaveDraft(c.criterionId)}
-                                    disabled={score == null || !comment.trim() || createMutation.isPending}
-                                    data-testid={`button-save-draft-${c.criterionId}`}
-                                    className="bg-card border border-border rounded-lg px-4 py-2 font-bold text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-secondary transition-all"
-                                  >
-                                    {createMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                    {createMutation.isPending ? "Salvando..." : isDraft ? "Atualizar Rascunho" : "Salvar Rascunho"}
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {submitted && comment && (
-                              <div className="bg-secondary border border-border rounded-lg p-4 mt-4">
-                                <p className="text-xs font-black uppercase mb-1">Seu Feedback:</p>
-                                <p className="text-sm text-muted-foreground">"{comment}"</p>
-                              </div>
-                            )}
-
-                            {submitted && audio && (
-                              <div className="bg-secondary border border-border rounded-lg p-4 mt-4">
-                                <p className="text-xs font-black uppercase mb-2">Áudio da avaliação</p>
-                                <AudioPlayer objectPath={audio} />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Sprint goal footer */}
-                    <div className="mt-12 pt-8 border-t border-dashed border-border flex flex-col md:flex-row justify-between items-center gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-primary text-primary-foreground border border-primary rounded-lg flex items-center justify-center">
-                          <Flag size={20} className="text-primary-foreground" />
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-bold uppercase">Meta da Avaliação</p>
-                          <div className="w-48 h-2 bg-secondary mt-1 border border-border overflow-hidden">
-                            <div className="h-full bg-accent" style={{ width: `${progressPct}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <CriteriaColumn
+                criteriaLocked={criteriaLocked}
+                myCriteria={myCriteria}
+                myAreaGroups={myAreaGroups}
+                publicLinkEligibleCriteria={publicLinkEligibleCriteria}
+                criterionAssignments={criterionAssignments}
+                comments={comments}
+                getEval={getEval}
+                currentScore={currentScore}
+                currentAudio={currentAudio}
+                isSaving={createMutation.isPending}
+                progressPct={progressPct}
+                onRedirectArea={openRedirectDialog}
+                onOpenPublicLink={openPublicLinkDialog}
+                onScoreClick={handleScoreClick}
+                onCommentChange={handleCommentChange}
+                onAudioChange={handleAudioChange}
+                onSaveDraft={handleSaveDraft}
+              />
 
               {/* ─── GRUPO 1: Ferramentas e Case (Cenografia) ─── */}
-              {isFerramentasEvaluatorForEvent && (() => {
-                const val = conformityEvalForm.guardaEquipamentos;
-                const isNao = val === false;
-                const commentMissing = isNao && !conformityEvalForm.guardaEquipamentosComment.trim();
-                // O comentário na tela difere do que está salvo no servidor?
-                const commentDirty = conformityEvalForm.guardaEquipamentosComment !== (myConformityData?.guardaEquipamentosComment ?? "");
-                const canSave = !commentMissing && commentDirty;
-                const hasSentLink = (ferramentasPublicTokenHistory?.length ?? 0) > 0;
-                return (
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-3 px-1">
-                      <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-                        <ShieldAlert size={22} /> Ferramentas e Case (Cenografia)
-                      </h3>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Popover open={redirectFerramentasOpen} onOpenChange={setRedirectFerramentasOpen}>
-                          <PopoverTrigger asChild>
-                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-card hover:bg-secondary transition-colors">
-                              <ArrowRight size={12} /> Redirecionar
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="end" className="p-0 rounded-xl border-border w-64 overflow-hidden" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-                            <Command className="rounded-xl">
-                              <CommandInput placeholder="Buscar avaliador..." />
-                              <CommandList className="max-h-[240px]">
-                                <CommandEmpty className="py-4 text-center text-xs font-bold uppercase text-muted-foreground">Nenhum encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                  {(ferramentasUsers ?? []).map(u => (
-                                    <CommandItem key={u.id} value={u.name}
-                                      onSelect={() => { setRedirectFerramentasTargetId(u.id); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
-                                      className="rounded-lg cursor-pointer aria-selected:bg-primary aria-selected:text-primary-foreground py-2 gap-3"
-                                    >
-                                      <Check size={14} className={cn("shrink-0", redirectFerramentasTargetId === u.id ? "opacity-100" : "opacity-0")} />
-                                      <span className="text-xs font-bold uppercase truncate">{u.name}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        {(() => {
-                          const pendingFerr = (ferramentasPublicTokenHistory ?? []).find(t => !t.usedAt);
-                          const answeredFerr = (ferramentasPublicTokenHistory ?? []).find(t => t.usedAt);
-                          const ferrBase = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                          if (pendingFerr) {
-                            const pendingUrl = `${ferrBase}/eval/${pendingFerr.id}`;
-                            return (
-                              <button type="button"
-                                onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingFerr.recipientName ?? "freelancer"}` }); else toast(COPY_FAILED_TOAST); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors"
-                                title="Copiar link já enviado — só existe um link por evento"
-                              >
-                                <Copy size={12} /> Copiar link ({pendingFerr.recipientName ?? "freelancer"})
-                              </button>
-                            );
-                          }
-                          if (answeredFerr) return null;
-                          return (
-                            <button type="button"
-                              onClick={() => { setConformityPublicLinkType("ferramentas"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchFerramentasTokenHistory(); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-card hover:bg-secondary transition-colors"
-                              title="Gerar link único para um freelancer responder o formulário de Ferramentas"
-                            >
-                              <Link2 size={12} /> Link Freelancer
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    {hasSentLink ? (
-                      <>
-                        <p className="text-sm text-muted-foreground px-1 -mt-1">
-                          Link enviado para um freelancer preencher este formulário. Acompanhe abaixo.
-                        </p>
-                        <ConformityLinkHistory history={ferramentasPublicTokenHistory ?? []} />
-                      </>
-                    ) : null}
-                    {!hasSentLink && (
-                      <>
-                        <p className="text-sm text-muted-foreground px-1 -mt-1">
-                          Você foi designado para avaliar o retorno de equipamentos e ferramentas.
-                        </p>
-                        <div className="bg-card border border-border rounded-xl overflow-hidden">
-                          <div className="px-5 transition-colors border-l-4" style={isNao ? { backgroundColor: "rgba(229,72,77,0.08)", borderLeftColor: WARNING } : val === null ? { backgroundColor: "rgba(232,162,61,0.08)", borderLeftColor: AMBER } : { borderLeftColor: "transparent" }}>
-                            <div className="flex flex-wrap items-center justify-between gap-3 min-h-[56px]">
-                              <span className="text-sm font-bold text-foreground leading-snug flex-1 min-w-[200px]">Todos os equipamentos e ferramentas retornaram?</span>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {isNao && <span className="text-[10px] font-black uppercase text-destructive whitespace-nowrap">-10 pts</span>}
-                                <div className="flex items-center border border-border rounded-lg overflow-hidden">
-                                  <button type="button"
-                                    onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: null })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                    className={`px-3 py-1.5 text-[11px] font-black uppercase border-r border-border transition-all ${val === null ? "" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                                    style={val === null ? { backgroundColor: AMBER, color: "var(--accent-foreground)" } : undefined}
-                                  >Pendente</button>
-                                  <button type="button"
-                                    onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: true } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                    className={`px-3 py-1.5 text-[11px] font-black uppercase border-r border-border transition-all ${val === true ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                                  >Sim</button>
-                                  <button type="button"
-                                    onClick={() => { setConformityEvalForm(f => ({ ...f, guardaEquipamentos: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentos: false } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                    className={`px-3 py-1.5 text-[11px] font-black uppercase transition-all ${val === false ? "bg-destructive text-destructive-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                                  >Não</button>
-                                </div>
-                              </div>
-                            </div>
-                            {val !== null && (
-                              <div className="pb-3 space-y-1">
-                                <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                                  Comentário {isNao ? <span className="text-destructive normal-case font-bold">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
-                                  {!commentDirty && conformityEvalForm.guardaEquipamentosComment && (
-                                    <span className="text-accent-text flex items-center gap-0.5 font-bold"><CheckCircle size={9} /> salvo</span>
-                                  )}
-                                </label>
-                                <Textarea
-                                  placeholder={isNao ? "Descreva o que aconteceu com os equipamentos/ferramentas..." : "Alguma observação? (opcional)"}
-                                  value={conformityEvalForm.guardaEquipamentosComment}
-                                  onChange={e => setConformityEvalForm(f => ({ ...f, guardaEquipamentosComment: e.target.value }))}
-                                  className="border border-border rounded-lg text-sm resize-none min-h-[72px]"
-                                />
-                                {commentMissing && <p className="text-[10px] font-bold text-destructive">Comentário obrigatório quando a resposta é Não.</p>}
-                              </div>
-                            )}
-                          </div>
-                          {/* Save comment — só aparece quando há alterações */}
-                          {val !== null && commentDirty && (
-                            <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ backgroundColor: "rgba(232,162,61,0.10)", borderTop: `1px solid ${AMBER}` }}>
-                              <span className="text-[11px] font-bold uppercase flex items-center gap-1" style={{ color: AMBER }}><AlertCircle size={11} /> Alterações não salvas</span>
-                              <button type="button" disabled={!canSave || conformityEvalMutation.isPending}
-                                onClick={() => { if (selectedEventId && canSave) conformityEvalMutation.mutate({ id: selectedEventId, data: { guardaEquipamentosComment: conformityEvalForm.guardaEquipamentosComment } }, { onSuccess: () => toast({ title: "Observação salva" }) }); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black uppercase bg-primary text-accent-text disabled:opacity-40 hover:opacity-90 transition-colors"
-                              >{conformityEvalMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Salvar</button>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
+              {isFerramentasEvaluatorForEvent && (
+                <FerramentasConformitySection
+                  conformityEvalForm={conformityEvalForm}
+                  setConformityEvalForm={setConformityEvalForm}
+                  myConformityData={myConformityData}
+                  ferramentasPublicTokenHistory={ferramentasPublicTokenHistory}
+                  ferramentasUsers={ferramentasUsers}
+                  redirectOpen={redirectFerramentasOpen}
+                  onRedirectOpenChange={setRedirectFerramentasOpen}
+                  redirectTargetId={redirectFerramentasTargetId}
+                  onRedirectSelect={(userId) => { setRedirectFerramentasTargetId(userId); redirectFerramentasMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
+                  onOpenLinkDialog={() => openConformityLinkDialog("ferramentas")}
+                  saveConformity={saveConformity}
+                  isSaving={conformityEvalMutation.isPending}
+                  toast={toast}
+                />
+              )}
 
               {/* ─── GRUPO 2: Cenografia ─── */}
-              {isConformityEvaluatorForEvent && (() => {
-                type CKey = "epi" | "estaiamentos" | "conduta";
-                type CCommentKey = "epiComment" | "estaiamentosComment" | "condutaComment";
-                const cenografiaItems: { key: CKey; commentKey: CCommentKey; label: string; question: string }[] = [
-                  { key: "epi", commentKey: "epiComment", label: "Uso de EPI", question: "Todos usaram EPI na arena?" },
-                  { key: "estaiamentos", commentKey: "estaiamentosComment", label: "Estaiamentos / Aterramentos", question: "Estaiamento e Aterramento foram feitos de maneira correta?" },
-                  { key: "conduta", commentKey: "condutaComment", label: "Conduta", question: "Conduta e comportamento foram adequados? (horários, ordens e regras)" },
-                ];
-                const standoutNeedsJustification = conformityEvalForm.standoutResponse === true && !conformityEvalForm.standoutJustification.trim();
-                const absencesNeedsReport = !conformityEvalForm.absencesReport.trim();
-                const missingRequiredComments = cenografiaItems.some(i => conformityEvalForm[i.key] === false && !conformityEvalForm[i.commentKey].trim());
-                // Algum campo de texto na tela difere do que está salvo no servidor?
-                const textsDirty =
-                  cenografiaItems.some(i => conformityEvalForm[i.commentKey] !== (myConformityData?.[i.commentKey] ?? "")) ||
-                  conformityEvalForm.absencesReport !== (myConformityData?.absencesReport ?? "") ||
-                  conformityEvalForm.standoutJustification !== (myConformityData?.standoutJustification ?? "");
-                const canSaveTexts = !standoutNeedsJustification && !absencesNeedsReport && !missingRequiredComments && textsDirty;
-                const filledCount = cenografiaItems.filter(i => conformityEvalForm[i.key] !== null).length;
-                const hasSentLink = (conformityPublicTokenHistory?.length ?? 0) > 0;
-                return (
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-3 px-1">
-                      <h3 className="text-xl md:text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-                        <ShieldAlert size={22} /> Cenografia
-                      </h3>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Popover open={redirectConformityOpen} onOpenChange={setRedirectConformityOpen}>
-                          <PopoverTrigger asChild>
-                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-card hover:bg-secondary transition-colors">
-                              <ArrowRight size={12} /> Redirecionar
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="end" className="p-0 rounded-xl border-border w-64 overflow-hidden" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-                            <Command className="rounded-xl">
-                              <CommandInput placeholder="Buscar avaliador..." />
-                              <CommandList className="max-h-[240px]">
-                                <CommandEmpty className="py-4 text-center text-xs font-bold uppercase text-muted-foreground">Nenhum encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                  {(cenografiaUsers ?? []).map(u => (
-                                    <CommandItem key={u.id} value={u.name}
-                                      onSelect={() => { setRedirectConformityTargetId(u.id); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId: u.id } }); }}
-                                      className="rounded-lg cursor-pointer aria-selected:bg-primary aria-selected:text-primary-foreground py-2 gap-3"
-                                    >
-                                      <Check size={14} className={cn("shrink-0", redirectConformityTargetId === u.id ? "opacity-100" : "opacity-0")} />
-                                      <span className="text-xs font-bold uppercase truncate">{u.name}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        {(() => {
-                          const pendingCeno = (conformityPublicTokenHistory ?? []).find(t => !t.usedAt);
-                          const answeredCeno = (conformityPublicTokenHistory ?? []).find(t => t.usedAt);
-                          const cenoBase = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                          if (pendingCeno) {
-                            const pendingUrl = `${cenoBase}/eval/${pendingCeno.id}`;
-                            return (
-                              <button type="button"
-                                onClick={async () => { if (await copyToClipboard(pendingUrl)) toast({ title: "Link copiado!", description: `Para: ${pendingCeno.recipientName ?? "freelancer"}` }); else toast(COPY_FAILED_TOAST); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors"
-                                title="Copiar link já enviado — só existe um link por evento"
-                              >
-                                <Copy size={12} /> Copiar link ({pendingCeno.recipientName ?? "freelancer"})
-                              </button>
-                            );
-                          }
-                          // Só esconde o botão se um link já foi usado E a conformidade
-                          // realmente foi preenchida. Se o link foi usado mas a matriz
-                          // seguiu vazia (0 itens), ainda é preciso poder reenviar — senão
-                          // fica "sem como" responder a conformidade.
-                          if (answeredCeno && filledCount > 0) return null;
-                          return (
-                            <button type="button"
-                              onClick={() => { setConformityPublicLinkType("cenografia"); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); refetchConformityTokenHistory(); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase border border-border rounded-lg bg-card hover:bg-secondary transition-colors"
-                              title="Gerar link único para um freelancer responder o formulário de Cenografia"
-                            >
-                              <Link2 size={12} /> {answeredCeno ? "Reenviar Link" : "Link Freelancer"}
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    {hasSentLink ? (
-                      <>
-                        <p className="text-sm text-muted-foreground px-1 -mt-1">
-                          Link enviado para um freelancer preencher este formulário. Acompanhe abaixo.
-                        </p>
-                        <ConformityLinkHistory history={conformityPublicTokenHistory ?? []} />
-                      </>
-                    ) : (
-                      <>
-                    <p className="text-sm text-muted-foreground px-1 -mt-1">
-                      Você foi designado para avaliar a conformidade da equipe de Cenografia neste evento.
-                    </p>
-
-                    {/* 3 conformity items */}
-                    <div className="bg-card border border-border rounded-xl overflow-hidden">
-                      <div className="divide-y divide-border">
-                        {cenografiaItems.map(item => {
-                          const val = conformityEvalForm[item.key];
-                          const isNao = val === false;
-                          return (
-                            <div key={item.key} className="px-5 transition-colors border-l-4" style={isNao ? { backgroundColor: "rgba(229,72,77,0.08)", borderLeftColor: WARNING } : val === null ? { backgroundColor: "rgba(232,162,61,0.08)", borderLeftColor: AMBER } : { borderLeftColor: "transparent" }}>
-                              <div className="flex flex-wrap items-center justify-between gap-3 min-h-[56px]">
-                                <span className="text-sm font-bold text-foreground leading-snug flex-1 min-w-[200px]">{item.question}</span>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {isNao && <span className="text-[10px] font-black uppercase text-destructive whitespace-nowrap">-10 pts</span>}
-                                  <div className="flex items-center border border-border rounded-lg overflow-hidden">
-                                    <button type="button"
-                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: true })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: true } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                      className={`px-3 py-1.5 text-[11px] font-black uppercase border-r border-border transition-all ${val === true ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                                    >Sim</button>
-                                    <button type="button"
-                                      onClick={() => { setConformityEvalForm(f => ({ ...f, [item.key]: false })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { [item.key]: false } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                                      className={`px-3 py-1.5 text-[11px] font-black uppercase transition-all ${val === false ? "bg-destructive text-destructive-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                                    >Não</button>
-                                  </div>
-                                </div>
-                              </div>
-                              {val !== null && (
-                                <div className="pb-3 space-y-1">
-                                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
-                                    Comentário {isNao ? <span className="text-destructive normal-case">* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
-                                  </label>
-                                  <Textarea
-                                    placeholder={isNao ? `Descreva o que aconteceu com ${item.label.toLowerCase()}...` : "Alguma observação? (opcional)"}
-                                    value={conformityEvalForm[item.commentKey]}
-                                    onChange={e => setConformityEvalForm(f => ({ ...f, [item.commentKey]: e.target.value }))}
-                                    className="border border-border rounded-lg text-sm resize-none min-h-[64px]"
-                                  />
-                                  {isNao && !conformityEvalForm[item.commentKey].trim() && (
-                                    <p className="text-[10px] font-bold text-destructive">Comentário obrigatório quando a resposta é Não.</p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {filledCount === cenografiaItems.length && (
-                        <div className="px-5 py-3 bg-secondary border-t border-border flex items-center gap-2">
-                          <CheckCircle size={14} className="text-accent-text" />
-                          <span className="text-xs font-bold uppercase text-accent-text">Itens preenchidos — {cenografiaItems.filter(i => conformityEvalForm[i.key] === true).length}/{cenografiaItems.length} conformes</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Absences question — texto livre sempre obrigatório */}
-                    <div className="bg-card border border-border rounded-xl overflow-hidden">
-                      <div className="px-5 py-4 space-y-1">
-                        <label className="block text-sm font-black uppercase text-foreground">
-                          Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span className="text-destructive">*</span> obrigatório
-                        </label>
-                        <Textarea
-                          placeholder="Ex.: João Silva — faltou sem aviso. Maria Souza — 45 min de atraso por trânsito. Se ninguém faltou/atrasou, escreva &quot;Ninguém faltou ou atrasou&quot;."
-                          value={conformityEvalForm.absencesReport}
-                          onChange={e => setConformityEvalForm(f => ({ ...f, absencesReport: e.target.value }))}
-                          className="border border-border rounded-lg text-sm resize-none min-h-[72px]"
-                        />
-                        {absencesNeedsReport && <p className="text-[10px] font-bold text-destructive">Especifique antes de salvar.</p>}
-                      </div>
-                    </div>
-
-                    {/* Standout question */}
-                    <div className="bg-card border border-border rounded-xl overflow-hidden">
-                      <div className="px-5 py-4 space-y-3">
-                        <label className="block text-sm font-black uppercase text-foreground">Algum profissional teve um desempenho fora da curva?</label>
-                        <div className="flex gap-2">
-                          <button type="button"
-                            onClick={() => { setConformityEvalForm(f => ({ ...f, standoutResponse: false, standoutJustification: '' })); if (selectedEventId) conformityEvalMutation.mutate({ id: selectedEventId, data: { standoutResponse: false, standoutJustification: null } }, { onSuccess: () => toast({ title: "Resposta salva" }) }); }}
-                            className={`flex-1 px-4 py-2.5 text-xs font-black uppercase border border-border rounded-lg transition-all ${conformityEvalForm.standoutResponse === false ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                          >Não, dentro do padrão esperado</button>
-                          <button type="button"
-                            onClick={() => setConformityEvalForm(f => ({ ...f, standoutResponse: true }))}
-                            className={`flex-1 px-4 py-2.5 text-xs font-black uppercase border border-border rounded-lg transition-all ${conformityEvalForm.standoutResponse === true ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground hover:bg-secondary"}`}
-                          >Sim, houve um grande destaque</button>
-                        </div>
-                        {conformityEvalForm.standoutResponse === true && (
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-accent-text">Detalhe o destaque <span>*</span> obrigatório</label>
-                            <Textarea
-                              placeholder="Nome do profissional e por que se destacou..."
-                              value={conformityEvalForm.standoutJustification}
-                              onChange={e => setConformityEvalForm(f => ({ ...f, standoutJustification: e.target.value }))}
-                              className="border border-border rounded-lg text-sm resize-none min-h-[72px]"
-                            />
-                            {standoutNeedsJustification && <p className="text-[10px] font-bold text-destructive">Descreva o destaque antes de salvar.</p>}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Save text fields — só aparece quando há alterações */}
-                    {textsDirty && (
-                      <div className="flex items-center justify-between gap-3 rounded-lg px-4 py-3" style={{ backgroundColor: "rgba(232,162,61,0.10)", border: `1px solid ${AMBER}` }}>
-                        <span className="text-[11px] font-bold uppercase flex items-center gap-1" style={{ color: AMBER }}><AlertCircle size={12} /> Alterações não salvas</span>
-                        <button type="button" disabled={!canSaveTexts || conformityEvalMutation.isPending}
-                          onClick={() => {
-                            if (!selectedEventId || !canSaveTexts) return;
-                            const payload: Record<string, unknown> = { absencesResponse: true, absencesReport: conformityEvalForm.absencesReport, standoutResponse: conformityEvalForm.standoutResponse, standoutJustification: conformityEvalForm.standoutJustification || null };
-                            cenografiaItems.forEach(item => { payload[item.commentKey] = conformityEvalForm[item.commentKey] || null; });
-                            conformityEvalMutation.mutate(
-                              { id: selectedEventId, data: payload as Parameters<typeof conformityEvalMutation.mutate>[0]["data"] },
-                              { onSuccess: () => toast({ title: "Observações salvas" }) },
-                            );
-                          }}
-                          className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-black uppercase bg-primary text-accent-text disabled:opacity-40 hover:opacity-90 transition-colors"
-                        ><Save size={14} /> Salvar observações</button>
-                      </div>
-                    )}
-                      </>
-                    )}
-
-                  </div>
-                );
-              })()}
+              {isConformityEvaluatorForEvent && (
+                <CenografiaConformitySection
+                  conformityEvalForm={conformityEvalForm}
+                  setConformityEvalForm={setConformityEvalForm}
+                  myConformityData={myConformityData}
+                  conformityPublicTokenHistory={conformityPublicTokenHistory}
+                  cenografiaUsers={cenografiaUsers}
+                  redirectOpen={redirectConformityOpen}
+                  onRedirectOpenChange={setRedirectConformityOpen}
+                  redirectTargetId={redirectConformityTargetId}
+                  onRedirectSelect={(userId) => { setRedirectConformityTargetId(userId); redirectConformityMutation.mutate({ id: selectedEventId!, data: { userId } }); }}
+                  onOpenLinkDialog={() => openConformityLinkDialog("cenografia")}
+                  saveConformity={saveConformity}
+                  isSaving={conformityEvalMutation.isPending}
+                  toast={toast}
+                />
+              )}
 
               {/* Right Sticky Panel */}
-              <div className="order-1 lg:order-none sticky top-16 md:top-2 lg:top-6 space-y-6 z-10">
-                <div className="bg-card border border-border rounded-xl overflow-hidden">
-                  <div className="bg-secondary px-5 py-4 border-b border-border">
-                    <h3 className="text-lg font-black uppercase tracking-tight text-foreground" style={{ fontFamily: CONDENSED }}>Resumo da Avaliação</h3>
-                    <p className="text-[11px] font-bold uppercase text-muted-foreground">Sua avaliação para este evento</p>
-                  </div>
-
-                  <div className="p-5 border-b-2 border-border">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold uppercase text-muted-foreground">Progresso</span>
-                      <span className="text-sm font-black text-accent-text">{Math.round(progressPct)}%</span>
-                    </div>
-                    <div className="w-full bg-secondary border border-border h-2.5 mb-2">
-                      <div className="bg-accent h-full transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      {extraConformityItemsTotal > 0
-                        ? `${totalCompleted} de ${totalItems} itens concluídos — ${completedCount} de ${myCriteria.length} critérios submetidos e ${extraConformityItemsCompleted} de ${extraConformityItemsTotal} perguntas da matriz respondidas.`
-                        : `${completedCount} de ${myCriteria.length} critérios submetidos.`}
-                    </p>
-                  </div>
-
-                  {/* Grade summary — evaluators only. Includes both scored
-                      criteria AND the extra Sim/Não questions from the
-                      Matriz de Conformidade (Ferramentas e Case / Cenografia),
-                      so nothing an avaliador has to fill out is left off the
-                      summary. */}
-                  {isEvaluator && (myCriteria.length > 0 || extraConformityItemsTotal > 0) && (
-                    <div className="p-5 border-b-2 border-border">
-                      <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Resumo das Notas</p>
-                      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                        {myCriteria.map(c => {
-                          const ev = getEval(c.criterionId);
-                          const score = currentScore(c.criterionId);
-                          const hasScore = score != null;
-                          const isSubmitted = ev?.status === "submitted";
-                          const isDraft = ev?.status === "draft";
-                          const commentText = comments[c.criterionId] ?? ev?.comments ?? "";
-                          const missingComment = !isSubmitted && hasScore && !commentText.trim();
-                          return (
-                            <div key={c.criterionId} className="space-y-0.5">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="text-[11px] font-bold uppercase text-foreground truncate">{c.criterionName}</span>
-                                  {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
-                                  {isDraft && !isSubmitted && <span className="shrink-0 text-[10px] font-black uppercase tracking-wide" style={{ color: AMBER }}>rascunho</span>}
-                                </div>
-                                {hasScore ? (
-                                  <span className="shrink-0 text-sm font-black text-accent-text">{score}<span className="text-[10px] text-muted-foreground">/10</span></span>
-                                ) : (
-                                  <span className="shrink-0 text-sm font-black text-muted-foreground/50">—</span>
-                                )}
-                              </div>
-                              {missingComment && (
-                                <p className="text-[10px] font-bold uppercase text-destructive">Falta preencher o comentário</p>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {isFerramentasEvaluatorForEvent && (
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[11px] font-bold uppercase text-foreground truncate">Guarda de Equipamentos</span>
-                            {conformityEvalForm.guardaEquipamentos === null ? (
-                              <span className="shrink-0 text-[10px] font-black uppercase tracking-wide" style={{ color: AMBER }}>pendente</span>
-                            ) : (
-                              <span className={`shrink-0 text-sm font-black ${conformityEvalForm.guardaEquipamentos ? "text-accent-text" : "text-destructive"}`}>{conformityEvalForm.guardaEquipamentos ? "Sim" : "Não"}</span>
-                            )}
-                          </div>
-                        )}
-                        {isConformityEvaluatorForEvent && [
-                          { label: "EPI", val: conformityEvalForm.epi },
-                          { label: "Estaiamentos / Aterramentos", val: conformityEvalForm.estaiamentos },
-                          { label: "Conduta", val: conformityEvalForm.conduta },
-                          { label: "Desempenho fora da curva", val: conformityEvalForm.standoutResponse },
-                        ].map(item => (
-                          <div key={item.label} className="flex items-center justify-between gap-3">
-                            <span className="text-[11px] font-bold uppercase text-foreground truncate">{item.label}</span>
-                            {item.val === null ? (
-                              <span className="shrink-0 text-[10px] font-black uppercase tracking-wide" style={{ color: AMBER }}>pendente</span>
-                            ) : (
-                              <span className={`shrink-0 text-sm font-black ${item.val ? "text-accent-text" : "text-destructive"}`}>{item.val ? "Sim" : "Não"}</span>
-                            )}
-                          </div>
-                        ))}
-                        {isConformityEvaluatorForEvent && (
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[11px] font-bold uppercase text-foreground truncate">Faltas/Atrasos</span>
-                            {conformityEvalForm.absencesReport.trim() ? (
-                              <span className="shrink-0 text-sm font-black text-accent-text">Respondido</span>
-                            ) : (
-                              <span className="shrink-0 text-[10px] font-black uppercase tracking-wide" style={{ color: AMBER }}>pendente</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Link Freelancer — movido para o cabeçalho de cada formulário/área */}
-
-                  {/* Submission — evaluators only */}
-                  {isEvaluator && myCriteria.length > 0 && (
-                    <div className="p-5">
-                      {allEvaled ? (
-                        <div className="flex items-center justify-center gap-2 text-accent-text bg-accent/15 border border-accent rounded-lg p-3 font-bold uppercase text-sm">
-                          <CheckCircle size={16} /> Você já concluiu sua avaliação
-                        </div>
-                      ) : allReady ? (
-                        <button
-                          data-testid="button-submit-eval"
-                          onClick={() => setConfirmLaunchOpen(true)}
-                          disabled={launching}
-                          className="w-full bg-primary text-primary-foreground border border-primary rounded-lg py-4 font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity hover:opacity-90"
-                        >
-                          <Rocket size={16} /> Lançar Avaliação
-                        </button>
-                      ) : (
-                        <button disabled className="w-full bg-secondary border border-border rounded-lg py-4 font-bold text-sm uppercase tracking-wider opacity-60 cursor-not-allowed">
-                          {pendingToFill} {pendingToFill === 1 ? "critério pendente" : "critérios pendentes"}
-                        </button>
-                      )}
-
-                      {!allEvaled && (
-                        <p className="text-[11px] text-center text-muted-foreground mt-3 leading-relaxed">
-                          {allReady
-                            ? <>Ao lançar, suas notas são <strong>submetidas e bloqueadas</strong>. Salvar rascunho é opcional.</>
-                            : <>Dê nota, preencha o comentário e grave o áudio de cada critério. <strong>Salvar rascunho é opcional</strong> — você pode lançar direto.</>}
-                        </p>
-                      )}
-
-                      <AlertDialog open={confirmLaunchOpen} onOpenChange={(o) => { if (!launching) setConfirmLaunchOpen(o); }}>
-                        <AlertDialogContent className="rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }} data-testid="dialog-confirm-launch">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle className="text-2xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-                              <Rocket size={22} className="text-accent-text" /> Confirmar lançamento
-                            </AlertDialogTitle>
-                            <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed">
-                              Você está prestes a submeter {toSubmitCount} {toSubmitCount === 1 ? "avaliação" : "avaliações"} para
-                              {" "}<strong>{currentEvent?.name}</strong>. Após o lançamento, as notas ficam
-                              {" "}<strong>bloqueadas para edição</strong> e compõem a nota final da equipe. Deseja continuar?
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          {isEvaluator && myCriteria.length > 0 && (
-                            <div className="border border-border rounded-lg bg-secondary p-4 max-h-60 overflow-y-auto">
-                              <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Resumo das Notas</p>
-                              <div className="space-y-2">
-                                {myCriteria.map(c => {
-                                  const ev = getEval(c.criterionId);
-                                  const score = currentScore(c.criterionId);
-                                  const hasScore = score != null;
-                                  const isSubmitted = ev?.status === "submitted";
-                                  const isDraft = ev?.status === "draft";
-                                  return (
-                                    <div key={c.criterionId} className="flex items-center justify-between gap-3">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <span className="text-[11px] font-bold uppercase text-foreground truncate">{c.criterionName}</span>
-                                        {isSubmitted && <Lock size={11} className="shrink-0 text-accent-text" />}
-                                        {isDraft && !isSubmitted && <span className="shrink-0 text-[10px] font-black uppercase tracking-wide" style={{ color: AMBER }}>rascunho</span>}
-                                      </div>
-                                      {hasScore ? (
-                                        <span className="shrink-0 text-sm font-black text-accent-text">{score}<span className="text-[10px] text-muted-foreground">/10</span></span>
-                                      ) : (
-                                        <span className="shrink-0 text-sm font-black text-muted-foreground/50">—</span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                          <AlertDialogFooter>
-                            <AlertDialogCancel
-                              disabled={launching}
-                              data-testid="button-cancel-launch"
-                              className="border border-border rounded-lg font-bold uppercase text-xs tracking-wider"
-                            >
-                              Voltar
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={(e) => { e.preventDefault(); handleLaunchAll(); }}
-                              disabled={launching}
-                              data-testid="button-confirm-launch"
-                              className="border border-border rounded-lg bg-primary text-primary-foreground font-bold uppercase text-xs tracking-wider hover:opacity-90 disabled:opacity-60"
-                            >
-                              {launching ? "Lançando..." : "Lançar agora"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <EvaluationSummaryPanel
+                isEvaluator={isEvaluator}
+                myCriteria={myCriteria}
+                getEval={getEval}
+                currentScore={currentScore}
+                comments={comments}
+                progressPct={progressPct}
+                totalItems={totalItems}
+                totalCompleted={totalCompleted}
+                completedCount={completedCount}
+                extraConformityItemsTotal={extraConformityItemsTotal}
+                extraConformityItemsCompleted={extraConformityItemsCompleted}
+                isFerramentasEvaluatorForEvent={isFerramentasEvaluatorForEvent}
+                isConformityEvaluatorForEvent={isConformityEvaluatorForEvent}
+                conformityEvalForm={conformityEvalForm}
+                allEvaled={allEvaled}
+                allReady={allReady}
+                pendingToFill={pendingToFill}
+                launching={launching}
+                confirmLaunchOpen={confirmLaunchOpen}
+                setConfirmLaunchOpen={setConfirmLaunchOpen}
+                toSubmitCount={toSubmitCount}
+                eventName={currentEvent?.name}
+                onLaunch={handleLaunchAll}
+              />
             </div>
           </div>
         )}
@@ -1741,479 +643,52 @@ export default function EvaluationsPage() {
         </div>
       </div>
 
-      {/* Redirect dialog — avaliador redireciona o formulário inteiro (todos os critérios da área) */}
-      <Dialog open={redirectDialogArea !== null} onOpenChange={(v) => { if (!v) { setRedirectDialogArea(null); setRedirectTargetId(null); } }}>
-        <DialogContent className="max-w-md rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <CornerDownRight size={18} /> Redirecionar Formulário
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {redirectDialogArea != null && (
-              <div className="bg-secondary border border-border rounded-lg px-4 py-3">
-                <p className="text-[10px] font-black uppercase text-muted-foreground mb-0.5">Formulário</p>
-                <p className="text-sm font-black uppercase">{redirectDialogArea.areaName}</p>
-                {redirectDialogArea.criteriaIds.length > 1 && (
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    {redirectDialogArea.criteriaIds.length} critérios serão transferidos juntos.
-                  </p>
-                )}
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground">
-              Selecione quem assumirá a responsabilidade por este formulário. Após a confirmação, todos os critérios saem da sua lista e passam para o usuário escolhido.
-            </p>
-            {effectiveRedirectOptions.length === 0 ? (
-              <div className="text-center py-6 border border-dashed border-border rounded-lg font-bold text-muted-foreground text-xs uppercase">
-                Nenhuma opção de redirecionamento disponível para este critério.
-              </div>
-            ) : (
-              <div className="border border-border rounded-lg divide-y divide-border max-h-56 overflow-y-auto">
-                {effectiveRedirectOptions.map((opt) => (
-                  <label key={opt.id} className="flex items-center gap-3 px-4 py-3 hover:bg-secondary cursor-pointer">
-                    <input
-                      type="radio"
-                      name="redirect-target"
-                      checked={redirectTargetId === opt.id}
-                      onChange={() => setRedirectTargetId(opt.id)}
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <span className="text-sm font-bold uppercase">{opt.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-          {redirectTargetId != null && (
-            <div className="bg-accent/10 border border-accent rounded-lg px-4 py-3 text-xs font-bold text-accent-text">
-              ↳ Confirmar: transferir para <strong>{effectiveRedirectOptions.find(o => o.id === redirectTargetId)?.name ?? "?"}</strong>. Esta ação é imediata.
-            </div>
-          )}
-          <DialogFooter className="gap-2 pt-4">
-            <button
-              type="button"
-              onClick={() => { setRedirectDialogArea(null); setRedirectTargetId(null); }}
-              className="border border-border rounded-lg px-5 py-2.5 font-bold uppercase text-xs hover:bg-secondary transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              disabled={redirectTargetId === null || patchCriterionAssignment.isPending}
-              onClick={async () => {
-                if (!redirectDialogArea || !redirectTargetId) return;
-                try {
-                  for (const criterionId of redirectDialogArea.criteriaIds) {
-                    await patchCriterionAssignment.mutateAsync({ criterionId, assignedToId: redirectTargetId, action: "redirect" });
-                  }
-                  toast({ title: "Formulário redirecionado com sucesso" });
-                  setRedirectDialogArea(null);
-                  setRedirectTargetId(null);
-                } catch (e) {
-                  toast({ title: "Erro ao redirecionar", description: (e as Error).message, variant: "destructive" });
-                }
-              }}
-              className="bg-primary text-primary-foreground border border-primary rounded-lg px-5 py-2.5 font-bold uppercase text-xs disabled:opacity-50"
-            >
-              {patchCriterionAssignment.isPending ? "Redirecionando..." : "Confirmar Transferência"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RedirectFormDialog
+        area={redirectDialogArea}
+        targetId={redirectTargetId}
+        onTargetChange={setRedirectTargetId}
+        options={effectiveRedirectOptions}
+        isPending={patchCriterionAssignment.isPending}
+        onClose={closeRedirectDialog}
+        onConfirm={confirmRedirect}
+      />
 
-      {/* Public link dialog — link único por formulário/área para freelancers */}
-      <Dialog
-        open={publicLinkDialogCriteriaIds !== null}
-        onOpenChange={(v) => {
-          if (!v) {
-            setPublicLinkDialogCriteriaIds(null);
-            setPublicLinkDialogAreaName(null);
-            setPublicLinkRecipientName("");
-            setPublicLinkIncludeConformity(false);
-            setPublicLinkForceConformity(false);
-            setGeneratedPublicUrl(null);
-            setLinkCopied(false);
-          }
-        }}
-      >
-        <DialogContent className="max-w-md rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Link2 size={18} /> Link para Freelancer
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {publicLinkDialogAreaName && (
-              <div className="border-l-4 border-accent pl-3">
-                <p className="text-[10px] font-bold uppercase text-muted-foreground">Formulário</p>
-                <p className="text-sm font-black uppercase">{publicLinkDialogAreaName}</p>
-              </div>
-            )}
-            {(() => {
-              // Critérios do formulário que o backend aceita num link público
-              // (interseção entre os critérios da área e os elegíveis). Os que
-              // ficaram de fora precisam ser respondidos pelo próprio avaliador.
-              const requestedIds = publicLinkDialogCriteriaIds ?? [];
-              const eligibleById = new Map((publicLinkEligibleCriteria ?? []).map(c => [c.criterionId, c]));
-              const dialogEligible = requestedIds.flatMap(id => { const c = eligibleById.get(id); return c ? [c] : []; });
-              const excluded = requestedIds
-                .filter(id => !eligibleById.has(id))
-                .map(id => activeCriteria.find(c => c.criterionId === id)?.criterionName ?? `critério #${id}`);
-              if (publicLinkEligibleCriteria === undefined) return null;
-              if (dialogEligible.length === 0) {
-                return (
-                  <div data-testid="notice-public-link-no-criteria" className="bg-destructive/10 border border-destructive rounded-lg px-4 py-3 flex items-start gap-2.5">
-                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-destructive" />
-                    <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-destructive">Nenhum critério disponível para link</p>
-                      <p className="text-xs text-destructive leading-snug">
-                        Nenhum dos critérios deste formulário pode ser respondido por link público para este avaliador/área — em geral porque já foram submetidos ou estão atribuídos a outra pessoa. Responda os critérios diretamente nesta tela ou use "Redirecionar Formulário" para passá-los a um colega.
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
-              return (
-                <div className="bg-secondary border border-border rounded-lg px-4 py-3 space-y-2">
-                  <div>
-                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">
-                      Critérios inclusos ({dialogEligible.length})
-                    </p>
-                    <ul className="space-y-0.5">
-                      {dialogEligible.map(c => (
-                        <li key={c.criterionId} className="text-sm font-black uppercase">{c.criterionName}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  {excluded.length > 0 && (
-                    <div data-testid="notice-public-link-partial" className="border-t border-dashed border-border pt-2">
-                      <p className="text-[10px] font-black uppercase text-destructive mb-1 flex items-center gap-1">
-                        <AlertCircle size={11} /> Fora do link ({excluded.length})
-                      </p>
-                      <ul className="space-y-0.5">
-                        {excluded.map((name, i) => (
-                          <li key={i} className="text-xs text-destructive">{name}</li>
-                        ))}
-                      </ul>
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
-                        Estes critérios não podem ir no link (já submetidos ou atribuídos a outra pessoa) e continuam sob sua responsabilidade nesta tela.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+      <PublicLinkDialog
+        criteriaIds={publicLinkDialogCriteriaIds}
+        areaName={publicLinkDialogAreaName}
+        recipientName={publicLinkRecipientName}
+        setRecipientName={setPublicLinkRecipientName}
+        includeConformity={publicLinkIncludeConformity}
+        setIncludeConformity={setPublicLinkIncludeConformity}
+        forceConformity={publicLinkForceConformity}
+        generatedUrl={generatedPublicUrl}
+        linkCopied={linkCopied}
+        setLinkCopied={setLinkCopied}
+        eligibleCriteria={publicLinkEligibleCriteria}
+        activeCriteria={activeCriteria}
+        history={publicTokenHistory}
+        isGenerating={createPublicToken.isPending}
+        isDeleting={deletePublicToken.isPending}
+        onGenerate={generatePublicLink}
+        onDeleteToken={deletePublicLinkToken}
+        onClose={closePublicLinkDialog}
+        toast={toast}
+      />
 
-            {!generatedPublicUrl ? (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Gere um link único para que um freelancer responda este formulário. O link expira após o primeiro uso.
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-black uppercase mb-2">
-                      Nome de quem vai receber o link
-                      <span className="text-destructive text-[10px] ml-2 bg-destructive/10 px-2 py-0.5 border border-border">Obrigatório</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={publicLinkRecipientName}
-                      onChange={e => setPublicLinkRecipientName(e.target.value)}
-                      placeholder="Ex: João Freelancer"
-                      className="w-full border border-border rounded-lg bg-card px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <label className={cn("flex items-start gap-2.5 select-none", publicLinkForceConformity ? "cursor-not-allowed opacity-90" : "cursor-pointer")}>
-                    <input
-                      type="checkbox"
-                      checked={publicLinkIncludeConformity}
-                      disabled={publicLinkForceConformity}
-                      onChange={e => setPublicLinkIncludeConformity(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 border border-border rounded-lg accent-primary cursor-pointer shrink-0 disabled:cursor-not-allowed"
-                    />
-                    <span className="text-xs font-bold text-muted-foreground leading-tight">
-                      Incluir matriz de conformidade no questionário<br />
-                      <span className="font-normal text-muted-foreground">EPI · Estaiamentos · Conduta · Faltas/Atrasos · Destaque</span>
-                      {publicLinkForceConformity && (
-                        <><br /><span className="font-bold text-accent-text">Obrigatório para Cenografia — o avaliador responde critério e conformidade no mesmo formulário.</span></>
-                      )}
-                    </span>
-                  </label>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-accent-text font-bold">
-                  Link gerado! Copie e envie para <strong>{publicLinkRecipientName}</strong>.
-                </p>
-                <div className="border border-border rounded-lg bg-secondary p-3 flex items-center gap-2">
-                  <span className="text-xs font-bold break-all flex-1 select-all">{generatedPublicUrl}</span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (await copyToClipboard(generatedPublicUrl ?? "")) { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2500); }
-                      else toast(COPY_FAILED_TOAST);
-                    }}
-                    className="shrink-0 bg-primary text-primary-foreground border border-primary rounded-lg px-3 py-2 flex items-center gap-1.5 font-bold text-xs uppercase hover:opacity-90 transition-colors"
-                  >
-                    {linkCopied ? <><CheckCheck size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Este link é de uso único e expira após o freelancer submeter a avaliação.
-                </p>
-              </>
-            )}
-
-            {/* Token history */}
-            {(publicTokenHistory ?? []).length > 0 && (
-              <div>
-                <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Histórico de links enviados</p>
-                <div className="border border-border rounded-lg divide-y divide-border max-h-40 overflow-y-auto">
-                  {(publicTokenHistory ?? []).map(t => (
-                    <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold truncate">
-                          {t.usedAt && t.submitterName ? t.submitterName : (t.recipientName ?? "—")}
-                        </p>
-                        {t.usedAt && t.submitterName && t.recipientName && t.submitterName !== t.recipientName && (
-                          <p className="text-[10px] text-muted-foreground truncate">Para: {t.recipientName}</p>
-                        )}
-                        <p className="text-[10px] text-muted-foreground">
-                          Enviado: {fmtDT(t.createdAt)}
-                        </p>
-                        {t.usedAt && (
-                          <p className="text-[10px] font-bold text-accent-text">
-                            Respondido: {fmtDT(t.usedAt)}
-                          </p>
-                        )}
-                      </div>
-                      {t.usedAt ? (
-                        <span className="shrink-0 text-[10px] font-bold uppercase bg-primary text-primary-foreground border border-primary rounded-lg px-2 py-0.5 flex items-center gap-1 mt-0.5">
-                          <CheckCircle size={10} /> Respondido
-                        </span>
-                      ) : (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10px] font-bold uppercase bg-secondary text-muted-foreground border border-border rounded-lg px-2 py-0.5 mt-0.5">
-                            Pendente
-                          </span>
-                          <button
-                            type="button"
-                            title="Excluir link"
-                            aria-label={`Excluir link enviado para ${t.recipientName ?? "destinatário sem nome"}`}
-                            disabled={deletePublicToken.isPending}
-                            onClick={() => deletePublicToken.mutate(
-                              { tokenId: t.id },
-                              { onSuccess: () => refetchTokenHistory() },
-                            )}
-                            className="mt-0.5 border border-border rounded-lg p-0.5 hover:bg-destructive/10 hover:border-destructive transition-colors disabled:opacity-40"
-                          >
-                            <Trash2 size={12} className="text-destructive" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="gap-2 pt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setPublicLinkDialogCriteriaIds(null);
-                setPublicLinkDialogAreaName(null);
-                setPublicLinkRecipientName("");
-                setPublicLinkIncludeConformity(false);
-            setPublicLinkForceConformity(false);
-                setGeneratedPublicUrl(null);
-                setLinkCopied(false);
-              }}
-              className="border border-border rounded-lg px-5 py-2.5 font-bold uppercase text-xs hover:bg-secondary transition-colors"
-            >
-              {generatedPublicUrl ? "Fechar" : "Cancelar"}
-            </button>
-            {!generatedPublicUrl && (() => {
-              const eligibleIds = new Set((publicLinkEligibleCriteria ?? []).map(c => c.criterionId));
-              const linkCriterionIds = (publicLinkDialogCriteriaIds ?? []).filter(id => eligibleIds.has(id));
-              const noEligible = linkCriterionIds.length === 0;
-              return (
-              <button
-                type="button"
-                data-testid="button-generate-public-link"
-                disabled={!publicLinkRecipientName.trim() || createPublicToken.isPending || noEligible}
-                title={noEligible ? "Nenhum critério disponível para gerar link" : undefined}
-                onClick={() => {
-                  if (!publicLinkRecipientName.trim() || noEligible) return;
-                  createPublicToken.mutate(
-                    { recipientName: publicLinkRecipientName.trim(), criterionIds: linkCriterionIds, includeConformity: publicLinkIncludeConformity || undefined },
-                    {
-                      onSuccess: ({ tokenId }) => {
-                        const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-                        setGeneratedPublicUrl(`${base}/eval/${tokenId}`);
-                        refetchTokenHistory();
-                      },
-                      onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
-                    },
-                  );
-                }}
-                className="bg-primary text-primary-foreground border border-primary rounded-lg px-5 py-2.5 font-bold uppercase text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {createPublicToken.isPending ? "Gerando..." : "Gerar Link"}
-              </button>
-              );
-            })()}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Dialog: Link Público de Conformidade (Cenografia / Ferramentas) ── */}
-      <Dialog open={conformityPublicLinkType !== null} onOpenChange={o => { if (!o) { setConformityPublicLinkType(null); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); } }}>
-        <DialogContent className="max-w-md rounded-xl border-border" style={{ backgroundColor: "var(--card)", color: "var(--foreground)" }}>
-          <DialogHeader>
-            <DialogTitle className="text-xl uppercase font-black tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <Link2 size={18} />
-              {conformityPublicLinkType === "cenografia" ? "Link Freelancer — Cenografia" : "Link Freelancer — Ferramentas"}
-            </DialogTitle>
-          </DialogHeader>
-
-          {(() => {
-            // Um link só por formulário: se já existe um pendente, mostramos o
-            // MESMO link pra reenviar; se já foi respondido, não há o que gerar.
-            const hist = conformityPublicLinkType === "cenografia"
-              ? (conformityPublicTokenHistory ?? [])
-              : (ferramentasPublicTokenHistory ?? []);
-            const answered = hist.find(t => t.usedAt != null);
-            const pending = hist.find(t => t.usedAt == null);
-            const base = window.location.origin + (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-            const existingUrl = pending ? `${base}/eval/${pending.id}` : null;
-            const shownUrl = generatedConformityUrl ?? existingUrl;
-            return (
-              <>
-                <div className="space-y-4 py-2">
-                  {answered ? (
-                    <div className="border border-accent rounded-lg bg-accent/10 p-3 flex items-start gap-2">
-                      <CheckCircle size={16} className="text-accent-text shrink-0 mt-0.5" />
-                      <p className="text-xs font-bold text-accent-text">
-                        Formulário já respondido por <span className="uppercase">{answered.submitterName ?? answered.recipientName ?? "freelancer"}</span>
-                        {answered.usedAt ? ` em ${fmtDT(answered.usedAt)}` : ""}. Não é possível gerar outro link.
-                      </p>
-                    </div>
-                  ) : shownUrl ? (
-                    <>
-                      <p className="text-sm text-muted-foreground">
-                        {pending && !generatedConformityUrl
-                          ? <>Já existe um link enviado para <strong>{pending.recipientName ?? "—"}</strong> aguardando resposta. Se a pessoa perdeu, copie e reenvie o mesmo link.</>
-                          : "Link gerado com sucesso! Copie e envie ao freelancer."}
-                      </p>
-                      <div className="border border-border rounded-lg bg-secondary px-3 py-2 flex items-center gap-2 min-w-0">
-                        <span className="text-xs font-bold text-muted-foreground truncate flex-1">{shownUrl}</span>
-                        <button type="button"
-                          onClick={async () => { if (await copyToClipboard(shownUrl)) { setConformityLinkCopied(true); setTimeout(() => setConformityLinkCopied(false), 2500); } else toast(COPY_FAILED_TOAST); }}
-                          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black uppercase bg-primary text-primary-foreground border border-primary rounded-lg hover:opacity-90 transition-colors"
-                        >
-                          <Copy size={12} />{conformityLinkCopied ? "Copiado!" : "Copiar"}
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Este link é de uso único e expira após o freelancer submeter o formulário.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm text-muted-foreground">
-                        {conformityPublicLinkType === "cenografia"
-                          ? "Gere um link único para um freelancer preencher o formulário de conformidade de Cenografia (EPI, Estaiamentos, Conduta, Ausências e Destaque). Só pode existir um link por evento."
-                          : "Gere um link único para um freelancer preencher o formulário de Guarda de Equipamentos. Só pode existir um link por evento."}
-                      </p>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-black uppercase">Nome do destinatário</Label>
-                        <input
-                          type="text"
-                          value={conformityPublicRecipientName}
-                          onChange={e => setConformityPublicRecipientName(e.target.value)}
-                          placeholder="Ex.: Fred Ribeiro"
-                          className="w-full border border-border rounded-lg px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {/* Registro do envio */}
-                  {hist.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Registro</p>
-                      <div className="border border-border rounded-lg divide-y divide-border max-h-40 overflow-y-auto">
-                        {hist.map(t => (
-                          <div key={t.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold truncate">
-                                {t.usedAt ? (t.submitterName ?? t.recipientName ?? "—") : (t.recipientName ?? "—")}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                Enviado: {fmtDT(t.createdAt)}
-                              </p>
-                              {t.usedAt && (
-                                <p className="text-[10px] font-bold text-accent-text">
-                                  Respondido: {fmtDT(t.usedAt)}
-                                </p>
-                              )}
-                            </div>
-                            {t.usedAt ? (
-                              <span className="shrink-0 text-[10px] font-bold uppercase bg-primary text-primary-foreground border border-primary rounded-lg px-2 py-0.5 flex items-center gap-1">
-                                <CheckCircle size={10} /> Respondido
-                              </span>
-                            ) : (
-                              <span className="shrink-0 text-[10px] font-bold uppercase bg-secondary text-muted-foreground border border-border rounded-lg px-2 py-0.5">
-                                Pendente
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <DialogFooter className="gap-2 pt-4">
-                  <button type="button"
-                    onClick={() => { setConformityPublicLinkType(null); setConformityPublicRecipientName(""); setGeneratedConformityUrl(null); setConformityLinkCopied(false); }}
-                    className="border border-border rounded-lg px-5 py-2.5 font-bold uppercase text-xs hover:bg-secondary transition-colors"
-                  >
-                    {shownUrl || answered ? "Fechar" : "Cancelar"}
-                  </button>
-                  {!shownUrl && !answered && (
-                    <button type="button"
-                      disabled={!conformityPublicRecipientName.trim() || createConformityPublicToken.isPending || createFerramentasPublicToken.isPending}
-                      onClick={() => {
-                        if (!conformityPublicRecipientName.trim()) return;
-                        const mutation = conformityPublicLinkType === "cenografia" ? createConformityPublicToken : createFerramentasPublicToken;
-                        mutation.mutate(
-                          { recipientName: conformityPublicRecipientName.trim() },
-                          {
-                            onSuccess: ({ tokenId }) => {
-                              setGeneratedConformityUrl(`${base}/eval/${tokenId}`);
-                              if (conformityPublicLinkType === "cenografia") refetchConformityTokenHistory();
-                              else refetchFerramentasTokenHistory();
-                            },
-                            onError: (e: Error) => toast({ title: "Erro ao gerar link", description: e.message, variant: "destructive" }),
-                          },
-                        );
-                      }}
-                      className="bg-primary text-primary-foreground border border-primary rounded-lg px-5 py-2.5 font-bold uppercase text-xs disabled:opacity-50"
-                    >
-                      {(createConformityPublicToken.isPending || createFerramentasPublicToken.isPending) ? "Gerando..." : "Gerar Link"}
-                    </button>
-                  )}
-                </DialogFooter>
-              </>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+      <ConformityPublicLinkDialog
+        linkType={conformityPublicLinkType}
+        recipientName={conformityPublicRecipientName}
+        setRecipientName={setConformityPublicRecipientName}
+        generatedUrl={generatedConformityUrl}
+        linkCopied={conformityLinkCopied}
+        setLinkCopied={setConformityLinkCopied}
+        conformityHistory={conformityPublicTokenHistory}
+        ferramentasHistory={ferramentasPublicTokenHistory}
+        isGenerating={createConformityPublicToken.isPending || createFerramentasPublicToken.isPending}
+        onGenerate={generateConformityLink}
+        onClose={closeConformityLinkDialog}
+        toast={toast}
+      />
 
     </div>
   );

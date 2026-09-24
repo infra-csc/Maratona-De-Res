@@ -112,7 +112,7 @@ export function useCriterionRouting(criterionId: number | null) {
   return useQuery<CriterionRouting | null>({
     queryKey: criterionRoutingKey(criterionId),
     queryFn: ({ signal }) => withServerMessage(getCriterionRouting(criterionId as number, { signal })),
-    enabled: criterionId != null,
+    enabled: !!criterionId,
   });
 }
 
@@ -141,7 +141,7 @@ export function useEventCriterionAssignments(eventId: number | null) {
   return useQuery<CriterionAssignment[]>({
     queryKey: eventCriterionAssignmentsKey(eventId),
     queryFn: () => getEventCriterionAssignments(eventId as number),
-    enabled: eventId != null,
+    enabled: !!eventId,
   });
 }
 
@@ -194,7 +194,7 @@ export function useRedirectOptions(eventId: number | null, criterionId: number |
   return useQuery<RouteUser[]>({
     queryKey: redirectOptionsKey(eventId, criterionId),
     queryFn: ({ signal }) => withServerMessage(getCriterionRedirectOptions(eventId as number, criterionId as number, { signal })),
-    enabled: eventId != null && criterionId != null,
+    enabled: !!eventId && !!criterionId,
   });
 }
 
@@ -203,7 +203,7 @@ export function usePublicLinkEligibleCriteria(eventId: number | null) {
   return useQuery<PublicLinkEligibleCriterion[]>({
     queryKey: publicLinkEligibleCriteriaKey(eventId),
     queryFn: ({ signal }) => withServerMessage(getPublicLinkEligibleCriteria(eventId as number, { signal })),
-    enabled: eventId != null,
+    enabled: !!eventId,
   });
 }
 
@@ -228,7 +228,7 @@ export function usePublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
     queryKey: publicTokensKey(eventId),
     queryFn: ({ signal }) => withServerMessage(getPublicTokens(eventId as number, { signal })),
-    enabled: eventId != null,
+    enabled: !!eventId,
   });
 }
 
@@ -261,7 +261,7 @@ export function useConformityPublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
     queryKey: conformityPublicTokensKey(eventId),
     queryFn: ({ signal }) => withServerMessage(getConformityPublicTokens(eventId as number, { signal })),
-    enabled: eventId != null,
+    enabled: !!eventId,
   });
 }
 
@@ -270,7 +270,7 @@ export function useFerramentasPublicTokens(eventId: number | null) {
   return useQuery<PublicToken[]>({
     queryKey: ferramentasPublicTokensKey(eventId),
     queryFn: ({ signal }) => withServerMessage(getFerramentasPublicTokens(eventId as number, { signal })),
-    enabled: eventId != null,
+    enabled: !!eventId,
   });
 }
 
@@ -279,7 +279,7 @@ export function useAllPublicTokens(eventId: number | null) {
   return useQuery<AdminPublicToken[]>({
     queryKey: allPublicTokensKey(eventId),
     queryFn: ({ signal }) => withServerMessage(getAllPublicTokens(eventId as number, { signal })),
-    enabled: eventId != null,
+    enabled: !!eventId,
   });
 }
 
@@ -316,6 +316,6 @@ export function useUsersByArea(areaId: number | null) {
   return useQuery<RouteUser[]>({
     queryKey: usersByAreaKey(areaId),
     queryFn: ({ signal }) => withServerMessage(getUsersByArea(areaId as number, { signal })),
-    enabled: areaId != null,
+    enabled: !!areaId,
   });
 }

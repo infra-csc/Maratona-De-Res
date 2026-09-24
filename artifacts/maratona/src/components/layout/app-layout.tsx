@@ -48,7 +48,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
             <span className="block font-black text-base uppercase tracking-tight leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
               Maratona
             </span>
-            <span className="block font-bold text-[10px] uppercase tracking-wider leading-none mt-0.5" style={{ color: ACCENT_TEXT }}>
+            <span className="block font-bold text-[11px] uppercase tracking-wider leading-none mt-0.5" style={{ color: ACCENT_TEXT }}>
               Resultados
             </span>
           </div>

@@ -32,6 +32,14 @@ export const INFO = "#5b8def";
  * própria lima #d4ff00 no escuro (15,9:1). Resolve pelo tema automaticamente.
  */
 export const ACCENT_TEXT = "var(--accent-text)";
+/** Positivo como TEXTO (≥ 5,9:1 nos dois temas). GOOD fica para fundos, barras e ícones. */
+export const GOOD_TEXT = "var(--status-ok-text)";
+/** Atenção como TEXTO (≥ 5,9:1 nos dois temas). AMBER fica para fundos, barras e ícones. */
+export const AMBER_TEXT = "var(--status-warn-text)";
+/** Erro como TEXTO (≥ 4,5:1 nos dois temas). WARNING fica para fundos, bordas e ícones. */
+export const DANGER_TEXT = "var(--status-danger-text)";
+/** Informativo como TEXTO (≥ 4,5:1 nos dois temas). INFO fica para fundos, bordas e ícones. */
+export const INFO_TEXT = "var(--status-info-text)";
 
 // ---------------------------------------------------------------------------
 // ESPELHOS dos tokens de tema. A FONTE DE VERDADE é src/index.css

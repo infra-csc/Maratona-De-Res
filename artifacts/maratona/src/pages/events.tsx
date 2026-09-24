@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurrentCycle, getGetEventsQueryKey, ApiError } from "@workspace/api-client-react";
-import type { EventInput } from "@workspace/api-client-react";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useGetEvents, useCreateEvent, useMergeEvent, useDeleteEvent, useGetCurrentCycle, getGetEventsQueryKey, ApiError, useNormalizeEventDates, useConfirmEventResultsBulk, useUpdateEvent } from "@workspace/api-client-react";
+import type { EventInput, NormalizeDatesResult } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ConfirmDialog } from "@/components/shared";
 import { useForm } from "react-hook-form";
-import { fmtDate, getCycleWeekends } from "@/lib/utils";
+import { fmtDate, getCycleWeekends, fmtNum } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Link } from "wouter";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { formatCyclePeriod } from "@/components/cycle-badge";
-import { PremiumCard, CONDENSED, WARNING, GOOD, AMBER, INFO } from "@/lib/premium-theme";
+import { PremiumCard, CONDENSED, WARNING, GOOD, AMBER, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT, INFO_TEXT } from "@/lib/premium-theme";
 import { cn } from "@/lib/utils";
 
 // ── Filtros na URL ──────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ function MiniBar({ value, total, color, title }: { value: number; total: number;
       <div className="h-[5px] rounded-full w-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
-      <span className="text-[10px] font-bold" style={{ color }}>{value}/{total}</span>
+      <span className="text-[11px] font-bold" style={{ color }}>{value}/{total}</span>
     </div>
   );
 }
@@ -74,7 +75,7 @@ function CalBar({ finalCount, partialCount, total }: { finalCount: number; parti
           <div className="absolute top-0 h-full" style={{ left: `${finalPct}%`, width: `${partialPct}%`, backgroundColor: AMBER }} />
         )}
       </div>
-      <span className="text-[10px] font-bold" style={{ color: labelColor }}>{totalCount}/{total}</span>
+      <span className="text-[11px] font-bold" style={{ color: labelColor }}>{totalCount}/{total}</span>
     </div>
   );
 }
@@ -83,8 +84,21 @@ const inputStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", b
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p role="alert" className="text-[11px] font-semibold" style={{ color: WARNING }}>{message}</p>;
+  return <p role="alert" className="text-[11px] font-semibold" style={{ color: DANGER_TEXT }}>{message}</p>;
 }
+
+/** Mensagem do servidor (`{ error }`) sem o prefixo "HTTP 400 ..." do ApiError. */
+function serverErrorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    const data = e.data as { error?: unknown } | null;
+    if (typeof data?.error === "string" && data.error.trim()) return data.error;
+    return `HTTP ${e.status}`;
+  }
+  return e instanceof Error ? e.message : "Tente novamente.";
+}
+
+/** Quantas mudanças de data mostrar na prévia antes do "+N mais". */
+const DATE_PREVIEW_LIMIT = 10;
 
 export default function EventsPage() {
   const { user } = useAuth();
@@ -180,63 +194,52 @@ export default function EventsPage() {
   const closeCreateDialog = () => { setCreateOpen(false); reset(); };
   const closeEditDialog = () => { setEditingEvent(null); resetEdit(); };
 
-  const normalizeDatesMutation = useMutation({
-    mutationFn: async () => {
-      const token = localStorage.getItem("maratona_token");
-      const res = await fetch("/api/events/admin/normalize-dates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e as { error?: string }).error ?? `HTTP ${res.status}`); }
-      return res.json() as Promise<{ ok: boolean; fixedCount: number; normalizedCount: number }>;
+  // "Unificar Datas" em dois passos: prévia (dryRun) → diálogo com a lista →
+  // aplicar só depois de digitar APLICAR (o servidor exige a mesma palavra).
+  const [normalizePreview, setNormalizePreview] = useState<NormalizeDatesResult | null>(null);
+  const normalizeDatesMutation = useNormalizeEventDates({
+    mutation: {
+      onSuccess: (d, vars) => {
+        if (vars.data.dryRun) {
+          if (d.changes.length === 0) {
+            toast({ title: "Nenhuma data para unificar", description: "Todos os eventos já estão com data única e as correções pontuais já foram aplicadas." });
+          } else {
+            setNormalizePreview(d);
+          }
+          return;
+        }
+        qc.invalidateQueries({ queryKey });
+        setNormalizePreview(null);
+        toast({ title: "Datas normalizadas", description: `${d.fixedCount} corrigidos + ${d.normalizedCount} unificados para data única.` });
+      },
+      onError: (e) => toast({ title: "Erro", description: serverErrorMessage(e), variant: "destructive" }),
     },
-    onSuccess: (d) => {
-      qc.invalidateQueries({ queryKey });
-      toast({ title: "Datas normalizadas", description: `${d.fixedCount} corrigidos + ${d.normalizedCount} unificados para data única.` });
-    },
-    onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
-  const bulkConfirmMutation = useMutation({
-    mutationFn: async (eventIds: number[]) => {
-      const token = localStorage.getItem("maratona_token");
-      const res = await fetch("/api/events/confirm-results-bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ eventIds }),
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e as { error?: string }).error ?? `HTTP ${res.status}`); }
-      return res.json() as Promise<{ confirmed: number; skipped: number; warnings: string[] }>;
+  const bulkConfirmMutation = useConfirmEventResultsBulk({
+    mutation: {
+      onSuccess: (d) => {
+        qc.invalidateQueries({ queryKey });
+        setBulkConfirmOpen(false);
+        const parts = [`${d.confirmed} evento(s) confirmado(s).`];
+        if (d.skipped > 0) parts.push(`${d.skipped} já estavam confirmados ou são históricos.`);
+        if (d.warnings.length > 0) parts.push(d.warnings.join(" "));
+        toast({ title: "Resultados confirmados", description: parts.join(" ") });
+      },
+      onError: (e) => toast({ title: "Erro ao confirmar em lote", description: serverErrorMessage(e), variant: "destructive" }),
     },
-    onSuccess: (d) => {
-      qc.invalidateQueries({ queryKey });
-      setBulkConfirmOpen(false);
-      const parts = [`${d.confirmed} evento(s) confirmado(s).`];
-      if (d.skipped > 0) parts.push(`${d.skipped} já estavam confirmados ou são históricos.`);
-      if (d.warnings.length > 0) parts.push(d.warnings.join(" "));
-      toast({ title: "Resultados confirmados", description: parts.join(" ") });
-    },
-    onError: (e: Error) => toast({ title: "Erro ao confirmar em lote", description: e.message, variant: "destructive" }),
   });
 
-  const editMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: EditEventInput }) => {
-      const token = localStorage.getItem("maratona_token");
-      const res = await fetch(`/api/events/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e as { error?: string }).error ?? `HTTP ${res.status}`); }
-      return res.json();
+  const editMutation = useUpdateEvent({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey });
+        toast({ title: "Evento atualizado com sucesso." });
+        setEditingEvent(null);
+        resetEdit();
+      },
+      onError: (e) => toast({ title: "Erro ao salvar", description: serverErrorMessage(e), variant: "destructive" }),
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey });
-      toast({ title: "Evento atualizado com sucesso." });
-      setEditingEvent(null);
-      resetEdit();
-    },
-    onError: (e: Error) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
   });
 
   useEffect(() => {
@@ -393,10 +396,10 @@ export default function EventsPage() {
 
         {cycle && (
           <div className="shrink-0 flex items-center gap-2 rounded-lg px-3.5 py-2" style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-            <CalendarRange size={16} className="shrink-0" style={{ color: "var(--accent)" }} />
+            <CalendarRange size={16} className="shrink-0" style={{ color: "var(--accent-text)" }} />
             <span className="flex flex-col leading-tight">
               <span className="font-black uppercase text-xs" style={{ fontFamily: CONDENSED }}>{cycle.name}</span>
-              <span className="text-[10px] font-semibold" style={{ color: "var(--muted-foreground)" }}>{cyclePeriod ?? "Período não definido"}</span>
+              <span className="text-[11px] font-semibold" style={{ color: "var(--muted-foreground)" }}>{cyclePeriod ?? "Período não definido"}</span>
             </span>
           </div>
         )}
@@ -406,12 +409,12 @@ export default function EventsPage() {
           {[
             { val: all.length,                                        label: "Eventos",     color: "var(--foreground)" },
             { val: all.filter(e => e.status === "open").length,      label: "Abertos",     color: "var(--accent)" },
-            { val: all.filter(e => hasPartialPublication(e)).length,  label: "Pub. Parcial", color: AMBER },
-            { val: all.filter(e => isPubFinal(e)).length, label: "Pub. Final",  color: GOOD },
+            { val: all.filter(e => hasPartialPublication(e)).length,  label: "Pub. Parcial", color: AMBER_TEXT },
+            { val: all.filter(e => isPubFinal(e)).length, label: "Pub. Final",  color: GOOD_TEXT },
           ].map((s, i) => (
             <div key={i} className="px-4 text-center" style={{ borderRight: i < 3 ? "1px solid var(--border)" : "none" }}>
               <span className="block font-black text-xl leading-none" style={{ fontFamily: CONDENSED, color: s.color }}>{s.val}</span>
-              <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>{s.label}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>{s.label}</span>
             </div>
           ))}
         </div>
@@ -420,10 +423,8 @@ export default function EventsPage() {
         <div className="ml-auto flex items-center gap-2.5 shrink-0">
           {user?.role === "admin" && (
             <button
-              onClick={() => {
-                if (!confirm("Isso vai:\n• Corrigir os 4 eventos com datas erradas\n• Unificar TODOS os eventos multi-dia para data única (startDate = endDate)\n\nConfirmar?")) return;
-                normalizeDatesMutation.mutate();
-              }}
+              onClick={() => normalizeDatesMutation.mutate({ data: { dryRun: true } })}
+              title="Mostra a prévia das datas que mudariam antes de aplicar"
               disabled={normalizeDatesMutation.isPending}
               className="h-9 px-3.5 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors disabled:opacity-50 hover:opacity-80"
               style={{ fontFamily: CONDENSED, border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
@@ -448,7 +449,7 @@ export default function EventsPage() {
                 </DialogHeader>
                 <form noValidate onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, name: d.name.trim(), endDate: d.startDate } }))} className="space-y-5 pt-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="input-event-name" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: WARNING }}>*</span></Label>
+                    <Label htmlFor="input-event-name" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
                     <Input id="input-event-name" data-testid="input-event-name" {...register("name", nameRules)} aria-invalid={!!createErrors.name} placeholder="Ex: Feira XYZ 2026" className="h-11 rounded-lg" style={inputStyle} />
                     <FieldError message={createErrors.name?.message} />
                   </div>
@@ -457,7 +458,7 @@ export default function EventsPage() {
                     <Input data-testid="input-event-client" {...register("clientName")} placeholder="Nome do cliente" className="h-11 rounded-lg" style={inputStyle} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="input-event-start" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Data do Evento <span style={{ color: WARNING }}>*</span></Label>
+                    <Label htmlFor="input-event-start" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Data do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
                     <Input id="input-event-start" data-testid="input-event-start" type="date" {...register("startDate", startDateRules)} aria-invalid={!!createErrors.startDate} className="h-11 rounded-lg" style={inputStyle} />
                     <FieldError message={createErrors.startDate?.message} />
                   </div>
@@ -551,9 +552,9 @@ export default function EventsPage() {
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 rounded-xl p-4 space-y-3" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Filtrar por data</p>
+            <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Filtrar por data</p>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-wide block mb-1" style={{ color: "var(--muted-foreground)" }}>De</label>
+              <label className="text-[11px] font-bold uppercase tracking-wide block mb-1" style={{ color: "var(--muted-foreground)" }}>De</label>
               <input
                 type="date"
                 value={filterDateFrom}
@@ -563,7 +564,7 @@ export default function EventsPage() {
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-wide block mb-1" style={{ color: "var(--muted-foreground)" }}>Até</label>
+              <label className="text-[11px] font-bold uppercase tracking-wide block mb-1" style={{ color: "var(--muted-foreground)" }}>Até</label>
               <input
                 type="date"
                 value={filterDateTo}
@@ -589,7 +590,7 @@ export default function EventsPage() {
       {/* ── Weekend chips row ── */}
       {cycleWeekends.length > 0 && (
         <div className="px-6 py-2.5 flex items-center gap-3 shrink-0" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-          <span className="text-[10px] font-black uppercase tracking-widest shrink-0 flex items-center gap-1.5" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+          <span className="text-[11px] font-black uppercase tracking-widest shrink-0 flex items-center gap-1.5" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
             <Calendar size={12} />
             Fim de Semana
           </span>
@@ -604,7 +605,7 @@ export default function EventsPage() {
                     if (active) { setFilterDateFrom(""); setFilterDateTo(""); }
                     else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); }
                   }}
-                  className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-colors shrink-0"
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase whitespace-nowrap transition-colors shrink-0"
                   style={{
                     fontFamily: CONDENSED,
                     backgroundColor: active ? "var(--primary)" : "var(--card)",
@@ -621,7 +622,7 @@ export default function EventsPage() {
             <button
               type="button"
               onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-              className="ml-auto text-[10px] font-bold uppercase shrink-0 hover:opacity-70"
+              className="ml-auto text-[11px] font-bold uppercase shrink-0 hover:opacity-70"
               style={{ color: "var(--muted-foreground)" }}
             >
               × limpar
@@ -691,7 +692,7 @@ export default function EventsPage() {
                 };
                 if (col === "matrix") {
                   return (
-                    <div key={col} role="columnheader" className="px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+                    <div key={col} role="columnheader" className="px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
                       {labels[col]}
                     </div>
                   );
@@ -709,7 +710,7 @@ export default function EventsPage() {
                       type="button"
                       onClick={() => handleColSort(col)}
                       aria-label={`Ordenar por ${labels[col]}${active ? (asc ? " (crescente)" : " (decrescente)") : ""}`}
-                      className="px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider select-none flex items-center gap-1 transition-colors group bg-transparent rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                      className="px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wider select-none flex items-center gap-1 transition-colors group bg-transparent rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
                       style={{ fontFamily: CONDENSED, color: active ? "var(--accent-text)" : "var(--muted-foreground)", outlineColor: "var(--ring)" }}
                     >
                       {labels[col]}
@@ -721,7 +722,7 @@ export default function EventsPage() {
                   </div>
                 );
               })}
-              <div role="columnheader" className="px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Status</div>
+              <div role="columnheader" className="px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Status</div>
               <div role="columnheader" className="px-3 py-2.5"><span className="sr-only">Ações</span></div>
             </div>
 
@@ -763,9 +764,9 @@ export default function EventsPage() {
                   : partialOnlyCount > 0 ? "Pub. Parcial"
                   : calSaved > 0 ? "Rascunho"
                   : "Avaliador";
-              const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0 ? GOOD
-                : finalPubCount > 0 || partialOnlyCount > 0 ? AMBER
-                : calSaved > 0 ? INFO
+              const scoreLabelColor = finalPubCount > 0 && partialOnlyCount === 0 ? GOOD_TEXT
+                : finalPubCount > 0 || partialOnlyCount > 0 ? AMBER_TEXT
+                : calSaved > 0 ? INFO_TEXT
                 : "var(--muted-foreground)";
 
               // MiniBar colors
@@ -780,21 +781,21 @@ export default function EventsPage() {
               // usava outra fórmula e eventos com "Pub. Final" sumiam do filtro.
               // `next` = destino do próximo passo quando o badge indica uma pendência acionável.
               const badge: { bg: string; fg: string; label: string; next?: { href: string; title: string } } = ev.isHistorical || isPubFinal(ev)
-                ? { bg: "rgba(154,176,0,0.14)", fg: GOOD, label: "Pub. Final" }
+                ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Pub. Final" }
                 : !ev.criteriaConfirmed && !hasEvals && !hasAnyPublication
-                ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Aguardando RH", next: { href: evaluationsHref, title: "Aguardando RH: confirmar os critérios e atribuir avaliadores em Avaliações" } }
+                ? { bg: "rgba(229,72,77,0.12)", fg: DANGER_TEXT, label: "Aguardando RH", next: { href: evaluationsHref, title: "Aguardando RH: confirmar os critérios e atribuir avaliadores em Avaliações" } }
                     : partialOnlyCount > 0
-                      ? { bg: "rgba(232,162,61,0.14)", fg: AMBER, label: "Pub. Parcial" }
+                      ? { bg: "rgba(232,162,61,0.14)", fg: AMBER_TEXT, label: "Pub. Parcial" }
                       : (calSaved > 0 || fc)
-                        ? { bg: "rgba(91,141,239,0.14)", fg: INFO, label: "Rascunho" }
+                        ? { bg: "rgba(91,141,239,0.14)", fg: INFO_TEXT, label: "Rascunho" }
                       : concluded
-                        ? { bg: "rgba(154,176,0,0.14)", fg: GOOD, label: "Concluído" }
+                        ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Concluído" }
                         : evalDone === evalTotal && evalTotal > 0
-                          ? { bg: "rgba(154,176,0,0.14)", fg: GOOD, label: "Avaliado" }
+                          ? { bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT, label: "Avaliado" }
                           : missing.length > 0
-                            ? { bg: "rgba(229,72,77,0.12)", fg: WARNING, label: "Sem Avaliador", next: { href: evaluationsHref, title: `Sem avaliador em: ${missing.join(", ")}. Atribuir em Avaliações` } }
+                            ? { bg: "rgba(229,72,77,0.12)", fg: DANGER_TEXT, label: "Sem Avaliador", next: { href: evaluationsHref, title: `Sem avaliador em: ${missing.join(", ")}. Atribuir em Avaliações` } }
                             : evalDone > 0 || evalTotal > 0
-                              ? { bg: "rgba(232,162,61,0.14)", fg: AMBER, label: "Em Avaliação" }
+                              ? { bg: "rgba(232,162,61,0.14)", fg: AMBER_TEXT, label: "Em Avaliação" }
                               : { bg: "var(--secondary)", fg: "var(--muted-foreground)", label: "Aguardando" };
 
               return (
@@ -814,17 +815,17 @@ export default function EventsPage() {
                     </Link>
                     <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
                       {!ev.criteriaConfirmed && !hasEvals && !hasAnyPublication && (
-                        <span className="text-[10px] font-bold uppercase" title="Aguardando o RH confirmar os critérios do evento" style={{ color: WARNING }}>Aguardando RH ·</span>
+                        <span className="text-[11px] font-bold uppercase" title="Aguardando o RH confirmar os critérios do evento" style={{ color: DANGER_TEXT }}>Aguardando RH ·</span>
                       )}
                       {!ev.resultsConfirmed && ev.criteriaConfirmed && (
-                        <span className="text-[10px] font-bold uppercase" title="Resultados não confirmados: ainda não contam na elegibilidade nem na nota dos colaboradores" style={{ color: AMBER }}>Não confirmado ·</span>
+                        <span className="text-[11px] font-bold uppercase" title="Resultados não confirmados: ainda não contam na elegibilidade nem na nota dos colaboradores" style={{ color: AMBER_TEXT }}>Não confirmado ·</span>
                       )}
                       <span className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>
                         {[ev.clientName, ev.city].filter(Boolean).join(" · ")}
                       </span>
                     </div>
                     {missing.length > 0 && !hasEvals && !hasAnyPublication && (
-                      <p className="text-[10px] font-bold uppercase truncate mt-0.5" style={{ color: WARNING }}>
+                      <p className="text-[11px] font-bold uppercase truncate mt-0.5" style={{ color: DANGER_TEXT }}>
                         Sem aval.: {missing.join(", ")}
                       </p>
                     )}
@@ -876,9 +877,9 @@ export default function EventsPage() {
                     {score != null ? (
                       <div>
                         <span className="font-black text-lg leading-none block" style={{ fontFamily: CONDENSED, color: fc ? GOOD : "var(--foreground)" }}>
-                          {score.toFixed(1)}
+                          {fmtNum(score, 1)}
                         </span>
-                        <span className="text-[9px] font-bold uppercase" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
+                        <span className="text-[11px] font-bold uppercase" style={{ color: scoreLabelColor }}>{scoreLabel}</span>
                       </div>
                     ) : (
                       <span className="text-sm italic opacity-40">—</span>
@@ -892,13 +893,13 @@ export default function EventsPage() {
                         href={badge.next.href}
                         title={badge.next.title}
                         data-testid={`badge-next-step-${ev.id}`}
-                        className="text-[9px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap inline-flex items-center gap-1 transition-opacity hover:opacity-80 underline-offset-2 hover:underline"
+                        className="text-[11px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap inline-flex items-center gap-1 transition-opacity hover:opacity-80 underline-offset-2 hover:underline"
                         style={{ backgroundColor: badge.bg, color: badge.fg }}
                       >
                         {badge.label} <ChevronRight size={9} aria-hidden="true" />
                       </Link>
                     ) : (
-                      <span className="text-[9px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
+                      <span className="text-[11px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: badge.bg, color: badge.fg }}>{badge.label}</span>
                     )}
                   </div>
 
@@ -980,7 +981,7 @@ export default function EventsPage() {
                                 data-testid={`button-delete-event-${ev.id}`}
                                 onClick={() => setDeleteTarget({ id: ev.id, name: ev.name })}
                                 className="gap-2 font-bold text-[12px] uppercase cursor-pointer rounded-md px-3 py-2"
-                                style={{ color: WARNING }}
+                                style={{ color: DANGER_TEXT }}
                               >
                                 <Trash2 size={13} /> Excluir
                               </DropdownMenuItem>
@@ -1001,11 +1002,11 @@ export default function EventsPage() {
         {!isLoading && filtered.length > 0 && (
           <div className="flex items-center gap-5 mt-4 px-1 flex-wrap">
             {[
-              { color: GOOD, label: "Pub. Final" },
-              { color: "var(--accent)", label: "Avaliado" },
-              { color: AMBER, label: "Em andamento" },
+              { color: GOOD_TEXT, label: "Pub. Final" },
+              { color: "var(--accent-text)", label: "Avaliado" },
+              { color: AMBER_TEXT, label: "Em andamento" },
               { color: "var(--border)", label: "Aguardando" },
-              { color: WARNING, label: "Aguardando RH" },
+              { color: DANGER_TEXT, label: "Aguardando RH" },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-1.5">
                 <div className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
@@ -1093,7 +1094,7 @@ export default function EventsPage() {
             </div>
 
             {mergeConflict && (
-              <div data-testid="alert-merge-conflict" className="rounded-lg p-3 text-sm space-y-1" style={{ backgroundColor: "rgba(232,162,61,0.12)", border: `1px solid ${AMBER}`, color: AMBER }}>
+              <div data-testid="alert-merge-conflict" className="rounded-lg p-3 text-sm space-y-1" style={{ backgroundColor: "rgba(232,162,61,0.12)", border: `1px solid ${AMBER}`, color: AMBER_TEXT }}>
                 <p className="font-bold uppercase">O duplicado já tem dado gravado:</p>
                 <p>{mergeConflict.evaluations} avaliação(ões), {mergeConflict.calibrations} calibração(ões), {mergeConflict.conformities} conformidade(s) e {mergeConflict.results} resultado(s).</p>
                 <p>Esses dados serão descartados. Confirma a mesclagem?</p>
@@ -1119,6 +1120,40 @@ export default function EventsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Unificar Datas: prévia + confirmação digitada ── */}
+      <ConfirmDialog
+        open={!!normalizePreview}
+        onOpenChange={(open) => { if (!open) setNormalizePreview(null); }}
+        title={`Unificar datas de ${normalizePreview?.changes.length ?? 0} evento(s)`}
+        description={normalizePreview
+          ? `${normalizePreview.fixedCount} correção(ões) pontual(is) e ${normalizePreview.normalizedCount} evento(s) multi-dia que passam a ter data única (início = fim). Isso grava direto nos eventos.`
+          : undefined}
+        confirmLabel="Aplicar"
+        confirmText="APLICAR"
+        destructive
+        isPending={normalizeDatesMutation.isPending}
+        onConfirm={() => normalizeDatesMutation.mutate({ data: { confirm: "APLICAR" } })}
+        data-testid="dialog-normalize-dates"
+      >
+        {normalizePreview && (
+          <ul className="max-h-60 overflow-y-auto rounded-lg text-[12px] divide-y" style={{ border: "1px solid var(--border)" }}>
+            {normalizePreview.changes.slice(0, DATE_PREVIEW_LIMIT).map(c => (
+              <li key={c.eventId} className="px-3 py-2 flex items-center justify-between gap-3" style={{ borderColor: "var(--border)" }}>
+                <span className="font-semibold truncate">{c.eventName}</span>
+                <span className="shrink-0 font-mono text-[11px]" style={{ color: "var(--muted-foreground)" }}>
+                  {fmtDate(c.startDateBefore)}{c.endDateBefore !== c.startDateBefore ? `–${fmtDate(c.endDateBefore)}` : ""} → {fmtDate(c.startDateAfter)}
+                </span>
+              </li>
+            ))}
+            {normalizePreview.changes.length > DATE_PREVIEW_LIMIT && (
+              <li className="px-3 py-2 text-center" style={{ color: "var(--muted-foreground)", borderColor: "var(--border)" }}>
+                +{normalizePreview.changes.length - DATE_PREVIEW_LIMIT} mais…
+              </li>
+            )}
+          </ul>
+        )}
+      </ConfirmDialog>
 
       {/* ── Bulk confirm dialog ── */}
       <Dialog open={bulkConfirmOpen} onOpenChange={(open) => { if (!bulkConfirmMutation.isPending) setBulkConfirmOpen(open); }}>
@@ -1151,7 +1186,7 @@ export default function EventsPage() {
             </button>
             <button
               type="button"
-              onClick={() => bulkConfirmMutation.mutate(bulkConfirmIds.map(ev => ev.id))}
+              onClick={() => bulkConfirmMutation.mutate({ data: { eventIds: bulkConfirmIds.map(ev => ev.id) } })}
               disabled={bulkConfirmMutation.isPending || bulkConfirmIds.length === 0}
               className="h-10 px-5 rounded-lg text-[12px] font-bold uppercase inline-flex items-center gap-2 disabled:opacity-50"
               style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
@@ -1166,7 +1201,7 @@ export default function EventsPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmText(""); } }}>
         <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED, color: WARNING }}>Excluir Evento</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>Excluir Evento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
@@ -1206,7 +1241,7 @@ export default function EventsPage() {
           </DialogHeader>
           <form noValidate onSubmit={handleSubmitEdit(d => { if (editingEvent) editMutation.mutate({ id: editingEvent.id, data: { ...d, name: d.name.trim(), endDate: d.startDate } }); })} className="space-y-5 pt-4">
             <div className="space-y-1.5">
-              <Label htmlFor="input-edit-event-name" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: WARNING }}>*</span></Label>
+              <Label htmlFor="input-edit-event-name" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
               <Input id="input-edit-event-name" data-testid="input-edit-event-name" {...registerEdit("name", nameRules)} aria-invalid={!!editErrors.name} className="h-11 rounded-lg" style={inputStyle} />
               <FieldError message={editErrors.name?.message} />
             </div>
@@ -1215,7 +1250,7 @@ export default function EventsPage() {
               <Input data-testid="input-edit-event-client" {...registerEdit("clientName")} className="h-11 rounded-lg" style={inputStyle} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="input-edit-event-start" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Data do Evento <span style={{ color: WARNING }}>*</span></Label>
+              <Label htmlFor="input-edit-event-start" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Data do Evento <span style={{ color: DANGER_TEXT }}>*</span></Label>
               <Input id="input-edit-event-start" data-testid="input-edit-event-start" type="date" {...registerEdit("startDate", startDateRules)} aria-invalid={!!editErrors.startDate} className="h-11 rounded-lg" style={inputStyle} />
               <FieldError message={editErrors.startDate?.message} />
             </div>

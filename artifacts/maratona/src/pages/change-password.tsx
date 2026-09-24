@@ -127,7 +127,7 @@ export default function ChangePasswordPage() {
           </div>
         </div>
 
-        <p className="text-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-6">
+        <p className="text-center text-[11px] font-bold text-muted-foreground uppercase tracking-widest mt-6">
           Sistema Exclusivo • Uso Restrito
         </p>
       </div>

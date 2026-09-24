@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRight } from "lucide-react";
+import { login as loginRequest, ApiError } from "@workspace/api-client-react";
 
 const CONDENSED = "'Barlow Condensed', 'Barlow', sans-serif";
 const ACCENT = "#ccff00";
@@ -44,16 +45,20 @@ export default function LoginPage() {
     if (!isReady) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: cpf, password: cpf }),
-      });
-      // O corpo pode não ser JSON (proxy, queda do servidor): nunca deixar o parse quebrar a mensagem.
-      const data = await res.json().catch(() => ({})) as { error?: string; token?: string; user?: { mustChangePassword?: boolean } };
-      if (!res.ok) throw new Error(loginErrorMessage(res.status, typeof data.error === "string" ? data.error : undefined));
-      if (!data.token || !data.user) throw new Error("Não foi possível entrar. Tente novamente.");
-      login(data.token, data.user as Parameters<typeof login>[1]);
+      let data: Awaited<ReturnType<typeof loginRequest>>;
+      try {
+        data = await loginRequest({ identifier: cpf, password: cpf });
+      } catch (err) {
+        // O corpo pode não ser JSON (proxy, queda do servidor): o ApiError guarda o
+        // corpo já lido em `data` (ou texto/null) — nunca deixar isso quebrar a mensagem.
+        if (err instanceof ApiError) {
+          const body = err.data as { error?: unknown } | null;
+          throw new Error(loginErrorMessage(err.status, typeof body?.error === "string" ? body.error : undefined));
+        }
+        throw err;
+      }
+      if (!data?.token || !data.user) throw new Error("Não foi possível entrar. Tente novamente.");
+      login(data.token, data.user);
       setLocation(data.user.mustChangePassword ? "/trocar-senha" : "/");
     } catch (err: unknown) {
       toast({
@@ -135,7 +140,7 @@ export default function LoginPage() {
               />
               <p
                 id="login-cpf-hint"
-                className="text-[10px] mt-1.5"
+                className="text-[11px] mt-1.5"
                 style={{ fontFamily: CONDENSED, color: HINT_COLOR }}
               >
                 {cpf.length === 0
@@ -169,7 +174,7 @@ export default function LoginPage() {
         </div>
 
         <p
-          className="text-center text-[9px] font-bold uppercase tracking-widest mt-5"
+          className="text-center text-[11px] font-bold uppercase tracking-widest mt-5"
           style={{ color: MUTED_COLOR }}
         >
           Sistema exclusivo • Uso restrito

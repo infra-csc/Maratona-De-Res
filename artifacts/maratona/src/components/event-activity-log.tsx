@@ -1,20 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Activity, Star, Sliders, MessagesSquare, MessageSquare, ClipboardCheck, History, ShieldCheck, Send } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getAuthToken } from "@/lib/custom-fetch";
+import { useGetEventActivityLog, getGetEventActivityLogQueryKey } from "@workspace/api-client-react";
 import { CONDENSED } from "@/lib/premium-theme";
-
-interface ActivityEntry {
-  id: string;
-  kind: string;
-  label: string;
-  userName: string | null;
-  criterionName: string | null;
-  score: number | null;
-  detail: string | null;
-  createdAt: string;
-}
+import { fmtNum } from "@/lib/utils";
 
 const KIND_CFG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
   eval:          { icon: <Star size={9} />,            color: "#9ab000", bg: "rgba(154,176,0,0.14)" },
@@ -39,18 +28,8 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
   const PAGE = 30;
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useQuery<ActivityEntry[]>({
-    queryKey: ["event-activity-log", eventId],
-    queryFn: async () => {
-      const token = getAuthToken();
-      const res = await fetch(`/api/events/${eventId}/activity-log`, {
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      if (!res.ok) throw new Error("Erro ao carregar log");
-      return res.json();
-    },
-    enabled: canView && expanded,
-    staleTime: 30_000,
+  const { data, isLoading } = useGetEventActivityLog(eventId, {
+    query: { queryKey: getGetEventActivityLogQueryKey(eventId), enabled: canView && expanded, staleTime: 30_000 },
   });
 
   if (!canView) return null;
@@ -67,12 +46,12 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
         className="w-full px-5 py-3 flex items-center gap-2 hover:opacity-80 transition-opacity"
         style={{ borderBottom: expanded ? "1px solid var(--border)" : "none" }}
       >
-        <Activity size={16} style={{ color: "var(--accent)" }} />
-        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+        <Activity size={16} style={{ color: "var(--accent-text)" }} />
+        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
           Log de Atividades
         </span>
         {data && (
-          <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+          <span className="ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded-full"
             style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
             {entries.length}
           </span>
@@ -94,7 +73,7 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
                 return (
                   <div key={e.id} className="flex items-start gap-2.5 py-1.5 px-1 rounded hover:bg-secondary/50 transition-colors">
                     <div className="flex flex-col items-center shrink-0 mt-0.5">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full text-[8px] font-bold shrink-0"
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold shrink-0"
                         style={{ backgroundColor: cfg.bg, color: cfg.color }}>
                         {cfg.icon}
                       </span>
@@ -104,7 +83,7 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded"
+                        <span className="text-[11px] font-black uppercase px-1.5 py-0.5 rounded"
                           style={{ backgroundColor: cfg.bg, color: cfg.color }}>
                           {e.label}
                         </span>
@@ -112,17 +91,17 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
                           <span className="text-[11px] font-bold truncate">{e.userName}</span>
                         )}
                         {e.criterionName && (
-                          <span className="text-[10px] truncate" style={{ color: "var(--muted-foreground)" }}>· {e.criterionName}</span>
+                          <span className="text-[11px] truncate" style={{ color: "var(--muted-foreground)" }}>· {e.criterionName}</span>
                         )}
                         {e.score != null && (
-                          <span className="text-[10px] font-black" style={{ color: cfg.color }}>→ {e.score.toFixed(2)}</span>
+                          <span className="text-[11px] font-black" style={{ color: cfg.color }}>→ {fmtNum(e.score, 2)}</span>
                         )}
-                        <span className="ml-auto text-[9px] shrink-0 whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
+                        <span className="ml-auto text-[11px] shrink-0 whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
                           {fmtDTShort(e.createdAt)}
                         </span>
                       </div>
                       {e.detail && (
-                        <p className="text-[10px] mt-0.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>"{e.detail}"</p>
+                        <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>"{e.detail}"</p>
                       )}
                     </div>
                   </div>
@@ -130,7 +109,7 @@ export function EventActivityLog({ eventId }: { eventId: number }) {
               })}
               {hasMore && (
                 <button type="button" onClick={() => setPage(p => p + 1)}
-                  className="w-full text-center text-[10px] font-black uppercase py-2 mt-1 rounded hover:opacity-70 transition-opacity"
+                  className="w-full text-center text-[11px] font-black uppercase py-2 mt-1 rounded hover:opacity-70 transition-opacity"
                   style={{ color: "var(--muted-foreground)", border: "1px dashed var(--border)" }}>
                   Ver mais ({entries.length - visible.length} restantes)
                 </button>

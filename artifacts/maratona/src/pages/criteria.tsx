@@ -15,7 +15,8 @@ import { Plus, Building2, Zap, Pencil, Check, X, RefreshCw, Route, UserCheck, Ch
 import { useAllCriterionRoutings, useSaveCriterionRouting } from "@/lib/routing-api";
 import type { CriterionRouting } from "@/lib/routing-api";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { CONDENSED, BODY, WARNING, GOOD, PremiumCard } from "@/lib/premium-theme";
+import { CONDENSED, BODY, GOOD, PremiumCard, DANGER_TEXT } from "@/lib/premium-theme";
+import { fmtNum } from "@/lib/utils";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
@@ -26,7 +27,7 @@ const requiredText = (message: string) => ({
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{message}</p>;
 }
 
 function CriterionWeightCell({
@@ -46,7 +47,7 @@ function CriterionWeightCell({
         className="rounded-lg px-3 py-1.5 inline-flex items-center gap-2 min-w-[48px] transition-colors hover:opacity-80 group/weight"
         style={{ backgroundColor: "var(--secondary)" }}
       >
-        <span className="text-lg font-black" style={{ fontFamily: CONDENSED }}>{weight.toFixed(0)}</span>
+        <span className="text-lg font-black" style={{ fontFamily: CONDENSED }}>{fmtNum(weight, 0)}</span>
         <Pencil size={11} className="opacity-0 group-hover/weight:opacity-100 transition-opacity" style={{ color: "var(--muted-foreground)" }} />
       </button>
     );
@@ -117,11 +118,11 @@ function EvaluatorPickerCell({
         <button type="button" className="flex items-center gap-1.5 text-left" title="Clique para definir o avaliador padrão">
           {current ? (
             <span className="flex items-center gap-1.5 text-sm font-bold transition-colors hover:opacity-80">
-              <UserCheck size={13} className="shrink-0" style={{ color: "var(--accent)" }} />
+              <UserCheck size={13} className="shrink-0" style={{ color: "var(--accent-text)" }} />
               {current}
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: WARNING }}>
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: DANGER_TEXT }}>
               <AlertCircle size={12} /> Sem avaliador
             </span>
           )}
@@ -129,7 +130,7 @@ function EvaluatorPickerCell({
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0 rounded-xl" align="start" onClick={e => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
         <div className="p-2" style={{ borderBottom: "1px solid var(--border)" }}>
-          <p className="text-[10px] font-black uppercase tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão</p>
+          <p className="text-[11px] font-black uppercase tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão</p>
           <Input placeholder="Buscar por nome..." value={search} onChange={e => setSearch(e.target.value)} className="h-7 text-xs rounded-lg" style={fieldStyle} autoFocus />
         </div>
         <div className="max-h-56 overflow-y-auto">
@@ -145,13 +146,13 @@ function EvaluatorPickerCell({
               className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-left transition-colors hover:opacity-90"
               style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: u.id === currentRouting?.defaultEvaluatorId ? "rgba(154,176,0,0.10)" : "transparent", color: u.id === currentRouting?.defaultEvaluatorId ? "var(--accent)" : "var(--foreground)" }}
             >
-              {u.id === currentRouting?.defaultEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent)" }} />}
+              {u.id === currentRouting?.defaultEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent-text)" }} />}
               <span>{u.name}</span>
             </button>
           ))}
         </div>
         {saveMutation.isPending && (
-          <div className="p-2 text-center text-[10px] font-bold" style={{ borderTop: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Salvando...</div>
+          <div className="p-2 text-center text-[11px] font-bold" style={{ borderTop: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Salvando...</div>
         )}
       </PopoverContent>
     </Popover>
@@ -194,11 +195,11 @@ function ConformityAreaEvaluatorPicker({
         <button type="button" className="flex items-center gap-1.5 text-left" title="Clique para definir o avaliador padrão da matriz">
           {currentEvaluatorName ? (
             <span className="flex items-center gap-1.5 text-sm font-bold transition-colors hover:opacity-80">
-              <UserCheck size={13} className="shrink-0" style={{ color: "var(--accent)" }} />
+              <UserCheck size={13} className="shrink-0" style={{ color: "var(--accent-text)" }} />
               {currentEvaluatorName}
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: WARNING }}>
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ color: DANGER_TEXT }}>
               <AlertCircle size={12} /> Sem avaliador
             </span>
           )}
@@ -206,7 +207,7 @@ function ConformityAreaEvaluatorPicker({
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0 rounded-xl" align="start" onClick={e => e.stopPropagation()} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
         <div className="p-2" style={{ borderBottom: "1px solid var(--border)" }}>
-          <p className="text-[10px] font-black uppercase tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão da Matriz</p>
+          <p className="text-[11px] font-black uppercase tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão da Matriz</p>
           <Input placeholder="Buscar por nome..." value={search} onChange={e => setSearch(e.target.value)} className="h-7 text-xs rounded-lg" style={fieldStyle} autoFocus />
         </div>
         <div className="max-h-56 overflow-y-auto">
@@ -218,13 +219,13 @@ function ConformityAreaEvaluatorPicker({
               className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-left transition-colors hover:opacity-90"
               style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: u.id === currentEvaluatorId ? "rgba(154,176,0,0.10)" : "transparent", color: u.id === currentEvaluatorId ? "var(--accent)" : "var(--foreground)" }}
             >
-              {u.id === currentEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent)" }} />}
+              {u.id === currentEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent-text)" }} />}
               <span>{u.name}</span>
             </button>
           ))}
         </div>
         {saveMutation.isPending && (
-          <div className="p-2 text-center text-[10px] font-bold" style={{ borderTop: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Salvando...</div>
+          <div className="p-2 text-center text-[11px] font-bold" style={{ borderTop: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Salvando...</div>
         )}
       </PopoverContent>
     </Popover>
@@ -292,7 +293,7 @@ function RoutingConfigDialog({
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Avaliador Principal</Label>
-          <span className="rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Obrigatório</span>
+          <span className="rounded px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wider" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Obrigatório</span>
         </div>
         <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Responsável padrão por este critério. Pré-selecionado ao gerar atribuições para um evento.</p>
         <Input placeholder="Buscar avaliador..." value={evalSearch} onChange={e => setEvalSearch(e.target.value)} className="h-9 rounded-lg text-sm" style={fieldStyle} />
@@ -310,13 +311,13 @@ function RoutingConfigDialog({
               className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-left transition-colors hover:opacity-90"
               style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none", backgroundColor: u.id === defaultEvaluatorId ? "rgba(154,176,0,0.10)" : "transparent", color: u.id === defaultEvaluatorId ? "var(--accent)" : "var(--foreground)" }}
             >
-              {u.id === defaultEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent)" }} />}
-              <span className="flex items-center gap-2"><UserCheck size={13} style={{ color: "var(--accent)" }} />{u.name}</span>
+              {u.id === defaultEvaluatorId && <Check size={11} className="shrink-0" style={{ color: "var(--accent-text)" }} />}
+              <span className="flex items-center gap-2"><UserCheck size={13} style={{ color: "var(--accent-text)" }} />{u.name}</span>
             </button>
           ))}
         </div>
         {defaultEvaluatorId == null && (
-          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase" style={{ color: WARNING }}>
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase" style={{ color: DANGER_TEXT }}>
             <AlertCircle size={12} /> Sem avaliador principal definido
           </p>
         )}
@@ -385,7 +386,7 @@ function RoutingConfigDialog({
                     <input type="checkbox" checked={selectedRedirectUsers.has(u.id)} onChange={() => toggleRedirectUser(u.id)} className="h-4 w-4" />
                     <span className="text-sm font-bold uppercase">{u.name}</span>
                     {u.id === defaultEvaluatorId && (
-                      <span className="ml-auto text-[9px] font-black uppercase rounded px-1.5 py-0.5" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Principal</span>
+                      <span className="ml-auto text-[11px] font-black uppercase rounded px-1.5 py-0.5" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Principal</span>
                     )}
                   </label>
                 ))}
@@ -585,7 +586,7 @@ export default function CriteriaPage() {
         {/* Page header */}
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Configuração de Performance</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Configuração de Performance</span>
             <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none mt-1" style={{ fontFamily: CONDENSED }}>
               Critérios de Avaliação
             </h1>
@@ -606,7 +607,7 @@ export default function CriteriaPage() {
               <Building2 size={15} className={syncLabelsRunning ? "animate-pulse" : ""} />
               {syncLabelsRunning ? "Sincronizando..." : syncLabelsResult != null ? `✓ ${syncLabelsResult} sync` : "Sync. Rótulos de Área"}
             </button>
-            <p className="text-[10px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Atualiza o nome da área exibido em cada critério</p>
+            <p className="text-[11px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Atualiza o nome da área exibido em cada critério</p>
           </div>
 
           <div className="flex flex-col items-center gap-1">
@@ -620,7 +621,7 @@ export default function CriteriaPage() {
               <Zap size={15} className={fixCalibRunning ? "animate-pulse" : ""} />
               {fixCalibRunning ? "Corrigindo..." : fixCalibResult != null ? `✓ ${fixCalibResult.totalUpdated} corr.` : "Corrigir Calibrações"}
             </button>
-            <p className="text-[10px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Recalcula calibrações com erro no servidor</p>
+            <p className="text-[11px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Recalcula calibrações com erro no servidor</p>
           </div>
 
           <div className="flex flex-col items-center gap-1">
@@ -635,7 +636,7 @@ export default function CriteriaPage() {
               <RefreshCw size={15} className={resyncAllMutation.isPending ? "animate-spin" : ""} />
               {resyncAllMutation.isPending ? "Sincronizando..." : "Sync. Todos os Eventos"}
             </button>
-            <p className="text-[10px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Aplica critérios ativos a todos os eventos abertos</p>
+            <p className="text-[11px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Aplica critérios ativos a todos os eventos abertos</p>
           </div>
 
           {canEdit && (
@@ -652,7 +653,7 @@ export default function CriteriaPage() {
                   </button>
                 </DialogTrigger>
               </Dialog>
-              <p className="text-[10px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Adiciona um critério de avaliação com nota e peso</p>
+              <p className="text-[11px] text-center max-w-[140px]" style={{ color: "var(--muted-foreground)" }}>Adiciona um critério de avaliação com nota e peso</p>
             </div>
           )}
         </section>
@@ -709,11 +710,11 @@ export default function CriteriaPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Critério &amp; Descrição</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Área</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Peso</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-right" style={{ color: "var(--muted-foreground)" }}>Status</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Critério &amp; Descrição</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Área</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Peso</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Avaliador Padrão</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-right" style={{ color: "var(--muted-foreground)" }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -806,7 +807,7 @@ export default function CriteriaPage() {
                               />
                             </div>
                             {eventCount > 0 && (
-                              <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>
+                              <span className="flex items-center gap-1 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                                 <Calendar size={10} /> {eventCount} evento{eventCount !== 1 ? "s" : ""}
                               </span>
                             )}
@@ -877,7 +878,7 @@ export default function CriteriaPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, name: d.name.trim(), defaultWeight: Number(d.defaultWeight) } }))} className="space-y-5 pt-4">
             <div className="space-y-1.5">
-              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: WARNING }}>*</span></Label>
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
               <Input data-testid="input-criterion-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome do critério."))} placeholder="Ex: Pontualidade" className="h-11 rounded-lg" style={fieldStyle} />
               <FieldError message={errors.name?.message} />
             </div>
@@ -968,7 +969,7 @@ export default function CriteriaPage() {
                 Cria uma cópia de <span className="font-bold" style={{ color: "var(--foreground)" }}>"{duplicateSource.name}"</span> (mesma descrição e peso) vinculada a outra área. Útil quando mais de uma área avalia o mesmo quesito e a nota final é a média entre elas.
               </p>
               <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nova Área Responsável <span style={{ color: WARNING }}>*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nova Área Responsável <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
                   <SelectTrigger data-testid="select-duplicate-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
                     <SelectValue placeholder="Selecione a área..." />
@@ -1017,7 +1018,7 @@ export default function CriteriaPage() {
                 ].map((s, i) => (
                   <div key={i} className="rounded-lg p-3" style={{ backgroundColor: "var(--secondary)" }}>
                     <p className="text-2xl font-black" style={{ fontFamily: CONDENSED }}>{s.val}</p>
-                    <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{s.label}</p>
+                    <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -1036,7 +1037,7 @@ export default function CriteriaPage() {
                   {resyncSummary.events.map((ev, i) => (
                     <div key={ev.id} className="px-4 py-2 flex items-center justify-between gap-3" style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
                       <span className="font-bold uppercase text-xs truncate">{ev.name}</span>
-                      <span className="text-[10px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
+                      <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
                         +{ev.added} novo(s){ev.activated > 0 ? ` ↺${ev.activated} reativado(s)` : ""}{ev.deactivated > 0 ? ` -${ev.deactivated}` : ""}
                       </span>
                     </div>

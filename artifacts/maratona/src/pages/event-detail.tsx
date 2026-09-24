@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth, hasRole } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { cn, fmtDate, fmtDateTime } from "@/lib/utils";
-import { CONDENSED, BODY, WARNING, GOOD, AMBER } from "@/lib/premium-theme";
+import { cn, fmtDate, fmtDateTime, fmtNum } from "@/lib/utils";
+import { CONDENSED, BODY, WARNING, GOOD, AMBER, GOOD_TEXT, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
@@ -112,8 +112,8 @@ function ExpandableComment({ comment }: { comment: string }) {
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
-        className="text-[10px] font-bold uppercase mt-0.5 hover:underline"
-        style={{ color: "var(--accent)" }}
+        className="text-[11px] font-bold uppercase mt-0.5 hover:underline"
+        style={{ color: "var(--accent-text)" }}
       >
         {expanded ? "Ver menos" : "Ver mais"}
       </button>
@@ -135,7 +135,7 @@ function ParticipantCommentBox({
     if (!initialComment) return null;
     return (
       <div className="mt-1 p-2 flex items-start gap-1.5 rounded-lg" style={{ backgroundColor: "rgba(232,162,61,0.08)", border: "1px solid rgba(232,162,61,0.3)" }}>
-        <MessageSquare size={12} className="shrink-0 mt-[2px]" style={{ color: AMBER }} />
+        <MessageSquare size={12} className="shrink-0 mt-[2px]" style={{ color: AMBER_TEXT }} />
         <p className="text-[11px] font-semibold whitespace-pre-wrap">{initialComment}</p>
       </div>
     );
@@ -143,7 +143,7 @@ function ParticipantCommentBox({
 
   return (
     <div className="mt-1 p-2 space-y-1.5 rounded-lg" style={{ backgroundColor: "rgba(232,162,61,0.08)", border: "1px solid rgba(232,162,61,0.3)" }}>
-      <p className="text-[10px] font-black uppercase flex items-center gap-1.5" style={{ color: AMBER }}>
+      <p className="text-[11px] font-black uppercase flex items-center gap-1.5" style={{ color: AMBER_TEXT }}>
         <MessageSquare size={12} /> {reason}
       </p>
       <Textarea
@@ -159,7 +159,7 @@ function ParticipantCommentBox({
         data-testid={`button-save-participant-comment-${employeeId}`}
         disabled={isSaving || !dirty}
         onClick={() => onSave(value.trim())}
-        className="px-3 py-1 rounded-lg font-black uppercase text-[10px] transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+        className="px-3 py-1 rounded-lg font-black uppercase text-[11px] transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
         style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
       >
         {isSaving ? "Salvando..." : "Salvar comentário"}
@@ -212,8 +212,8 @@ function EventCommentsPanel({ eventId }: { eventId: number }) {
   return (
     <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
       <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-        <MessageSquare size={16} style={{ color: "var(--accent)" }} />
-        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Comentários do Evento</span>
+        <MessageSquare size={16} style={{ color: "var(--accent-text)" }} />
+        <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Comentários do Evento</span>
       </div>
       <div className="p-5 space-y-4">
         <div data-testid="list-event-comments" className="max-h-96 overflow-y-auto space-y-2.5 pr-1">
@@ -227,18 +227,18 @@ function EventCommentsPanel({ eventId }: { eventId: number }) {
               const canDelete = isOwner || canManage;
               return (
                 <div key={c.id} data-testid={`comment-${c.id}`} className="rounded-lg p-3 flex items-start gap-3 group" style={{ backgroundColor: "var(--secondary)" }}>
-                  <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-[10px]" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
+                  <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-[11px]" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
                     {c.userName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-black uppercase text-xs">{c.userName}</span>
                       {c.userRole && (
-                        <span className="px-1.5 py-0.5 rounded font-bold text-[9px] uppercase" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
+                        <span className="px-1.5 py-0.5 rounded font-bold text-[11px] uppercase" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
                           {COMMENT_ROLE_LABELS[c.userRole] ?? c.userRole}
                         </span>
                       )}
-                      <span className="text-[10px] font-semibold" style={{ color: "var(--muted-foreground)" }}>{fmtDateTime(c.createdAt, COMMENT_TS_OPTS)}</span>
+                      <span className="text-[11px] font-semibold" style={{ color: "var(--muted-foreground)" }}>{fmtDateTime(c.createdAt, COMMENT_TS_OPTS)}</span>
                     </div>
                     <p className="text-sm whitespace-pre-wrap mt-1 break-words">{c.message}</p>
                   </div>
@@ -249,7 +249,7 @@ function EventCommentsPanel({ eventId }: { eventId: number }) {
                       onClick={() => deleteComment.mutate({ id: eventId, commentId: c.id })}
                       disabled={deleteComment.isPending}
                       className="p-1 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 disabled:opacity-40 hover:opacity-70"
-                      style={{ color: WARNING }}
+                      style={{ color: DANGER_TEXT }}
                       title="Excluir comentário"
                       aria-label="Excluir comentário"
                     >
@@ -330,7 +330,7 @@ function HistoricalResultPanel({
           type="button"
           data-testid="button-edit-historical-result"
           onClick={() => setEditing(true)}
-          className="px-3 py-1.5 rounded-lg font-black uppercase text-[10px] transition-colors hover:opacity-80"
+          className="px-3 py-1.5 rounded-lg font-black uppercase text-[11px] transition-colors hover:opacity-80"
           style={{ border: "1px solid var(--border)" }}
         >
           Editar nota/observações importadas
@@ -344,13 +344,13 @@ function HistoricalResultPanel({
 
   return (
     <div data-testid="panel-historical-result-edit" className="mt-4 p-3 rounded-lg space-y-2 w-full max-w-md" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-      <p className="text-[10px] font-black uppercase" style={{ color: AMBER }}>Evento Histórico — editar nota e observações importadas</p>
+      <p className="text-[11px] font-black uppercase" style={{ color: AMBER_TEXT }}>Evento Histórico — editar nota e observações importadas</p>
       <div>
-        <Label className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nota (0-100)</Label>
+        <Label className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nota (0-100)</Label>
         <Input data-testid="input-historical-score" type="text" inputMode="decimal" value={score} onChange={(e) => setScore(e.target.value)} className="text-sm rounded-lg mt-1" style={fieldStyle} />
       </div>
       <div>
-        <Label className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Observações</Label>
+        <Label className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Observações</Label>
         <Textarea data-testid="textarea-historical-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Comentários de conformidade/performance da planilha..." className="text-xs rounded-lg min-h-[80px] mt-1" style={fieldStyle} />
       </div>
       <div className="flex gap-2">
@@ -359,7 +359,7 @@ function HistoricalResultPanel({
           data-testid="button-save-historical-result"
           disabled={!scoreValid || updateHistorical.isPending}
           onClick={() => updateHistorical.mutate({ id: eventId, data: { importedScore: parsedScore, importedNotes: notes.trim() || null } })}
-          className="px-3 py-1 rounded-lg font-black uppercase text-[10px] transition-opacity disabled:opacity-50 hover:opacity-90"
+          className="px-3 py-1 rounded-lg font-black uppercase text-[11px] transition-opacity disabled:opacity-50 hover:opacity-90"
           style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
         >
           {updateHistorical.isPending ? "Salvando..." : "Salvar"}
@@ -369,14 +369,14 @@ function HistoricalResultPanel({
           data-testid="button-cancel-historical-result"
           disabled={updateHistorical.isPending}
           onClick={() => setEditing(false)}
-          className="px-3 py-1 rounded-lg font-black uppercase text-[10px] transition-colors disabled:opacity-50 hover:opacity-80"
+          className="px-3 py-1 rounded-lg font-black uppercase text-[11px] transition-colors disabled:opacity-50 hover:opacity-80"
           style={{ border: "1px solid var(--border)" }}
         >
           Cancelar
         </button>
       </div>
       {!scoreValid && score.trim() !== "" && (
-        <p className="text-[10px] font-bold" style={{ color: WARNING }}>Nota deve ser um número entre 0 e 100</p>
+        <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Nota deve ser um número entre 0 e 100</p>
       )}
     </div>
   );
@@ -674,7 +674,7 @@ export default function EventDetailPage() {
     );
   }
 
-  const fmt = (v: number) => `${v.toFixed(1)}`;
+  const fmt = (v: number) => `${fmtNum(v, 1)}`;
   const activeCriteriaCount = (event.criteria ?? []).filter(c => c.active).length;
 
   return (
@@ -690,17 +690,17 @@ export default function EventDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 data-testid="text-event-name" className="font-black uppercase text-2xl tracking-tight leading-none" style={{ fontFamily: CONDENSED }}>{event.name}</h1>
               {event.isHistorical && (
-                <span data-testid="badge-historical" className="px-2.5 py-1 rounded-full font-bold text-[9px] uppercase" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER }}>Histórico</span>
+                <span data-testid="badge-historical" className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER_TEXT }}>Histórico</span>
               )}
               {event.forcedClosed && (
-                <span className="px-2.5 py-1 rounded-full font-bold text-[9px] uppercase inline-flex items-center gap-1" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>
+                <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase inline-flex items-center gap-1" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>
                   <ShieldAlert size={8} /> Fechamento Forçado
                 </span>
               )}
               {event.resultsConfirmed ? (
-                <span data-testid="badge-results-confirmed" className="px-2.5 py-1 rounded-full font-bold text-[9px] uppercase" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>Resultados Confirmados</span>
+                <span data-testid="badge-results-confirmed" className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>Resultados Confirmados</span>
               ) : (
-                <span data-testid="badge-results-pending" className="px-2.5 py-1 rounded-full font-bold text-[9px] uppercase" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>Não Confirmado</span>
+                <span data-testid="badge-results-pending" className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>Não Confirmado</span>
               )}
             </div>
             <p className="text-[12px] font-semibold mt-1.5" style={{ color: "var(--muted-foreground)" }}>
@@ -802,19 +802,19 @@ export default function EventDetailPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
               <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                 <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED, color: displayScore != null ? "var(--accent)" : "var(--muted-foreground)" }}>{displayScore != null ? fmt(displayScore) : "—"}</div>
-                <div className="text-[10px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Nota do Evento</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Nota do Evento</div>
               </div>
               <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                 <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{event.participants?.filter(p => p.countsForScore !== false).length ?? 0}</div>
-                <div className="text-[10px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Participantes</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Participantes</div>
               </div>
               <div className="rounded-xl p-4" title={criteriaTooltip} style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                 <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED }}>{evaluatedCount}/{criteriaTotal}</div>
-                <div className="text-[10px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Critérios Avaliados</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Critérios Avaliados</div>
               </div>
               <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                 <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED, color: nonConformCount > 0 ? WARNING : "var(--foreground)" }}>{nonConformCount}</div>
-                <div className="text-[10px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Itens Não Conformes</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Itens Não Conformes</div>
               </div>
             </div>
           );
@@ -824,7 +824,7 @@ export default function EventDetailPage() {
         {canViewResult && result && result.criteriaDetails && result.criteriaDetails.length > 0 && (
           <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="px-5 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Critérios de Avaliação</span>
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Critérios de Avaliação</span>
             </div>
             <div className="flex flex-col">
               {result.criteriaDetails.map(c => {
@@ -837,15 +837,15 @@ export default function EventDetailPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold uppercase text-sm">{c.criterionName}</span>
                         {c.responsibleAreaLabel && (
-                          <span className="text-[9px] font-bold uppercase rounded px-2 py-0.5" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{c.responsibleAreaLabel}</span>
+                          <span className="text-[11px] font-bold uppercase rounded px-2 py-0.5" style={{ color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{c.responsibleAreaLabel}</span>
                         )}
-                        <span className="text-[9px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Peso {fmt(c.weight)}</span>
+                        <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Peso {fmt(c.weight)}</span>
                       </div>
                       {justifications.length > 0 && (
                         <div className="mt-2 space-y-1.5" data-testid={`justifications-${c.criterionId}`}>
                           {justifications.map((j, i) => (
                             <div key={i} className="rounded-lg px-3 py-2" style={{ backgroundColor: "var(--secondary)" }}>
-                              <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Avaliado por <span style={{ color: "var(--foreground)" }}>{j.name}</span> — {j.score.toFixed(1)}</p>
+                              <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Avaliado por <span style={{ color: "var(--foreground)" }}>{j.name}</span> — {fmtNum(j.score, 1)}</p>
                               {j.comment ? <ExpandableComment comment={j.comment} /> : null}
                               {j.audioUrl && <div className="mt-1.5"><AudioPlayer objectPath={j.audioUrl} /></div>}
                             </div>
@@ -854,7 +854,7 @@ export default function EventDetailPage() {
                       )}
                       {calibrated && c.calibrationReason && (
                         <>
-                          <p className="mt-2 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Calibração</p>
+                          <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Calibração</p>
                           <div className="mt-1 rounded-lg px-3 py-2 text-[12px]" style={{ backgroundColor: "rgba(154,176,0,0.10)", border: "1px solid rgba(154,176,0,0.25)" }}>{c.calibrationReason}</div>
                         </>
                       )}
@@ -864,15 +864,15 @@ export default function EventDetailPage() {
                     </div>
                     <div className="flex gap-6 items-center shrink-0">
                       <div className="text-center">
-                        <span className="block text-[9px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Avaliador</span>
+                        <span className="block text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Avaliador</span>
                         <span className="font-black text-base" style={{ fontFamily: CONDENSED }}>{c.averageScore != null ? fmt(c.averageScore) : "—"}</span>
                       </div>
                       <div className="text-center">
-                        <span className="block text-[9px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Calibrada</span>
+                        <span className="block text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Calibrada</span>
                         {calibrated ? (
-                          <span className="font-black text-lg" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{fmt(c.calibratedScore as number)}</span>
+                          <span className="font-black text-lg" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmt(c.calibratedScore as number)}</span>
                         ) : imp && !imp.excluded ? (
-                          <span className="font-black text-lg" style={{ fontFamily: CONDENSED, color: AMBER }}>{fmt(imp.score)}</span>
+                          <span className="font-black text-lg" style={{ fontFamily: CONDENSED, color: AMBER_TEXT }}>{fmt(imp.score)}</span>
                         ) : (
                           <span className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>{imp?.excluded ? "Não avaliado" : "—"}</span>
                         )}
@@ -889,8 +889,8 @@ export default function EventDetailPage() {
         {event.isHistorical && (
           <section className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-              <MessageSquare size={16} style={{ color: "var(--accent)" }} />
-              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Observações Importadas</span>
+              <MessageSquare size={16} style={{ color: "var(--accent-text)" }} />
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Observações Importadas</span>
             </div>
             <div className="p-5">
               <HistoricalResultPanel eventId={event.id} currentScore={event.importedScore} currentNotes={event.importedNotes} canManage={canManage} />
@@ -902,12 +902,12 @@ export default function EventDetailPage() {
         {((event.participants && event.participants.length > 0) || canManageTeam) && (
           <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="px-5 py-3 flex items-center justify-between gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Equipe Alocada ({event.participants?.filter(p => p.countsForScore !== false).length ?? 0})</span>
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Equipe Alocada ({event.participants?.filter(p => p.countsForScore !== false).length ?? 0})</span>
               {canManageTeam && (
                 <button
                   data-testid="button-add-participant"
                   onClick={() => setAddParticipantOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors hover:opacity-80"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80"
                   style={{ border: "1px solid var(--border)" }}
                 >
                   <UserPlus size={12} /> Adicionar
@@ -952,7 +952,7 @@ export default function EventDetailPage() {
                                 data-testid={`button-toggle-participant-${p.employeeId}`}
                                 onClick={() => updateParticipant.mutate({ id, participantId: p.id, data: { confirmed: isInactive } })}
                                 className="p-1.5 rounded-lg transition-colors hover:opacity-80"
-                                style={isInactive ? { border: "1px solid var(--border)" } : { backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}
+                                style={isInactive ? { border: "1px solid var(--border)" } : { backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}
                                 title={isInactive ? "Reativar colaborador" : "Marcar como inativo (não compareceu)"}
                                 aria-label={isInactive ? `Reativar ${p.employeeName}` : `Marcar ${p.employeeName} como inativo (não compareceu)`}
                               >
@@ -962,7 +962,7 @@ export default function EventDetailPage() {
                                 data-testid={`button-remove-participant-${p.employeeId}`}
                                 onClick={() => setPendingRemoveParticipant(p.id)}
                                 className="p-1.5 rounded-lg transition-colors hover:opacity-80"
-                                style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}
+                                style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}
                                 title="Remover do evento"
                                 aria-label={`Remover ${p.employeeName} do evento`}
                               >
@@ -981,7 +981,7 @@ export default function EventDetailPage() {
                                   updateParticipant.mutate({ id, participantId: p.id, data: { functionName: e.target.value } });
                                 }
                               }}
-                              className="text-[10px] font-bold uppercase bg-transparent border-0 border-b border-dashed focus:outline-none cursor-pointer px-0 py-0 leading-tight appearance-none pr-3"
+                              className="text-[11px] font-bold uppercase bg-transparent border-0 border-b border-dashed focus:outline-none cursor-pointer px-0 py-0 leading-tight appearance-none pr-3"
                               style={{ color: "var(--muted-foreground)", borderBottomColor: "var(--border)" }}
                               title="Cargo/função deste colaborador neste evento"
                             >
@@ -989,22 +989,22 @@ export default function EventDetailPage() {
                                 <option key={fn} value={fn}>{fn}</option>
                               ))}
                             </select>
-                            {isInactive && <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>· Inativo</span>}
+                            {isInactive && <span className="text-[11px] font-bold uppercase" style={{ color: DANGER_TEXT }}>· Inativo</span>}
                           </div>
                         ) : (
-                          <p className="text-[10px] font-bold uppercase leading-tight" style={{ color: "var(--muted-foreground)" }}>
-                            {p.functionName}{isInactive && <span style={{ color: WARNING }}> · Inativo</span>}
+                          <p className="text-[11px] font-bold uppercase leading-tight" style={{ color: "var(--muted-foreground)" }}>
+                            {p.functionName}{isInactive && <span style={{ color: DANGER_TEXT }}> · Inativo</span>}
                           </p>
                         )}
 
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase" style={{ backgroundColor: p.employmentType === "freela" ? "var(--secondary)" : "transparent", border: "1px solid var(--border)" }}>
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase" style={{ backgroundColor: p.employmentType === "freela" ? "var(--secondary)" : "transparent", border: "1px solid var(--border)" }}>
                             {p.employmentType === "freela" ? "Freela" : "Casa"}
                           </span>
                           {isInformational && (
                             <span
                               data-testid={`badge-no-score-${p.employeeId}`}
-                              className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                              className="px-2 py-0.5 rounded text-[11px] font-bold uppercase"
                               style={{ backgroundColor: WARNING, color: "#fff" }}
                               title="Participação apenas histórica/informativa — não entra na nota nem na elegibilidade."
                             >
@@ -1067,7 +1067,7 @@ export default function EventDetailPage() {
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Colaborador <span style={{ color: WARNING }}>*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Colaborador <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
                   <PopoverTrigger asChild>
                     <button
@@ -1148,8 +1148,8 @@ export default function EventDetailPage() {
         {!isOperador && (
         <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
           <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-            <ShieldAlert size={16} style={{ color: "var(--accent)" }} />
-            <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Matriz de Conformidade</span>
+            <ShieldAlert size={16} style={{ color: "var(--accent-text)" }} />
+            <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Matriz de Conformidade</span>
           </div>
           {canManage ? (
             <div className="flex flex-col min-[480px]:flex-row" style={{ borderBottom: "1px solid var(--border)" }}>
@@ -1158,10 +1158,10 @@ export default function EventDetailPage() {
                 { label: "Cenografia", open: conformityEvaluatorPickerOpen, setOpen: setConformityEvaluatorPickerOpen, current: event?.conformityEvaluatorUserId, currentName: event?.conformityEvaluatorName, mut: setConformityEvaluatorMutation },
               ].map(g => (
                 <div key={g.label} className="flex-1 px-4 py-2.5 flex items-center gap-2 min-w-0">
-                  <span className="text-[9px] font-black uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>{g.label}:</span>
+                  <span className="text-[11px] font-black uppercase shrink-0" style={{ color: "var(--muted-foreground)" }}>{g.label}:</span>
                   <Popover open={g.open} onOpenChange={g.setOpen}>
                     <PopoverTrigger asChild>
-                      <button type="button" title={g.currentName ?? "Sem avaliador"} className="flex items-center gap-1 text-[10px] font-bold uppercase rounded-lg px-2 py-1 transition-colors flex-1 min-w-0 hover:opacity-80" style={fieldStyle}>
+                      <button type="button" title={g.currentName ?? "Sem avaliador"} className="flex items-center gap-1 text-[11px] font-bold uppercase rounded-lg px-2 py-1 transition-colors flex-1 min-w-0 hover:opacity-80" style={fieldStyle}>
                         <UserCheck size={10} className="shrink-0" />
                         <span className="truncate">{g.currentName ?? "Sem avaliador"}</span>
                       </button>
@@ -1193,14 +1193,14 @@ export default function EventDetailPage() {
               ))}
             </div>
           ) : (event?.conformityEvaluatorName || event?.conformityEvaluatorFerramentasName) ? (
-            <div className="flex flex-col min-[480px]:flex-row text-[10px] font-bold" style={{ borderBottom: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
+            <div className="flex flex-col min-[480px]:flex-row text-[11px] font-bold" style={{ borderBottom: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
               <div className="flex-1 px-4 py-2.5 flex items-center gap-1.5 min-w-0"><span className="uppercase shrink-0">Ferramentas:</span><span className="truncate" style={{ color: "var(--foreground)" }}>{event.conformityEvaluatorFerramentasName ?? "—"}</span></div>
               <div className="flex-1 px-4 py-2.5 flex items-center gap-1.5 min-w-0"><span className="uppercase shrink-0">Cenografia:</span><span className="truncate" style={{ color: "var(--foreground)" }}>{event.conformityEvaluatorName ?? "—"}</span></div>
             </div>
           ) : null}
 
           {!conformityData && importedConformityRatio && (
-            <p className="px-5 pt-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+            <p className="px-5 pt-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
               {importedConformityAllValue !== null
                 ? `Inferido das observações importadas (${importedConformityRatio.sim}/${importedConformityRatio.total} itens "Sim")`
                 : `Observações importadas indicam ${importedConformityRatio.sim}/${importedConformityRatio.total} itens "Sim" — não é possível identificar qual item pelo texto`}
@@ -1215,8 +1215,8 @@ export default function EventDetailPage() {
             return (
               <div key={group}>
                 <div className="flex items-center gap-2 px-5 py-2" style={{ backgroundColor: "var(--secondary)", borderTop: "1px solid var(--border)" }}>
-                  <span className="text-[10px] font-black uppercase">{groupLabel}</span>
-                  {evaluatorName ? <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>— {evaluatorName}</span> : <span className="text-[10px]" style={{ color: WARNING }}>— sem avaliador atribuído</span>}
+                  <span className="text-[11px] font-black uppercase">{groupLabel}</span>
+                  {evaluatorName ? <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>— {evaluatorName}</span> : <span className="text-[11px]" style={{ color: DANGER_TEXT }}>— sem avaliador atribuído</span>}
                 </div>
                 {groupItems.map(item => {
                   const value = conformityForm[item.key];
@@ -1232,7 +1232,7 @@ export default function EventDetailPage() {
                           <span className="text-sm font-bold">{item.label}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 py-2">
-                          {isNonConforming && <span className="text-[10px] font-black uppercase whitespace-nowrap mr-1" style={{ color: WARNING }}>-10 pts</span>}
+                          {isNonConforming && <span className="text-[11px] font-black uppercase whitespace-nowrap mr-1" style={{ color: DANGER_TEXT }}>-10 pts</span>}
                           {canManageConformity ? (
                             <div className="flex items-center rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
                               <button type="button" onClick={() => { setConformityForm({ ...conformityForm, [item.key]: true }); setConformity.mutate({ id, data: { [item.key]: true } }); }} className="px-2.5 py-1 text-[11px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === true ? "var(--primary)" : "transparent", color: value === true ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Sim</button>
@@ -1254,7 +1254,7 @@ export default function EventDetailPage() {
                               aria-expanded={expandedComments.has(item.key)}
                               onClick={() => setExpandedComments(prev => { const next = new Set(prev); if (next.has(item.key)) next.delete(item.key); else next.add(item.key); return next; })}
                               className="p-1.5 rounded-lg transition-colors hover:opacity-80"
-                              style={needsComment ? { color: WARNING, backgroundColor: "rgba(229,72,77,0.10)" } : comment ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
+                              style={needsComment ? { color: DANGER_TEXT, backgroundColor: "rgba(229,72,77,0.10)" } : comment ? { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } : { border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
                             >
                               <MessageSquare size={13} />
                             </button>
@@ -1274,7 +1274,7 @@ export default function EventDetailPage() {
                             type="button"
                             disabled={setConformity.isPending}
                             onClick={() => setConformity.mutate({ id, data: { [item.commentKey]: comment || null } })}
-                            className="px-3 py-1 rounded-lg font-black uppercase text-[10px] disabled:opacity-50 transition-opacity hover:opacity-90"
+                            className="px-3 py-1 rounded-lg font-black uppercase text-[11px] disabled:opacity-50 transition-opacity hover:opacity-90"
                             style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                           >
                             {setConformity.isPending ? "Salvando..." : "Salvar Comentário"}
@@ -1297,15 +1297,15 @@ export default function EventDetailPage() {
           {(conformityData || canManageConformity) && (
             <div>
               <div className="flex items-center gap-2 px-5 py-2" style={{ backgroundColor: "var(--secondary)", borderTop: "1px solid var(--border)" }}>
-                <span className="text-[10px] font-black uppercase">Cenografia</span>
-                <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>— Respostas Extras</span>
+                <span className="text-[11px] font-black uppercase">Cenografia</span>
+                <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>— Respostas Extras</span>
               </div>
               <div className="px-5 py-3.5 space-y-2" style={{ borderTop: "1px solid var(--border)" }}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold">Faltou / Atrasou?</span>
                   {conformityForm.absencesResponse !== null
-                    ? <span className="text-[10px] font-black uppercase rounded px-2 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>Respondido</span>
-                    : <span className="text-[10px] font-black uppercase rounded px-2 py-0.5" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER }}>Não respondido</span>}
+                    ? <span className="text-[11px] font-black uppercase rounded px-2 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>Respondido</span>
+                    : <span className="text-[11px] font-black uppercase rounded px-2 py-0.5" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER_TEXT }}>Não respondido</span>}
                 </div>
                 {canManageConformity ? (
                   <div className="space-y-1.5">
@@ -1320,7 +1320,7 @@ export default function EventDetailPage() {
                       type="button"
                       disabled={setConformity.isPending}
                       onClick={() => setConformity.mutate({ id, data: { absencesResponse: conformityForm.absencesReport.trim() ? true : null, absencesReport: conformityForm.absencesReport || null } })}
-                      className="px-3 py-1 rounded-lg font-black uppercase text-[10px] disabled:opacity-50 transition-opacity hover:opacity-90"
+                      className="px-3 py-1 rounded-lg font-black uppercase text-[11px] disabled:opacity-50 transition-opacity hover:opacity-90"
                       style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                     >
                       {setConformity.isPending ? "Salvando..." : "Salvar"}
@@ -1360,7 +1360,7 @@ export default function EventDetailPage() {
                         type="button"
                         disabled={setConformity.isPending}
                         onClick={() => setConformity.mutate({ id, data: { standoutJustification: conformityForm.standoutJustification || null } })}
-                        className="px-3 py-1 rounded-lg font-black uppercase text-[10px] disabled:opacity-50 transition-opacity hover:opacity-90"
+                        className="px-3 py-1 rounded-lg font-black uppercase text-[11px] disabled:opacity-50 transition-opacity hover:opacity-90"
                         style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                       >
                         {setConformity.isPending ? "Salvando..." : "Salvar Destaque"}
@@ -1378,7 +1378,7 @@ export default function EventDetailPage() {
 
           {(result?.conformityPenalty ?? 0) > 0 && (
             <div className="px-5 pt-3 pb-3" style={{ borderTop: "1px solid var(--border)" }}>
-              <p className="text-xs font-bold uppercase flex items-center gap-1.5" style={{ color: WARNING }}>
+              <p className="text-xs font-bold uppercase flex items-center gap-1.5" style={{ color: DANGER_TEXT }}>
                 <AlertTriangle size={13} /> Desconto na nota final do evento: -{result?.conformityPenalty} pts
               </p>
             </div>
@@ -1390,16 +1390,16 @@ export default function EventDetailPage() {
         {hasPerformanceTable && result && result.eventScore > 0 && participantResults.length > 0 && (
           <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-              <BarChart3 size={16} style={{ color: "var(--accent)" }} />
-              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Performance Individual (Equipe)</span>
+              <BarChart3 size={16} style={{ color: "var(--accent-text)" }} />
+              <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Performance Individual (Equipe)</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Colaborador</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Score Equivalente</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Colaborador</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Score Equivalente</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1411,9 +1411,9 @@ export default function EventDetailPage() {
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         {p.eligible === false ? (
-                          <span className="inline-block text-[10px] uppercase font-black rounded-full px-2 py-1" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: WARNING }}>Inativo/Inelegível</span>
+                          <span className="inline-block text-[11px] uppercase font-black rounded-full px-2 py-1" style={{ backgroundColor: "rgba(229,72,77,0.12)", color: DANGER_TEXT }}>Inativo/Inelegível</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black rounded-full px-2 py-1" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>
+                          <span className="inline-flex items-center gap-1 text-[11px] uppercase font-black rounded-full px-2 py-1" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>
                             <CheckCircle2 size={10} /> Elegível
                           </span>
                         )}

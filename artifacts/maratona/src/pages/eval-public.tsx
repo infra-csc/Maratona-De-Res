@@ -1,26 +1,19 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { CheckCircle2, ClipboardCheck, AlertTriangle, ShieldAlert, Sun, Moon } from "lucide-react";
-import { CONDENSED, BODY, WARNING, darkTokens, lightTokens } from "@/lib/premium-theme";
+import { CONDENSED, BODY, WARNING, darkTokens, lightTokens, DANGER_TEXT } from "@/lib/premium-theme";
+import {
+  getPublicEval, submitPublicEval, submitPublicEvalConformity, ApiError,
+  type PublicEvalInfo, type PublicEvalSubmitInput, type PublicEvalConformityInput,
+} from "@workspace/api-client-react";
 
-type TokenType = "criteria" | "conformity_cenografia" | "conformity_ferramentas" | "criteria_with_conformity";
-
-interface TokenCriterion {
-  criterionId: number;
-  criterionName: string;
-  criterionDescription: string | null;
-}
-
-interface TokenInfo {
-  tokenId: string;
-  tokenType: TokenType;
-  isUsed: boolean;
-  usedAt: string | null;
-  recipientName: string | null;
-  submitterName: string | null;
-  eventName: string | null;
-  eventStatus: string | null;
-  criteria: TokenCriterion[];
+/** Mensagem do servidor (`{ error }`) sem o prefixo "HTTP 4xx ..." do ApiError. */
+function serverErrorMessage(e: unknown, fallback: (status: number) => string): string {
+  if (e instanceof ApiError) {
+    const data = e.data as { error?: unknown } | null;
+    return typeof data?.error === "string" && data.error.trim() ? data.error : fallback(e.status);
+  }
+  return e instanceof Error ? e.message : fallback(0);
 }
 
 // score: null = ainda não selecionado; number = selecionado (inclusive 0)
@@ -107,7 +100,7 @@ export default function PublicEvalPage() {
   const token = params.token;
 
   const [isDark, setIsDark] = useState(false);
-  const [info, setInfo] = useState<TokenInfo | null>(null);
+  const [info, setInfo] = useState<PublicEvalInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitterName, setSubmitterName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -132,25 +125,18 @@ export default function PublicEvalPage() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`/api/public-eval/${token}`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}));
-          throw new Error((j as { error?: string }).error ?? `Erro ${r.status}`);
-        }
-        return r.json();
-      })
+    getPublicEval(token)
       .then((data) => {
         setInfo(data);
         setSubmitterName("");
         setAnswers(
           Object.fromEntries(
             // score: null = ainda não selecionado (0 é nota válida)
-            (data.criteria ?? []).map((c: TokenCriterion) => [c.criterionId, { score: null, comments: "" }]),
+            (data.criteria ?? []).map((c) => [c.criterionId, { score: null, comments: "" }]),
           ),
         );
       })
-      .catch((e: Error) => setLoadError(e.message));
+      .catch((e: unknown) => setLoadError(serverErrorMessage(e, (status) => `Erro ${status}`)));
   }, [token]);
 
   const tokenType = info?.tokenType ?? "criteria";
@@ -190,7 +176,7 @@ export default function PublicEvalPage() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const body: Record<string, unknown> = {
+      const body: PublicEvalSubmitInput = {
         submitterName: submitterName.trim(),
         evaluations: criteria.map((c) => ({
           criterionId: c.criterionId,
@@ -215,18 +201,10 @@ export default function PublicEvalPage() {
           standoutJustification: cenoAnswers.standoutJustification || null,
         });
       }
-      const r = await fetch(`/api/public-eval/${token}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error((j as { error?: string }).error ?? "Erro ao enviar");
-      }
+      await submitPublicEval(token, body);
       setDone(true);
     } catch (e: unknown) {
-      setSubmitError((e as Error).message);
+      setSubmitError(serverErrorMessage(e, () => "Erro ao enviar"));
     } finally {
       setIsSubmitting(false);
     }
@@ -237,7 +215,7 @@ export default function PublicEvalPage() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const body: Record<string, unknown> = { submitterName: submitterName.trim() };
+      const body: PublicEvalConformityInput = { submitterName: submitterName.trim() };
       if (tokenType === "conformity_cenografia") {
         Object.assign(body, {
           epi: cenoAnswers.epi,
@@ -258,18 +236,10 @@ export default function PublicEvalPage() {
           guardaEquipamentosComment: ferramentasComment || null,
         });
       }
-      const r = await fetch(`/api/public-eval/${token}/submit-conformity`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error((j as { error?: string }).error ?? "Erro ao enviar");
-      }
+      await submitPublicEvalConformity(token, body);
       setDone(true);
     } catch (e: unknown) {
-      setSubmitError((e as Error).message);
+      setSubmitError(serverErrorMessage(e, () => "Erro ao enviar"));
     } finally {
       setIsSubmitting(false);
     }
@@ -288,7 +258,7 @@ export default function PublicEvalPage() {
     return (
       <div style={shellStyle} className="min-h-screen flex items-center justify-center p-6">
         <Card className="max-w-md w-full p-8 text-center">
-          <AlertTriangle size={40} className="mx-auto mb-4" style={{ color: WARNING }} />
+          <AlertTriangle size={40} className="mx-auto mb-4" style={{ color: DANGER_TEXT }} />
           <h1 className="font-black text-2xl uppercase tracking-wide mb-2" style={{ fontFamily: CONDENSED }}>Link Inválido</h1>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>{loadError}</p>
         </Card>
@@ -315,7 +285,7 @@ export default function PublicEvalPage() {
     return (
       <div style={shellStyle} className="min-h-screen flex items-center justify-center p-6">
         <Card className="max-w-md w-full p-8 text-center">
-          <CheckCircle2 size={40} className="mx-auto mb-4" style={{ color: "var(--accent)" }} />
+          <CheckCircle2 size={40} className="mx-auto mb-4" style={{ color: "var(--accent-text)" }} />
           <h1 className="font-black text-2xl uppercase tracking-wide mb-2" style={{ fontFamily: CONDENSED }}>Link Já Utilizado</h1>
           <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
             Este formulário já foi preenchido por <strong style={{ color: "var(--foreground)" }}>{info.submitterName ?? "alguém"}</strong>.
@@ -335,7 +305,7 @@ export default function PublicEvalPage() {
     return (
       <div style={shellStyle} className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center space-y-4">
-          <CheckCircle2 size={56} strokeWidth={1.5} style={{ color: "var(--accent)", margin: "0 auto" }} />
+          <CheckCircle2 size={56} strokeWidth={1.5} style={{ color: "var(--accent-text)", margin: "0 auto" }} />
           <h2 className="font-black text-3xl uppercase tracking-wide" style={{ fontFamily: CONDENSED }}>Respostas Enviadas</h2>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
             Obrigado, <span className="font-semibold" style={{ color: "var(--foreground)" }}>{submitterName}</span>. Suas respostas foram registradas com sucesso.
@@ -363,7 +333,7 @@ export default function PublicEvalPage() {
     return (
       <div style={shellStyle} className="min-h-screen flex items-center justify-center p-6">
         <Card className="max-w-md w-full p-8 text-center">
-          <AlertTriangle size={40} className="mx-auto mb-4" style={{ color: WARNING }} />
+          <AlertTriangle size={40} className="mx-auto mb-4" style={{ color: DANGER_TEXT }} />
           <h1 className="font-black text-2xl uppercase tracking-wide mb-2" style={{ fontFamily: CONDENSED }}>Link sem critérios</h1>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
             Este link não tem critérios para avaliar{info.eventName ? <> em <strong style={{ color: "var(--foreground)" }}>{info.eventName}</strong></> : null} — peça outro ao responsável pelo evento.
@@ -425,8 +395,8 @@ export default function PublicEvalPage() {
         {/* Hero header */}
         <Card className="px-6 pt-6 pb-7">
           <div className="flex items-center gap-2 mb-4">
-            {(isConformity || isCombined) ? <ShieldAlert size={14} strokeWidth={2.5} style={{ color: "var(--accent)" }} /> : <ClipboardCheck size={14} strokeWidth={2.5} style={{ color: "var(--accent)" }} />}
-            <span className="text-[11px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+            {(isConformity || isCombined) ? <ShieldAlert size={14} strokeWidth={2.5} style={{ color: "var(--accent-text)" }} /> : <ClipboardCheck size={14} strokeWidth={2.5} style={{ color: "var(--accent-text)" }} />}
+            <span className="text-[11px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
               {isConformityCenografia ? "Conformidade — Cenografia" : isConformityFerramentas ? "Conformidade — Ferramentas" : isCombined ? "Avaliação + Conformidade" : "Avaliação de Desempenho"}
             </span>
           </div>
@@ -443,7 +413,7 @@ export default function PublicEvalPage() {
         {/* Nome */}
         <Card className="px-5 py-5 space-y-3">
           <label className="block text-[11px] font-bold tracking-[0.15em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-            Seu nome completo <span style={{ color: WARNING }}>*</span>
+            Seu nome completo <span style={{ color: DANGER_TEXT }}>*</span>
           </label>
           <input
             id="field-submitter-name"
@@ -475,9 +445,9 @@ export default function PublicEvalPage() {
                 {/* Score picker: 0-10, rótulo só nas pontas */}
                 <div>
                   <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-3" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-                    Nota <span style={{ color: WARNING }}>*</span>
+                    Nota <span style={{ color: DANGER_TEXT }}>*</span>
                     {selectedScore !== null && scoreLabels[selectedScore] && (
-                      <span className="ml-2 normal-case font-semibold" style={{ color: "var(--accent)" }}>— {scoreLabels[selectedScore]}</span>
+                      <span className="ml-2 normal-case font-semibold" style={{ color: "var(--accent-text)" }}>— {scoreLabels[selectedScore]}</span>
                     )}
                   </p>
                   <div className="flex gap-1" id={`crit-${c.criterionId}-score`} role="group" aria-label={`Nota do critério ${c.criterionName}`}>
@@ -501,16 +471,16 @@ export default function PublicEvalPage() {
                     ))}
                   </div>
                   <div className="flex justify-between mt-1.5">
-                    <span className="text-[10px] font-medium max-w-[120px] leading-tight" style={{ color: "var(--muted-foreground)" }}>{scoreLabels[0]}</span>
-                    <span className="text-[10px] font-medium max-w-[120px] text-right leading-tight" style={{ color: "var(--muted-foreground)" }}>{scoreLabels[10]}</span>
+                    <span className="text-[11px] font-medium max-w-[120px] leading-tight" style={{ color: "var(--muted-foreground)" }}>{scoreLabels[0]}</span>
+                    <span className="text-[11px] font-medium max-w-[120px] text-right leading-tight" style={{ color: "var(--muted-foreground)" }}>{scoreLabels[10]}</span>
                   </div>
                 </div>
 
                 {/* Comentário SEMPRE obrigatório */}
                 <div>
                   <label className="block text-[11px] font-bold tracking-[0.15em] uppercase mb-1.5" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-                    Comentário <span style={{ color: WARNING }}>*</span>
-                    <span className="ml-1 text-[10px] font-medium normal-case" style={{ color: "var(--muted-foreground)" }}>(obrigatório)</span>
+                    Comentário <span style={{ color: DANGER_TEXT }}>*</span>
+                    <span className="ml-1 text-[11px] font-medium normal-case" style={{ color: "var(--muted-foreground)" }}>(obrigatório)</span>
                   </label>
                   <textarea
                     id={`crit-${c.criterionId}-comment`}
@@ -526,7 +496,7 @@ export default function PublicEvalPage() {
                     }}
                   />
                   {commentMissing && (
-                    <p className="text-[10px] font-bold mt-1" style={{ color: WARNING }}>Preencha o comentário antes de enviar.</p>
+                    <p className="text-[11px] font-bold mt-1" style={{ color: DANGER_TEXT }}>Preencha o comentário antes de enviar.</p>
                   )}
                 </div>
               </div>
@@ -545,7 +515,7 @@ export default function PublicEvalPage() {
             <div className="space-y-4">
               <Card className="overflow-hidden">
                 <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
-                  <span className="text-[11px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Matriz de Conformidade</span>
+                  <span className="text-[11px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Matriz de Conformidade</span>
                 </div>
                 {items.map((item, i) => {
                   const val = cenoAnswers[item.key];
@@ -555,14 +525,14 @@ export default function PublicEvalPage() {
                       <div className="flex items-center justify-between gap-4">
                         <p className="text-sm leading-snug flex-1">{item.question}</p>
                         <div className="flex items-center gap-2 shrink-0">
-                          {isNao && <span className="text-[10px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: CONDENSED, color: WARNING }}>-10 pts</span>}
+                          {isNao && <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>-10 pts</span>}
                           <YesNoToggle value={val} onChange={(v) => setCenoAnswers(f => ({ ...f, [item.key]: v }))} />
                         </div>
                       </div>
                       {val !== null && (
                         <div className="mt-3 space-y-1">
-                          <label className="text-[10px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-                            Comentário {isNao ? <span className="normal-case font-semibold" style={{ color: WARNING }}>* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                          <label className="text-[11px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+                            Comentário {isNao ? <span className="normal-case font-semibold" style={{ color: DANGER_TEXT }}>* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
                           </label>
                           <textarea
                             id={`ceno-${item.key}-comment`}
@@ -574,7 +544,7 @@ export default function PublicEvalPage() {
                             style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                           />
                           {isNao && !cenoAnswers[item.commentKey].trim() && (
-                            <p className="text-[10px] font-bold" style={{ color: WARNING }}>Comentário obrigatório quando a resposta é Não.</p>
+                            <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Comentário obrigatório quando a resposta é Não.</p>
                           )}
                         </div>
                       )}
@@ -585,7 +555,7 @@ export default function PublicEvalPage() {
 
               <Card className="p-5 space-y-1">
                 <label className="block text-sm font-semibold">
-                  Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span style={{ color: WARNING }}>*</span> obrigatório
+                  Alguém faltou ou atrasou por mais de 30 minutos? Especifique. <span style={{ color: DANGER_TEXT }}>*</span> obrigatório
                 </label>
                 <textarea
                   id="ceno-absences"
@@ -596,12 +566,12 @@ export default function PublicEvalPage() {
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
                   style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                 />
-                {!cenoAnswers.absencesReport.trim() && <p className="text-[10px] font-bold" style={{ color: WARNING }}>Especifique antes de enviar.</p>}
+                {!cenoAnswers.absencesReport.trim() && <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Especifique antes de enviar.</p>}
               </Card>
 
               <Card className="p-5 space-y-3">
                 <label className="block text-sm font-semibold">
-                  Algum profissional teve um desempenho fora da curva? <span style={{ color: WARNING }}>*</span>
+                  Algum profissional teve um desempenho fora da curva? <span style={{ color: DANGER_TEXT }}>*</span>
                 </label>
                 <div className="flex gap-2">
                   <button type="button"
@@ -627,7 +597,7 @@ export default function PublicEvalPage() {
                 </div>
                 {cenoAnswers.standoutResponse === true && (
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Detalhe o destaque <span>*</span> obrigatório</label>
+                    <label className="text-[11px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Detalhe o destaque <span>*</span> obrigatório</label>
                     <textarea
                       id="ceno-standout-justification"
                       rows={2}
@@ -637,7 +607,7 @@ export default function PublicEvalPage() {
                       className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
                       style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                     />
-                    {cenoStandoutMissing && <p className="text-[10px] font-bold" style={{ color: WARNING }}>Descreva o destaque antes de enviar.</p>}
+                    {cenoStandoutMissing && <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Descreva o destaque antes de enviar.</p>}
                   </div>
                 )}
               </Card>
@@ -651,20 +621,20 @@ export default function PublicEvalPage() {
           return (
             <Card className="overflow-hidden">
               <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
-                <span className="text-[11px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Ferramentas e Case</span>
+                <span className="text-[11px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Ferramentas e Case</span>
               </div>
               <div className="px-5 py-4" id="ferr-answer">
                 <div className="flex items-center justify-between gap-4">
                   <p className="text-sm leading-snug flex-1">Todos os equipamentos e ferramentas retornaram?</p>
                   <div className="flex items-center gap-2 shrink-0">
-                    {isNao && <span className="text-[10px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: CONDENSED, color: WARNING }}>-10 pts</span>}
+                    {isNao && <span className="text-[11px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>-10 pts</span>}
                     <YesNoToggle value={ferramentasAnswer} onChange={setFerramentasAnswer} />
                   </div>
                 </div>
                 {ferramentasAnswer !== null && (
                   <div className="mt-3 space-y-1">
-                    <label className="text-[10px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-                      Comentário {isNao ? <span className="normal-case font-semibold" style={{ color: WARNING }}>* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
+                    <label className="text-[11px] font-bold tracking-[0.1em] uppercase" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
+                      Comentário {isNao ? <span className="normal-case font-semibold" style={{ color: DANGER_TEXT }}>* obrigatório</span> : <span className="font-normal normal-case">(opcional)</span>}
                     </label>
                     <textarea
                       id="ferr-comment"
@@ -676,7 +646,7 @@ export default function PublicEvalPage() {
                       style={{ backgroundColor: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
                     />
                     {isNao && !ferramentasComment.trim() && (
-                      <p className="text-[10px] font-bold" style={{ color: WARNING }}>Comentário obrigatório quando a resposta é Não.</p>
+                      <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Comentário obrigatório quando a resposta é Não.</p>
                     )}
                   </div>
                 )}
@@ -687,7 +657,7 @@ export default function PublicEvalPage() {
 
         {/* Submit */}
         {submitError && (
-          <div className="rounded-lg px-4 py-3 text-sm font-semibold" style={{ backgroundColor: "rgba(229,72,77,0.1)", border: `1px solid ${WARNING}`, color: WARNING }}>
+          <div className="rounded-lg px-4 py-3 text-sm font-semibold" style={{ backgroundColor: "rgba(229,72,77,0.1)", border: `1px solid ${WARNING}`, color: DANGER_TEXT }}>
             {submitError}
           </div>
         )}

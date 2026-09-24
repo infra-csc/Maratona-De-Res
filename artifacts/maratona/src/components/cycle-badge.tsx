@@ -1,5 +1,6 @@
 import { useGetCurrentCycle } from "@workspace/api-client-react";
 import { CalendarRange } from "lucide-react";
+import { CONDENSED } from "@/lib/premium-theme";
 
 // Formata "YYYY-MM-DD" -> "DD/MM/YYYY" sem usar new Date() para evitar
 // deslocamento de fuso horário (datas de ciclo são dias civis, não instantes).
@@ -35,14 +36,15 @@ export function CycleBadge({ className = "", showName = true }: CycleBadgeProps)
   return (
     <div
       data-testid="badge-cycle-period"
-      className={`inline-flex items-center gap-2 border-2 border-[#191c1e] bg-white px-3 py-2 ${className}`}
+      className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 ${className}`}
+      style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}
     >
-      <CalendarRange size={16} className="shrink-0 text-[#191c1e]" />
+      <CalendarRange size={16} className="shrink-0" style={{ color: "var(--muted-foreground)" }} aria-hidden />
       <span className="flex flex-col leading-tight">
         {showName && (
-          <span className="font-black italic uppercase text-xs tracking-wider text-[#191c1e]">{cycle.name}</span>
+          <span className="font-black uppercase text-xs tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--foreground)" }}>{cycle.name}</span>
         )}
-        <span className="text-[11px] font-bold italic uppercase tracking-wide text-[#444933]">
+        <span className="text-[11px] font-semibold" style={{ color: "var(--muted-foreground)" }}>
           {period ?? "Período não definido"}
         </span>
       </span>

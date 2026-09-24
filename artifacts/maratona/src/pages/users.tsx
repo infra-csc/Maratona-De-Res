@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, useMergeUser, getGetUsersQueryKey } from "@workspace/api-client-react";
-import type { UserInput, User, MergeUserResult } from "@workspace/api-client-react";
+import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useResetUserPassword, useGetAreas, useGetEmployees, useImpersonate, useMergeUser, getGetUsersQueryKey, bulkUpdateUserEmails, ApiError } from "@workspace/api-client-react";
+import type { UserInput, User, MergeUserResult, EmailMigrationPreviewItem } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Trash2, KeyRound, ShieldCheck, Mail, Building2, UserCircle, Users, Filter, Eye, Pencil, LineChart, GitMerge, X } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { CONDENSED, BODY, WARNING, GOOD, AMBER, INFO, PremiumCard } from "@/lib/premium-theme";
+import { CONDENSED, BODY, WARNING, GOOD, PremiumCard, GOOD_TEXT, DANGER_TEXT, AMBER_TEXT, INFO_TEXT } from "@/lib/premium-theme";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
@@ -23,27 +23,27 @@ const requiredText = (message: string) => ({
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{message}</p>;
 }
 
-/** Lê `{ error }` do corpo da resposta sem quebrar quando o corpo não é JSON. */
-async function readServerError(res: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: unknown };
-    if (typeof body?.error === "string" && body.error.trim()) return body.error;
-  } catch { /* corpo vazio ou não-JSON */ }
-  return fallback;
+/** Mensagem para o toast: `{ error }` do servidor, o texto padrão quando o corpo não traz um, ou a falha de rede. */
+function serverErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) {
+    const data = e.data as { error?: unknown } | null;
+    return typeof data?.error === "string" && data.error.trim() ? data.error : fallback;
+  }
+  return e instanceof Error ? e.message : "Tente novamente.";
 }
 
 const ROLES: { value: string; label: string; bg: string; fg: string }[] = [
   { value: "admin", label: "Administrador", bg: "var(--primary)", fg: "var(--primary-foreground)" },
-  { value: "rh", label: "RH", bg: "rgba(154,176,0,0.14)", fg: GOOD },
+  { value: "rh", label: "RH", bg: "rgba(154,176,0,0.14)", fg: GOOD_TEXT },
   { value: "avaliador", label: "Avaliador", bg: "var(--secondary)", fg: "var(--muted-foreground)" },
-  { value: "diretoria", label: "Diretoria", bg: "rgba(229,72,77,0.12)", fg: WARNING },
-  { value: "visualizador", label: "Visualizador", bg: "rgba(232,162,61,0.14)", fg: AMBER },
+  { value: "diretoria", label: "Diretoria", bg: "rgba(229,72,77,0.12)", fg: DANGER_TEXT },
+  { value: "visualizador", label: "Visualizador", bg: "rgba(232,162,61,0.14)", fg: AMBER_TEXT },
   // Confirma equipes por evento e envia avaliação (qualquer área), cadastra/edita
   // colaboradores — mas nunca vê nota, resposta enviada ou matriz de conformidade.
-  { value: "operador", label: "Operador", bg: "rgba(91,141,239,0.14)", fg: INFO },
+  { value: "operador", label: "Operador", bg: "rgba(91,141,239,0.14)", fg: INFO_TEXT },
 ];
 
 function initials(name: string) {
@@ -68,7 +68,7 @@ export default function UsersPage() {
   const [mergeResult, setMergeResult] = useState<MergeUserResult | null>(null);
 
   const [emailMigOpen, setEmailMigOpen] = useState(false);
-  const [emailMigPreview, setEmailMigPreview] = useState<{ id: number; name?: string; emailFrom?: string | null; emailTo?: string; email?: string; status: string }[] | null>(null);
+  const [emailMigPreview, setEmailMigPreview] = useState<EmailMigrationPreviewItem[] | null>(null);
   const [emailMigLoading, setEmailMigLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
 
@@ -162,15 +162,7 @@ export default function UsersPage() {
   async function runEmailMigration(dryRun: boolean) {
     setEmailMigLoading(true);
     try {
-      const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-      const token = localStorage.getItem("maratona_token");
-      const res = await fetch(`${base}/api/users/bulk-update-emails`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ dryRun }),
-      });
-      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível migrar os e-mails. Tente novamente."));
-      const data = await res.json().catch(() => ({})) as { updated?: number; preview?: NonNullable<typeof emailMigPreview> };
+      const data = await bulkUpdateUserEmails({ dryRun });
       if (!dryRun) {
         toast({ title: `${data.updated ?? 0} e-mail(s) atualizado(s) com sucesso` });
         qc.invalidateQueries({ queryKey: qKey });
@@ -180,7 +172,7 @@ export default function UsersPage() {
         setEmailMigPreview(data.preview ?? []);
       }
     } catch (e: unknown) {
-      toast({ title: "Não foi possível migrar os e-mails", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
+      toast({ title: "Não foi possível migrar os e-mails", description: serverErrorMessage(e, "Não foi possível migrar os e-mails. Tente novamente."), variant: "destructive" });
     } finally {
       setEmailMigLoading(false);
     }
@@ -212,7 +204,7 @@ export default function UsersPage() {
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-5">
           <div>
             <h1 data-testid="text-page-title" className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none flex items-center gap-2.5" style={{ fontFamily: CONDENSED }}>
-              <ShieldCheck size={26} style={{ color: "var(--accent)" }} /> Acessos &amp; Permissões
+              <ShieldCheck size={26} style={{ color: "var(--accent-text)" }} /> Acessos &amp; Permissões
             </h1>
             <p className="text-sm mt-1.5 max-w-xl" style={{ color: "var(--muted-foreground)" }}>Controle quem pode acessar a plataforma e o que podem fazer.</p>
           </div>
@@ -247,10 +239,10 @@ export default function UsersPage() {
                       {emailMigPreview && (
                         <div className="space-y-3">
                           <div className="flex gap-4 text-xs font-bold uppercase tracking-wide">
-                            <span style={{ color: GOOD }}>{emailMigPreview.filter(p => p.status === "will_update").length} para atualizar</span>
+                            <span style={{ color: GOOD_TEXT }}>{emailMigPreview.filter(p => p.status === "will_update").length} para atualizar</span>
                             <span style={{ color: "var(--muted-foreground)" }}>{emailMigPreview.filter(p => p.status === "no_change").length} sem mudança</span>
                             {emailMigPreview.filter(p => p.status === "not_found").length > 0 && (
-                              <span style={{ color: WARNING }}>{emailMigPreview.filter(p => p.status === "not_found").length} não encontrado</span>
+                              <span style={{ color: DANGER_TEXT }}>{emailMigPreview.filter(p => p.status === "not_found").length} não encontrado</span>
                             )}
                           </div>
                           <div className="max-h-72 overflow-y-auto rounded-lg" style={{ border: "1px solid var(--border)" }}>
@@ -258,7 +250,7 @@ export default function UsersPage() {
                               <div key={p.id} className="px-3 py-2 text-xs" style={{ backgroundColor: "rgba(154,176,0,0.08)", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
                                 <span className="font-bold">{p.name}</span>
                                 <div className="line-through" style={{ color: "var(--muted-foreground)" }}>{p.emailFrom ?? <em>sem email</em>}</div>
-                                <div className="font-mono" style={{ color: GOOD }}>{p.emailTo}</div>
+                                <div className="font-mono" style={{ color: GOOD_TEXT }}>{p.emailTo}</div>
                               </div>
                             ))}
                             {emailMigPreview.filter(p => p.status === "no_change").map((p, i) => (
@@ -317,7 +309,7 @@ export default function UsersPage() {
                 </DialogHeader>
                 <form onSubmit={handleSubmit(d => createMutation.mutate({ data: d }))} className="space-y-5 pt-4">
                   <div className="space-y-1.5">
-                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: DANGER_TEXT }}>*</span></Label>
                     <div className="relative">
                       <UserCircle size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
                       <Input data-testid="input-user-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome completo."))} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
@@ -325,7 +317,7 @@ export default function UsersPage() {
                     <FieldError message={errors.name?.message} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: WARNING }}>*</span></Label>
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: DANGER_TEXT }}>*</span></Label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
                       <Input data-testid="input-user-email" type="email" aria-invalid={!!errors.email} {...register("email", requiredText("Informe o e-mail."))} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
@@ -333,7 +325,7 @@ export default function UsersPage() {
                     <FieldError message={errors.email?.message} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Senha Inicial <span style={{ color: WARNING }}>*</span></Label>
+                    <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Senha Inicial <span style={{ color: DANGER_TEXT }}>*</span></Label>
                     <div className="relative">
                       <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
                       <Input data-testid="input-user-password" type="password" aria-invalid={!!errors.password} {...register("password", requiredText("Informe a senha inicial."))} placeholder="••••••••" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
@@ -342,7 +334,7 @@ export default function UsersPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível de Permissão <span style={{ color: WARNING }}>*</span></Label>
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível de Permissão <span style={{ color: DANGER_TEXT }}>*</span></Label>
                       <Select defaultValue="avaliador" onValueChange={v => setValue("role", v)}>
                         <SelectTrigger data-testid="select-user-role" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
                           <SelectValue />
@@ -410,12 +402,12 @@ export default function UsersPage() {
           </div>
           <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Ativos Agora</span>
-            <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{stats.ativos}</p>
+            <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{stats.ativos}</p>
             <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.ativos)}%`, backgroundColor: "var(--primary)" }} /></div>
           </div>
           <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível Admin</span>
-            <p data-testid="stat-admins" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: WARNING }}>{stats.admins}</p>
+            <p data-testid="stat-admins" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>{stats.admins}</p>
             <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.admins)}%`, backgroundColor: WARNING }} /></div>
           </div>
         </section>
@@ -426,9 +418,9 @@ export default function UsersPage() {
         ) : (
           <PremiumCard className="overflow-hidden">
             <div className="px-5 py-3 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)" }}>
-              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Grade de Acessos</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Grade de Acessos</h3>
               {mergeMode ? (
-                <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--accent)" }}>
+                <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--accent-text)" }}>
                   Modo Mescla — selecione avaliadores duplicados
                 </span>
               ) : <Filter size={16} style={{ color: "var(--muted-foreground)" }} />}
@@ -472,11 +464,11 @@ export default function UsersPage() {
                 <thead>
                   <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
                     {mergeMode && <th className="px-4 py-3 w-10" />}
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Usuário</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Perfil</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Área</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-right" style={{ color: "var(--muted-foreground)" }}>Ações</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Usuário</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Perfil</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Área</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-right" style={{ color: "var(--muted-foreground)" }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -534,7 +526,7 @@ export default function UsersPage() {
                         )}
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
-                            {isCanonical && <span className="text-[10px] rounded px-1.5 py-0.5 font-black uppercase shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Canônico</span>}
+                            {isCanonical && <span className="text-[11px] rounded px-1.5 py-0.5 font-black uppercase shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>Canônico</span>}
                             <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--secondary)" }}>
                               <span className="text-sm font-black">{initials(u.name)}</span>
                             </div>
@@ -545,7 +537,7 @@ export default function UsersPage() {
                                 <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>CPF: {u.cpfLogin}</p>
                               )}
                               {u.employeeName && (
-                                <p className="text-[11px] font-bold uppercase mt-0.5" style={{ color: "var(--accent)" }}>↳ {u.employeeName}</p>
+                                <p className="text-[11px] font-bold uppercase mt-0.5" style={{ color: "var(--accent-text)" }}>↳ {u.employeeName}</p>
                               )}
                             </div>
                           </div>
@@ -570,7 +562,7 @@ export default function UsersPage() {
                               <span className="px-2.5 py-1 rounded-full font-bold text-[11px] uppercase" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>Inativo</span>
                             )}
                             {u.mustChangePassword && (
-                              <span className="text-[10px] font-bold uppercase" style={{ color: WARNING }}>Troca de senha pendente</span>
+                              <span className="text-[11px] font-bold uppercase" style={{ color: DANGER_TEXT }}>Troca de senha pendente</span>
                             )}
                           </div>
                         </td>
@@ -642,7 +634,7 @@ export default function UsersPage() {
                                     data-testid={`button-delete-user-${u.id}`}
                                     title="Remover acesso"
                                     className="p-2 rounded-lg transition-colors hover:opacity-80"
-                                    style={{ border: "1px solid var(--border)", color: WARNING }}
+                                    style={{ border: "1px solid var(--border)", color: DANGER_TEXT }}
                                   >
                                     <Trash2 size={14} />
                                   </button>
@@ -690,7 +682,7 @@ export default function UsersPage() {
       {mergeMode && selectedIds.size >= 2 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-4 flex items-center gap-6 min-w-[500px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--primary)" }}>
           <div className="flex-1">
-            <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--accent)" }}>Mescla de Avaliadores</p>
+            <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--accent-text)" }}>Mescla de Avaliadores</p>
             <p className="text-sm font-bold mt-0.5">
               {selectedIds.size} selecionados
               {canonicalId ? ` — canônico: ${sortedUsers.find(u => u.id === canonicalId)?.name ?? canonicalId}` : " — defina o canônico nas ações"}
@@ -716,7 +708,7 @@ export default function UsersPage() {
                       <li key={id}>{sortedUsers.find(u => u.id === id)?.name ?? id}</li>
                     ))}
                   </ul>
-                  <span className="block font-bold" style={{ color: WARNING }}>Os duplicados serão desativados. Esta ação não pode ser desfeita.</span>
+                  <span className="block font-bold" style={{ color: DANGER_TEXT }}>Os duplicados serão desativados. Esta ação não pode ser desfeita.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -751,7 +743,7 @@ export default function UsersPage() {
         <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
-              <GitMerge size={22} style={{ color: "var(--accent)" }} /> Mescla Concluída
+              <GitMerge size={22} style={{ color: "var(--accent-text)" }} /> Mescla Concluída
             </DialogTitle>
           </DialogHeader>
           {mergeResult && (
@@ -769,7 +761,7 @@ export default function UsersPage() {
                   { val: mergeResult.movedConformities ?? 0, label: "Conformidades transferidas" },
                 ].map((s, i) => (
                   <div key={i} className="rounded-lg p-3" style={{ backgroundColor: "var(--secondary)" }}>
-                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{s.val}</p>
+                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{s.val}</p>
                     <p className="text-[11px] font-bold uppercase mt-1" style={{ color: "var(--muted-foreground)" }}>{s.label}</p>
                   </div>
                 ))}
@@ -804,7 +796,7 @@ export default function UsersPage() {
                 style={fieldStyle}
               />
               {newPassword.length > 0 && newPassword.length < 6 && (
-                <p className="text-[11px] font-bold" style={{ color: WARNING }}>A senha precisa ter pelo menos 6 caracteres.</p>
+                <p className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>A senha precisa ter pelo menos 6 caracteres.</p>
               )}
             </div>
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
@@ -887,7 +879,7 @@ function EditUserForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-4">
       <div className="space-y-1.5">
-        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
+        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: DANGER_TEXT }}>*</span></Label>
         <div className="relative">
           <UserCircle size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
           <Input data-testid="input-edit-user-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome completo."))} placeholder="Nome do usuário" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
@@ -895,7 +887,7 @@ function EditUserForm({
         <FieldError message={errors.name?.message} />
       </div>
       <div className="space-y-1.5">
-        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: WARNING }}>*</span></Label>
+        <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>E-mail Corporativo <span style={{ color: DANGER_TEXT }}>*</span></Label>
         <div className="relative">
           <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--muted-foreground)" }} />
           <Input data-testid="input-edit-user-email" type="email" aria-invalid={!!errors.email} {...register("email", requiredText("Informe o e-mail."))} placeholder="email@cenografica.com.br" className="pl-9 h-11 rounded-lg" style={fieldStyle} />
@@ -904,7 +896,7 @@ function EditUserForm({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível de Permissão <span style={{ color: WARNING }}>*</span></Label>
+          <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nível de Permissão <span style={{ color: DANGER_TEXT }}>*</span></Label>
           <Select defaultValue={user.role} onValueChange={v => setValue("role", v)} disabled={isSelf}>
             <SelectTrigger data-testid="select-edit-user-role" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
               <SelectValue />

@@ -201,7 +201,7 @@ function HistoryView({ history }: { history: CycleHistory }) {
                       <td className="py-2 px-3" style={tdStyle}>
                         {r.eligible
                           ? <StatusBadge variant="ok" size="sm" label="Sim" />
-                          : <span className="inline-flex flex-col gap-0.5"><StatusBadge variant="warn" size="sm" label="Não" />{r.eligibilityReason && <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{r.eligibilityReason}</span>}</span>}
+                          : <span className="inline-flex flex-col items-start gap-0.5"><StatusBadge variant="warn" size="sm" label="Não" />{r.eligibilityReason && <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{r.eligibilityReason}</span>}</span>}
                       </td>
                       <td className="py-2 px-3 text-right tabular-nums whitespace-nowrap" style={tdStyle}>
                         {brl(r.bonusValue)}

@@ -1,10 +1,10 @@
 import { useGetDashboardSummary, useGetDashboardTopEmployees, useGetDashboardQuarterlyEvolution, useGetDashboardPlatoonDistribution, useGetCurrentCycle, useGetEvents, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import { CheckCircle2, Trophy, DollarSign, History, AlertTriangle, ChevronRight, CalendarRange, Shapes, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { formatCyclePeriod } from "@/components/cycle-badge";
-import { PremiumCard, CONDENSED, WARNING } from "@/lib/premium-theme";
-import { getCycleWeekends } from "@/lib/utils";
+import { PremiumCard, CONDENSED, WARNING, DANGER_TEXT } from "@/lib/premium-theme";
+import { getCycleWeekends, fmtNum } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { data: summary } = useGetDashboardSummary({
@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const { data: cycle } = useGetCurrentCycle();
   const { data: events } = useGetEvents();
 
-  const fmt = (v: number) => `${v.toFixed(1)}/100`;
+  const fmt = (v: number) => `${fmtNum(v, 1)}/100`;
   const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
   const submitted = summary?.submittedEvaluations ?? 0;
@@ -55,7 +55,7 @@ export default function DashboardPage() {
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2"
             style={{ border: "1px solid var(--border)", backgroundColor: "var(--card)" }}
           >
-            <CalendarRange size={16} className="shrink-0" style={{ color: "var(--accent)" }} />
+            <CalendarRange size={16} className="shrink-0" style={{ color: "var(--accent-text)" }} />
             <span className="flex flex-col leading-tight">
               <span className="font-bold uppercase text-xs tracking-wider" style={{ fontFamily: CONDENSED }}>{cycle.name}</span>
               <span className="text-[11px] font-medium tracking-wide" style={{ color: "var(--muted-foreground)" }}>
@@ -73,7 +73,7 @@ export default function DashboardPage() {
           <div className="z-10">
             <p className="text-xs font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Média do Ciclo</p>
             <h2 data-testid="text-quarter-avg" className="text-[40px] leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>
-              {summary?.quarterAverage != null ? summary.quarterAverage.toFixed(1) : "—"}
+              {summary?.quarterAverage != null ? fmtNum(summary.quarterAverage, 1) : "—"}
             </h2>
             <p className="text-[11px] font-medium mt-1" style={{ color: "var(--muted-foreground)" }}>Pontos no ciclo</p>
           </div>
@@ -87,7 +87,7 @@ export default function DashboardPage() {
           <div className="z-10">
             <p className="text-xs font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Eventos Confirmados</p>
             <h2 data-testid="text-total-events" className="text-[40px] leading-none font-black mt-2" style={{ fontFamily: CONDENSED }}>{summary?.totalEvents ?? "—"}</h2>
-            <p className="text-[11px] font-semibold mt-1 flex items-center gap-1" style={{ color: "var(--accent)" }}>
+            <p className="text-[11px] font-semibold mt-1 flex items-center gap-1" style={{ color: "var(--accent-text)" }}>
               <CheckCircle2 size={12} /> de {summary?.eventsInCycle ?? 0} no ciclo
             </p>
           </div>
@@ -115,7 +115,7 @@ export default function DashboardPage() {
         <PremiumCard className="p-6 h-40 flex flex-col justify-between relative overflow-hidden group">
           <div className="z-10">
             <p className="text-xs font-bold uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Bônus Projetado</p>
-            <h2 data-testid="text-projected-bonus" className="text-[30px] leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+            <h2 data-testid="text-projected-bonus" className="text-[30px] leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
               {summary?.totalBonusPreview != null ? fmtBRL(summary.totalBonusPreview) : "—"}
             </h2>
             <p className="text-[11px] font-medium mt-1" style={{ color: "var(--muted-foreground)" }}>Estimativa do ciclo</p>
@@ -139,18 +139,19 @@ export default function DashboardPage() {
             <ComposedChart data={evolution} margin={{ top: 20, right: 8, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
               <XAxis dataKey="label" axisLine={{ stroke: "var(--border)" }} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: "var(--muted-foreground)" }} dy={8} />
-              <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v as number).toFixed(0)}`} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} domain={[0, 100]} />
+              <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${fmtNum((v as number), 0)}`} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} domain={[0, 100]} />
               <Tooltip
                 cursor={{ fill: "rgba(154,176,0,0.1)" }}
                 contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", backgroundColor: "var(--card)", color: "var(--foreground)", fontWeight: 600, fontSize: 12 }}
-                formatter={v => [`${(v as number).toFixed(1)} pts`, "Média"]}
+                formatter={v => [`${fmtNum((v as number), 1)} pts`, "Média"]}
               />
-              <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                {evolution.map((_, i) => (
-                  <Cell key={i} fill={i % 2 === 0 ? "var(--accent)" : "var(--secondary)"} />
-                ))}
+              {/* Uma série só: a cor segue o dado, não a posição (antes alternava). */}
+              <Bar dataKey="average" fill="var(--viz-series-1)" radius={[4, 4, 0, 0]} maxBarSize={56} isAnimationActive={false}>
+                <LabelList dataKey="average" position="top" formatter={(v: unknown) => fmtNum(Number(v), 1)} style={{ fontSize: 12, fontWeight: 700, fill: "var(--foreground)" }} />
               </Bar>
-              <Line type="monotone" dataKey="average" stroke="var(--foreground)" strokeWidth={2} strokeDasharray="6 6" dot={false} />
+              {evolution.length > 1 && (
+                <Line type="monotone" dataKey="average" stroke="var(--foreground)" strokeWidth={2} strokeDasharray="6 6" dot={false} isAnimationActive={false} />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </PremiumCard>
@@ -180,7 +181,7 @@ export default function DashboardPage() {
                   <tr key={emp.employeeId} className="transition-colors hover:opacity-80" style={{ borderBottom: "1px solid var(--border)" }}>
                     <td className="p-4 text-lg font-black w-12" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>{String(i + 1).padStart(2, "0")}</td>
                     <td className="p-4 text-base font-bold">{emp.employeeName}</td>
-                    <td className="p-4 text-right text-lg font-black" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{fmt(emp.finalResult)}</td>
+                    <td className="p-4 text-right text-lg font-black" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{fmt(emp.finalResult)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -190,7 +191,7 @@ export default function DashboardPage() {
 
         <PremiumCard className="p-6">
           <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-1" style={{ fontFamily: CONDENSED }}>
-            <Shapes size={16} style={{ color: "var(--accent)" }} /> Distribuição por Faixa
+            <Shapes size={16} style={{ color: "var(--accent-text)" }} /> Distribuição por Faixa
           </h3>
           <p className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>Colaboradores com resultado apurado neste ciclo, por faixa de bônus</p>
           {!platoons || platoons.length === 0 ? (
@@ -212,7 +213,7 @@ export default function DashboardPage() {
                         <span className="text-sm font-semibold truncate">{label}</span>
                       </div>
                       <span className="text-sm font-bold shrink-0" style={{ color: "var(--muted-foreground)" }}>
-                        {p.count} <span className="opacity-60">({p.percentage.toFixed(0)}%)</span>
+                        {p.count} <span className="opacity-60">({fmtNum(p.percentage, 0)}%)</span>
                       </span>
                     </div>
                   );
@@ -232,7 +233,7 @@ export default function DashboardPage() {
           <div className={hasRisk && hasUpcoming ? "grid grid-cols-1 lg:grid-cols-2 gap-5" : "grid grid-cols-1 max-w-xl"}>
             {hasRisk && (
               <PremiumCard className="p-6" style={{ borderColor: WARNING }}>
-                <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-4" style={{ fontFamily: CONDENSED, color: WARNING }}>
+                <h3 className="text-sm font-black uppercase flex items-center gap-2 mb-4" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>
                   <AlertTriangle size={16} /> Zona de Risco
                 </h3>
                 <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
@@ -249,13 +250,13 @@ export default function DashboardPage() {
             {hasUpcoming && (
               <PremiumCard className="overflow-hidden">
                 <div className="p-5 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-                  <Calendar size={15} style={{ color: "var(--accent)" }} />
+                  <Calendar size={15} style={{ color: "var(--accent-text)" }} />
                   <h3 className="text-sm font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Próximos Fins de Semana</h3>
                 </div>
                 <div className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {upcomingWeekends.map(w => (
                     <div key={w.sat} className="px-5 py-3">
-                      <p className="text-[11px] font-black uppercase tracking-wider mb-2" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>
+                      <p className="text-[11px] font-black uppercase tracking-wider mb-2" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>
                         {w.label}
                       </p>
                       <div className="space-y-1">

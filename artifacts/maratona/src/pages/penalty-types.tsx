@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Plus, Trash2, Pencil, AlertTriangle, Award, Settings2, RefreshCw } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { CONDENSED, BODY, WARNING, GOOD } from "@/lib/premium-theme";
+import { CONDENSED, BODY, WARNING, GOOD, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
@@ -31,7 +31,7 @@ const requiredText = (message: string) => ({
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{message}</p>;
 }
 
 interface TypeFormData {
@@ -214,7 +214,7 @@ export default function PenaltyTypesPage() {
             {/* Penalidades */}
             <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
               <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-                <AlertTriangle size={16} style={{ color: WARNING }} />
+                <AlertTriangle size={16} style={{ color: DANGER_TEXT }} />
                 <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED }}>Penalidades (−)</span>
                 <span className="ml-auto text-xs" style={{ color: "var(--muted-foreground)" }}>{penaltyTypes.length} tipo{penaltyTypes.length !== 1 ? "s" : ""}</span>
               </div>
@@ -231,7 +231,7 @@ export default function PenaltyTypesPage() {
             {/* Méritos */}
             <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
               <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
-                <Award size={16} style={{ color: "var(--accent)" }} />
+                <Award size={16} style={{ color: "var(--accent-text)" }} />
                 <span className="font-black uppercase tracking-tight text-xs" style={{ fontFamily: CONDENSED }}>Méritos (+)</span>
                 <span className="ml-auto text-xs" style={{ color: "var(--muted-foreground)" }}>{meritTypes.length} tipo{meritTypes.length !== 1 ? "s" : ""}</span>
               </div>
@@ -249,7 +249,7 @@ export default function PenaltyTypesPage() {
 
         {/* Info box */}
         <div className="rounded-xl px-5 py-4 text-sm font-semibold flex items-start gap-3" style={{ backgroundColor: "rgba(154,176,0,0.10)", border: "1px solid rgba(154,176,0,0.3)" }}>
-          <Award size={18} className="shrink-0 mt-0.5" style={{ color: GOOD }} />
+          <Award size={18} className="shrink-0 mt-0.5" style={{ color: GOOD_TEXT }} />
           <div>
             <strong className="uppercase">Como funciona:</strong> Os tipos cadastrados aqui aparecem automaticamente no modal de "Novo Lançamento".
             Tipos marcados com <strong>📍 Exige Evento</strong> obrigam a seleção de um evento específico ao registrar.
@@ -269,12 +269,12 @@ export default function PenaltyTypesPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5 col-span-2">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: WARNING }}>*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Input aria-invalid={!!errors.label} {...register("label", requiredText("Informe o nome do tipo."))} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-lg" style={fieldStyle} />
                 <FieldError message={errors.label?.message} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Slug <span style={{ color: WARNING }}>*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Slug <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Input
                   aria-invalid={!!errors.slug}
                   {...register("slug", editingType ? {} : requiredText("Informe o slug (identificador)."))}
@@ -287,7 +287,7 @@ export default function PenaltyTypesPage() {
                 <FieldError message={errors.slug?.message} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pontos <span style={{ color: WARNING }}>*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pontos <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Input
                   type="number"
                   min="0"
@@ -333,7 +333,7 @@ export default function PenaltyTypesPage() {
             )}
 
             <div className="space-y-1.5">
-              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo <span style={{ color: WARNING }}>*</span></Label>
+              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo <span style={{ color: DANGER_TEXT }}>*</span></Label>
               <Select value={watchedKind} onValueChange={v => setValue("kind", v as "penalty" | "merit")} disabled={!!editingType}>
                 <SelectTrigger className="h-11 rounded-lg" style={fieldStyle}>
                   <SelectValue />
@@ -439,10 +439,10 @@ function TypeRow({ type, canEdit, onEdit, onDelete, isFirst }: {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-black uppercase text-sm">{type.label}</span>
           {!type.active && (
-            <span className="text-[10px] font-bold uppercase rounded px-1.5 py-0.5" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Inativo</span>
+            <span className="text-[11px] font-bold uppercase rounded px-1.5 py-0.5" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Inativo</span>
           )}
           {type.requiresEvent && (
-            <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>📍 Evento</span>
+            <span className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>📍 Evento</span>
           )}
         </div>
         <div className="text-xs font-mono mt-0.5" style={{ color: "var(--muted-foreground)" }}>{type.slug}</div>
@@ -465,7 +465,7 @@ function TypeRow({ type, canEdit, onEdit, onDelete, isFirst }: {
           <button
             type="button"
             className="p-2 rounded-lg transition-colors hover:opacity-80"
-            style={{ color: WARNING }}
+            style={{ color: DANGER_TEXT }}
             onClick={() => onDelete(type.id)}
             title="Remover"
             aria-label={`Remover ${type.label}`}

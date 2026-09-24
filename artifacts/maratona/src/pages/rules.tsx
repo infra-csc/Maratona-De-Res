@@ -3,6 +3,7 @@ import {
   useGetRules, useUpdateRule,
   useGetPlatoonRules, useUpdatePlatoonRule, useCreatePlatoonRule, useDeletePlatoonRule,
   getGetRulesQueryKey, getGetPlatoonRulesQueryKey,
+  replaceAllPlatoonRules, ApiError,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,6 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePremiumTheme, CONDENSED, BODY, WARNING } from "@/lib/premium-theme";
-import { getAuthToken } from "@/lib/custom-fetch";
 import { useAuth, hasRole } from "@/lib/auth-context";
 
 /** Campo numérico em edição: NaN (campo apagado) vira "" para o input não exibir "NaN". */
@@ -156,25 +156,19 @@ export default function RulesPage() {
   async function handleReplaceAll() {
     setReplacing(true);
     try {
-      const token = getAuthToken();
-      const res = await fetch("/api/platoon-rules/replace-all", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ rules: NEW_TIERS_2026 }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Não foi possível substituir as faixas. Tente novamente.");
-      }
+      await replaceAllPlatoonRules({ rules: NEW_TIERS_2026 });
       qc.invalidateQueries({ queryKey: platoonQKey });
       setPlatoonValues({});
       setShowReplaceDialog(false);
       toast({ title: "Faixas substituídas com sucesso", description: `${NEW_TIERS_2026.length} faixas aplicadas.` });
     } catch (e: unknown) {
-      toast({ title: "Erro ao substituir faixas", description: (e as Error).message, variant: "destructive" });
+      // Mensagem do servidor ({ error }) sem o prefixo "HTTP 400 ..." do ApiError.
+      const fallback = "Não foi possível substituir as faixas. Tente novamente.";
+      const serverError = e instanceof ApiError ? (e.data as { error?: unknown } | null)?.error : undefined;
+      const description = e instanceof ApiError
+        ? (typeof serverError === "string" && serverError.trim() ? serverError : fallback)
+        : (e as Error).message;
+      toast({ title: "Erro ao substituir faixas", description, variant: "destructive" });
     } finally {
       setReplacing(false);
     }
@@ -239,7 +233,7 @@ export default function RulesPage() {
           <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: "var(--accent)", minHeight: "3.5rem" }} />
           <div>
             <h1 data-testid="text-page-title" className="font-black uppercase leading-none" style={{ fontFamily: CONDENSED, fontSize: "clamp(2rem,5vw,3.2rem)", letterSpacing: "-0.02em" }}>
-              Regras do <span style={{ color: "var(--accent)" }}>Sistema</span>
+              Regras do <span style={{ color: "var(--accent-text)" }}>Sistema</span>
             </h1>
             <p className="text-sm mt-1.5 max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
               Defina os parâmetros de cálculo e as bonificações financeiras por faixa de nota. A agressividade das regras dita o ritmo da corrida.
@@ -349,13 +343,13 @@ export default function RulesPage() {
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <div className="relative max-w-[120px] mx-auto">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent)" }}>R$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent-text)" }}>R$</span>
                           <Input data-testid={`input-platoon-bonus-${p.id}`} aria-label="Prêmio base da faixa em reais" type="number" min="0" step="100" className="w-full text-right h-10 rounded-lg font-black" value={numOrEmpty(currentBonus)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusValue: parseFloat(e.target.value) } }))} />
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <div className="relative max-w-[120px] mx-auto">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent)" }}>R$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black z-10" style={{ color: "var(--accent-text)" }}>R$</span>
                           <Input data-testid={`input-platoon-extra-${p.id}`} aria-label="Bônus por evento extra em reais" type="number" min="0" step="50" className="w-full text-right h-10 rounded-lg font-black" value={numOrEmpty(currentExtra)} onChange={e => setPlatoonValues(v => ({ ...v, [p.id]: { ...v[p.id], bonusPerExtraEvent: parseFloat(e.target.value) } }))} />
                         </div>
                       </td>
@@ -423,24 +417,24 @@ export default function RulesPage() {
                 { label: "Nome (opcional)", testId: "", w: "w-32", placeholder: "Ex: Elite", type: "text", val: newBand.name, onChange: (v: string) => setNewBand(b => ({ ...b, name: v })) },
               ].map(f => (
                 <div key={f.label} className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
+                  <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
                   <Input type={f.type} aria-label={f.label} value={f.val} onChange={e => f.onChange(e.target.value)} className={`h-10 ${f.w} rounded-lg font-bold`} placeholder={f.placeholder} />
                 </div>
               ))}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Mínima</label>
+                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Mínima</label>
                 <Input data-testid="input-new-platoon-min" type="number" min="0" max="100" step="0.01" value={newBand.minScore} onChange={e => setNewBand(v => ({ ...v, minScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="0" />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Máxima</label>
+                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Nota Máxima</label>
                 <Input data-testid="input-new-platoon-max" type="number" min="0" max="100" step="0.01" value={newBand.maxScore} onChange={e => setNewBand(v => ({ ...v, maxScore: e.target.value }))} className="h-10 w-20 text-center rounded-lg font-black" placeholder="100" />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Prêmio Base (R$)</label>
+                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Prêmio Base (R$)</label>
                 <Input data-testid="input-new-platoon-bonus" type="number" min="0" step="100" value={newBand.bonusValue} onChange={e => setNewBand(v => ({ ...v, bonusValue: e.target.value }))} className="h-10 w-28 text-right rounded-lg font-black" placeholder="0" />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Bônus Extra (R$/ev.)</label>
+                <label className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Bônus Extra (R$/ev.)</label>
                 <Input data-testid="input-new-platoon-extra" type="number" min="0" step="50" value={newBand.bonusPerExtraEvent} onChange={e => setNewBand(v => ({ ...v, bonusPerExtraEvent: e.target.value }))} className="h-10 w-28 text-right rounded-lg font-black" placeholder="0" />
               </div>
               <button

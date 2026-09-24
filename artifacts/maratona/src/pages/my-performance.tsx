@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { useGetCurrentCycle } from "@workspace/api-client-react";
+import { useGetCurrentCycle, useGetMyPerformance, getGetMyPerformanceQueryKey, ApiError } from "@workspace/api-client-react";
+import type { MyPerformanceEvent } from "@workspace/api-client-react";
 import { CycleBadge } from "@/components/cycle-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,96 +10,20 @@ import {
   CheckCircle2, Clock, ChevronDown, ChevronRight,
   MapPin, Search, Award,
 } from "lucide-react";
-import { cn, fmtDate, fmtDateTime } from "@/lib/utils";
+import { cn, fmtDate, fmtDateTime, fmtNum } from "@/lib/utils";
 import { INFO } from "@/lib/premium-theme";
-import { useQuery } from "@tanstack/react-query";
 
-interface PerformanceData {
-  employee: { id: number; name: string; department: string; functionName: string; eligible?: boolean; eligibilityStatus?: string | null };
-  cycle: { id: number; name: string };
-  summary: {
-    grossAverage: number | null;
-    currentPlatoon: string | null;
-    currentPlatoonColor: string | null;
-    currentPlatoonMinScore: number | null;
-    currentPlatoonMaxScore: number | null;
-    nextPlatoon: string | null;
-    nextPlatoonColor: string | null;
-    nextPlatoonMinScore: number | null;
-    projectedBonus: number | null;
-    bonusStatus: string | null;
-    eligible: boolean;
-    totalEvents: number;
-    closedEvents: number;
-    openEvents: number;
-    confirmedEvents: number;
-    participatedEventsCount?: number | null;
-    minEventsForEligibility: number;
-    totalAbsences: number;
-    penaltyPoints: number;
-    meritPoints: number;
-    isQuarterClosed: boolean;
-    finalResult: number | null;
-    absencePenalty: number | null;
-    scoredEventsCount?: number | null;
-  };
-  adjustments: Adjustment[];
-  events: EventSummary[];
+// Tipos do contrato (GET /my-performance em lib/api-spec/openapi.yaml).
+type EventSummary = MyPerformanceEvent;
+
+/** Mensagem do servidor (`{ error }`) sem o prefixo "HTTP 404 ..." do ApiError. */
+function performanceErrorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    const data = e.data as { error?: unknown } | null;
+    return typeof data?.error === "string" && data.error.trim() ? data.error : "Erro ao carregar desempenho";
+  }
+  return e instanceof Error ? e.message : "Erro ao carregar desempenho";
 }
-
-interface Adjustment {
-  id: number;
-  kind: "penalty" | "merit";
-  penaltyType: string;
-  points: number;
-  quantity: number;
-  totalPoints: number;
-  date: string | null;
-  reason: string | null;
-  eventName: string | null;
-}
-
-interface EventSummary {
-  eventId: number;
-  eventName: string;
-  city: string | null;
-  state: string | null;
-  location: string | null;
-  startDate: string;
-  status: string;
-  feedbackReleased?: boolean;
-  feedbackReleasedAt?: string | null;
-  criteriaConfirmed?: boolean;
-  criteriaConfirmedAt?: string | null;
-  partialPublishedAt?: string | null;
-  eventScore: number;
-  rawTeamScore?: number | null;
-  conformityPenalty?: number;
-  conformityFailedItems?: { label: string; comment: string | null }[];
-  projectedPlatoon: string | null;
-  projectedPlatoonColor: string | null;
-  evaluatedCriteria: number;
-  totalCriteria: number;
-  criteriaDetails: CriterionDetail[];
-  countsForScore: boolean;
-  resultsConfirmed: boolean;
-  isHistorical?: boolean;
-}
-
-interface CriterionDetail {
-  criterionId: number;
-  criterionName: string;
-  criterionDescription: string;
-  weight: number;
-  scoreUsed: number | null;
-  criterionTotal: number | null;
-  publicComments: string[];
-  calibrationReason?: string | null;
-  evaluated: boolean;
-  partialPublishedAt?: string | null;
-  finalPublishedAt?: string | null;
-}
-
 
 function contrastingTextColor(hex: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -109,12 +34,20 @@ function contrastingTextColor(hex: string): string {
   return luminance > 0.6 ? "#111111" : "#ffffff";
 }
 
+/** Cor de TEXTO para uma nota 0–100 (tokens legíveis nos dois temas). */
 function scoreColor(score: number | null): string {
   if (score === null) return "var(--muted-foreground)";
-  if (score >= 90) return "#22c55e";
-  if (score >= 80) return "#ccff00";
-  if (score >= 60) return "#f59e0b";
-  return "#ef4444";
+  if (score >= 80) return "var(--status-ok-text)";
+  if (score >= 60) return "var(--status-warn-text)";
+  return "var(--status-danger-text)";
+}
+
+/** Cor de BARRA/preenchimento para uma nota 0–100 (a lima da marca só em fundo). */
+function scoreBarColor(score: number | null): string {
+  if (score === null) return "var(--muted)";
+  if (score >= 80) return "var(--accent)";
+  if (score >= 60) return "var(--status-warn)";
+  return "var(--status-danger)";
 }
 
 function scoreLabel(score: number | null): string {
@@ -173,7 +106,7 @@ function EventCard({ event }: { event: EventSummary }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={cn(
-                "text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full",
+                "text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full",
                 isAvaliadoFinal
                   ? "bg-[#191c1e] text-[#ccff00]"
                   : isAvaliadoParcial
@@ -187,7 +120,7 @@ function EventCard({ event }: { event: EventSummary }) {
               {!event.countsForScore && (
                 <span
                   title="Participação apenas histórica/informativa — não entra na sua média nem na elegibilidade."
-                  className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#862200]/10 text-[#862200]"
+                  className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[var(--status-danger-bg)] text-[var(--status-danger-text)]"
                 >
                   Não conta p/ nota
                 </span>
@@ -213,18 +146,18 @@ function EventCard({ event }: { event: EventSummary }) {
                 <>
                   {/* Nota bruta riscada */}
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground">Nota time</span>
+                    <span className="text-[11px] uppercase font-bold text-muted-foreground">Nota time</span>
                     <span className="font-black text-[14px] leading-none line-through text-muted-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      {(event.rawTeamScore ?? event.eventScore + (event.conformityPenalty ?? 0)).toFixed(1)}
+                      {fmtNum((event.rawTeamScore ?? event.eventScore + (event.conformityPenalty ?? 0)), 1)}
                     </span>
                   </div>
                   {/* Desconto Matriz + itens reprovados */}
                   <div className="flex flex-col items-end gap-0.5">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(192,57,43,0.12)", color: "#c0392b" }}>
-                      Matriz −{(event.conformityPenalty ?? 0).toFixed(1)}
+                    <span className="text-[11px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(192,57,43,0.12)", color: "var(--status-danger-text)" }}>
+                      Matriz −{fmtNum((event.conformityPenalty ?? 0), 1)}
                     </span>
                     {(event.conformityFailedItems ?? []).map((item, i) => (
-                      <span key={i} className="text-[9px] font-bold px-1.5 py-0.5 rounded text-right" style={{ backgroundColor: "rgba(192,57,43,0.07)", color: "#c0392b" }}
+                      <span key={i} className="text-[11px] font-bold px-1.5 py-0.5 rounded text-right" style={{ backgroundColor: "rgba(192,57,43,0.07)", color: "var(--status-danger-text)" }}
                         title={item.comment ?? undefined}>
                         NÃO: {item.label}{item.comment ? " ⓘ" : ""}
                       </span>
@@ -232,23 +165,23 @@ function EventCard({ event }: { event: EventSummary }) {
                   </div>
                   {/* Nota final em destaque */}
                   <div className="text-right">
-                    <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-0.5">Nota final</span>
+                    <span className="block text-[11px] uppercase font-bold text-muted-foreground mb-0.5">Nota final</span>
                     <span className="font-black text-[19px] leading-none" style={{ color: scoreColor(event.eventScore) }}>
-                      {event.eventScore.toFixed(1)}
+                      {fmtNum(event.eventScore, 1)}
                     </span>
                   </div>
                 </>
               ) : (
                 <div className="text-right">
-                  <span className="block text-[9px] uppercase font-bold text-muted-foreground mb-0.5">Nota</span>
+                  <span className="block text-[11px] uppercase font-bold text-muted-foreground mb-0.5">Nota</span>
                   <span className="font-black text-[19px] leading-none" style={{ color: scoreColor(event.eventScore) }}>
-                    {event.eventScore.toFixed(1)}
+                    {fmtNum(event.eventScore, 1)}
                   </span>
                 </div>
               )}
               {event.projectedPlatoon && event.projectedPlatoonColor && (
                 <span
-                  className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full"
+                  className="text-[11px] font-black uppercase px-2 py-0.5 rounded-full"
                   style={{ backgroundColor: event.projectedPlatoonColor, color: contrastingTextColor(event.projectedPlatoonColor) }}
                 >
                   {event.projectedPlatoon}
@@ -269,18 +202,18 @@ function EventCard({ event }: { event: EventSummary }) {
                 <div className="flex justify-between items-start gap-4 mb-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-[9px] font-bold uppercase text-muted-foreground px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Peso {c.weight}</span>
+                      <span className="text-[11px] font-bold uppercase text-muted-foreground px-2 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>Peso {c.weight}</span>
                       {event.feedbackReleased || c.finalPublishedAt ? (
                         <span
                           title={c.finalPublishedAt ? `Avaliado em ${fmtDateTime(c.finalPublishedAt)}` : event.feedbackReleasedAt ? `Avaliado em ${fmtDateTime(event.feedbackReleasedAt)}` : undefined}
-                          className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#191c1e] text-[#ccff00] flex items-center gap-1"
+                          className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#191c1e] text-[#ccff00] flex items-center gap-1"
                         >
                           <CheckCircle2 size={11}/> Avaliado{c.finalPublishedAt ? ` · ${fmtDateTime(c.finalPublishedAt)}` : ""}
                         </span>
                       ) : c.partialPublishedAt ? (
                         <span
                           title={`Publicação parcial em ${fmtDateTime(c.partialPublishedAt)}`}
-                          className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#ccff00] text-[#191c1e]"
+                          className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#ccff00] text-[#191c1e]"
                         >
                           Projeção Parcial
                         </span>
@@ -292,25 +225,25 @@ function EventCard({ event }: { event: EventSummary }) {
                   <div className="text-right shrink-0 flex flex-col items-end gap-1">
                     {c.scoreUsed !== null ? (
                       <div className="flex items-end gap-1">
-                        <span className="font-black text-2xl leading-none" style={{ color: scoreColor(c.scoreUsed * 10) }}>{c.scoreUsed.toFixed(1)}</span>
+                        <span className="font-black text-2xl leading-none" style={{ color: scoreColor(c.scoreUsed * 10) }}>{fmtNum(c.scoreUsed, 1)}</span>
                         <span className="text-xs font-bold text-muted-foreground pb-1">/10</span>
                       </div>
                     ) : (
-                      <span className="text-[9px] font-bold uppercase px-2 py-1 rounded text-muted-foreground" style={{ backgroundColor: "var(--muted)" }}>Pendente</span>
+                      <span className="text-[11px] font-bold uppercase px-2 py-1 rounded text-muted-foreground" style={{ backgroundColor: "var(--muted)" }}>Pendente</span>
                     )}
                   </div>
                 </div>
                 {c.scoreUsed !== null && (
                   <div className="h-[4px] rounded-full overflow-hidden mb-3" style={{ backgroundColor: "var(--muted)" }}>
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(c.scoreUsed / 10) * 100}%`, backgroundColor: scoreColor(c.scoreUsed * 10) }} />
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(c.scoreUsed / 10) * 100}%`, backgroundColor: scoreBarColor(c.scoreUsed * 10) }} />
                   </div>
                 )}
 
                 {c.publicComments.length > 0 && (
                   <div className="mt-4 space-y-2 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-                    <p className="text-[10px] font-black uppercase text-muted-foreground">Feedbacks da equipe avaliadora</p>
+                    <p className="text-[11px] font-black uppercase text-muted-foreground">Feedbacks da equipe avaliadora</p>
                     {c.publicComments.map((comment, i) => (
-                      <div key={i} className="text-xs text-foreground p-3 rounded border-l-2 border-[#ccff00]" style={{ backgroundColor: "var(--muted)" }}>
+                      <div key={i} className="text-xs text-foreground p-3 rounded border-l-2 border-[var(--accent)]" style={{ backgroundColor: "var(--muted)" }}>
                         <span className="italic leading-relaxed">"{comment}"</span>
                       </div>
                     ))}
@@ -318,7 +251,7 @@ function EventCard({ event }: { event: EventSummary }) {
                 )}
                 {c.calibrationReason && (
                   <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Comentário de calibração</p>
+                    <p className="text-[11px] font-black uppercase text-muted-foreground mb-2">Comentário de calibração</p>
                     <div className="text-xs text-foreground p-3 rounded border-l-2" style={{ backgroundColor: "var(--muted)", borderLeftColor: INFO }}>
                       <span className="italic leading-relaxed">"{c.calibrationReason}"</span>
                     </div>
@@ -340,27 +273,14 @@ export default function MyPerformancePage() {
   const [eventFilter, setEventFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "avaliado" | "em_avaliacao">("all");
 
-  const { data, isLoading, error } = useQuery<PerformanceData>({
-    queryKey: ["my-performance"],
-    queryFn: async () => {
-      const token = localStorage.getItem("maratona_token");
-      const apiBase = import.meta.env.VITE_API_BASE_URL ?? "/api";
-      const resp = await fetch(`${apiBase}/my-performance`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error ?? "Erro ao carregar desempenho");
-      }
-      return resp.json();
-    },
-    enabled: !!user?.employeeId,
+  const { data, isLoading, error } = useGetMyPerformance({
+    query: { queryKey: getGetMyPerformanceQueryKey(), enabled: !!user?.employeeId },
   });
 
   if (!user?.employeeId) {
     return (
       <div className="p-8 max-w-2xl mx-auto mt-12 rounded-xl text-center space-y-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto text-[#862200] mb-2" style={{ backgroundColor: "var(--muted)" }}>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto text-[var(--status-danger-text)] mb-2" style={{ backgroundColor: "var(--muted)" }}>
           <AlertTriangle size={28} />
         </div>
         <h2 className="text-2xl font-bold text-foreground">Acesso Restrito</h2>
@@ -401,7 +321,7 @@ export default function MyPerformancePage() {
     <div className="min-h-full text-foreground" style={{ backgroundColor: "var(--background)" }}>
       {/* Header */}
       <header className="sticky top-14 md:top-0 z-30 flex flex-wrap gap-4 justify-between items-center px-6 md:px-10 py-[18px]" style={{ backgroundColor: "var(--background)", borderBottom: "1px solid var(--border)" }}>
-        <h1 className="font-black text-[24px] uppercase tracking-tight flex items-center gap-3" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
+        <h1 className="font-black text-[24px] uppercase tracking-tight flex items-center gap-3" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent-text)" }}>
           <TrendingUp size={24} />
           Meu Desempenho
         </h1>
@@ -418,8 +338,8 @@ export default function MyPerformancePage() {
           <div className={cn(
             "rounded-xl px-4 py-3 text-[12px] font-bold uppercase flex items-center gap-2",
             summary.isQuarterClosed
-              ? "bg-[rgba(154,176,0,0.12)] text-[#506600]"
-              : "bg-[rgba(232,162,61,0.14)] text-[#c98a1f]"
+              ? "bg-[rgba(154,176,0,0.12)] text-[var(--status-ok-text)]"
+              : "bg-[rgba(232,162,61,0.14)] text-[var(--status-warn-text)]"
           )} style={{ border: `1px solid ${summary.isQuarterClosed ? "rgba(154,176,0,0.3)" : "rgba(232,162,61,0.35)"}` }}>
             {summary.isQuarterClosed ? <CheckCircle2 size={15} /> : <Clock size={15} />}
             {summary.isQuarterClosed
@@ -437,9 +357,9 @@ export default function MyPerformancePage() {
         )}
 
         {error && (
-          <Alert variant="destructive" className="rounded-xl bg-[#862200]/10 border-[#862200]/30 text-[#862200]">
+          <Alert variant="destructive" className="rounded-xl bg-[var(--status-danger-bg)] border-[#862200]/30 text-[var(--status-danger-text)]">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="font-bold ml-2">{(error as Error).message}</AlertDescription>
+            <AlertDescription className="font-bold ml-2">{performanceErrorMessage(error)}</AlertDescription>
           </Alert>
         )}
 
@@ -449,19 +369,19 @@ export default function MyPerformancePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-[14px]">
               {/* Média do Ciclo */}
               <div className="rounded-xl p-[18px] relative overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Média do Ciclo</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Média do Ciclo</span>
                 {result !== null ? (
                   <>
                     <div className="mt-1.5 flex items-baseline gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      <span className="font-black text-[34px] leading-none" style={{ color: scoreColor(result) }}>{result.toFixed(1)}</span>
+                      <span className="font-black text-[34px] leading-none" style={{ color: scoreColor(result) }}>{fmtNum(result, 1)}</span>
                       <span className="text-[15px] text-muted-foreground">/100</span>
                     </div>
                     <div className="mt-1 flex items-center gap-2 flex-wrap">
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                      <p className="text-[11px] font-bold uppercase text-muted-foreground">
                         {summary.isQuarterClosed ? "Resultado oficial" : "Projeção parcial"}
                       </p>
                       {result !== null && (
-                        <span className="text-[9px] font-bold text-muted-foreground">{scoreLabel(result)}</span>
+                        <span className="text-[11px] font-bold text-muted-foreground">{scoreLabel(result)}</span>
                       )}
                     </div>
                   </>
@@ -469,7 +389,7 @@ export default function MyPerformancePage() {
                   <div className="text-lg text-muted-foreground mt-4">—</div>
                 )}
                 <div className="mt-3 h-[5px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${result ?? 0}%`, backgroundColor: scoreColor(result) }} />
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${result ?? 0}%`, backgroundColor: scoreBarColor(result) }} />
                 </div>
               </div>
 
@@ -484,12 +404,12 @@ export default function MyPerformancePage() {
                 const steps = Array.from({ length: target }, (_, i) => i < confirmed);
                 return (
                   <div className="rounded-xl p-[18px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Elegibilidade ao Bônus</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Elegibilidade ao Bônus</span>
                     <div className="mt-1.5 flex items-baseline gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      <span className="font-black text-[34px] leading-none" style={{ color: atingiu ? "#ccff00" : "var(--foreground)" }}>{confirmed}</span>
+                      <span className="font-black text-[34px] leading-none" style={{ color: atingiu ? "var(--accent-text)" : "var(--foreground)" }}>{confirmed}</span>
                       <span className="text-[15px] text-muted-foreground">/ {target} eventos</span>
                     </div>
-                    <p className={cn("mt-1 text-[10px] font-bold uppercase", atingiu ? "text-[#506600]" : "text-[#c98a1f]")}>
+                    <p className={cn("mt-1 text-[11px] font-bold uppercase", atingiu ? "text-[var(--status-ok-text)]" : "text-[var(--status-warn-text)]")}>
                       {atingiu ? "✓ Meta atingida — elegível ao bônus" : `Faltam ${faltam} evento${faltam !== 1 ? "s" : ""} confirmados`}
                     </p>
                     {/* Step dots */}
@@ -502,7 +422,7 @@ export default function MyPerformancePage() {
                             width: `calc(${100 / target}% - 3px)`,
                             minWidth: 10,
                             height: 8,
-                            backgroundColor: filled ? (atingiu ? "#ccff00" : "var(--foreground)") : "var(--muted)",
+                            backgroundColor: filled ? (atingiu ? "var(--accent)" : "var(--foreground)") : "var(--muted)",
                           }}
                         />
                       ))}
@@ -531,20 +451,20 @@ export default function MyPerformancePage() {
                       borderLeft: `4px solid ${summary.currentPlatoonColor ?? "var(--accent)"}`,
                     }}
                   >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Faixa</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Faixa</span>
                     <div className="mt-1.5 flex items-center gap-2">
                       {summary.currentPlatoonColor && (
-                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: summary.currentPlatoonColor }} />
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: summary.currentPlatoonColor, boxShadow: "0 0 0 1px var(--border)" }} />
                       )}
                       <span
                         className="font-black text-[24px] leading-none"
-                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: summary.currentPlatoonColor ?? "var(--foreground)" }}
+                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--foreground)" }}
                       >
                         {summary.currentPlatoon}
                       </span>
                     </div>
                     {min != null && max != null && (
-                      <p className="text-[10px] font-bold mt-1 text-muted-foreground">
+                      <p className="text-[11px] font-bold mt-1 text-muted-foreground">
                         {min}–{max}
                       </p>
                     )}
@@ -569,21 +489,21 @@ export default function MyPerformancePage() {
 
                     {/* Falta para a próxima faixa */}
                     {gapToNext !== null && summary.nextPlatoon && (
-                      <p className="text-[10px] font-semibold mt-2 leading-tight" style={{ color: summary.nextPlatoonColor ?? "var(--muted-foreground)" }}>
+                      <p className="text-[11px] font-semibold mt-2 leading-tight" style={{ color: summary.nextPlatoonColor ?? "var(--muted-foreground)" }}>
                         +{gapToNext.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pts → {summary.nextPlatoon}
                       </p>
                     )}
 
                     {/* Mensagem de conquista para o tier máximo */}
                     {!summary.nextPlatoon && summary.currentPlatoon && (
-                      <p className="text-[10px] font-semibold mt-2 leading-tight" style={{ color: summary.currentPlatoonColor ?? "var(--accent)" }}>
+                      <p className="text-[11px] font-semibold mt-2 leading-tight" style={{ color: summary.currentPlatoonColor ?? "var(--accent)" }}>
                         🏆 Nível máximo atingido!
                       </p>
                     )}
 
                     {summary.projectedBonus != null && summary.eligible && summary.projectedBonus > 0 && (
                       <p
-                        className="text-[10px] font-bold mt-1.5"
+                        className="text-[11px] font-bold mt-1.5"
                         style={{ color: summary.currentPlatoonColor ?? "var(--accent)" }}
                       >
                         Bônus: {summary.projectedBonus.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}
@@ -627,7 +547,7 @@ export default function MyPerformancePage() {
               return (
                 <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
                   <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
                       Como sua nota é calculada
                     </p>
                   </div>
@@ -636,20 +556,20 @@ export default function MyPerformancePage() {
                   <div className="divide-y" style={{ borderColor: "var(--border)" }}>
                     {scoredEvts.map((ev, i) => (
                       <div key={ev.eventId} className="flex items-center gap-3 px-5 py-3">
-                        <span className="text-[10px] font-black text-muted-foreground w-5 shrink-0 text-right">{i + 1}</span>
+                        <span className="text-[11px] font-black text-muted-foreground w-5 shrink-0 text-right">{i + 1}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline justify-between gap-2 mb-1">
                             <p className="text-[12px] font-bold text-foreground truncate">{ev.eventName}</p>
                             {ev.startDate && (
-                              <span className="text-[10px] text-muted-foreground shrink-0">{fmtDate(ev.startDate)}</span>
+                              <span className="text-[11px] text-muted-foreground shrink-0">{fmtDate(ev.startDate)}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="flex-1 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--border)" }}>
-                              <div className="h-full rounded-full" style={{ width: `${ev.eventScore}%`, backgroundColor: scoreColor(ev.eventScore) }} />
+                              <div className="h-full rounded-full" style={{ width: `${ev.eventScore}%`, backgroundColor: scoreBarColor(ev.eventScore) }} />
                             </div>
-                            <span className="text-[15px] font-black shrink-0 w-[42px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(ev.eventScore) === "#ccff00" ? "#7a9200" : scoreColor(ev.eventScore) }}>
-                              {ev.eventScore.toFixed(1)}
+                            <span className="text-[15px] font-black shrink-0 w-[42px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(ev.eventScore) }}>
+                              {fmtNum(ev.eventScore, 1)}
                             </span>
                           </div>
                         </div>
@@ -660,7 +580,7 @@ export default function MyPerformancePage() {
                   {/* Fórmula de cálculo */}
                   <div className="px-5 py-5" style={{ backgroundColor: "var(--muted)", borderTop: "1px solid var(--border)" }}>
                     {/* Rótulo da fórmula */}
-                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-4">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-4">
                       {netPenalty !== 0
                         ? `( soma das notas ${pen > 0 ? "− penalidades" : ""}${mer > 0 ? " + méritos" : ""} ) ÷ nº de provas = nota final`
                         : "soma das notas ÷ nº de provas = nota final"}
@@ -671,9 +591,9 @@ export default function MyPerformancePage() {
 
                       {/* SOMA */}
                       <div className="flex flex-col items-center justify-center px-4 py-3 rounded-l-lg min-w-[72px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                        <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground mb-1">Soma</span>
+                        <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-1">Soma</span>
                         <span className="font-black text-[24px] leading-none text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                          {liveConsistent ? liveTotal.toFixed(1) : (displayAvg * N).toFixed(1)}
+                          {liveConsistent ? fmtNum(liveTotal, 1) : fmtNum((displayAvg * N), 1)}
                         </span>
                       </div>
 
@@ -684,8 +604,8 @@ export default function MyPerformancePage() {
                             <span className="text-[18px] font-black text-muted-foreground">−</span>
                           </div>
                           <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "rgba(192,57,43,0.08)", border: "1px solid rgba(192,57,43,0.25)" }}>
-                            <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: "#c0392b" }}>Penalidades</span>
-                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#c0392b" }}>{pen}</span>
+                            <span className="text-[11px] font-black uppercase tracking-wider mb-1" style={{ color: "var(--status-danger-text)" }}>Penalidades</span>
+                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--status-danger-text)" }}>{pen}</span>
                           </div>
                         </>
                       )}
@@ -697,8 +617,8 @@ export default function MyPerformancePage() {
                             <span className="text-[18px] font-black text-muted-foreground">+</span>
                           </div>
                           <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "rgba(22,163,74,0.10)", border: "1px solid rgba(22,163,74,0.30)" }}>
-                            <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: "#16a34a" }}>Méritos</span>
-                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#16a34a" }}>{mer}</span>
+                            <span className="text-[11px] font-black uppercase tracking-wider mb-1" style={{ color: "var(--status-ok-text)" }}>Méritos</span>
+                            <span className="font-black text-[24px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--status-ok-text)" }}>{mer}</span>
                           </div>
                         </>
                       )}
@@ -708,7 +628,7 @@ export default function MyPerformancePage() {
                         <span className="text-[18px] font-black text-muted-foreground">÷</span>
                       </div>
                       <div className="flex flex-col items-center justify-center px-4 py-3 min-w-[72px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                        <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground mb-1">Provas</span>
+                        <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-1">Provas</span>
                         <span className="font-black text-[24px] leading-none text-foreground" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{N}</span>
                       </div>
 
@@ -717,11 +637,11 @@ export default function MyPerformancePage() {
                         <span className="text-[18px] font-black text-muted-foreground">=</span>
                       </div>
                       <div className="flex flex-col items-center justify-center px-4 py-3 rounded-r-lg flex-1 min-w-[88px]" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                        <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground mb-1">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-1">
                           Nota Final{isClamped ? " (limitado a 0–100)" : ""}
                         </span>
                         <div className="flex items-baseline gap-1">
-                          <span className="font-black text-[28px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(finalVal) }}>{finalVal.toFixed(1)}</span>
+                          <span className="font-black text-[28px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(finalVal) }}>{fmtNum(finalVal, 1)}</span>
                           <span className="text-[11px] text-muted-foreground">/100</span>
                         </div>
                       </div>
@@ -729,7 +649,7 @@ export default function MyPerformancePage() {
 
                     {/* Explicação textual — só quando há penalidade/mérito */}
                     {netPenalty !== 0 && (
-                      <p className="mt-3 text-[10px] text-muted-foreground leading-relaxed">
+                      <p className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
                         Penalidades e méritos são somados ao total antes de dividir pelas provas —
                         {" "}por isso o impacto depende de quantos eventos você participou.
                       </p>
@@ -741,7 +661,7 @@ export default function MyPerformancePage() {
 
             {/* Penalidades e Méritos */}
             <div>
-              <h3 className="font-black text-[16px] uppercase mb-3 flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
+              <h3 className="font-black text-[16px] uppercase mb-3 flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent-text)" }}>
                 <AlertTriangle size={18} /> Penalidades e Méritos
               </h3>
               {(data.adjustments?.length ?? 0) === 0 ? (
@@ -757,7 +677,7 @@ export default function MyPerformancePage() {
                     return (
                       <div className="flex items-center gap-3 flex-wrap mb-3">
                         {mer > 0 && <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-[#ccff00] text-[#161e00]">+{mer} pts méritos</span>}
-                        {pen > 0 && <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-[#862200]/15 text-[#862200]">−{pen} pts penalidades</span>}
+                        {pen > 0 && <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-[var(--status-danger-bg)] text-[var(--status-danger-text)]">−{pen} pts penalidades</span>}
                         <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full text-foreground" style={{ backgroundColor: "var(--muted)" }}>
                           Líquido: {net >= 0 ? `+${net}` : net} pts
                         </span>
@@ -769,14 +689,14 @@ export default function MyPerformancePage() {
                       <div key={adj.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={idx > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                              adj.kind === "merit" ? "bg-[#16a34a]/15 text-[#15803d]" : "bg-[#862200]/15 text-[#862200]"
+                            <span className={`text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                              adj.kind === "merit" ? "bg-[#16a34a]/15 text-[var(--status-ok-text)]" : "bg-[var(--status-danger-bg)] text-[var(--status-danger-text)]"
                             }`}>
                               {adj.kind === "merit" ? "Mérito" : "Penalidade"}
                             </span>
                             <span className="text-[12px] font-bold text-foreground">{adj.penaltyType}</span>
                             {adj.quantity > 1 && (
-                              <span className="text-[10px] font-bold text-muted-foreground px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>×{adj.quantity}</span>
+                              <span className="text-[11px] font-bold text-muted-foreground px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--muted)" }}>×{adj.quantity}</span>
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
@@ -785,13 +705,13 @@ export default function MyPerformancePage() {
                           </div>
                           {adj.reason && <p className="text-[11px] text-muted-foreground italic mt-1">"{adj.reason}"</p>}
                         </div>
-                        <span className={`font-black text-[18px] shrink-0 ${adj.kind === "merit" ? "text-[#506600]" : "text-[#862200]"}`} style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                        <span className={`font-black text-[18px] shrink-0 ${adj.kind === "merit" ? "text-[var(--status-ok-text)]" : "text-[var(--status-danger-text)]"}`} style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                           {adj.kind === "merit" ? "+" : "−"}{adj.totalPoints} pts
                         </span>
                       </div>
                     ))}
                   </div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mt-2">
+                  <p className="text-[11px] font-bold uppercase text-muted-foreground mt-2">
                     Méritos somam e penalidades descontam pontos na sua nota final do ciclo (limitada entre 0 e 100).
                   </p>
                 </>
@@ -821,62 +741,62 @@ export default function MyPerformancePage() {
               const worst = entries[entries.length - 1];
               return (
                 <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
                     <Award size={13} /> Destaques do Ciclo
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Ponto forte */}
                     <div className="rounded-lg p-4" style={{ backgroundColor: "rgba(204,255,0,0.06)", border: "1px solid rgba(204,255,0,0.2)" }}>
                       <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp size={14} style={{ color: "#ccff00" }} />
-                        <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: "#ccff00" }}>Ponto Forte</span>
+                        <TrendingUp size={14} style={{ color: "var(--accent-text)" }} />
+                        <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: "var(--accent-text)" }}>Ponto Forte</span>
                       </div>
                       <p className="font-black text-[14px] text-foreground leading-tight mb-1">{best.name}</p>
                       <div className="flex items-baseline gap-1">
-                        <span className="font-black text-[22px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#ccff00" }}>{best.avg.toFixed(1)}</span>
+                        <span className="font-black text-[22px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent-text)" }}>{fmtNum(best.avg, 1)}</span>
                         <span className="text-[11px] text-muted-foreground">/10 média · {best.count} evento{best.count !== 1 ? "s" : ""}</span>
                       </div>
                       <div className="mt-2 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${(best.avg / 10) * 100}%`, backgroundColor: "#ccff00" }} />
+                        <div className="h-full rounded-full" style={{ width: `${(best.avg / 10) * 100}%`, backgroundColor: "var(--accent)" }} />
                       </div>
                     </div>
                     {/* A desenvolver */}
                     <div className="rounded-lg p-4" style={{ backgroundColor: "rgba(134,34,0,0.06)", border: "1px solid rgba(134,34,0,0.2)" }}>
                       <div className="flex items-center gap-2 mb-2">
-                        <TrendingDown size={14} className="text-[#c05020]" />
-                        <span className="text-[9px] font-black uppercase tracking-wider text-[#c05020]">A Desenvolver</span>
+                        <TrendingDown size={14} className="text-[var(--status-danger-text)]" />
+                        <span className="text-[11px] font-black uppercase tracking-wider text-[var(--status-danger-text)]">A Desenvolver</span>
                       </div>
                       <p className="font-black text-[14px] text-foreground leading-tight mb-1">{worst.name}</p>
                       <div className="flex items-baseline gap-1">
-                        <span className="font-black text-[22px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(worst.avg * 10) }}>{worst.avg.toFixed(1)}</span>
+                        <span className="font-black text-[22px] leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: scoreColor(worst.avg * 10) }}>{fmtNum(worst.avg, 1)}</span>
                         <span className="text-[11px] text-muted-foreground">/10 média · {worst.count} evento{worst.count !== 1 ? "s" : ""}</span>
                       </div>
                       <div className="mt-2 h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--muted)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${(worst.avg / 10) * 100}%`, backgroundColor: scoreColor(worst.avg * 10) }} />
+                        <div className="h-full rounded-full" style={{ width: `${(worst.avg / 10) * 100}%`, backgroundColor: scoreBarColor(worst.avg * 10) }} />
                       </div>
                     </div>
                   </div>
                   {/* Ranking completo de todos os critérios */}
                   <div className="mt-4 pt-3 space-y-2" style={{ borderTop: "1px solid var(--border)" }}>
-                    <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground mb-2">Ranking de Quesitos</p>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-2">Ranking de Quesitos</p>
                     {entries.map((e, i) => {
                       const isFirst = i === 0;
                       const isLast = i === entries.length - 1;
                       return (
                         <div key={e.name} className="flex items-center gap-3">
-                          <span className="text-[10px] font-black text-muted-foreground w-4 shrink-0 text-right">{i + 1}</span>
+                          <span className="text-[11px] font-black text-muted-foreground w-4 shrink-0 text-right">{i + 1}</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <span className="text-[11px] font-bold text-foreground truncate">{e.name}</span>
-                              {isFirst && <span className="text-[8px] font-black uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(204,255,0,0.15)", color: "#7a9200" }}>melhor</span>}
-                              {isLast && entries.length > 1 && <span className="text-[8px] font-black uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(134,34,0,0.08)", color: "#c05020" }}>a desenvolver</span>}
+                              {isFirst && <span className="text-[11px] font-black uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(204,255,0,0.15)", color: "var(--status-ok-text)" }}>melhor</span>}
+                              {isLast && entries.length > 1 && <span className="text-[11px] font-black uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(134,34,0,0.08)", color: "var(--status-danger-text)" }}>a desenvolver</span>}
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: "var(--border)" }}>
-                                <div className="h-full rounded-full" style={{ width: `${(e.avg / 10) * 100}%`, backgroundColor: isFirst ? "#ccff00" : scoreColor(e.avg * 10) }} />
+                                <div className="h-full rounded-full" style={{ width: `${(e.avg / 10) * 100}%`, backgroundColor: isFirst ? "var(--accent)" : scoreBarColor(e.avg * 10) }} />
                               </div>
-                              <span className="text-[12px] font-black shrink-0 w-[28px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: isFirst ? "#7a9200" : (scoreColor(e.avg * 10) === "#ccff00" ? "#7a9200" : scoreColor(e.avg * 10)) }}>
-                                {e.avg.toFixed(1)}
+                              <span className="text-[12px] font-black shrink-0 w-[28px] text-right" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: isFirst ? "var(--status-ok-text)" : scoreColor(e.avg * 10) }}>
+                                {fmtNum(e.avg, 1)}
                               </span>
                             </div>
                           </div>
@@ -892,7 +812,7 @@ export default function MyPerformancePage() {
             {/* Histórico de Eventos */}
             <div>
               <div className="flex flex-col gap-3 mb-[14px]">
-                <h3 className="font-black text-[16px] uppercase flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
+                <h3 className="font-black text-[16px] uppercase flex items-center gap-2" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent-text)" }}>
                   <Calendar size={18} /> Histórico de Eventos
                 </h3>
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -983,7 +903,7 @@ export default function MyPerformancePage() {
 
             {/* Privacy note */}
             <div className="rounded-xl p-4 text-center" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sigilo de Avaliação</p>
+              <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Sigilo de Avaliação</p>
               <p className="text-[11px] text-muted-foreground mt-1 italic">
                 Para garantir imparcialidade, as notas e comentários exibidos são consolidados. A identidade dos avaliadores é estritamente confidencial.
               </p>

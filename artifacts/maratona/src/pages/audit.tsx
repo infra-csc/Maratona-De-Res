@@ -122,7 +122,7 @@ export default function AuditPage() {
                   <tr key={log.id} data-testid={`row-audit-${log.id}`} className="hover:bg-slate-50/50 transition-colors font-mono text-sm">
                     <td className="px-6 py-3 text-slate-500 whitespace-nowrap">{fmtDateTime(log.createdAt)}</td>
                     <td className="px-6 py-3">
-                      <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold border tracking-wider ${ACTION_COLORS[log.action] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                      <span className={`text-[11px] px-2 py-0.5 rounded uppercase font-bold border tracking-wider ${ACTION_COLORS[log.action] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
                         {ACTION_LABELS[log.action] ?? log.action}
                       </span>
                     </td>

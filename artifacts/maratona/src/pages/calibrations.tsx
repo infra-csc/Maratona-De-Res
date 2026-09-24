@@ -1,116 +1,35 @@
 import { useState, useEffect, useRef } from "react";
-import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useCreateCalibration, useGetEventFeedback, usePublishCriterionPartialFeedback, usePublishCriterionFinalFeedback, useUpdateEventCriteria, useGetEventConformity, useSetEventConformity, useGetEventComments, useGetReviewRequests, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvents, useGetEvent, useGetCalibrations, useGetEventCriteria, useGetEvaluations, useGetEventComments, useGetCurrentCycle, getGetCalibrationsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useSearch } from "wouter";
-import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Target, AlertCircle, SlidersHorizontal, ChevronsUpDown, ChevronDown, ChevronUp, Check, Save, CheckCircle, Trophy, Flag, Send, ExternalLink, Filter, ShieldCheck, X, MessageSquare, User, Users, Copy, Clock, History, Trash2, Plus } from "lucide-react";
+import { Target } from "lucide-react";
 import { useCalibrationComments, useAddCalibrationComment, useDeleteCalibrationComment, useCalibrationAudit } from "@/lib/calibration-api";
-import { formatEventSubtitle, getCycleWeekends } from "@/lib/utils";
-import { CONDENSED, BODY, WARNING, GOOD, AMBER, INFO, usePremiumTheme } from "@/lib/premium-theme";
+import { getCycleWeekends } from "@/lib/utils";
+import { CONDENSED, BODY, usePremiumTheme } from "@/lib/premium-theme";
 import { EventActivityLog } from "@/components/event-activity-log";
+import { calibrationEventChip, filterCalibratableEvents, getPickerPalette, SAVED_REASON_FEEDBACK_MS } from "./calibrations/helpers";
+import { deriveCriteria, deriveDirtyState } from "./calibrations/derive";
+import { useCalibrationSaveFlow } from "./calibrations/use-calibration-save-flow";
+import { useConformity } from "./calibrations/use-conformity";
+import { CalibrationHeader } from "./calibrations/calibration-header";
+import { CalibrationSidebar } from "./calibrations/calibration-sidebar";
+import { CalibrationActionBar } from "./calibrations/calibration-action-bar";
+import { CriteriaTable } from "./calibrations/criteria-table";
+import type { CriterionRowSharedProps } from "./calibrations/criterion-row";
+import type { EventPickerProps } from "./calibrations/event-picker";
 
-// Badge do seletor de eventos: prioridade pub. final > pub. parcial > calibrado > fechado > em avaliação > aguardando.
-// Eventos históricos e fechados sem calibração mostram "Fechado"; demais mostram o estado real.
-function calibrationEventChip(ev: {
-  isHistorical?: boolean;
-  feedbackReleased?: boolean;
-  partialPublishedAt?: string | null;
-  finalCalibratedCriteria?: number | null;
-  totalCriteria?: number | null;
-  calibratedCriteriaCount?: number | null;
-  status?: string;
-  evaluatedCriteria?: number | null;
-}): { label: string; bg: string; fg: string } {
-  const finalCount = ev.finalCalibratedCriteria ?? 0;
-  const total = ev.totalCriteria ?? 0;
-  const allFinalPub = finalCount > 0 && total > 0 && finalCount >= total;
-  if (ev.feedbackReleased || allFinalPub)
-    return { label: "Pub. Final", bg: "rgba(154,176,0,0.14)", fg: GOOD };
-  if (ev.partialPublishedAt || finalCount > 0)
-    return { label: "Pub. Parcial", bg: "rgba(232,162,61,0.14)", fg: AMBER };
-  if ((ev.calibratedCriteriaCount ?? 0) > 0)
-    return { label: "Calibrado", bg: "rgba(91,141,239,0.14)", fg: INFO };
-  if (ev.status === "closed" || ev.isHistorical)
-    return { label: "Fechado", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
-  if ((ev.evaluatedCriteria ?? 0) > 0)
-    return { label: "Em Avaliação", bg: "rgba(154,176,0,0.14)", fg: GOOD };
-  return { label: "Aguardando", bg: "var(--secondary)", fg: "var(--muted-foreground)" };
-}
-
-function formatDateTime(d: Date): string {
-  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-// Erros dos hooks gerados (ApiError) e do calibration-api.ts (ApiRequestError)
-// carregam `status`; os laços em lote usam isso para parar no primeiro 401/403.
-function errorStatus(e: unknown): number | undefined {
-  if (e && typeof e === "object" && "status" in e) {
-    const s = (e as { status?: unknown }).status;
-    if (typeof s === "number") return s;
-  }
-  return undefined;
-}
-function errorMessage(e: unknown): string | undefined {
-  if (e && typeof e === "object" && "message" in e) {
-    const m = (e as { message?: unknown }).message;
-    if (typeof m === "string" && m.trim()) return m;
-  }
-  return undefined;
-}
-function isAuthError(e: unknown): boolean {
-  const s = errorStatus(e);
-  return s === 401 || s === 403;
-}
-const SESSION_EXPIRED_TOAST = {
-  title: "Sessão expirada",
-  description: "Sua sessão expirou ou foi trocada em outra aba. Entre novamente.",
-  variant: "destructive" as const,
-};
-const SAVED_REASON_FEEDBACK_MS = 2000;
-
-const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
-
+// Página de Calibrações. O estado compartilhado vive aqui e desce por props;
+// helpers, derivações, o fluxo salvar→publicar (use-calibration-save-flow) e
+// os blocos visuais ficam em ./calibrations/.
 export default function CalibrationsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isDark } = usePremiumTheme();
   const canFinalize = ["admin", "rh", "diretoria"].includes(user?.role ?? "");
 
-  const pk = isDark
-    ? {
-        bg: "#0f0f0f",
-        card: "#161616",
-        border: "rgba(255,255,255,0.12)",
-        text: "#f0ede8",
-        muted: "rgba(255,255,255,0.35)",
-        activeBg: "#ccff00",
-        activeFg: "#0f0f0f",
-        itemSel: "#1a1a1a",
-        itemBorder: "rgba(255,255,255,0.07)",
-        shadow: "6px 6px 0 #ccff00",
-        chipBorder: "rgba(255,255,255,0.20)",
-        chipText: "rgba(255,255,255,0.45)",
-        searchBorder: "rgba(255,255,255,0.10)",
-      }
-    : {
-        bg: "#ffffff",
-        card: "#f5f4ef",
-        border: "rgba(0,0,0,0.14)",
-        text: "#111111",
-        muted: "rgba(0,0,0,0.40)",
-        activeBg: "#111111",
-        activeFg: "#ffffff",
-        itemSel: "#f0efe9",
-        itemBorder: "rgba(0,0,0,0.07)",
-        shadow: "6px 6px 0 rgba(0,0,0,0.15)",
-        chipBorder: "rgba(0,0,0,0.20)",
-        chipText: "rgba(0,0,0,0.50)",
-        searchBorder: "rgba(0,0,0,0.10)",
-      };
+  const pk = getPickerPalette(isDark);
   const qc = useQueryClient();
   const search = useSearch();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
@@ -175,20 +94,7 @@ export default function CalibrationsPage() {
   // momento, inclusive antes de todas as avaliações serem enviadas.
   const calibratableEvents = events ?? [];
   const cycleWeekends = getCycleWeekends(cycle?.startDate, cycle?.endDate);
-  const filteredCalibratableEvents = calibratableEvents.filter(e => {
-    const evalCount = e.evaluatedCriteria ?? 0;
-    const calCount  = e.calibratedCriteriaCount ?? 0;
-    const total     = e.totalCriteria ?? 0;
-    const hasPub    = !!e.partialPublishedAt || !!e.feedbackReleased || (e.finalCalibratedCriteria ?? 0) > 0;
-    const matchStatus = eventStatusFilter === "all"
-      || (eventStatusFilter === "pending"     && evalCount === 0 && calCount === 0)
-      || (eventStatusFilter === "inProgress"  && !!e.criteriaConfirmed && (evalCount > 0 || calCount > 0))
-      || (eventStatusFilter === "done"        && (e.status === "closed" || (total > 0 && evalCount >= total) || hasPub));
-    const matchDate = (!filterDateFrom || (e.endDate ?? "") >= filterDateFrom) && (!filterDateTo || (e.startDate ?? "") <= filterDateTo);
-    const q = eventSearchText.trim().toLowerCase();
-    const matchText = !q || [e.name, e.clientName, e.city, e.state].some(v => v?.toLowerCase().includes(q));
-    return matchStatus && matchDate && matchText;
-  });
+  const filteredCalibratableEvents = filterCalibratableEvents(calibratableEvents, eventStatusFilter, filterDateFrom, filterDateTo, eventSearchText);
   const pickedEvent = calibratableEvents.find(e => e.id === selectedEventId);
 
   // Clear selection if the picked event no longer exists (e.g. removed/out of cycle)
@@ -219,299 +125,44 @@ export default function CalibrationsPage() {
     setEventIdFromUrlApplied(true);
   }, [events, search, eventIdFromUrlApplied]);
 
-  // Edição de peso por critério, direto na calibração. O PUT aceita payload
-  // parcial (o backend mescla com as linhas não alteradas) e recalcula o
-  // resultado na hora se o evento já estiver fechado.
-  const updateWeightMutation = useUpdateEventCriteria({
-    mutation: {
-      onSuccess: (data, variables) => {
-        qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
-        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-        qc.invalidateQueries({ queryKey: fbQKey });
-        setSavingWeightId(null);
-        const savedId = variables.data.criteria?.[0]?.criterionId;
-        if (savedId != null) {
-          setWeightEdits(prev => {
-            const next = { ...prev };
-            delete next[savedId];
-            return next;
-          });
-        }
-        if (data.warnings && data.warnings.length > 0) {
-          toast({ title: "Peso salvo", description: data.warnings.join(" "), variant: "destructive" });
-        } else {
-          toast({ title: "Peso salvo" });
-        }
-      },
-      onError: (e: { message?: string }) => {
-        toast({ title: "Erro ao salvar peso", description: e.message, variant: "destructive" });
-        setSavingWeightId(null);
-      },
-    },
+  // Derivações puras (fusão pai/filho, notas dos avaliadores, pendências).
+  // Calculadas antes do fluxo salvar→publicar, que as recebe por parâmetro.
+  const { getAreaScores, getAvgScore, getCalibration, activeCriteria, childCriterionIdsMap, displayActiveCriteria } =
+    deriveCriteria(criteria, calibrations, evaluations);
+  const { pendingScore, pendingReasonOnlyCrits, pendingWeightCritIds, unsavedEditsCount, totalDirtyCount } =
+    deriveDirtyState({ displayActiveCriteria, getCalibration, calScores, calReasons, weightEdits, publishIntents });
+  const scoredCriteria = displayActiveCriteria.filter(c => getAvgScore(c.criterionId) != null);
+  // Auto-preenche calibrações para critérios que têm nota do avaliador mas ainda
+  // não têm calibração — útil após importar avaliações via formulário.
+  const autoFillableCriteria = scoredCriteria.filter(c => !getCalibration(c.criterionId));
+
+  // Mutations de peso/calibração/publicação + feedback do evento (mesma ordem de hooks de antes).
+  const {
+    updateWeightMutation,
+    saveWeight,
+    savingAll,
+    savingAutoFill,
+    feedback,
+    handlePublishAll,
+    saveCalibration,
+    autoFillFromEvaluator,
+    handleSaveAll,
+  } = useCalibrationSaveFlow({
+    selectedEventId, qc, toast, criteria, calQKey,
+    weightEdits, setWeightEdits, setSavingWeightId,
+    calScores, setCalScores, calReasons, setCalReasons, setSavingCritId, markReasonSaved,
+    publishIntents, setPublishingAll,
+    displayActiveCriteria, childCriterionIdsMap, getCalibration, getAvgScore,
+    pendingScore, pendingReasonOnlyCrits, pendingWeightCritIds, unsavedEditsCount, totalDirtyCount,
+    autoFillableCriteria,
   });
-
-  function saveWeight(critId: number, active: boolean) {
-    const raw = (weightEdits[critId] ?? "").replace(",", ".").trim();
-    const w = Number(raw);
-    if (!raw || isNaN(w) || w < 0) {
-      toast({ title: "Peso inválido", description: "Informe um peso maior ou igual a zero.", variant: "destructive" });
-      return;
-    }
-    setSavingWeightId(critId);
-    updateWeightMutation.mutate({
-      id: selectedEventId!,
-      data: { criteria: [{ criterionId: critId, active, weight: w }] },
-    });
-  }
-
-  // Única mutation de calibração da tela — sem toast por item. Cada fluxo
-  // (salvar um critério, salvar tudo, auto-preencher) aguarda as chamadas e
-  // emite UM resumo no fim, em vez de uma notificação por requisição.
-  const bulkMutation = useCreateCalibration();
-  const [savingAll, setSavingAll] = useState(false);
-  const [savingAutoFill, setSavingAutoFill] = useState(false);
-
-  const fbQKey = ["event-feedback", selectedEventId] as unknown[];
-  const { data: feedback } = useGetEventFeedback(selectedEventId!, {
-    query: { enabled: !!selectedEventId, queryKey: fbQKey },
-  });
-
-  const publishCriterionPartialMutation = usePublishCriterionPartialFeedback();
-  const publishCriterionFinalMutation = usePublishCriterionFinalFeedback();
 
   // Conformidade
-  const { data: conformity } = useGetEventConformity(selectedEventId!, {
-    query: { enabled: !!selectedEventId, queryKey: ["conformity", selectedEventId] as unknown[] },
-  });
-  const setConformityMutation = useSetEventConformity({
-    mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["conformity", selectedEventId] });
-        qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      },
-    },
-  });
-  const [conformityForm, setConformityForm] = useState<{
-    epi: boolean | null; estaiamentos: boolean | null; guardaEquipamentos: boolean | null; conduta: boolean | null;
-    epiComment: string; estaiamentosComment: string; guardaEquipamentosComment: string; condutaComment: string;
-    absencesReport: string; standoutResponse: boolean | null; standoutJustification: string;
-  }>({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "", absencesReport: "", standoutResponse: null, standoutJustification: "" });
-  const [conformityExpandedComments, setConformityExpandedComments] = useState<Set<string>>(new Set());
-  const canManageConformity = ["admin", "rh", "diretoria"].includes(user?.role ?? "")
-    || !!(user && fullEvent && user.id === fullEvent.conformityEvaluatorUserId)
-    || !!(user && fullEvent && user.id === fullEvent.conformityEvaluatorFerramentasUserId);
-  useEffect(() => {
-    setConformityExpandedComments(new Set());
-    if (conformity) {
-      setConformityForm({
-        epi: conformity.epi ?? null,
-        estaiamentos: conformity.estaiamentos ?? null,
-        guardaEquipamentos: conformity.guardaEquipamentos ?? null,
-        conduta: conformity.conduta ?? null,
-        epiComment: conformity.epiComment ?? "",
-        estaiamentosComment: conformity.estaiamentosComment ?? "",
-        guardaEquipamentosComment: conformity.guardaEquipamentosComment ?? "",
-        condutaComment: conformity.condutaComment ?? "",
-        absencesReport: conformity.absencesReport ?? "",
-        standoutResponse: conformity.standoutResponse ?? null,
-        standoutJustification: conformity.standoutJustification ?? "",
-      });
-    } else {
-      setConformityForm({ epi: null, estaiamentos: null, guardaEquipamentos: null, conduta: null, epiComment: "", estaiamentosComment: "", guardaEquipamentosComment: "", condutaComment: "", absencesReport: "", standoutResponse: null, standoutJustification: "" });
-    }
-  }, [conformity, selectedEventId]);
+  const conformityState = useConformity({ selectedEventId, qc, user, fullEvent });
 
   const { data: eventComments } = useGetEventComments(selectedEventId!, {
     query: { enabled: !!selectedEventId, queryKey: ["event-comments", selectedEventId] as unknown[] },
   });
-  const canSeeReviewRequests = ["admin", "rh", "diretoria"].includes(user?.role ?? "");
-  const { data: allReviewRequests } = useGetReviewRequests({
-    query: { enabled: canSeeReviewRequests, queryKey: ["review-requests"] as unknown[] },
-  });
-  const eventReviewRequests = (allReviewRequests ?? []).filter(r => r.eventId === selectedEventId);
-  const pendingEventReviewRequests = eventReviewRequests.filter(r => r.status === "pending");
-
-  // Nome legível de um critério para as mensagens de erro em lote.
-  function criterionLabel(critId: number): string {
-    return (criteria ?? []).find(c => c.criterionId === critId)?.criterionName ?? `#${critId}`;
-  }
-  function failedDescription(failedIds: number[], firstError: string | null): string {
-    const names = failedIds.map(criterionLabel).join(", ");
-    return firstError ? `Falhou em: ${names}. ${firstError}` : `Falhou em: ${names}.`;
-  }
-
-  // Publica todos os critérios calibrados de acordo com a intenção definida por critério
-  async function handlePublishAll() {
-    if (!selectedEventId) return;
-    // Publicar usa a nota que está NO SERVIDOR. Se há nota/justificativa/peso
-    // digitados e não salvos, publicaríamos a nota antiga — bloqueia e orienta.
-    if (unsavedEditsCount > 0) {
-      toast({ title: "Há notas não salvas", description: "Salve as alterações antes de publicar — a publicação usa a nota gravada no servidor.", variant: "destructive" });
-      return;
-    }
-    // Inclui critérios inativos-mas-calibrados: eles aparecem na tela com o
-    // toggle Parc./Final, então o Publicar deve poder aplicar o status neles
-    // também (o backend permite publicar critério inativo já calibrado).
-    const calibrated = displayActiveCriteria.filter(c => getCalibration(c.criterionId) != null);
-    if (calibrated.length === 0) {
-      toast({ title: "Nenhum critério calibrado para publicar", description: "Salve ao menos uma nota calibrada antes de publicar.", variant: "destructive" });
-      return;
-    }
-    setPublishingAll(true);
-    let okFinal = 0, okPartial = 0;
-    const failed: number[] = [];
-    let firstError: string | null = null;
-    let sessionExpired = false;
-    for (const c of calibrated) {
-      const intent = publishIntents[c.criterionId] ?? "partial";
-      try {
-        if (intent === "final") {
-          await publishCriterionFinalMutation.mutateAsync({ id: selectedEventId, criterionId: c.criterionId });
-          okFinal++;
-        } else {
-          await publishCriterionPartialMutation.mutateAsync({ id: selectedEventId, criterionId: c.criterionId });
-          okPartial++;
-        }
-      } catch (e) {
-        if (isAuthError(e)) { sessionExpired = true; break; }
-        failed.push(c.criterionId);
-        if (!firstError) firstError = errorMessage(e) ?? null;
-      }
-    }
-    setPublishingAll(false);
-    qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
-    qc.invalidateQueries({ queryKey: fbQKey });
-    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-    if (sessionExpired) {
-      toast(SESSION_EXPIRED_TOAST);
-      return;
-    }
-    if (failed.length === 0) {
-      const parts: string[] = [];
-      if (okFinal > 0) parts.push(`${okFinal} Final`);
-      if (okPartial > 0) parts.push(`${okPartial} Parcial`);
-      toast({ title: `Publicado — ${parts.join(", ")}` });
-    } else {
-      toast({ title: `${okFinal + okPartial} publicado(s), ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
-    }
-  }
-
-  function getAreaScores(critId: number) {
-    // Inclui avaliações dos critérios eventScoped "filhos" (cópias duplicadas
-    // ligadas a este critério). O map é calculado abaixo após activeCriteria.
-    const children = childCriterionIdsMap.get(critId) ?? [];
-    const allIds = [critId, ...children];
-    return (evaluations ?? [])
-      .filter(e => allIds.includes(e.criterionId) && e.status === "submitted")
-      .map(e => {
-        const crit = activeCriteria.find(ac => ac.criterionId === e.criterionId);
-        const respondedRaw = e.submittedAt ?? e.createdAt ?? null;
-        // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
-        return { name: e.evaluatorName ?? "Avaliador", score: Number(e.score), comment: (e.comments ?? "").trim(), audioUrl: e.audioUrl ?? null, areaName: crit?.responsibleAreaName ?? null, isChild: e.criterionId !== critId, respondedAt: respondedRaw ? new Date(respondedRaw) : null };
-      });
-  }
-
-  function getAvgScore(critId: number) {
-    const scores = getAreaScores(critId).map(s => s.score);
-    return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-  }
-
-  function getCalibration(critId: number) {
-    return (calibrations ?? []).find(c => c.criterionId === critId);
-  }
-
-  // Salva UM critério (pai + cópias eventScoped filhas) aguardando todas as
-  // requisições: um único spinner e um único toast, independentemente de
-  // quantos filhos o critério tenha.
-  async function saveCalibration(critId: number) {
-    if (!selectedEventId) return;
-    const existing = getCalibration(critId);
-    const raw = calScores[critId] ?? (existing ? String(Number(existing.calibratedScore)) : "");
-    const reason = (calReasons[critId] ?? existing?.calibrationReason ?? "").trim();
-    const score = Number(raw);
-    if (!raw || isNaN(score) || score < 0 || score > 10) {
-      toast({ title: "Nota inválida", description: "Informe uma nota calibrada de 0 a 10.", variant: "destructive" });
-      return;
-    }
-    setSavingCritId(critId);
-    const avg = getAvgScore(critId);
-    const targetIds = [critId, ...(childCriterionIdsMap.get(critId) ?? [])];
-    try {
-      const results = await Promise.all(targetIds.map(id => bulkMutation.mutateAsync({
-        data: {
-          eventId: selectedEventId,
-          criterionId: id,
-          calibratedScore: score,
-          calibrationReason: reason,
-          originalAverageScore: avg ?? undefined,
-        },
-      })));
-      setCalScores(prev => { const n = { ...prev }; delete n[critId]; return n; });
-      setCalReasons(prev => { const n = { ...prev }; delete n[critId]; return n; });
-      markReasonSaved(critId);
-      qc.invalidateQueries({ queryKey: calQKey });
-      qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-      qc.invalidateQueries({ queryKey: fbQKey });
-      const warnings = Array.from(new Set(results.flatMap(r => r.warnings ?? [])));
-      if (warnings.length > 0) {
-        toast({ title: "Calibração registrada", description: warnings.join(" "), variant: "destructive" });
-      } else {
-        toast({ title: "Calibração registrada" });
-      }
-    } catch (e) {
-      if (isAuthError(e)) toast(SESSION_EXPIRED_TOAST);
-      else toast({ title: "Erro ao salvar calibração", description: errorMessage(e), variant: "destructive" });
-    } finally {
-      setSavingCritId(null);
-    }
-  }
-
-  // Inclui critérios com calibração salva mesmo se ec_active=F (foram calibrados antes de serem desativados no evento).
-  const calibratedCriterionIds = new Set((calibrations ?? []).filter(c => c.calibratedScore != null).map(c => c.criterionId));
-  const activeCriteria = (criteria ?? [])
-    .filter(c => c.active || calibratedCriterionIds.has(c.criterionId))
-    .sort((a, b) => a.criterionId - b.criterionId);
-
-  // Mapa: criterionId → [IDs dos critérios eventScoped que têm este como fonte].
-  // Permite fundir avaliações de duplicatas ("Qualidade de Entrega" + "(2)")
-  // numa única linha na tabela de calibrações.
-  const childCriterionIdsMap = new Map<number, number[]>();
-  activeCriteria.forEach(c => {
-    if (c.eventScoped && c.sourceCriterionId != null) {
-      const arr = childCriterionIdsMap.get(c.sourceCriterionId) ?? [];
-      arr.push(c.criterionId);
-      childCriterionIdsMap.set(c.sourceCriterionId, arr);
-    }
-  });
-
-  // Segunda passagem: critérios eventScoped ÓRFÃOS (sourceCriterionId=null) com o
-  // mesmo nome de um critério não-scoped → fundir pelo nome para exibição unificada.
-  const nonScopedByName = new Map<string, number>(
-    activeCriteria
-      .filter(c => !c.eventScoped)
-      .map(c => [c.criterionName.trim().toUpperCase(), c.criterionId])
-  );
-  activeCriteria.forEach(c => {
-    if (c.eventScoped && c.sourceCriterionId == null) {
-      const parentId = nonScopedByName.get(c.criterionName.trim().toUpperCase());
-      if (parentId != null) {
-        const arr = childCriterionIdsMap.get(parentId) ?? [];
-        if (!arr.includes(c.criterionId)) arr.push(c.criterionId);
-        childCriterionIdsMap.set(parentId, arr);
-      }
-    }
-  });
-
-  // Conjunto de IDs de critérios "filhos" — ocultos da tabela (fundidos no pai)
-  const childCriterionIdSet = new Set<number>(
-    [...childCriterionIdsMap.values()].flat()
-  );
-  // Lista de exibição: exclui os filhos (suas notas aparecem na linha do pai).
-  // Dupla proteção: pelo set E pela flag direta (cobre casos de cache stale).
-  const displayActiveCriteria = activeCriteria.filter(c =>
-    !childCriterionIdSet.has(c.criterionId) &&
-    !(c.eventScoped && c.sourceCriterionId != null)
-  );
 
   // Inicializa publishIntents quando o evento muda ou quando os critérios carregam.
   // DEVE ficar APÓS a declaração de displayActiveCriteria para evitar TDZ em produção.
@@ -536,52 +187,8 @@ export default function CalibrationsPage() {
     ? displayActiveCriteria.filter(c => !getCalibration(c.criterionId)).length
     : 0;
 
-  // Quantos critérios têm uma edição LOCAL pendente (digitada pelo usuário e ainda
-  // não salva). Não recai para o score já salvo na API para evitar falso-positivo
-  // de "pendente" em critérios que já foram gravados.
-  function pendingScore(critId: number) {
-    const raw = calScores[critId];
-    if (raw === undefined) return null;
-    const score = Number(raw);
-    if (!raw || isNaN(score) || score < 0 || score > 10) return null;
-    return score;
-  }
-  const fillableCount = displayActiveCriteria.filter(c => pendingScore(c.criterionId) != null).length;
-
   // Critérios com peso > 0 (únicos que entram nos contadores de calibração)
   const scorableActiveCriteria = displayActiveCriteria.filter(c => Number(c.weightOverride ?? c.originalWeight ?? 0) > 0);
-
-  // Pendências para o "Salvar Tudo": comentários isolados (critério já calibrado
-  // mas com razão editada localmente sem nova nota) + pesos editados.
-  const pendingReasonOnlyCrits = displayActiveCriteria.filter(c => {
-    if (pendingScore(c.criterionId) != null) return false; // já coberto pelo fillableCount
-    const localReason = calReasons[c.criterionId];
-    if (localReason === undefined) return false;
-    const existing = getCalibration(c.criterionId);
-    if (!existing) return false; // sem calibração existente, não há score para reusar
-    return localReason.trim() !== (existing.calibrationReason ?? "").trim();
-  });
-  const pendingWeightCritIds = Object.keys(weightEdits).map(Number).filter(id => {
-    const raw = (weightEdits[id] ?? "").replace(",", ".").trim();
-    return raw !== "" && !isNaN(Number(raw)) && Number(raw) >= 0;
-  });
-
-  // Critérios cuja intenção de publicação (toggle Parc./Final) diverge do estado
-  // JÁ publicado no servidor — cada divergência é uma mudança de status pendente
-  // que o "Salvar" deve aplicar (publicar/rebaixar), não só as edições de nota.
-  // Só conta critérios calibrados (sem calibração não há o que publicar).
-  const pendingPublishCritIds = displayActiveCriteria.filter(c => {
-    if (!getCalibration(c.criterionId)) return false;
-    const intent = publishIntents[c.criterionId];
-    if (intent === undefined) return false;
-    const baseline = c.finalPublishedAt ? "final" : "partial";
-    return intent !== baseline;
-  }).map(c => c.criterionId);
-
-  // Edições de DADOS não salvas (nota, justificativa, peso). Não inclui a
-  // divergência de intenção Parc./Final — essa é justamente o que "Publicar" aplica.
-  const unsavedEditsCount = fillableCount + pendingReasonOnlyCrits.length + pendingWeightCritIds.length;
-  const totalDirtyCount = unsavedEditsCount + pendingPublishCritIds.length;
 
   // Quantos critérios já publicados como Final
   const finalPublishedCount = scorableActiveCriteria.filter(c => !!c.finalPublishedAt).length;
@@ -594,406 +201,80 @@ export default function CalibrationsPage() {
     ? displayActiveCriteria.filter(c => !!getCalibration(c.criterionId))
     : displayActiveCriteria;
 
-  const scoredCriteria = displayActiveCriteria.filter(c => getAvgScore(c.criterionId) != null);
   const alreadyReleased = !!feedback?.feedbackReleased;
   const feedbackReleasedAtDate = feedback?.feedbackReleasedAt ? new Date(feedback.feedbackReleasedAt) : null;
   const partialPublishedAtDate = feedback?.partialPublishedAt ? new Date(feedback.partialPublishedAt) : null;
 
-  // Auto-preenche calibrações para critérios que têm nota do avaliador mas ainda
-  // não têm calibração — útil após importar avaliações via formulário.
-  const autoFillableCriteria = scoredCriteria.filter(c => !getCalibration(c.criterionId));
-  async function autoFillFromEvaluator() {
-    if (autoFillableCriteria.length === 0) return;
-    setSavingAutoFill(true);
-    let ok = 0;
-    const failed: number[] = [];
-    let firstError: string | null = null;
-    let sessionExpired = false;
-    const allWarnings: string[] = [];
-    for (const c of autoFillableCriteria) {
-      const avg = getAvgScore(c.criterionId);
-      if (avg == null) continue;
-      try {
-        const result = await bulkMutation.mutateAsync({
-          data: {
-            eventId: selectedEventId!,
-            criterionId: c.criterionId,
-            calibratedScore: avg,
-            originalAverageScore: avg,
-          },
-        });
-        if (result.warnings) allWarnings.push(...result.warnings);
-        ok++;
-      } catch (e) {
-        if (isAuthError(e)) { sessionExpired = true; break; }
-        failed.push(c.criterionId);
-        if (!firstError) firstError = errorMessage(e) ?? null;
-      }
-    }
-    setSavingAutoFill(false);
-    qc.invalidateQueries({ queryKey: calQKey });
-    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-    qc.invalidateQueries({ queryKey: fbQKey });
-    if (sessionExpired) {
-      toast(SESSION_EXPIRED_TOAST);
-      return;
-    }
-    const uniqueWarnings = Array.from(new Set(allWarnings));
-    if (failed.length === 0) {
-      toast({
-        title: `${ok} calibraç${ok === 1 ? "ão preenchida" : "ões preenchidas"} com nota do avaliador`,
-        description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined,
-        variant: uniqueWarnings.length > 0 ? "destructive" : undefined,
-      });
-    } else {
-      toast({ title: `${ok} preenchida(s), ${failed.length} com erro`, description: failedDescription(failed, firstError), variant: "destructive" });
-    }
-  }
-
-  // Salva TUDO de uma vez: calibrações com nota nova, comentários pendentes em
-  // calibrações já salvas, e edições de peso.
-  async function handleSaveAll() {
-    if (totalDirtyCount === 0 || !selectedEventId) return;
-    const eventId = selectedEventId;
-    setSavingAll(true);
-    let okCal = 0, okWeight = 0, okPublish = 0;
-    const failedCal: number[] = [], failedWeight: number[] = [], failedPublish: number[] = [];
-    let firstError: string | null = null;
-    let sessionExpired = false;
-    const allWarnings: string[] = [];
-    const savedScoreIds = new Set<number>();
-    const savedReasonOnlyIds: number[] = [];
-
-    // 1. Calibrações com nota nova (+ comentário)
-    const toSaveScores = displayActiveCriteria
-      .map(c => ({ critId: c.criterionId, score: pendingScore(c.criterionId), reason: (calReasons[c.criterionId] ?? getCalibration(c.criterionId)?.calibrationReason ?? "").trim() }))
-      .filter((x): x is { critId: number; score: number; reason: string } => x.score != null);
-    for (const x of toSaveScores) {
-      try {
-        const result = await bulkMutation.mutateAsync({
-          data: { eventId, criterionId: x.critId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined },
-        });
-        if (result.warnings) allWarnings.push(...result.warnings);
-        for (const childId of (childCriterionIdsMap.get(x.critId) ?? [])) {
-          await bulkMutation.mutateAsync({ data: { eventId, criterionId: childId, calibratedScore: x.score, calibrationReason: x.reason, originalAverageScore: getAvgScore(x.critId) ?? undefined } });
-        }
-        // Só conta como salvo (e limpa a edição local) com pai E filhos gravados.
-        okCal++;
-        savedScoreIds.add(x.critId);
-      } catch (e) {
-        if (isAuthError(e)) { sessionExpired = true; break; }
-        failedCal.push(x.critId);
-        if (!firstError) firstError = errorMessage(e) ?? null;
-      }
-    }
-
-    // 2. Comentários pendentes em calibrações já salvas (sem nova nota)
-    if (!sessionExpired) for (const c of pendingReasonOnlyCrits) {
-      const existing = getCalibration(c.criterionId);
-      if (!existing) continue;
-      const score = Number(existing.calibratedScore);
-      const reason = (calReasons[c.criterionId] ?? "").trim();
-      try {
-        await bulkMutation.mutateAsync({
-          data: { eventId, criterionId: c.criterionId, calibratedScore: score, calibrationReason: reason, originalAverageScore: getAvgScore(c.criterionId) ?? undefined },
-        });
-        okCal++;
-        savedReasonOnlyIds.push(c.criterionId);
-      } catch (e) {
-        if (isAuthError(e)) { sessionExpired = true; break; }
-        failedCal.push(c.criterionId);
-        if (!firstError) firstError = errorMessage(e) ?? null;
-      }
-    }
-
-    // 3. Pesos editados
-    if (!sessionExpired) for (const critId of pendingWeightCritIds) {
-      const raw = (weightEdits[critId] ?? "").replace(",", ".").trim();
-      const w = Number(raw);
-      const crit = displayActiveCriteria.find(c => c.criterionId === critId);
-      if (!crit || isNaN(w)) continue;
-      try {
-        await updateWeightMutation.mutateAsync({ id: eventId, data: { criteria: [{ criterionId: critId, active: crit.active ?? true, weight: w }] } });
-        okWeight++;
-        setWeightEdits(prev => { const n = { ...prev }; delete n[critId]; return n; });
-      } catch (e) {
-        if (isAuthError(e)) { sessionExpired = true; break; }
-        failedWeight.push(critId);
-        if (!firstError) firstError = errorMessage(e) ?? null;
-      }
-    }
-
-    // 4. Mudanças de status (Parc./Final). Recalculado AQUI, depois da etapa 1:
-    // um critério que acabou de receber a primeira nota ainda não tinha
-    // calibração no render anterior e ficaria fora de `pendingPublishCritIds`,
-    // deixando a intenção "Final" sem efeito. Considera publicável todo critério
-    // salvo agora OU já calibrado no servidor cuja intenção diverge do publicado.
-    const publishTargets = displayActiveCriteria.filter(c => {
-      const hasCalibration = savedScoreIds.has(c.criterionId) || !!getCalibration(c.criterionId);
-      if (!hasCalibration) return false;
-      const intent = publishIntents[c.criterionId];
-      if (intent === undefined) return false;
-      const baseline = c.finalPublishedAt ? "final" : "partial";
-      return intent !== baseline;
-    }).map(c => c.criterionId);
-    if (!sessionExpired) for (const critId of publishTargets) {
-      const intent = publishIntents[critId];
-      try {
-        if (intent === "final") {
-          await publishCriterionFinalMutation.mutateAsync({ id: eventId, criterionId: critId });
-        } else {
-          await publishCriterionPartialMutation.mutateAsync({ id: eventId, criterionId: critId });
-        }
-        okPublish++;
-      } catch (e) {
-        if (isAuthError(e)) { sessionExpired = true; break; }
-        failedPublish.push(critId);
-        if (!firstError) firstError = errorMessage(e) ?? null;
-      }
-    }
-
-    setSavingAll(false);
-    const totalOk = okCal + okWeight + okPublish;
-    const totalFailed = failedCal.length + failedWeight.length + failedPublish.length;
-
-    // Limpa as edições locais apenas dos critérios efetivamente gravados; os
-    // que falharam (ou não chegaram a ser enviados) continuam editáveis.
-    const savedIds = [...savedScoreIds, ...savedReasonOnlyIds];
-    setCalScores(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
-    setCalReasons(prev => { const n = { ...prev }; savedIds.forEach(id => delete n[id]); return n; });
-    savedReasonOnlyIds.forEach(markReasonSaved);
-
-    qc.invalidateQueries({ queryKey: calQKey });
-    qc.invalidateQueries({ queryKey: ["ec", selectedEventId] });
-    qc.invalidateQueries({ queryKey: getGetEventsQueryKey() });
-    qc.invalidateQueries({ queryKey: fbQKey });
-
-    if (sessionExpired) {
-      toast({ ...SESSION_EXPIRED_TOAST, description: `${SESSION_EXPIRED_TOAST.description}${totalOk > 0 ? ` ${totalOk} item(ns) já haviam sido salvos.` : ""}` });
-      return;
-    }
-
-    const uniqueWarnings = Array.from(new Set(allWarnings));
-    if (totalFailed === 0) {
-      const parts: string[] = [];
-      if (okCal > 0) parts.push(`${okCal} calibraç${okCal === 1 ? "ão" : "ões"}`);
-      if (okWeight > 0) parts.push(`${okWeight} peso${okWeight === 1 ? "" : "s"}`);
-      if (okPublish > 0) parts.push(`${okPublish} status`);
-      toast({ title: `Tudo salvo — ${parts.join(", ")}`, description: uniqueWarnings.length > 0 ? uniqueWarnings.join(" ") : undefined, variant: uniqueWarnings.length > 0 ? "destructive" : undefined });
-    } else {
-      const failedIds = Array.from(new Set([...failedCal, ...failedWeight, ...failedPublish]));
-      toast({ title: `${totalOk} salvo(s), ${totalFailed} com erro`, description: failedDescription(failedIds, firstError), variant: "destructive" });
-    }
-  }
-
   const currentPubBadge = pickedEvent ? calibrationEventChip(pickedEvent) : null;
+
+  const pickerProps: EventPickerProps = {
+    pk,
+    eventPickerOpen,
+    setEventPickerOpen,
+    calibratableEvents,
+    filteredCalibratableEvents,
+    pickedEvent,
+    selectedEventId,
+    onSelectEvent: (eventId: number) => { setSelectedEventId(eventId); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); },
+    eventStatusFilter,
+    setEventStatusFilter,
+    eventSearchText,
+    setEventSearchText,
+    cycleWeekends,
+    filterDateFrom,
+    setFilterDateFrom,
+    filterDateTo,
+    setFilterDateTo,
+  };
+
+  const rowProps: CriterionRowSharedProps = {
+    getAreaScores,
+    getAvgScore,
+    getCalibration,
+    childCriterionIdsMap,
+    activeCriteria,
+    calScores,
+    setCalScores,
+    calReasons,
+    setCalReasons,
+    savedReasonIds,
+    setSavedReasonIds,
+    savingCritId,
+    savingAll,
+    saveCalibration,
+    expandedEvalComments,
+    setExpandedEvalComments,
+    calAudit,
+    calComments,
+    newCommentTexts,
+    setNewCommentTexts,
+    canFinalize,
+    addCommentMutation,
+    deleteCommentMutation,
+    toast,
+    canEditWeights,
+    weightEdits,
+    setWeightEdits,
+    savingWeightId,
+    updateWeightPending: updateWeightMutation.isPending,
+    saveWeight,
+    publishIntents,
+    setPublishIntents,
+  };
 
   return (
     <div className="min-h-full" style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}>
 
       {/* ── COMPACT STICKY HEADER ── */}
-      <div className="sticky top-0 z-30 px-3 py-2.5 flex items-center gap-2.5" style={{ backgroundColor: "var(--card)", borderBottom: "1px solid var(--border)" }}>
-        <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ border: "2px solid var(--accent)" }} />
-        <span className="font-black uppercase text-[13px] tracking-tight shrink-0 hidden sm:inline" style={{ fontFamily: CONDENSED }}>Calibrações</span>
-
-        {/* Event picker inline */}
-        <div className="flex-1 min-w-0">
-          <Popover open={eventPickerOpen} onOpenChange={setEventPickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                role="combobox"
-                data-testid="select-event"
-                disabled={calibratableEvents.length === 0}
-                className="w-full h-9 px-3 flex items-center justify-between gap-2 text-left transition-opacity hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed rounded-none"
-                style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)", color: "var(--foreground)" }}
-              >
-                {pickedEvent ? (
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="font-black uppercase text-[11px] truncate" style={{ fontFamily: CONDENSED }}>{pickedEvent.name}</span>
-                    {formatEventSubtitle(pickedEvent) && (
-                      <span className="text-[10px] font-bold truncate hidden md:inline" style={{ color: "var(--muted-foreground)" }}>{formatEventSubtitle(pickedEvent)}</span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="font-black uppercase text-[10px] tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>
-                    {calibratableEvents.length === 0 ? "Nenhum evento no ciclo" : "Selecionar evento..."}
-                  </span>
-                )}
-                <ChevronsUpDown size={13} className="shrink-0" style={{ color: "var(--muted-foreground)" }} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              className="p-0 rounded-none w-[min(96vw,600px)]"
-              style={{
-                backgroundColor: pk.bg,
-                border: `2px solid ${pk.border}`,
-                color: pk.text,
-                boxShadow: pk.shadow,
-              }}
-            >
-              <Command
-                shouldFilter={false}
-                className="[&_[cmdk-input-wrapper]]:hidden [&_[cmdk-item]]:rounded-none [&_[cmdk-item]]:px-0 [&_[cmdk-group]]:px-0"
-                style={{ backgroundColor: pk.bg, color: pk.text }}
-              >
-                {/* ── Status filter tabs ── */}
-                <div className="flex" style={{ borderBottom: `2px solid ${pk.border}` }}>
-                  {([
-                    { value: "all", label: "Todos" },
-                    { value: "pending", label: "Aguardando" },
-                    { value: "inProgress", label: "Em Avaliação" },
-                    { value: "done", label: "Fechado" },
-                  ] as const).map((opt, i) => {
-                    const active = eventStatusFilter === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        data-testid={`button-filter-status-${opt.value}`}
-                        onClick={() => setEventStatusFilter(opt.value)}
-                        className="flex-1 py-2.5 font-black uppercase text-[11px] tracking-widest transition-all"
-                        style={{
-                          fontFamily: CONDENSED,
-                          backgroundColor: active ? pk.activeBg : "transparent",
-                          color: active ? pk.activeFg : pk.muted,
-                          borderRight: i < 3 ? `1px solid ${pk.border}` : undefined,
-                        }}
-                      >{opt.label}</button>
-                    );
-                  })}
-                </div>
-
-                {/* ── Search (plain input, no duplicate icon) ── */}
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5" style={{ borderBottom: `1px solid ${pk.border}`, backgroundColor: pk.card }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: pk.muted, flexShrink: 0 }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                  <input
-                    data-testid="input-event-search"
-                    type="text"
-                    value={eventSearchText}
-                    onChange={e => setEventSearchText(e.target.value)}
-                    placeholder="Buscar evento ou cliente..."
-                    className="flex-1 h-8 bg-transparent border-none outline-none font-bold text-[12px] placeholder:opacity-50"
-                    style={{ color: pk.text, fontFamily: BODY }}
-                    autoComplete="off"
-                  />
-                  {eventSearchText && (
-                    <button type="button" onClick={() => setEventSearchText("")} className="shrink-0 hover:opacity-70 transition-opacity" style={{ color: pk.muted }}>
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-
-                {/* ── Date weekend chips (horizontal scroll) ── */}
-                {cycleWeekends.length > 0 && (
-                  <div className="flex items-center gap-0 px-3.5 py-2 overflow-x-auto" style={{ borderBottom: `1px solid ${pk.border}`, backgroundColor: pk.bg, scrollbarWidth: "none" }}>
-                    <span className="text-[10px] font-black uppercase shrink-0 mr-2.5" style={{ color: pk.muted, fontFamily: CONDENSED }}>Fim de semana</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {cycleWeekends.map(w => {
-                        const active = filterDateFrom === w.sat && filterDateTo === w.sun;
-                        return (
-                          <button key={w.sat} type="button"
-                            onClick={() => { if (active) { setFilterDateFrom(""); setFilterDateTo(""); } else { setFilterDateFrom(w.sat); setFilterDateTo(w.sun); } }}
-                            className="px-2.5 py-1 font-black uppercase text-[10px] tracking-wide transition-all shrink-0 whitespace-nowrap"
-                            style={{
-                              fontFamily: CONDENSED,
-                              backgroundColor: active ? pk.activeBg : "transparent",
-                              color: active ? pk.activeFg : pk.chipText,
-                              border: active ? `1.5px solid ${pk.activeBg}` : `1.5px solid ${pk.chipBorder}`,
-                            }}
-                          >{w.label}</button>
-                        );
-                      })}
-                      {(filterDateFrom || filterDateTo) && (
-                        <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-                          className="text-[10px] font-black uppercase shrink-0 px-2 hover:opacity-70 transition-opacity"
-                          style={{ color: pk.muted }}
-                        >× Limpar</button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Event list ── */}
-                <CommandList className="max-h-[320px] overflow-y-auto" style={{ backgroundColor: pk.bg }}>
-                  <CommandEmpty className="py-10 text-center font-black uppercase text-[11px] tracking-widest" style={{ color: pk.muted, fontFamily: CONDENSED }}>
-                    Nenhum evento encontrado.
-                  </CommandEmpty>
-                  <CommandGroup className="p-0" style={{ backgroundColor: pk.bg }}>
-                    {filteredCalibratableEvents.map((ev, idx) => {
-                      const chip = calibrationEventChip(ev);
-                      const isSelected = selectedEventId === ev.id;
-                      return (
-                        <CommandItem
-                          key={ev.id}
-                          value={`${ev.name} ${ev.clientName} ${ev.city} ${ev.state}`}
-                          data-testid={`option-event-${ev.id}`}
-                          onSelect={() => { setSelectedEventId(ev.id); setCalScores({}); setCalReasons({}); setWeightEdits({}); setEventPickerOpen(false); }}
-                          className="cursor-pointer rounded-none flex items-stretch gap-0 aria-selected:bg-transparent"
-                          style={{
-                            borderTop: idx > 0 ? `1px solid ${pk.itemBorder}` : undefined,
-                            backgroundColor: isSelected ? pk.itemSel : "transparent",
-                          }}
-                        >
-                          {/* Selected indicator bar */}
-                          <div className="w-[3px] shrink-0" style={{ backgroundColor: isSelected ? pk.activeBg : "transparent" }} />
-                          <div className="flex items-center gap-3 px-3.5 py-2.5 flex-1 min-w-0">
-                            <span className="flex flex-col min-w-0 flex-1 gap-0.5">
-                              <span
-                                className="font-black uppercase text-[13px] leading-tight"
-                                style={{ fontFamily: CONDENSED, color: isSelected ? pk.activeBg : pk.text }}
-                              >{ev.name}</span>
-                              {formatEventSubtitle(ev) && (
-                                <span className="text-[11px] font-bold uppercase" style={{ color: pk.muted }}>
-                                  {formatEventSubtitle(ev)}
-                                </span>
-                              )}
-                            </span>
-                            <span
-                              className="font-black text-[10px] uppercase tracking-wider shrink-0 px-2 py-0.5"
-                              style={{
-                                fontFamily: CONDENSED,
-                                border: `1.5px solid ${chip.fg}`,
-                                color: chip.fg,
-                                backgroundColor: chip.bg,
-                              }}
-                            >{chip.label}</span>
-                          </div>
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Publication status badge */}
-        {pickedEvent && currentPubBadge && (
-          <span className="shrink-0 px-2.5 py-1 rounded-full font-bold text-[10px] uppercase hidden sm:inline"
-            style={{
-              backgroundColor: (alreadyReleased || allCriteriaFinalPublished) ? "var(--primary)" : partialPublishedAtDate ? "rgba(232,162,61,0.14)" : "var(--secondary)",
-              color: (alreadyReleased || allCriteriaFinalPublished) ? "var(--primary-foreground)" : partialPublishedAtDate ? AMBER : "var(--muted-foreground)",
-            }}
-            title={(alreadyReleased || allCriteriaFinalPublished) ? `Final liberado em ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}` : partialPublishedAtDate ? `Parcial publicado em ${formatDateTime(partialPublishedAtDate)}` : "Notas não publicadas"}
-          >
-            {(alreadyReleased || allCriteriaFinalPublished) ? "Final" : partialPublishedAtDate ? "Parcial" : "Não pub."}
-          </span>
-        )}
-
-        {/* Pending calibrations badge */}
-        {pendingCount > 0 && (
-          <span
-            title={`${pendingCount} critério(s) sem calibração`}
-            className="shrink-0 font-black text-[11px] uppercase px-2.5 py-1 rounded-full flex items-center gap-1"
-            style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-          >
-            <SlidersHorizontal size={11} /> {pendingCount}
-          </span>
-        )}
-      </div>
+      <CalibrationHeader
+        pickerProps={pickerProps}
+        showPubBadge={!!(pickedEvent && currentPubBadge)}
+        alreadyReleased={alreadyReleased}
+        allCriteriaFinalPublished={allCriteriaFinalPublished}
+        partialPublishedAtDate={partialPublishedAtDate}
+        feedbackReleasedAtDate={feedbackReleasedAtDate}
+        pendingCount={pendingCount}
+      />
 
       <div className="p-4">
         {/* ── PLACEHOLDER: nenhum evento selecionado ── */}
@@ -1011,230 +292,16 @@ export default function CalibrationsPage() {
         <div className="flex flex-col lg:flex-row gap-4 items-start">
 
           {/* ── RIGHT SIDEBAR: Context always visible ── */}
-          <aside className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-16 self-start lg:order-2 rounded-xl max-h-[50vh] lg:max-h-[calc(100vh-90px)] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-
-            {/* Event summary bar */}
-            {pickedEvent && (
-              <div className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
-                <div className="flex items-center gap-3 min-w-0">
-                  <h3 className="font-black uppercase tracking-tight text-sm truncate" style={{ fontFamily: CONDENSED }}>{pickedEvent.name}</h3>
-                  <span className="text-[11px] font-bold uppercase truncate hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{pickedEvent.clientName}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                  {feedback && (
-                    <span className="rounded-lg px-3 py-1.5 flex items-center gap-1.5" style={{ border: "1px solid var(--border)" }}>
-                      <span className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nota Final</span>
-                      <span className="text-lg font-black leading-none" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{feedback.eventScore.toFixed(1)}<span className="text-xs" style={{ color: "var(--muted-foreground)" }}>/100</span></span>
-                    </span>
-                  )}
-                  <Link
-                    href={`/events/${selectedEventId}`}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase rounded-lg px-3 py-1.5 transition-colors hover:opacity-80 shrink-0"
-                    style={{ border: "1px solid var(--border)" }}
-                  >
-                    <ExternalLink size={12} /> Ver Evento
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Review requests */}
-            {eventReviewRequests.length > 0 && (
-              <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Flag size={13} className="shrink-0" style={{ color: WARNING }} />
-                  <span className="text-[11px] font-black uppercase" style={{ color: WARNING }}>
-                    Revisão Sinalizada {pendingEventReviewRequests.length > 0 && `— ${pendingEventReviewRequests.length} pendente${pendingEventReviewRequests.length === 1 ? "" : "s"}`}
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  {eventReviewRequests.map(r => (
-                    <div key={r.id} className="flex items-start gap-2 text-xs px-3 py-2 rounded-lg" style={{ backgroundColor: r.status === "pending" ? "rgba(229,72,77,0.10)" : "var(--secondary)", border: r.status === "pending" ? `1px solid ${WARNING}` : "1px solid var(--border)" }}>
-                      <div className="min-w-0 flex-1">
-                        <span className="font-bold uppercase">{r.employeeName}</span>
-                        {r.comment && <p className="mt-0.5" style={{ color: "var(--foreground)" }}>"{r.comment}"</p>}
-                        {r.status === "resolved" && r.resolutionNotes && <p className="text-[10px] font-bold uppercase mt-0.5" style={{ color: "var(--muted-foreground)" }}>Resposta: {r.resolutionNotes}</p>}
-                      </div>
-                      <span className="px-1.5 py-0.5 rounded font-bold text-[9px] uppercase shrink-0" style={{ backgroundColor: r.status === "pending" ? WARNING : "var(--secondary)", color: r.status === "pending" ? "#fff" : "var(--muted-foreground)" }}>
-                        {r.status === "pending" ? "Pendente" : "Resolvido"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Team */}
-            {fullEvent?.participants && fullEvent.participants.length > 0 && (() => {
-              const relevantParticipants = fullEvent.participants!.filter(p => p.confirmed !== false && p.countsForScore !== false);
-              return (
-                <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                  <button type="button" onClick={() => setTeamPanelOpen(o => !o)} className="flex items-center gap-2 w-full text-left mb-2">
-                    <Users size={13} className="shrink-0" />
-                    <span className="text-[11px] font-black uppercase">Equipe Alocada <span style={{ color: "var(--muted-foreground)" }}>({relevantParticipants.length})</span></span>
-                    {teamPanelOpen ? <ChevronUp size={12} className="ml-auto" style={{ color: "var(--muted-foreground)" }} /> : <ChevronDown size={12} className="ml-auto" style={{ color: "var(--muted-foreground)" }} />}
-                  </button>
-                  {teamPanelOpen && (
-                    relevantParticipants.length === 0 ? (
-                      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Nenhum colaborador ativo alocado.</p>
-                    ) : (
-                      <div className="space-y-1">
-                        {relevantParticipants.map(p => {
-                          return (
-                            <div key={p.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--secondary)" }}>
-                              <div className="w-7 h-7 rounded-md flex items-center justify-center font-black text-[10px] shrink-0" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
-                                {p.employeeName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="font-black uppercase text-[10px] leading-tight truncate">{p.employeeName}</p>
-                                <p className="text-[9px] font-bold uppercase truncate" style={{ color: "var(--muted-foreground)" }}>{p.functionName}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Conformidade — editável para gestores */}
-            {(conformity || canManageConformity) && (
-              <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                <p className="text-[11px] font-black uppercase mb-2 flex items-center gap-1.5"><ShieldCheck size={13} /> Matriz de Conformidade</p>
-                {(fullEvent?.conformityEvaluatorName || fullEvent?.conformityEvaluatorFerramentasName) && (
-                  <div className="mb-2 space-y-0.5">
-                    {fullEvent?.conformityEvaluatorName && (
-                      <p className="text-[9px] flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}><User size={9} /> Responsável Cenografia: <span className="font-bold ml-0.5" style={{ color: "var(--foreground)" }}>{fullEvent.conformityEvaluatorName}</span></p>
-                    )}
-                    {fullEvent?.conformityEvaluatorFerramentasName && (
-                      <p className="text-[9px] flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}><User size={9} /> Responsável Ferramentas: <span className="font-bold ml-0.5" style={{ color: "var(--foreground)" }}>{fullEvent.conformityEvaluatorFerramentasName}</span></p>
-                    )}
-                  </div>
-                )}
-                <div className="space-y-1 mb-2">
-                  {([
-                    { label: "EPI", key: "epi" as const, commentKey: "epiComment" as const },
-                    { label: "Estaiamento", key: "estaiamentos" as const, commentKey: "estaiamentosComment" as const },
-                    { label: "Conduta", key: "conduta" as const, commentKey: "condutaComment" as const },
-                    { label: "Guarda Equip.", key: "guardaEquipamentos" as const, commentKey: "guardaEquipamentosComment" as const },
-                  ]).map(item => {
-                    const value = conformityForm[item.key];
-                    const comment = conformityForm[item.commentKey];
-                    const isExpanded = conformityExpandedComments.has(item.key);
-                    // Mostra quem realmente preencheu cada seção (gravado no momento do save).
-                    // "Guarda Equip." = Ferramentas; demais = Cenografia.
-                    // TODO contrato: ferramentasSubmittedByName/cenografiaSubmittedByName ainda
-                    // não existem em EventConformity (api.schemas.ts) — cast mantido até o codegen.
-                    const answeredByName = item.key === "guardaEquipamentos"
-                      ? ((conformity as unknown as Record<string, unknown>)?.ferramentasSubmittedByName as string | null | undefined) ?? null
-                      : ((conformity as unknown as Record<string, unknown>)?.cenografiaSubmittedByName as string | null | undefined) ?? null;
-                    return (
-                      <div key={item.key} className="rounded-lg overflow-hidden" style={{ border: value === null ? "1px solid var(--border)" : value ? `1px solid ${GOOD}` : `1px solid ${WARNING}`, backgroundColor: value === null ? "var(--secondary)" : value ? "rgba(154,176,0,0.10)" : "rgba(229,72,77,0.08)" }}>
-                        <div className="flex items-center gap-1 px-2 py-1.5">
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[10px] font-bold uppercase truncate block">{item.label}</span>
-                            {value !== null && answeredByName && (
-                              <span className="text-[8px] flex items-center gap-0.5 mt-0.5" style={{ color: GOOD }}>
-                                <Check size={8} /> {answeredByName}
-                              </span>
-                            )}
-                          </div>
-                          {canManageConformity ? (
-                            <div role="group" aria-label={`${item.label}: conformidade`} className="flex items-center rounded overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
-                              {/* Alvo mínimo de toque 28×28 px (WCAG 2.5.8) */}
-                              <button type="button" aria-label="Sim" aria-pressed={value === true} onClick={() => { const next = { ...conformityForm, [item.key]: true }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: true } }); }} className="min-w-[28px] min-h-[28px] px-1.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === true ? "var(--primary)" : "transparent", color: value === true ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>S</button>
-                              <button type="button" aria-label="Não" aria-pressed={value === false} onClick={() => { const next = { ...conformityForm, [item.key]: false }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: false } }); }} className="min-w-[28px] min-h-[28px] px-1.5 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: value === false ? WARNING : "transparent", color: value === false ? "#fff" : "var(--muted-foreground)" }}>N</button>
-                              <button type="button" aria-label="Não se aplica" aria-pressed={value === null} onClick={() => { const next = { ...conformityForm, [item.key]: null }; setConformityForm(next); setConformityMutation.mutate({ id: selectedEventId!, data: { [item.key]: null } }); }} className="min-w-[28px] min-h-[28px] px-1.5 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: value === null ? "rgba(232,162,61,0.24)" : "transparent", color: value === null ? AMBER : "var(--muted-foreground)" }}>?</button>
-                            </div>
-                          ) : (
-                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: value === null ? "var(--secondary)" : value ? "var(--primary)" : WARNING, color: value === null ? "var(--muted-foreground)" : value ? "var(--primary-foreground)" : "#fff" }}>
-                              {value === null ? "—" : value ? "OK" : "Não"}
-                            </span>
-                          )}
-                          {canManageConformity && (
-                            <button type="button" title={comment ? "Ver/editar comentário" : "Adicionar comentário"} onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); if (next.has(item.key)) next.delete(item.key); else next.add(item.key); return next; })} className="p-0.5 rounded transition-all ml-0.5" style={{ border: comment ? "1px solid var(--primary)" : "1px solid var(--border)", backgroundColor: comment ? "var(--primary)" : "transparent", color: comment ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>
-                              <MessageSquare size={9} />
-                            </button>
-                          )}
-                        </div>
-                        {isExpanded && canManageConformity && (
-                          <div className="px-2 pb-2 space-y-1">
-                            <Textarea value={comment} onChange={e => setConformityForm(f => ({ ...f, [item.commentKey]: e.target.value }))} placeholder="Observação..." className="text-[10px] resize-none min-h-[48px] p-1.5 rounded" style={fieldStyle} />
-                            <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { [item.commentKey]: comment || null } })} className="px-2 py-0.5 rounded font-black uppercase text-[9px] disabled:opacity-50 transition-colors hover:opacity-90" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
-                              Salvar
-                            </button>
-                          </div>
-                        )}
-                        {!isExpanded && comment && (
-                          <p className="px-2 pb-1 text-[9px] line-clamp-1 cursor-pointer" style={{ color: "var(--muted-foreground)" }} onClick={() => setConformityExpandedComments(prev => { const next = new Set(prev); next.add(item.key); return next; })}>💬 {comment}</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {/* Faltas/Atrasos */}
-                  <div className="rounded-lg px-2 py-1.5" style={{ border: conformityForm.absencesReport ? `1px solid ${AMBER}` : "1px solid var(--border)", backgroundColor: conformityForm.absencesReport ? "rgba(232,162,61,0.10)" : "var(--secondary)" }}>
-                    <p className="text-[9px] font-bold uppercase mb-1 flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}><User size={9} /> Faltas/Atrasos</p>
-                    {canManageConformity ? (
-                      <div className="flex gap-1">
-                        <Textarea value={conformityForm.absencesReport} onChange={e => setConformityForm(f => ({ ...f, absencesReport: e.target.value }))} placeholder="Sem registro" className="text-[10px] resize-none min-h-[36px] p-1 flex-1 rounded" style={fieldStyle} />
-                        <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { absencesReport: conformityForm.absencesReport || null } })} className="px-1.5 rounded font-black text-[9px] disabled:opacity-50 transition-colors hover:opacity-90 shrink-0 self-start" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
-                          <Save size={9} />
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="text-[10px] leading-snug">{conformityForm.absencesReport || <span style={{ color: "var(--muted-foreground)" }}>Sem registro</span>}</p>
-                    )}
-                  </div>
-                  {/* Destaque */}
-                  <div className="rounded-lg px-2 py-1.5" style={{ border: conformityForm.standoutResponse === true ? `1px solid ${GOOD}` : "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === true ? "rgba(154,176,0,0.10)" : "var(--secondary)" }}>
-                    <p className="text-[9px] font-bold uppercase mb-1 flex items-center gap-1" style={{ color: GOOD }}><Trophy size={9} /> Destaque</p>
-                    {canManageConformity ? (
-                      <div className="space-y-1">
-                        <div className="flex items-center rounded overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-                          <button type="button" aria-pressed={conformityForm.standoutResponse === false} onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: false, standoutJustification: "" })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: false } }); }} className="flex-1 min-h-[28px] px-2 text-[9px] font-black uppercase transition-all" style={{ borderRight: "1px solid var(--border)", backgroundColor: conformityForm.standoutResponse === false ? "var(--primary)" : "transparent", color: conformityForm.standoutResponse === false ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>Não</button>
-                          <button type="button" aria-pressed={conformityForm.standoutResponse === true} onClick={() => { setConformityForm(f => ({ ...f, standoutResponse: true })); setConformityMutation.mutate({ id: selectedEventId!, data: { standoutResponse: true } }); }} className="flex-1 min-h-[28px] px-2 text-[9px] font-black uppercase transition-all" style={{ backgroundColor: conformityForm.standoutResponse === true ? GOOD : "transparent", color: conformityForm.standoutResponse === true ? "#fff" : "var(--muted-foreground)" }}>Sim</button>
-                        </div>
-                        {conformityForm.standoutResponse === true && (
-                          <div className="flex gap-1">
-                            <Textarea value={conformityForm.standoutJustification} onChange={e => setConformityForm(f => ({ ...f, standoutJustification: e.target.value }))} placeholder="Justificativa do destaque..." className="text-[10px] resize-none min-h-[36px] p-1 flex-1 rounded" style={fieldStyle} />
-                            <button type="button" disabled={setConformityMutation.isPending} onClick={() => setConformityMutation.mutate({ id: selectedEventId!, data: { standoutJustification: conformityForm.standoutJustification || null } })} className="px-1.5 rounded font-black text-[9px] disabled:opacity-50 transition-colors hover:opacity-90 shrink-0 self-start" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>
-                              <Save size={9} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] leading-snug">
-                        {conformityForm.standoutResponse === null ? <span style={{ color: "var(--muted-foreground)" }}>Pendente</span> : conformityForm.standoutResponse ? (conformityForm.standoutJustification || "Sim") : "Não"}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Event Comments */}
-            {eventComments && eventComments.length > 0 && (
-              <div className="px-4 py-3">
-                <p className="text-[11px] font-black uppercase mb-2 flex items-center gap-1.5"><MessageSquare size={13} /> Comentários <span style={{ color: "var(--muted-foreground)" }}>({eventComments.length})</span></p>
-                <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                  {eventComments.map((c, i) => (
-                    <div key={i} className="text-[11px] rounded-lg px-3 py-2" style={{ backgroundColor: "var(--secondary)" }}>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-bold uppercase text-[10px]">{c.userName || "Admin"}</span>
-                        <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{c.createdAt ? formatDateTime(new Date(c.createdAt)) : ""}</span>
-                      </div>
-                      <p className="leading-snug whitespace-pre-wrap">{c.message}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </aside>
+          <CalibrationSidebar
+            selectedEventId={selectedEventId}
+            pickedEvent={pickedEvent}
+            feedback={feedback}
+            fullEvent={fullEvent}
+            teamPanelOpen={teamPanelOpen}
+            setTeamPanelOpen={setTeamPanelOpen}
+            conformityState={conformityState}
+            eventComments={eventComments}
+          />
 
           {/* ── LEFT COLUMN: Calibrations table ── */}
           <div className="flex-1 min-w-0 space-y-3 lg:order-1">
@@ -1246,569 +313,33 @@ export default function CalibrationsPage() {
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2 flex-wrap rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  {/* Liberar Sem Cal. — à esquerda */}
-                  {autoFillableCriteria.length > 0 && canFinalize && (
-                    <button
-                      data-testid="button-autofill-from-evaluator"
-                      type="button"
-                      disabled={savingAutoFill || savingAll}
-                      onClick={autoFillFromEvaluator}
-                      title="Cria calibrações iguais à nota do avaliador para todos os critérios ainda sem calibração"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs uppercase disabled:opacity-50 transition-colors hover:opacity-80"
-                      style={{ border: "1px solid var(--border)" }}
-                    >
-                      <Check size={13} /> {savingAutoFill ? "Preenchendo..." : `Liberar Sem Cal. (${autoFillableCriteria.length})`}
-                    </button>
-                  )}
-
-                  {/* Progress + filtros */}
-                  <span className="text-[11px] font-bold uppercase flex items-center gap-1" style={{ color: "var(--muted-foreground)" }} title={`${finalPublishedCount} de ${scorableActiveCriteria.length} critérios (peso > 0) publicados como Final`}>
-                    <ShieldCheck size={11} style={{ color: GOOD }} /> {finalPublishedCount}/{scorableActiveCriteria.length} final
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Filter size={11} className="mr-0.5" style={{ color: "var(--muted-foreground)" }} />
-                    {([
-                      { value: "all", label: "Todos" },
-                      { value: "uncalibrated", label: "Pendentes" },
-                      { value: "calibrated", label: "Calibrados" },
-                    ] as const).map(opt => {
-                      const active = criterionFilter === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setCriterionFilter(opt.value)}
-                          className="text-[10px] font-black uppercase px-2 py-1 rounded transition-colors"
-                          style={{ backgroundColor: active ? "var(--primary)" : "transparent", color: active ? "var(--primary-foreground)" : "var(--muted-foreground)" }}
-                        >{opt.label}</button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Grupo direito: log de publicação + Salvar + Publicar */}
-                  <div className="ml-auto flex items-center gap-2">
-                    {/* Log de publicação */}
-                    {(alreadyReleased || allCriteriaFinalPublished || partialPublishedAtDate) && (
-                      <span className="text-[10px] font-bold flex items-center gap-1" style={{ color: alreadyReleased || allCriteriaFinalPublished ? GOOD : AMBER }}>
-                        {alreadyReleased || allCriteriaFinalPublished ? <ShieldCheck size={11} /> : <Send size={11} />}
-                        {alreadyReleased || allCriteriaFinalPublished
-                          ? `Final ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}`
-                          : `Parcial ${partialPublishedAtDate ? formatDateTime(partialPublishedAtDate) : ""}`}
-                      </span>
-                    )}
-                    {/* Salvar — sempre visível quando há alterações */}
-                    <button
-                      data-testid="button-save-all-cal"
-                      type="button"
-                      disabled={savingAll || totalDirtyCount === 0}
-                      onClick={handleSaveAll}
-                      title={totalDirtyCount === 0 ? "Nenhuma alteração pendente" : `Salvar ${totalDirtyCount} alteração(ões) pendente(s)`}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
-                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                    >
-                      <Save size={13} /> {savingAll ? "Salvando..." : `Salvar${totalDirtyCount > 0 ? ` (${totalDirtyCount})` : ""}`}
-                    </button>
-                    {/* Publicar */}
-                    {canFinalize && (
-                      <button
-                        data-testid="button-publish-all"
-                        type="button"
-                        disabled={publishingAll || savingAll}
-                        onClick={handlePublishAll}
-                        title={unsavedEditsCount > 0 ? "Há notas não salvas — salve antes de publicar" : "Publicar os critérios calibrados conforme a intenção Parc./Final de cada um"}
-                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-black text-xs uppercase transition-colors hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ border: "1px solid var(--border)" }}
-                      >
-                        <Send size={13} /> {publishingAll ? "Publicando..." : "Publicar"}
-                      </button>
-                    )}
-                  </div>
-                </div>
+              <CalibrationActionBar
+                autoFillableCount={autoFillableCriteria.length}
+                canFinalize={canFinalize}
+                savingAutoFill={savingAutoFill}
+                savingAll={savingAll}
+                publishingAll={publishingAll}
+                autoFillFromEvaluator={autoFillFromEvaluator}
+                finalPublishedCount={finalPublishedCount}
+                scorableCount={scorableActiveCriteria.length}
+                criterionFilter={criterionFilter}
+                setCriterionFilter={setCriterionFilter}
+                alreadyReleased={alreadyReleased}
+                allCriteriaFinalPublished={allCriteriaFinalPublished}
+                feedbackReleasedAtDate={feedbackReleasedAtDate}
+                partialPublishedAtDate={partialPublishedAtDate}
+                totalDirtyCount={totalDirtyCount}
+                unsavedEditsCount={unsavedEditsCount}
+                handleSaveAll={handleSaveAll}
+                handlePublishAll={handlePublishAll}
+              />
 
               {/* ── CRITERIA TABLE ── */}
-              {filteredActiveCriteria.length === 0 && displayActiveCriteria.length > 0 ? (
-                <div className="rounded-xl px-5 py-4 text-center" style={{ backgroundColor: "var(--secondary)" }}>
-                  <p className="text-sm font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Nenhum critério para o filtro selecionado.</p>
-                </div>
-              ) : (
-                <div className="rounded-xl overflow-x-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-                  <table className="w-full text-sm border-collapse min-w-[520px]">
-                    <thead>
-                      <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
-                        <th className="text-left px-3 py-2.5 text-[10px] font-black uppercase tracking-wider" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Critério</th>
-                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-16" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Peso</th>
-                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-20" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }} title="Média das notas enviadas pelos avaliadores da área">Avaliador</th>
-                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-28" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Calibrada</th>
-                        <th className="text-center px-2 py-2.5 text-[10px] font-black uppercase tracking-wider w-32 hidden sm:table-cell" style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)" }}>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredActiveCriteria.map(c => {
-                        const areaScores = getAreaScores(c.criterionId);
-                        const avg = getAvgScore(c.criterionId);
-                        const cal = getCalibration(c.criterionId);
-                        // Number(): o contrato diz number, mas colunas numeric do Postgres podem chegar como string.
-                        const calVal = cal ? Number(cal.calibratedScore) : null;
-                        const scoreVal = calScores[c.criterionId] ?? (calVal != null ? String(calVal) : "");
-                        const isSaving = savingCritId === c.criterionId;
-                        const isFinalPublished = !!c.finalPublishedAt;
-                        const peso = c.weightOverride ?? c.originalWeight ?? 0;
-                        const hasUnsaved = calScores[c.criterionId] !== undefined;
-                        const savedScore = calVal;
-                        const changedFromSaved = hasUnsaved && String(savedScore) !== calScores[c.criterionId];
-                        const reasonVal = calReasons[c.criterionId] ?? (cal?.calibrationReason ?? "");
-                        const reasonChanged = calReasons[c.criterionId] !== undefined && calReasons[c.criterionId] !== (cal?.calibrationReason ?? "");
-
-                        return (
-                          <tr
-                            key={c.criterionId}
-                            data-testid={`row-cal-${c.criterionId}`}
-                            className="transition-colors group"
-                            style={{ borderTop: "1px solid var(--border)" }}
-                          >
-                            {/* Critério */}
-                            <td className="px-3 py-2.5">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-black uppercase text-[12px] leading-tight" style={{ fontFamily: CONDENSED }}>{c.criterionName}</span>
-                                {c.responsibleAreaName && (
-                                  <span className="hidden lg:inline text-[9px] font-bold uppercase rounded px-1" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{c.responsibleAreaName}</span>
-                                )}
-                                {(childCriterionIdsMap.get(c.criterionId) ?? []).map(childId => {
-                                  const childCrit = activeCriteria.find(ac => ac.criterionId === childId);
-                                  return childCrit?.responsibleAreaName ? (
-                                    <span key={childId} className="hidden lg:inline text-[9px] font-bold uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>+ {childCrit.responsibleAreaName}</span>
-                                  ) : null;
-                                })}
-                              </div>
-                              {/* ── Avaliadores: nota individual + comentário ── */}
-                              {areaScores.map((s, i) => (
-                                <div key={i} className="mt-2 pt-1.5" style={{ borderTop: "1px dashed var(--border)" }}>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[8px] font-black uppercase tracking-wider px-1 py-px" style={{ color: GOOD, backgroundColor: "rgba(154,176,0,0.12)" }}>Avaliador</span>
-                                    <span className="text-[10px] font-bold">{s.name}</span>
-                                    {s.areaName && (
-                                      <span className="text-[8px] font-bold uppercase px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>{s.areaName}</span>
-                                    )}
-                                    {s.respondedAt && (
-                                      <span className="text-[8px] font-bold flex items-center gap-0.5" style={{ color: "var(--muted-foreground)" }} title={`Respondido em ${formatDateTime(s.respondedAt)}`}>
-                                        <Clock size={8} /> {formatDateTime(s.respondedAt)}
-                                      </span>
-                                    )}
-                                    {s.comment && (
-                                      <button
-                                        type="button"
-                                        onClick={e => {
-                                          e.stopPropagation();
-                                          setCalReasons(prev => ({ ...prev, [c.criterionId]: s.comment }));
-                                          setTimeout(() => {
-                                            const el = document.querySelector(`[data-testid="input-cal-reason-inline-${c.criterionId}"]`) as HTMLTextAreaElement | null;
-                                            if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
-                                          }, 0);
-                                        }}
-                                        title="Copiar para justificativa da calibração"
-                                        className="ml-auto h-4 w-4 flex items-center justify-center shrink-0 hover:opacity-70"
-                                        style={{ color: GOOD }}
-                                      >
-                                        <Copy size={9} />
-                                      </button>
-                                    )}
-                                  </div>
-                                  {s.comment && (() => {
-                                    const expandKey = `${c.criterionId}-${i}`;
-                                    const isExpanded = expandedEvalComments.has(expandKey);
-                                    const isLong = s.comment.length > 140 || s.comment.split("\n").length > 3;
-                                    return (
-                                      <div className="mt-0.5">
-                                        <p
-                                          className={`text-[11px] leading-snug${!isExpanded && isLong ? " line-clamp-3" : ""}`}
-                                          style={{ whiteSpace: "pre-wrap" }}
-                                        >
-                                          {s.comment}
-                                        </p>
-                                        {isLong && (
-                                          <button
-                                            type="button"
-                                            onClick={e => {
-                                              e.stopPropagation();
-                                              setExpandedEvalComments(prev => {
-                                                const n = new Set(prev);
-                                                if (n.has(expandKey)) n.delete(expandKey); else n.add(expandKey);
-                                                return n;
-                                              });
-                                            }}
-                                            className="text-[9px] font-black uppercase mt-0.5"
-                                            style={{ color: GOOD }}
-                                          >
-                                            {isExpanded ? "▲ ver menos" : "▼ ver mais"}
-                                          </button>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              ))}
-                              {/* ── Justificativa da calibração (editável) ── */}
-                              <div onClick={e => e.stopPropagation()} className="mt-2 pt-1.5" style={{ borderTop: "1px dashed var(--border)" }}>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  <span className="text-[8px] font-black uppercase tracking-wider rounded px-1 py-px" style={{ color: "var(--muted-foreground)", backgroundColor: "var(--secondary)" }}>Calibração</span>
-                                  {cal?.calibratedByName && (
-                                    <span className="text-[10px] font-bold" style={{ color: "var(--muted-foreground)" }}>{cal.calibratedByName}</span>
-                                  )}
-                                  {calVal != null && (
-                                    <span className="text-[10px] font-black" style={{ color: GOOD }}>→ {calVal.toFixed(2)}</span>
-                                  )}
-                                  {cal?.calibratedAt && (
-                                    <span className="text-[8px] flex items-center gap-0.5" style={{ color: "var(--muted-foreground)" }}>
-                                      <Clock size={8} /> {formatDateTime(new Date(cal.calibratedAt))}
-                                    </span>
-                                  )}
-                                  {/* ── Indicador de salvo ── */}
-                                  {savedReasonIds.has(c.criterionId) && !reasonChanged && (
-                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black uppercase" style={{ color: GOOD }}>
-                                      <Check size={9} /> Salvo
-                                    </span>
-                                  )}
-                                  {/* ── Indicador de não salvo ── */}
-                                  {reasonChanged && (
-                                    <span className="ml-auto flex items-center gap-0.5 text-[9px] font-black uppercase" style={{ color: AMBER }}>
-                                      <AlertCircle size={9} /> Não salvo
-                                    </span>
-                                  )}
-                                </div>
-                                <textarea
-                                  data-testid={`input-cal-reason-inline-${c.criterionId}`}
-                                  rows={1}
-                                  value={reasonVal}
-                                  onClick={e => e.stopPropagation()}
-                                  onChange={e => {
-                                    setSavedReasonIds(prev => { const n = new Set(prev); n.delete(c.criterionId); return n; });
-                                    setCalReasons(prev => ({ ...prev, [c.criterionId]: e.target.value }));
-                                    e.target.style.height = "auto";
-                                    e.target.style.height = e.target.scrollHeight + "px";
-                                  }}
-                                  onFocus={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-                                  onBlur={e => {
-                                    e.stopPropagation();
-                                    // Auto-save ao perder foco quando há uma calibração existente e razão mudou.
-                                    // O indicador "Salvo" é ligado por saveCalibration só após sucesso.
-                                    if (reasonChanged && cal && !isSaving) {
-                                      void saveCalibration(c.criterionId);
-                                    }
-                                  }}
-                                  placeholder="Escreva a justificativa e clique fora para salvar…"
-                                  className="w-full px-2 py-1.5 text-[11px] rounded resize-none leading-snug overflow-hidden transition-colors focus:outline-none"
-                                  style={{
-                                    border: reasonChanged ? `1px solid ${AMBER}` : "1px solid var(--border)",
-                                    backgroundColor: reasonChanged ? "rgba(232,162,61,0.08)" : reasonVal ? "rgba(154,176,0,0.06)" : "var(--secondary)",
-                                    color: "var(--foreground)",
-                                  }}
-                                />
-                                {/* Ação manual quando não há calibração ainda ou usuário quer salvar explicitamente */}
-                                {reasonChanged && (
-                                  <div className="mt-1 flex items-center gap-2">
-                                    {cal ? (
-                                      <button
-                                        type="button"
-                                        disabled={isSaving}
-                                        onClick={e => {
-                                          e.stopPropagation();
-                                          void saveCalibration(c.criterionId);
-                                        }}
-                                        className="px-2.5 py-1 rounded font-black uppercase text-[10px] disabled:opacity-50 transition-opacity hover:opacity-90 flex items-center gap-1"
-                                        style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                                      >
-                                        <Save size={10} /> Salvar justificativa
-                                      </button>
-                                    ) : (
-                                      <p className="text-[10px] flex items-center gap-1" style={{ color: "var(--muted-foreground)" }}>
-                                        <AlertCircle size={10} /> Salve a nota calibrada primeiro para gravar a justificativa.
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* ── Histórico de calibrações (sempre visível) ─ */}
-                              {(() => {
-                                const auditEntries = (calAudit ?? []).filter(a => a.criterionId === c.criterionId);
-                                if (!auditEntries.length) return null;
-                                return (
-                                  <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
-                                    <div className="flex items-center gap-1 mb-0.5">
-                                      <History size={8} style={{ color: "var(--muted-foreground)" }} />
-                                      <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                                        Histórico ({auditEntries.length})
-                                      </span>
-                                    </div>
-                                    {auditEntries.map(entry => {
-                                      const before = entry.beforeJson ? (() => { try { return JSON.parse(entry.beforeJson); } catch { return null; } })() : null;
-                                      const after  = entry.afterJson  ? (() => { try { return JSON.parse(entry.afterJson);  } catch { return null; } })() : null;
-                                      const isRecal = entry.action === "recalibrate_released";
-                                      const scoreText = after?.score != null
-                                        ? (before?.score != null ? `${before.score} → ${after.score}` : `→ ${after.score}`)
-                                        : null;
-                                      return (
-                                        <div key={entry.id} className="flex items-center gap-1.5 flex-wrap px-1.5 py-1 rounded"
-                                          style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                                          <span className="shrink-0 text-[7px] font-black uppercase px-1 py-px rounded"
-                                            style={{ backgroundColor: isRecal ? "rgba(232,162,61,0.18)" : "rgba(154,176,0,0.14)", color: isRecal ? AMBER : GOOD }}>
-                                            {isRecal ? "Recal. pós-lib." : "Calibrou"}
-                                          </span>
-                                          <span className="text-[9px] font-bold">{entry.userName ?? "?"}</span>
-                                          {scoreText && (
-                                            <span className="text-[9px] font-black" style={{ color: GOOD }}>{scoreText}</span>
-                                          )}
-                                          <span className="text-[8px] ml-auto" style={{ color: "var(--muted-foreground)" }}>
-                                            {formatDateTime(new Date(entry.createdAt))}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })()}
-
-                              {/* ── Comentários ─────────────────────────────── */}
-                              {(() => {
-                                const criterionComments = (calComments ?? []).filter(cm => cm.criterionId === c.criterionId);
-                                const commentText = newCommentTexts[c.criterionId] ?? "";
-                                return (
-                                  <div className="mt-2 pt-1.5 space-y-1.5" style={{ borderTop: "1px dashed var(--border)" }} onClick={e => e.stopPropagation()}>
-                                    {/* Header */}
-                                    <div className="flex items-center gap-2">
-                                      <MessageSquare size={9} style={{ color: "var(--muted-foreground)" }} />
-                                      <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                                        Comentários{criterionComments.length > 0 ? ` (${criterionComments.length})` : ""}
-                                      </span>
-                                    </div>
-                                    {/* Comentários existentes */}
-                                    {criterionComments.map(cm => (
-                                      <div key={cm.id} className="rounded p-1.5 group/cm"
-                                        style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                                        <div className="flex items-center gap-1.5 mb-0.5">
-                                          <User size={8} style={{ color: "var(--muted-foreground)" }} />
-                                          <span className="text-[9px] font-black">{cm.createdByName ?? "?"}</span>
-                                          <span className="text-[8px]" style={{ color: "var(--muted-foreground)" }}>
-                                            {formatDateTime(new Date(cm.createdAt))}
-                                          </span>
-                                          {canFinalize && (
-                                            <button type="button"
-                                              onClick={() => deleteCommentMutation.mutate(cm.id, {
-                                                onSuccess: () => toast({ title: "Comentário excluído" }),
-                                                onError: (e: Error) => toast({ title: "Erro ao excluir comentário", description: e.message, variant: "destructive" }),
-                                              })}
-                                              disabled={deleteCommentMutation.isPending}
-                                              className="ml-auto opacity-60 hover:opacity-100 transition-opacity disabled:opacity-30"
-                                              style={{ color: "var(--muted-foreground)" }} title="Excluir">
-                                              <Trash2 size={9} />
-                                            </button>
-                                          )}
-                                        </div>
-                                        <p className="text-[11px] leading-snug whitespace-pre-wrap">{cm.text}</p>
-                                      </div>
-                                    ))}
-                                    {/* Input novo comentário */}
-                                    {canFinalize && (
-                                      <div className="flex gap-1.5">
-                                        <textarea rows={1}
-                                          placeholder="Adicionar comentário… (Ctrl+Enter)"
-                                          value={commentText}
-                                          onChange={e => {
-                                            setNewCommentTexts(prev => ({ ...prev, [c.criterionId]: e.target.value }));
-                                            e.target.style.height = "auto";
-                                            e.target.style.height = e.target.scrollHeight + "px";
-                                          }}
-                                          onFocus={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-                                          onKeyDown={e => {
-                                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && commentText.trim()) {
-                                              e.preventDefault();
-                                              addCommentMutation.mutate(
-                                                { criterionId: c.criterionId, text: commentText.trim() },
-                                                { onSuccess: () => setNewCommentTexts(prev => ({ ...prev, [c.criterionId]: "" })) }
-                                              );
-                                            }
-                                          }}
-                                          className="flex-1 px-2 py-1.5 text-[11px] rounded resize-none leading-snug overflow-hidden focus:outline-none"
-                                          style={{ border: "1px solid var(--border)", backgroundColor: "var(--secondary)", color: "var(--foreground)", minHeight: 30 }}
-                                        />
-                                        <button type="button"
-                                          disabled={!commentText.trim() || addCommentMutation.isPending}
-                                          onClick={() => addCommentMutation.mutate(
-                                            { criterionId: c.criterionId, text: commentText.trim() },
-                                            { onSuccess: () => setNewCommentTexts(prev => ({ ...prev, [c.criterionId]: "" })) }
-                                          )}
-                                          className="self-end h-8 w-8 rounded flex items-center justify-center disabled:opacity-40 hover:opacity-80 transition-opacity"
-                                          style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)", flexShrink: 0 }}
-                                          title="Enviar comentário">
-                                          <Plus size={12} />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                            </td>
-                            {/* Peso */}
-                            <td className="px-2 py-2.5 text-center" onClick={e => e.stopPropagation()}>
-                              {canEditWeights ? (
-                                <div className="flex items-center justify-center gap-1">
-                                  <input
-                                    data-testid={`input-weight-${c.criterionId}`}
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={weightEdits[c.criterionId] ?? String(peso)}
-                                    onChange={e => setWeightEdits(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9.,]/g, "") }))}
-                                    className="h-6 w-10 px-1 rounded text-center text-xs font-black focus:outline-none"
-                                    style={fieldStyle}
-                                  />
-                                  {weightEdits[c.criterionId] != null && Number(weightEdits[c.criterionId].replace(",", ".")) !== Number(peso) && (
-                                    <button
-                                      data-testid={`button-save-weight-${c.criterionId}`}
-                                      type="button"
-                                      disabled={savingWeightId === c.criterionId && updateWeightMutation.isPending}
-                                      onClick={() => saveWeight(c.criterionId, c.active)}
-                                      title="Salvar peso"
-                                      className="h-6 w-6 rounded flex items-center justify-center disabled:opacity-50 transition-opacity hover:opacity-90"
-                                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                                    >
-                                      {savingWeightId === c.criterionId && updateWeightMutation.isPending ? "·" : <Check size={10} />}
-                                    </button>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-xs font-black">{peso}</span>
-                              )}
-                            </td>
-                            {/* Nota Avaliador */}
-                            <td className="px-2 py-2.5 text-center">
-                              {/* Quando há múltiplos avaliadores, mostra breakdown por área */}
-                              {areaScores.length > 1 && (
-                                <div className="flex items-center justify-center gap-1 mb-0.5 flex-wrap">
-                                  {areaScores.map((s, si) => (
-                                    <span
-                                      key={si}
-                                      className="text-[9px] font-black px-1 py-px leading-none"
-                                      style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)", fontFamily: CONDENSED }}
-                                      title={`${s.name}${s.areaName ? ` · ${s.areaName}` : ""}: ${s.score.toFixed(1)}`}
-                                    >
-                                      {s.score.toFixed(1)}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                              <span className="text-sm font-black" style={{ color: calVal != null ? "var(--muted-foreground)" : "var(--foreground)", textDecoration: calVal != null ? "line-through" : "none" }}>
-                                {avg != null ? avg.toFixed(2) : <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>—</span>}
-                              </span>
-                            </td>
-                            {/* Nota Calibrada inline */}
-                            <td className="px-2 py-2.5" onClick={e => e.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1">
-                                <input
-                                  data-testid={`input-cal-score-${c.criterionId}`}
-                                  type="text"
-                                  inputMode="numeric"
-                                  value={scoreVal}
-                                  onChange={e => setCalScores(prev => ({ ...prev, [c.criterionId]: e.target.value.replace(/[^0-9]/g, "") }))}
-                                  placeholder="—"
-                                  className="h-7 w-12 px-1 rounded text-center text-sm font-black focus:outline-none"
-                                  style={{
-                                    border: changedFromSaved ? `2px solid ${WARNING}` : calVal != null ? `2px solid ${GOOD}` : "2px solid var(--border)",
-                                    backgroundColor: changedFromSaved ? "rgba(229,72,77,0.08)" : calVal != null ? "rgba(154,176,0,0.10)" : "var(--secondary)",
-                                    color: "var(--foreground)",
-                                  }}
-                                />
-                                {changedFromSaved && (
-                                  <button
-                                    data-testid={`button-save-cal-${c.criterionId}`}
-                                    type="button"
-                                    disabled={isSaving || savingAll}
-                                    onClick={() => void saveCalibration(c.criterionId)}
-                                    title="Salvar calibração"
-                                    className="h-7 w-7 rounded flex items-center justify-center disabled:opacity-50 transition-opacity hover:opacity-90"
-                                    style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
-                                  >
-                                    {isSaving ? "·" : <Save size={11} />}
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                            {/* Status + seletor de intenção de publicação */}
-                            <td className="px-1 py-2 text-center hidden sm:table-cell" onClick={e => e.stopPropagation()}>
-                              {cal && canFinalize ? (
-                                <div className="flex flex-col items-center gap-1">
-                                  {/* Estado de publicação atual — badge prominente */}
-                                  {isFinalPublished ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(154,176,0,0.18)", color: GOOD, border: `1px solid ${GOOD}` }}>
-                                        <CheckCircle size={8} /> Final pub.
-                                      </span>
-                                      <span className="text-[8px] leading-tight text-center" style={{ color: "var(--muted-foreground)" }}>
-                                        {formatDateTime(new Date(c.finalPublishedAt!))}
-                                      </span>
-                                      {c.finalPublishedByUserName && (
-                                        <span className="text-[8px] leading-tight text-center font-medium" style={{ color: GOOD }}>
-                                          {c.finalPublishedByUserName}
-                                        </span>
-                                      )}
-                                    </div>
-                                  ) : c.partialPublishedAt ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(232,162,61,0.18)", color: AMBER, border: `1px solid ${AMBER}` }}>
-                                        <CheckCircle size={8} /> Parcial pub.
-                                      </span>
-                                      <span className="text-[8px] leading-tight text-center" style={{ color: "var(--muted-foreground)" }}>
-                                        {formatDateTime(new Date(c.partialPublishedAt))}
-                                      </span>
-                                      {c.partialPublishedByUserName && (
-                                        <span className="text-[8px] leading-tight text-center font-medium" style={{ color: AMBER }}>
-                                          {c.partialPublishedByUserName}
-                                        </span>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>
-                                      Não pub.
-                                    </span>
-                                  )}
-                                  {/* Seletor de intenção: Parc. | Final */}
-                                  <div className="flex items-stretch rounded overflow-hidden w-full max-w-[88px]" style={{ border: "1px solid var(--border)" }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "partial" }))}
-                                      className="flex-1 py-1 text-[8px] font-black uppercase transition-colors leading-none"
-                                      style={{ backgroundColor: (publishIntents[c.criterionId] ?? "partial") === "partial" ? AMBER : "transparent", color: (publishIntents[c.criterionId] ?? "partial") === "partial" ? "#fff" : "var(--muted-foreground)" }}
-                                    >
-                                      Parc.
-                                    </button>
-                                    <span className="w-px shrink-0" style={{ backgroundColor: "var(--border)" }} />
-                                    <button
-                                      type="button"
-                                      onClick={() => setPublishIntents(prev => ({ ...prev, [c.criterionId]: "final" }))}
-                                      className="flex-1 py-1 text-[8px] font-black uppercase transition-colors leading-none"
-                                      style={{ backgroundColor: (publishIntents[c.criterionId] ?? "partial") === "final" ? GOOD : "transparent", color: (publishIntents[c.criterionId] ?? "partial") === "final" ? "#fff" : "var(--muted-foreground)" }}
-                                    >
-                                      Final
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : cal ? (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD, border: `1px solid ${GOOD}` }}>
-                                  <CheckCircle size={9} /> Cal.
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 whitespace-nowrap" style={{ backgroundColor: "rgba(232,162,61,0.14)", color: AMBER, border: `1px solid ${AMBER}` }}>
-                                  {avg != null ? "Pendente" : "Sem nota"}
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <CriteriaTable
+                filteredActiveCriteria={filteredActiveCriteria}
+                displayActiveCount={displayActiveCriteria.length}
+                rowProps={rowProps}
+              />
 
 
             </>

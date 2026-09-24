@@ -8,8 +8,15 @@ import {
   useBulkGenerateCollaboratorAccess,
   getGetEmployeesQueryKey,
   getGetCollaboratorsWithoutAccessQueryKey,
+  impersonate as requestImpersonation,
+  bulkSetEmployeeCpf,
+  getCasaPins,
+  bulkGenerateCasaPins,
+  generateEmployeePin,
+  bulkEmploymentReset,
+  ApiError,
 } from "@workspace/api-client-react";
-import type { EmployeeInput, GeneratedCredential, BulkGenerateAccessResult, MergeEmployeeResult } from "@workspace/api-client-react";
+import type { EmployeeInput, GeneratedCredential, BulkGenerateAccessResult, MergeEmployeeResult, BulkSetCpfResult, CasaPin, SkippedPin } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +27,7 @@ import { copyToClipboard, COPY_FAILED_TOAST } from "@/lib/clipboard";
 import { useForm } from "react-hook-form";
 import {Plus, Search, CheckCircle2, XCircle, Filter, Pencil, KeyRound, Download, AlertTriangle, GitMerge, X, RefreshCw, Eye, Wifi, WifiOff, Hash, Copy, Check, Link, CreditCard } from "lucide-react";
 import { useAuth, hasRole } from "@/lib/auth-context";
-import { CONDENSED, BODY, WARNING, GOOD, PremiumCard } from "@/lib/premium-theme";
+import { CONDENSED, BODY, WARNING, GOOD, PremiumCard, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 
 const fieldStyle: React.CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
@@ -31,16 +38,16 @@ const requiredText = (message: string) => ({
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p role="alert" className="text-[11px] font-bold" style={{ color: WARNING }}>{message}</p>;
+  return <p role="alert" className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>{message}</p>;
 }
 
-/** Lê `{ error }` do corpo da resposta sem quebrar quando o corpo não é JSON. */
-async function readServerError(res: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: unknown };
-    if (typeof body?.error === "string" && body.error.trim()) return body.error;
-  } catch { /* corpo vazio ou não-JSON */ }
-  return fallback;
+/** Mensagem para o toast: `{ error }` do servidor, o texto padrão quando o corpo não traz um, ou a falha de rede. */
+function serverErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) {
+    const data = e.data as { error?: unknown } | null;
+    return typeof data?.error === "string" && data.error.trim() ? data.error : fallback;
+  }
+  return e instanceof Error ? e.message : "Tente novamente.";
 }
 
 /** Enter/Espaço acionam linhas com role="checkbox". */
@@ -93,7 +100,7 @@ export default function EmployeesPage() {
     const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
     return `${window.location.origin}${base}/login`;
   })();
-  const { user, impersonate, token } = useAuth();
+  const { user, impersonate } = useAuth();
   const { toast } = useToast();
   const [previewingId, setPreviewingId] = useState<number | null>(null);
 
@@ -101,21 +108,15 @@ export default function EmployeesPage() {
     if (!emp.linkedUserId) return;
     setPreviewingId(emp.id);
     try {
-      const res = await fetch("/api/auth/impersonate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ userId: emp.linkedUserId }),
-      });
-      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível abrir a visão deste colaborador. Tente novamente."));
-      const { token: newToken, user: impUser } = await res.json() as { token: string; user: import("@workspace/api-client-react").User };
+      const { token: newToken, user: impUser } = await requestImpersonation({ userId: emp.linkedUserId });
       impersonate(newToken, impUser);
       const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
       window.location.assign(`${base}/`);
     } catch (e) {
-      toast({ title: "Não foi possível visualizar como este colaborador", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
+      toast({ title: "Não foi possível visualizar como este colaborador", description: serverErrorMessage(e, "Não foi possível abrir a visão deste colaborador. Tente novamente."), variant: "destructive" });
       setPreviewingId(null);
     }
-  }, [impersonate, toast, token]);
+  }, [impersonate, toast]);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"true" | "false">("true");
@@ -132,18 +133,16 @@ export default function EmployeesPage() {
   const [pinCopied, setPinCopied] = useState(false);
   const [bulkLinkCopied, setBulkLinkCopied] = useState(false);
 
-  type BulkPinEntry = { name: string; cpfLogin: string; pin: string };
-  type BulkPinSkip = { name: string; reason: string };
+  // Senhas carregadas (casa-pins) ou recém-geradas (bulk-generate-pins).
   const [bulkPinOpen, setBulkPinOpen] = useState(false);
   const [bulkPinLoading, setBulkPinLoading] = useState(false);
-  const [bulkPinResult, setBulkPinResult] = useState<{ results: BulkPinEntry[]; skipped: BulkPinSkip[] } | null>(null);
+  const [bulkPinResult, setBulkPinResult] = useState<{ results: CasaPin[]; skipped: SkippedPin[] } | null>(null);
   const [bulkPinSource, setBulkPinSource] = useState<"loaded" | "generated">("loaded");
   const [confirmRegen, setConfirmRegen] = useState(false);
 
   const [bulkCpfOpen, setBulkCpfOpen] = useState(false);
   const [bulkCpfLoading, setBulkCpfLoading] = useState(false);
-  type BulkCpfResult = { updated: { id: number; name: string }[]; notFound: string[] };
-  const [bulkCpfResult, setBulkCpfResult] = useState<BulkCpfResult | null>(null);
+  const [bulkCpfResult, setBulkCpfResult] = useState<BulkSetCpfResult | null>(null);
 
   // Lista "Nome;CPF" colada pelo admin no diálogo (nunca dado pessoal no código).
   const [bulkCpfText, setBulkCpfText] = useState("");
@@ -161,21 +160,17 @@ export default function EmployeesPage() {
     setBulkCpfLoading(true);
     setBulkCpfResult(null);
     try {
-      const res = await fetch("/api/employees/bulk-set-cpf", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(parsedCpfRows),
-      });
-      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível importar os CPFs. Tente novamente."));
-      const data = await res.json() as BulkCpfResult;
+      const data = await bulkSetEmployeeCpf(parsedCpfRows);
       setBulkCpfResult(data);
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
     } catch (e) {
-      toast({ title: "Não foi possível importar os CPFs", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
+      toast({ title: "Não foi possível importar os CPFs", description: serverErrorMessage(e, "Não foi possível importar os CPFs. Tente novamente."), variant: "destructive" });
     } finally {
       setBulkCpfLoading(false);
     }
-  }, [token, toast, qc]);
+    // parsedCpfRows nas dependências: sem ele o callback ficava preso à lista
+    // do primeiro render (vazia) e o servidor recebia [].
+  }, [parsedCpfRows, toast, qc]);
 
   // Load current PINs from DB whenever the dialog opens (for employees marked as "casa")
   useEffect(() => {
@@ -186,9 +181,8 @@ export default function EmployeesPage() {
       .filter(e => e.employmentType === "casa")
       .map(e => e.id);
     const idsParam = casaIds.length > 0 ? casaIds.join(",") : "0";
-    fetch(`/api/employees/casa-pins?ids=${idsParam}`, { headers: { "Authorization": `Bearer ${token}` } })
-      .then(r => r.json())
-      .then((data: { results: BulkPinEntry[] }) => {
+    getCasaPins({ ids: idsParam })
+      .then((data) => {
         if (!cancelled) {
           setBulkPinResult(data.results.length > 0 ? { results: data.results, skipped: [] } : null);
           setBulkPinSource("loaded");
@@ -198,48 +192,37 @@ export default function EmployeesPage() {
       .catch(() => { if (!cancelled) setBulkPinResult(null); })
       .finally(() => { if (!cancelled) setBulkPinLoading(false); });
     return () => { cancelled = true; };
-  }, [bulkPinOpen, token]);
+  }, [bulkPinOpen]);
 
   const handleBulkGeneratePins = useCallback(async () => {
     setBulkPinLoading(true);
     setConfirmRegen(false);
     try {
-      const res = await fetch("/api/employees/bulk-generate-pins", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        // No ids → backend generates for ALL active casa employees regardless of frontend filters
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível definir as senhas. Tente novamente."));
-      const data = await res.json() as { results: BulkPinEntry[]; skipped: BulkPinSkip[] };
+      // Sem ids → o backend gera para TODOS os casa ativos, independente dos filtros da tela
+      const data = await bulkGenerateCasaPins({});
       setBulkPinResult(data);
       setBulkPinSource("generated");
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
     } catch (e) {
-      toast({ title: "Não foi possível definir as senhas", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
+      toast({ title: "Não foi possível definir as senhas", description: serverErrorMessage(e, "Não foi possível definir as senhas. Tente novamente."), variant: "destructive" });
     } finally {
       setBulkPinLoading(false);
     }
-  }, [token, toast, qc]);
+  }, [toast, qc]);
 
   const handleGeneratePin = useCallback(async (emp: EmployeeWithCycle) => {
     setGeneratingPinId(emp.id);
     try {
-      const res = await fetch(`/api/employees/${emp.id}/generate-pin`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await readServerError(res, "Não foi possível gerar a senha. Tente novamente."));
-      const data = await res.json() as { pin: string; cpfLogin: string; userCreated: boolean };
+      const data = await generateEmployeePin(emp.id);
       setPinDialog({ empName: emp.name, pin: data.pin, cpfLogin: data.cpfLogin, created: data.userCreated });
       setPinCopied(false);
       qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
     } catch (e) {
-      toast({ title: "Não foi possível gerar a senha", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
+      toast({ title: "Não foi possível gerar a senha", description: serverErrorMessage(e, "Não foi possível gerar a senha. Tente novamente."), variant: "destructive" });
     } finally {
       setGeneratingPinId(null);
     }
-  }, [token, toast, qc]);
+  }, [toast, qc]);
 
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
@@ -479,7 +462,7 @@ export default function EmployeesPage() {
                     className="space-y-5 pt-4"
                   >
                     <div className="space-y-1.5">
-                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
+                      <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: DANGER_TEXT }}>*</span></Label>
                       <Input data-testid="input-employee-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome completo."))} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
                       <FieldError message={errors.name?.message} />
                     </div>
@@ -498,7 +481,7 @@ export default function EmployeesPage() {
                       </div>
                     </div>
                     <div className="rounded-lg px-3.5 py-2.5 flex items-center gap-2" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo de Contratação</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo de Contratação</span>
                       <span className="ml-auto text-xs font-black uppercase" style={{ color: "var(--foreground)" }}>Casa</span>
                     </div>
                     <p className="text-[11px] -mt-3" style={{ color: "var(--muted-foreground)" }}>
@@ -537,7 +520,7 @@ export default function EmployeesPage() {
               className="space-y-5 pt-4"
             >
               <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: WARNING }}>*</span></Label>
+                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome Completo <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Input data-testid="input-edit-employee-name" aria-invalid={!!editErrors.name} {...registerEdit("name", requiredText("Informe o nome completo."))} placeholder="Nome do colaborador" className="h-11 rounded-lg" style={fieldStyle} />
                 <FieldError message={editErrors.name?.message} />
               </div>
@@ -604,12 +587,12 @@ export default function EmployeesPage() {
           </div>
           <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Ativos</span>
-            <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>{stats.ativos}</p>
+            <p data-testid="stat-ativos" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>{stats.ativos}</p>
             <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.ativos)}%`, backgroundColor: "var(--primary)" }} /></div>
           </div>
           <div className="rounded-xl p-5" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Elegíveis para Bônus</span>
-            <p data-testid="stat-elegiveis" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: GOOD }}>{stats.elegiveis}</p>
+            <p data-testid="stat-elegiveis" className="text-4xl leading-none font-black mt-2" style={{ fontFamily: CONDENSED, color: GOOD_TEXT }}>{stats.elegiveis}</p>
             <div className="w-full h-1.5 rounded-full mt-4 overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}><div className="h-full rounded-full" style={{ width: `${pct(stats.elegiveis)}%`, backgroundColor: GOOD }} /></div>
           </div>
         </section>
@@ -668,22 +651,22 @@ export default function EmployeesPage() {
         ) : (
           <PremiumCard className="overflow-hidden">
             <div className="px-5 py-3 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border)" }}>
-              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent)" }}>Grid de Colaboradores</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: CONDENSED, color: "var(--accent-text)" }}>Grid de Colaboradores</h3>
               <Filter size={16} style={{ color: "var(--muted-foreground)" }} />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr style={{ backgroundColor: "var(--secondary)", borderBottom: "1px solid var(--border)" }}>
-                    {mergeMode && <th className="px-4 py-3 text-[10px] font-bold uppercase text-center w-10" style={{ color: "var(--muted-foreground)" }}>✓</th>}
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Atleta / Colaborador</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Departamento</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cargo</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
-                    <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
-                    {canBulk && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Acesso</th>}
-                    {canEdit && !mergeMode && <th className="px-5 py-3 text-[10px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
+                    {mergeMode && <th className="px-4 py-3 text-[11px] font-bold uppercase text-center w-10" style={{ color: "var(--muted-foreground)" }}>✓</th>}
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Atleta / Colaborador</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Departamento</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Cargo</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Tipo</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Status</th>
+                    <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Elegibilidade</th>
+                    {canBulk && !mergeMode && <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Acesso</th>}
+                    {canEdit && !mergeMode && <th className="px-5 py-3 text-[11px] font-bold uppercase text-center" style={{ color: "var(--muted-foreground)" }}>Ações</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -722,7 +705,7 @@ export default function EmployeesPage() {
                           </div>
                           <div>
                             <p className="font-bold">{toTitleCase(emp.name)}</p>
-                            {isCanonical && <span className="text-[10px] font-black uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>CANÔNICO</span>}
+                            {isCanonical && <span className="text-[11px] font-black uppercase rounded px-1" style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}>CANÔNICO</span>}
                             {emp.email && <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{emp.email}</p>}
                           </div>
                         </div>
@@ -750,9 +733,9 @@ export default function EmployeesPage() {
                             );
                             if (status === "eligible") return (
                               <>
-                                <span className="flex items-center gap-1.5" style={{ color: GOOD }}><CheckCircle2 size={16} /> Elegível</span>
+                                <span className="flex items-center gap-1.5" style={{ color: GOOD_TEXT }}><CheckCircle2 size={16} /> Elegível</span>
                                 {emp.participatedEventsCount !== null && (
-                                  <span className="text-[10px] font-normal normal-case opacity-60" style={{ color: "var(--muted-foreground)" }}>{emp.participatedEventsCount} eventos</span>
+                                  <span className="text-[11px] font-normal normal-case opacity-60" style={{ color: "var(--muted-foreground)" }}>{emp.participatedEventsCount} eventos</span>
                                 )}
                               </>
                             );
@@ -760,7 +743,7 @@ export default function EmployeesPage() {
                               <>
                                 <span className="flex items-center gap-1.5 opacity-70" style={{ color: "var(--muted-foreground)" }}><XCircle size={16} /> Não Elegível</span>
                                 {emp.participatedEventsCount !== null && (
-                                  <span className="text-[10px] font-normal normal-case opacity-60" style={{ color: "var(--muted-foreground)" }}>{emp.participatedEventsCount} eventos</span>
+                                  <span className="text-[11px] font-normal normal-case opacity-60" style={{ color: "var(--muted-foreground)" }}>{emp.participatedEventsCount} eventos</span>
                                 )}
                               </>
                             );
@@ -774,7 +757,7 @@ export default function EmployeesPage() {
                         <td className="px-5 py-3.5 text-center">
                           {emp.hasAccess ? (
                             <div className="flex flex-col items-center gap-1">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: GOOD }}>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: GOOD_TEXT }}>
                                 <Wifi size={11} /> Com acesso
                               </span>
                               {isAdmin && (
@@ -783,7 +766,7 @@ export default function EmployeesPage() {
                                   title={`Visualizar app como ${emp.name}`}
                                   disabled={previewingId === emp.id}
                                   onClick={() => handlePreviewAs(emp)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
                                   style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
                                 >
                                   {previewingId === emp.id
@@ -797,7 +780,7 @@ export default function EmployeesPage() {
                                   title={`Gerar novo PIN para ${emp.name}`}
                                   disabled={generatingPinId === emp.id}
                                   onClick={() => handleGeneratePin(emp)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
                                   style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}
                                 >
                                   {generatingPinId === emp.id
@@ -808,7 +791,7 @@ export default function EmployeesPage() {
                             </div>
                           ) : emp.employmentType === "casa" ? (
                             <div className="flex flex-col items-center gap-1">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
                                 <WifiOff size={11} /> Sem acesso
                               </span>
                               <button
@@ -816,7 +799,7 @@ export default function EmployeesPage() {
                                 title={`Criar acesso com PIN para ${emp.name}`}
                                 disabled={generatingPinId === emp.id}
                                 onClick={() => handleGeneratePin(emp)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase transition-all hover:opacity-90 disabled:opacity-50"
                                 style={{ backgroundColor: "var(--accent)", color: "#000" }}
                               >
                                 {generatingPinId === emp.id
@@ -825,7 +808,7 @@ export default function EmployeesPage() {
                               </button>
                             </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold opacity-50" style={{ color: "var(--muted-foreground)" }}>
                               <WifiOff size={11} /> Sem acesso
                             </span>
                           )}
@@ -931,7 +914,7 @@ export default function EmployeesPage() {
                     <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Prontos para gerar acesso</p>
                   </div>
                   <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "var(--secondary)" }}>
-                    <p className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: WARNING }}>{bulkPreview?.missingCpfCount ?? 0}</p>
+                    <p className="text-3xl font-black" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>{bulkPreview?.missingCpfCount ?? 0}</p>
                     <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF cadastrado</p>
                   </div>
                 </div>
@@ -966,7 +949,7 @@ export default function EmployeesPage() {
                   <strong style={{ color: "var(--foreground)" }}>{bulkResult.createdCount}</strong> acesso(s) gerado(s) com sucesso. Baixe o arquivo CSV agora — as senhas não poderão ser visualizadas novamente.
                 </p>
                 {bulkResult.conflicts.length > 0 && (
-                  <p className="text-xs" style={{ color: WARNING }}>{bulkResult.conflicts.length} colaborador(es) já possuíam acesso e foram ignorados.</p>
+                  <p className="text-xs" style={{ color: DANGER_TEXT }}>{bulkResult.conflicts.length} colaborador(es) já possuíam acesso e foram ignorados.</p>
                 )}
                 <button
                   data-testid="button-download-credentials-csv"
@@ -1004,7 +987,7 @@ export default function EmployeesPage() {
               Marque os colaboradores que devem aparecer no ranking como <strong>Casa</strong>. Todos os demais serão marcados como <strong>Freela</strong> e não contarão no ranking.
             </p>
             <div className="flex gap-3 text-xs font-bold">
-              <span className="px-2 py-1 rounded" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD }}>{casaSelection.size} Casa</span>
+              <span className="px-2 py-1 rounded" style={{ backgroundColor: "rgba(154,176,0,0.14)", color: GOOD_TEXT }}>{casaSelection.size} Casa</span>
               <span className="px-2 py-1 rounded" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
                 {(employees?.filter(e => e.active !== false).length ?? 0) - casaSelection.size} Freela
               </span>
@@ -1051,7 +1034,7 @@ export default function EmployeesPage() {
                       </div>
                       <span className="text-sm flex-1">{emp.name}</span>
                       <span
-                        className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
+                        className="text-[11px] font-bold uppercase px-1.5 py-0.5 rounded"
                         style={{ backgroundColor: isCasa ? "rgba(154,176,0,0.14)" : "var(--secondary)", color: isCasa ? GOOD : "var(--muted-foreground)" }}
                       >
                         {isCasa ? "Casa" : "Freela"}
@@ -1064,7 +1047,7 @@ export default function EmployeesPage() {
               )}
             </div>
             {casaSelection.size === 0 && (
-              <div className="rounded-lg p-3 text-sm" style={{ backgroundColor: "rgba(229,72,77,0.08)", border: "1px solid rgba(229,72,77,0.25)", color: WARNING }}>
+              <div className="rounded-lg p-3 text-sm" style={{ backgroundColor: "rgba(229,72,77,0.08)", border: "1px solid rgba(229,72,77,0.25)", color: DANGER_TEXT }}>
                 ⚠ Nenhum selecionado como Casa — todos ficarão como Freela e o ranking ficará vazio.
               </div>
             )}
@@ -1084,17 +1067,12 @@ export default function EmployeesPage() {
                 onClick={async () => {
                   setResetTypePending(true);
                   try {
-                    const res = await fetch("/api/employees/bulk-employment-reset", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                      body: JSON.stringify({ casaIds: Array.from(casaSelection) }),
-                    });
-                    if (!res.ok) throw new Error(await readServerError(res, "Não foi possível atualizar os tipos. Tente novamente."));
+                    await bulkEmploymentReset({ casaIds: Array.from(casaSelection) });
                     await qc.invalidateQueries({ queryKey: getGetEmployeesQueryKey() });
                     toast({ title: "Tipos atualizados", description: `${casaSelection.size} colaborador(es) Casa. Demais marcados como Freela. Ranking recalculado.` });
                     setResetTypeOpen(false);
                   } catch (e) {
-                    toast({ title: "Não foi possível atualizar os tipos", description: e instanceof Error ? e.message : "Tente novamente.", variant: "destructive" });
+                    toast({ title: "Não foi possível atualizar os tipos", description: serverErrorMessage(e, "Não foi possível atualizar os tipos. Tente novamente."), variant: "destructive" });
                   } finally {
                     setResetTypePending(false);
                   }
@@ -1122,7 +1100,7 @@ export default function EmployeesPage() {
               <p><span className="font-black">{mergeResult?.movedParticipations ?? 0}</span> participações transferidas</p>
               {(mergeResult?.movedAbsences ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedAbsences}</span> penalidades/méritos transferidos</p>}
               {(mergeResult?.movedEvaluatorEvals ?? 0) > 0 && <p><span className="font-black">{mergeResult?.movedEvaluatorEvals}</span> avaliações de avaliador transferidas</p>}
-              {(mergeResult?.removedUsers ?? 0) > 0 && <p style={{ color: WARNING }}><span className="font-black">{mergeResult?.removedUsers}</span> conta(s) de usuário desativada(s)</p>}
+              {(mergeResult?.removedUsers ?? 0) > 0 && <p style={{ color: DANGER_TEXT }}><span className="font-black">{mergeResult?.removedUsers}</span> conta(s) de usuário desativada(s)</p>}
             </div>
             <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Agora você pode usar "Gerar Acessos em Massa" para criar as credenciais dos colaboradores mesclados.</p>
             <div className="flex justify-end pt-2" style={{ borderTop: "1px solid var(--border)" }}>
@@ -1201,14 +1179,14 @@ export default function EmployeesPage() {
               <div className="flex gap-3 items-stretch">
                 <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
                   <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: "#ccff00" }}>{bulkPinResult.results.length}</p>
-                  <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
+                  <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>
                     {bulkPinSource === "generated" ? "Senhas definidas agora" : "Senhas ativas"}
                   </p>
                 </div>
                 {bulkPinResult.skipped.length > 0 && (
                   <div className="flex-1 rounded-lg px-3 py-2 text-center" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>
-                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: WARNING }}>{bulkPinResult.skipped.length}</p>
-                    <p className="text-[10px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF (ignorados)</p>
+                    <p className="text-2xl font-black" style={{ fontFamily: CONDENSED, color: DANGER_TEXT }}>{bulkPinResult.skipped.length}</p>
+                    <p className="text-[11px] font-bold uppercase" style={{ color: "var(--muted-foreground)" }}>Sem CPF (ignorados)</p>
                   </div>
                 )}
               </div>
@@ -1219,13 +1197,13 @@ export default function EmployeesPage() {
                   <table className="w-full text-sm border-collapse">
                     <thead style={{ backgroundColor: "var(--secondary)", position: "sticky", top: 0, zIndex: 10 }}>
                       <tr>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Nome</th>
-                        <th className="px-4 py-2.5 text-center text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Senha</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Nome</th>
+                        <th className="px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-widest" style={{ fontFamily: CONDENSED, borderBottom: "1px solid var(--border)" }}>Senha</th>
                       </tr>
                     </thead>
                     <tbody>
                       {bulkPinResult.results.map((r, i) => (
-                        <tr key={r.cpfLogin} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "var(--secondary)" }}>
+                        <tr key={r.cpfLogin ?? `${r.name}-${i}`} style={{ borderBottom: i < bulkPinResult.results.length - 1 ? "1px solid var(--border)" : "none", backgroundColor: i % 2 === 0 ? "transparent" : "var(--secondary)" }}>
                           <td className="px-4 py-2.5 font-medium">{r.name}</td>
                           <td className="px-4 py-2.5 text-center">
                             <span className="text-sm font-black font-mono" style={{ color: "#ccff00" }}>
@@ -1248,7 +1226,7 @@ export default function EmployeesPage() {
                     if (await copyToClipboard(APP_LINK)) { setBulkLinkCopied(true); setTimeout(() => setBulkLinkCopied(false), 2000); }
                     else toast(COPY_FAILED_TOAST);
                   }}
-                  className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded font-black text-[10px] uppercase transition-all hover:opacity-80"
+                  className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded font-black text-[11px] uppercase transition-all hover:opacity-80"
                   style={{ border: "1px solid var(--border)", color: "var(--foreground)", cursor: "pointer" }}
                 >
                   {bulkLinkCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Link</>}
@@ -1290,7 +1268,7 @@ export default function EmployeesPage() {
                 <div className="flex gap-2 items-center">
                   {confirmRegen ? (
                     <>
-                      <span className="text-[11px] font-bold" style={{ color: WARNING }}>Redefinir senhas para CPF?</span>
+                      <span className="text-[11px] font-bold" style={{ color: DANGER_TEXT }}>Redefinir senhas para CPF?</span>
                       <button
                         onClick={handleBulkGeneratePins}
                         disabled={bulkPinLoading}
@@ -1343,11 +1321,11 @@ export default function EmployeesPage() {
 
             <div className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--border)" }}>
               <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Login (CPF)</p>
+                <p className="text-[11px] font-black uppercase tracking-widest mb-1" style={{ color: "var(--muted-foreground)", fontFamily: CONDENSED }}>Login (CPF)</p>
                 <p className="text-base font-black tracking-widest">{pinDialog?.cpfLogin}</p>
               </div>
               <div className="px-4 py-4" style={{ backgroundColor: "var(--primary)", borderBottom: "1px solid rgba(0,0,0,0.15)" }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--primary-foreground)", opacity: 0.65, fontFamily: CONDENSED }}>Senha (CPF)</p>
+                <p className="text-[11px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--primary-foreground)", opacity: 0.65, fontFamily: CONDENSED }}>Senha (CPF)</p>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-2xl font-black font-mono tracking-wider" style={{ color: "var(--primary-foreground)" }}>
                     {pinDialog?.pin.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}

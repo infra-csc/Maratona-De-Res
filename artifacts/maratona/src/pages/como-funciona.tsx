@@ -52,7 +52,7 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
         : { backgroundColor: "var(--muted)", border: "1px solid var(--border)" }
       }
     >
-      <span className="text-[10px] font-black uppercase tracking-wider sm:w-36 sm:shrink-0 sm:pt-0.5" style={{ color: highlight ? "#506600" : "var(--muted-foreground)" }}>{label}</span>
+      <span className="text-[11px] font-black uppercase tracking-wider sm:w-36 sm:shrink-0 sm:pt-0.5" style={{ color: highlight ? "#506600" : "var(--muted-foreground)" }}>{label}</span>
       <span className="text-[13px] font-bold leading-snug" style={{ color: highlight ? "#161e00" : "var(--foreground)" }}>{value}</span>
     </div>
   );
@@ -61,7 +61,7 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
 function StatusBadge({ label, color, text }: { label: string; color: string; text: string }) {
   return (
     <div className="flex items-start gap-3 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-      <span className={`shrink-0 mt-0.5 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${color}`}>{label}</span>
+      <span className={`shrink-0 mt-0.5 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full ${color}`}>{label}</span>
       <span className="text-[13px] text-muted-foreground leading-snug">{text}</span>
     </div>
   );
@@ -106,8 +106,8 @@ export default function ComoFuncionaPage() {
       <div className="p-4 sm:p-6 md:p-10 space-y-8 max-w-4xl mx-auto">
 
         {/* Header */}
-        <header className="border-l-4 border-[#ccff00] pl-5 py-1">
-          <h1 className="font-black text-[42px] md:text-[52px] uppercase tracking-tight leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent)" }}>
+        <header className="border-l-4 border-[var(--accent)] pl-5 py-1">
+          <h1 className="font-black text-[42px] md:text-[52px] uppercase tracking-tight leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "var(--accent-text)" }}>
             Como Funciona
           </h1>
           <p className="text-[14px] leading-relaxed text-muted-foreground mt-2 max-w-2xl">
@@ -154,7 +154,7 @@ export default function ComoFuncionaPage() {
                   className={`flex items-center gap-4 px-5 py-3 transition-colors ${matched ? "hover:brightness-95 text-foreground" : "opacity-25 pointer-events-none"}`}
                   style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}
                 >
-                  <span className="text-[10px] font-black text-muted-foreground w-5 shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="text-[11px] font-black text-muted-foreground w-5 shrink-0">{String(i + 1).padStart(2, "0")}</span>
                   <s.icon size={13} className="shrink-0" style={{ color: matched ? "var(--accent)" : "var(--muted-foreground)" }} />
                   <span className="text-[13px] font-bold uppercase tracking-tight">{s.title}</span>
                 </a>
@@ -235,13 +235,13 @@ export default function ComoFuncionaPage() {
             </p>
 
             <div className="mt-3 space-y-4">
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#ba1a1a]">Penalidades (descontam pontos do total)</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-[#ba1a1a]">Penalidades (descontam pontos do total)</p>
               <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "rgba(186,26,26,0.10)", borderBottom: "1px solid var(--border)" }}>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#ba1a1a]">Tipo</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#ba1a1a] text-right">Pontos</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#ba1a1a]">Tipo</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#ba1a1a] text-right">Pontos</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -257,13 +257,13 @@ export default function ComoFuncionaPage() {
                 </table>
               </div>
 
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#16a34a]">Méritos (somam pontos ao total)</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-[#16a34a]">Méritos (somam pontos ao total)</p>
               <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "rgba(22,163,74,0.10)", borderBottom: "1px solid var(--border)" }}>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#16a34a]">Tipo</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-[#16a34a] text-right">Pontos</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#16a34a]">Tipo</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#16a34a] text-right">Pontos</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -294,7 +294,7 @@ export default function ComoFuncionaPage() {
             </p>
             <div className="space-y-2 mt-2">
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(204,255,0,0.12)", border: "1px solid rgba(204,255,0,0.3)" }}>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[#ccff00] sm:w-36 sm:shrink-0 sm:pt-0.5">Meta mínima</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-[#ccff00] sm:w-36 sm:shrink-0 sm:pt-0.5">Meta mínima</span>
                 <span className="text-[13px] font-bold text-[#ccff00] leading-snug">
                   {minEvents !== null
                     ? <>Você precisa de pelo menos <strong>{minEvents} eventos confirmados</strong> neste ciclo para ter direito ao bônus.</>
@@ -303,11 +303,11 @@ export default function ComoFuncionaPage() {
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Não elegível</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Não elegível</span>
                 <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Se você não atingir o mínimo de eventos confirmados, o bônus aparecerá como "—" (não elegível para este ciclo).</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Eventos extras</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-[rgba(255,255,255,0.4)] sm:w-36 sm:shrink-0 sm:pt-0.5">Eventos extras</span>
                 <span className="text-[13px] font-bold text-[rgba(255,255,255,0.5)] leading-snug">Cada evento confirmado acima do mínimo pode gerar bônus adicional. O valor extra depende da nota daquele evento específico e da faixa correspondente.</span>
               </div>
             </div>
@@ -334,10 +334,10 @@ export default function ComoFuncionaPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground">Faixa</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground">Nota</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground text-right">Bônus Base</th>
-                      <th className="px-4 py-2.5 text-[10px] font-black uppercase text-muted-foreground text-right">Extra/Evento</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-muted-foreground">Faixa</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-muted-foreground">Nota</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-muted-foreground text-right">Bônus Base</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-muted-foreground text-right">Extra/Evento</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -453,7 +453,7 @@ export default function ComoFuncionaPage() {
               ].map(({ q, a }, i) => (
                 <div key={i} className="p-4 rounded-xl" style={{ border: "1px solid var(--border)", backgroundColor: "var(--muted)" }}>
                   <p className="text-[13px] font-black text-foreground mb-2 flex items-start gap-2">
-                    <span className="shrink-0 bg-[#ccff00] text-[#161e00] font-black text-[9px] px-1.5 py-0.5 rounded mt-0.5">P</span>
+                    <span className="shrink-0 bg-[#ccff00] text-[#161e00] font-black text-[11px] px-1.5 py-0.5 rounded mt-0.5">P</span>
                     {q}
                   </p>
                   <p className="text-[13px] text-muted-foreground pl-6 leading-relaxed">{a}</p>
@@ -465,7 +465,7 @@ export default function ComoFuncionaPage() {
 
         {/* Footer note */}
         <div className="rounded-xl p-4 text-center" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
             Maratona de Resultados · Cenográfica Eventos
           </p>
           <p className="text-[11px] text-muted-foreground mt-1">

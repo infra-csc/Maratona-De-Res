@@ -67,3 +67,11 @@ export function getCycleWeekends(startDate?: string | null, endDate?: string | n
   }
   return result;
 }
+
+/**
+ * Número para exibição no padrão brasileiro (vírgula decimal), com casas fixas.
+ * Use no lugar de `.toFixed()` em qualquer valor mostrado na tela.
+ */
+export function fmtNum(value: number, digits = 1): string {
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
