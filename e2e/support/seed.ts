@@ -8,11 +8,21 @@
 //    designados ao avaliador, sem nenhuma nota. Ana, Bruno e Carla na equipe.
 // Quando o fluxo confirma o evento alvo, Ana e Bruno chegam a 8 eventos e
 // passam a ter bônus; Carla (1 evento) continua inelegível.
+//
+// Dados isolados dos specs extras (nenhum toca o que o fluxo principal usa):
+//  - link-publico: evento 10 aberto, critérios designados à "Avaliadora Link"
+//    (usuária 3, nunca entra no sistema), Elisa na equipe, sem nota.
+//  - faltas-meritos: Diego participou dos 7 eventos históricos + o evento 9
+//    (confirmado, calibrado em 9,0) → 8 eventos, nota 90, Quênia, R$ 3.200.
+//    Os tipos de lançamento NÃO são semeados: o spec usa "Restaurar Padrões".
+//  - auditoria: evento 11 calibrado em 8,5, ainda não confirmado; Fábio na equipe.
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import type { PGlite } from "@electric-sql/pglite";
-import { ADMIN, AVALIADOR, ANA, CRITERIA, REPO_ROOT, TARGET_EVENT } from "./env";
+import {
+  ADMIN, AVALIADOR, AVALIADORA_LINK, ANA, AUDIT_EVENT, CRITERIA, DIEGO, ELISA, FABIO, FALTAS_EVENT, LINK_EVENT, REPO_ROOT, TARGET_EVENT,
+} from "./env";
 
 const MIGRATIONS_DIR = path.join(REPO_ROOT, "lib", "db", "migrations");
 
@@ -69,11 +79,15 @@ export async function seed(pg: PGlite): Promise<void> {
     { id: ANA.id, name: ANA.name, department: "Operações", function_name: "Montador", employment_type: "casa", active: true },
     { id: 2, name: "Bruno Lima E2E", department: "Operações", function_name: "Montador", employment_type: "casa", active: true },
     { id: 3, name: "Carla Souza E2E", department: "Operações", function_name: "Motorista", employment_type: "casa", active: true },
+    { id: DIEGO.id, name: DIEGO.name, department: "Operações", function_name: "Montador", employment_type: "casa", active: true },
+    { id: ELISA.id, name: ELISA.name, department: "Operações", function_name: "Montador", employment_type: "casa", active: true },
+    { id: FABIO.id, name: FABIO.name, department: "Logística", function_name: "Motorista", employment_type: "casa", active: true },
   ]));
 
   statements.push(insert("users", [
     { id: ADMIN.id, name: ADMIN.name, email: "admin.e2e@exemplo.com", cpf_login: ADMIN.cpf, role: "admin", area_id: null },
     { id: AVALIADOR.id, name: AVALIADOR.name, email: "avaliador.e2e@exemplo.com", cpf_login: AVALIADOR.cpf, role: "avaliador", area_id: 1 },
+    { id: AVALIADORA_LINK.id, name: AVALIADORA_LINK.name, email: "avaliadora.link.e2e@exemplo.com", cpf_login: AVALIADORA_LINK.cpf, role: "avaliador", area_id: 1 },
   ].map(u => ({ ...u, password_hash: bcrypt.hashSync(u.cpf_login, 8), active: true, must_change_password: false }))));
 
   statements.push(insert("cycles", [
@@ -118,6 +132,25 @@ export async function seed(pg: PGlite): Promise<void> {
     start_date: targetDay, end_date: targetDay, cycle_id: 1, status: "open", criteria_confirmed: true,
     results_confirmed: false, results_confirmed_at: null, results_confirmed_by: null, feedback_released: false,
   });
+  // Eventos isolados dos specs extras.
+  const faltasDay = isoDay(-5);
+  events.push({
+    id: FALTAS_EVENT.id, name: FALTAS_EVENT.name, client_name: "Cliente E2E", city: "Santos", state: "SP",
+    start_date: faltasDay, end_date: faltasDay, cycle_id: 1, status: "closed", criteria_confirmed: true,
+    results_confirmed: true, results_confirmed_at: `${faltasDay} 20:00`, results_confirmed_by: ADMIN.id, feedback_released: true,
+  });
+  const linkDay = isoDay(-2);
+  events.push({
+    id: LINK_EVENT.id, name: LINK_EVENT.name, client_name: "Cliente E2E", city: "Sorocaba", state: "SP",
+    start_date: linkDay, end_date: linkDay, cycle_id: 1, status: "open", criteria_confirmed: true,
+    results_confirmed: false, results_confirmed_at: null, results_confirmed_by: null, feedback_released: false,
+  });
+  const auditDay = isoDay(-4);
+  events.push({
+    id: AUDIT_EVENT.id, name: AUDIT_EVENT.name, client_name: "Cliente E2E", city: "Jundiaí", state: "SP",
+    start_date: auditDay, end_date: auditDay, cycle_id: 1, status: "open", criteria_confirmed: true,
+    results_confirmed: false, results_confirmed_at: null, results_confirmed_by: null, feedback_released: false,
+  });
   statements.push(insert("events", events));
 
   const participants: Row[] = [];
@@ -132,16 +165,36 @@ export async function seed(pg: PGlite): Promise<void> {
   }
   for (const emp of [ANA.id, 2, 3]) participants.push({ event_id: TARGET_EVENT.id, employee_id: emp, function_name: "Montador", confirmed: true });
   for (const c of CRITERIA) eventCriteria.push({ event_id: TARGET_EVENT.id, criterion_id: c.id, active: true, weight_override: null });
+
+  // faltas-meritos: Diego nos 7 históricos + evento 9 (calibrado em 9,0).
+  for (let e = 1; e <= 7; e++) participants.push({ event_id: e, employee_id: DIEGO.id, function_name: "Montador", confirmed: true });
+  participants.push({ event_id: FALTAS_EVENT.id, employee_id: DIEGO.id, function_name: "Montador", confirmed: true });
+  // link-publico: Elisa no evento 10 (sem nota). auditoria: Fábio no evento 11 (calibrado em 8,5).
+  participants.push({ event_id: LINK_EVENT.id, employee_id: ELISA.id, function_name: "Montador", confirmed: true });
+  participants.push({ event_id: AUDIT_EVENT.id, employee_id: FABIO.id, function_name: "Motorista", confirmed: true });
+  for (const c of CRITERIA) {
+    eventCriteria.push({ event_id: FALTAS_EVENT.id, criterion_id: c.id, active: true, weight_override: 50 });
+    calibrations.push({ event_id: FALTAS_EVENT.id, criterion_id: c.id, original_average_score: 9, calibrated_score: 9, calibration_reason: "Seed E2E", calibrated_by_user_id: ADMIN.id });
+    eventCriteria.push({ event_id: LINK_EVENT.id, criterion_id: c.id, active: true, weight_override: null });
+    eventCriteria.push({ event_id: AUDIT_EVENT.id, criterion_id: c.id, active: true, weight_override: 50 });
+    calibrations.push({ event_id: AUDIT_EVENT.id, criterion_id: c.id, original_average_score: 8.5, calibrated_score: 8.5, calibration_reason: "Seed E2E", calibrated_by_user_id: ADMIN.id });
+  }
   statements.push(insert("event_participants", participants));
   statements.push(insert("event_criteria", eventCriteria));
   statements.push(insert("calibrations", calibrations));
 
   // Designação do avaliador no evento alvo: por área (sistema antigo) e por
   // critério (roteamento novo) — é o que a tela /evaluations usa para listar.
-  statements.push(insert("event_area_assignments", [{ event_id: TARGET_EVENT.id, area_id: 1, evaluator_user_id: AVALIADOR.id }]));
-  statements.push(insert("event_criterion_assignments", CRITERIA.map(c => ({
-    event_id: TARGET_EVENT.id, criterion_id: c.id, assigned_to_id: AVALIADOR.id, status: "pending",
-  }))));
+  statements.push(insert("event_area_assignments", [
+    { event_id: TARGET_EVENT.id, area_id: 1, evaluator_user_id: AVALIADOR.id },
+    { event_id: LINK_EVENT.id, area_id: 1, evaluator_user_id: AVALIADORA_LINK.id },
+  ]));
+  statements.push(insert("event_criterion_assignments", [
+    ...CRITERIA.map(c => ({ event_id: TARGET_EVENT.id, criterion_id: c.id, assigned_to_id: AVALIADOR.id, status: "pending" })),
+    // link-publico: os 2 critérios do evento 10 com a avaliadora do link
+    // (mesma área → o admin gera UM questionário com os dois).
+    ...CRITERIA.map(c => ({ event_id: LINK_EVENT.id, criterion_id: c.id, assigned_to_id: AVALIADORA_LINK.id, status: "pending" })),
+  ]));
 
   for (const s of statements) {
     try {

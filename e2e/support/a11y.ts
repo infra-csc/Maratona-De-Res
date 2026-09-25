@@ -59,13 +59,18 @@ function nameFromSnapshot(snapshot: string): string {
   return m ? m[1].trim() : "";
 }
 
-export async function checkA11y(page: Page, screen: string, testInfo: TestInfo): Promise<void> {
+/**
+ * `inDialog`: com um diálogo modal aberto, o resto da página sai da árvore de
+ * acessibilidade (aria-hidden) — o h1 some de propósito. Aí só vale a regra
+ * dos campos, que é o que importa no diálogo.
+ */
+export async function checkA11y(page: Page, screen: string, testInfo: TestInfo, opts: { inDialog?: boolean } = {}): Promise<void> {
   const known = KNOWN_ISSUES.filter(k => k.screen === screen);
   const problems: string[] = [];
   const tolerated: string[] = [];
 
-  // (1) exatamente um h1 visível
-  const h1Count = await page.getByRole("heading", { level: 1 }).filter({ visible: true }).count();
+  // (1) exatamente um h1 visível (fora de diálogo modal)
+  const h1Count = opts.inDialog ? 1 : await page.getByRole("heading", { level: 1 }).filter({ visible: true }).count();
   if (h1Count !== 1) {
     const msg = `[${screen}] ${h1Count} <h1> visíveis (esperado: 1)`;
     const k = known.find(i => i.rule === "h1");

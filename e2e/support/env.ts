@@ -35,3 +35,23 @@ export const CRITERIA = [
   { id: 1, name: "Qualidade da entrega" },
   { id: 2, name: "Pontualidade" },
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Dados próprios de cada spec extra (ver support/seed.ts). Cada spec mexe só
+// nos seus eventos/colaboradores, então a ordem de execução não importa.
+// ---------------------------------------------------------------------------
+
+/** link-publico.spec.ts: avaliadora designada ao evento, que NUNCA entra no sistema — responde pelo link. */
+export const AVALIADORA_LINK = { id: 3, name: "Avaliadora Link E2E", cpf: "33366699957" } as const;
+/** link-publico.spec.ts: evento aberto, critérios designados à avaliadora do link, sem nota. */
+export const LINK_EVENT = { id: 10, name: "Maratona E2E Link Publico" } as const;
+export const ELISA = { id: 5, name: "Elisa Rocha E2E" } as const;
+
+/** faltas-meritos.spec.ts: colaborador com 8 eventos confirmados (nota 90, faixa Quênia) antes dos lançamentos. */
+export const DIEGO = { id: 4, name: "Diego Martins E2E" } as const;
+/** 8º evento do Diego (confirmado, calibrado em 9,0) — só ele participou. */
+export const FALTAS_EVENT = { id: 9, name: "Corrida E2E Faltas" } as const;
+
+/** auditoria.spec.ts: evento já calibrado e ainda não confirmado; o spec confirma e confere a trilha. */
+export const AUDIT_EVENT = { id: 11, name: "Meia Maratona E2E Auditoria" } as const;
+export const FABIO = { id: 6, name: "Fabio Nunes E2E" } as const;
