@@ -219,8 +219,8 @@ export default function ComoFuncionaPage() {
               </div>
             </div>
             <div className="mt-4 p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: "rgba(186,26,26,0.08)", border: "1px solid rgba(186,26,26,0.25)" }}>
-              <AlertTriangle size={15} className="text-[#ba1a1a] shrink-0 mt-0.5" />
-              <p className="text-[12px] text-[#ba1a1a] leading-relaxed">
+              <AlertTriangle size={15} className="text-[var(--status-danger-text)] shrink-0 mt-0.5" />
+              <p className="text-[12px] text-[var(--status-danger-text)] leading-relaxed">
                 Cada resposta <strong>"Não"</strong> na Matriz de Conformidade desconta <strong>10 pontos</strong> da nota daquele evento específico. Se todos os 4 itens forem "Não", o evento perde 40 pontos antes de entrar na sua média.
               </p>
             </div>
@@ -235,20 +235,20 @@ export default function ComoFuncionaPage() {
             </p>
 
             <div className="mt-3 space-y-4">
-              <p className="text-[11px] font-black uppercase tracking-wider text-[#ba1a1a]">Penalidades (descontam pontos do total)</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-[var(--status-danger-text)]">Penalidades (descontam pontos do total)</p>
               <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "rgba(186,26,26,0.10)", borderBottom: "1px solid var(--border)" }}>
-                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#ba1a1a]">Tipo</th>
-                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#ba1a1a] text-right">Pontos</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[var(--status-danger-text)]">Tipo</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[var(--status-danger-text)] text-right">Pontos</th>
                     </tr>
                   </thead>
                   <tbody>
                     {activePenalties.length > 0 ? activePenalties.map((r, i) => (
                       <tr key={r.id} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
                         <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.label}</td>
-                        <td className="px-4 py-3 text-[13px] font-black text-[#ba1a1a] text-right">−{r.points} pts</td>
+                        <td className="px-4 py-3 text-[13px] font-black text-[var(--status-danger-text)] text-right">−{r.points} pts</td>
                       </tr>
                     )) : (
                       <tr><td colSpan={2} className="px-4 py-3 text-[13px] text-muted-foreground">Nenhum tipo de penalidade cadastrado.</td></tr>
@@ -257,20 +257,20 @@ export default function ComoFuncionaPage() {
                 </table>
               </div>
 
-              <p className="text-[11px] font-black uppercase tracking-wider text-[#16a34a]">Méritos (somam pontos ao total)</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-[var(--status-ok-text)]">Méritos (somam pontos ao total)</p>
               <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr style={{ backgroundColor: "rgba(22,163,74,0.10)", borderBottom: "1px solid var(--border)" }}>
-                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#16a34a]">Tipo</th>
-                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[#16a34a] text-right">Pontos</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[var(--status-ok-text)]">Tipo</th>
+                      <th className="px-4 py-2.5 text-[11px] font-black uppercase text-[var(--status-ok-text)] text-right">Pontos</th>
                     </tr>
                   </thead>
                   <tbody>
                     {activeMerits.length > 0 ? activeMerits.map((r, i) => (
                       <tr key={r.id} style={i > 0 ? { borderTop: "1px solid var(--border)" } : {}}>
                         <td className="px-4 py-3 text-[13px] font-bold text-foreground">{r.label}</td>
-                        <td className="px-4 py-3 text-[13px] font-black text-[#16a34a] text-right">+{r.points} pts</td>
+                        <td className="px-4 py-3 text-[13px] font-black text-[var(--status-ok-text)] text-right">+{r.points} pts</td>
                       </tr>
                     )) : (
                       <tr><td colSpan={2} className="px-4 py-3 text-[13px] text-muted-foreground">Nenhum tipo de mérito cadastrado.</td></tr>

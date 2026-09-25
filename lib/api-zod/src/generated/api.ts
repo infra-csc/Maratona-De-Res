@@ -3633,6 +3633,7 @@ export const GetAnalyticsOverviewResponse = zod.object({
   "eventsConfirmed": zod.int(),
   "eventsScored": zod.int(),
   "avgEventScore": zod.number().nullish(),
+  "avgFinalResult": zod.number().nullish().describe('Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)'),
   "collaborators": zod.int(),
   "reachedMinEvents": zod.int(),
   "eligible": zod.int(),
@@ -3646,6 +3647,12 @@ export const GetAnalyticsOverviewResponse = zod.object({
   "meritsCount": zod.int(),
   "minEvents": zod.int()
 }),
+  "ruleSet": zod.object({
+  "minEvents": zod.int(),
+  "conformityItemPoints": zod.number(),
+  "conformityPenaltyFactor": zod.number(),
+  "conformityPenaltyPerNo": zod.number()
+}).describe('Parâmetros das regras de negócio em vigor'),
   "scoreTrend": zod.array(zod.object({
   "weekStart": zod.string(),
   "label": zod.string(),
@@ -3674,6 +3681,8 @@ export const GetAnalyticsOverviewResponse = zod.object({
   "color": zod.string().nullish(),
   "minScore": zod.number().nullish(),
   "maxScore": zod.number().nullish(),
+  "bonusValue": zod.number().nullish(),
+  "bonusPerExtraEvent": zod.number().nullish(),
   "count": zod.int(),
   "bonusTotal": zod.number()
 })),

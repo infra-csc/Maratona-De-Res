@@ -165,8 +165,13 @@ export function validateCalculationExample(): boolean {
  * Sem registro de conformidade = conformidade plena (100).
  * null = PENDENTE: ainda não avaliado — sem penalidade (tratado como SIM).
  */
+/** Pontos de cada item da matriz respondido SIM (ou pendente). 4 itens → 100. */
+export const CONFORMITY_ITEM_POINTS = 25;
+/** Fração do que falta para 100 na matriz que vira desconto na nota do evento. */
+export const CONFORMITY_PENALTY_FACTOR = 0.4;
+
 export function calculateConformitySubtotal(items: (boolean | null | undefined)[]): number {
-  return items.reduce((sum: number, v) => sum + (v === false ? 0 : 25), 0);
+  return items.reduce((sum: number, v) => sum + (v === false ? 0 : CONFORMITY_ITEM_POINTS), 0);
 }
 
 /**
@@ -175,7 +180,7 @@ export function calculateConformitySubtotal(items: (boolean | null | undefined)[
  * a nota de performance.
  */
 export function calculateConformityPenalty(conformitySubtotal: number): number {
-  return Math.round((100 - conformitySubtotal) * 0.4 * 100) / 100;
+  return Math.round((100 - conformitySubtotal) * CONFORMITY_PENALTY_FACTOR * 100) / 100;
 }
 
 /**

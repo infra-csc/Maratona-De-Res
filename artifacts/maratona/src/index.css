@@ -285,3 +285,26 @@
     @apply bg-card/80 backdrop-blur-md border border-card-border shadow-sm;
   }
 }
+
+/* ── Impressão / "Salvar como PDF" (relatório de Análises) ──
+   O app ocupa exatamente a tela e rola por dentro do <main>; impresso assim,
+   sairia só a primeira página. Aqui a casca vira bloco de altura livre, o
+   menu some e o tema claro vale mesmo com o modo escuro ligado. */
+@media print {
+  @page { size: A4; margin: 14mm 12mm; }
+  :root, .dark {
+    color-scheme: light;
+    --background: #ffffff; --foreground: #111111; --card: #ffffff; --card-foreground: #111111;
+    --border: rgba(0,0,0,0.14); --secondary: #eeede8; --muted: #f3f3f0; --muted-foreground: #4f4f48;
+    --accent: #9ab000; --accent-text: #4f5c00; --primary: #111111; --primary-foreground: #ffffff;
+    --status-ok-text: #4f5c00; --status-warn-text: #7a4200; --status-danger-text: #a3221b; --status-info-text: #244fa6;
+    --viz-series-1: #6f8300; --viz-grid: #e3e2dc;
+  }
+  html, body { background: #ffffff !important; height: auto !important; overflow: visible !important; }
+  .app-shell { display: block !important; height: auto !important; overflow: visible !important; }
+  .app-main { height: auto !important; overflow: visible !important; display: block !important; }
+  .no-print { display: none !important; }
+  .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  .print-page-break { break-before: page; page-break-before: always; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

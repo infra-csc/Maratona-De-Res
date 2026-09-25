@@ -5364,7 +5364,7 @@ components:
 
     AnalyticsOverview:
       type: object
-      required: [cycle, kpis, scoreTrend, criteria, conformity, faixas, funnel, nearNextFaixa, evaluators, adjustments, clients]
+      required: [cycle, kpis, ruleSet, scoreTrend, criteria, conformity, faixas, funnel, nearNextFaixa, evaluators, adjustments, clients]
       properties:
         cycle:
           type: object
@@ -5390,6 +5390,9 @@ components:
               type: integer
             avgEventScore:
               type: ["number", "null"]
+            avgFinalResult:
+              type: ["number", "null"]
+              description: Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)
             collaborators:
               type: integer
             reachedMinEvents:
@@ -5414,6 +5417,19 @@ components:
               type: integer
             minEvents:
               type: integer
+        ruleSet:
+          type: object
+          description: Parâmetros das regras de negócio em vigor
+          required: [minEvents, conformityItemPoints, conformityPenaltyFactor, conformityPenaltyPerNo]
+          properties:
+            minEvents:
+              type: integer
+            conformityItemPoints:
+              type: number
+            conformityPenaltyFactor:
+              type: number
+            conformityPenaltyPerNo:
+              type: number
         scoreTrend:
           type: array
           items:
@@ -5479,6 +5495,10 @@ components:
               minScore:
                 type: ["number", "null"]
               maxScore:
+                type: ["number", "null"]
+              bonusValue:
+                type: ["number", "null"]
+              bonusPerExtraEvent:
                 type: ["number", "null"]
               count:
                 type: integer

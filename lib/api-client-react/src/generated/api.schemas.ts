@@ -1088,6 +1088,11 @@ export type AnalyticsOverviewKpis = {
   eventsScored: number;
   /** @nullable */
   avgEventScore?: number | null;
+  /**
+     * Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)
+     * @nullable
+     */
+  avgFinalResult?: number | null;
   collaborators: number;
   reachedMinEvents: number;
   eligible: number;
@@ -1101,6 +1106,16 @@ export type AnalyticsOverviewKpis = {
   penaltiesCount: number;
   meritsCount: number;
   minEvents: number;
+};
+
+/**
+ * Parâmetros das regras de negócio em vigor
+ */
+export type AnalyticsOverviewRuleSet = {
+  minEvents: number;
+  conformityItemPoints: number;
+  conformityPenaltyFactor: number;
+  conformityPenaltyPerNo: number;
 };
 
 export type AnalyticsOverviewScoreTrendItem = {
@@ -1141,6 +1156,10 @@ export type AnalyticsOverviewFaixasItem = {
   minScore?: number | null;
   /** @nullable */
   maxScore?: number | null;
+  /** @nullable */
+  bonusValue?: number | null;
+  /** @nullable */
+  bonusPerExtraEvent?: number | null;
   count: number;
   bonusTotal: number;
 };
@@ -1202,6 +1221,8 @@ export type AnalyticsOverviewClientsItem = {
 export interface AnalyticsOverview {
   cycle: AnalyticsOverviewCycle;
   kpis: AnalyticsOverviewKpis;
+  /** Parâmetros das regras de negócio em vigor */
+  ruleSet: AnalyticsOverviewRuleSet;
   scoreTrend: AnalyticsOverviewScoreTrendItem[];
   criteria: AnalyticsOverviewCriteriaItem[];
   conformity: AnalyticsOverviewConformityItem[];

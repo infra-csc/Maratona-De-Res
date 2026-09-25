@@ -15,11 +15,14 @@ import type { AnalyticsOverviewFaixasItem } from './analyticsOverviewFaixasItem'
 import type { AnalyticsOverviewFunnelItem } from './analyticsOverviewFunnelItem';
 import type { AnalyticsOverviewKpis } from './analyticsOverviewKpis';
 import type { AnalyticsOverviewNearNextFaixaItem } from './analyticsOverviewNearNextFaixaItem';
+import type { AnalyticsOverviewRuleSet } from './analyticsOverviewRuleSet';
 import type { AnalyticsOverviewScoreTrendItem } from './analyticsOverviewScoreTrendItem';
 
 export interface AnalyticsOverview {
   cycle: AnalyticsOverviewCycle;
   kpis: AnalyticsOverviewKpis;
+  /** Parâmetros das regras de negócio em vigor */
+  ruleSet: AnalyticsOverviewRuleSet;
   scoreTrend: AnalyticsOverviewScoreTrendItem[];
   criteria: AnalyticsOverviewCriteriaItem[];
   conformity: AnalyticsOverviewConformityItem[];

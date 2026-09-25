@@ -117,3 +117,26 @@ test("Ciclo vazio não quebra", () => {
   assert.equal(o.scoreTrend.length, 0);
   assert.equal(o.conformity.every(c => c.naoPct === null), true);
 });
+
+test("critérios e matriz só contam eventos confirmados (como a nota oficial)", () => {
+  const input = base();
+  // Evento 3 não confirmado: uma avaliação enviada e uma matriz com "Não" não podem entrar.
+  input.evaluations.push({ eventId: 3, criterionId: 100, evaluatorUserId: 5, evaluatorName: "Ava", score: 1, status: "submitted", submittedAt: new Date("2026-08-16T12:00:00Z") });
+  input.conformities.push({ eventId: 3, epi: false, estaiamentos: false, conduta: false, guardaEquipamentos: false });
+  const o = computeAnalytics(input);
+  const prazo = o.criteria.find(c => c.name === "Prazo")!;
+  assert.equal(prazo.eventsCount, 2);
+  assert.equal(prazo.avgScore, 75); // evento 1 calibrado 7 → 70, evento 2 avaliador 8 → 80
+  const conduta = o.conformity.find(c => c.item === "conduta")!;
+  assert.equal(conduta.answered, 1);
+  assert.equal(conduta.nao, 0);
+  // Avaliadores continuam vendo tudo o que foi enviado, inclusive do evento não confirmado.
+  assert.equal(o.evaluators.find(e => e.name === "Ava")!.submitted, 3);
+});
+
+test("nota final média: mesma conta de Resultados (ignora quem não tem evento com nota)", () => {
+  const input = base();
+  input.quarterly.push({ employeeId: 13, employeeName: "Dani", finalResult: 0, platoon: "Sem Bônus", bonusValue: 0, eligible: false, eventsCount: 0, participatedEventsCount: 1 });
+  const o = computeAnalytics(input);
+  assert.equal(o.kpis.avgFinalResult, 73.5); // (72,5 + 68 + 80) / 3
+});

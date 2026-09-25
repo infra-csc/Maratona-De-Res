@@ -24,6 +24,7 @@ export * from './analyticsOverviewFaixasItem';
 export * from './analyticsOverviewFunnelItem';
 export * from './analyticsOverviewKpis';
 export * from './analyticsOverviewNearNextFaixaItem';
+export * from './analyticsOverviewRuleSet';
 export * from './analyticsOverviewScoreTrendItem';
 export * from './area';
 export * from './areaConformityRouting';

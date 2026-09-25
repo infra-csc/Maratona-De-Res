@@ -149,7 +149,9 @@ function HistoryView({ history }: { history: CycleHistory }) {
 
       <Section
         title="Ranking final"
-        subtitle="Nota final, faixa e bônus de cada colaborador neste ciclo. Quem foi desligado depois continua aqui."
+        subtitle={cycle.isCurrent
+          ? "Nota final, faixa e bônus de cada colaborador. Mesmos colaboradores do Ranking (ativos)."
+          : "Nota final, faixa e bônus de cada colaborador neste ciclo. Quem foi desligado depois continua aqui."}
         actions={ranking.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <div className="relative">

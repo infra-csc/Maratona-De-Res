@@ -9,17 +9,17 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="flex h-screen overflow-hidden transition-colors duration-300"
+      className="app-shell flex h-screen overflow-hidden transition-colors duration-300"
       style={{ backgroundColor: "var(--background)", color: "var(--foreground)", fontFamily: BODY }}
     >
       {/* Desktop: sidebar persistente */}
-      <div className="hidden md:flex shrink-0">
+      <div className="no-print hidden md:flex shrink-0">
         <Sidebar />
       </div>
 
       {/* Mobile: drawer overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="no-print fixed inset-0 z-50 md:hidden flex">
           <div className="absolute left-0 top-0 h-full z-10">
             <Sidebar onClose={() => setMobileOpen(false)} />
           </div>
@@ -30,10 +30,10 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main className="flex-1 h-full overflow-y-auto relative flex flex-col">
+      <main className="app-main flex-1 h-full overflow-y-auto relative flex flex-col">
         {/* Barra superior mobile */}
         <div
-          className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 shrink-0 transition-colors duration-300"
+          className="no-print md:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 shrink-0 transition-colors duration-300"
           style={{ backgroundColor: "var(--card)", borderBottom: "1px solid var(--border)" }}
         >
           <button
@@ -56,7 +56,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
           <div className="w-9" />
         </div>
 
-        <ImpersonationBanner />
+        <div className="no-print"><ImpersonationBanner /></div>
         <div className="relative z-10 min-h-full pb-12 flex-1">
           {children}
         </div>

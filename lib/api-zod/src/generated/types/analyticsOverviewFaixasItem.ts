@@ -14,6 +14,10 @@ export type AnalyticsOverviewFaixasItem = {
   minScore?: number | null;
   /** @nullable */
   maxScore?: number | null;
+  /** @nullable */
+  bonusValue?: number | null;
+  /** @nullable */
+  bonusPerExtraEvent?: number | null;
   count: number;
   bonusTotal: number;
 };

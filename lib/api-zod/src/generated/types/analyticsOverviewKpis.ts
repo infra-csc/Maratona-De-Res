@@ -12,6 +12,11 @@ export type AnalyticsOverviewKpis = {
   eventsScored: number;
   /** @nullable */
   avgEventScore?: number | null;
+  /**
+     * Média das notas finais de quem tem evento com nota (mesma conta da tela de Resultados)
+     * @nullable
+     */
+  avgFinalResult?: number | null;
   collaborators: number;
   reachedMinEvents: number;
   eligible: number;

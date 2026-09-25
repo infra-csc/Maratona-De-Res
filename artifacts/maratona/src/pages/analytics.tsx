@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
 import { useGetAnalyticsOverview, getGetAnalyticsOverviewQueryKey, type AnalyticsOverview } from "@workspace/api-client-react";
-import { AlertTriangle, BarChart3, Table2, TrendingUp } from "lucide-react";
-import { PageHeader, EmptyState, LoadingState, StatusBadge } from "@/components/shared";
+import { AlertTriangle, BarChart3, ChevronDown, Download, FileSpreadsheet, FileText, RefreshCw, Table2, TrendingUp } from "lucide-react";
+import { useLocation } from "wouter";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { exportAnalyticsXlsx } from "@/lib/analytics-export";
+import { PageHeader, EmptyState, LoadingState, StatusBadge, StatTile } from "@/components/shared";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, fmtNum } from "@/lib/utils";
 
 // Paleta dos gráficos validada (dataviz/validate_palette) contra as superfícies
 // do app: série 1 = lima da marca escurecido para barra/linha (#6f8300 claro,
@@ -51,19 +56,6 @@ function Card({ title, subtitle, children, table, span2 }: {
   );
 }
 
-function Stat({ label, value, detail, hero }: { label: string; value: React.ReactNode; detail?: React.ReactNode; hero?: boolean }) {
-  return (
-    <div
-      className="rounded-xl px-4 py-3.5 flex flex-col justify-between min-w-0"
-      style={{ backgroundColor: hero ? "var(--primary)" : "var(--card)", border: `1px solid ${hero ? "var(--primary)" : "var(--border)"}`, color: hero ? "var(--primary-foreground)" : "var(--foreground)" }}
-    >
-      <span className="text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.06em", opacity: hero ? 0.8 : 1, color: hero ? undefined : "var(--muted-foreground)" }}>{label}</span>
-      <span className={`${hero ? "text-5xl" : "text-[28px]"} font-black leading-none mt-2`} style={{ fontFamily: CONDENSED }}>{value}</span>
-      {detail && <span className="text-[12px] mt-1.5" style={{ opacity: hero ? 0.8 : 1, color: hero ? undefined : "var(--muted-foreground)" }}>{detail}</span>}
-    </div>
-  );
-}
-
 function VizTooltip({ active, payload, lines }: { active?: boolean; payload?: { payload: Record<string, unknown> }[]; lines: (row: Record<string, unknown>) => { label: string; value: string }[] }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
@@ -103,18 +95,48 @@ function DataTable({ head, rows }: { head: string[]; rows: (React.ReactNode)[][]
 }
 
 /** Barras horizontais de uma série, com valor na ponta (sem legenda: o título nomeia). */
+/** Largura do contêiner (para o eixo de rótulos não espremer as barras no celular). */
+function useWidth<E extends HTMLElement>() {
+  const ref = useRef<E>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(entries => setWidth(entries[0]?.contentRect.width ?? 0));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
+/** Rótulo do eixo: corta com reticências no espaço disponível; o nome inteiro fica no title. */
+function AxisLabel({ x, y, payload, maxChars }: { x?: number; y?: number; payload?: { value: string }; maxChars: number }) {
+  const full = String(payload?.value ?? "");
+  const text = full.length > maxChars ? `${full.slice(0, Math.max(1, maxChars - 1))}…` : full;
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill="var(--foreground)">
+      <title>{full}</title>
+      {text}
+    </text>
+  );
+}
+
 function HBars<T extends Record<string, unknown>>({ data, labelKey, valueKey, max, format, tooltip, height }: {
   data: T[]; labelKey: keyof T & string; valueKey: keyof T & string; max?: number;
   format: (v: number) => string; tooltip: (row: T) => { label: string; value: string }[]; height?: number;
 }) {
   const h = height ?? Math.max(120, data.length * 34 + 24);
+  const [ref, width] = useWidth<HTMLDivElement>();
+  // ~40% da largura para os nomes (entre 96 e 190 px); ~6,3 px por caractere a 11 px.
+  const labelWidth = Math.round(Math.min(190, Math.max(96, (width || 420) * 0.4)));
+  const maxChars = Math.floor((labelWidth - 8) / 6.3);
   return (
-    <div style={{ height: h }} role="img" aria-label={data.map(d => `${String(d[labelKey])}: ${format(Number(d[valueKey]))}`).join("; ")}>
+    <div ref={ref} style={{ height: h }} role="img" aria-label={data.map(d => `${String(d[labelKey])}: ${format(Number(d[valueKey]))}`).join("; ")}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 4 }} barCategoryGap={8}>
           <CartesianGrid horizontal={false} stroke={GRID} />
           <XAxis type="number" domain={[0, max ?? "auto"]} axisLine={false} tickLine={false} tick={AXIS_TICK} />
-          <YAxis type="category" dataKey={labelKey} width={170} axisLine={{ stroke: GRID }} tickLine={false} tick={{ ...AXIS_TICK, fill: "var(--foreground)" }} />
+          <YAxis type="category" dataKey={labelKey} width={labelWidth} axisLine={{ stroke: GRID }} tickLine={false} tick={<AxisLabel maxChars={maxChars} />} />
           <Tooltip cursor={{ fill: "var(--secondary)", opacity: 0.6 }} content={<VizTooltip lines={row => tooltip(row as T)} />} />
           <Bar dataKey={valueKey} fill={SERIES} barSize={16} radius={[0, 4, 4, 0]} isAnimationActive={false}>
             <LabelList dataKey={valueKey} position="right" formatter={(v: unknown) => format(Number(v))} style={{ fontSize: 11, fontWeight: 700, fill: "var(--foreground)" }} />
@@ -133,7 +155,7 @@ function biasBadge(bias: number | null, samples: number) {
 }
 
 export default function AnalyticsPage() {
-  const { data, isLoading, isError, error } = useGetAnalyticsOverview({
+  const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useGetAnalyticsOverview({
     query: { queryKey: getGetAnalyticsOverviewQueryKey(), staleTime: 60_000 },
   });
 
@@ -147,15 +169,18 @@ export default function AnalyticsPage() {
       </div>
     );
   }
-  return <AnalyticsView data={data} />;
+  return <AnalyticsView data={data} updatedAt={dataUpdatedAt} refreshing={isFetching} onRefresh={() => void refetch()} />;
 }
 
-function AnalyticsView({ data }: { data: AnalyticsOverview }) {
+function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
+  data: AnalyticsOverview; updatedAt: number; refreshing: boolean; onRefresh: () => void;
+}) {
   const k = data.kpis;
   const period = data.cycle.startDate && data.cycle.endDate
     ? `${fmtDate(data.cycle.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })} a ${fmtDate(data.cycle.endDate, { day: "2-digit", month: "2-digit", year: "numeric" })}`
     : null;
   const weakest = data.criteria[0];
+  const maxCount = Math.max(1, ...data.faixas.map(x => x.count));
   const worstConformity = [...data.conformity].filter(c => c.naoPct != null).sort((a, b) => (b.naoPct ?? 0) - (a.naoPct ?? 0))[0];
 
   return (
@@ -163,16 +188,35 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
       <PageHeader
         eyebrow={`${data.cycle.name}${period ? ` · ${period}` : ""}`}
         title="Análises"
-        description="Como o ciclo está indo: notas, critérios, conformidade, bônus e avaliadores. Só entram na nota os eventos com resultados confirmados."
+        description="Como o ciclo está indo: notas, critérios, conformidade, bônus e avaliadores. Só entram na nota os eventos com resultados confirmados; os colaboradores contados são os mesmos do Ranking."
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="text-[12px] tabular-nums" style={{ color: "var(--muted-foreground)" }} aria-live="polite">
+              {refreshing ? "Atualizando…" : `Atualizado às ${new Date(updatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}
+            </span>
+            <ExportMenu data={data} />
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12px] font-bold uppercase transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              style={{ border: "1px solid var(--border)", fontFamily: CONDENSED }}
+              data-testid="button-refresh-analytics"
+            >
+              <RefreshCw size={14} aria-hidden className={refreshing ? "animate-spin" : undefined} /> Atualizar
+            </button>
+          </div>
+        }
       />
 
       {/* ── Indicadores ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" data-testid="analytics-kpis">
-        <Stat hero label="Nota média do ciclo" value={n1(k.avgEventScore)} detail={`${k.eventsScored} evento(s) com nota oficial`} />
-        <Stat label="Eventos confirmados" value={`${k.eventsConfirmed}/${k.eventsTotal}`} detail={`${pct(k.eventsConfirmed, k.eventsTotal)}% do ciclo`} />
-        <Stat label="Elegíveis ao bônus" value={`${k.eligible}/${k.collaborators}`} detail={`${k.withBonus} com bônus hoje`} />
-        <Stat label="Bônus projetado" value={brl(k.bonusTotal)} detail="Soma dos elegíveis" />
-        <Stat label="Avaliações enviadas" value={k.evaluationsSubmitted} detail={k.evaluationsDraft > 0 ? `${k.evaluationsDraft} em rascunho` : "Nenhum rascunho parado"} />
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="analytics-kpis">
+        <StatTile hero label="Nota final média" value={n1(k.avgFinalResult)} detail={`${k.collaborators} colaboradores no ranking`} data-testid="kpi-avg-final" />
+        <StatTile label="Nota média dos eventos" value={n1(k.avgEventScore)} detail={`${k.eventsScored} evento(s) com nota oficial`} />
+        <StatTile label="Eventos confirmados" value={`${k.eventsConfirmed}/${k.eventsTotal}`} detail={`${pct(k.eventsConfirmed, k.eventsTotal)}% do ciclo`} />
+        <StatTile label="Elegíveis ao bônus" value={`${k.eligible}/${k.collaborators}`} detail={`${k.withBonus} com bônus hoje`} />
+        <StatTile label="Bônus projetado" value={brl(k.bonusTotal)} detail="Soma dos elegíveis" />
+        <StatTile label="Avaliações enviadas" value={k.evaluationsSubmitted} detail={k.evaluationsDraft > 0 ? `${k.evaluationsDraft} em rascunho` : "Nenhum rascunho parado"} />
       </div>
 
       {/* ── Destaques em texto: o que pede atenção ── */}
@@ -246,24 +290,28 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
           subtitle={`Do total de participantes até quem recebe bônus (mínimo de ${k.minEvents} eventos).`}
           table={<DataTable head={["Etapa", "Pessoas", "% do total"]} rows={data.funnel.map(f => [f.label, f.count, `${pct(f.count, data.funnel[0]?.count ?? 0)}%`])} />}
         >
-          <HBars
-            data={data.funnel}
-            labelKey="label"
-            valueKey="count"
-            format={v => String(v)}
-            tooltip={row => [
-              { label: row.label, value: "" },
-              { label: "Pessoas", value: String(row.count) },
-              { label: "% do total", value: `${pct(row.count, data.funnel[0]?.count ?? 0)}%` },
-            ]}
-          />
+          {/* Lista em vez de gráfico: rótulos inteiros num card estreito. */}
+          <ol className="space-y-3" aria-label="Funil do bônus">
+            {data.funnel.map(f => {
+              const total = data.funnel[0]?.count ?? 0;
+              return (
+                <li key={f.stage} className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1">
+                  <span className="text-[12.5px] font-semibold">{f.label}</span>
+                  <span className="text-[12px] tabular-nums"><strong className="text-[14px]">{f.count}</strong> <span style={{ color: "var(--muted-foreground)" }}>· {pct(f.count, total)}%</span></span>
+                  <div className="col-span-2 h-2 rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }} aria-hidden>
+                    <div className="h-full rounded-full" style={{ width: `${pct(f.count, total)}%`, backgroundColor: SERIES }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         </Card>
 
         {/* ── Critérios ── */}
         <Card
           span2
           title="Nota média por critério"
-          subtitle="Do mais fraco para o mais forte. Usa a nota calibrada quando existe; senão, a média dos avaliadores (0 a 100)."
+          subtitle="Eventos confirmados, do mais fraco para o mais forte. Usa a nota calibrada quando existe; senão, a média dos avaliadores (0 a 100)."
           table={data.criteria.length > 0 && (
             <DataTable
               head={["Critério", "Nota usada", "Avaliadores", "Calibrada", "Eventos"]}
@@ -294,7 +342,7 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
         {/* ── Conformidade ── */}
         <Card
           title="Matriz de conformidade"
-          subtitle={'Percentual de respostas "Não" por item (pendentes ficam de fora).'}
+          subtitle={'Eventos confirmados: percentual de respostas "Não" por item (sem resposta fica de fora).'}
           table={<DataTable head={["Item", "% Não", "Não", "Respostas"]} rows={data.conformity.map(c => [c.label, c.naoPct == null ? "—" : `${n1(c.naoPct)}%`, c.nao, c.answered])} />}
         >
           <HBars
@@ -319,13 +367,12 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
         >
           <ul className="space-y-2">
             {data.faixas.map(f => {
-              const maxCount = Math.max(1, ...data.faixas.map(x => x.count));
               return (
                 <li key={f.name} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
                   <span className="flex items-center gap-2 min-w-0 text-[12.5px]">
                     <span aria-hidden className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: f.color ?? "var(--muted-foreground)", boxShadow: "inset 0 0 0 1px var(--border)" }} />
                     <span className="truncate font-semibold">{f.name}</span>
-                    {f.minScore != null && <span className="shrink-0 text-[11px]" style={{ color: "var(--muted-foreground)" }}>{n1(f.minScore)}–{n1(f.maxScore)}</span>}
+                    {f.minScore != null && <span className="shrink-0 text-[11px] tabular-nums" style={{ color: "var(--muted-foreground)" }}>{fmtNum(f.minScore, 2)}–{fmtNum(f.maxScore ?? 0, 2)}</span>}
                   </span>
                   <span className="text-[12px] tabular-nums text-right" style={{ color: "var(--muted-foreground)" }}>{f.bonusTotal > 0 ? brl(f.bonusTotal) : ""}</span>
                   <div className="col-span-2 flex items-center gap-2">
@@ -392,7 +439,7 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
             <DataTable
               head={["Tipo", "Ocorr.", "Pontos", "Pessoas"]}
               rows={data.adjustments.map(a => [
-                <span className="inline-flex items-center gap-2"><StatusBadge size="sm" variant={a.kind === "merit" ? "ok" : "danger"} label={a.kind === "merit" ? "Mérito" : "Penal."} />{a.label}</span>,
+                <span className="inline-flex items-center gap-2"><StatusBadge size="sm" variant={a.kind === "merit" ? "ok" : "danger"} label={a.kind === "merit" ? "Mérito" : "Penalidade"} />{a.label}</span>,
                 a.occurrences, `${a.kind === "merit" ? "+" : "−"}${a.points}`, a.employees,
               ])}
             />
@@ -437,5 +484,48 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
         </section>
       </div>
     </div>
+  );
+}
+
+/** Exportar: relatório para imprimir/salvar em PDF ou planilha Excel com todas as tabelas. */
+function ExportMenu({ data }: { data: AnalyticsOverview }) {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const exportXlsx = async () => {
+    setBusy(true);
+    try {
+      await exportAnalyticsXlsx(data);
+      toast({ title: "Planilha exportada", description: "O arquivo foi salvo na pasta de downloads." });
+    } catch (e) {
+      toast({ title: "Não foi possível gerar a planilha", description: (e as Error)?.message ?? "Tente novamente.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" className="h-9" disabled={busy} data-testid="button-export-analytics">
+          <Download size={14} aria-hidden /> {busy ? "Gerando…" : "Exportar"} <ChevronDown size={14} aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuItem onSelect={() => navigate("/analytics/relatorio?imprimir=1")} data-testid="menu-export-pdf">
+          <FileText size={15} aria-hidden />
+          <span className="flex flex-col">
+            <span className="font-semibold">Relatório em PDF</span>
+            <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Análise do ciclo + regras de negócio</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void exportXlsx()} data-testid="menu-export-xlsx">
+          <FileSpreadsheet size={15} aria-hidden />
+          <span className="flex flex-col">
+            <span className="font-semibold">Planilha Excel</span>
+            <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Uma aba por tabela da tela</span>
+          </span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

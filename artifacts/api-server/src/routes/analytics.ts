@@ -9,6 +9,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { computeAnalytics } from "../lib/analytics.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
+import { rankingScope } from "../lib/ranking-scope.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -41,8 +42,9 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
       bonusValue: quarterlyResultsTable.bonusValue, eligible: quarterlyResultsTable.eligible,
       eventsCount: quarterlyResultsTable.eventsCount, participatedEventsCount: quarterlyResultsTable.participatedEventsCount,
     }).from(quarterlyResultsTable)
-      .leftJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-      .where(eq(quarterlyResultsTable.cycleId, cycle.id)),
+      .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
+      // Mesmo recorte do Ranking (casa, fora de Sup Ceno, ativos, com participação que conta).
+      .where(and(eq(quarterlyResultsTable.cycleId, cycle.id), rankingScope({ activeOnlyInCycleId: cycle.id }))),
     db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)),
     getMinEventsForEligibility(),
     inCycle(db.select({

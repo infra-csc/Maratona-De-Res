@@ -2,11 +2,12 @@ import { Router } from "express";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { validateCycleFields } from "../lib/cycle-rules.js";
+import { rankingScope } from "../lib/ranking-scope.js";
 import {
-  db, cyclesTable, eventsTable, quarterlyResultsTable, employeesTable, eventParticipantsTable,
+  db, cyclesTable, eventsTable, quarterlyResultsTable, employeesTable,
   type Cycle,
 } from "@workspace/db";
-import { and, desc, eq, exists, inArray, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { audit } from "../lib/audit.js";
 
 /**
@@ -40,29 +41,6 @@ function toCycle(c: Cycle) {
 const num = (v: string | number | null | undefined) => (v == null ? 0 : typeof v === "number" ? v : parseFloat(v) || 0);
 const numOrNull = (v: string | number | null | undefined) => (v == null ? null : Math.round(num(v) * 100) / 100);
 
-/**
- * Mesmo recorte do ranking (routes/ranking.ts): só colaborador da casa, fora
- * "Sup Ceno *" e com participação que conta nota em algum evento do ciclo.
- * Diferença proposital: NÃO filtra employees.active, porque o histórico
- * precisa mostrar quem participou mesmo que já tenha sido desligado.
- */
-function rankingScope(): SQL {
-  return and(
-    eq(employeesTable.employmentType, "casa"),
-    sql`(${employeesTable.functionName} IS NULL OR ${employeesTable.functionName} NOT ILIKE 'sup ceno%')`,
-    exists(
-      db.select({ one: sql`1` })
-        .from(eventParticipantsTable)
-        .innerJoin(eventsTable, eq(eventParticipantsTable.eventId, eventsTable.id))
-        .where(and(
-          eq(eventParticipantsTable.employeeId, employeesTable.id),
-          eq(eventsTable.cycleId, quarterlyResultsTable.cycleId),
-          sql`(${eventParticipantsTable.functionName} IS NULL OR ${eventParticipantsTable.functionName} NOT ILIKE 'sup ceno%')`,
-        )),
-    ),
-  )!;
-}
-
 async function loadCycleStats(cycleIds: number[]) {
   const empty = {
     eventsTotal: 0, eventsConfirmed: 0, eventsOpen: 0, firstEventDate: null as string | null, lastEventDate: null as string | null,
@@ -70,6 +48,8 @@ async function loadCycleStats(cycleIds: number[]) {
   };
   const stats = new Map<number, typeof empty>(cycleIds.map(id => [id, { ...empty }]));
   if (cycleIds.length === 0) return stats;
+  // Ciclo atual: mesmo recorte da tela de Resultados (só ativos). Anteriores: histórico completo.
+  const currentId = (await getCurrentCycle())?.id ?? null;
 
   const [eventRows, resultRows] = await Promise.all([
     db.select({
@@ -92,7 +72,7 @@ async function loadCycleStats(cycleIds: number[]) {
       avgFinal: sql<string | null>`(avg(${quarterlyResultsTable.finalResult}) filter (where ${quarterlyResultsTable.eventsCount} > 0))::text`,
     }).from(quarterlyResultsTable)
       .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-      .where(and(inArray(quarterlyResultsTable.cycleId, cycleIds), rankingScope()))
+      .where(and(inArray(quarterlyResultsTable.cycleId, cycleIds), rankingScope({ activeOnlyInCycleId: currentId })))
       .groupBy(quarterlyResultsTable.cycleId),
   ]);
 
@@ -166,7 +146,7 @@ router.get("/cycles/:id/history", requireRole(...MANAGERS), async (req, res) => 
       paidAt: quarterlyResultsTable.paidAt,
     }).from(quarterlyResultsTable)
       .innerJoin(employeesTable, eq(quarterlyResultsTable.employeeId, employeesTable.id))
-      .where(and(eq(quarterlyResultsTable.cycleId, id), rankingScope()))
+      .where(and(eq(quarterlyResultsTable.cycleId, id), rankingScope({ activeOnlyInCycleId: cycle.isCurrent ? id : null })))
       .orderBy(sql`${quarterlyResultsTable.finalResult} DESC`, employeesTable.name),
     db.select({
       id: eventsTable.id,

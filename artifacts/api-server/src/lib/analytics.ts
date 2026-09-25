@@ -1,6 +1,6 @@
 // Agregações da tela de Análises. Função pura: recebe as linhas já lidas do
 // banco e devolve os indicadores — testável sem Postgres (analytics.test.ts).
-import { getPlatoonByScore, calculateTieredBonus, type PlatoonRuleData } from "./calculations.js";
+import { getPlatoonByScore, calculateTieredBonus, CONFORMITY_ITEM_POINTS, CONFORMITY_PENALTY_FACTOR, type PlatoonRuleData } from "./calculations.js";
 
 export interface AnalyticsInput {
   events: { id: number; name: string; clientName: string | null; startDate: string; endDate: string; resultsConfirmed: boolean; isHistorical: boolean }[];
@@ -18,7 +18,7 @@ export interface AnalyticsInput {
 
 export interface AnalyticsOverview {
   kpis: {
-    eventsTotal: number; eventsConfirmed: number; eventsScored: number; avgEventScore: number | null;
+    eventsTotal: number; eventsConfirmed: number; eventsScored: number; avgEventScore: number | null; avgFinalResult: number | null;
     collaborators: number; reachedMinEvents: number; eligible: number; withBonus: number; bonusTotal: number;
     evaluationsSubmitted: number; evaluationsDraft: number; calibratedCriteria: number; avgCalibrationShift: number | null;
     penaltiesCount: number; meritsCount: number; minEvents: number;
@@ -26,7 +26,9 @@ export interface AnalyticsOverview {
   scoreTrend: { weekStart: string; label: string; avgScore: number; events: number }[];
   criteria: { key: string; name: string; area: string | null; avgScore: number; evaluatorAvg: number | null; calibratedAvg: number | null; calibratedCount: number; eventsCount: number }[];
   conformity: { item: string; label: string; answered: number; nao: number; naoPct: number | null }[];
-  faixas: { name: string; color: string | null; minScore: number | null; maxScore: number | null; count: number; bonusTotal: number }[];
+  faixas: { name: string; color: string | null; minScore: number | null; maxScore: number | null; bonusValue: number | null; bonusPerExtraEvent: number | null; count: number; bonusTotal: number }[];
+  /** Parâmetros das regras de negócio em vigor (para o relatório explicar com os números reais). */
+  ruleSet: { minEvents: number; conformityItemPoints: number; conformityPenaltyFactor: number; conformityPenaltyPerNo: number };
   funnel: { stage: string; label: string; count: number }[];
   nearNextFaixa: { employeeId: number; name: string; finalResult: number; currentFaixa: string | null; nextFaixa: string; gap: number; currentBonus: number; potentialBonus: number }[];
   evaluators: { userId: number; name: string; submitted: number; drafts: number; avgGiven: number | null; calibrationBias: number | null; biasSamples: number; avgDaysToSubmit: number | null }[];
@@ -75,6 +77,8 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   }));
 
   // ── Critérios: nota usada (calibração ?? média dos avaliadores), 0-100 ──
+  // Só eventos com resultados confirmados, como a nota oficial (o cabeçalho da
+  // tela promete isso). Avaliadores (mais abaixo) seguem vendo tudo.
   const submitted = input.evaluations.filter(e => e.status === "submitted");
   const evalsByEc = new Map<string, number[]>();
   for (const e of submitted) {
@@ -88,7 +92,7 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   for (const ec of input.eventCriteria) {
     if (!ec.active) continue;
     const ev = eventById.get(ec.eventId);
-    if (!ev || ev.isHistorical) continue;
+    if (!ev || ev.isHistorical || !ev.resultsConfirmed) continue;
     const k = `${ec.eventId}:${ec.criterionId}`;
     const evalAvg = avg(evalsByEc.get(k) ?? []);
     const cal = calByEc.get(k);
@@ -114,9 +118,10 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   })).sort((x, y) => x.avgScore - y.avgScore);
 
   // ── Matriz de conformidade ──
+  const confirmedConformities = input.conformities.filter(c => eventById.get(c.eventId)?.resultsConfirmed);
   const conformity = CONFORMITY_ITEMS.map(({ item, label }) => {
     let answered = 0; let nao = 0;
-    for (const c of input.conformities) {
+    for (const c of confirmedConformities) {
       const v = c[item];
       if (v == null) continue;
       answered++;
@@ -137,11 +142,12 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
   }
   const faixas: AnalyticsOverview["faixas"] = rulesAsc.map(r => ({
     name: r.name, color: r.color ?? null, minScore: r.minScore, maxScore: r.maxScore,
+    bonusValue: r.bonusValue, bonusPerExtraEvent: r.bonusPerExtraEvent ?? 0,
     count: faixaCount.get(r.name)?.count ?? 0,
     bonusTotal: r2(faixaCount.get(r.name)?.bonus ?? 0),
   }));
   for (const [name, f] of faixaCount) {
-    if (!rulesAsc.some(r => r.name === name)) faixas.push({ name, color: null, minScore: null, maxScore: null, count: f.count, bonusTotal: r2(f.bonus) });
+    if (!rulesAsc.some(r => r.name === name)) faixas.push({ name, color: null, minScore: null, maxScore: null, bonusValue: null, bonusPerExtraEvent: null, count: f.count, bonusTotal: r2(f.bonus) });
   }
   const reachedMin = input.quarterly.filter(q => q.participatedEventsCount >= input.minEvents).length;
   const eligible = input.quarterly.filter(q => q.eligible).length;
@@ -228,6 +234,8 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
       eventsConfirmed: input.events.filter(e => e.resultsConfirmed).length,
       eventsScored: scoredConfirmed.length,
       avgEventScore: officialConfirmed.length ? r1(avg(officialConfirmed)!) : null,
+      // Mesma conta da tela de Resultados: média das notas finais de quem tem evento com nota.
+      avgFinalResult: (() => { const xs = input.quarterly.filter(q => q.eventsCount > 0).map(q => q.finalResult); return xs.length ? r1(avg(xs)!) : null; })(),
       collaborators: input.quarterly.length,
       reachedMinEvents: reachedMin,
       eligible,
@@ -240,6 +248,12 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
       penaltiesCount: input.adjustments.filter(a => a.kind === "penalty").reduce((s, a) => s + a.quantity, 0),
       meritsCount: input.adjustments.filter(a => a.kind === "merit").reduce((s, a) => s + a.quantity, 0),
       minEvents: input.minEvents,
+    },
+    ruleSet: {
+      minEvents: input.minEvents,
+      conformityItemPoints: CONFORMITY_ITEM_POINTS,
+      conformityPenaltyFactor: CONFORMITY_PENALTY_FACTOR,
+      conformityPenaltyPerNo: r2(CONFORMITY_ITEM_POINTS * CONFORMITY_PENALTY_FACTOR),
     },
     scoreTrend,
     criteria,
