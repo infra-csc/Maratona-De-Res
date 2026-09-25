@@ -79,3 +79,4 @@
 - [Employee merge FK orphan bug](employee-merge-fk-orphan.md) — skipped/conflicting FK rows must be DELETEd inside the merge txn or the final employee DELETE violates FK
 - [Auth limitation for appPreview screenshots](auth-screenshot-limitation.md) — Maratona's JWT-in-localStorage auth blocks Screenshot tool on protected routes; verify via tsc + curl API contracts instead
 - [Platoon tier decimal boundaries](platoon-tier-decimal-boundaries.md) — tiers must be closed-both-ends with a real 0.01 gap (74.99/75), not touching integers + invisible inclusive flags; rename needs a recompute to refresh snapshot labels
+- [Git rebase after conflict resolution](git-rebase-after-merge.md) — a platform-triggered rebase may replay local commits after a merge; recheck final branch and validations after it finishes.

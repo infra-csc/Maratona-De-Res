@@ -5,7 +5,7 @@
  */
 import { Router } from "express";
 import { db, eventCriteriaTable } from "@workspace/db";
-import { and, inArray, eq } from "drizzle-orm";
+import { and, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";

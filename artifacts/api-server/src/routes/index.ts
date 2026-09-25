@@ -25,7 +25,6 @@ import storageRouter from "./storage.js";
 import cyclesRouter from "./cycles.js";
 import routingRouter from "./routing.js";
 import publicEvalRouter from "./public-eval.js";
-import reviewRequestsRouter from "./review-requests.js";
 import adminRouter from "./admin.js";
 
 const router: IRouter = Router();
@@ -68,9 +67,6 @@ router.use(eligibilityRouter);
 // otherwise those guards 403 the non-manager-accessible exports
 // (/exports/ranking, /exports/event-results, /exports/absences).
 router.use(exportsRouter);
-// reviewRequestsRouter mounted before auditRouter/integrationRouter so that its
-// own requireRole guard (admin|rh|diretoria) is used instead of the blanket one.
-router.use(reviewRequestsRouter);
 router.use(adminRouter);
 router.use(auditRouter);
 router.use(integrationRouter);

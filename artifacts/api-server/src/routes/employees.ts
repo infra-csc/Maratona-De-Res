@@ -139,7 +139,7 @@ router.post("/employees", requireRole("admin", "rh", "operador"), async (req, re
 });
 
 router.patch("/employees/:id", requireRole("admin", "rh", "operador"), async (req, res) => {
-  const id = parseId(req.params.id);
+  const id = parseId(req.params.id as string);
   if (!id) { res.status(400).json({ error: "ID inválido" }); return; }
   const { name, document, email, phone, department, functionName, employmentType, active, eligibleForBonus, eligibilityStatus, eligibilityReason } = req.body;
   const [before] = await db.select().from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
@@ -174,7 +174,7 @@ router.patch("/employees/:id", requireRole("admin", "rh", "operador"), async (re
 });
 
 router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res) => {
-  const canonicalId = parseId(req.params.id);
+  const canonicalId = parseId(req.params.id as string);
   if (!canonicalId) { res.status(400).json({ error: "ID inválido" }); return; }
   const { duplicateIds } = req.body as { duplicateIds: number[] };
   if (!Array.isArray(duplicateIds) || duplicateIds.length === 0) {
