@@ -188,7 +188,7 @@ function Report({ data }: { data: AnalyticsOverview }) {
           <Table head={["Fim de semana", "Nota média", "Eventos"]} rows={data.scoreTrend.map(t => [t.label, <span key="v"><Bar value={t.avgScore} max={maxTrend} />{n1(t.avgScore)}</span>, t.events])} />
         </Section>
 
-        <Section title="Critérios" lead="Eventos confirmados, do mais fraco para o mais forte. Nota usada = calibrada pelo RH quando existe; senão, média dos avaliadores (0 a 100).">
+        <Section title="Critérios" lead="Eventos confirmados, do mais fraco para o mais forte (0 a 100). Nota usada = calibrada pelo RH quando existe; senão, média dos avaliadores. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) aparece uma vez por área; na nota do evento as duas entram pela média.">
           <Table head={["Critério", "Área", "Nota usada", "Avaliadores", "Calibrada", "Eventos"]} align={["l", "l", "r", "r", "r", "r"]}
             rows={data.criteria.map(c => [c.name, c.area ?? "—", <span key="v"><Bar value={c.avgScore} max={100} />{n1(c.avgScore)}</span>, n1(c.evaluatorAvg), c.calibratedCount > 0 ? `${n1(c.calibratedAvg)} (${c.calibratedCount})` : "—", c.eventsCount])} />
         </Section>

@@ -9,7 +9,8 @@ import { useLocation } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { exportAnalyticsXlsx } from "@/lib/analytics-export";
+import { exportAnalyticsXlsx, exportEventsReportXlsx } from "@/lib/analytics-export";
+import { getAnalyticsEventsReport } from "@workspace/api-client-react";
 import { PageHeader, EmptyState, LoadingState, StatusBadge, StatTile } from "@/components/shared";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { fmtDate, fmtNum } from "@/lib/utils";
@@ -311,7 +312,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
         <Card
           span2
           title="Nota média por critério"
-          subtitle="Eventos confirmados, do mais fraco para o mais forte. Usa a nota calibrada quando existe; senão, a média dos avaliadores (0 a 100)."
+          subtitle="Eventos confirmados, do mais fraco para o mais forte (0 a 100). Usa a nota calibrada quando existe; senão, a média dos avaliadores. Critério avaliado por duas áreas aparece uma vez por área; na nota do evento as duas entram pela média."
           table={data.criteria.length > 0 && (
             <DataTable
               head={["Critério", "Nota usada", "Avaliadores", "Calibrada", "Eventos"]}
@@ -474,6 +475,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
         {/* ── Próximos passos ── */}
         <section className="rounded-xl p-5 flex flex-col gap-2 text-[13px]" style={{ backgroundColor: "var(--secondary)" }}>
           <h2 className="text-[15px] font-black uppercase" style={{ fontFamily: CONDENSED }}>Onde agir</h2>
+          <p><Link href="/analytics/eventos" className="font-semibold underline underline-offset-2" data-testid="link-events-report">Resultado por evento</Link> <span style={{ color: "var(--muted-foreground)" }}>— nota final calibrada, critérios e equipe de cada evento confirmado.</span></p>
           <p style={{ color: "var(--muted-foreground)" }}>Os números acima vêm das telas de trabalho:</p>
           <ul className="space-y-1.5">
             <li><Link href="/events?status=unconfirmed" className="font-semibold underline underline-offset-2">Eventos não confirmados</Link> <span style={{ color: "var(--muted-foreground)" }}>— não entram na nota.</span></li>
@@ -492,6 +494,17 @@ function ExportMenu({ data }: { data: AnalyticsOverview }) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  const exportEventsXlsx = async () => {
+    setBusy(true);
+    try {
+      await exportEventsReportXlsx(await getAnalyticsEventsReport());
+      toast({ title: "Planilha por evento exportada", description: "O arquivo foi salvo na pasta de downloads." });
+    } catch (e) {
+      toast({ title: "Não foi possível gerar a planilha", description: (e as Error)?.message ?? "Tente novamente.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
   const exportXlsx = async () => {
     setBusy(true);
     try {
@@ -516,6 +529,20 @@ function ExportMenu({ data }: { data: AnalyticsOverview }) {
           <span className="flex flex-col">
             <span className="font-semibold">Relatório em PDF</span>
             <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Análise do ciclo + regras de negócio</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate("/analytics/eventos?imprimir=1")} data-testid="menu-export-events-pdf">
+          <FileText size={15} aria-hidden />
+          <span className="flex flex-col">
+            <span className="font-semibold">Relatório por evento (PDF)</span>
+            <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Nota final calibrada, critérios e equipe</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void exportEventsXlsx()} data-testid="menu-export-events-xlsx">
+          <FileSpreadsheet size={15} aria-hidden />
+          <span className="flex flex-col">
+            <span className="font-semibold">Planilha por evento</span>
+            <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Eventos, critérios e equipes</span>
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void exportXlsx()} data-testid="menu-export-xlsx">

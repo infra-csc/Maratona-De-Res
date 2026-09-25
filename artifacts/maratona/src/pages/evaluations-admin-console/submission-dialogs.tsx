@@ -134,10 +134,9 @@ export function ViewConformityDialog({ viewConformity, setViewConformity, confor
               ))}
               {/* Ausências */}
               {(() => {
-                const c = conformity as unknown as Record<string, unknown>;
-                const absRep = c.absencesReport as string | null | undefined;
-                const standout = c.standoutResponse as boolean | null | undefined;
-                const standoutJust = c.standoutJustification as string | null | undefined;
+                const absRep = conformity?.absencesReport;
+                const standout = conformity?.standoutResponse;
+                const standoutJust = conformity?.standoutJustification;
                 return (
                   <>
                     <div className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)", border: "1px solid var(--border)" }}>

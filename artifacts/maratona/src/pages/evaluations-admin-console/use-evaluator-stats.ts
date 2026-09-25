@@ -30,8 +30,7 @@ export function useEvaluatorStats({ enrichedEvents, selected, selectedDetail, co
       }
       // Avaliadores da Matriz de Conformidade (cenografia)
       if (ev.conformityEvaluatorUserId != null && ev.conformityEvaluatorName) {
-        const cenoConf = ev as unknown as { conformity?: { epi?: unknown; estaiamentos?: unknown; conduta?: unknown; standoutResponse?: unknown; absencesResponse?: unknown } | null };
-        const cenoDone = !!(cenoConf.conformity?.epi != null && cenoConf.conformity?.estaiamentos != null && cenoConf.conformity?.conduta != null && cenoConf.conformity?.standoutResponse != null && cenoConf.conformity?.absencesResponse != null);
+        const cenoDone = ev.conformityCenografiaDone;
         const cur = map.get(ev.conformityEvaluatorUserId) ?? { name: ev.conformityEvaluatorName, assigned: 0, submitted: 0, pendingEvents: [] };
         cur.assigned++;
         if (cenoDone) { cur.submitted++; } else if (!cur.pendingEvents.some(e => e.id === ev.id)) { cur.pendingEvents.push({ id: ev.id, name: ev.name }); }
@@ -39,8 +38,7 @@ export function useEvaluatorStats({ enrichedEvents, selected, selectedDetail, co
       }
       // Avaliadores da Matriz de Conformidade (ferramentas)
       if (ev.conformityEvaluatorFerramentasUserId != null && ev.conformityEvaluatorFerramentasName) {
-        const ferrConf = ev as unknown as { conformity?: { guardaEquipamentos?: unknown } | null };
-        const ferrDone = ferrConf.conformity?.guardaEquipamentos != null;
+        const ferrDone = ev.conformityFerramentasDone;
         const cur = map.get(ev.conformityEvaluatorFerramentasUserId) ?? { name: ev.conformityEvaluatorFerramentasName, assigned: 0, submitted: 0, pendingEvents: [] };
         cur.assigned++;
         if (ferrDone) { cur.submitted++; } else if (!cur.pendingEvents.some(e => e.id === ev.id)) { cur.pendingEvents.push({ id: ev.id, name: ev.name }); }
