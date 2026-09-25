@@ -1,4 +1,6 @@
-import { pgTable, serial, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -18,7 +20,7 @@ export const employeesTable = pgTable("employees", {
   eligibilityStatus: text("eligibility_status").notNull().default("eligible"), // eligible | not_eligible | suspended | terminated
   eligibilityReason: text("eligibility_reason"),
   sourceType: text("source_type").notNull().default("manual"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   externalIdUq: uniqueIndex("employees_external_id_uq").on(t.externalId),
 }));

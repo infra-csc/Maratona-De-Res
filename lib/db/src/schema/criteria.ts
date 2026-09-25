@@ -1,4 +1,5 @@
-import { pgTable, serial, text, boolean, integer, numeric, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, numeric, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areasTable } from "./areas";
@@ -32,11 +33,11 @@ export const eventCriteriaTable = pgTable("event_criteria", {
   // Snapshot explícito de publicação parcial deste critério (antes da
   // liberação final do evento). Pode ser republicado várias vezes
   // (sobrescreve a data); a liberação final continua sendo por evento.
-  partialPublishedAt: timestamp("partial_published_at"),
+  partialPublishedAt: timestamptz("partial_published_at"),
   // Publicação "Final" por critério — diferente de parcial apenas na exibição
   // ao colaborador (sem aviso de rascunho). Não trava edição; se a nota mudar
   // após publicar como Final, o colaborador vê o valor atualizado automaticamente.
-  finalPublishedAt: timestamp("final_published_at"),
+  finalPublishedAt: timestamptz("final_published_at"),
   // Auditoria de publicação: quem publicou parcial/final
   partialPublishedByUserId: integer("partial_published_by_user_id").references(() => usersTable.id),
   finalPublishedByUserId: integer("final_published_by_user_id").references(() => usersTable.id),

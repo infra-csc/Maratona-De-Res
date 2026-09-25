@@ -1,4 +1,6 @@
-import { pgTable, serial, integer, boolean, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, boolean, text, uniqueIndex } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { criteriaTable } from "./criteria";
@@ -25,8 +27,8 @@ export const criterionRoutingTable = pgTable("criterion_routing", {
   redirectMode: text("redirect_mode").notNull().default("area"),
   redirectAreaId: integer("redirect_area_id").references(() => areasTable.id, { onDelete: "set null" }),
   allowPublicLink: boolean("allow_public_link").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamptz("updated_at").notNull().default(sql`now()`),
 }, (t) => ({
   criterionUq: uniqueIndex("criterion_routing_criterion_uq").on(t.criterionId),
 }));
@@ -44,8 +46,8 @@ export const areaConformityRoutingTable = pgTable("area_conformity_routing", {
   id: serial("id").primaryKey(),
   areaId: integer("area_id").notNull().references(() => areasTable.id, { onDelete: "cascade" }),
   defaultEvaluatorId: integer("default_evaluator_id").references(() => usersTable.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamptz("updated_at").notNull().default(sql`now()`),
 }, (t) => ({
   areaUq: uniqueIndex("area_conformity_routing_area_uq").on(t.areaId),
 }));
@@ -80,9 +82,9 @@ export const eventCriterionAssignmentsTable = pgTable("event_criterion_assignmen
   status: text("status").notNull().default("suggested"),
   redirectedFromId: integer("redirected_from_id").references(() => usersTable.id, { onDelete: "set null" }),
   confirmedByUserId: integer("confirmed_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),
-  confirmedAt: timestamp("confirmed_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  confirmedAt: timestamptz("confirmed_at"),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamptz("updated_at").notNull().default(sql`now()`),
 }, (t) => ({
   eventCriterionUq: uniqueIndex("event_criterion_assignments_uq").on(t.eventId, t.criterionId),
 }));
@@ -100,8 +102,8 @@ export const publicEvalTokensTable = pgTable("public_eval_tokens", {
   createdByUserId: integer("created_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),
   recipientName: text("recipient_name"),
   submitterName: text("submitter_name"),
-  usedAt: timestamp("used_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  usedAt: timestamptz("used_at"),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
   /** 'criteria' | 'conformity_cenografia' | 'conformity_ferramentas' */
   tokenType: text("token_type").notNull().default("criteria"),
 });

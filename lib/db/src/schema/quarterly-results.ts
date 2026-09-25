@@ -1,4 +1,5 @@
-import { pgTable, serial, integer, numeric, text, timestamp, boolean, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, boolean, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
@@ -27,9 +28,9 @@ export const quarterlyResultsTable = pgTable("quarterly_results", {
   bonusStatus: text("bonus_status").notNull().default("projected"), // projected | approved | scheduled | paid | blocked | not_eligible
   paymentMethod: text("payment_method").notNull().default("Caju Saldo Livre"),
   paymentDueDate: date("payment_due_date"),
-  paidAt: timestamp("paid_at"),
+  paidAt: timestamptz("paid_at"),
   paymentNotes: text("payment_notes"),
-  closedAt: timestamp("closed_at"),
+  closedAt: timestamptz("closed_at"),
   closedByUserId: integer("closed_by_user_id").references(() => usersTable.id),
 }, (t) => ({
   employeeCycleUq: uniqueIndex("quarterly_results_employee_cycle_uq").on(t.employeeId, t.cycleId),

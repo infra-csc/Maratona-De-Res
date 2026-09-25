@@ -1,4 +1,6 @@
-import { pgTable, serial, integer, numeric, text, timestamp, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { eventsTable } from "./events";
@@ -18,8 +20,8 @@ export const evaluationsTable = pgTable("evaluations", {
   audioUrl: text("audio_url"),
   commentVisibility: text("comment_visibility").notNull().default("internal"),
   status: text("status").notNull().default("draft"),
-  submittedAt: timestamp("submitted_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  submittedAt: timestamptz("submitted_at"),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   // Uma avaliação por (evento, critério, avaliador): duplo clique/duas abas
   // criavam duas linhas e a média contava o avaliador em dobro.
@@ -36,7 +38,7 @@ export const calibrationsTable = pgTable("calibrations", {
   calibratedScore: numeric("calibrated_score", { precision: 5, scale: 2 }).notNull(),
   calibrationReason: text("calibration_reason"),
   calibratedByUserId: integer("calibrated_by_user_id").notNull().references(() => usersTable.id),
-  calibratedAt: timestamp("calibrated_at").notNull().defaultNow(),
+  calibratedAt: timestamptz("calibrated_at").notNull().default(sql`now()`),
 }, (t) => ({
   // Uma calibração por (evento, critério): duas linhas tornavam a nota
   // oficial dependente da ordem em que o Postgres devolvia as linhas.
@@ -72,8 +74,8 @@ export const eventConformitiesTable = pgTable("event_conformities", {
   // Nome de quem realmente preencheu cada seção — set no save (autenticado ou link público).
   cenografiaSubmittedByName: text("cenografia_submitted_by_name"),
   ferramentasSubmittedByName: text("ferramentas_submitted_by_name"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamptz("updated_at").notNull().default(sql`now()`),
 }, (t) => ({
   eventUq: uniqueIndex("event_conformities_event_uq").on(t.eventId),
 }));
@@ -86,8 +88,8 @@ export const employeeEventResultsTable = pgTable("employee_event_results", {
   calibratedEventScore: numeric("calibrated_event_score", { precision: 6, scale: 2 }),
   finalEventScore: numeric("final_event_score", { precision: 6, scale: 2 }).notNull().default("0"),
   platoonProjected: text("platoon_projected"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamptz("updated_at").notNull().default(sql`now()`),
 }, (t) => ({
   eventEmployeeUq: uniqueIndex("employee_event_results_event_employee_uq").on(t.eventId, t.employeeId),
   employeeIdx: index("employee_event_results_employee_idx").on(t.employeeId),
@@ -100,7 +102,7 @@ export const calibrationCommentsTable = pgTable("calibration_comments", {
   criterionId: integer("criterion_id").notNull().references(() => criteriaTable.id, { onDelete: "cascade" }),
   text: text("text").notNull(),
   createdByUserId: integer("created_by_user_id").notNull().references(() => usersTable.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
 });
 
 export const insertEvaluationSchema = createInsertSchema(evaluationsTable).omit({ id: true, createdAt: true });

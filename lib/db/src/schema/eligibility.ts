@@ -1,4 +1,6 @@
-import { pgTable, serial, integer, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
@@ -15,8 +17,8 @@ export const employeeCycleEligibilityTable = pgTable("employee_cycle_eligibility
   eligible: boolean("eligible").notNull().default(true),
   reason: text("reason"),
   createdByUserId: integer("created_by_user_id").references(() => usersTable.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamptz("updated_at").notNull().default(sql`now()`),
 }, (t) => ({
   employeeCycleUq: uniqueIndex("employee_cycle_eligibility_employee_cycle_uq").on(t.employeeId, t.cycleId),
 }));
