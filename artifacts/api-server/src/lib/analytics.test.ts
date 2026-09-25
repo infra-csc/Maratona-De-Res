@@ -140,3 +140,53 @@ test("nota final média: mesma conta de Resultados (ignora quem não tem evento 
   const o = computeAnalytics(input);
   assert.equal(o.kpis.avgFinalResult, 73.5); // (72,5 + 68 + 80) / 3
 });
+
+test("critérios: uma linha por área (Atendimento e Ativação); cópias \"(2)\" entram na área certa, um ponto por evento", () => {
+  const input = base();
+  // Cenário real de produção: "Qualidade da Entrega" global de Atendimento (17),
+  // outra global de mesmo nome da Ativação (34), cópias "(2)" com e sem origem.
+  input.criteriaCatalog = [
+    { id: 17, name: "Qualidade da Entrega", eventScoped: false, sourceCriterionId: null },
+    { id: 34, name: "Qualidade da Entrega", eventScoped: false, sourceCriterionId: null },
+    { id: 36, name: "Qualidade da Entrega (2)", eventScoped: true, sourceCriterionId: 17 },
+    { id: 30, name: "Qualidade da Entrega (2)", eventScoped: true, sourceCriterionId: null },
+  ];
+  input.eventCriteria.push(
+    { eventId: 1, criterionId: 17, active: true, name: "Qualidade da Entrega", area: "Atendimento" },
+    { eventId: 1, criterionId: 36, active: true, name: "Qualidade da Entrega (2)", area: "Ativação" },
+    { eventId: 2, criterionId: 34, active: true, name: "Qualidade da Entrega", area: "Ativação" },
+    { eventId: 2, criterionId: 30, active: true, name: "Qualidade da Entrega (2)", area: "Ativação" },
+  );
+  input.evaluations.push(
+    { eventId: 1, criterionId: 17, evaluatorUserId: 7, evaluatorName: "Cid", score: 8, status: "submitted", submittedAt: null },
+    { eventId: 1, criterionId: 36, evaluatorUserId: 8, evaluatorName: "Dea", score: 6, status: "submitted", submittedAt: null },
+    { eventId: 2, criterionId: 34, evaluatorUserId: 8, evaluatorName: "Dea", score: 9, status: "submitted", submittedAt: null },
+    { eventId: 2, criterionId: 30, evaluatorUserId: 8, evaluatorName: "Dea", score: 7, status: "submitted", submittedAt: null },
+  );
+  const o = computeAnalytics(input);
+  const q = o.criteria.filter(c => c.name.startsWith("Qualidade"));
+  assert.equal(q.length, 2);
+  assert.ok(q.every(c => c.name === "Qualidade da Entrega"));
+  const atend = q.find(c => c.area === "Atendimento")!;
+  const ativ = q.find(c => c.area === "Ativação")!;
+  assert.equal(atend.eventsCount, 1);  // evento 1 (critério 17)
+  assert.equal(atend.avgScore, 80);
+  // Ativação: evento 1 = cópia (2) → 60; evento 2 = média de 34 (90) e cópia (70) = 80 → (60+80)/2
+  assert.equal(ativ.eventsCount, 2);
+  assert.equal(ativ.avgScore, 70);
+});
+
+test("critérios: peso 0 fica fora da média; inativo só entra se tiver calibração (regra da nota oficial)", () => {
+  const input = base();
+  input.eventCriteria.push(
+    { eventId: 1, criterionId: 200, active: true, name: "Duplicado sem peso", area: "Atendimento", weight: 0 },
+    { eventId: 1, criterionId: 201, active: false, name: "Inativo calibrado", area: "Logística", weight: 3 },
+    { eventId: 2, criterionId: 202, active: false, name: "Inativo sem calibração", area: "Logística", weight: 3 },
+  );
+  input.calibrations.push({ eventId: 1, criterionId: 200, calibratedScore: 0 }, { eventId: 1, criterionId: 201, calibratedScore: 5 });
+  input.evaluations.push({ eventId: 2, criterionId: 202, evaluatorUserId: 5, evaluatorName: "Ava", score: 9, status: "submitted", submittedAt: null });
+  const o = computeAnalytics(input);
+  assert.equal(o.criteria.find(c => c.name === "Duplicado sem peso"), undefined);
+  assert.equal(o.criteria.find(c => c.name === "Inativo calibrado")?.avgScore, 50);
+  assert.equal(o.criteria.find(c => c.name === "Inativo sem calibração"), undefined);
+});

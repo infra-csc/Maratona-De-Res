@@ -9,6 +9,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { calculateEventResult, getPlatoonByScore, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
 import { audit } from "../lib/audit.js";
 import { recomputeCycleResults } from "./results.js";
+import { pgNum } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -48,10 +49,10 @@ async function buildEventFeedback(eventId: number) {
   const criteria = activeCriteria.map(c => {
     const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
     const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
-    const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
+    const evalScores = submittedEvals.map(e => pgNum(e.score));
     const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
     const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
-    const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
+    const calibratedScore = calibration ? pgNum(calibration.calibratedScore) : null;
     // "Avaliado" (scoreUsed não nulo) exige que TODOS os avaliadores designados
     // para a área do critério tenham enviado, ou que exista calibração.
     const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
@@ -85,10 +86,10 @@ async function buildEventFeedback(eventId: number) {
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
   const platoonMapped = platoonRules.map(r => ({
     name: r.name, color: r.color,
-    minScore: parseFloat(r.minScore as unknown as string),
-    maxScore: parseFloat(r.maxScore as unknown as string),
+    minScore: pgNum(r.minScore),
+    maxScore: pgNum(r.maxScore),
     minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
-    bonusValue: parseFloat(r.bonusValue as unknown as string),
+    bonusValue: pgNum(r.bonusValue),
   }));
   const platoon = getPlatoonByScore(eventScore, platoonMapped);
 
@@ -266,20 +267,24 @@ router.post("/events/:id/criteria/publish-partial-all", requireRole("admin", "rh
     return;
   }
 
-  const allLinks = await db
-    .select({ id: eventCriteriaTable.id, eventScoped: criteriaTable.eventScoped })
-    .from(eventCriteriaTable)
-    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
-  const criteriaLinks = allLinks.filter(c => !c.eventScoped);
-
+  // Tudo ou nada: uma falha no meio não pode deixar só parte dos critérios
+  // publicada (o colaborador veria um retrato parcial inconsistente).
   const now = new Date();
-  for (const link of criteriaLinks) {
-    await db.update(eventCriteriaTable).set({
-      partialPublishedAt: now,
-      partialPublishedByUserId: req.user!.userId,
-    }).where(eq(eventCriteriaTable.id, link.id));
-  }
+  const criteriaLinks = await db.transaction(async (tx) => {
+    const allLinks = await tx
+      .select({ id: eventCriteriaTable.id, eventScoped: criteriaTable.eventScoped })
+      .from(eventCriteriaTable)
+      .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+      .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
+    const links = allLinks.filter(c => !c.eventScoped);
+    for (const link of links) {
+      await tx.update(eventCriteriaTable).set({
+        partialPublishedAt: now,
+        partialPublishedByUserId: req.user!.userId,
+      }).where(eq(eventCriteriaTable.id, link.id));
+    }
+    return links;
+  });
   await audit(req.user!.userId, "publish_partial_all_feedback", "events", eventId, null, { count: criteriaLinks.length });
 
   res.json({ published: criteriaLinks.length, partialPublishedAt: now });
@@ -295,22 +300,25 @@ router.post("/events/:id/criteria/publish-final-all", requireRole("admin", "rh",
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
   if (!event) { res.status(404).json({ error: "Evento não encontrado" }); return; }
 
-  const allFinalLinks = await db
-    .select({ id: eventCriteriaTable.id, partialPublishedAt: eventCriteriaTable.partialPublishedAt, partialPublishedByUserId: eventCriteriaTable.partialPublishedByUserId, eventScoped: criteriaTable.eventScoped })
-    .from(eventCriteriaTable)
-    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-    .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
-  const criteriaLinks = allFinalLinks.filter(c => !c.eventScoped);
-
+  // Tudo ou nada (ver publish-partial-all).
   const now = new Date();
-  for (const link of criteriaLinks) {
-    await db.update(eventCriteriaTable).set({
-      finalPublishedAt: now,
-      finalPublishedByUserId: req.user!.userId,
-      partialPublishedAt: link.partialPublishedAt ?? now,
-      partialPublishedByUserId: link.partialPublishedByUserId ?? req.user!.userId,
-    }).where(eq(eventCriteriaTable.id, link.id));
-  }
+  const criteriaLinks = await db.transaction(async (tx) => {
+    const allFinalLinks = await tx
+      .select({ id: eventCriteriaTable.id, partialPublishedAt: eventCriteriaTable.partialPublishedAt, partialPublishedByUserId: eventCriteriaTable.partialPublishedByUserId, eventScoped: criteriaTable.eventScoped })
+      .from(eventCriteriaTable)
+      .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
+      .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
+    const links = allFinalLinks.filter(c => !c.eventScoped);
+    for (const link of links) {
+      await tx.update(eventCriteriaTable).set({
+        finalPublishedAt: now,
+        finalPublishedByUserId: req.user!.userId,
+        partialPublishedAt: link.partialPublishedAt ?? now,
+        partialPublishedByUserId: link.partialPublishedByUserId ?? req.user!.userId,
+      }).where(eq(eventCriteriaTable.id, link.id));
+    }
+    return links;
+  });
   await audit(req.user!.userId, "publish_final_all_feedback", "events", eventId, null, { count: criteriaLinks.length });
 
   res.json({ published: criteriaLinks.length, finalPublishedAt: now });

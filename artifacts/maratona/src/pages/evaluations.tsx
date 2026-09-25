@@ -227,7 +227,7 @@ export default function EvaluationsPage() {
   function currentScore(criterionId: number): number | null {
     if (scores[criterionId] != null) return scores[criterionId];
     const ev = getEval(criterionId);
-    return ev ? parseFloat(ev.score as unknown as string) : null;
+    return ev ? Number(ev.score) : null;
   }
 
   function currentAudio(criterionId: number): string | null {

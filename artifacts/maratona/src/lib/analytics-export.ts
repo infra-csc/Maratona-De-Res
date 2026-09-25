@@ -2,7 +2,7 @@ import type { AnalyticsOverview } from "@workspace/api-client-react";
 
 /** Nome de arquivo seguro a partir do nome do ciclo ("Ciclo 2 · 2026" → "ciclo-2-2026"). */
 export function cycleSlug(name: string): string {
-  return name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+  return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
 }
 
 const r1 = (v: number | null | undefined) => (v == null ? null : Math.round(v * 10) / 10);
@@ -64,4 +64,40 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
   add("Clientes", data.clients.map(c => ({ Cliente: c.client, "Nota média": c.avgScore, Eventos: c.events })));
 
   XLSX.writeFile(wb, `analises-${cycleSlug(data.cycle.name)}.xlsx`);
+}
+
+/** Planilha do relatório por evento: Eventos, Critérios por evento e Equipes (só confirmados). */
+export async function exportEventsReportXlsx(report: import("@workspace/api-client-react").EventsReport): Promise<void> {
+  const XLSX = await import("xlsx");
+  const br = (d: string | null | undefined) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : "");
+  const n2 = (v: number | null | undefined) => (v == null ? "" : Math.round(v * 100) / 100);
+  const events = report.events.filter(e => e.resultsConfirmed && e.finalScore != null)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name, "pt-BR"));
+  const wb = XLSX.utils.book_new();
+  const add = (name: string, rows: Record<string, unknown>[], widths: number[]) => {
+    const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ "Sem dados": "" }]);
+    ws["!cols"] = widths.map(wch => ({ wch }));
+    if (rows.length) ws["!autofilter"] = { ref: ws["!ref"] as string };
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  };
+  add("Eventos", events.map(e => ({
+    Data: br(e.startDate), Evento: e.name, Cliente: e.clientName ?? "", Local: [e.city, e.state].filter(Boolean).join("/"),
+    Tipo: e.isHistorical ? "Importado (nota pronta)" : "Avaliado no app",
+    "Nota final oficial (0-100)": n2(e.finalScore), "Performance (0-100)": e.isHistorical ? "" : n2(e.performanceScore),
+    "Desconto da matriz (pts)": e.isHistorical ? "" : n2(e.conformityPenalty),
+    "Critérios calibrados": e.isHistorical ? "" : `${e.calibratedCriteria}/${e.totalCriteria}`,
+    "Equipe (contam para nota)": e.team.filter(t => t.countsForScore).length, "Equipe (total)": e.team.length,
+  })), [11, 46, 20, 16, 22, 14, 12, 12, 11, 12, 10]);
+  add("Critérios por evento", events.flatMap(e => e.criteria.map(c => ({
+    Data: br(e.startDate), Evento: e.name, Critério: c.name, Área: c.area ?? "", Peso: c.weight,
+    "Média dos avaliadores (0-10)": n2(c.evaluatorAvg), "Calibrada pelo RH (0-10)": n2(c.calibrated), "Nota usada (0-10)": n2(c.used),
+    "Justificativa da calibração": c.calibrationReason ?? "",
+    "Conta na nota": c.weight > 0 ? "Sim" : "Não (peso 0)",
+  }))), [11, 46, 34, 16, 6, 12, 12, 10, 50, 14]);
+  add("Equipes", events.flatMap(e => e.team.map(t => ({
+    Data: br(e.startDate), Evento: e.name, Colaborador: t.name, "Função no evento": t.functionName ?? "",
+    Vínculo: t.employmentType === "freela" ? "Freela" : t.employmentType === "casa" ? "Casa" : (t.employmentType ?? ""),
+    "Conta para a nota": t.countsForScore ? "Sim" : "Não", "Nota final do evento (0-100)": n2(e.finalScore),
+  }))), [11, 46, 38, 26, 8, 10, 12]);
+  XLSX.writeFile(wb, `relatorio-por-evento-${cycleSlug(report.cycle.name)}.xlsx`);
 }

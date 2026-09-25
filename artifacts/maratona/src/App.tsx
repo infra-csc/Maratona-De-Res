@@ -23,6 +23,7 @@ const PenaltyTypesPage = lazy(() => import("@/pages/penalty-types"));
 const ResultsPage = lazy(() => import("@/pages/results"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
 const AnalyticsReportPage = lazy(() => import("@/pages/analytics-report"));
+const AnalyticsEventsReportPage = lazy(() => import("@/pages/analytics-events-report"));
 const CyclesPage = lazy(() => import("@/pages/cycles"));
 const CycleHistoryPage = lazy(() => import("@/pages/cycle-history"));
 const CriteriaPage = lazy(() => import("@/pages/criteria"));
@@ -141,6 +142,7 @@ function AppRoutes() {
       <Route path="/penalty-types" component={() => <ProtectedRoute component={PenaltyTypesPage} roles={["admin", "rh"]} />} />
       <Route path="/results" component={() => <ProtectedRoute component={ResultsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/ranking"><Redirect to="/results" /></Route>
+      <Route path="/analytics/eventos" component={() => <ProtectedRoute component={AnalyticsEventsReportPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/analytics/relatorio" component={() => <ProtectedRoute component={AnalyticsReportPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} roles={["admin", "rh", "diretoria"]} />} />
       <Route path="/cycles/:id" component={() => <ProtectedRoute component={CycleHistoryPage} roles={["admin", "rh", "diretoria"]} />} />

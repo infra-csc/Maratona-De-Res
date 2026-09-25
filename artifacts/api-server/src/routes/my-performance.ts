@@ -12,6 +12,7 @@ import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
 import { heapOrder } from "../lib/cycle-data.js";
+import { pgNum } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -105,10 +106,10 @@ router.get("/my-performance", async (req, res) => {
       ));
     for (const r of officialRows) {
       if (r.finalEventScore != null) {
-        officialEventScores.set(r.eventId, parseFloat(r.finalEventScore as unknown as string));
+        officialEventScores.set(r.eventId, pgNum(r.finalEventScore));
       }
       if (r.eventScore != null) {
-        officialRawEventScores.set(r.eventId, parseFloat(r.eventScore as unknown as string));
+        officialRawEventScores.set(r.eventId, pgNum(r.eventScore));
       }
     }
   }
@@ -116,11 +117,11 @@ router.get("/my-performance", async (req, res) => {
   const platoonRules = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
   const platoonRulesMapped = platoonRules.map(r => ({
     name: r.name, color: r.color,
-    minScore: parseFloat(r.minScore as unknown as string),
-    maxScore: parseFloat(r.maxScore as unknown as string),
+    minScore: pgNum(r.minScore),
+    maxScore: pgNum(r.maxScore),
     minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
-    bonusValue: parseFloat(r.bonusValue as unknown as string),
-    bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
+    bonusValue: pgNum(r.bonusValue),
+    bonusPerExtraEvent: pgNum(r.bonusPerExtraEvent),
   }));
 
   // Dados de TODOS os eventos do colaborador em lote: 5 consultas no total
@@ -246,7 +247,7 @@ router.get("/my-performance", async (req, res) => {
         const weight = parseFloat(((r.weight ?? r.defaultWeight) ?? "1") as string);
         const submittedEvals = allEvals.filter(e => e.criterionId === r.criterionId && e.status === "submitted");
         const calibration = allCalibrations.find(cal => cal.criterionId === r.criterionId);
-        const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
+        const calibratedScore = calibration ? pgNum(calibration.calibratedScore) : null;
         const scoreUsed = calibratedScore;
         const completion = getCriterionEvaluationStatus(r.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
         const isEvaluated = calibratedScore !== null || completion.isEvaluated;
@@ -300,11 +301,11 @@ router.get("/my-performance", async (req, res) => {
           averageScore: (() => {
             const subs = allEvals.filter(e => e.criterionId === r.criterionId && e.status === "submitted");
             if (subs.length === 0) return null;
-            return subs.reduce((s, e) => s + parseFloat(e.score as unknown as string), 0) / subs.length;
+            return subs.reduce((s, e) => s + pgNum(e.score), 0) / subs.length;
           })(),
           calibratedScore: (() => {
             const cal = allCalibrations.find(c => c.criterionId === r.criterionId);
-            return cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+            return cal ? pgNum(cal.calibratedScore) : null;
           })(),
           isEventScoped: true,
           sourceCriterionId: r.sourceCriterionId ?? null,
@@ -321,7 +322,7 @@ router.get("/my-performance", async (req, res) => {
     const eventScore = officialScore != null
       ? officialScore
       : (p.isHistorical && p.importedScore != null)
-        ? parseFloat(p.importedScore as unknown as string)
+        ? pgNum(p.importedScore)
         : rawEventScore;
     // "Tem nota" = linha oficial, nota importada ou algum critério com nota.
     // Nota 0 legítima conta; evento sem nenhuma avaliação não conta.
@@ -481,12 +482,12 @@ router.get("/my-performance", async (req, res) => {
     currentPlatoonColor = snapRule?.color ?? (quarterResult.platoonColor as string | null) ?? null;
     currentPlatoonMinScore = snapRule?.minScore ?? null;
     currentPlatoonMaxScore = snapRule?.maxScore ?? null;
-    finalResult = parseFloat(quarterResult.finalResult as unknown as string);
+    finalResult = pgNum(quarterResult.finalResult);
     const nextRule = getNextPlatoonRule(currentPlatoon);
     nextPlatoon = nextRule?.name ?? null;
     nextPlatoonColor = nextRule?.color ?? null;
     nextPlatoonMinScore = nextRule?.minScore ?? null;
-    currentBonus = parseFloat(quarterResult.bonusValue as unknown as string);
+    currentBonus = pgNum(quarterResult.bonusValue);
     bonusStatus = quarterResult.bonusStatus;
   } else if (grossAverage !== null) {
     // Espelha a regra de fechamento (results.ts): méritos somam, penalidades
@@ -517,7 +518,7 @@ router.get("/my-performance", async (req, res) => {
   // não do recálculo ao vivo — evita discrepância entre "Média do Ciclo" e
   // "Média dos Eventos" na tela do colaborador.
   const responseGrossAverage = quarterResult
-    ? parseFloat(quarterResult.grossAverage as unknown as string)
+    ? pgNum(quarterResult.grossAverage)
     : grossAverage;
   const responseEventsCount = quarterResult
     ? quarterResult.eventsCount
@@ -567,7 +568,7 @@ router.get("/my-performance", async (req, res) => {
       meritPoints: Math.round(meritPoints * 100) / 100,
       isQuarterClosed: cycle.status === "closed" || !!cycle.closedAt,
       finalResult,
-      absencePenalty: quarterResult ? parseFloat(quarterResult.absencePenalty as unknown as string) : null,
+      absencePenalty: quarterResult ? pgNum(quarterResult.absencePenalty) : null,
       paymentMethod: quarterResult ? quarterResult.paymentMethod : "Caju Saldo Livre",
       hasQuarterSnapshot: !!quarterResult,
     },

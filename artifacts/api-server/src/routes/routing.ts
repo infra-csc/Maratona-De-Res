@@ -10,6 +10,7 @@ import {
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import type { DbOrTx, Tx } from "../lib/db-tx.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -130,23 +131,29 @@ router.put("/criteria/:id/routing", requireRole("admin", "rh"), async (req, res)
     updatedAt: new Date(),
   };
 
-  let routing;
-  if (existing) {
-    [routing] = await db.update(criterionRoutingTable).set(values)
-      .where(eq(criterionRoutingTable.id, existing.id)).returning();
-  } else {
-    [routing] = await db.insert(criterionRoutingTable).values({ criterionId, ...values }).returning();
-  }
-
-  if (redirectMode === "specific" && Array.isArray(redirectUserIds)) {
-    await db.delete(criterionRedirectUsersTable)
-      .where(eq(criterionRedirectUsersTable.criterionId, criterionId));
-    if (redirectUserIds.length > 0) {
-      await db.insert(criterionRedirectUsersTable).values(
-        redirectUserIds.map((userId: number) => ({ criterionId, userId })),
-      );
+  // Roteamento e lista de redirecionamento juntos: falhar ao gravar a lista
+  // (ex.: usuário inexistente) não pode deixar o critério em modo "specific"
+  // com a lista antiga já apagada.
+  const routing = await db.transaction(async (tx) => {
+    let saved;
+    if (existing) {
+      [saved] = await tx.update(criterionRoutingTable).set(values)
+        .where(eq(criterionRoutingTable.id, existing.id)).returning();
+    } else {
+      [saved] = await tx.insert(criterionRoutingTable).values({ criterionId, ...values }).returning();
     }
-  }
+
+    if (redirectMode === "specific" && Array.isArray(redirectUserIds)) {
+      await tx.delete(criterionRedirectUsersTable)
+        .where(eq(criterionRedirectUsersTable.criterionId, criterionId));
+      if (redirectUserIds.length > 0) {
+        await tx.insert(criterionRedirectUsersTable).values(
+          redirectUserIds.map((userId: number) => ({ criterionId, userId })),
+        );
+      }
+    }
+    return saved;
+  });
 
   await audit(req.user!.userId, "upsert", "criterion_routing", criterionId, existing ?? null, routing);
   res.json(routing);
@@ -281,8 +288,17 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
 // padrão já vem pré-determinado do routing — não faz sentido depender de
 // um clique manual de RH pra isso existir).
 // ---------------------------------------------------------------------------
-export async function generateCriterionAssignments(eventId: number) {
-  const eventCriteria = await db.select({ criterionId: eventCriteriaTable.criterionId })
+// Tudo numa transação: uma falha no meio não deixa só parte dos critérios
+// com atribuição (o evento ficaria com quesitos "sem dono" até alguém clicar
+// de novo). Quando chamada de dentro de outra transação (ex.: confirmação
+// dos critérios do evento), `exec.transaction` vira um SAVEPOINT e o commit
+// fica com quem chamou.
+export async function generateCriterionAssignments(eventId: number, exec: DbOrTx = db) {
+  return exec.transaction(tx => generateCriterionAssignmentsTx(eventId, tx));
+}
+
+async function generateCriterionAssignmentsTx(eventId: number, tx: Tx) {
+  const eventCriteria = await tx.select({ criterionId: eventCriteriaTable.criterionId })
     .from(eventCriteriaTable)
     .where(and(eq(eventCriteriaTable.eventId, eventId), eq(eventCriteriaTable.active, true)));
 
@@ -292,12 +308,12 @@ export async function generateCriterionAssignments(eventId: number) {
 
   const criterionIds = eventCriteria.map(ec => ec.criterionId);
 
-  const routings = await db.select()
+  const routings = await tx.select()
     .from(criterionRoutingTable)
     .where(inArray(criterionRoutingTable.criterionId, criterionIds));
   const routingMap = new Map(routings.map(r => [r.criterionId, r]));
 
-  const existing = await db.select({ id: eventCriterionAssignmentsTable.id, criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
+  const existing = await tx.select({ id: eventCriterionAssignmentsTable.id, criterionId: eventCriterionAssignmentsTable.criterionId, assignedToId: eventCriterionAssignmentsTable.assignedToId })
     .from(eventCriterionAssignmentsTable)
     .where(eq(eventCriterionAssignmentsTable.eventId, eventId));
   const existingByCriterion = new Map(existing.map(e => [e.criterionId, e]));
@@ -311,7 +327,7 @@ export async function generateCriterionAssignments(eventId: number) {
       // botão "Aplicar avaliadores padrão" só criava linhas novas e deixava
       // as vazias travadas para sempre.
       if (current.assignedToId == null && r?.defaultEvaluatorId != null) {
-        await db.update(eventCriterionAssignmentsTable)
+        await tx.update(eventCriterionAssignmentsTable)
           .set({ assignedToId: r.defaultEvaluatorId, status: "suggested", updatedAt: new Date() })
           .where(eq(eventCriterionAssignmentsTable.id, current.id));
         generated++;
@@ -320,7 +336,7 @@ export async function generateCriterionAssignments(eventId: number) {
       }
       continue;
     }
-    await db.insert(eventCriterionAssignmentsTable).values({
+    await tx.insert(eventCriterionAssignmentsTable).values({
       eventId,
       criterionId,
       assignedToId: r?.defaultEvaluatorId ?? null,
@@ -333,35 +349,39 @@ export async function generateCriterionAssignments(eventId: number) {
   // Ferramentas) a partir de area_conformity_routing, sem sobrescrever escolha
   // manual já feita no evento. Assim "Aplicar Avaliadores Padrão" traz também
   // os avaliadores das duas matrizes, não só os dos critérios. Opcional: se a
-  // tabela ainda não existir/estiver vazia, loga e segue.
+  // tabela ainda não existir/estiver vazia, loga e segue. Roda num SAVEPOINT:
+  // dentro de uma transação, um erro do Postgres aborta tudo o que vem depois;
+  // o savepoint isola esta parte opcional sem perder as atribuições acima.
   try {
-    const [ev] = await db.select({
-      conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId,
-      conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId,
-    }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
-    if (ev && (ev.conformityEvaluatorUserId == null || ev.conformityEvaluatorFerramentasUserId == null)) {
-      const conformityDefaults = await db.select({
-        areaName: areasTable.name,
-        defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
-      })
-        .from(areaConformityRoutingTable)
-        .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id));
-      const byName = (needle: string) => conformityDefaults.find(
-        d => (d.areaName ?? "").trim().toLowerCase().includes(needle),
-      )?.defaultEvaluatorId ?? null;
-      const patch: Partial<typeof eventsTable.$inferInsert> = {};
-      if (ev.conformityEvaluatorUserId == null) {
-        const cenografiaDefault = byName("cenografia");
-        if (cenografiaDefault != null) patch.conformityEvaluatorUserId = cenografiaDefault;
+    await tx.transaction(async (sp) => {
+      const [ev] = await sp.select({
+        conformityEvaluatorUserId: eventsTable.conformityEvaluatorUserId,
+        conformityEvaluatorFerramentasUserId: eventsTable.conformityEvaluatorFerramentasUserId,
+      }).from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+      if (ev && (ev.conformityEvaluatorUserId == null || ev.conformityEvaluatorFerramentasUserId == null)) {
+        const conformityDefaults = await sp.select({
+          areaName: areasTable.name,
+          defaultEvaluatorId: areaConformityRoutingTable.defaultEvaluatorId,
+        })
+          .from(areaConformityRoutingTable)
+          .leftJoin(areasTable, eq(areaConformityRoutingTable.areaId, areasTable.id));
+        const byName = (needle: string) => conformityDefaults.find(
+          d => (d.areaName ?? "").trim().toLowerCase().includes(needle),
+        )?.defaultEvaluatorId ?? null;
+        const patch: Partial<typeof eventsTable.$inferInsert> = {};
+        if (ev.conformityEvaluatorUserId == null) {
+          const cenografiaDefault = byName("cenografia");
+          if (cenografiaDefault != null) patch.conformityEvaluatorUserId = cenografiaDefault;
+        }
+        if (ev.conformityEvaluatorFerramentasUserId == null) {
+          const ferramentasDefault = byName("ferramentas");
+          if (ferramentasDefault != null) patch.conformityEvaluatorFerramentasUserId = ferramentasDefault;
+        }
+        if (Object.keys(patch).length > 0) {
+          await sp.update(eventsTable).set(patch).where(eq(eventsTable.id, eventId));
+        }
       }
-      if (ev.conformityEvaluatorFerramentasUserId == null) {
-        const ferramentasDefault = byName("ferramentas");
-        if (ferramentasDefault != null) patch.conformityEvaluatorFerramentasUserId = ferramentasDefault;
-      }
-      if (Object.keys(patch).length > 0) {
-        await db.update(eventsTable).set(patch).where(eq(eventsTable.id, eventId));
-      }
-    }
+    });
   } catch (err) {
     console.error(`[routing] Falha ao pré-preencher avaliadores da matriz no evento ${eventId}:`, err);
   }

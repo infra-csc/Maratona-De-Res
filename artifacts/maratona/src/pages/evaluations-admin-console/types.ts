@@ -49,6 +49,9 @@ export interface EnrichedEvent {
   finalCalibratedCriteria: number;
   conformityNeeded: boolean;
   conformityComplete: boolean;
+  /** Cada lado da matriz respondido por quem foi atribuído (vem da lista de eventos). */
+  conformityCenografiaDone: boolean;
+  conformityFerramentasDone: boolean;
   // Avaliadores da Matriz de Conformidade (incluídos na vista global de avaliadores)
   conformityEvaluatorUserId?: number | null;
   conformityEvaluatorName?: string | null;

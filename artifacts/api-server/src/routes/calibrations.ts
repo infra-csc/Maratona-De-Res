@@ -4,6 +4,7 @@ import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { recomputeCycleResults } from "./results.js";
+import { pgNum } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -41,8 +42,8 @@ router.get("/calibrations", async (req, res) => {
   const calibrations = await query;
   res.json(calibrations.map(c => ({
     ...c,
-    originalAverageScore: c.originalAverageScore ? parseFloat(c.originalAverageScore as unknown as string) : null,
-    calibratedScore: parseFloat(c.calibratedScore as unknown as string),
+    originalAverageScore: c.originalAverageScore ? pgNum(c.originalAverageScore) : null,
+    calibratedScore: pgNum(c.calibratedScore),
   })));
 });
 
@@ -81,7 +82,7 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
 
   let calibration;
   const beforeSnap = existing
-    ? { score: parseFloat(existing.calibratedScore as unknown as string), reason: existing.calibrationReason }
+    ? { score: pgNum(existing.calibratedScore), reason: existing.calibrationReason }
     : null;
 
   if (existing) {
@@ -130,7 +131,7 @@ router.post("/calibrations", requireRole("admin", "rh", "diretoria"), async (req
 
   res.status(201).json({
     ...calibration,
-    calibratedScore: parseFloat(calibration.calibratedScore as unknown as string),
+    calibratedScore: pgNum(calibration.calibratedScore),
     warnings: warnings.length > 0 ? warnings : undefined,
   });
 });
@@ -152,7 +153,7 @@ router.get("/calibrations/audit", requireRole("admin", "rh", "diretoria"), async
 
   const calIdStrings = calRows.map(c => String(c.id));
   const criterionByCalId = new Map(calRows.map(c => [String(c.id), c.criterionId]));
-  const scoreByCalId = new Map(calRows.map(c => [String(c.id), parseFloat(c.calibratedScore as unknown as string)]));
+  const scoreByCalId = new Map(calRows.map(c => [String(c.id), pgNum(c.calibratedScore)]));
 
   // Busca os critérios do evento para nomes
   const criteriaRows = await db.select({ id: criteriaTable.id, name: criteriaTable.name })

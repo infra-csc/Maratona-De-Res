@@ -2002,6 +2002,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
 
+  /analytics/events-report:
+    get:
+      operationId: getAnalyticsEventsReport
+      tags: [analytics]
+      summary: Relatório por evento (nota final calibrada, critérios, calibração e equipe)
+      parameters:
+        - name: cycleId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventsReport"
+        "400":
+          description: cycleId inválido
+        "404":
+          description: Ciclo não encontrado
+
   /analytics/overview:
     get:
       operationId: getAnalyticsOverview
@@ -4352,6 +4375,20 @@ components:
         conformityTotal:
           type: integer
           description: Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).
+        conformityCenografiaDone:
+          type: boolean
+          description: Matriz de Cenografia respondida por completo (só quando há avaliador atribuído)
+        conformityFerramentasDone:
+          type: boolean
+          description: Matriz de Ferramentas respondida (só quando há avaliador atribuído)
+        conformityEvaluatorUserId:
+          type: ["integer", "null"]
+        conformityEvaluatorName:
+          type: ["string", "null"]
+        conformityEvaluatorFerramentasUserId:
+          type: ["integer", "null"]
+        conformityEvaluatorFerramentasName:
+          type: ["string", "null"]
         createdAt:
           type: string
 
@@ -4806,6 +4843,12 @@ components:
           type: ["string", "null"]
         createdByUserId:
           type: integer
+        createdByUserName:
+          type: ["string", "null"]
+        cenografiaSubmittedByName:
+          type: ["string", "null"]
+        ferramentasSubmittedByName:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -5361,6 +5404,105 @@ components:
           type: boolean
         displayOrder:
           type: integer
+
+    EventsReport:
+      type: object
+      required: [cycle, events]
+      properties:
+        cycle:
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            startDate:
+              type: ["string", "null"]
+            endDate:
+              type: ["string", "null"]
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventReportRow"
+
+    EventReportRow:
+      type: object
+      required: [id, name, startDate, endDate, status, resultsConfirmed, isHistorical, conformityPenalty, calibratedCriteria, evaluatedCriteria, totalCriteria, criteria, team]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        clientName:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        status:
+          type: string
+        resultsConfirmed:
+          type: boolean
+        isHistorical:
+          type: boolean
+        finalScore:
+          type: ["number", "null"]
+          description: Nota final oficial (0-100) do recálculo; só eventos confirmados
+        projectedScore:
+          type: ["number", "null"]
+        performanceScore:
+          type: ["number", "null"]
+        conformityPenalty:
+          type: number
+        calibratedCriteria:
+          type: integer
+        evaluatedCriteria:
+          type: integer
+        totalCriteria:
+          type: integer
+        criteria:
+          type: array
+          items:
+            type: object
+            required: [name, weight, status, active]
+            properties:
+              name:
+                type: string
+              area:
+                type: ["string", "null"]
+              weight:
+                type: number
+              evaluatorAvg:
+                type: ["number", "null"]
+              calibrated:
+                type: ["number", "null"]
+              used:
+                type: ["number", "null"]
+              calibrationReason:
+                type: ["string", "null"]
+              status:
+                type: string
+              active:
+                type: boolean
+        team:
+          type: array
+          items:
+            type: object
+            required: [name, countsForScore]
+            properties:
+              name:
+                type: string
+              functionName:
+                type: ["string", "null"]
+              employmentType:
+                type: ["string", "null"]
+              countsForScore:
+                type: boolean
 
     AnalyticsOverview:
       type: object

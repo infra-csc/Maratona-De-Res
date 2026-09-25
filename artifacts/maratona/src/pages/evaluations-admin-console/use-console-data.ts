@@ -166,7 +166,7 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
           formSubmitterName: evalRow?.evaluatorName ?? null,
           state,
           submittedAt: evalRow?.submittedAt ?? null,
-          score: evalRow?.score != null ? parseFloat(evalRow.score as unknown as string) : null,
+          score: evalRow?.score != null ? Number(evalRow.score) : null,
           comments: evalRow?.comments ?? null,
           audioUrl: evalRow?.audioUrl ?? null,
         };
@@ -175,7 +175,6 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
       const done = rows.filter(r => r.state === "done").length;
       const unassigned = rows.filter(r => r.state === "unassigned").length;
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      const evC = ev as unknown as { conformityNeeded?: boolean; conformityComplete?: boolean; conformityEvaluatorUserId?: number | null; conformityEvaluatorName?: string | null; conformityEvaluatorFerramentasUserId?: number | null; conformityEvaluatorFerramentasName?: string | null };
       return {
         id: ev.id, name: ev.name, clientName: ev.clientName ?? null, city: ev.city ?? null, state: ev.state ?? null,
         status: ev.status, startDate: ev.startDate ?? null, endDate: ev.endDate ?? null,
@@ -185,12 +184,14 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
         isDone: total > 0 && done === total,
         partialPublishedCount: ev.partialPublishedCount ?? 0,
         finalCalibratedCriteria: ev.finalCalibratedCriteria ?? 0,
-        conformityNeeded: !!evC.conformityNeeded,
-        conformityComplete: !!evC.conformityComplete,
-        conformityEvaluatorUserId: evC.conformityEvaluatorUserId ?? null,
-        conformityEvaluatorName: evC.conformityEvaluatorName ?? null,
-        conformityEvaluatorFerramentasUserId: evC.conformityEvaluatorFerramentasUserId ?? null,
-        conformityEvaluatorFerramentasName: evC.conformityEvaluatorFerramentasName ?? null,
+        conformityNeeded: !!ev.conformityNeeded,
+        conformityComplete: !!ev.conformityComplete,
+        conformityCenografiaDone: !!ev.conformityCenografiaDone,
+        conformityFerramentasDone: !!ev.conformityFerramentasDone,
+        conformityEvaluatorUserId: ev.conformityEvaluatorUserId ?? null,
+        conformityEvaluatorName: ev.conformityEvaluatorName ?? null,
+        conformityEvaluatorFerramentasUserId: ev.conformityEvaluatorFerramentasUserId ?? null,
+        conformityEvaluatorFerramentasName: ev.conformityEvaluatorFerramentasName ?? null,
       };
     });
   // criteriaQueries/assignQueries são lidos via índice; as assinaturas

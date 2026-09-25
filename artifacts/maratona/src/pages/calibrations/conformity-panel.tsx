@@ -50,8 +50,8 @@ export function ConformityPanel({ selectedEventId, fullEvent, conformityState }:
                     // TODO contrato: ferramentasSubmittedByName/cenografiaSubmittedByName ainda
                     // não existem em EventConformity (api.schemas.ts) — cast mantido até o codegen.
                     const answeredByName = item.key === "guardaEquipamentos"
-                      ? ((conformity as unknown as Record<string, unknown>)?.ferramentasSubmittedByName as string | null | undefined) ?? null
-                      : ((conformity as unknown as Record<string, unknown>)?.cenografiaSubmittedByName as string | null | undefined) ?? null;
+                      ? conformity?.ferramentasSubmittedByName ?? null
+                      : conformity?.cenografiaSubmittedByName ?? null;
                     return (
                       <div key={item.key} className="rounded-lg overflow-hidden" style={{ border: value === null ? "1px solid var(--border)" : value ? `1px solid ${GOOD}` : `1px solid ${WARNING}`, backgroundColor: value === null ? "var(--secondary)" : value ? "rgba(154,176,0,0.10)" : "rgba(229,72,77,0.08)" }}>
                         <div className="flex items-center gap-1 px-2 py-1.5">

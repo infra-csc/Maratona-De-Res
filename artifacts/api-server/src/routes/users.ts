@@ -5,6 +5,7 @@ import { eq, and, isNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole, bumpTokenVersion, invalidateSessionCache } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
+import { affectedRows } from "../lib/pg-num.js";
 
 const router = Router();
 
@@ -272,19 +273,19 @@ router.post("/users/:id/merge", requireRole("admin", "rh"), async (req, res) => 
     const evRes = await tx.update(evaluationsTable)
       .set({ evaluatorUserId: canonicalId })
       .where(inArray(evaluationsTable.evaluatorUserId, dupIds));
-    movedEvaluations = (evRes as unknown as { rowCount?: number }).rowCount ?? 0;
+    movedEvaluations = affectedRows(evRes);
 
     // calibrations.calibrated_by_user_id
     const calRes = await tx.update(calibrationsTable)
       .set({ calibratedByUserId: canonicalId })
       .where(inArray(calibrationsTable.calibratedByUserId, dupIds));
-    movedCalibrations = (calRes as unknown as { rowCount?: number }).rowCount ?? 0;
+    movedCalibrations = affectedRows(calRes);
 
     // event_conformities.created_by_user_id
     const confRes = await tx.update(eventConformitiesTable)
       .set({ createdByUserId: canonicalId })
       .where(inArray(eventConformitiesTable.createdByUserId, dupIds));
-    movedConformities = (confRes as unknown as { rowCount?: number }).rowCount ?? 0;
+    movedConformities = affectedRows(confRes);
 
     // events.conformity_evaluator_user_id / conformity_evaluator_ferramentas_user_id
     for (const dupId of dupIds) {
