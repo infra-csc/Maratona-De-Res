@@ -1,7 +1,7 @@
 // Barra de ações compacta: Liberar Sem Cal., progresso, filtros, log de publicação, Salvar e Publicar.
 import type React from "react";
 import { Check, Save, Send, Filter, ShieldCheck } from "lucide-react";
-import { GOOD, AMBER, GOOD_TEXT } from "@/lib/premium-theme";
+import { GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
 import { formatDateTime } from "./helpers";
 import type { CriterionFilter } from "./types";
 
@@ -91,7 +91,7 @@ export function CalibrationActionBar({
                   <div className="ml-auto flex items-center gap-2">
                     {/* Log de publicação */}
                     {(alreadyReleased || allCriteriaFinalPublished || partialPublishedAtDate) && (
-                      <span className="text-[11px] font-bold flex items-center gap-1" style={{ color: alreadyReleased || allCriteriaFinalPublished ? GOOD : AMBER }}>
+                      <span className="text-[11px] font-bold flex items-center gap-1" style={{ color: alreadyReleased || allCriteriaFinalPublished ? GOOD_TEXT : AMBER_TEXT }}>
                         {alreadyReleased || allCriteriaFinalPublished ? <ShieldCheck size={11} /> : <Send size={11} />}
                         {alreadyReleased || allCriteriaFinalPublished
                           ? `Final ${feedbackReleasedAtDate ? formatDateTime(feedbackReleasedAtDate) : ""}`

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { cn } from "@/lib/utils";
 import { Clock, Link2, Lock, UserCheck } from "lucide-react";
-import { CONDENSED, WARNING, GOOD_TEXT } from "@/lib/premium-theme";
+import { CONDENSED, GOOD_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import { STATE_CFG, fmtDT } from "./helpers";
 import { EventCombobox, InlinePicker } from "./pickers";
 import type { ConformityKey, ConformityLinkDialogState, ConformityRow, CritRow, EnrichedEvent } from "./types";
@@ -51,7 +51,7 @@ export function TableView(props: {
               <div className="px-3.5 py-3 font-black uppercase text-[13px]" style={{ fontFamily: CONDENSED }}>{c.criterionName}</div>
               <div className="px-3.5 py-3 font-bold uppercase text-[11px]" style={{ color: "var(--muted-foreground)" }}>{c.areaName}</div>
               <div className="px-3.5 py-3">
-                <div className="font-semibold text-xs" style={{ color: c.assignedToId == null ? WARNING : "var(--foreground)" }}>{c.assignedToName ?? "Sem avaliador"}</div>
+                <div className="font-semibold text-xs" style={{ color: c.assignedToId == null ? DANGER_TEXT : "var(--foreground)" }}>{c.assignedToName ?? "Sem avaliador"}</div>
                 {c.formSubmitterName && c.formSubmitterName !== c.assignedToName && (
                   <div className="flex items-center gap-1 mt-0.5 text-[11px] font-bold" style={{ color: "var(--muted-foreground)" }}>
                     <UserCheck size={8} /> {c.formSubmitterName}
@@ -129,7 +129,7 @@ export function TableView(props: {
               <div className="px-3.5 py-3 font-bold uppercase text-[11px]" style={{ color: "var(--muted-foreground)" }}>
                 {cf.key === "cenografia" ? "Cenografia" : "Ferramentas"}
               </div>
-              <div className="px-3.5 py-3 font-semibold text-xs" style={{ color: !hasEvaluator ? WARNING : "var(--foreground)" }}>
+              <div className="px-3.5 py-3 font-semibold text-xs" style={{ color: !hasEvaluator ? DANGER_TEXT : "var(--foreground)" }}>
                 {cf.evaluatorName ?? "Sem avaliador"}
               </div>
               <div className="px-3.5 py-3 font-bold text-[11px]" style={{ color: "var(--muted-foreground)" }}>

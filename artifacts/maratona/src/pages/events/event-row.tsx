@@ -6,7 +6,7 @@ import { ChevronRight, Users, GitMerge, SlidersHorizontal, Trash2, Pencil, MoreH
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { hasRole } from "@/lib/auth-context";
 import { fmtNum } from "@/lib/utils";
-import { CONDENSED, GOOD, AMBER, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
+import { CONDENSED, GOOD, AMBER, AMBER_TEXT, DANGER_TEXT, GOOD_TEXT } from "@/lib/premium-theme";
 import { MiniBar, CalBar } from "./bars";
 import { deriveEventRow } from "./rules";
 import type { EventItem } from "./types";
@@ -107,7 +107,7 @@ export function EventRow({ ev, user, gridCols, onEdit, onMerge, onDelete }: Even
       <div className="px-3.5 py-3 text-center">
         {score != null ? (
           <div>
-            <span className="font-black text-lg leading-none block" style={{ fontFamily: CONDENSED, color: fc ? GOOD : "var(--foreground)" }}>
+            <span className="font-black text-lg leading-none block" style={{ fontFamily: CONDENSED, color: fc ? GOOD_TEXT : "var(--foreground)" }}>
               {fmtNum(score, 1)}
             </span>
             <span className="text-[11px] font-bold uppercase" style={{ color: scoreLabelColor }}>{scoreLabel}</span>

@@ -50,7 +50,7 @@ export function EventHeader({ event, canManage, resultsConfirmBusy, resultsDialo
               {fmtDate(event.startDate, { day: "2-digit", month: "2-digit", year: "numeric" })} — {fmtDate(event.endDate, { day: "2-digit", month: "2-digit", year: "numeric" })}
             </p>
           </div>
-          <div className="flex gap-2 shrink-0 items-center">
+          <div className="flex flex-wrap gap-2 shrink-0 items-center">
             <Link
               href={`/evaluations?eventId=${event.id}`}
               data-testid="link-event-evaluations"

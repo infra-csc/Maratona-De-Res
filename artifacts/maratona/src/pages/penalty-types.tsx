@@ -447,7 +447,7 @@ function TypeRow({ type, canEdit, onEdit, onDelete, isFirst }: {
         </div>
         <div className="text-xs font-mono mt-0.5" style={{ color: "var(--muted-foreground)" }}>{type.slug}</div>
       </div>
-      <div className="font-black text-lg shrink-0" style={{ fontFamily: CONDENSED, color: isMerit ? GOOD : WARNING }}>
+      <div className="font-black text-lg shrink-0" style={{ fontFamily: CONDENSED, color: isMerit ? GOOD_TEXT : DANGER_TEXT }}>
         {isMerit ? "+" : "-"}{type.points} pts
       </div>
       {canEdit && (

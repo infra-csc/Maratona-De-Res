@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useGetEvents, useGetUsers, useGetCurrentCycle, useGetEvaluations,
   getEventCriteria, getGetEvaluationsQueryKey, getGetEventsQueryKey,
+  getEvaluationConsole, getGetEvaluationConsoleQueryKey,
   type Evaluation,
 } from "@workspace/api-client-react";
 import { getEventCriterionAssignments, eventCriterionAssignmentsKey } from "@/lib/routing-api";
@@ -60,41 +61,33 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
   }, [selectedEventId]);
 
   // ---- Dados de TODOS os eventos (fundo, 5 min) ----
-  // Critérios e atribuições por evento continuam sendo N + N requisições
-  // porque a fila (contagem de critérios sem avaliador, filtros por área e
-  // por avaliador, "Concluídos") e o KPI/aba global "Avaliadores pendentes"
-  // dependem de dados POR CRITÉRIO de cada evento — os agregados de /events
-  // (evaluatedCriteria, unassignedAreaNames) têm semântica diferente (por
-  // área; exige todos os avaliadores da área) e não substituem isso.
-  // As N consultas de avaliações viraram UMA (/evaluations sem eventId).
-  const criteriaQueries = useQueries({
-    queries: configuredEvents.map(ev => ({
-      queryKey: ["event-criteria", ev.id] as unknown[],
-      queryFn: () => getEventCriteria(ev.id),
-      ...BACKGROUND_QUERY,
-    })),
-  });
-  const assignQueries = useQueries({
-    queries: configuredEvents.map(ev => ({
-      queryKey: eventCriterionAssignmentsKey(ev.id),
-      queryFn: () => getEventCriterionAssignments(ev.id),
-      ...BACKGROUND_QUERY,
-    })),
+  // A fila (contagem de critérios sem avaliador, filtros por área e por
+  // avaliador, "Concluídos") e o KPI "Avaliadores pendentes" dependem de dados
+  // POR CRITÉRIO de cada evento. Critérios e atribuições de todos os eventos
+  // vêm numa requisição só (/evaluation-console) e as avaliações em outra
+  // (/evaluations sem eventId) — antes eram 2 requisições por evento.
+  const eventIdsParam = useMemo(() => configuredEvents.map(e => e.id).join(","), [configuredEvents]);
+  const qc = useQueryClient();
+  const { data: consoleData, dataUpdatedAt: consoleUpdatedAt } = useQuery({
+    queryKey: getGetEvaluationConsoleQueryKey({ eventIds: eventIdsParam }),
+    queryFn: () => getEvaluationConsole({ eventIds: eventIdsParam }),
+    enabled: eventIdsParam !== "",
+    ...BACKGROUND_QUERY,
   });
   const { data: allEvaluations } = useGetEvaluations(undefined, {
     query: { queryKey: getGetEvaluationsQueryKey(), ...BACKGROUND_QUERY },
   });
 
   // ---- Evento selecionado (fresco, validade padrão de 30 s) ----
-  // Critérios/atribuições usam a MESMA chave das consultas de fundo (cache
-  // compartilhado, sem requisição duplicada); só a política de refetch é
-  // mais agressiva. As avaliações do evento selecionado têm chave própria.
-  useQuery({
+  // Critérios, atribuições e avaliações do evento selecionado têm consultas
+  // próprias, com as chaves que as mutações da Central invalidam; quando
+  // chegam, substituem a cópia de fundo daquele evento.
+  const { data: selectedCriteria } = useQuery({
     queryKey: ["event-criteria", selectedEventId] as unknown[],
     queryFn: () => getEventCriteria(selectedEventId as number),
     enabled: selectedEventId != null,
   });
-  useQuery({
+  const { data: selectedAssignments } = useQuery({
     queryKey: eventCriterionAssignmentsKey(selectedEventId),
     queryFn: () => getEventCriterionAssignments(selectedEventId as number),
     enabled: selectedEventId != null,
@@ -122,19 +115,43 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
     return idx;
   }, [allEvaluations, selectedEvaluationsData, selectedEventId]);
 
-  // Assinaturas estáveis: os arrays de useQueries são novos a cada render,
-  // mas `dataUpdatedAt` só muda quando algum dado realmente chegou.
-  const criteriaSig = criteriaQueries.map(q => q.dataUpdatedAt).join(",");
-  const assignSig = assignQueries.map(q => q.dataUpdatedAt).join(",");
+  // Índices evento → linhas. Para cada evento, a consulta própria (do evento
+  // selecionado agora ou de um que foi selecionado antes e editado) vence a
+  // cópia em lote quando é mais nova — assim trocar de evento não faz a fila
+  // voltar a mostrar o estado de antes da edição.
+  const criteriaByEvent = useMemo(
+    () => indexByEvent(consoleData?.criteria, consoleUpdatedAt, id => ["event-criteria", id]),
+    // selectedCriteria entra só para recalcular quando a consulta fresca chega.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [consoleData, consoleUpdatedAt, selectedCriteria, selectedEventId],
+  );
+  const assignmentsByEvent = useMemo(
+    () => indexByEvent(consoleData?.assignments, consoleUpdatedAt, id => eventCriterionAssignmentsKey(id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [consoleData, consoleUpdatedAt, selectedAssignments, selectedEventId],
+  );
+
+  function indexByEvent<T extends { eventId: number }>(rows: T[] | undefined, batchUpdatedAt: number, keyOf: (id: number) => readonly unknown[]) {
+    const m = new Map<number, T[]>();
+    for (const r of rows ?? []) {
+      const list = m.get(r.eventId);
+      if (list) list.push(r); else m.set(r.eventId, [r]);
+    }
+    for (const ev of configuredEvents) {
+      const state = qc.getQueryState<T[]>(keyOf(ev.id));
+      if (state?.data && state.dataUpdatedAt > batchUpdatedAt) m.set(ev.id, state.data);
+    }
+    return m;
+  }
 
   // Enriquece cada evento com o status real de cada critério (atribuído +
   // enviado), combinando roteamento (quem está designado) com o envio de
   // fato (evaluations). A tabela de atribuições NUNCA marca "submitted" —
   // isso só existe na avaliação em si.
   const enrichedEvents: EnrichedEvent[] = useMemo(() => {
-    return configuredEvents.map((ev, i) => {
-      const criteria = (criteriaQueries[i]?.data ?? []).filter(c => c.active);
-      const assignments = assignQueries[i]?.data ?? [];
+    return configuredEvents.map(ev => {
+      const criteria = (criteriaByEvent.get(ev.id) ?? []).filter(c => c.active);
+      const assignments = assignmentsByEvent.get(ev.id) ?? [];
       const assignByCrit = new Map(assignments.map(a => [a.criterionId, a]));
       const evalsByCrit = evalIndex.get(ev.id);
       const rows: CritRow[] = criteria.map(c => {
@@ -194,10 +211,7 @@ export function useConsoleData(selectedEventId: number | null, setSelectedEventI
         conformityEvaluatorFerramentasName: ev.conformityEvaluatorFerramentasName ?? null,
       };
     });
-  // criteriaQueries/assignQueries são lidos via índice; as assinaturas
-  // (dataUpdatedAt) representam o conteúdo deles de forma estável.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configuredEvents, criteriaSig, assignSig, evalIndex]);
+  }, [configuredEvents, criteriaByEvent, assignmentsByEvent, evalIndex]);
 
   return { allUsers, cycleWeekends, evalIndex, enrichedEvents };
 }

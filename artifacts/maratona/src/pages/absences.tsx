@@ -463,7 +463,7 @@ export default function AbsencesPage() {
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-center">
-                          <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: isMerit ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)", color: isMerit ? GOOD : WARNING }}>
+                          <span className="inline-block font-black px-2.5 py-1 rounded text-xs" style={{ backgroundColor: isMerit ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)", color: isMerit ? GOOD_TEXT : DANGER_TEXT }}>
                             {isMerit ? "+" : "−"}{a.points * a.quantity}
                           </span>
                         </td>
@@ -749,7 +749,7 @@ export default function AbsencesPage() {
 
             <div className="flex items-center justify-between px-4 py-3 rounded-lg font-black uppercase tracking-tight" style={{
               backgroundColor: previewKind === "merit" ? "rgba(154,176,0,0.15)" : "rgba(229,72,77,0.15)",
-              color: previewKind === "merit" ? GOOD : WARNING,
+              color: previewKind === "merit" ? GOOD_TEXT : DANGER_TEXT,
               border: `1px solid ${previewKind === "merit" ? "rgba(154,176,0,0.3)" : "rgba(229,72,77,0.3)"}`,
             }}>
               <span className="text-xs">{!editingAbsence && watchedDate2?.trim() ? "Total a lançar (×2 datas):" : "Total a lançar:"}</span>

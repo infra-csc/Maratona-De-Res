@@ -283,7 +283,7 @@ export default function MyPerformancePage() {
         <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto text-[var(--status-danger-text)] mb-2" style={{ backgroundColor: "var(--muted)" }}>
           <AlertTriangle size={28} />
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Acesso Restrito</h2>
+        <h1 className="text-2xl font-bold text-foreground">Meu Desempenho: acesso restrito</h1>
         <p className="text-muted-foreground text-sm">
           Seu perfil de usuário não está vinculado a um colaborador no sistema. O painel Meu Desempenho é exclusivo para participantes da Maratona de Resultados.
         </p>
