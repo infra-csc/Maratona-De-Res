@@ -26,6 +26,8 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   reporter: [
     ["list"],
+    // No CI, cada falha também vira anotação no commit (visível sem login).
+    ...(process.env.CI ? [["github"] as ["github"]] : []),
     ["html", { outputFolder: path.join(ROOT, "playwright-report"), open: "never" }],
   ],
   use: {

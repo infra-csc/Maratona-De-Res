@@ -84,7 +84,22 @@ jobs:
           NODE_ENV: production
 
       - name: E2E (Playwright)
-        run: pnpm run test:e2e
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run test:e2e 2>&1 | tee e2e-output.log
+
+      # Os logs do Actions pedem login mesmo em repositório público; as
+      # anotações não. Em falha, o fim da saída do teste e do log da API vira
+      # anotação, legível por quem acompanha o CI pela API ou pela página.
+      - name: Resumo da falha como anotação
+        if: failure()
+        shell: bash
+        run: |
+          esc() { sed -e "s/%/%25/g" | awk 1 ORS="%0A"; }
+          [ -f e2e-output.log ] && echo "::error title=E2E - saída do teste::$(tail -n 60 e2e-output.log | esc)"
+          [ -f test-results/e2e-api.log ] && echo "::error title=E2E - log da API::$(tail -n 40 test-results/e2e-api.log | esc)"
+          true
 
       - name: Relatório, traces e log da API (em falha)
         if: failure()
@@ -94,5 +109,6 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            e2e-output.log
           retention-days: 14
           if-no-files-found: ignore
