@@ -6,6 +6,7 @@ import {
 } from "@workspace/api-client-react";
 import type { PenaltyType } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { invalidateCycleResults } from "@/lib/invalidate-results";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -69,7 +70,7 @@ export default function PenaltyTypesPage() {
 
   const createMutation = useCreatePenaltyType({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: qKey }); toast({ title: "Tipo criado com sucesso" }); setOpen(false); },
+      onSuccess: () => { qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc); toast({ title: "Tipo criado com sucesso" }); setOpen(false); },
       onError: (e: { message?: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
     },
   });
@@ -77,7 +78,7 @@ export default function PenaltyTypesPage() {
   const updateMutation = useUpdatePenaltyType({
     mutation: {
       onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: qKey });
+        qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc);
         const retro = (data as PenaltyType & { retroactiveUpdated?: number }).retroactiveUpdated ?? 0;
         toast({
           title: "Tipo atualizado",
@@ -94,7 +95,7 @@ export default function PenaltyTypesPage() {
 
   const deleteMutation = useDeletePenaltyType({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: qKey }); setDeleteTargetId(null); toast({ title: "Tipo removido" }); },
+      onSuccess: () => { qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc); setDeleteTargetId(null); toast({ title: "Tipo removido" }); },
       onError: () => toast({ title: "Erro ao remover tipo", variant: "destructive" }),
     },
   });
@@ -102,7 +103,7 @@ export default function PenaltyTypesPage() {
   const seedMutation = useSeedDefaultPenaltyTypes({
     mutation: {
       onSuccess: (data) => {
-        qc.invalidateQueries({ queryKey: qKey });
+        qc.invalidateQueries({ queryKey: qKey }); invalidateCycleResults(qc);
         if (data.inserted === 0) {
           toast({ title: "Tipos padrão já existem", description: "Nenhum tipo novo foi inserido." });
         } else {
@@ -269,13 +270,14 @@ export default function PenaltyTypesPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5 col-span-2">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
-                <Input aria-invalid={!!errors.label} {...register("label", requiredText("Informe o nome do tipo."))} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-lg" style={fieldStyle} />
+                <Label htmlFor="ptype-label" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
+                <Input id="ptype-label" aria-invalid={!!errors.label} {...register("label", requiredText("Informe o nome do tipo."))} placeholder="Ex: Atraso Injustificado" className="h-11 rounded-lg" style={fieldStyle} />
                 <FieldError message={errors.label?.message} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Slug <span style={{ color: DANGER_TEXT }}>*</span></Label>
+                <Label htmlFor="ptype-slug" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Slug <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Input
+                  id="ptype-slug"
                   aria-invalid={!!errors.slug}
                   {...register("slug", editingType ? {} : requiredText("Informe o slug (identificador)."))}
                   placeholder="ex: atraso"
@@ -287,8 +289,9 @@ export default function PenaltyTypesPage() {
                 <FieldError message={errors.slug?.message} />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pontos <span style={{ color: DANGER_TEXT }}>*</span></Label>
+                <Label htmlFor="ptype-points" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Pontos <span style={{ color: DANGER_TEXT }}>*</span></Label>
                 <Input
+                  id="ptype-points"
                   type="number"
                   min="0"
                   aria-invalid={!!errors.points}
@@ -333,9 +336,9 @@ export default function PenaltyTypesPage() {
             )}
 
             <div className="space-y-1.5">
-              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo <span style={{ color: DANGER_TEXT }}>*</span></Label>
+              <Label htmlFor="ptype-kind" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Tipo <span style={{ color: DANGER_TEXT }}>*</span></Label>
               <Select value={watchedKind} onValueChange={v => setValue("kind", v as "penalty" | "merit")} disabled={!!editingType}>
-                <SelectTrigger className="h-11 rounded-lg" style={fieldStyle}>
+                <SelectTrigger id="ptype-kind" className="h-11 rounded-lg" style={fieldStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -351,7 +354,7 @@ export default function PenaltyTypesPage() {
                 <p className="font-bold uppercase text-xs tracking-wider">📍 Exige evento vinculado</p>
                 <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Obriga seleção de evento ao lançar.</p>
               </div>
-              <Switch checked={watchedRequiresEvent} onCheckedChange={v => setValue("requiresEvent", v)} />
+              <Switch aria-label="Exige evento vinculado" checked={watchedRequiresEvent} onCheckedChange={v => setValue("requiresEvent", v)} />
             </div>
 
             <div className="flex items-center justify-between py-2" style={{ borderTop: "1px solid var(--border)" }}>
@@ -359,7 +362,7 @@ export default function PenaltyTypesPage() {
                 <p className="font-bold uppercase text-xs tracking-wider">Ativo</p>
                 <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>Aparece no modal de novo lançamento.</p>
               </div>
-              <Switch checked={watchedActive} onCheckedChange={v => setValue("active", v)} />
+              <Switch aria-label="Tipo ativo" checked={watchedActive} onCheckedChange={v => setValue("active", v)} />
             </div>
 
             {/* Preview */}
