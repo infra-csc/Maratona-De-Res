@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AuditLog } from './auditLog';
+import type { AuditRefs } from './auditRefs';
 
 export interface AuditLogPage {
   data: AuditLog[];
   total: number;
   page: number;
   limit: number;
+  refs: AuditRefs;
 }

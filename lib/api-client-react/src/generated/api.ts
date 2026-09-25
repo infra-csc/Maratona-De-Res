@@ -83,6 +83,7 @@ import type {
   EmployeeUpdate,
   ErrorEnvelope,
   Evaluation,
+  EvaluationConsoleData,
   EvaluationInput,
   EvaluationUpdate,
   Event,
@@ -124,6 +125,7 @@ import type {
   GetCollaboratorsWithoutAccessParams,
   GetCycleEligibilityParams,
   GetEmployeesParams,
+  GetEvaluationConsoleParams,
   GetEvaluationsParams,
   GetEventsParams,
   GetQuarterlyResultsParams,
@@ -9587,7 +9589,7 @@ export const getGetAuditLogsUrl = (params?: GetAuditLogsParams,) => {
 }
 
 /**
- * @summary Get audit logs
+ * @summary Trilha de auditoria (admin/rh), com nomes resolvidos e segredos ocultos
  */
 export const getAuditLogs = async (params?: GetAuditLogsParams, options?: Parameters<typeof customFetch>[1]): Promise<AuditLogPage> => {
 
@@ -9634,7 +9636,7 @@ export type GetAuditLogsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get audit logs
+ * @summary Trilha de auditoria (admin/rh), com nomes resolvidos e segredos ocultos
  */
 
 export function useGetAuditLogs<TData = Awaited<ReturnType<typeof getAuditLogs>>, TError = ErrorType<unknown>>(
@@ -12966,6 +12968,92 @@ export const useUnreleaseEventFeedback = <TError = ErrorType<ErrorEnvelope>,
       > => {
       return useMutation(getUnreleaseEventFeedbackMutationOptions(options));
     }
+
+export const getGetEvaluationConsoleUrl = (params: GetEvaluationConsoleParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/evaluation-console?${stringifiedParams}` : `/evaluation-console`
+}
+
+/**
+ * Visão de gestor (admin, rh, diretoria, operador). Cada linha tem o mesmo
+ * formato de GET /events/{id}/criteria e GET /events/{id}/criterion-assignments.
+ * @summary Critérios e atribuições de vários eventos numa requisição (Central de Avaliações)
+ */
+export const getEvaluationConsole = async (params: GetEvaluationConsoleParams, options?: Parameters<typeof customFetch>[1]): Promise<EvaluationConsoleData> => {
+
+  return customFetch<EvaluationConsoleData>(getGetEvaluationConsoleUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEvaluationConsoleQueryKey = (params?: GetEvaluationConsoleParams,) => {
+    return [
+    `/evaluation-console`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEvaluationConsoleQueryOptions = <TData = Awaited<ReturnType<typeof getEvaluationConsole>>, TError = ErrorType<ErrorEnvelope>>(params: GetEvaluationConsoleParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEvaluationConsole>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEvaluationConsoleQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEvaluationConsole>>> = ({ signal }) => getEvaluationConsole(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEvaluationConsole>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEvaluationConsoleQueryResult = NonNullable<Awaited<ReturnType<typeof getEvaluationConsole>>>
+export type GetEvaluationConsoleQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Critérios e atribuições de vários eventos numa requisição (Central de Avaliações)
+ */
+
+export function useGetEvaluationConsole<TData = Awaited<ReturnType<typeof getEvaluationConsole>>, TError = ErrorType<ErrorEnvelope>>(
+ params: GetEvaluationConsoleParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEvaluationConsole>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEvaluationConsoleQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetEventCriterionAssignmentsUrl = (id: number,) => {
 

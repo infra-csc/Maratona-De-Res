@@ -1781,10 +1781,20 @@ export interface AuditLog {
   userId?: number | null;
   /** @nullable */
   userName?: string | null;
+  /**
+     * Admin que agiu em Modo Dev (userName é o usuário impersonado)
+     * @nullable
+     */
+  impersonatorName?: string | null;
   action: string;
   entity: string;
   /** @nullable */
   entityId?: string | null;
+  /**
+     * Nome do registro afetado (evento, pessoa, critério…), quando existe
+     * @nullable
+     */
+  entityLabel?: string | null;
   /** @nullable */
   beforeJson?: string | null;
   /** @nullable */
@@ -1792,11 +1802,36 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export type AuditRefsUsers = {[key: string]: string};
+
+export type AuditRefsEvents = {[key: string]: string};
+
+export type AuditRefsEmployees = {[key: string]: string};
+
+export type AuditRefsCriteria = {[key: string]: string};
+
+export type AuditRefsCycles = {[key: string]: string};
+
+export type AuditRefsAreas = {[key: string]: string};
+
+/**
+ * Nomes dos registros citados na página (id → nome), por tipo
+ */
+export interface AuditRefs {
+  users: AuditRefsUsers;
+  events: AuditRefsEvents;
+  employees: AuditRefsEmployees;
+  criteria: AuditRefsCriteria;
+  cycles: AuditRefsCycles;
+  areas: AuditRefsAreas;
+}
+
 export interface AuditLogPage {
   data: AuditLog[];
   total: number;
   page: number;
   limit: number;
+  refs: AuditRefs;
 }
 
 export interface IntegrationStatus {
@@ -2177,6 +2212,11 @@ export interface EventCriterionAssignment {
   updatedAt: string | null;
   /** @nullable */
   createdAt: string | null;
+}
+
+export interface EvaluationConsoleData {
+  criteria: EventCriterion[];
+  assignments: EventCriterionAssignment[];
 }
 
 export interface EventCriterionAssignmentRow {
@@ -2902,9 +2942,18 @@ employeeId: number;
 
 export type GetAuditLogsParams = {
 userId?: number;
+/**
+ * Um tipo de registro ou vários separados por vírgula
+ */
 entity?: string;
 action?: string;
+/**
+ * AAAA-MM-DD (início do dia, horário de Brasília) ou data-hora ISO
+ */
 from?: string;
+/**
+ * AAAA-MM-DD (fim do dia, horário de Brasília) ou data-hora ISO
+ */
 to?: string;
 page?: number;
 limit?: number;
@@ -2927,5 +2976,12 @@ export type GetCasaPinsParams = {
  * IDs de colaborador separados por vírgula (ex. 1,2,3). Ausente = todos.
  */
 ids?: string;
+};
+
+export type GetEvaluationConsoleParams = {
+/**
+ * IDs separados por vírgula (máximo 500)
+ */
+eventIds: string;
 };
 

@@ -12,10 +12,20 @@ export interface AuditLog {
   userId?: number | null;
   /** @nullable */
   userName?: string | null;
+  /**
+     * Admin que agiu em Modo Dev (userName é o usuário impersonado)
+     * @nullable
+     */
+  impersonatorName?: string | null;
   action: string;
   entity: string;
   /** @nullable */
   entityId?: string | null;
+  /**
+     * Nome do registro afetado (evento, pessoa, critério…), quando existe
+     * @nullable
+     */
+  entityLabel?: string | null;
   /** @nullable */
   beforeJson?: string | null;
   /** @nullable */

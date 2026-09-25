@@ -11,6 +11,7 @@ import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import type { DbOrTx, Tx } from "../lib/db-tx.js";
+import { loadEventCriteria, loadCriterionAssignments } from "../lib/event-console-data.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -168,37 +169,7 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
   const eventId = parseInt(req.params.id as string);
   const user = req.user!;
 
-  const allAssigned = await db.select({
-    id: eventCriterionAssignmentsTable.id,
-    eventId: eventCriterionAssignmentsTable.eventId,
-    criterionId: eventCriterionAssignmentsTable.criterionId,
-    criterionName: criteriaTable.name,
-    criterionAreaId: criteriaTable.responsibleAreaId,
-    assignedToId: eventCriterionAssignmentsTable.assignedToId,
-    assignedToName: usersTable.name,
-    status: eventCriterionAssignmentsTable.status,
-    redirectedFromId: eventCriterionAssignmentsTable.redirectedFromId,
-    confirmedAt: eventCriterionAssignmentsTable.confirmedAt,
-    updatedAt: eventCriterionAssignmentsTable.updatedAt,
-    createdAt: eventCriterionAssignmentsTable.createdAt,
-  })
-    .from(eventCriterionAssignmentsTable)
-    .leftJoin(criteriaTable, eq(eventCriterionAssignmentsTable.criterionId, criteriaTable.id))
-    .leftJoin(usersTable, eq(eventCriterionAssignmentsTable.assignedToId, usersTable.id))
-    .where(eq(eventCriterionAssignmentsTable.eventId, eventId))
-    .orderBy(criteriaTable.name);
-
-  // Enrich with redirectedFromName via a second look-up (alias not available in this drizzle version)
-  const redirectFromIds = [...new Set(allAssigned.map(a => a.redirectedFromId).filter((id): id is number => id != null))];
-  const redirectFromUsers = redirectFromIds.length > 0
-    ? await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable).where(inArray(usersTable.id, redirectFromIds))
-    : [];
-  const redirectFromMap = new Map(redirectFromUsers.map(u => [u.id, u.name]));
-
-  const enriched = allAssigned.map(a => ({
-    ...a,
-    redirectedFromName: a.redirectedFromId != null ? (redirectFromMap.get(a.redirectedFromId) ?? null) : null,
-  }));
+  const enriched = await loadCriterionAssignments([eventId]);
 
   if (user.role === "avaliador") {
     // Além das próprias, o avaliador principal de uma área vê TODAS as
@@ -277,6 +248,22 @@ router.get("/events/:id/criterion-assignments", async (req, res) => {
   }
 
   res.json(enriched);
+});
+
+// ---------------------------------------------------------------------------
+// GET /evaluation-console?eventIds=1,2,3
+// Central de Avaliações: critérios e atribuições de TODOS os eventos da fila
+// numa requisição (antes eram 2 por evento). Visão de gestor — o avaliador usa
+// as rotas por evento, que aplicam o filtro dele.
+// ---------------------------------------------------------------------------
+const CONSOLE_MAX_EVENTS = 500;
+router.get("/evaluation-console", requireRole("admin", "rh", "diretoria", "operador"), async (req, res) => {
+  const raw = String(req.query.eventIds ?? "").trim();
+  const eventIds = [...new Set(raw.split(",").map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n > 0))];
+  if (raw !== "" && eventIds.length === 0) { res.status(400).json({ error: "eventIds inválido: use números separados por vírgula" }); return; }
+  if (eventIds.length > CONSOLE_MAX_EVENTS) { res.status(400).json({ error: `No máximo ${CONSOLE_MAX_EVENTS} eventos por consulta` }); return; }
+  const [criteria, assignments] = await Promise.all([loadEventCriteria(eventIds), loadCriterionAssignments(eventIds)]);
+  res.json({ criteria, assignments });
 });
 
 // ---------------------------------------------------------------------------
