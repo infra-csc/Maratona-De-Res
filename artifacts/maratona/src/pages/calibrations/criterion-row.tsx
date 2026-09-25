@@ -172,6 +172,7 @@ export function CriterionRow({
                                 <div className="flex items-center justify-center gap-1">
                                   <input
                                     data-testid={`input-weight-${c.criterionId}`}
+                                    aria-label={`Peso de ${c.criterionName}`}
                                     type="text"
                                     inputMode="decimal"
                                     value={weightEdits[c.criterionId] ?? String(peso)}

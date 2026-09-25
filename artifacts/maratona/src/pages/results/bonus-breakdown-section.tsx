@@ -1,7 +1,7 @@
 import type { RankingDetailBonusBreakdown } from "@workspace/api-client-react";
 import { Wallet2 } from "lucide-react";
 import { cn, fmtDate, fmtNum } from "@/lib/utils";
-import { CONDENSED, WARNING, AMBER, GOOD } from "@/lib/premium-theme";
+import { CONDENSED, WARNING, AMBER, GOOD_TEXT } from "@/lib/premium-theme";
 import { contrastingTextColor, fmtBRL, fmtBRLShort } from "./helpers";
 
 const BONUS_STATUS_LABEL: Record<string, string> = {
@@ -83,7 +83,7 @@ export function BonusBreakdownSection({ bd }: { bd: BonusBreakdownData }) {
                       <span>· nota {fmtNum(ev.eventScore, 1)}</span>
                     </div>
                   </div>
-                  <span className="font-black text-[12px] shrink-0" style={{ color: ev.value > 0 ? GOOD : "var(--muted-foreground)" }}>
+                  <span className="font-black text-[12px] shrink-0" style={{ color: ev.value > 0 ? GOOD_TEXT : "var(--muted-foreground)" }}>
                     {ev.value > 0 ? "+" + fmtBRLShort(ev.value) : "R$ 0"}
                   </span>
                 </div>

@@ -30,3 +30,19 @@ Antes do primeiro pull que traz índices únicos novos, rode
 `scripts/sql/check-duplicates.sql`; se devolver linhas, rode
 `scripts/sql/dedupe-before-unique.sql` dentro de uma transação, conferindo
 antes do COMMIT.
+
+## Datas: `timestamptz` (migração 0002)
+
+Toda coluna de instante é `timestamp with time zone`, declarada com
+`timestamptz(...)` de `src/schema/columns.ts` — não use `timestamp(...)` do
+Drizzle em coluna nova. Os valores sempre foram UTC; a 0002 converte com
+`AT TIME ZONE 'UTC'` (independe do fuso de quem roda) e é idempotente.
+
+**Ordem em produção (obrigatória):** publicar o app novo PRIMEIRO e só depois
+rodar `migrate:deploy` no banco de produção. O app novo lê os dois formatos; o
+app antigo não lê o formato novo (as datas viram inválidas). Entre os dois
+passos o app funciona normalmente.
+
+Nas migrações, prefira SQL idempotente (`IF NOT EXISTS`, blocos `DO` que
+conferem o estado): o mesmo arquivo roda no banco do Shell pelo pós-merge e
+depois, à mão, no de produção.

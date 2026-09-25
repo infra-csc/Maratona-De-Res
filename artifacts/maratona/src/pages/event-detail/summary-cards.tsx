@@ -1,6 +1,6 @@
 // Cards de indicadores do topo: nota do evento, participantes, critérios
 // avaliados e itens não conformes da Matriz.
-import { CONDENSED, WARNING } from "@/lib/premium-theme";
+import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
 import { CONFORMITY_ITEMS, fmt } from "./helpers";
 import type { ConformityForm, EventDetail, EventTeamResult } from "./types";
 
@@ -35,7 +35,7 @@ export function SummaryCards({ event, result, conformityForm, activeCriteriaCoun
         <div className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Critérios Avaliados</div>
       </div>
       <div className="rounded-xl p-4" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED, color: nonConformCount > 0 ? WARNING : "var(--foreground)" }}>{nonConformCount}</div>
+        <div className="font-black text-2xl leading-none" style={{ fontFamily: CONDENSED, color: nonConformCount > 0 ? DANGER_TEXT : "var(--foreground)" }}>{nonConformCount}</div>
         <div className="text-[11px] font-bold uppercase tracking-wide mt-1.5" style={{ color: "var(--muted-foreground)" }}>Itens Não Conformes</div>
       </div>
     </div>

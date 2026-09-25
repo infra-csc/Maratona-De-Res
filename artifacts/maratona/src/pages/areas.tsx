@@ -217,7 +217,7 @@ export default function AreasPage() {
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
                         <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Status</span>
-                        <Switch checked={a.active} onCheckedChange={v => updateMutation.mutate({ id: a.id, data: { active: v } })} />
+                        <Switch aria-label={`Área ${a.name} ${a.active ? "ativa" : "inativa"}`} checked={a.active} onCheckedChange={v => updateMutation.mutate({ id: a.id, data: { active: v } })} />
                       </div>
                     </div>
 

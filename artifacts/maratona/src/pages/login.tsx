@@ -77,20 +77,21 @@ export default function LoginPage() {
       style={{ backgroundColor: PAGE_BG }}
     >
       {/* Branding */}
-      <div className="mb-10 text-center select-none">
-        <p
-          className="text-6xl font-black uppercase leading-none tracking-tight"
+      {/* A marca é o título da tela (único h1) para leitores de tela. */}
+      <h1 className="mb-10 text-center select-none">
+        <span
+          className="block text-6xl font-black uppercase leading-none tracking-tight"
           style={{ fontFamily: CONDENSED, color: ACCENT }}
         >
           Maratona
-        </p>
-        <p
-          className="text-6xl font-black uppercase leading-none tracking-tight"
+        </span>
+        <span
+          className="block text-6xl font-black uppercase leading-none tracking-tight"
           style={{ fontFamily: CONDENSED, color: "rgba(255,255,255,0.30)" }}
         >
           de Resultados
-        </p>
-      </div>
+        </span>
+      </h1>
 
       {/* Card */}
       <div className="w-full" style={{ maxWidth: 420 }}>

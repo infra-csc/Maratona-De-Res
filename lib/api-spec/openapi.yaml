@@ -2370,7 +2370,7 @@ paths:
     get:
       operationId: getAuditLogs
       tags: [audit]
-      summary: Get audit logs
+      summary: Trilha de auditoria (admin/rh), com nomes resolvidos e segredos ocultos
       parameters:
         - name: userId
           in: query
@@ -2378,6 +2378,7 @@ paths:
             type: integer
         - name: entity
           in: query
+          description: Um tipo de registro ou vários separados por vírgula
           schema:
             type: string
         - name: action
@@ -2386,10 +2387,12 @@ paths:
             type: string
         - name: from
           in: query
+          description: AAAA-MM-DD (início do dia, horário de Brasília) ou data-hora ISO
           schema:
             type: string
         - name: to
           in: query
+          description: AAAA-MM-DD (fim do dia, horário de Brasília) ou data-hora ISO
           schema:
             type: string
         - name: page
@@ -3298,6 +3301,35 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "404":
           description: Evento não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /evaluation-console:
+    get:
+      operationId: getEvaluationConsole
+      tags: [events]
+      summary: Critérios e atribuições de vários eventos numa requisição (Central de Avaliações)
+      description: |
+        Visão de gestor (admin, rh, diretoria, operador). Cada linha tem o mesmo
+        formato de GET /events/{id}/criteria e GET /events/{id}/criterion-assignments.
+      parameters:
+        - name: eventIds
+          in: query
+          required: true
+          description: IDs separados por vírgula (máximo 500)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationConsoleData"
+        "400":
+          description: eventIds inválido
           content:
             application/json:
               schema:
@@ -6512,12 +6544,18 @@ components:
           type: ["integer", "null"]
         userName:
           type: ["string", "null"]
+        impersonatorName:
+          type: ["string", "null"]
+          description: Admin que agiu em Modo Dev (userName é o usuário impersonado)
         action:
           type: string
         entity:
           type: string
         entityId:
           type: ["string", "null"]
+        entityLabel:
+          type: ["string", "null"]
+          description: Nome do registro afetado (evento, pessoa, critério…), quando existe
         beforeJson:
           type: ["string", "null"]
         afterJson:
@@ -6527,7 +6565,7 @@ components:
 
     AuditLogPage:
       type: object
-      required: [data, total, page, limit]
+      required: [data, total, page, limit, refs]
       properties:
         data:
           type: array
@@ -6539,6 +6577,20 @@ components:
           type: integer
         limit:
           type: integer
+        refs:
+          $ref: "#/components/schemas/AuditRefs"
+
+    AuditRefs:
+      type: object
+      description: Nomes dos registros citados na página (id → nome), por tipo
+      required: [users, events, employees, criteria, cycles, areas]
+      properties:
+        users: { type: object, additionalProperties: { type: string } }
+        events: { type: object, additionalProperties: { type: string } }
+        employees: { type: object, additionalProperties: { type: string } }
+        criteria: { type: object, additionalProperties: { type: string } }
+        cycles: { type: object, additionalProperties: { type: string } }
+        areas: { type: object, additionalProperties: { type: string } }
 
     IntegrationStatus:
       type: object
@@ -7125,6 +7177,19 @@ components:
     CriterionAssignmentStatus:
       type: string
       enum: [pending, suggested, confirmed, submitted]
+
+    EvaluationConsoleData:
+      type: object
+      required: [criteria, assignments]
+      properties:
+        criteria:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventCriterion"
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventCriterionAssignment"
 
     EventCriterionAssignment:
       type: object

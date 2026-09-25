@@ -4,7 +4,7 @@ import type { QuarterlyResult } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Download, Search, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CONDENSED, WARNING, AMBER } from "@/lib/premium-theme";
+import { CONDENSED, WARNING, AMBER_TEXT } from "@/lib/premium-theme";
 import { useSort, onKeyActivate, fmtScore, fieldStyle, type SortDir } from "./helpers";
 import { SortIcon, FaixaBadge } from "./badges";
 import { PlatoonDistributionPanel } from "./platoon-distribution-panel";
@@ -172,7 +172,7 @@ export function ConsolidationTab({ isManager }: { isManager: boolean }) {
                           className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full"
                           style={{
                             backgroundColor: (r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? "rgba(232,162,61,0.14)" : "var(--primary)",
-                            color: (r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? AMBER : "var(--primary-foreground)",
+                            color: (r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? AMBER_TEXT : "var(--primary-foreground)",
                           }}
                           title={(r.participatedEventsCount ?? 0) > (r.eventsCount ?? 0) ? "Participou em mais eventos do que os que entraram na nota" : undefined}
                         >

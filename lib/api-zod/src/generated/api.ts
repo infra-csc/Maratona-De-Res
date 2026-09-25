@@ -4384,14 +4384,14 @@ export const GetRankingDetailResponse = zod.object({
 
 
 /**
- * @summary Get audit logs
+ * @summary Trilha de auditoria (admin/rh), com nomes resolvidos e segredos ocultos
  */
 export const GetAuditLogsQueryParams = zod.object({
   "userId": zod.coerce.number().int().optional(),
-  "entity": zod.coerce.string().optional(),
+  "entity": zod.coerce.string().optional().describe('Um tipo de registro ou vários separados por vírgula'),
   "action": zod.coerce.string().optional(),
-  "from": zod.coerce.string().optional(),
-  "to": zod.coerce.string().optional(),
+  "from": zod.coerce.string().optional().describe('AAAA-MM-DD (início do dia, horário de Brasília) ou data-hora ISO'),
+  "to": zod.coerce.string().optional().describe('AAAA-MM-DD (fim do dia, horário de Brasília) ou data-hora ISO'),
   "page": zod.coerce.number().int().optional(),
   "limit": zod.coerce.number().int().optional()
 })
@@ -4401,16 +4401,26 @@ export const GetAuditLogsResponse = zod.object({
   "id": zod.int(),
   "userId": zod.int().nullish(),
   "userName": zod.string().nullish(),
+  "impersonatorName": zod.string().nullish().describe('Admin que agiu em Modo Dev (userName é o usuário impersonado)'),
   "action": zod.string(),
   "entity": zod.string(),
   "entityId": zod.string().nullish(),
+  "entityLabel": zod.string().nullish().describe('Nome do registro afetado (evento, pessoa, critério…), quando existe'),
   "beforeJson": zod.string().nullish(),
   "afterJson": zod.string().nullish(),
   "createdAt": zod.string()
 })),
   "total": zod.int(),
   "page": zod.int(),
-  "limit": zod.int()
+  "limit": zod.int(),
+  "refs": zod.object({
+  "users": zod.record(zod.string(), zod.string()),
+  "events": zod.record(zod.string(), zod.string()),
+  "employees": zod.record(zod.string(), zod.string()),
+  "criteria": zod.record(zod.string(), zod.string()),
+  "cycles": zod.record(zod.string(), zod.string()),
+  "areas": zod.record(zod.string(), zod.string())
+}).describe('Nomes dos registros citados na página (id → nome), por tipo')
 })
 
 
@@ -5282,6 +5292,54 @@ export const UnreleaseEventFeedbackParams = zod.object({
 
 export const UnreleaseEventFeedbackResponse = zod.object({
   "success": zod.boolean()
+})
+
+
+/**
+ * Visão de gestor (admin, rh, diretoria, operador). Cada linha tem o mesmo
+ * formato de GET /events/{id}/criteria e GET /events/{id}/criterion-assignments.
+ * @summary Critérios e atribuições de vários eventos numa requisição (Central de Avaliações)
+ */
+export const GetEvaluationConsoleQueryParams = zod.object({
+  "eventIds": zod.coerce.string().describe('IDs separados por vírgula (máximo 500)')
+})
+
+export const GetEvaluationConsoleResponse = zod.object({
+  "criteria": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaId": zod.int().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional(),
+  "sourceCriterionId": zod.int().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
+})),
+  "assignments": zod.array(zod.object({
+  "id": zod.int().nullable().describe('null nas linhas "virtuais" do avaliador principal (critério ainda sem atribuição gravada).'),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "criterionName": zod.string().nullable(),
+  "criterionAreaId": zod.int().nullable(),
+  "assignedToId": zod.int().nullable(),
+  "assignedToName": zod.string().nullable(),
+  "status": zod.enum(['pending', 'suggested', 'confirmed', 'submitted']),
+  "redirectedFromId": zod.int().nullable(),
+  "redirectedFromName": zod.string().nullable(),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date().nullable()
+}))
 })
 
 

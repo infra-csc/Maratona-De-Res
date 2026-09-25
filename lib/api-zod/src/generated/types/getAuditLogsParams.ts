@@ -8,9 +8,18 @@
 
 export type GetAuditLogsParams = {
 userId?: number;
+/**
+ * Um tipo de registro ou vários separados por vírgula
+ */
 entity?: string;
 action?: string;
+/**
+ * AAAA-MM-DD (início do dia, horário de Brasília) ou data-hora ISO
+ */
 from?: string;
+/**
+ * AAAA-MM-DD (fim do dia, horário de Brasília) ou data-hora ISO
+ */
 to?: string;
 page?: number;
 limit?: number;

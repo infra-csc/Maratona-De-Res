@@ -1,4 +1,6 @@
-import { pgTable, serial, text, boolean, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer} from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areasTable } from "./areas";
@@ -17,11 +19,11 @@ export const usersTable = pgTable("users", {
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   pinValue: text("pin_value").unique(),
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
-  lockedUntil: timestamp("locked_until"),
+  lockedUntil: timestamptz("locked_until"),
   // Versão das sessões: incrementada ao desativar, trocar papel ou senha. O JWT
   // carrega "tv"; se divergir do banco, requireAuth recusa o token.
   tokenVersion: integer("token_version").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });

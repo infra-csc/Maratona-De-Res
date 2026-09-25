@@ -31,7 +31,7 @@ export function LinkDialog(props: {
   } = props;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+      <div role="dialog" aria-modal="true" aria-label={`Link freelancer: ${linkDialog.criterionNames.join(", ")}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         {/* header */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
           <div className="min-w-0">
@@ -78,6 +78,7 @@ export function LinkDialog(props: {
               <input
                 type="text"
                 value={linkRecipientName}
+                aria-label="Para quem é o link"
                 onChange={e => setLinkRecipientName(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") handleGenerateLink(); }}
                 placeholder="Nome do freelancer"
@@ -103,6 +104,7 @@ export function LinkDialog(props: {
               <div className="flex gap-2 items-start">
                 <input
                   readOnly
+                  aria-label="Link gerado"
                   value={generatedLinkUrl}
                   className="flex-1 rounded-lg px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
                   style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}
@@ -192,7 +194,7 @@ export function ConformityLinkDialog(props: {
   } = props;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
+      <div role="dialog" aria-modal="true" aria-label={`Link freelancer de conformidade: ${conformityLinkDialog.label}`} className="rounded-xl w-full max-w-md overflow-hidden" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--secondary)" }}>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--muted-foreground)" }}>Link Freelancer · Conformidade</p>
@@ -222,6 +224,7 @@ export function ConformityLinkDialog(props: {
                 <input
                   type="text"
                   value={conformityLinkRecipientName}
+                  aria-label="Para quem é o link"
                   onChange={e => setConformityLinkRecipientName(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") handleGenerateConformityLink(); }}
                   placeholder="Nome do freelancer"
@@ -245,6 +248,7 @@ export function ConformityLinkDialog(props: {
               <div className="flex gap-2 items-start">
                 <input
                   readOnly
+                  aria-label="Link gerado"
                   value={conformityLinkUrl}
                   className="flex-1 rounded-lg px-2 py-1.5 text-xs font-mono truncate focus:outline-none"
                   style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}

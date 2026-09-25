@@ -1,4 +1,5 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text} from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -7,7 +8,7 @@ export const rulesTable = pgTable("rules", {
   key: text("key").notNull().unique(),
   value: text("value").notNull(),
   description: text("description").notNull(),
-  updatedAt: timestamp("updated_at"),
+  updatedAt: timestamptz("updated_at"),
 });
 
 export const insertRuleSchema = createInsertSchema(rulesTable).omit({ id: true });

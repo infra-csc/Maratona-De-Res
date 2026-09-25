@@ -1,4 +1,6 @@
-import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text} from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { eventsTable } from "./events";
@@ -11,8 +13,8 @@ export const eventReviewRequestsTable = pgTable("event_review_requests", {
   employeeId: integer("employee_id").notNull().references(() => employeesTable.id),
   comment: text("comment").notNull(),
   status: text("status").notNull().default("pending"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
+  resolvedAt: timestamptz("resolved_at"),
   resolvedByUserId: integer("resolved_by_user_id").references(() => usersTable.id),
   resolutionNotes: text("resolution_notes"),
 });

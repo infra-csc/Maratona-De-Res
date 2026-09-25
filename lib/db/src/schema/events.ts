@@ -1,4 +1,6 @@
-import { pgTable, serial, text, boolean, integer, numeric, timestamp, date, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, numeric, date, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeesTable } from "./employees";
@@ -20,9 +22,9 @@ export const eventsTable = pgTable("events", {
   forcedClosed: boolean("forced_closed").notNull().default(false),
   forcedCloseReason: text("forced_close_reason"),
   feedbackReleased: boolean("feedback_released").notNull().default(false),
-  feedbackReleasedAt: timestamp("feedback_released_at"),
+  feedbackReleasedAt: timestamptz("feedback_released_at"),
   criteriaConfirmed: boolean("criteria_confirmed").notNull().default(false),
-  criteriaConfirmedAt: timestamp("criteria_confirmed_at"),
+  criteriaConfirmedAt: timestamptz("criteria_confirmed_at"),
   // Evento histórico importado sem avaliação individual por critério: a nota
   // já vem pronta (calibrada) de uma planilha/fonte externa e é usada
   // diretamente como eventScore/calibratedEventScore/finalEventScore em
@@ -39,7 +41,7 @@ export const eventsTable = pgTable("events", {
   // (inclusive eventos já existentes/fechados/pagos): nada conta até ser
   // confirmado manualmente. Ver recomputeCycleResults em routes/results.ts.
   resultsConfirmed: boolean("results_confirmed").notNull().default(false),
-  resultsConfirmedAt: timestamp("results_confirmed_at"),
+  resultsConfirmedAt: timestamptz("results_confirmed_at"),
   resultsConfirmedBy: integer("results_confirmed_by").references(() => usersTable.id),
   // Usuário responsável por preencher a Matriz de Conformidade via Central de Avaliações.
   // null = RH/Admin preenche diretamente na página do evento (comportamento legado).
@@ -47,7 +49,7 @@ export const eventsTable = pgTable("events", {
   conformityEvaluatorUserId: integer("conformity_evaluator_user_id").references(() => usersTable.id),
   // Grupo 1 (Ferramentas e Case/Giovanni): apenas guardaEquipamentos
   conformityEvaluatorFerramentasUserId: integer("conformity_evaluator_ferramentas_user_id").references(() => usersTable.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   externalIdUq: uniqueIndex("events_external_id_uq").on(t.externalId),
 }));
@@ -77,7 +79,7 @@ export const eventParticipantsTable = pgTable("event_participants", {
   // Equivale a "Realizadas = Previstas" para fins de nota/elegibilidade.
   // diariaQuickConfirmedAt registra quando ocorreu (auditoria).
   diariaQuickConfirmed: boolean("diaria_quick_confirmed").default(false),
-  diariaQuickConfirmedAt: timestamp("diaria_quick_confirmed_at"),
+  diariaQuickConfirmedAt: timestamptz("diaria_quick_confirmed_at"),
   // Comentário livre sobre o colaborador nesse evento (ex.: justificativa de
   // diárias não cumpridas ou de marcação como inativo). Preenchido manualmente
   // por admin/RH; exibido na UI apenas quando há descumprimento de diárias
@@ -98,7 +100,7 @@ export const eventCommentsTable = pgTable("event_comments", {
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => usersTable.id),
   message: text("message").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
 });
 
 export const insertEventSchema = createInsertSchema(eventsTable).omit({ id: true, createdAt: true });

@@ -55,6 +55,7 @@ export function EventPicker({
                 type="button"
                 role="combobox"
                 data-testid="select-event"
+                aria-label="Evento para calibrar"
                 disabled={calibratableEvents.length === 0}
                 className="w-full h-9 px-3 flex items-center justify-between gap-2 text-left transition-opacity hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed rounded-none"
                 style={{ backgroundColor: "var(--secondary)", border: "2px solid var(--border)", color: "var(--foreground)" }}

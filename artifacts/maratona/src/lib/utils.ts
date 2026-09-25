@@ -43,7 +43,7 @@ export interface CycleWeekend {
   sat: string;
   /** Domingo, "YYYY-MM-DD". */
   sun: string;
-  /** Rótulo curto "DD–DD/MM". */
+  /** Rótulo curto "DD–DD/MM" (ou "DD/MM–DD/MM" na virada do mês). */
   label: string;
 }
 
@@ -61,7 +61,13 @@ export function getCycleWeekends(startDate?: string | null, endDate?: string | n
     const sat = d.toISOString().split("T")[0];
     const sunD = new Date(d); sunD.setDate(sunD.getDate() + 1);
     const sun = sunD.toISOString().split("T")[0];
-    const label = `${String(d.getDate()).padStart(2, "0")}–${String(sunD.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const dd = (x: Date) => String(x.getDate()).padStart(2, "0");
+    const mm = (x: Date) => String(x.getMonth() + 1).padStart(2, "0");
+    // Fim de semana que vira o mês leva os dois meses ("31/10–01/11"); antes
+    // saía "31–01/10", com o domingo no mês errado.
+    const label = d.getMonth() === sunD.getMonth()
+      ? `${dd(d)}–${dd(sunD)}/${mm(d)}`
+      : `${dd(d)}/${mm(d)}–${dd(sunD)}/${mm(sunD)}`;
     result.push({ sat, sun, label });
     d.setDate(d.getDate() + 7);
   }

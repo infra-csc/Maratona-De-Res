@@ -40,12 +40,12 @@ export function ConformityAssignmentList(props: {
           return (
             <div key={cf.key} className="rounded-lg px-3.5 py-3 relative overflow-hidden" style={{ border: "1px solid var(--border)" }}>
               <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: cfg.accent }} />
-              <div className="flex items-center justify-between gap-2.5">
-                <div>
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <div className="min-w-0">
                   <div className="font-black uppercase text-sm" style={{ fontFamily: CONDENSED }}>{cf.name}</div>
                   <div className="text-[11px] font-bold uppercase mt-0.5" style={{ color: "var(--muted-foreground)" }}>{cf.scope} · {cf.evaluatorName ?? "Sem avaliador"}</div>
                 </div>
-                <div className="flex items-center gap-2 whitespace-nowrap">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{cf.filled}/{cf.total}</span>
                   {cf.filled > 0 && canViewSubmissions && (
                     <button

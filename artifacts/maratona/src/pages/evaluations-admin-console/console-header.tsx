@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { cn } from "@/lib/utils";
 import { ClipboardCheck, Table2, Users, SlidersHorizontal } from "lucide-react";
-import { CONDENSED, WARNING, AMBER, AMBER_TEXT } from "@/lib/premium-theme";
+import { CONDENSED, WARNING, AMBER, AMBER_TEXT, DANGER_TEXT } from "@/lib/premium-theme";
 import type { ConsoleView, EnrichedEvent, QueueTab } from "./types";
 
 /** Header: título + switcher de abas */
@@ -16,7 +16,8 @@ export function ConsoleHeader({ view, setView, isOperador }: {
         <h1 className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Central de Avaliações</h1>
         <p className="text-[11px] font-bold uppercase tracking-wide mt-0.5" style={{ color: "var(--muted-foreground)" }}>Acompanhe o progresso e atribua avaliadores</p>
       </div>
-      <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
+      {/* No celular as abas dividem a largura (sem ícone) para caber as quatro. */}
+      <div className="flex w-full md:w-auto rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid var(--border)" }}>
         {(() => {
           const tabs = ([
             { key: "assign", label: "Atribuição", Icon: ClipboardCheck },
@@ -33,8 +34,9 @@ export function ConsoleHeader({ view, setView, isOperador }: {
             key={v.key}
             type="button"
             onClick={() => setView(v.key)}
+            aria-pressed={view === v.key}
             className={cn(
-              "px-3.5 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors",
+              "flex-1 md:flex-none justify-center px-2 md:px-3.5 py-2 text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors",
               idx < tabs.length - 1 && "border-r",
             )}
             style={{
@@ -44,7 +46,7 @@ export function ConsoleHeader({ view, setView, isOperador }: {
               color: view === v.key ? "var(--primary-foreground)" : "var(--muted-foreground)",
             }}
           >
-            <v.Icon size={13} /> {v.label}
+            <v.Icon size={13} className="hidden sm:inline" aria-hidden="true" /> {v.label}
           </button>
           ));
         })()}
@@ -85,7 +87,7 @@ export function KpiStrip({ todoCount, selected, currentWeekendDoneCount, pending
       >
         <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: AMBER_TEXT }}>{pendingEvaluatorsCount}</div>
         <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Avaliadores pendentes</div>
-        <div className="text-[11px] mt-0.5" style={{ color: noEvaluatorFilter ? AMBER : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
+        <div className="text-[11px] mt-0.5" style={{ color: noEvaluatorFilter ? AMBER_TEXT : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
       </button>
       <button
         type="button"
@@ -93,9 +95,9 @@ export function KpiStrip({ todoCount, selected, currentWeekendDoneCount, pending
         className="rounded-xl p-3.5 text-left transition-opacity hover:opacity-80"
         style={{ backgroundColor: noEvaluatorFilter ? `rgba(229,72,77,0.12)` : (selected?.unassigned ?? 0) > 0 ? `rgba(229,72,77,0.06)` : "var(--card)", border: noEvaluatorFilter ? `1px solid ${WARNING}` : (selected?.unassigned ?? 0) > 0 ? `1px solid ${WARNING}44` : "1px solid var(--border)" }}
       >
-        <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: (selected?.unassigned ?? 0) > 0 ? WARNING : "var(--foreground)" }}>{selected?.unassigned ?? 0}</div>
+        <div className="text-3xl font-black leading-none" style={{ fontFamily: CONDENSED, color: (selected?.unassigned ?? 0) > 0 ? DANGER_TEXT : "var(--foreground)" }}>{selected?.unassigned ?? 0}</div>
         <div className="text-[11px] font-bold uppercase tracking-wide mt-1" style={{ color: "var(--muted-foreground)" }}>Critérios sem avaliador</div>
-        <div className="text-[11px] mt-0.5" style={{ color: noEvaluatorFilter ? WARNING : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
+        <div className="text-[11px] mt-0.5" style={{ color: noEvaluatorFilter ? DANGER_TEXT : "var(--muted-foreground)", opacity: 0.8 }}>{noEvaluatorFilter ? "Filtro ativo — clique para limpar" : "Filtrar eventos →"}</div>
       </button>
     </div>
   );

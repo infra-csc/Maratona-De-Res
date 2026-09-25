@@ -10,6 +10,7 @@ import { freezeEventCriteriaWeights } from "./evaluations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { participantCountsForScore } from "../lib/participation.js";
 import { pgNum, affectedRows } from "../lib/pg-num.js";
+import { loadEventCriteria } from "../lib/event-console-data.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -1435,39 +1436,7 @@ router.post("/events/:id/conformity", async (req, res) => {
 
 router.get("/events/:id/criteria", async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const partialPubAlias = aliasedTable(usersTable, "partial_pub");
-  const finalPubAlias = aliasedTable(usersTable, "final_pub");
-  const criteria = await db
-    .select({
-      id: eventCriteriaTable.id,
-      eventId: eventCriteriaTable.eventId,
-      criterionId: eventCriteriaTable.criterionId,
-      criterionName: criteriaTable.name,
-      criterionDescription: criteriaTable.description,
-      responsibleAreaId: criteriaTable.responsibleAreaId,
-      responsibleAreaName: areasTable.name,
-      active: eventCriteriaTable.active,
-      originalWeight: criteriaTable.defaultWeight,
-      weightOverride: eventCriteriaTable.weightOverride,
-      eventScoped: criteriaTable.eventScoped,
-      sourceCriterionId: criteriaTable.sourceCriterionId,
-      partialPublishedAt: eventCriteriaTable.partialPublishedAt,
-      finalPublishedAt: eventCriteriaTable.finalPublishedAt,
-      partialPublishedByUserName: partialPubAlias.name,
-      finalPublishedByUserName: finalPubAlias.name,
-    })
-    .from(eventCriteriaTable)
-    .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
-    .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
-    .leftJoin(partialPubAlias, eq(eventCriteriaTable.partialPublishedByUserId, partialPubAlias.id))
-    .leftJoin(finalPubAlias, eq(eventCriteriaTable.finalPublishedByUserId, finalPubAlias.id))
-    .where(eq(eventCriteriaTable.eventId, id));
-  const activeCriteria = criteria.filter(c => c.active);
-  const totalWeight = activeCriteria.reduce((s, c) => s + parseFloat(c.weightOverride ?? c.originalWeight ?? "1"), 0);
-  res.json(criteria.map(c => {
-    const w = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    return { ...c, originalWeight: parseFloat(c.originalWeight ?? "1"), weightOverride: c.weightOverride ? parseFloat(c.weightOverride) : null, normalizedWeight: c.active && totalWeight > 0 ? w / totalWeight : 0, weight: c.active ? w : 0 };
-  }));
+  res.json(await loadEventCriteria([id]));
 });
 
 

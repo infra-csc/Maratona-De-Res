@@ -1,4 +1,6 @@
-import { pgTable, serial, integer, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, index } from "drizzle-orm/pg-core";
+import { timestamptz } from "./columns";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -14,7 +16,7 @@ export const auditLogsTable = pgTable("audit_logs", {
   entityId: text("entity_id"),
   beforeJson: text("before_json"),
   afterJson: text("after_json"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamptz("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   entityIdx: index("audit_logs_entity_idx").on(t.entity, t.entityId, t.createdAt),
 }));
