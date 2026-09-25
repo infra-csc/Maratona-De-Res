@@ -38,7 +38,10 @@ export function signToken(payload: JwtPayload): string {
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, _JWT_SECRET) as unknown as JwtPayload;
+  const decoded = jwt.verify(token, _JWT_SECRET);
+  // Nossos tokens são sempre objetos; string aqui seria um token alheio.
+  if (typeof decoded === "string") throw new Error("Token em formato inesperado");
+  return decoded as JwtPayload;
 }
 
 declare global {

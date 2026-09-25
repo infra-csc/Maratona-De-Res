@@ -26,6 +26,7 @@ import {
   getCriterionEvaluationStatus, mergeEventScopedCriteria,
 } from "./calculations.js";
 import { participantCountsForScore, isInformationalFunction } from "./participation.js";
+import { pgNum } from "./pg-num.js";
 
 // ─── Nota do TIME de um evento ──────────────────────────────────────────────
 
@@ -104,10 +105,10 @@ export function computeEventTeamResultFromData<TConformity extends ConformityLik
   const criteriaDetails = displayCriteria.map(c => {
     const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
     const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
-    const evalScores = submittedEvals.map(e => parseFloat(e.score as unknown as string));
+    const evalScores = submittedEvals.map(e => pgNum(e.score));
     const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
     const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
-    const calibratedScore = calibration ? parseFloat(calibration.calibratedScore as unknown as string) : null;
+    const calibratedScore = calibration ? pgNum(calibration.calibratedScore) : null;
     const calibrationReason = calibration?.calibrationReason ?? null;
     const scoreUsed = calibratedScore !== null ? calibratedScore : averageScore;
     const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
@@ -353,7 +354,7 @@ export function buildCycleResults<TConformity extends ConformityLike>(input: Cyc
       .filter(p => p.confirmed !== false && participantCountsForScore(p));
 
     if (ev.isHistorical) {
-      const historicalScore = parseFloat(ev.importedScore as unknown as string);
+      const historicalScore = pgNum(ev.importedScore);
       eventScoreById.set(ev.id, historicalScore);
       eventDateById.set(ev.id, ev.startDate);
       const platoonProj = getPlatoonByScore(historicalScore, platoonRules);
@@ -486,9 +487,9 @@ export function buildCycleResults<TConformity extends ConformityLike>(input: Cyc
     // valor recalculado diverge do que já foi (ou será) pago.
     const prev = paymentByEmployee.get(employeeId);
     const keepPayment = !!prev && (!!prev.paidAt || PRESERVE_PAYMENT_STATUSES.includes(prev.bonusStatus));
-    if (keepPayment && Math.abs(bonusValue - parseFloat(prev!.bonusValue as unknown as string)) > 0.01) {
+    if (keepPayment && Math.abs(bonusValue - pgNum(prev!.bonusValue)) > 0.01) {
       warnings.push(
-        `${employee.name}: bônus recalculado para R$ ${bonusValue.toFixed(2)} diverge do valor com status "${prev!.bonusStatus}" (R$ ${parseFloat(prev!.bonusValue as unknown as string).toFixed(2)}). Revise o pagamento.`
+        `${employee.name}: bônus recalculado para R$ ${bonusValue.toFixed(2)} diverge do valor com status "${prev!.bonusStatus}" (R$ ${pgNum(prev!.bonusValue).toFixed(2)}). Revise o pagamento.`
       );
     }
 

@@ -10,6 +10,7 @@ import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { computeEventTeamResultsBatch } from "./results.js";
 import { participantCountsForScore, isInformationalFunction } from "../lib/participation.js";
+import { pgNum } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -68,8 +69,8 @@ router.get("/ranking", requireRole("admin", "rh", "diretoria"), async (req, res)
   ]);
 
   const platoonByName = new Map(platoonRuleRows.map(p => [p.name, {
-    minScore: parseFloat(p.minScore as unknown as string),
-    maxScore: parseFloat(p.maxScore as unknown as string),
+    minScore: pgNum(p.minScore),
+    maxScore: pgNum(p.maxScore),
   }]));
 
   let filtered = results;
@@ -149,11 +150,11 @@ router.get("/ranking-detail", async (req, res) => {
 
   const platoonRulesMapped = platoonRules.map(r => ({
     name: r.name, color: r.color,
-    minScore: parseFloat(r.minScore as unknown as string),
-    maxScore: parseFloat(r.maxScore as unknown as string),
+    minScore: pgNum(r.minScore),
+    maxScore: pgNum(r.maxScore),
     minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
-    bonusValue: parseFloat(r.bonusValue as unknown as string),
-    bonusPerExtraEvent: parseFloat((r.bonusPerExtraEvent ?? 0) as unknown as string),
+    bonusValue: pgNum(r.bonusValue),
+    bonusPerExtraEvent: pgNum((r.bonusPerExtraEvent ?? 0)),
   }));
 
   const validParticipations = participations.filter(p => p.eventId);
@@ -174,7 +175,7 @@ router.get("/ranking-detail", async (req, res) => {
       : "outro";
 
     if (p.isHistorical) {
-      const historicalScore = p.importedScore != null ? parseFloat(p.importedScore as unknown as string) : 0;
+      const historicalScore = p.importedScore != null ? pgNum(p.importedScore) : 0;
       const platoon = getPlatoonByScore(historicalScore, platoonRulesMapped);
       return {
         hasScore: p.importedScore != null,
@@ -278,7 +279,7 @@ router.get("/ranking-detail", async (req, res) => {
   // foi lançada depois do fechamento sem um novo recompute.
   const liveFinalResult = grossAverage !== null
     ? calculateQuarterFinalResult(grossAverage, penaltyPoints - meritPoints, scored.length)
-    : (quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : null);
+    : (quarterResult ? pgNum(quarterResult.finalResult) : null);
 
   // Composição do bônus (só gestores — é dado financeiro). Replica a regra de
   // recomputeCycleResults + calculateTieredBonus para mostrar a conta inteira:
@@ -293,7 +294,7 @@ router.get("/ranking-detail", async (req, res) => {
     const scoredByDate = scored
       .filter(e => !!e.startDate)
       .sort((a, b) => (a.startDate ?? "").localeCompare(b.startDate ?? ""));
-    const baseScore = quarterResult ? parseFloat(quarterResult.finalResult as unknown as string) : liveFinalResult;
+    const baseScore = quarterResult ? pgNum(quarterResult.finalResult) : liveFinalResult;
     const basePlatoon = baseScore != null ? getPlatoonByScore(baseScore, platoonRulesMapped) : null;
     const perExtraValue = basePlatoon?.bonusPerExtraEvent ?? 0;
     const extraEvents = scoredByDate.slice(minEvents).map((e, i) => {
@@ -331,8 +332,8 @@ router.get("/ranking-detail", async (req, res) => {
       zeroReason,
       eligible: quarterResult ? quarterResult.eligible : null,
       eligibilityReason: quarterResult?.eligibilityReason ?? null,
-      storedTotal: quarterResult ? parseFloat(quarterResult.bonusValue as unknown as string) : null,
-      storedExtra: quarterResult ? parseFloat(quarterResult.extraBonusValue as unknown as string) : null,
+      storedTotal: quarterResult ? pgNum(quarterResult.bonusValue) : null,
+      storedExtra: quarterResult ? pgNum(quarterResult.extraBonusValue) : null,
       bonusStatus: quarterResult?.bonusStatus ?? null,
       paymentMethod: quarterResult?.paymentMethod ?? null,
       paymentDueDate: quarterResult?.paymentDueDate ? String(quarterResult.paymentDueDate) : null,
@@ -358,7 +359,7 @@ router.get("/ranking-detail", async (req, res) => {
       platoonColor: quarterResult?.platoonColor ?? null,
       platoonMinScore: quarterResult?.platoon ? (platoonRulesMapped.find(r => r.name === quarterResult.platoon)?.minScore ?? null) : null,
       platoonMaxScore: quarterResult?.platoon ? (platoonRulesMapped.find(r => r.name === quarterResult.platoon)?.maxScore ?? null) : null,
-      bonusValue: isManager && quarterResult ? parseFloat(quarterResult.bonusValue as unknown as string) : null,
+      bonusValue: isManager && quarterResult ? pgNum(quarterResult.bonusValue) : null,
       eventsCount: events.length,
       scoreSum: grossAverage !== null ? scoreSum : null,
       confirmedEventCount: scored.length,

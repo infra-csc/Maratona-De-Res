@@ -671,6 +671,12 @@ export const GetEventsResponseItem = zod.object({
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
   "conformityFilled": zod.int().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
   "conformityTotal": zod.int().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
+  "conformityCenografiaDone": zod.boolean().optional().describe('Matriz de Cenografia respondida por completo (só quando há avaliador atribuído)'),
+  "conformityFerramentasDone": zod.boolean().optional().describe('Matriz de Ferramentas respondida (só quando há avaliador atribuído)'),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
 export const GetEventsResponse = zod.array(GetEventsResponseItem)
@@ -732,6 +738,12 @@ export const CreateEventResponse = zod.object({
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
   "conformityFilled": zod.int().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
   "conformityTotal": zod.int().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
+  "conformityCenografiaDone": zod.boolean().optional().describe('Matriz de Cenografia respondida por completo (só quando há avaliador atribuído)'),
+  "conformityFerramentasDone": zod.boolean().optional().describe('Matriz de Ferramentas respondida (só quando há avaliador atribuído)'),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -862,6 +874,9 @@ export const GetEventResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -929,6 +944,12 @@ export const UpdateEventResponse = zod.object({
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
   "conformityFilled": zod.int().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
   "conformityTotal": zod.int().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
+  "conformityCenografiaDone": zod.boolean().optional().describe('Matriz de Cenografia respondida por completo (só quando há avaliador atribuído)'),
+  "conformityFerramentasDone": zod.boolean().optional().describe('Matriz de Ferramentas respondida (só quando há avaliador atribuído)'),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -1041,6 +1062,12 @@ export const MergeEventResponse = zod.object({
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
   "conformityFilled": zod.int().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
   "conformityTotal": zod.int().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
+  "conformityCenografiaDone": zod.boolean().optional().describe('Matriz de Cenografia respondida por completo (só quando há avaliador atribuído)'),
+  "conformityFerramentasDone": zod.boolean().optional().describe('Matriz de Ferramentas respondida (só quando há avaliador atribuído)'),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 }),
   "warnings": zod.array(zod.string())
@@ -1102,6 +1129,12 @@ export const CloseEventResponse = zod.object({
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
   "conformityFilled": zod.int().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
   "conformityTotal": zod.int().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
+  "conformityCenografiaDone": zod.boolean().optional().describe('Matriz de Cenografia respondida por completo (só quando há avaliador atribuído)'),
+  "conformityFerramentasDone": zod.boolean().optional().describe('Matriz de Ferramentas respondida (só quando há avaliador atribuído)'),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -1156,6 +1189,12 @@ export const ReopenEventResponse = zod.object({
   "conformityComplete": zod.boolean().optional().describe('true se todos os itens da Matriz de Conformidade exigidos pelos avaliadores atribuídos foram preenchidos.'),
   "conformityFilled": zod.int().optional().describe('Itens da Matriz de Conformidade já respondidos (só conta os lados com avaliador atribuído).'),
   "conformityTotal": zod.int().optional().describe('Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído).'),
+  "conformityCenografiaDone": zod.boolean().optional().describe('Matriz de Cenografia respondida por completo (só quando há avaliador atribuído)'),
+  "conformityFerramentasDone": zod.boolean().optional().describe('Matriz de Ferramentas respondida (só quando há avaliador atribuído)'),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
 
@@ -1261,6 +1300,9 @@ export const GetEventResultResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }).nullish(),
@@ -1650,6 +1692,9 @@ export const SetConformityEvaluatorResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -1786,6 +1831,9 @@ export const RedirectConformityEvaluatorResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -1922,6 +1970,9 @@ export const SetConformityEvaluatorFerramentasResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -2058,6 +2109,9 @@ export const RedirectConformityEvaluatorFerramentasResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -2087,6 +2141,9 @@ export const GetEventConformityResponse = zod.union([zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()])
@@ -2130,6 +2187,9 @@ export const SetEventConformityResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 })
@@ -2338,6 +2398,9 @@ export const UpdateEventAssignmentsResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -2474,6 +2537,9 @@ export const ConfirmEventCriteriaResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -2606,6 +2672,9 @@ export const ResyncEventCriteriaResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -2857,6 +2926,9 @@ export const DuplicateEventCriterionResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -2990,6 +3062,9 @@ export const DeleteEventCriterionResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()
@@ -3614,6 +3689,59 @@ export const GetDashboardSummaryResponse = zod.object({
   "employeeId": zod.int(),
   "employeeName": zod.string(),
   "currentScore": zod.number().nullish()
+}))
+})
+
+
+/**
+ * @summary Relatório por evento (nota final calibrada, critérios, calibração e equipe)
+ */
+export const GetAnalyticsEventsReportQueryParams = zod.object({
+  "cycleId": zod.coerce.number().int().optional()
+})
+
+export const GetAnalyticsEventsReportResponse = zod.object({
+  "cycle": zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish()
+}),
+  "events": zod.array(zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "status": zod.string(),
+  "resultsConfirmed": zod.boolean(),
+  "isHistorical": zod.boolean(),
+  "finalScore": zod.number().nullish().describe('Nota final oficial (0-100) do recálculo; só eventos confirmados'),
+  "projectedScore": zod.number().nullish(),
+  "performanceScore": zod.number().nullish(),
+  "conformityPenalty": zod.number(),
+  "calibratedCriteria": zod.int(),
+  "evaluatedCriteria": zod.int(),
+  "totalCriteria": zod.int(),
+  "criteria": zod.array(zod.object({
+  "name": zod.string(),
+  "area": zod.string().nullish(),
+  "weight": zod.number(),
+  "evaluatorAvg": zod.number().nullish(),
+  "calibrated": zod.number().nullish(),
+  "used": zod.number().nullish(),
+  "calibrationReason": zod.string().nullish(),
+  "status": zod.string(),
+  "active": zod.boolean()
+})),
+  "team": zod.array(zod.object({
+  "name": zod.string(),
+  "functionName": zod.string().nullish(),
+  "employmentType": zod.string().nullish(),
+  "countsForScore": zod.boolean()
+}))
 }))
 })
 
@@ -5116,6 +5244,9 @@ export const SwapEventCriterionSourceResponse = zod.object({
   "standoutResponse": zod.boolean().nullish(),
   "standoutJustification": zod.string().nullish(),
   "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional(),
   "updatedAt": zod.coerce.date().optional()
 }),zod.null()]).optional()

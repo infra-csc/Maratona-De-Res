@@ -22,16 +22,17 @@ import {
   employeeIdsNeededForRecompute,
   type CycleRecomputeInput, type EventTeamData, type PlatoonRuleMapped,
 } from "./cycle-compute.js";
+import { pgNum } from "./pg-num.js";
 
 export async function loadPlatoonRules(): Promise<PlatoonRuleMapped[]> {
   const rows = await db.select().from(platoonRulesTable).where(eq(platoonRulesTable.active, true)).orderBy(platoonRulesTable.displayOrder);
   return rows.map(r => ({
     name: r.name, color: r.color,
-    minScore: parseFloat(r.minScore as unknown as string),
-    maxScore: parseFloat(r.maxScore as unknown as string),
+    minScore: pgNum(r.minScore),
+    maxScore: pgNum(r.maxScore),
     minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
-    bonusValue: parseFloat(r.bonusValue as unknown as string),
-    bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
+    bonusValue: pgNum(r.bonusValue),
+    bonusPerExtraEvent: pgNum(r.bonusPerExtraEvent),
   }));
 }
 

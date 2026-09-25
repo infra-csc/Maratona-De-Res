@@ -3,8 +3,10 @@ import { db, evaluationsTable, criteriaTable, usersTable, eventsTable, eventCrit
 import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import type { DbOrTx } from "../lib/db-tx.js";
 import { getPrincipalAreaIds } from "./routing.js";
 import { recomputeCycleResults } from "./results.js";
+import { pgNum } from "../lib/pg-num.js";
 
 // Submissão/reabertura muda a média do critério; se o evento já conta para o
 // ciclo (resultsConfirmed ou fechado), o snapshot oficial precisa acompanhar.
@@ -78,15 +80,15 @@ async function isAssignedForCriterion(eventId: number, criterionId: number, user
  * edits to a global criterion's default weight can never alter an event that
  * already has evaluations. Idempotent: only fills null overrides.
  */
-async function freezeEventCriteriaWeights(eventId: number) {
-  const rows = await db
+export async function freezeEventCriteriaWeights(eventId: number, exec: DbOrTx = db) {
+  const rows = await exec
     .select({ id: eventCriteriaTable.id, active: eventCriteriaTable.active, weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
     .where(eq(eventCriteriaTable.eventId, eventId));
   for (const r of rows) {
     if (r.active && r.weightOverride == null) {
-      await db.update(eventCriteriaTable)
+      await exec.update(eventCriteriaTable)
         .set({ weightOverride: String(parseFloat(r.defaultWeight ?? "0")) })
         .where(eq(eventCriteriaTable.id, r.id));
     }
@@ -181,7 +183,7 @@ router.get("/evaluations", async (req, res) => {
   const redactContent = isRole(user.role, "operador");
   res.json(evaluations.map(e => ({
     ...e,
-    score: redactContent ? null : parseFloat(e.score as unknown as string),
+    score: redactContent ? null : pgNum(e.score),
     comments: redactContent ? null : e.comments,
     audioUrl: redactContent ? null : e.audioUrl,
     evaluatorName: hideEvaluatorName ? null : (e.tokenSubmitterName ?? e.evaluatorName),
@@ -254,22 +256,28 @@ router.post("/evaluations", requireRole("admin", "rh", "avaliador"), async (req,
   } else {
     // First evaluation for this (event, criterion, evaluator): freeze the
     // event's criteria weights so they can never drift once evaluations exist.
-    await freezeEventCriteriaWeights(eventId);
-    [evaluation] = await db.insert(evaluationsTable).values({
-      eventId, criterionId,
-      evaluatorUserId: req.user!.userId,
-      score: String(numScore),
-      comments: comments ?? null,
-      commentVisibility: commentVisibility ?? "internal",
-      audioUrl: audioUrl ?? null,
-    }).onConflictDoUpdate({
-      // Duplo clique/duas abas: a segunda inserção do mesmo (evento, critério,
-      // avaliador) vira atualização do rascunho em vez de uma linha duplicada.
-      target: [evaluationsTable.eventId, evaluationsTable.criterionId, evaluationsTable.evaluatorUserId],
-      set: { score: String(numScore), comments: comments ?? null, commentVisibility: commentVisibility ?? "internal", audioUrl: audioUrl ?? null },
-    }).returning();
+    // Congelamento e inserção na MESMA transação: se a inserção falhar, os
+    // pesos não ficam congelados "à toa" (e vice-versa: nunca existe avaliação
+    // num evento com pesos ainda flutuando).
+    evaluation = await db.transaction(async (tx) => {
+      await freezeEventCriteriaWeights(eventId, tx);
+      const [row] = await tx.insert(evaluationsTable).values({
+        eventId, criterionId,
+        evaluatorUserId: req.user!.userId,
+        score: String(numScore),
+        comments: comments ?? null,
+        commentVisibility: commentVisibility ?? "internal",
+        audioUrl: audioUrl ?? null,
+      }).onConflictDoUpdate({
+        // Duplo clique/duas abas: a segunda inserção do mesmo (evento, critério,
+        // avaliador) vira atualização do rascunho em vez de uma linha duplicada.
+        target: [evaluationsTable.eventId, evaluationsTable.criterionId, evaluationsTable.evaluatorUserId],
+        set: { score: String(numScore), comments: comments ?? null, commentVisibility: commentVisibility ?? "internal", audioUrl: audioUrl ?? null },
+      }).returning();
+      return row;
+    });
   }
-  res.status(201).json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
+  res.status(201).json({ ...evaluation, score: pgNum(evaluation.score) });
 });
 
 router.patch("/evaluations/:id", async (req, res) => {
@@ -296,7 +304,7 @@ router.patch("/evaluations/:id", async (req, res) => {
     }
   }
 
-  const numScore = score !== undefined ? parseFloat(score) : parseFloat(existing.score as unknown as string);
+  const numScore = score !== undefined ? parseFloat(score) : pgNum(existing.score);
   if (score !== undefined && (isNaN(numScore) || numScore < 0 || numScore > 10)) {
     res.status(400).json({ error: "A nota deve estar entre 0 e 10" });
     return;
@@ -312,7 +320,7 @@ router.patch("/evaluations/:id", async (req, res) => {
     ...(commentVisibility !== undefined && { commentVisibility }),
     ...(audioUrl !== undefined && { audioUrl }),
   }).where(eq(evaluationsTable.id, id)).returning();
-  res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
+  res.json({ ...evaluation, score: pgNum(evaluation.score) });
 });
 
 router.post("/evaluations/:id/submit", async (req, res) => {
@@ -344,7 +352,7 @@ router.post("/evaluations/:id/submit", async (req, res) => {
   }).where(eq(evaluationsTable.id, id)).returning();
   await audit(req.user!.userId, "submit", "evaluations", id, existing, evaluation);
   await recomputeIfEventCounts(existing.eventId, req.user!.userId);
-  res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
+  res.json({ ...evaluation, score: pgNum(evaluation.score) });
 });
 
 router.post("/evaluations/:id/reopen", requireRole("admin", "rh"), async (req, res) => {
@@ -357,7 +365,7 @@ router.post("/evaluations/:id/reopen", requireRole("admin", "rh"), async (req, r
   }).where(eq(evaluationsTable.id, id)).returning();
   await audit(req.user!.userId, "reopen", "evaluations", id, existing, evaluation);
   await recomputeIfEventCounts(existing.eventId, req.user!.userId);
-  res.json({ ...evaluation, score: parseFloat(evaluation.score as unknown as string) });
+  res.json({ ...evaluation, score: pgNum(evaluation.score) });
 });
 
 export default router;

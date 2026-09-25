@@ -10,6 +10,7 @@ import { getCurrentCycle, getMinEventsForEligibility } from "../lib/cycle.js";
 import { computeAnalytics } from "../lib/analytics.js";
 import { loadPenaltyLabels } from "./penalty-types.js";
 import { rankingScope } from "../lib/ranking-scope.js";
+import { buildEventsReport } from "../lib/events-report.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -33,7 +34,7 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
   const ids = events.map(e => e.id);
   const inCycle = <T>(rows: Promise<T[]>) => (ids.length > 0 ? rows : Promise.resolve([] as T[]));
 
-  const [official, quarterly, rules, minEvents, evals, cals, ecs, confs, absences, labels] = await Promise.all([
+  const [official, quarterly, rules, minEvents, evals, cals, ecs, confs, absences, labels, catalog] = await Promise.all([
     inCycle(db.select({ eventId: employeeEventResultsTable.eventId, score: employeeEventResultsTable.finalEventScore })
       .from(employeeEventResultsTable).where(inArray(employeeEventResultsTable.eventId, ids))),
     db.select({
@@ -58,6 +59,7 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
       .from(calibrationsTable).where(inArray(calibrationsTable.eventId, ids))),
     inCycle(db.select({
       eventId: eventCriteriaTable.eventId, criterionId: eventCriteriaTable.criterionId, active: eventCriteriaTable.active,
+      weightOverride: eventCriteriaTable.weightOverride, defaultWeight: criteriaTable.defaultWeight,
       name: criteriaTable.name, areaLabel: criteriaTable.responsibleAreaLabel, areaName: areasTable.name,
     }).from(eventCriteriaTable)
       .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -72,6 +74,8 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
       points: absencesTable.points, quantity: absencesTable.quantity,
     }).from(absencesTable).where(and(eq(absencesTable.cycleId, cycle.id))),
     loadPenaltyLabels(),
+    // Catálogo inteiro (poucas dezenas de linhas): liga cópias por evento à origem.
+    db.select({ id: criteriaTable.id, name: criteriaTable.name, eventScoped: criteriaTable.eventScoped, sourceCriterionId: criteriaTable.sourceCriterionId }).from(criteriaTable),
   ]);
 
   const overview = computeAnalytics({
@@ -95,8 +99,10 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
     eventCriteria: ecs.map(c => ({
       eventId: c.eventId, criterionId: c.criterionId, active: c.active,
       name: c.name ?? `Critério #${c.criterionId}`, area: c.areaLabel ?? c.areaName ?? null,
+      weight: num(c.weightOverride ?? c.defaultWeight ?? 1),
     })),
     conformities: confs,
+    criteriaCatalog: catalog.map(c => ({ id: c.id, name: c.name, eventScoped: c.eventScoped, sourceCriterionId: c.sourceCriterionId ?? null })),
     adjustments: absences.map(a => ({
       employeeId: a.employeeId, label: labels.get(a.penaltyType) ?? a.penaltyType,
       kind: a.kind === "merit" ? "merit" as const : "penalty" as const, points: a.points, quantity: a.quantity,
@@ -104,6 +110,28 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
   });
 
   res.json({ cycle: { id: cycle.id, name: cycle.name, startDate: cycle.startDate ?? null, endDate: cycle.endDate ?? null }, ...overview });
+});
+
+/**
+ * GET /analytics/events-report?cycleId=
+ * Relatório por evento: nota final oficial (calibrada), performance, desconto
+ * da matriz, cada critério (avaliadores, calibração e justificativa) e a
+ * equipe. Ciclo atual por padrão; cycleId permite ciclos anteriores.
+ */
+router.get("/analytics/events-report", requireRole("admin", "rh", "diretoria"), async (req, res) => {
+  const raw = req.query.cycleId;
+  let cycleId: number | null = null;
+  if (raw !== undefined) {
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n <= 0) { res.status(400).json({ error: "cycleId inválido" }); return; }
+    cycleId = n;
+  } else {
+    cycleId = (await getCurrentCycle())?.id ?? null;
+  }
+  if (cycleId == null) { res.status(404).json({ error: "Nenhum ciclo ativo" }); return; }
+  const report = await buildEventsReport(cycleId);
+  if (!report) { res.status(404).json({ error: "Ciclo não encontrado" }); return; }
+  res.json(report);
 });
 
 export default router;

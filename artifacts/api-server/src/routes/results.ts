@@ -13,6 +13,7 @@ import { audit } from "../lib/audit.js";
 import { participantCountsForScore } from "../lib/participation.js";
 import { buildCycleResults, computeEventTeamResultFromData, emptyEventTeamData } from "../lib/cycle-compute.js";
 import { loadCycleRecomputeInput, loadEventTeamData, loadPlatoonRules } from "../lib/cycle-data.js";
+import { pgNum } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -145,7 +146,7 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
   // retornamos a lista de critérios (com scores nulos) para que o frontend
   // possa exibir a tabela e popular "Nota Avaliador" a partir do importedNotes.
   if (event.isHistorical) {
-    const score = parseFloat(event.importedScore as unknown as string);
+    const score = pgNum(event.importedScore);
     const platoon = getPlatoonByScore(score, platoonRules);
 
     const [historicalCriteriaRows, historicalCalibrations] = await Promise.all([
@@ -183,7 +184,7 @@ router.get("/events/:id/result", requireRole("admin", "rh", "diretoria"), async 
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       .map(c => {
         const cal = calMap.get(c.criterionId!);
-        const calibratedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+        const calibratedScore = cal ? pgNum(cal.calibratedScore) : null;
         return {
           criterionId: c.criterionId!,
           criterionName: c.criterionName ?? "",
@@ -321,8 +322,8 @@ router.get("/results/quarterly", async (req, res) => {
     ]);
 
     const platoonByName = new Map(platoonRuleRows.map(p => [p.name, {
-      minScore: parseFloat(p.minScore as unknown as string),
-      maxScore: parseFloat(p.maxScore as unknown as string),
+      minScore: pgNum(p.minScore),
+      maxScore: pgNum(p.maxScore),
     }]));
 
     const filtered = results

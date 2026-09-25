@@ -7,6 +7,7 @@ import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
 import { normalizeCpf, isValidCpfLength, defaultPasswordForCpf } from "../lib/credentials.js";
+import { affectedRows } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -205,7 +206,7 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
     const absResult = await tx.update(absencesTable)
       .set({ employeeId: canonicalId })
       .where(inArray(absencesTable.employeeId, dupIds));
-    movedAbsences = (absResult as unknown as { rowCount?: number }).rowCount ?? 0;
+    movedAbsences = affectedRows(absResult);
 
     // employee_event_results: move scored results (sem conflito); descarta os que conflitam
     const canonicalResultEventIds = new Set(
@@ -232,7 +233,7 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
     const revResult = await tx.update(eventReviewRequestsTable)
       .set({ employeeId: canonicalId })
       .where(inArray(eventReviewRequestsTable.employeeId, dupIds));
-    movedReviews = (revResult as unknown as { rowCount?: number }).rowCount ?? 0;
+    movedReviews = affectedRows(revResult);
 
     // eligibility: move if no conflict
     const canonicalElig = await tx.select({ cycleId: employeeCycleEligibilityTable.cycleId })
@@ -271,7 +272,7 @@ router.post("/employees/:id/merge", requireRole("admin", "rh"), async (req, res)
         const evRes = await tx.update(evaluationsTable)
           .set({ evaluatorUserId: canonicalUser.id })
           .where(eq(evaluationsTable.evaluatorUserId, dupUser.id));
-        movedEvaluatorEvals += (evRes as unknown as { rowCount?: number }).rowCount ?? 0;
+        movedEvaluatorEvals += affectedRows(evRes);
         // Desvincula e desativa a conta do duplicado
         await tx.update(usersTable)
           .set({ employeeId: null, active: false })

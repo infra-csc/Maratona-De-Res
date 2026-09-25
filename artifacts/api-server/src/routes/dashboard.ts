@@ -4,6 +4,7 @@ import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { calculateTieredBonus, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus } from "../lib/calculations.js";
+import { pgNum } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -72,17 +73,17 @@ router.get("/dashboard/summary", async (req, res) => {
       .orderBy(platoonRulesTable.displayOrder);
     const platoonRules = platoonRulesRaw.map(r => ({
       name: r.name, color: r.color,
-      minScore: parseFloat(r.minScore as unknown as string),
-      maxScore: parseFloat(r.maxScore as unknown as string),
+      minScore: pgNum(r.minScore),
+      maxScore: pgNum(r.maxScore),
       minInclusive: r.minInclusive, maxInclusive: r.maxInclusive,
-      bonusValue: parseFloat(r.bonusValue as unknown as string),
-      bonusPerExtraEvent: parseFloat(r.bonusPerExtraEvent as unknown as string),
+      bonusValue: pgNum(r.bonusValue),
+      bonusPerExtraEvent: pgNum(r.bonusPerExtraEvent),
     }));
     totalBonusPreview = quarterResults.reduce((s, r) => {
       if (r.eligible === false) return s;
-      const snapshotBonus = parseFloat(r.bonusValue as unknown as string);
+      const snapshotBonus = pgNum(r.bonusValue);
       if (snapshotBonus > 0) return s + snapshotBonus;
-      const fr = parseFloat(r.finalResult as unknown as string);
+      const fr = pgNum(r.finalResult);
       if (fr > 0) return s + calculateTieredBonus(fr, [], platoonRules);
       return s;
     }, 0);

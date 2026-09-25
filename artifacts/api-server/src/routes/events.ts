@@ -1,13 +1,15 @@
 import { Router } from "express";
-import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable } from "@workspace/db";
+import { db, eventsTable, eventParticipantsTable, employeesTable, criteriaTable, eventCriteriaTable, evaluationsTable, calibrationsTable, areasTable, eventAreaAssignmentsTable, usersTable, eventConformitiesTable, employeeEventResultsTable, absencesTable, eventCommentsTable, eventCriterionAssignmentsTable, auditLogsTable, calibrationCommentsTable, publicEvalTokensTable, publicEvalTokenCriteriaTable } from "@workspace/db";
 import { eq, and, sql, inArray, or, ne, aliasedTable, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireRole, isRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { convertScoreToPercentage, calculateEventResult, buildAssignedEvaluatorsByArea, getCriterionEvaluationStatus, mergeEventScopedCriteria, calculateConformitySubtotal, calculateFinalEventScore } from "../lib/calculations.js";
 import { recomputeCycleResults } from "./results.js";
 import { generateCriterionAssignments } from "./routing.js";
+import { freezeEventCriteriaWeights } from "./evaluations.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { participantCountsForScore } from "../lib/participation.js";
+import { pgNum, affectedRows } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -67,7 +69,7 @@ router.get("/events", async (req, res) => {
     const cenoAssigned = ev.conformityEvaluatorUserId != null;
     const ferrAssigned = ev.conformityEvaluatorFerramentasUserId != null;
     const conformityNeeded = cenoAssigned || ferrAssigned;
-    if (!conformityNeeded) return { conformityNeeded: false, conformityComplete: false, conformityFilled: 0, conformityTotal: 0 };
+    if (!conformityNeeded) return { conformityNeeded: false, conformityComplete: false, conformityFilled: 0, conformityTotal: 0, conformityCenografiaDone: false, conformityFerramentasDone: false };
     const conf = conformityRows.find(c => c.eventId === ev.id);
     const cenoFields = [conf?.epi, conf?.estaiamentos, conf?.conduta, conf?.standoutResponse, conf?.absencesResponse];
     const cenoFilled = cenoAssigned ? cenoFields.filter(v => v != null).length : 0;
@@ -77,7 +79,11 @@ router.get("/events", async (req, res) => {
     const conformityFilled = cenoFilled + ferrFilled;
     const conformityTotal = cenoTotal + ferrTotal;
     const conformityComplete = conformityFilled === conformityTotal;
-    return { conformityNeeded, conformityComplete, conformityFilled, conformityTotal };
+    // Por lado: quem respondeu a matriz de Cenografia / Ferramentas (a Central de
+    // Avaliações usa para não contar esses avaliadores como pendentes).
+    const conformityCenografiaDone = cenoAssigned && cenoFilled === cenoTotal;
+    const conformityFerramentasDone = ferrAssigned && ferrFilled === ferrTotal;
+    return { conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone };
   }
 
   // Filtra eventos dentro do período do ciclo atual (se o ciclo tiver datas definidas;
@@ -108,7 +114,7 @@ router.get("/events", async (req, res) => {
       .from(employeeEventResultsTable)
       .where(inArray(employeeEventResultsTable.eventId, cycleEventIds));
     for (const r of officialRows) {
-      if (!officialScoreByEvent.has(r.eventId)) officialScoreByEvent.set(r.eventId, parseFloat(r.finalEventScore as unknown as string));
+      if (!officialScoreByEvent.has(r.eventId)) officialScoreByEvent.set(r.eventId, pgNum(r.finalEventScore));
     }
   }
 
@@ -119,7 +125,7 @@ router.get("/events", async (req, res) => {
     // Ainda calcula critérios/calibrações caso existam (históricos podem ter
     // calibrações complementares importadas via planilha).
     if (ev.isHistorical) {
-      const score = ev.importedScore != null ? parseFloat(ev.importedScore as unknown as string) : null;
+      const score = ev.importedScore != null ? pgNum(ev.importedScore) : null;
       const evCals = calibrations.filter(c => c.eventId === ev.id);
       // Para eventos históricos: inclui critérios ec_active=F se tiverem calibração salva
       // (critérios podem ter sido desativados depois de já serem calibrados no sistema legado).
@@ -131,7 +137,7 @@ router.get("/events", async (req, res) => {
       );
       // Todos os critérios ativos com peso > 0 — denominador correto para o total.
       const allScorableCriteria = activeCriteria.filter(c => {
-        const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
+        const w = pgNum((c.weightOverride ?? c.defaultWeight ?? "1"));
         return w > 0;
       });
       // Critérios com calibração salva (para contadores de calibração).
@@ -145,7 +151,7 @@ router.get("/events", async (req, res) => {
       const partialPublishedAt = partialTimestamps.length > 0
         ? new Date(Math.max(...partialTimestamps.map(d => d.getTime()))) : null;
       const partialPublishedCount = allScorableCriteria.filter(c => c.partialPublishedAt != null).length;
-      const { conformityNeeded, conformityComplete, conformityFilled, conformityTotal } = getConformityStatus(ev);
+      const { conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone } = getConformityStatus(ev);
       return {
         ...ev,
         participantCount,
@@ -167,6 +173,8 @@ router.get("/events", async (req, res) => {
         conformityComplete,
         conformityFilled,
         conformityTotal,
+        conformityCenografiaDone,
+        conformityFerramentasDone,
       };
     }
 
@@ -190,7 +198,7 @@ router.get("/events", async (req, res) => {
     const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignmentRows.filter(a => a.eventId === ev.id));
     const scored = submitted.filter(e => e.score != null);
     const avgRaw = scored.length > 0
-      ? scored.reduce((s, e) => s + parseFloat(e.score as unknown as string), 0) / scored.length
+      ? scored.reduce((s, e) => s + pgNum(e.score), 0) / scored.length
       : null;
     const averageScore = avgRaw != null ? convertScoreToPercentage(avgRaw) : null;
 
@@ -216,12 +224,12 @@ router.get("/events", async (req, res) => {
     // dupla-contagem quando pai e filho eventScoped ambos forem avaliados.
     const evaluatedParentIds = new Set<number>();
     const criteriaRaw = activeCriteria.map((c) => {
-      const weight = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
+      const weight = pgNum((c.weightOverride ?? c.defaultWeight ?? "1"));
       const critEvals = submitted.filter(e => e.criterionId === c.criterionId);
-      const critScores = critEvals.filter(e => e.score != null).map(e => parseFloat(e.score as unknown as string));
+      const critScores = critEvals.filter(e => e.score != null).map(e => pgNum(e.score));
       const avgScore = critScores.length > 0 ? critScores.reduce((a, b) => a + b, 0) / critScores.length : null;
       const cal = evCals.find(x => x.criterionId === c.criterionId);
-      const calibratedScore = cal ? parseFloat(cal.calibratedScore as unknown as string) : null;
+      const calibratedScore = cal ? pgNum(cal.calibratedScore) : null;
       if (calibratedScore !== null) hasCalibration = true;
       const status = getCriterionEvaluationStatus(c.responsibleAreaId, critEvals.map(e => e.evaluatorUserId as number), assignedByArea);
       if (weight > 0) {
@@ -248,10 +256,10 @@ router.get("/events", async (req, res) => {
     // calcular a média com o critério pai.
     for (const ch of eventScopedCriteria) {
       const chEvals = submitted.filter(e => e.criterionId === ch.criterionId);
-      const chScores = chEvals.filter(e => e.score != null).map(e => parseFloat(e.score as unknown as string));
+      const chScores = chEvals.filter(e => e.score != null).map(e => pgNum(e.score));
       const chAvg = chScores.length > 0 ? chScores.reduce((a, b) => a + b, 0) / chScores.length : null;
       const chCal = evCals.find(x => x.criterionId === ch.criterionId);
-      const chCalibrated = chCal ? parseFloat(chCal.calibratedScore as unknown as string) : null;
+      const chCalibrated = chCal ? pgNum(chCal.calibratedScore) : null;
       if (chCalibrated !== null) hasCalibration = true;
       const chStatus = getCriterionEvaluationStatus(ch.responsibleAreaId, chEvals.map(e => e.evaluatorUserId as number), assignedByArea);
       // Critério filho (eventScoped) também contribui para os slots de avaliadores.
@@ -268,7 +276,7 @@ router.get("/events", async (req, res) => {
       const isOrphan = ch.criterionSourceCriterionId == null
         || !activeCriteria.some(c => c.criterionId === ch.criterionSourceCriterionId);
       const chWeight = isOrphan
-        ? parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string)
+        ? pgNum((ch.weightOverride ?? ch.defaultWeight ?? "1"))
         : 0;
       if (isOrphan) {
         if (chWeight > 0 && chStatus.isEvaluated) {
@@ -317,10 +325,10 @@ router.get("/events", async (req, res) => {
     // Totalmente calibrado = todo critério ativo com peso > 0 já teve a calibração
     // publicada como final (não basta ter calibração parcial/rascunho).
     const finalCalibratedCriteria = activeCriteria.filter(c => {
-      const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
+      const w = pgNum((c.weightOverride ?? c.defaultWeight ?? "1"));
       return w > 0 && c.finalPublishedAt != null;
     }).length + orphanScoped.filter(ch => {
-      const w = parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string);
+      const w = pgNum((ch.weightOverride ?? ch.defaultWeight ?? "1"));
       return w > 0 && ch.finalPublishedAt != null;
     }).length;
     const fullyCalibrated = scorableCount > 0 && finalCalibratedCriteria === scorableCount;
@@ -359,18 +367,18 @@ router.get("/events", async (req, res) => {
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
     const partialPublishedCount = activeCriteria.filter(c => {
-      const w = parseFloat((c.weightOverride ?? c.defaultWeight ?? "1") as unknown as string);
+      const w = pgNum((c.weightOverride ?? c.defaultWeight ?? "1"));
       return w > 0 && c.partialPublishedAt != null;
     }).length + orphanScoped.filter(ch => {
-      const w = parseFloat((ch.weightOverride ?? ch.defaultWeight ?? "1") as unknown as string);
+      const w = pgNum((ch.weightOverride ?? ch.defaultWeight ?? "1"));
       return w > 0 && ch.partialPublishedAt != null;
     }).length;
-    const { conformityNeeded, conformityComplete, conformityFilled, conformityTotal } = getConformityStatus(ev);
+    const { conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone } = getConformityStatus(ev);
     const conformityEvaluatorName = ev.conformityEvaluatorUserId != null
       ? (conformityEvalNameById.get(ev.conformityEvaluatorUserId) ?? null) : null;
     const conformityEvaluatorFerramentasName = ev.conformityEvaluatorFerramentasUserId != null
       ? (conformityEvalNameById.get(ev.conformityEvaluatorFerramentasUserId) ?? null) : null;
-    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityEvaluatorName, conformityEvaluatorFerramentasName };
+    return { ...ev, participantCount, evaluationProgress: progress, totalCriteria: scorableCount, submittedCount: submitted.length, evaluatedCriteria, totalEvaluatorSlots, submittedEvaluatorCount, calibratedCriteriaCount, finalCalibratedCriteria, partialPublishedCount, averageScore, teamScore, hasCalibration, fullyCalibrated, partialPublishedAt, unassignedAreaNames, conformityNeeded, conformityComplete, conformityFilled, conformityTotal, conformityCenografiaDone, conformityFerramentasDone, conformityEvaluatorName, conformityEvaluatorFerramentasName };
   });
   // "operador" vê a lista de eventos (progresso, status, contagens) mas NUNCA
   // a nota — redact aqui na origem, já que a tela de Eventos (no menu dele)
@@ -625,15 +633,20 @@ router.post("/events", requireRole("admin", "rh", "operador"), async (req, res) 
   }
   const cycle = await getCurrentCycle();
   if (!cycle) { res.status(400).json({ error: "Nenhum ciclo ativo" }); return; }
-  const [ev] = await db.insert(eventsTable).values({
-    name, clientName: clientName ?? null, location: location ?? null, city: city ?? null,
-    state: state ?? null, startDate, endDate, cycleId: cycle.id,
-  }).returning();
+  // Evento e vínculo com o catálogo juntos: nunca fica um evento criado sem
+  // critérios porque a segunda escrita falhou.
+  const ev = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(eventsTable).values({
+      name, clientName: clientName ?? null, location: location ?? null, city: city ?? null,
+      state: state ?? null, startDate, endDate, cycleId: cycle.id,
+    }).returning();
 
-  const allCriteria = await db.select().from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
-  if (allCriteria.length > 0) {
-    await db.insert(eventCriteriaTable).values(allCriteria.map(c => ({ eventId: ev.id, criterionId: c.id, active: true })));
-  }
+    const allCriteria = await tx.select().from(criteriaTable).where(and(eq(criteriaTable.active, true), eq(criteriaTable.eventScoped, false)));
+    if (allCriteria.length > 0) {
+      await tx.insert(eventCriteriaTable).values(allCriteria.map(c => ({ eventId: created.id, criterionId: c.id, active: true })));
+    }
+    return created;
+  });
 
   await audit(req.user!.userId, "create", "events", ev.id, null, ev);
   res.status(201).json({ ...ev, participantCount: 0, evaluationProgress: 0, averageScore: null });
@@ -1530,14 +1543,18 @@ router.put("/events/:id/criteria", requireRole("admin", "rh"), async (req, res) 
     return;
   }
 
-  for (const ec of existing) {
-    const item = items.find(i => i.criterionId === ec.criterionId);
-    if (!item) continue;
-    await db.update(eventCriteriaTable).set({
-      active: item.active,
-      weightOverride: item.active ? String(Number(item.weight) || 0) : null,
-    }).where(eq(eventCriteriaTable.id, ec.id));
-  }
+  // Tudo ou nada: um peso inválido no meio da lista (ex.: estouro do
+  // numeric(5,2)) não pode deixar metade dos pesos já trocada.
+  await db.transaction(async (tx) => {
+    for (const ec of existing) {
+      const item = items.find(i => i.criterionId === ec.criterionId);
+      if (!item) continue;
+      await tx.update(eventCriteriaTable).set({
+        active: item.active,
+        weightOverride: item.active ? String(Number(item.weight) || 0) : null,
+      }).where(eq(eventCriteriaTable.id, ec.id));
+    }
+  });
 
   // Alterar pesos depois que o evento já foi fechado muda o resultado do
   // ciclo (dashboard/ranking/pagamentos), que foi calculado com os pesos
@@ -1611,20 +1628,25 @@ router.post("/events/:id/criteria/duplicate", requireRole("admin", "rh"), async 
   const [source] = await db.select().from(criteriaTable).where(eq(criteriaTable.id, sourceCriterionId)).limit(1);
   if (!source) { res.status(404).json({ error: "Critério de origem não encontrado" }); return; }
 
-  const [copy] = await db.insert(criteriaTable).values({
-    name: name || `${source.name} (2)`,
-    description: source.description,
-    responsibleAreaId: areaIdOverride ?? source.responsibleAreaId,
-    responsibleAreaLabel: areaLabelOverride ?? source.responsibleAreaLabel,
-    defaultWeight: source.defaultWeight,
-    active: true,
-    displayOrder: source.displayOrder,
-    eventScoped: true,
-    sourceCriterionId: sourceCriterionId,
-  }).returning();
+  // Cópia e vínculo juntos: sem isso, uma falha no vínculo deixava um
+  // critério eventScoped órfão (invisível no catálogo e em qualquer evento).
+  const copy = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(criteriaTable).values({
+      name: name || `${source.name} (2)`,
+      description: source.description,
+      responsibleAreaId: areaIdOverride ?? source.responsibleAreaId,
+      responsibleAreaLabel: areaLabelOverride ?? source.responsibleAreaLabel,
+      defaultWeight: source.defaultWeight,
+      active: true,
+      displayOrder: source.displayOrder,
+      eventScoped: true,
+      sourceCriterionId: sourceCriterionId,
+    }).returning();
 
-  // Começa com peso 0 para não quebrar a soma de 20; o RH redistribui depois.
-  await db.insert(eventCriteriaTable).values({ eventId, criterionId: copy.id, active: true, weightOverride: "0" });
+    // Começa com peso 0 para não quebrar a soma de 20; o RH redistribui depois.
+    await tx.insert(eventCriteriaTable).values({ eventId, criterionId: created.id, active: true, weightOverride: "0" });
+    return created;
+  });
 
   await audit(req.user!.userId, "duplicate", "criteria", copy.id, null, { eventId, sourceCriterionId, name: copy.name });
   res.status(201).json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
@@ -1654,8 +1676,44 @@ router.delete("/events/:id/criteria/:eventCriterionId", requireRole("admin", "rh
     return;
   }
 
-  await db.delete(eventCriteriaTable).where(eq(eventCriteriaTable.id, ecId));
-  await db.delete(criteriaTable).where(eq(criteriaTable.id, link.criterionId));
+  // Calibração é dado real (dá para calibrar critério sem nota): não some calada.
+  const [{ calCount }] = await db.select({ calCount: sql<number>`count(*)` })
+    .from(calibrationsTable)
+    .where(and(eq(calibrationsTable.eventId, eventId), eq(calibrationsTable.criterionId, link.criterionId)));
+  if (Number(calCount) > 0) {
+    res.status(409).json({ error: "Este quesito já foi calibrado. Remova a calibração antes de excluí-lo." });
+    return;
+  }
+
+  // Tudo numa transação e sem órfãos: atribuição de avaliador e link público
+  // apontam para o critério SEM cascade (o DELETE do critério estourava FK
+  // depois de o vínculo com o evento já ter sumido). Duplicatas feitas a partir
+  // deste quesito herdam a origem dele, para continuarem somando no pai.
+  await db.transaction(async (tx) => {
+    await tx.delete(eventCriterionAssignmentsTable).where(and(
+      eq(eventCriterionAssignmentsTable.eventId, eventId),
+      eq(eventCriterionAssignmentsTable.criterionId, link.criterionId),
+    ));
+    const eventTokens = tx.select({ id: publicEvalTokensTable.id })
+      .from(publicEvalTokensTable)
+      .where(eq(publicEvalTokensTable.eventId, eventId));
+    await tx.delete(publicEvalTokenCriteriaTable).where(and(
+      eq(publicEvalTokenCriteriaTable.criterionId, link.criterionId),
+      inArray(publicEvalTokenCriteriaTable.tokenId, eventTokens),
+    ));
+    await tx.delete(eventCriteriaTable).where(eq(eventCriteriaTable.id, ecId));
+
+    // Só apaga o critério em si se nenhum outro evento o usa (ex.: após mesclagem).
+    const [{ otherLinks }] = await tx.select({ otherLinks: sql<number>`count(*)` })
+      .from(eventCriteriaTable)
+      .where(eq(eventCriteriaTable.criterionId, link.criterionId));
+    if (Number(otherLinks) === 0) {
+      await tx.update(criteriaTable)
+        .set({ sourceCriterionId: crit.sourceCriterionId })
+        .where(eq(criteriaTable.sourceCriterionId, link.criterionId));
+      await tx.delete(criteriaTable).where(eq(criteriaTable.id, link.criterionId));
+    }
+  });
   await audit(req.user!.userId, "delete", "criteria", link.criterionId, crit, null);
   res.json(await loadEventDetail(eventId, isRole(req.user!.role, "operador")));
 });
@@ -1897,35 +1955,30 @@ router.post("/events/:id/criteria/confirm", requireRole("admin", "rh"), async (r
     // essa atribuição pode chegar depois (ex.: freelancer ainda não confirmado).
     // Libera parcialmente; áreas sem avaliador continuam visíveis como alerta
     // em outras telas (unassignedAreaNames), mas não bloqueiam o fluxo.
+  }
 
+  // Congelamento dos pesos, flag de confirmação e atribuições padrão juntos:
+  // se gerar as atribuições falhar, o evento não fica "confirmado" com
+  // quesitos sem dono (nem com pesos congelados à toa).
+  const ev = await db.transaction(async (tx) => {
     // Freeze each active criterion's effective weight so that later edits to the
     // global default weight can never alter an event locked for evaluation.
-    for (const r of rows) {
-      if (r.active && r.weightOverride == null) {
-        await db.update(eventCriteriaTable)
-          .set({ weightOverride: String(parseFloat(r.originalWeight ?? "0")) })
-          .where(eq(eventCriteriaTable.id, r.id));
-      }
-    }
-  }
+    if (confirmed) await freezeEventCriteriaWeights(id, tx);
 
-  const [ev] = await db.update(eventsTable).set({
-    criteriaConfirmed: confirmed,
-    criteriaConfirmedAt: confirmed ? new Date() : null,
-  }).where(eq(eventsTable.id, id)).returning();
+    const [updated] = await tx.update(eventsTable).set({
+      criteriaConfirmed: confirmed,
+      criteriaConfirmedAt: confirmed ? new Date() : null,
+    }).where(eq(eventsTable.id, id)).returning();
+
+    // O avaliador padrão de cada critério já vem pré-determinado pelo roteamento
+    // global — não faz sentido depender de um clique manual em "Gerar Sugestões"
+    // pra isso existir. Gera automaticamente ao liberar as avaliações. Também
+    // pré-preenche os avaliadores padrão das duas matrizes de conformidade
+    // (Cenografia/Ferramentas); idempotente e sem sobrescrever escolhas manuais.
+    if (confirmed) await generateCriterionAssignments(id, tx);
+    return updated;
+  });
   await audit(req.user!.userId, confirmed ? "confirm_criteria" : "reopen_criteria", "events", id, before, ev);
-
-  // O avaliador padrão de cada critério já vem pré-determinado pelo roteamento
-  // global — não faz sentido depender de um clique manual em "Gerar Sugestões"
-  // pra isso existir. Gera automaticamente ao liberar as avaliações (idempotente:
-  // pula critérios que já têm atribuição, então não sobrescreve nada).
-  if (confirmed) {
-    // Gera as atribuições padrão dos critérios E pré-preenche os avaliadores
-    // padrão das duas matrizes de conformidade (Cenografia/Ferramentas) — tudo
-    // centralizado em generateCriterionAssignments, idempotente e sem
-    // sobrescrever escolhas manuais já feitas no evento.
-    await generateCriterionAssignments(id);
-  }
 
   res.json(await loadEventDetail(id, isRole(req.user!.role, "operador")));
 });
@@ -2043,10 +2096,10 @@ router.get("/events/:id/activity-log", requireRole("admin", "rh", "diretoria"), 
     if (!e.submittedAt) continue;
     // Para avaliações via link público, usa o nome digitado (submitter_name) em vez da conta do gerente
     const displayName = e.submitterName ?? e.userName ?? null;
-    entries.push({ id: `eval-${e.id}`, kind: "eval", label: "Enviou avaliação", userName: displayName, criterionName: critName.get(e.criterionId) ?? null, score: parseFloat(e.score as unknown as string), detail: null, createdAt: new Date(e.submittedAt).toISOString() });
+    entries.push({ id: `eval-${e.id}`, kind: "eval", label: "Enviou avaliação", userName: displayName, criterionName: critName.get(e.criterionId) ?? null, score: pgNum(e.score), detail: null, createdAt: new Date(e.submittedAt).toISOString() });
   }
   for (const c of cals) {
-    entries.push({ id: `cal-${c.id}`, kind: "calibration", label: "Calibrou nota", userName: c.userName ?? null, criterionName: critName.get(c.criterionId) ?? null, score: parseFloat(c.score as unknown as string), detail: null, createdAt: new Date(c.calibratedAt).toISOString() });
+    entries.push({ id: `cal-${c.id}`, kind: "calibration", label: "Calibrou nota", userName: c.userName ?? null, criterionName: critName.get(c.criterionId) ?? null, score: pgNum(c.score), detail: null, createdAt: new Date(c.calibratedAt).toISOString() });
   }
   for (const cm of calComments) {
     const t = cm.text;
@@ -2247,7 +2300,7 @@ router.post("/events/admin/fix-calibration-criteria", requireRole("admin"), asyn
     const updated = await db.execute(
       sql`UPDATE calibrations SET criterion_id = ${toCrit.id} WHERE criterion_id = ${fromCrit.id}`
     );
-    const count = (updated as unknown as { rowCount: number }).rowCount ?? 0;
+    const count = affectedRows(updated);
     totalUpdated += count;
     results.push({ from: fromName, to: toName, fromId: fromCrit.id, toId: toCrit.id, updated: count });
   }

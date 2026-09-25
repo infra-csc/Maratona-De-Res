@@ -11,7 +11,14 @@ export interface AnalyticsInput {
   minEvents: number;
   evaluations: { eventId: number; criterionId: number; evaluatorUserId: number; evaluatorName: string; score: number; status: string; submittedAt: Date | null }[];
   calibrations: { eventId: number; criterionId: number; calibratedScore: number }[];
-  eventCriteria: { eventId: number; criterionId: number; active: boolean; name: string; area: string | null }[];
+  /** weight = peso efetivo no evento (weightOverride ?? peso padrão); ausente = 1. */
+  eventCriteria: { eventId: number; criterionId: number; active: boolean; name: string; area: string | null; weight?: number | null }[];
+  /**
+   * Catálogo de critérios (todos, inclusive cópias por evento). Serve para
+   * juntar a cópia "Qualidade da Entrega (2)" ao critério de origem, como faz a
+   * nota oficial (mergeEventScopedCriteria). Opcional nos testes antigos.
+   */
+  criteriaCatalog?: { id: number; name: string; eventScoped: boolean; sourceCriterionId: number | null }[];
   conformities: { eventId: number; epi: boolean | null; estaiamentos: boolean | null; conduta: boolean | null; guardaEquipamentos: boolean | null }[];
   adjustments: { employeeId: number; label: string; kind: "penalty" | "merit"; points: number; quantity: number }[];
 }
@@ -87,26 +94,50 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
     evalsByEc.get(k)!.push(e.score);
   }
   const calByEc = new Map(input.calibrations.map(c => [`${c.eventId}:${c.criterionId}`, c.calibratedScore]));
-  const critAgg = new Map<string, { name: string; area: string | null; used: number[]; evalAvg: number[]; cal: number[] }>();
+  // Uma linha por critério E área: cópias por evento ("… (2)", "… (cópia)")
+  // voltam para o nome de origem e ficam na área que avaliou. Assim "Qualidade
+  // da Entrega" aparece duas vezes — Atendimento e Ativação —, como é avaliada;
+  // na nota oficial do evento as duas entram pela média. Um ponto por evento.
+  const catalogById = new Map((input.criteriaCatalog ?? []).map(c => [c.id, c]));
+  const baseName = (n: string) => n.replace(/\s*\((?:\d+|c[óo]pia)\)\s*$/i, "").trim();
+  const rootOf = (ec: { criterionId: number; name: string; area: string | null }) => {
+    const cat = catalogById.get(ec.criterionId);
+    const src = cat?.sourceCriterionId != null ? catalogById.get(cat.sourceCriterionId) : undefined;
+    const name = baseName(src?.name ?? cat?.name ?? ec.name);
+    return { key: `${name.toLocaleLowerCase("pt-BR")}|${(ec.area ?? "").toLocaleLowerCase("pt-BR")}`, name, area: ec.area };
+  };
+  const perEvent = new Map<string, { rootKey: string; name: string; area: string | null; used: number[]; evalAvg: number[]; cal: number[] }>();
   const shifts: number[] = [];
   for (const ec of input.eventCriteria) {
-    if (!ec.active) continue;
     const ev = eventById.get(ec.eventId);
     if (!ev || ev.isHistorical || !ev.resultsConfirmed) continue;
     const k = `${ec.eventId}:${ec.criterionId}`;
+    // Mesma regra da nota oficial: entram os ativos e os inativos calibrados;
+    // peso 0 não conta na nota do evento, então também não entra na média.
+    if (!ec.active && !calByEc.has(k)) continue;
+    if ((ec.weight ?? 1) <= 0) continue;
     const evalAvg = avg(evalsByEc.get(k) ?? []);
     const cal = calByEc.get(k);
     const used = cal ?? evalAvg;
     if (used == null) continue;
-    const key = `${ec.name}|${ec.area ?? ""}`;
-    if (!critAgg.has(key)) critAgg.set(key, { name: ec.name, area: ec.area, used: [], evalAvg: [], cal: [] });
-    const a = critAgg.get(key)!;
-    a.used.push(used * 10);
-    if (evalAvg != null) a.evalAvg.push(evalAvg * 10);
+    const root = rootOf(ec);
+    const pk = `${ec.eventId}|${root.key}`;
+    if (!perEvent.has(pk)) perEvent.set(pk, { rootKey: root.key, name: root.name, area: root.area, used: [], evalAvg: [], cal: [] });
+    const e = perEvent.get(pk)!;
+    e.used.push(used * 10);
+    if (evalAvg != null) e.evalAvg.push(evalAvg * 10);
     if (cal != null) {
-      a.cal.push(cal * 10);
+      e.cal.push(cal * 10);
       if (evalAvg != null) shifts.push((cal - evalAvg) * 10);
     }
+  }
+  const critAgg = new Map<string, { name: string; area: string | null; used: number[]; evalAvg: number[]; cal: number[] }>();
+  for (const e of perEvent.values()) {
+    if (!critAgg.has(e.rootKey)) critAgg.set(e.rootKey, { name: e.name, area: e.area, used: [], evalAvg: [], cal: [] });
+    const a = critAgg.get(e.rootKey)!;
+    a.used.push(avg(e.used)!);
+    if (e.evalAvg.length) a.evalAvg.push(avg(e.evalAvg)!);
+    if (e.cal.length) a.cal.push(avg(e.cal)!);
   }
   const criteria = [...critAgg.entries()].map(([key, a]) => ({
     key, name: a.name, area: a.area,

@@ -12,6 +12,7 @@ import { audit } from "../lib/audit.js";
 import { getCurrentCycle } from "../lib/cycle.js";
 import { recomputeCycleResults } from "./results.js";
 import { isSyncableFunction } from "../lib/participation.js";
+import { affectedRows } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -1331,8 +1332,12 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
           await tx.update(eventCriteriaTable).set({ active: true }).where(eq(eventCriteriaTable.id, existing.id));
         }
       }
+      // Quesito aposentado: DESATIVA o vínculo em vez de apagar. Apagar perdia o
+      // peso ajustado (weight_override) e deixava avaliações sem vínculo; o
+      // cálculo oficial já ignora vínculo inativo (exceto se tiver calibração).
       if (retiredCriteriaIds.length > 0) {
-        await tx.delete(eventCriteriaTable).where(and(eq(eventCriteriaTable.eventId, eventId), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)));
+        await tx.update(eventCriteriaTable).set({ active: false })
+          .where(and(eq(eventCriteriaTable.eventId, eventId), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)));
       }
 
       // Notas que já existem no app para (evento, quesito, avaliador) NÃO são
@@ -1424,7 +1429,8 @@ router.post("/integration/import/survey", requireRole("admin"), async (req, res)
         if (rowsByEventId.has(ev.id)) continue; // já processado no loop principal
 
         if (retiredCriteriaIds.length > 0) {
-          await tx.delete(eventCriteriaTable).where(
+          // Desativa (não apaga): mesma razão do laço principal acima.
+          await tx.update(eventCriteriaTable).set({ active: false }).where(
             and(eq(eventCriteriaTable.eventId, ev.id), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds)),
           );
         }
@@ -1530,7 +1536,7 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
         const deactivated = await tx.update(eventCriteriaTable)
           .set({ active: false })
           .where(and(eq(eventCriteriaTable.eventId, ev.id), inArray(eventCriteriaTable.criterionId, retiredCriteriaIds), eq(eventCriteriaTable.active, true)));
-        if ((deactivated as unknown as { rowCount: number }).rowCount > 0) changed = true;
+        if (affectedRows(deactivated) > 0) changed = true;
       }
       // 3b. Add or reactivate new target criteria
       const existingECs = await tx.select().from(eventCriteriaTable).where(eq(eventCriteriaTable.eventId, ev.id));
@@ -1557,7 +1563,7 @@ router.post("/integration/migrate-criteria-catalog", requireRole("admin"), async
       const result = await tx.update(evaluationsTable)
         .set({ criterionId: newCrit.id })
         .where(eq(evaluationsTable.criterionId, oldCrit.id));
-      evaluationsRemapped += (result as unknown as { rowCount: number }).rowCount ?? 0;
+      evaluationsRemapped += affectedRows(result);
     }
   });
 

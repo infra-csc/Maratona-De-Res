@@ -363,6 +363,18 @@ export interface Event {
   conformityFilled?: number;
   /** Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído). */
   conformityTotal?: number;
+  /** Matriz de Cenografia respondida por completo (só quando há avaliador atribuído) */
+  conformityCenografiaDone?: boolean;
+  /** Matriz de Ferramentas respondida (só quando há avaliador atribuído) */
+  conformityFerramentasDone?: boolean;
+  /** @nullable */
+  conformityEvaluatorUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorName?: string | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasName?: string | null;
   createdAt?: string;
 }
 
@@ -578,6 +590,12 @@ export interface EventConformity {
   /** @nullable */
   standoutJustification?: string | null;
   createdByUserId: number;
+  /** @nullable */
+  createdByUserName?: string | null;
+  /** @nullable */
+  cenografiaSubmittedByName?: string | null;
+  /** @nullable */
+  ferramentasSubmittedByName?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1071,6 +1089,77 @@ export interface PlatoonRuleUpdate {
   description?: string;
   active?: boolean;
   displayOrder?: number;
+}
+
+export type EventsReportCycle = {
+  id: number;
+  name: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+};
+
+export type EventReportRowCriteriaItem = {
+  name: string;
+  /** @nullable */
+  area?: string | null;
+  weight: number;
+  /** @nullable */
+  evaluatorAvg?: number | null;
+  /** @nullable */
+  calibrated?: number | null;
+  /** @nullable */
+  used?: number | null;
+  /** @nullable */
+  calibrationReason?: string | null;
+  status: string;
+  active: boolean;
+};
+
+export type EventReportRowTeamItem = {
+  name: string;
+  /** @nullable */
+  functionName?: string | null;
+  /** @nullable */
+  employmentType?: string | null;
+  countsForScore: boolean;
+};
+
+export interface EventReportRow {
+  id: number;
+  name: string;
+  /** @nullable */
+  clientName?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  state?: string | null;
+  startDate: string;
+  endDate: string;
+  status: string;
+  resultsConfirmed: boolean;
+  isHistorical: boolean;
+  /**
+     * Nota final oficial (0-100) do recálculo; só eventos confirmados
+     * @nullable
+     */
+  finalScore?: number | null;
+  /** @nullable */
+  projectedScore?: number | null;
+  /** @nullable */
+  performanceScore?: number | null;
+  conformityPenalty: number;
+  calibratedCriteria: number;
+  evaluatedCriteria: number;
+  totalCriteria: number;
+  criteria: EventReportRowCriteriaItem[];
+  team: EventReportRowTeamItem[];
+}
+
+export interface EventsReport {
+  cycle: EventsReportCycle;
+  events: EventReportRow[];
 }
 
 export type AnalyticsOverviewCycle = {
@@ -2788,6 +2877,10 @@ employeeId?: number;
 export type SeedDefaultPenaltyTypes200 = {
   inserted?: number;
   message?: string;
+};
+
+export type GetAnalyticsEventsReportParams = {
+cycleId?: number;
 };
 
 export type GetQuarterlyResultsParams = {

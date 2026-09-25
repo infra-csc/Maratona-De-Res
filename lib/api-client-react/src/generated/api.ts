@@ -107,6 +107,7 @@ import type {
   EventResultsConfirmationResponse,
   EventTeamResult,
   EventUpdate,
+  EventsReport,
   ExportEventResultsParams,
   FixCalibrationCriteria200,
   FixOrphanedEvaluations200,
@@ -114,6 +115,7 @@ import type {
   GenerateAssignmentsResult,
   GeneratePinResult,
   GetAbsencesParams,
+  GetAnalyticsEventsReportParams,
   GetAuditLogsParams,
   GetCalibrationAuditParams,
   GetCalibrationCommentsParams,
@@ -8008,6 +8010,90 @@ export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDash
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAnalyticsEventsReportUrl = (params?: GetAnalyticsEventsReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/analytics/events-report?${stringifiedParams}` : `/analytics/events-report`
+}
+
+/**
+ * @summary Relatório por evento (nota final calibrada, critérios, calibração e equipe)
+ */
+export const getAnalyticsEventsReport = async (params?: GetAnalyticsEventsReportParams, options?: Parameters<typeof customFetch>[1]): Promise<EventsReport> => {
+
+  return customFetch<EventsReport>(getGetAnalyticsEventsReportUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAnalyticsEventsReportQueryKey = (params?: GetAnalyticsEventsReportParams,) => {
+    return [
+    `/analytics/events-report`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAnalyticsEventsReportQueryOptions = <TData = Awaited<ReturnType<typeof getAnalyticsEventsReport>>, TError = ErrorType<void>>(params?: GetAnalyticsEventsReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsEventsReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAnalyticsEventsReportQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalyticsEventsReport>>> = ({ signal }) => getAnalyticsEventsReport(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsEventsReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAnalyticsEventsReportQueryResult = NonNullable<Awaited<ReturnType<typeof getAnalyticsEventsReport>>>
+export type GetAnalyticsEventsReportQueryError = ErrorType<void>
+
+
+/**
+ * @summary Relatório por evento (nota final calibrada, critérios, calibração e equipe)
+ */
+
+export function useGetAnalyticsEventsReport<TData = Awaited<ReturnType<typeof getAnalyticsEventsReport>>, TError = ErrorType<void>>(
+ params?: GetAnalyticsEventsReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsEventsReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAnalyticsEventsReportQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

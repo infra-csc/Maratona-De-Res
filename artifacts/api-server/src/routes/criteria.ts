@@ -3,6 +3,7 @@ import { db, criteriaTable, areasTable, eventCriteriaTable, eventsTable } from "
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
+import { pgNum, affectedRows } from "../lib/pg-num.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -24,7 +25,7 @@ router.get("/criteria", async (_req, res) => {
     .leftJoin(areasTable, eq(criteriaTable.responsibleAreaId, areasTable.id))
     .where(eq(criteriaTable.eventScoped, false))
     .orderBy(criteriaTable.displayOrder, criteriaTable.name);
-  res.json(criteria.map(c => ({ ...c, defaultWeight: parseFloat(c.defaultWeight as unknown as string), eventCount: Number(c.eventCount) })));
+  res.json(criteria.map(c => ({ ...c, defaultWeight: pgNum(c.defaultWeight), eventCount: Number(c.eventCount) })));
 });
 
 router.post("/criteria", requireRole("admin", "rh"), async (req, res) => {
@@ -58,35 +59,41 @@ router.patch("/criteria/:id", requireRole("admin", "rh"), async (req, res) => {
     }
   }
 
-  const [criterion] = await db.update(criteriaTable).set({
-    ...(name !== undefined && { name }),
-    ...(description !== undefined && { description }),
-    ...(responsibleAreaId !== undefined && { responsibleAreaId }),
-    ...(newAreaLabel !== undefined && { responsibleAreaLabel: newAreaLabel }),
-    ...(defaultWeight !== undefined && { defaultWeight: String(defaultWeight) }),
-    ...(active !== undefined && { active }),
-    ...(displayOrder !== undefined && { displayOrder }),
-  }).where(eq(criteriaTable.id, id)).returning();
+  // Critério e vínculos dos eventos abertos na mesma transação: se a
+  // desativação nos eventos falhar, o catálogo não fica desativado sozinho.
+  const criterion = await db.transaction(async (tx) => {
+    const [updatedCriterion] = await tx.update(criteriaTable).set({
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+      ...(responsibleAreaId !== undefined && { responsibleAreaId }),
+      ...(newAreaLabel !== undefined && { responsibleAreaLabel: newAreaLabel }),
+      ...(defaultWeight !== undefined && { defaultWeight: String(defaultWeight) }),
+      ...(active !== undefined && { active }),
+      ...(displayOrder !== undefined && { displayOrder }),
+    }).where(eq(criteriaTable.id, id)).returning();
 
-  // Se um critério global for desativado, ele não deve continuar aparecendo
-  // como pendente de peso/avaliador em eventos que ainda não travaram os
-  // critérios (RH ainda não confirmou). Eventos já confirmados/avaliados
-  // mantêm o snapshot histórico intacto.
-  if (active === false && before.active !== false) {
-    const openEvents = await db
-      .select({ id: eventsTable.id })
-      .from(eventsTable)
-      .where(eq(eventsTable.criteriaConfirmed, false));
-    const openEventIds = openEvents.map(e => e.id);
-    if (openEventIds.length > 0) {
-      await db.update(eventCriteriaTable)
-        .set({ active: false })
-        .where(and(
-          eq(eventCriteriaTable.criterionId, id),
-          inArray(eventCriteriaTable.eventId, openEventIds),
-        ));
+    // Se um critério global for desativado, ele não deve continuar aparecendo
+    // como pendente de peso/avaliador em eventos que ainda não travaram os
+    // critérios (RH ainda não confirmou). Eventos já confirmados/avaliados
+    // mantêm o snapshot histórico intacto.
+    if (active === false && before.active !== false) {
+      const openEvents = await tx
+        .select({ id: eventsTable.id })
+        .from(eventsTable)
+        .where(eq(eventsTable.criteriaConfirmed, false));
+      const openEventIds = openEvents.map(e => e.id);
+      if (openEventIds.length > 0) {
+        await tx.update(eventCriteriaTable)
+          .set({ active: false })
+          .where(and(
+            eq(eventCriteriaTable.criterionId, id),
+            inArray(eventCriteriaTable.eventId, openEventIds),
+          ));
+      }
     }
-  }
+
+    return updatedCriterion;
+  });
 
   await audit(req.user!.userId, "update", "criteria", id, before, criterion);
   res.json(criterion);
@@ -102,7 +109,7 @@ router.post("/criteria/admin/sync-area-labels", requireRole("admin"), async (req
     WHERE  criteria.responsible_area_id = areas.id
       AND  (criteria.responsible_area_label IS DISTINCT FROM areas.name)
   `);
-  const count = (updated as unknown as { rowCount: number }).rowCount ?? 0;
+  const count = affectedRows(updated);
   await audit(req.user!.userId, "sync_area_labels", "criteria", undefined, { updated: count }, undefined);
   res.json({ updated: count });
 });

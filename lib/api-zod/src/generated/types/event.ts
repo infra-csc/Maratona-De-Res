@@ -72,5 +72,17 @@ export interface Event {
   conformityFilled?: number;
   /** Itens da Matriz de Conformidade esperados (5 Cenografia + 1 Ferramentas, por lado atribuído). */
   conformityTotal?: number;
+  /** Matriz de Cenografia respondida por completo (só quando há avaliador atribuído) */
+  conformityCenografiaDone?: boolean;
+  /** Matriz de Ferramentas respondida (só quando há avaliador atribuído) */
+  conformityFerramentasDone?: boolean;
+  /** @nullable */
+  conformityEvaluatorUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorName?: string | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasUserId?: number | null;
+  /** @nullable */
+  conformityEvaluatorFerramentasName?: string | null;
   createdAt?: string;
 }

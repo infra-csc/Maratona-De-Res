@@ -34,6 +34,12 @@ export interface EventConformity {
   /** @nullable */
   standoutJustification?: string | null;
   createdByUserId: number;
+  /** @nullable */
+  createdByUserName?: string | null;
+  /** @nullable */
+  cenografiaSubmittedByName?: string | null;
+  /** @nullable */
+  ferramentasSubmittedByName?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

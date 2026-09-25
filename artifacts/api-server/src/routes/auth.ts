@@ -14,7 +14,7 @@ const router = Router();
 const PIN_MAX_FAILURES = 10;
 const PIN_WINDOW_MS = 15 * 60_000;
 const pinFailures = new Map<string, { count: number; resetAt: number }>();
-function clientKey(req: { headers: Record<string, unknown>; ip?: string }): string {
+function clientKey(req: { headers: Record<string, string | string[] | undefined>; ip?: string }): string {
   const fwd = req.headers["x-forwarded-for"];
   const first = typeof fwd === "string" ? fwd.split(",")[0]?.trim() : undefined;
   return first || req.ip || "unknown";
@@ -79,7 +79,7 @@ router.post("/auth/login", async (req, res) => {
 
   // PIN-only path for casa employees (lookup by stored pinValue)
   if (pin && /^\d{4}$/.test(pin)) {
-    const key = clientKey(req as unknown as { headers: Record<string, unknown>; ip?: string });
+    const key = clientKey(req);
     const blockedMinutes = pinBlocked(key);
     if (blockedMinutes != null) {
       res.status(429).json({ error: `Muitas tentativas. Tente novamente em ${blockedMinutes} min.` });
