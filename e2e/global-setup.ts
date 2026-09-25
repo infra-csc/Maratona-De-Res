@@ -96,7 +96,10 @@ export default async function globalSetup(_config: FullConfig) {
     }
     log.end();
     await dbServer.stop();
-    await pg.close();
+    // Sem pg.close(): no Linux do CI, um temporizador interno do PGlite dispara
+    // depois do close e derruba o processo com exceção não tratada (o teste
+    // já tinha passado, mas o job saía com código 1). O banco é só memória e
+    // morre junto com o processo do Playwright.
   };
 
   try {
