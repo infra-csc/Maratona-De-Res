@@ -50,3 +50,49 @@ jobs:
           PORT: "8080"
           BASE_PATH: "/"
           NODE_ENV: production
+
+  # E2E de navegador (Playwright): login → evento → avaliação → calibração →
+  # confirmação → bônus em Resultados. Banco em WASM (PGlite), API e front a
+  # partir do build de produção — tudo sobe no global-setup (e2e/), sem serviço
+  # externo. Roda em paralelo ao job "check".
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Instalar o Chromium do Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build (api + web)
+        run: pnpm --filter @workspace/api-server --filter @workspace/maratona run build
+        env:
+          PORT: "5191"
+          BASE_PATH: "/"
+          NODE_ENV: production
+
+      - name: E2E (Playwright)
+        run: pnpm run test:e2e
+
+      - name: Relatório, traces e log da API (em falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore

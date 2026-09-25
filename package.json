@@ -9,6 +9,7 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "test": "node --import ./scripts/test/register.mjs --test \"artifacts/api-server/src/**/*.test.ts\"",
     "test:routes": "node --import ./scripts/test/register.mjs --test \"artifacts/api-server/src/**/*.route.test.ts\"",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "codegen": "pnpm --filter @workspace/api-spec run codegen",
     "check:api-contract": "node scripts/check-api-contract.mjs"
   },
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
     "@electric-sql/pglite-socket": "0.2.11",
+    "@playwright/test": "1.63.0",
     "prettier": "^3.8.3",
     "typescript": "~5.9.3"
   }
