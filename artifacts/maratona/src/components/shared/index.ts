@@ -6,3 +6,4 @@ export { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
 export { LoadingState, type LoadingStateProps } from "./loading-state";
 export { SectionLabel, type SectionLabelProps } from "./section-label";
 export { StatTile, type StatTileProps } from "./stat-tile";
+export { HScroller, type HScrollerProps } from "./h-scroller";

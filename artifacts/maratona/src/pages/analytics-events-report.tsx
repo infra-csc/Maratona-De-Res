@@ -203,7 +203,7 @@ function Report({ report }: { report: EventsReport }) {
           <p className="text-[11px] font-bold uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.12em", color: "var(--accent-text)" }}>Maratona de Resultados · Relatório por evento</p>
           <h1 className="text-[34px] font-black uppercase leading-none" style={{ fontFamily: CONDENSED }}>{report.cycle.name}</h1>
           <p className="text-[13px]" style={{ color: "var(--muted-foreground)" }}>
-            Nota final de cada evento já calibrada pelo RH, com os critérios, a calibração e a equipe que trabalhou. {events.length} eventos com resultado confirmado
+            Nota final de cada evento já calibrada, com os critérios, a calibração e a equipe que trabalhou. {events.length} eventos com resultado confirmado
             {events.length ? `, de ${br(events[0].startDate)} a ${br(events[events.length - 1].startDate)}` : ""}
             {pendingCount ? `; ${pendingCount} evento(s) ainda sem confirmação ficaram de fora` : ""}. Gerado em {generatedAt}{user?.name ? ` por ${user.name}` : ""}.
           </p>
@@ -297,7 +297,7 @@ function Report({ report }: { report: EventsReport }) {
 
             <H2 breakBefore>Como a nota do evento é calculada</H2>
             <ol className="list-decimal pl-5 space-y-1.5 text-[13px]">
-              <li>Cada critério recebe nota de 0 a 10. Vale a nota calibrada pelo RH quando existe; senão, a média dos avaliadores do critério.</li>
+              <li>Cada critério recebe nota de 0 a 10. Vale a nota calibrada quando existe; senão, a média dos avaliadores do critério.</li>
               <li>A performance é a média ponderada pelos pesos dos critérios, convertida para 0 a 100. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) entra pela média das duas. Peso 0 não conta.</li>
               <li>A matriz de conformidade tem quatro itens; cada "Não" tira 10 pontos da nota do evento, que fica entre 0 e 100.</li>
               <li>Só eventos com resultados confirmados entram na nota do ciclo e no bônus. A equipe que conta é a da casa; freela e função "Sup Ceno" são informativos.</li>

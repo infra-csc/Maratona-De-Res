@@ -20,8 +20,11 @@ export interface AnalyticsInput {
    */
   criteriaCatalog?: { id: number; name: string; eventScoped: boolean; sourceCriterionId: number | null }[];
   conformities: { eventId: number; epi: boolean | null; estaiamentos: boolean | null; conduta: boolean | null; guardaEquipamentos: boolean | null }[];
-  adjustments: { employeeId: number; label: string; kind: "penalty" | "merit"; points: number; quantity: number }[];
+  adjustments: { employeeId: number; employeeName?: string | null; label: string; kind: "penalty" | "merit"; points: number; quantity: number }[];
 }
+
+/** Colaborador no ranking de penalidades ou de méritos do ciclo. */
+export interface AdjustedPerson { employeeId: number; name: string; points: number; occurrences: number; types: string[] }
 
 export interface AnalyticsOverview {
   kpis: {
@@ -40,6 +43,9 @@ export interface AnalyticsOverview {
   nearNextFaixa: { employeeId: number; name: string; finalResult: number; currentFaixa: string | null; nextFaixa: string; gap: number; currentBonus: number; potentialBonus: number }[];
   evaluators: { userId: number; name: string; submitted: number; drafts: number; avgGiven: number | null; calibrationBias: number | null; biasSamples: number; avgDaysToSubmit: number | null }[];
   adjustments: { label: string; kind: "penalty" | "merit"; occurrences: number; points: number; employees: number }[];
+  /** Quem mais perdeu pontos com penalidades e quem mais ganhou com méritos (até 10 cada). */
+  topPenalized: AdjustedPerson[];
+  topMerited: AdjustedPerson[];
   clients: { client: string; avgScore: number; events: number }[];
 }
 
@@ -245,6 +251,25 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
     .map(g => ({ label: g.label, kind: g.kind, occurrences: g.occurrences, points: g.points, employees: g.employees.size }))
     .sort((a, b) => b.occurrences - a.occurrences);
 
+  // Por pessoa: pontos = pontos × quantidade, somados no ciclo; empate → mais ocorrências.
+  const byPerson = (kind: "penalty" | "merit"): AdjustedPerson[] => {
+    const acc = new Map<number, { name: string; points: number; occurrences: number; types: Set<string> }>();
+    for (const a of input.adjustments) {
+      if (a.kind !== kind) continue;
+      const p = acc.get(a.employeeId) ?? { name: a.employeeName ?? `Colaborador #${a.employeeId}`, points: 0, occurrences: 0, types: new Set<string>() };
+      p.points += a.points * a.quantity;
+      p.occurrences += a.quantity;
+      p.types.add(a.label);
+      acc.set(a.employeeId, p);
+    }
+    return [...acc.entries()]
+      .map(([employeeId, p]) => ({ employeeId, name: p.name, points: r1(p.points), occurrences: p.occurrences, types: [...p.types].sort((x, y) => x.localeCompare(y, "pt-BR")) }))
+      .sort((a, b) => b.points - a.points || b.occurrences - a.occurrences || a.name.localeCompare(b.name, "pt-BR"))
+      .slice(0, 10);
+  };
+  const topPenalized = byPerson("penalty");
+  const topMerited = byPerson("merit");
+
   // ── Clientes ──
   const byClient = new Map<string, number[]>();
   for (const e of scoredConfirmed) {
@@ -294,6 +319,8 @@ export function computeAnalytics(input: AnalyticsInput): AnalyticsOverview {
     nearNextFaixa,
     evaluators,
     adjustments,
+    topPenalized,
+    topMerited,
     clients,
   };
 }

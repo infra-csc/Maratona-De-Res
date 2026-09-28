@@ -5636,9 +5636,26 @@ components:
               countsForScore:
                 type: boolean
 
+    AnalyticsAdjustedPerson:
+      type: object
+      required: [employeeId, name, points, occurrences, types]
+      properties:
+        employeeId:
+          type: integer
+        name:
+          type: string
+        points:
+          type: number
+        occurrences:
+          type: integer
+        types:
+          type: array
+          items:
+            type: string
+
     AnalyticsOverview:
       type: object
-      required: [cycle, kpis, ruleSet, scoreTrend, criteria, conformity, faixas, funnel, nearNextFaixa, evaluators, adjustments, clients]
+      required: [cycle, kpis, ruleSet, scoreTrend, criteria, conformity, faixas, funnel, nearNextFaixa, evaluators, adjustments, clients, topPenalized, topMerited]
       properties:
         cycle:
           type: object
@@ -5851,6 +5868,16 @@ components:
                 type: number
               employees:
                 type: integer
+        topPenalized:
+          type: array
+          description: Colaboradores que mais perderam pontos com penalidades no ciclo (até 10)
+          items:
+            $ref: "#/components/schemas/AnalyticsAdjustedPerson"
+        topMerited:
+          type: array
+          description: Colaboradores que mais ganharam pontos com méritos no ciclo (até 10)
+          items:
+            $ref: "#/components/schemas/AnalyticsAdjustedPerson"
         clients:
           type: array
           items:

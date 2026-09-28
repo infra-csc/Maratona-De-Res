@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { getCycleWeekends } from "@/lib/utils";
 import { CONDENSED } from "@/lib/premium-theme";
 import { inputStyle } from "./form-bits";
+import { HScroller } from "@/components/shared";
 
 const chipFilters: { key: string | null; label: string; title: string }[] = [
   { key: null,          label: "Todos",           title: "Todos os eventos do ciclo" },
@@ -146,7 +147,7 @@ export function WeekendChipsRow({ weekends, weekendRowRef, filterDateFrom, filte
         <Calendar size={12} />
         Fim de Semana
       </span>
-      <div ref={weekendRowRef} className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+      <HScroller label="fins de semana" viewportRef={weekendRowRef} className="flex-1">
         {weekends.map(w => {
           const active = filterDateFrom === w.sat && filterDateTo === w.sun;
           return (
@@ -169,7 +170,7 @@ export function WeekendChipsRow({ weekends, weekendRowRef, filterDateFrom, filte
             </button>
           );
         })}
-      </div>
+      </HScroller>
       {hasDateFilter && filterDateFrom && filterDateTo && (
         <button
           type="button"

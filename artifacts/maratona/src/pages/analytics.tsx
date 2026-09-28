@@ -73,18 +73,50 @@ function VizTooltip({ active, payload, lines }: { active?: boolean; payload?: { 
   );
 }
 
-function DataTable({ head, rows }: { head: string[]; rows: (React.ReactNode)[][] }) {
+type SortCell = string | number | null | undefined;
+
+/**
+ * Tabela simples. Com `sort` (valores crus de cada célula, na mesma ordem das
+ * linhas), o cabeçalho vira botão: 1º clique ordena (texto A→Z, número do
+ * maior para o menor), 2º clique inverte. Vazio fica sempre no fim.
+ */
+function DataTable({ head, rows, sort }: { head: string[]; rows: (React.ReactNode)[][]; sort?: SortCell[][] }) {
+  const [by, setBy] = useState<{ col: number; dir: 1 | -1 } | null>(null);
+  const order = rows.map((_, i) => i);
+  if (sort && by) {
+    order.sort((x, y) => {
+      const a = sort[x][by.col], b = sort[y][by.col];
+      if (a == null || b == null) return a == null && b == null ? 0 : a == null ? 1 : -1;
+      const c = typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "pt-BR", { numeric: true });
+      return c * by.dir;
+    });
+  }
+  const toggle = (col: number) => {
+    const numeric = typeof sort?.find(r => r[col] != null)?.[col] === "number";
+    setBy(prev => (prev?.col === col ? { col, dir: prev.dir === 1 ? -1 : 1 } : { col, dir: numeric ? -1 : 1 }));
+  };
   return (
     <table className="w-full text-[12.5px]">
       <thead>
         <tr>
-          {head.map((h, i) => (
-            <th key={h} className={`py-2 px-2 font-bold uppercase text-[11px] ${i === 0 ? "text-left" : "text-right"}`} style={{ fontFamily: CONDENSED, color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>{h}</th>
-          ))}
+          {head.map((h, i) => {
+            const active = by?.col === i;
+            const ariaSort = active ? (by!.dir === 1 ? "ascending" : "descending") : sort ? "none" : undefined;
+            return (
+              <th key={h} aria-sort={ariaSort} className={`py-2 px-2 font-bold uppercase text-[11px] ${i === 0 ? "text-left" : "text-right"}`} style={{ fontFamily: CONDENSED, color: active ? "var(--foreground)" : "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>
+                {sort ? (
+                  <button type="button" onClick={() => toggle(i)} className={`inline-flex items-center gap-1 uppercase font-bold hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded ${i === 0 ? "" : "flex-row-reverse"}`}>
+                    {h}
+                    <span aria-hidden className="text-[11px]">{active ? (by!.dir === 1 ? "▲" : "▼") : "↕"}</span>
+                  </button>
+                ) : h}
+              </th>
+            );
+          })}
         </tr>
       </thead>
       <tbody>
-        {rows.map((r, ri) => (
+        {order.map(ri => rows[ri]).map((r, ri) => (
           <tr key={ri}>
             {r.map((c, ci) => (
               <td key={ci} className={`py-2 px-2 ${ci === 0 ? "text-left" : "text-right tabular-nums"}`} style={{ borderBottom: "1px solid var(--border)" }}>{c}</td>
@@ -151,8 +183,8 @@ function HBars<T extends Record<string, unknown>>({ data, labelKey, valueKey, ma
 
 function biasBadge(bias: number | null, samples: number) {
   if (bias == null || samples < 3) return <span style={{ color: "var(--muted-foreground)" }}>—</span>;
-  if (bias >= 5) return <StatusBadge variant="info" size="sm" label={`RH sobe +${n1(bias)}`} srLabel={`A calibração sobe as notas deste avaliador em média ${n1(bias)} pontos`} />;
-  if (bias <= -5) return <StatusBadge variant="warn" size="sm" label={`RH desce ${n1(bias)}`} srLabel={`A calibração desce as notas deste avaliador em média ${n1(Math.abs(bias))} pontos`} />;
+  if (bias >= 5) return <StatusBadge variant="info" size="sm" label={`Calibração sobe +${n1(bias)}`} srLabel={`A calibração sobe as notas deste avaliador em média ${n1(bias)} pontos`} />;
+  if (bias <= -5) return <StatusBadge variant="warn" size="sm" label={`Calibração desce ${n1(bias)}`} srLabel={`A calibração desce as notas deste avaliador em média ${n1(Math.abs(bias))} pontos`} />;
   return <StatusBadge variant="ok" size="sm" label={`Alinhado ${bias > 0 ? "+" : ""}${n1(bias)}`} />;
 }
 
@@ -183,6 +215,8 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
     : null;
   const weakest = data.criteria[0];
   const maxCount = Math.max(1, ...data.faixas.map(x => x.count));
+  // "Sem cliente" não é cliente: sem nenhum evento com cliente informado, o card some.
+  const realClients = data.clients.filter(c => c.client !== "Sem cliente");
   const worstConformity = [...data.conformity].filter(c => c.naoPct != null).sort((a, b) => (b.naoPct ?? 0) - (a.naoPct ?? 0))[0];
 
   return (
@@ -220,7 +254,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
         <StatTile label="Eventos confirmados" value={`${k.eventsConfirmed}/${k.eventsTotal}`} detail={`${pct(k.eventsConfirmed, k.eventsTotal)}% do ciclo`} />
         <StatTile label="Elegíveis ao bônus" value={`${k.eligible}/${k.collaborators}`} detail={`${k.withBonus} com bônus hoje`} />
         <StatTile label="Bônus projetado" value={brl(k.bonusTotal)} detail="Soma dos elegíveis" />
-        <StatTile label="Avaliações enviadas" value={k.evaluationsSubmitted} detail={k.evaluationsDraft > 0 ? `${k.evaluationsDraft} em rascunho` : "Nenhum rascunho parado"} />
+        <StatTile label="Avaliações enviadas" value={k.evaluationsSubmitted} detail="Notas enviadas pelos avaliadores no ciclo" />
       </div>
 
       {/* ── Destaques em texto: o que pede atenção ── */}
@@ -238,7 +272,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
           )}
           {k.avgCalibrationShift != null && (
             <li className="rounded-lg px-3.5 py-2.5" style={{ backgroundColor: "var(--secondary)" }}>
-              A calibração do RH move as notas em média <strong>{k.avgCalibrationShift > 0 ? "+" : ""}{n1(k.avgCalibrationShift)}</strong> ponto(s) em {k.calibratedCriteria} critério(s) calibrado(s).
+              A calibração move as notas em média <strong>{k.avgCalibrationShift > 0 ? "+" : ""}{n1(k.avgCalibrationShift)}</strong> ponto(s) em {k.calibratedCriteria} critério(s) calibrado(s).
             </li>
           )}
         </ul>
@@ -320,6 +354,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
             <DataTable
               head={["Critério", "Nota usada", "Avaliadores", "Calibrada", "Eventos"]}
               rows={data.criteria.map(c => [`${c.name}${c.area ? ` · ${c.area}` : ""}`, n1(c.avgScore), n1(c.evaluatorAvg), c.calibratedCount > 0 ? `${n1(c.calibratedAvg)} (${c.calibratedCount})` : "—", c.eventsCount])}
+              sort={data.criteria.map(c => [`${c.name} ${c.area ?? ""}`, c.avgScore, c.evaluatorAvg, c.calibratedCount > 0 ? c.calibratedAvg : null, c.eventsCount])}
             />
           )}
         >
@@ -366,28 +401,30 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
         {/* ── Faixas ── */}
         <Card
           title="Colaboradores por faixa"
-          subtitle="Faixa da nota final do ciclo e bônus projetado de cada uma."
-          table={<DataTable head={["Faixa", "Pessoas", "Bônus"]} rows={data.faixas.map(f => [f.name, f.count, brl(f.bonusTotal)])} />}
+          subtitle="Quantas pessoas estão em cada faixa pela nota final do ciclo, e o bônus projetado da faixa."
+          table={<DataTable head={["Faixa", "Pessoas", "Bônus projetado"]} rows={data.faixas.map(f => [f.name, f.count, f.bonusTotal > 0 ? brl(f.bonusTotal) : "—"])} sort={data.faixas.map(f => [f.minScore ?? 0, f.count, f.bonusTotal])} />}
         >
-          <ul className="space-y-2">
-            {data.faixas.map(f => {
-              return (
-                <li key={f.name} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
+          {/* Cada faixa num bloco, com pessoas e bônus na MESMA linha do nome:
+              antes o valor ficava solto entre duas faixas e não dava para saber de qual era. */}
+          <ul>
+            {data.faixas.map(f => (
+              <li key={f.name} className="py-2.5 first:pt-0" style={{ borderBottom: "1px solid var(--border)" }}>
+                <div className="flex items-baseline justify-between gap-3">
                   <span className="flex items-center gap-2 min-w-0 text-[12.5px]">
                     <span aria-hidden className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: f.color ?? "var(--muted-foreground)", boxShadow: "inset 0 0 0 1px var(--border)" }} />
                     <span className="truncate font-semibold">{f.name}</span>
                     {f.minScore != null && <span className="shrink-0 text-[11px] tabular-nums" style={{ color: "var(--muted-foreground)" }}>{fmtNum(f.minScore, 2)}–{fmtNum(f.maxScore ?? 0, 2)}</span>}
                   </span>
-                  <span className="text-[12px] tabular-nums text-right" style={{ color: "var(--muted-foreground)" }}>{f.bonusTotal > 0 ? brl(f.bonusTotal) : ""}</span>
-                  <div className="col-span-2 flex items-center gap-2">
-                    <div className="h-2 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${(f.count / maxCount) * 100}%`, backgroundColor: SERIES }} />
-                    </div>
-                    <span className="w-8 text-right text-[12px] font-bold tabular-nums">{f.count}</span>
-                  </div>
-                </li>
-              );
-            })}
+                  <span className="shrink-0 text-[12px] tabular-nums text-right">
+                    <strong className="text-[13px]">{f.count}</strong> {f.count === 1 ? "pessoa" : "pessoas"}
+                    <span style={{ color: "var(--muted-foreground)" }}> · {f.bonusTotal > 0 ? brl(f.bonusTotal) : "sem bônus"}</span>
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 rounded-full overflow-hidden" style={{ backgroundColor: "var(--secondary)" }} aria-hidden>
+                  <div className="h-full rounded-full" style={{ width: `${(f.count / maxCount) * 100}%`, backgroundColor: SERIES }} />
+                </div>
+              </li>
+            ))}
           </ul>
         </Card>
 
@@ -406,6 +443,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
                 rows={data.nearNextFaixa.map(r => [
                   r.name, n1(r.finalResult), r.currentFaixa ?? "—", r.nextFaixa, `${n1(r.gap)} pt`, brl(r.currentBonus), brl(r.potentialBonus),
                 ])}
+                sort={data.nearNextFaixa.map(r => [r.name, r.finalResult, r.currentFaixa, r.nextFaixa, r.gap, r.currentBonus, r.potentialBonus])}
               />
             </div>
           )}
@@ -415,18 +453,19 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
         <Card
           span2
           title="Avaliadores"
-          subtitle='"Ajuste da calibração" compara a nota do avaliador com a calibrada pelo RH (a partir de 3 casos). "Dias até enviar" conta a partir do fim do evento.'
+          subtitle='"Ajuste da calibração" compara a nota do avaliador com a calibrada (a partir de 3 casos). "Dias até enviar" conta a partir do fim do evento.'
         >
           {data.evaluators.length === 0 ? (
             <EmptyState compact title="Nenhuma avaliação no ciclo" />
           ) : (
             <div className="overflow-x-auto">
               <DataTable
-                head={["Avaliador", "Enviadas", "Rascunhos", "Nota média dada", "Ajuste da calibração", "Dias até enviar"]}
+                head={["Avaliador", "Enviadas", "Nota média dada", "Ajuste da calibração", "Dias até enviar"]}
                 rows={data.evaluators.map(e => [
-                  e.name, e.submitted, e.drafts > 0 ? <span style={{ color: "var(--status-warn-text)", fontWeight: 700 }}>{e.drafts}</span> : 0,
+                  e.name, e.submitted,
                   n1(e.avgGiven), biasBadge(e.calibrationBias ?? null, e.biasSamples), n1(e.avgDaysToSubmit),
                 ])}
+                sort={data.evaluators.map(e => [e.name, e.submitted, e.avgGiven, e.biasSamples >= 3 ? e.calibrationBias : null, e.avgDaysToSubmit])}
               />
             </div>
           )}
@@ -446,22 +485,54 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
                 <span className="inline-flex items-center gap-2"><StatusBadge size="sm" variant={a.kind === "merit" ? "ok" : "danger"} label={a.kind === "merit" ? "Mérito" : "Penalidade"} />{a.label}</span>,
                 a.occurrences, `${a.kind === "merit" ? "+" : "−"}${a.points}`, a.employees,
               ])}
+              sort={data.adjustments.map(a => [a.label, a.occurrences, a.kind === "merit" ? a.points : -a.points, a.employees])}
             />
           )}
         </Card>
 
-        {/* ── Clientes ── */}
+        {/* ── Pessoas: mais penalidades × mais méritos ── */}
         <Card
+          span2
+          title="Quem mais perdeu e quem mais ganhou pontos"
+          subtitle="Colaboradores com mais pontos de penalidade e mais pontos de mérito no ciclo (até 10 de cada)."
+        >
+          <div className="grid gap-5 md:grid-cols-2">
+            {([
+              { key: "penalty", title: "Mais penalidades", people: data.topPenalized, sign: "−", variant: "danger" as const, empty: "Nenhuma penalidade no ciclo" },
+              { key: "merit", title: "Mais méritos", people: data.topMerited, sign: "+", variant: "ok" as const, empty: "Nenhum mérito no ciclo" },
+            ]).map(col => (
+              <section key={col.key} aria-label={col.title} className="min-w-0">
+                <h3 className="mb-1 text-[12px] font-black uppercase" style={{ fontFamily: CONDENSED, letterSpacing: "0.06em", color: "var(--muted-foreground)" }}>{col.title}</h3>
+                {col.people.length === 0 ? (
+                  <EmptyState compact title={col.empty} />
+                ) : (
+                  <DataTable
+                    head={["Colaborador", "Pontos", "Ocorr."]}
+                    rows={col.people.map(p => [
+                      <span className="flex flex-col">
+                        <span className="font-semibold">{p.name}</span>
+                        <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{p.types.join(", ")}</span>
+                      </span>,
+                      <StatusBadge size="sm" variant={col.variant} label={`${col.sign}${fmtNum(p.points, Number.isInteger(p.points) ? 0 : 1)}`} />,
+                      p.occurrences,
+                    ])}
+                    sort={col.people.map(p => [p.name, p.points, p.occurrences])}
+                  />
+                )}
+              </section>
+            ))}
+          </div>
+        </Card>
+
+        {/* ── Clientes: só quando os eventos têm cliente informado ── */}
+        {realClients.length > 0 && <Card
           span2
           title="Nota média por cliente"
           subtitle="Clientes com mais eventos confirmados no ciclo (até 12)."
-          table={data.clients.length > 0 && <DataTable head={["Cliente", "Nota média", "Eventos"]} rows={data.clients.map(c => [c.client, n1(c.avgScore), c.events])} />}
+          table={<DataTable head={["Cliente", "Nota média", "Eventos"]} rows={realClients.map(c => [c.client, n1(c.avgScore), c.events])} sort={realClients.map(c => [c.client, c.avgScore, c.events])} />}
         >
-          {data.clients.length === 0 ? (
-            <EmptyState compact title="Sem eventos confirmados" />
-          ) : (
-            <HBars
-              data={data.clients}
+          <HBars
+              data={realClients}
               labelKey="client"
               valueKey="avgScore"
               max={100}
@@ -472,8 +543,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
                 { label: "Eventos", value: String(row.events) },
               ]}
             />
-          )}
-        </Card>
+        </Card>}
 
         {/* ── Próximos passos ── */}
         <section className="rounded-xl p-5 flex flex-col gap-2 text-[13px]" style={{ backgroundColor: "var(--secondary)" }}>
@@ -482,7 +552,7 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
           <p style={{ color: "var(--muted-foreground)" }}>Os números acima vêm das telas de trabalho:</p>
           <ul className="space-y-1.5">
             <li><Link href="/events?status=unconfirmed" className="font-semibold underline underline-offset-2">Eventos não confirmados</Link> <span style={{ color: "var(--muted-foreground)" }}>— não entram na nota.</span></li>
-            <li><Link href="/evaluations" className="font-semibold underline underline-offset-2">Avaliações pendentes</Link> <span style={{ color: "var(--muted-foreground)" }}>— rascunhos e links.</span></li>
+            <li><Link href="/evaluations" className="font-semibold underline underline-offset-2">Avaliações pendentes</Link> <span style={{ color: "var(--muted-foreground)" }}>— quem ainda não enviou e links de avaliação.</span></li>
             <li><Link href="/calibrations" className="font-semibold underline underline-offset-2">Calibrações</Link> <span style={{ color: "var(--muted-foreground)" }}>— ajuste e publicação.</span></li>
             <li><Link href="/results" className="font-semibold underline underline-offset-2">Resultados e bônus</Link> <span style={{ color: "var(--muted-foreground)" }}>— ranking e pagamentos.</span></li>
           </ul>

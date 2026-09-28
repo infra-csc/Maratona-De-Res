@@ -190,3 +190,20 @@ test("critérios: peso 0 fica fora da média; inativo só entra se tiver calibra
   assert.equal(o.criteria.find(c => c.name === "Inativo calibrado")?.avgScore, 50);
   assert.equal(o.criteria.find(c => c.name === "Inativo sem calibração"), undefined);
 });
+
+test("quem mais perdeu e quem mais ganhou pontos: soma pontos × quantidade por pessoa, com os tipos", () => {
+  const o = computeAnalytics({
+    ...base(),
+    adjustments: [
+      { employeeId: 1, employeeName: "Ana", label: "Falta", kind: "penalty", points: 5, quantity: 2 },
+      { employeeId: 1, employeeName: "Ana", label: "Atraso", kind: "penalty", points: 2, quantity: 1 },
+      { employeeId: 2, employeeName: "Bruno", label: "Falta", kind: "penalty", points: 5, quantity: 1 },
+      { employeeId: 2, employeeName: "Bruno", label: "Destaque", kind: "merit", points: 3, quantity: 1 },
+    ],
+  });
+  assert.deepEqual(o.topPenalized.map(p => [p.name, p.points, p.occurrences, p.types]), [
+    ["Ana", 12, 3, ["Atraso", "Falta"]],
+    ["Bruno", 5, 1, ["Falta"]],
+  ]);
+  assert.deepEqual(o.topMerited.map(p => [p.name, p.points]), [["Bruno", 3]]);
+});
