@@ -1,6 +1,6 @@
 import type { EventDetail } from "@workspace/api-client-react";
-import { Copy, Trash2 } from "lucide-react";
-import { CONDENSED, WARNING, GOOD_TEXT } from "@/lib/premium-theme";
+import { Copy, Trash2, Users, AlertTriangle } from "lucide-react";
+import { CONDENSED, WARNING, GOOD_TEXT, AMBER_TEXT } from "@/lib/premium-theme";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,7 +21,10 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
     swapDialog, setSwapDialog, swapSourceId, setSwapSourceId, swapPending,
     areasList, duplicateCriterion, deleteCriterion,
     critMeta, targetWeightSum, setCriterionActive, handleConfirmDuplicate, handleSwapSource, fmtW,
+    areasDialog, setAreasDialog, areasSelection, setAreasSelection, setCriterionAreas, handleSaveAreas, sameAreaCopiesOf,
   } = mgmt;
+  const areaOptions = (areasList ?? []).filter(a => a.active !== false && a.id !== areasDialog?.responsibleAreaId);
+  const doomedCopies = areasDialog ? sameAreaCopiesOf(areasDialog.criterionId) : [];
   return (
     <>
       <Dialog open={duplicateDialog !== null} onOpenChange={o => { if (!o) setDuplicateDialog(null); }}>
@@ -31,15 +34,15 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Nome do novo quesito</label>
-              <Input value={duplicateName} onChange={e => setDuplicateName(e.target.value)} className="rounded-lg font-black text-sm h-10" style={fieldStyle} autoFocus />
+              <label htmlFor="duplicate-event-criterion-name" className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Nome do novo quesito</label>
+              <Input id="duplicate-event-criterion-name" value={duplicateName} onChange={e => setDuplicateName(e.target.value)} className="rounded-lg font-black text-sm h-10" style={fieldStyle} autoFocus />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>
+              <label htmlFor="duplicate-event-criterion-area" className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>
                 Área responsável <span className="font-normal normal-case" style={{ color: "var(--muted-foreground)" }}>(opcional — padrão: mesma área de origem)</span>
               </label>
               <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
-                <SelectTrigger className="rounded-lg font-bold text-sm h-10" style={fieldStyle}>
+                <SelectTrigger id="duplicate-event-criterion-area" className="rounded-lg font-bold text-sm h-10" style={fieldStyle}>
                   <SelectValue placeholder="Manter área original..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -128,9 +131,9 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
               As avaliações existentes permanecem vinculadas — só o critério de origem muda. A calibração passará a mesclar este duplicado com o novo critério escolhido.
             </p>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Novo critério de origem *</label>
+              <label htmlFor="swap-source-criterion" className="text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Novo critério de origem *</label>
               <Select value={swapSourceId} onValueChange={setSwapSourceId}>
-                <SelectTrigger className="h-9 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--border)" }}>
+                <SelectTrigger id="swap-source-criterion" className="h-9 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--border)" }}>
                   <SelectValue placeholder="Selecionar..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -149,6 +152,71 @@ export function CriteriaDialogs({ mgmt, selected, selectedDetail }: {
             <button type="button" onClick={() => { setSwapDialog(null); setSwapSourceId(""); }} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
             <button type="button" disabled={!swapSourceId || swapPending} onClick={handleSwapSource} className="h-9 px-4 rounded-lg text-[11px] font-bold uppercase disabled:opacity-40 transition-colors hover:opacity-90" style={{ backgroundColor: WARNING, color: "#fff" }}>
               {swapPending ? "Salvando..." : "Confirmar correção"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={areasDialog !== null} onOpenChange={o => { if (!o && !setCriterionAreas.isPending) setAreasDialog(null); }}>
+        <DialogContent className="rounded-xl max-w-md max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <DialogHeader>
+            <DialogTitle className="uppercase font-black tracking-tight text-lg flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+              <Users size={18} aria-hidden="true" /> Áreas que avaliam
+            </DialogTitle>
+          </DialogHeader>
+          {areasDialog && (
+            <div className="space-y-4 py-1">
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                <span className="font-bold" style={{ color: "var(--foreground)" }}>{areasDialog.name}</span> neste evento. Cada área marcada responde o critério e a nota é a média das áreas. O padrão do catálogo não muda.
+              </p>
+              <fieldset className="rounded-lg p-3 space-y-2 max-h-72 overflow-y-auto" style={{ border: "1px solid var(--border)" }} disabled={setCriterionAreas.isPending}>
+                <legend className="px-1 text-[11px] font-black uppercase" style={{ color: "var(--muted-foreground)" }}>Áreas</legend>
+                {areasDialog.responsibleAreaId != null && (
+                  <label htmlFor="event-criterion-area-responsible" className="flex items-center gap-2 text-xs font-bold uppercase opacity-70">
+                    <input id="event-criterion-area-responsible" type="checkbox" checked disabled readOnly className="h-4 w-4 shrink-0" />
+                    {areasDialog.responsibleAreaName ?? `Área ${areasDialog.responsibleAreaId}`}
+                    <span className="normal-case font-normal">(responsável)</span>
+                  </label>
+                )}
+                {areaOptions.map(a => {
+                  const id = `event-criterion-area-${a.id}`;
+                  return (
+                    <label key={a.id} htmlFor={id} className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer">
+                      <input
+                        id={id}
+                        type="checkbox"
+                        data-testid={`checkbox-event-criterion-area-${a.id}`}
+                        checked={areasSelection.includes(a.id)}
+                        onChange={e => setAreasSelection(prev => e.target.checked ? [...prev, a.id] : prev.filter(x => x !== a.id))}
+                        className="h-4 w-4 shrink-0"
+                      />
+                      {a.name}
+                    </label>
+                  );
+                })}
+                {areaOptions.length === 0 && (
+                  <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Não há outras áreas ativas.</p>
+                )}
+              </fieldset>
+              {doomedCopies.length > 0 && (
+                <p role="note" className="flex items-start gap-2 text-xs font-bold" style={{ color: AMBER_TEXT }}>
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+                  Ao salvar, sai também a cópia feita à mão na mesma área: {doomedCopies.map(c => c.criterionName).join(", ")}.
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <button type="button" disabled={setCriterionAreas.isPending} onClick={() => setAreasDialog(null)} className="px-4 py-2 rounded-lg font-bold uppercase text-xs disabled:opacity-40 transition-colors hover:opacity-80" style={{ border: "1px solid var(--border)" }}>Cancelar</button>
+            <button
+              type="button"
+              data-testid="button-save-event-criterion-areas"
+              disabled={setCriterionAreas.isPending}
+              onClick={handleSaveAreas}
+              className="px-4 py-2 rounded-lg font-black uppercase text-xs disabled:opacity-40 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+            >
+              {setCriterionAreas.isPending ? "Salvando..." : "Salvar áreas"}
             </button>
           </DialogFooter>
         </DialogContent>

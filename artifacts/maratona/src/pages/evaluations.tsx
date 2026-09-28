@@ -7,7 +7,7 @@ import { useEventCriterionAssignments, usePatchCriterionAssignment, useRedirectO
 import { AdminEvaluationsConsole } from "./evaluations-admin-console";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { CENOGRAFIA_AREA_ID, FERRAMENTAS_AREA_ID } from "./evaluations/constants";
-import { conformityFormFromData, emptyConformityForm, groupCriteriaByArea, publicEvalBaseUrl } from "./evaluations/helpers";
+import { conformityFormFromData, displayCriterionName, emptyConformityForm, groupCriteriaByArea, multiAreaCriterionIds, publicEvalBaseUrl } from "./evaluations/helpers";
 import type { AreaAssignTarget, AreaGroup, ConformityEvalForm, ConformityLinkType, EvalTab, RedirectDialogArea } from "./evaluations/types";
 import { useEvaluatorOverview } from "./evaluations/use-evaluator-overview";
 import { EvaluatorSidebar } from "./evaluations/evaluator-sidebar";
@@ -161,6 +161,7 @@ export default function EvaluationsPage() {
   });
 
   const activeCriteria = (criteria ?? []).filter(c => c.active);
+  const sharedCriterionIds = multiAreaCriterionIds(activeCriteria);
 
   // Sidebar do avaliador (A Fazer / Publicado / Concluídas) — useQueries por evento liberado.
   const { configuredEvents, relevantEvaluatorEvents, evaluatorEventStats, publishedNotDoneEvents, todoEvents, doneEvents } =
@@ -291,7 +292,7 @@ export default function EvaluationsPage() {
         if (ev?.status === "submitted") continue;
         const score = currentScore(c.criterionId);
         if (score == null) continue;
-        failingCriterionName = c.criterionName ?? `critério #${c.criterionId}`;
+        failingCriterionName = displayCriterionName(c.criterionName) || `critério #${c.criterionId}`;
         const comment = comments[c.criterionId] ?? ev?.comments ?? "";
         const audioUrl = currentAudio(c.criterionId);
         const created = await createEvaluation({
@@ -558,6 +559,7 @@ export default function EvaluationsPage() {
                 myAreaGroups={myAreaGroups}
                 publicLinkEligibleCriteria={publicLinkEligibleCriteria}
                 criterionAssignments={criterionAssignments}
+                sharedCriterionIds={sharedCriterionIds}
                 comments={comments}
                 getEval={getEval}
                 currentScore={currentScore}

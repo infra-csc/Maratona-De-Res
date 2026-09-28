@@ -3,6 +3,15 @@ import type { ConformityArea } from "./types";
 
 export const fieldStyle: CSSProperties = { backgroundColor: "var(--secondary)", border: "1px solid var(--border)", color: "var(--foreground)" };
 
+/** Mensagem do servidor sem o prefixo "HTTP 409 Conflict: " que o cliente gerado acrescenta. */
+export function serverMessage(e: unknown): string {
+  const data = (e as { data?: { error?: unknown; message?: unknown } } | null)?.data;
+  if (data && typeof data.error === "string" && data.error.trim()) return data.error;
+  if (data && typeof data.message === "string" && data.message.trim()) return data.message;
+  const msg = (e as { message?: string } | null)?.message ?? "";
+  return msg.replace(/^HTTP \d{3}[^:]*:\s*/, "") || "Tente novamente.";
+}
+
 /** Campo obrigatório que rejeita espaços em branco (o `required` nativo aceita "   "). */
 export const requiredText = (message: string) => ({
   validate: (v: unknown) => (typeof v === "string" && v.trim().length > 0) || message,

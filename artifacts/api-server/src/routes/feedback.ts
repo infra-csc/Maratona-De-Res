@@ -30,6 +30,7 @@ async function buildEventFeedback(eventId: number) {
       partialPublishedAt: eventCriteriaTable.partialPublishedAt,
       finalPublishedAt: eventCriteriaTable.finalPublishedAt,
       eventScoped: criteriaTable.eventScoped,
+      sourceCriterionId: criteriaTable.sourceCriterionId,
     })
     .from(eventCriteriaTable)
     .leftJoin(criteriaTable, eq(eventCriteriaTable.criterionId, criteriaTable.id))
@@ -46,17 +47,34 @@ async function buildEventFeedback(eventId: number) {
     .from(eventAreaAssignmentsTable).where(eq(eventAreaAssignmentsTable.eventId, eventId));
   const assignedByArea = buildAssignedEvaluatorsByArea(areaAssignments);
 
+  // Cópias por área (critério respondido por várias áreas) entram no original:
+  // a nota do critério é a média das ÁREAS que avaliaram, como na nota oficial
+  // (mergeEventScopedCriteria). Antes o feedback ignorava as cópias e mostrava
+  // só a nota da área responsável.
+  const copiesByParent = new Map<number, typeof eventCriteriaRows>();
+  for (const c of eventCriteriaRows) {
+    if (c.eventScoped && c.sourceCriterionId != null) {
+      copiesByParent.set(c.sourceCriterionId, [...(copiesByParent.get(c.sourceCriterionId) ?? []), c]);
+    }
+  }
+  const memberStatus = (m: (typeof eventCriteriaRows)[number]) => {
+    const submittedEvals = allEvals.filter(e => e.criterionId === m.criterionId && e.status === "submitted");
+    const scores = submittedEvals.map(e => pgNum(e.score));
+    const average = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+    // "Avaliado" exige que TODOS os avaliadores designados para a área tenham enviado.
+    const completion = getCriterionEvaluationStatus(m.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
+    return { average, evaluated: completion.isEvaluated };
+  };
+
   const criteria = activeCriteria.map(c => {
     const weight = parseFloat(c.weightOverride ?? c.originalWeight ?? "1");
-    const submittedEvals = allEvals.filter(e => e.criterionId === c.criterionId && e.status === "submitted");
-    const evalScores = submittedEvals.map(e => pgNum(e.score));
-    const averageScore = evalScores.length > 0 ? evalScores.reduce((a, b) => a + b, 0) / evalScores.length : null;
+    const members = [c, ...(copiesByParent.get(c.criterionId as number) ?? [])].map(memberStatus);
+    const areaAverages = members.map(m => m.average).filter((v): v is number => v != null);
+    const averageScore = areaAverages.length > 0 ? areaAverages.reduce((a, b) => a + b, 0) / areaAverages.length : null;
     const calibration = allCalibrations.find(cal => cal.criterionId === c.criterionId);
     const calibratedScore = calibration ? pgNum(calibration.calibratedScore) : null;
-    // "Avaliado" (scoreUsed não nulo) exige que TODOS os avaliadores designados
-    // para a área do critério tenham enviado, ou que exista calibração.
-    const completion = getCriterionEvaluationStatus(c.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
-    const isEvaluated = calibratedScore !== null || completion.isEvaluated;
+    // Conta só quem avaliou: basta uma área concluída (ou a calibração do RH).
+    const isEvaluated = calibratedScore !== null || members.some(m => m.evaluated);
     const scoreUsed = isEvaluated ? (calibratedScore !== null ? calibratedScore : averageScore) : null;
     return {
       criterionId: c.criterionId,

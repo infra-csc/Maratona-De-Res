@@ -96,6 +96,7 @@ import type {
   EventCriteriaConfirm,
   EventCriteriaUpdate,
   EventCriterion,
+  EventCriterionAreasInput,
   EventCriterionAssignment,
   EventCriterionAssignmentRow,
   EventCriterionDuplicate,
@@ -5803,6 +5804,171 @@ export const useDuplicateEventCriterion = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDuplicateEventCriterionMutationOptions(options));
+    }
+
+export const getSetEventCriterionAreasUrl = (id: number,
+    criterionId: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/${criterionId}/areas`
+}
+
+/**
+ * @summary Áreas que respondem o critério neste evento, além da responsável (cria/remove as cópias por área)
+ */
+export const setEventCriterionAreas = async (id: number,
+    criterionId: number,
+    eventCriterionAreasInput: EventCriterionAreasInput, options?: Parameters<typeof customFetch>[1]): Promise<EventDetail> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EventDetail>(getSetEventCriterionAreasUrl(id,criterionId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(eventCriterionAreasInput)
+  }
+);}
+
+
+
+
+
+export const getSetEventCriterionAreasMutationKey = () => ['setEventCriterionAreas'] as const;
+
+export const getSetEventCriterionAreasMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventCriterionAreas>>, TError,SetEventCriterionAreasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setEventCriterionAreas>>, TError,SetEventCriterionAreasMutationVariables, TContext> => {
+
+const mutationKey = getSetEventCriterionAreasMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setEventCriterionAreas>>, SetEventCriterionAreasMutationVariables> = (props) => {
+          const {id,criterionId,data} = props ?? {};
+
+          return  setEventCriterionAreas(id,criterionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetEventCriterionAreasMutationResult = NonNullable<Awaited<ReturnType<typeof setEventCriterionAreas>>>
+    export type SetEventCriterionAreasMutationBody = BodyType<EventCriterionAreasInput>
+    export type SetEventCriterionAreasMutationError = ErrorType<ErrorEnvelope>
+    export type SetEventCriterionAreasMutationVariables = {id: number;criterionId: number;data: BodyType<EventCriterionAreasInput>}
+
+    /**
+ * @summary Áreas que respondem o critério neste evento, além da responsável (cria/remove as cópias por área)
+ */
+export const useSetEventCriterionAreas = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventCriterionAreas>>, TError,SetEventCriterionAreasMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setEventCriterionAreas>>,
+        TError,
+        SetEventCriterionAreasMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetEventCriterionAreasMutationOptions(options));
+    }
+
+export const getApplyEventCriteriaAreaDefaultsUrl = (id: number,) => {
+
+
+
+
+  return `/events/${id}/criteria/area-defaults`
+}
+
+/**
+ * @summary Aplica no evento o padrão do catálogo de áreas que respondem cada critério (só cria cópias que faltam)
+ */
+export const applyEventCriteriaAreaDefaults = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<EventDetail> => {
+
+  return customFetch<EventDetail>(getApplyEventCriteriaAreaDefaultsUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getApplyEventCriteriaAreaDefaultsMutationKey = () => ['applyEventCriteriaAreaDefaults'] as const;
+
+export const getApplyEventCriteriaAreaDefaultsMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyEventCriteriaAreaDefaults>>, TError,ApplyEventCriteriaAreaDefaultsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyEventCriteriaAreaDefaults>>, TError,ApplyEventCriteriaAreaDefaultsMutationVariables, TContext> => {
+
+const mutationKey = getApplyEventCriteriaAreaDefaultsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyEventCriteriaAreaDefaults>>, ApplyEventCriteriaAreaDefaultsMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  applyEventCriteriaAreaDefaults(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyEventCriteriaAreaDefaultsMutationResult = NonNullable<Awaited<ReturnType<typeof applyEventCriteriaAreaDefaults>>>
+
+    export type ApplyEventCriteriaAreaDefaultsMutationError = ErrorType<ErrorEnvelope>
+    export type ApplyEventCriteriaAreaDefaultsMutationVariables = {id: number}
+
+    /**
+ * @summary Aplica no evento o padrão do catálogo de áreas que respondem cada critério (só cria cópias que faltam)
+ */
+export const useApplyEventCriteriaAreaDefaults = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyEventCriteriaAreaDefaults>>, TError,ApplyEventCriteriaAreaDefaultsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof applyEventCriteriaAreaDefaults>>,
+        TError,
+        ApplyEventCriteriaAreaDefaultsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApplyEventCriteriaAreaDefaultsMutationOptions(options));
     }
 
 export const getDeleteEventCriterionUrl = (id: number,

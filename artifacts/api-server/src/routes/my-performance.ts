@@ -245,12 +245,18 @@ router.get("/my-performance", async (req, res) => {
       .filter(r => r.active || allCalibrations.some(cal => cal.criterionId === r.criterionId))
       .map(r => {
         const weight = parseFloat(((r.weight ?? r.defaultWeight) ?? "1") as string);
-        const submittedEvals = allEvals.filter(e => e.criterionId === r.criterionId && e.status === "submitted");
         const calibration = allCalibrations.find(cal => cal.criterionId === r.criterionId);
         const calibratedScore = calibration ? pgNum(calibration.calibratedScore) : null;
         const scoreUsed = calibratedScore;
-        const completion = getCriterionEvaluationStatus(r.responsibleAreaId, submittedEvals.map(e => e.evaluatorUserId as number), assignedByArea);
-        const isEvaluated = calibratedScore !== null || completion.isEvaluated;
+        // Critério respondido por várias áreas: as cópias da mesma origem contam
+        // junto — basta uma área concluída (conta só quem avaliou).
+        const members = [r, ...eventCriteriaRows.filter(x => x.eventScoped && x.active && x.sourceCriterionId === r.criterionId)];
+        const anyAreaDone = members.some(m => getCriterionEvaluationStatus(
+          m.responsibleAreaId,
+          allEvals.filter(e => e.criterionId === m.criterionId && e.status === "submitted").map(e => e.evaluatorUserId as number),
+          assignedByArea,
+        ).isEvaluated);
+        const isEvaluated = calibratedScore !== null || anyAreaDone;
         const criterionTotal = scoreUsed !== null ? scoreUsed * weight : null;
         const publicComments = allEvals
           .filter(e => e.criterionId === r.criterionId && e.commentVisibility === "public" && e.comments)

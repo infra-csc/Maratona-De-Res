@@ -2936,6 +2936,281 @@ export const DuplicateEventCriterionResponse = zod.object({
 
 
 /**
+ * @summary Áreas que respondem o critério neste evento, além da responsável (cria/remove as cópias por área)
+ */
+export const SetEventCriterionAreasParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "criterionId": zod.coerce.number().int()
+})
+
+export const SetEventCriterionAreasBody = zod.object({
+  "areaIds": zod.array(zod.int())
+})
+
+export const SetEventCriterionAreasResponse = zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.int(),
+  "cycleName": zod.string().optional(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
+  "resultsConfirmed": zod.boolean().optional(),
+  "resultsConfirmedAt": zod.string().nullish(),
+  "resultsConfirmedBy": zod.int().nullish(),
+  "participants": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.int().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('LEGADO — a validação de diárias foi removida do app. Mantido apenas como leitura de dados históricos; não é mais escrito. A presença é controlada exclusivamente pelo campo `confirmed`.'),
+  "actualDiariaCount": zod.int().nullish().describe('LEGADO — ver actualDiariaDates. Não é mais escrito.'),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('LEGADO — o modo rápido de confirmação não existe mais.'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('LEGADO — timestamp histórico da confirmação rápida.'),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de inatividade).'),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade.')
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaId": zod.int().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional(),
+  "sourceCriterionId": zod.int().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "areaId": zod.int(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.int(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "eventId": zod.int(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional(),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Aplica no evento o padrão do catálogo de áreas que respondem cada critério (só cria cópias que faltam)
+ */
+export const ApplyEventCriteriaAreaDefaultsParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ApplyEventCriteriaAreaDefaultsResponse = zod.object({
+  "id": zod.int(),
+  "name": zod.string(),
+  "clientName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "startDate": zod.string(),
+  "endDate": zod.string(),
+  "cycleId": zod.int(),
+  "cycleName": zod.string().optional(),
+  "status": zod.string(),
+  "forcedClosed": zod.boolean().optional(),
+  "forcedCloseReason": zod.string().nullish(),
+  "criteriaConfirmed": zod.boolean().optional(),
+  "hasEvaluations": zod.boolean().optional(),
+  "feedbackReleased": zod.boolean().optional(),
+  "isHistorical": zod.boolean().optional(),
+  "importedScore": zod.number().nullish(),
+  "importedNotes": zod.string().nullish(),
+  "resultsConfirmed": zod.boolean().optional(),
+  "resultsConfirmedAt": zod.string().nullish(),
+  "resultsConfirmedBy": zod.int().nullish(),
+  "participants": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "employmentType": zod.union([zod.literal('casa'),zod.literal('freela'),zod.literal(null)]).nullish(),
+  "functionName": zod.string(),
+  "teamName": zod.string().nullish(),
+  "confirmed": zod.boolean().optional(),
+  "scheduledDiariaCount": zod.int().nullish(),
+  "scheduledDiariaStart": zod.string().nullish(),
+  "scheduledDiariaEnd": zod.string().nullish(),
+  "actualDiariaDates": zod.array(zod.string()).nullish().describe('LEGADO — a validação de diárias foi removida do app. Mantido apenas como leitura de dados históricos; não é mais escrito. A presença é controlada exclusivamente pelo campo `confirmed`.'),
+  "actualDiariaCount": zod.int().nullish().describe('LEGADO — ver actualDiariaDates. Não é mais escrito.'),
+  "diariaQuickConfirmed": zod.boolean().nullish().describe('LEGADO — o modo rápido de confirmação não existe mais.'),
+  "diariaQuickConfirmedAt": zod.string().nullish().describe('LEGADO — timestamp histórico da confirmação rápida.'),
+  "comment": zod.string().nullish().describe('Comentário livre sobre o colaborador nesse evento (ex.: justificativa de inatividade).'),
+  "countsForScore": zod.boolean().describe('Se false, a participação é apenas histórica/informativa (freela ou função "Sup Ceno *") e nunca entra na nota nem na elegibilidade.')
+})).optional(),
+  "criteria": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "criterionDescription": zod.string().nullish(),
+  "responsibleAreaId": zod.int().nullish(),
+  "responsibleAreaName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "originalWeight": zod.number().optional(),
+  "weightOverride": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weight": zod.number().optional(),
+  "eventScoped": zod.boolean().optional(),
+  "sourceCriterionId": zod.int().nullish(),
+  "partialPublishedAt": zod.string().nullish(),
+  "finalPublishedAt": zod.string().nullish(),
+  "partialPublishedByUserName": zod.string().nullish(),
+  "finalPublishedByUserName": zod.string().nullish()
+})).optional(),
+  "areaAssignments": zod.array(zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "areaId": zod.int(),
+  "areaName": zod.string().nullish(),
+  "evaluatorUserId": zod.int(),
+  "evaluatorName": zod.string().nullish()
+})).optional(),
+  "evaluationMatrix": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "criteria": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "status": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish()
+}))
+})).optional(),
+  "results": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "employeeName": zod.string(),
+  "eventId": zod.int(),
+  "eventScore": zod.number(),
+  "projectedPlatoon": zod.string().nullish(),
+  "criteriaDetails": zod.array(zod.object({
+  "criterionId": zod.int(),
+  "criterionName": zod.string(),
+  "averageScore": zod.number().nullish(),
+  "calibratedScore": zod.number().nullish(),
+  "scoreUsed": zod.number().nullish(),
+  "scorePercentual": zod.number().nullish(),
+  "normalizedWeight": zod.number(),
+  "weightedContribution": zod.number().nullish()
+})).optional()
+})).optional(),
+  "evaluationProgress": zod.number().optional(),
+  "conformityEvaluatorUserId": zod.int().nullish(),
+  "conformityEvaluatorName": zod.string().nullish(),
+  "conformityEvaluatorFerramentasUserId": zod.int().nullish(),
+  "conformityEvaluatorFerramentasName": zod.string().nullish(),
+  "conformity": zod.union([zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "epi": zod.boolean().nullish(),
+  "estaiamentos": zod.boolean().nullish(),
+  "guardaEquipamentos": zod.boolean().nullish(),
+  "conduta": zod.boolean().nullish(),
+  "epiComment": zod.string().nullish(),
+  "estaiamentosComment": zod.string().nullish(),
+  "guardaEquipamentosComment": zod.string().nullish(),
+  "condutaComment": zod.string().nullish(),
+  "absencesResponse": zod.boolean().nullish(),
+  "absencesReport": zod.string().nullish(),
+  "standoutResponse": zod.boolean().nullish(),
+  "standoutJustification": zod.string().nullish(),
+  "createdByUserId": zod.int(),
+  "createdByUserName": zod.string().nullish(),
+  "cenografiaSubmittedByName": zod.string().nullish(),
+  "ferramentasSubmittedByName": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),zod.null()]).optional()
+})
+
+
+/**
  * @summary Delete a duplicated (event-scoped) criterion from an event
  */
 export const DeleteEventCriterionParams = zod.object({
@@ -3082,7 +3357,9 @@ export const GetCriteriaResponseItem = zod.object({
   "responsibleAreaName": zod.string().nullish(),
   "defaultWeight": zod.number(),
   "active": zod.boolean(),
-  "displayOrder": zod.int()
+  "displayOrder": zod.int(),
+  "evaluateAllAreas": zod.boolean().optional().describe('Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas'),
+  "evaluatingAreaIds": zod.array(zod.int()).optional().describe('Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)')
 })
 export const GetCriteriaResponse = zod.array(GetCriteriaResponseItem)
 
@@ -3095,7 +3372,9 @@ export const CreateCriterionBody = zod.object({
   "description": zod.string().optional(),
   "responsibleAreaId": zod.int().optional(),
   "defaultWeight": zod.number(),
-  "displayOrder": zod.int().optional()
+  "displayOrder": zod.int().optional(),
+  "evaluateAllAreas": zod.boolean().optional().describe('Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas'),
+  "evaluatingAreaIds": zod.array(zod.int()).optional().describe('Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)')
 })
 
 export const CreateCriterionResponse = zod.object({
@@ -3106,7 +3385,9 @@ export const CreateCriterionResponse = zod.object({
   "responsibleAreaName": zod.string().nullish(),
   "defaultWeight": zod.number(),
   "active": zod.boolean(),
-  "displayOrder": zod.int()
+  "displayOrder": zod.int(),
+  "evaluateAllAreas": zod.boolean().optional().describe('Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas'),
+  "evaluatingAreaIds": zod.array(zod.int()).optional().describe('Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)')
 })
 
 
@@ -3123,7 +3404,9 @@ export const UpdateCriterionBody = zod.object({
   "responsibleAreaId": zod.int().nullish(),
   "defaultWeight": zod.number().optional(),
   "active": zod.boolean().optional(),
-  "displayOrder": zod.int().optional()
+  "displayOrder": zod.int().optional(),
+  "evaluateAllAreas": zod.boolean().optional().describe('Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas'),
+  "evaluatingAreaIds": zod.array(zod.int()).optional().describe('Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)')
 })
 
 export const UpdateCriterionResponse = zod.object({
@@ -3134,7 +3417,9 @@ export const UpdateCriterionResponse = zod.object({
   "responsibleAreaName": zod.string().nullish(),
   "defaultWeight": zod.number(),
   "active": zod.boolean(),
-  "displayOrder": zod.int()
+  "displayOrder": zod.int(),
+  "evaluateAllAreas": zod.boolean().optional().describe('Todas as áreas ativas respondem o critério (além da responsável); a nota no evento é a média das áreas'),
+  "evaluatingAreaIds": zod.array(zod.int()).optional().describe('Áreas que respondem o critério além da responsável (ignorado com evaluateAllAreas)')
 })
 
 

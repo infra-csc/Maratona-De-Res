@@ -146,3 +146,38 @@ export function buildConformityRows(selectedDetail: EventDetail | undefined): Co
     },
   ];
 }
+
+/** Mensagem do servidor sem o prefixo "HTTP 409 Conflict: " que o cliente gerado acrescenta. */
+export function serverMessage(e: unknown): string {
+  const data = (e as { data?: { error?: unknown; message?: unknown } } | null)?.data;
+  if (data && typeof data.error === "string" && data.error.trim()) return data.error;
+  if (data && typeof data.message === "string" && data.message.trim()) return data.message;
+  const msg = (e as { message?: string } | null)?.message ?? "";
+  return msg.replace(/^HTTP \d{3}[^:]*:\s*/, "") || "Tente novamente.";
+}
+
+/** Área extra de um critério no evento (= uma cópia com área própria). */
+export type EventAreaCopy = { criterionId: number; areaId: number; areaName: string };
+
+/**
+ * Cópias de área por critério ORIGINAL do evento: linhas eventScoped cujo
+ * sourceCriterionId é um critério (não cópia) do evento e cuja área difere da
+ * responsável do original. Cópias feitas à mão na mesma área ficam de fora.
+ */
+export function areaCopiesByParent(criteria: EventDetail["criteria"]): Map<number, EventAreaCopy[]> {
+  const rows = criteria ?? [];
+  const parents = new Map(rows.filter(c => !c.eventScoped).map(c => [c.criterionId, c]));
+  const out = new Map<number, EventAreaCopy[]>();
+  for (const c of rows) {
+    if (!c.eventScoped || c.sourceCriterionId == null || c.responsibleAreaId == null) continue;
+    const parent = parents.get(c.sourceCriterionId);
+    if (!parent || parent.responsibleAreaId === c.responsibleAreaId) continue;
+    const list = out.get(parent.criterionId) ?? [];
+    if (!list.some(x => x.areaId === c.responsibleAreaId)) {
+      list.push({ criterionId: c.criterionId, areaId: c.responsibleAreaId, areaName: c.responsibleAreaName ?? `Área ${c.responsibleAreaId}` });
+    }
+    out.set(parent.criterionId, list);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.areaName.localeCompare(b.areaName, "pt-BR"));
+  return out;
+}

@@ -131,6 +131,7 @@ export * from './eventCriteriaConfirm';
 export * from './eventCriteriaUpdate';
 export * from './eventCriteriaUpdateCriteriaItem';
 export * from './eventCriterion';
+export * from './eventCriterionAreasInput';
 export * from './eventCriterionAssignment';
 export * from './eventCriterionAssignmentRow';
 export * from './eventCriterionDuplicate';

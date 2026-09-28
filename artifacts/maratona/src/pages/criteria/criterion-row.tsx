@@ -1,15 +1,17 @@
 import type { Criterion, useUpdateCriterion } from "@workspace/api-client-react";
 import { Switch } from "@/components/ui/switch";
-import { Building2, Settings2, Calendar, Copy } from "lucide-react";
+import { Building2, Settings2, Calendar, Copy, Users } from "lucide-react";
 import type { CriterionRouting } from "@/lib/routing-api";
 import { GOOD_TEXT } from "@/lib/premium-theme";
 import { CriterionWeightCell } from "./weight-cell";
 import { EvaluatorPickerCell } from "./evaluator-pickers";
-import type { EvaluatorOption } from "./types";
+import { EvaluatingAreasChip } from "./evaluating-areas";
+import type { AreaOption, EvaluatorOption } from "./types";
 
 /** Uma linha da tabela de critérios: nome, área (+ duplicar), peso, avaliador padrão e status. */
 export function CriterionRow({
   criterion: c, index: i, routing, pickerEvaluators, updateMutation, onDuplicate, onOpenRouting, onRoutingSaved,
+  areas, canEdit, onEditAreas,
 }: {
   criterion: Criterion;
   index: number;
@@ -19,6 +21,9 @@ export function CriterionRow({
   onDuplicate: (c: Criterion) => void;
   onOpenRouting: (id: number) => void;
   onRoutingSaved: () => void;
+  areas: AreaOption[];
+  canEdit: boolean;
+  onEditAreas: (c: Criterion) => void;
 }) {
   const eventCount = (c as { eventCount?: number }).eventCount ?? 0;
   return (
@@ -28,7 +33,7 @@ export function CriterionRow({
         {c.description && <p className="text-xs mt-1 max-w-md leading-relaxed" style={{ color: "var(--muted-foreground)" }}>{c.description}</p>}
       </td>
       <td className="px-5 py-3.5">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {c.responsibleAreaName ? (
             <span className="rounded-lg px-2.5 py-1 font-bold text-[11px] uppercase inline-flex items-center gap-1.5" style={{ backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}>
               <Building2 size={12} /> {c.responsibleAreaName}
@@ -46,6 +51,20 @@ export function CriterionRow({
           >
             <Copy size={13} />
           </button>
+          <EvaluatingAreasChip criterion={c} areas={areas} />
+          {canEdit && (
+            <button
+              type="button"
+              data-testid={`button-criterion-areas-${c.id}`}
+              onClick={() => onEditAreas(c)}
+              title="Definir as áreas que avaliam este critério"
+              aria-label={`Áreas que avaliam o critério ${c.name}`}
+              className="p-1 transition-colors shrink-0 hover:opacity-70"
+              style={{ color: "var(--muted-foreground)" }}
+            >
+              <Users size={13} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </td>
       <td className="px-5 py-3.5 text-center">

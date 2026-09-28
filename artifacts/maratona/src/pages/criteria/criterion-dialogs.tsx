@@ -2,36 +2,39 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Copy } from "lucide-react";
+import { Copy, Users } from "lucide-react";
 import { CONDENSED, DANGER_TEXT } from "@/lib/premium-theme";
 import { fieldStyle, requiredText } from "./helpers";
 import { FieldError } from "./form-bits";
-import type { CreateCriterionForm, DuplicateCriterionState } from "./use-criterion-forms";
+import type { CreateCriterionForm, CriterionAreasEditor, DuplicateCriterionState } from "./use-criterion-forms";
+import { EvaluatingAreasField } from "./evaluating-areas";
 import type { AreaOption, ResyncSummary } from "./types";
 
 /** Conteúdo do diálogo "Novo Critério de Avaliação" (o botão que abre fica no cabeçalho). */
 export function CreateCriterionDialog({ state, areas }: { state: CreateCriterionForm; areas: AreaOption[] | undefined }) {
-  const { open, setCreateOpen, form, createMutation } = state;
-  const { register, handleSubmit, setValue, formState: { errors } } = form;
+  const { open, setCreateOpen, form, createMutation, areasValue, setAreasValue, submit } = state;
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = form;
+  const responsibleAreaId = watch("responsibleAreaId");
   return (
     <Dialog open={open} onOpenChange={setCreateOpen}>
-      <DialogContent className="max-w-md rounded-xl" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+      <DialogContent className="max-w-md rounded-xl max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-black uppercase tracking-tight" style={{ fontFamily: CONDENSED }}>Novo Critério de Avaliação</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(d => createMutation.mutate({ data: { ...d, name: d.name.trim(), defaultWeight: Number(d.defaultWeight) } }))} className="space-y-5 pt-4">
+        <form onSubmit={handleSubmit(submit)} className="space-y-5 pt-4">
           <div className="space-y-1.5">
-            <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
-            <Input data-testid="input-criterion-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome do critério."))} placeholder="Ex: Pontualidade" className="h-11 rounded-lg" style={fieldStyle} />
+            <Label htmlFor="create-criterion-name" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nome <span style={{ color: DANGER_TEXT }}>*</span></Label>
+            <Input id="create-criterion-name" data-testid="input-criterion-name" aria-invalid={!!errors.name} {...register("name", requiredText("Informe o nome do critério."))} placeholder="Ex: Pontualidade" className="h-11 rounded-lg" style={fieldStyle} />
             <FieldError message={errors.name?.message} />
           </div>
           <div className="space-y-1.5">
-            <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Descrição do que é avaliado</Label>
-            <Input data-testid="input-criterion-desc" {...register("description")} placeholder="Instruções para o avaliador..." className="h-11 rounded-lg" style={fieldStyle} />
+            <Label htmlFor="create-criterion-desc" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Descrição do que é avaliado</Label>
+            <Input id="create-criterion-desc" data-testid="input-criterion-desc" {...register("description")} placeholder="Instruções para o avaliador..." className="h-11 rounded-lg" style={fieldStyle} />
           </div>
           <div className="space-y-1.5">
-            <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Peso Padrão</Label>
+            <Label htmlFor="create-criterion-weight" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Peso Padrão</Label>
             <Input
+              id="create-criterion-weight"
               data-testid="input-criterion-weight"
               type="number"
               min="0"
@@ -44,9 +47,9 @@ export function CreateCriterionDialog({ state, areas }: { state: CreateCriterion
             <FieldError message={errors.defaultWeight?.message} />
           </div>
           <div className="space-y-1.5">
-            <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Área Responsável (Opcional)</Label>
+            <Label htmlFor="create-criterion-area" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Área Responsável (Opcional)</Label>
             <Select onValueChange={v => setValue("responsibleAreaId", Number(v))}>
-              <SelectTrigger data-testid="select-criterion-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
+              <SelectTrigger id="create-criterion-area" data-testid="select-criterion-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
@@ -56,6 +59,13 @@ export function CreateCriterionDialog({ state, areas }: { state: CreateCriterion
               </SelectContent>
             </Select>
           </div>
+          <EvaluatingAreasField
+            idPrefix="create-criterion-areas"
+            value={areasValue}
+            onChange={setAreasValue}
+            areas={areas}
+            responsibleAreaId={responsibleAreaId}
+          />
           <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
             <button type="button" onClick={() => setCreateOpen(false)} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
             <button
@@ -91,9 +101,9 @@ export function DuplicateCriterionDialog({ state, areas }: { state: DuplicateCri
               Cria uma cópia de <span className="font-bold" style={{ color: "var(--foreground)" }}>"{duplicateSource.name}"</span> (mesma descrição e peso) vinculada a outra área. Útil quando mais de uma área avalia o mesmo quesito e a nota final é a média entre elas.
             </p>
             <div className="space-y-1.5">
-              <Label className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nova Área Responsável <span style={{ color: DANGER_TEXT }}>*</span></Label>
+              <Label htmlFor="duplicate-criterion-area" className="font-bold uppercase text-xs tracking-wider" style={{ color: "var(--muted-foreground)" }}>Nova Área Responsável <span style={{ color: DANGER_TEXT }}>*</span></Label>
               <Select value={duplicateAreaId} onValueChange={setDuplicateAreaId}>
-                <SelectTrigger data-testid="select-duplicate-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
+                <SelectTrigger id="duplicate-criterion-area" data-testid="select-duplicate-area" className="h-11 rounded-lg font-bold uppercase text-xs" style={fieldStyle}>
                   <SelectValue placeholder="Selecione a área..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -116,6 +126,51 @@ export function DuplicateCriterionDialog({ state, areas }: { state: DuplicateCri
                 style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 {duplicateMutation.isPending ? "Duplicando..." : "Duplicar Critério"}
+              </button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Diálogo "Áreas que avaliam" de um critério já existente. */
+export function CriterionAreasDialog({ editor, areas }: { editor: CriterionAreasEditor; areas: AreaOption[] | undefined }) {
+  const { target, value, setValue, mutation, close, save } = editor;
+  return (
+    <Dialog open={target !== null} onOpenChange={(v) => { if (!v) close(); }}>
+      <DialogContent className="max-w-md rounded-xl max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+        <DialogHeader>
+          <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2" style={{ fontFamily: CONDENSED }}>
+            <Users size={18} aria-hidden="true" /> Áreas que avaliam
+          </DialogTitle>
+        </DialogHeader>
+        {target && (
+          <div className="space-y-5 pt-1">
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              <span className="font-bold" style={{ color: "var(--foreground)" }}>{target.name}</span>
+              {" — "}área responsável: <span className="font-bold" style={{ color: "var(--foreground)" }}>{target.responsibleAreaName ?? "nenhuma"}</span>.
+            </p>
+            <EvaluatingAreasField
+              idPrefix={`criterion-areas-${target.id}`}
+              value={value}
+              onChange={setValue}
+              areas={areas}
+              responsibleAreaId={target.responsibleAreaId}
+              disabled={mutation.isPending}
+            />
+            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+              <button type="button" onClick={close} className="h-10 px-4 rounded-lg font-bold uppercase text-xs" style={{ border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>Cancelar</button>
+              <button
+                type="button"
+                data-testid="button-save-criterion-areas"
+                disabled={mutation.isPending}
+                onClick={save}
+                className="h-10 px-5 rounded-lg font-bold text-sm uppercase disabled:opacity-50 transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+              >
+                {mutation.isPending ? "Salvando..." : "Salvar"}
               </button>
             </div>
           </div>
