@@ -1178,6 +1178,14 @@ export interface EventsReport {
   events: EventReportRow[];
 }
 
+export interface AnalyticsAdjustedPerson {
+  employeeId: number;
+  name: string;
+  points: number;
+  occurrences: number;
+  types: string[];
+}
+
 export type AnalyticsOverviewCycle = {
   id: number;
   name: string;
@@ -1336,6 +1344,10 @@ export interface AnalyticsOverview {
   nearNextFaixa: AnalyticsOverviewNearNextFaixaItem[];
   evaluators: AnalyticsOverviewEvaluatorsItem[];
   adjustments: AnalyticsOverviewAdjustmentsItem[];
+  /** Colaboradores que mais perderam pontos com penalidades no ciclo (até 10) */
+  topPenalized: AnalyticsAdjustedPerson[];
+  /** Colaboradores que mais ganharam pontos com méritos no ciclo (até 10) */
+  topMerited: AnalyticsAdjustedPerson[];
   clients: AnalyticsOverviewClientsItem[];
 }
 

@@ -4131,6 +4131,20 @@ export const GetAnalyticsOverviewResponse = zod.object({
   "points": zod.number(),
   "employees": zod.int()
 })),
+  "topPenalized": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "name": zod.string(),
+  "points": zod.number(),
+  "occurrences": zod.int(),
+  "types": zod.array(zod.string())
+})).describe('Colaboradores que mais perderam pontos com penalidades no ciclo (até 10)'),
+  "topMerited": zod.array(zod.object({
+  "employeeId": zod.int(),
+  "name": zod.string(),
+  "points": zod.number(),
+  "occurrences": zod.int(),
+  "types": zod.array(zod.string())
+})).describe('Colaboradores que mais ganharam pontos com méritos no ciclo (até 10)'),
   "clients": zod.array(zod.object({
   "client": zod.string(),
   "avgScore": zod.number(),

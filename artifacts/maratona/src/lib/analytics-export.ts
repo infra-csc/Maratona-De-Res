@@ -33,7 +33,6 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
     { Indicador: "Com bônus", Valor: k.withBonus },
     { Indicador: "Bônus projetado (R$)", Valor: k.bonusTotal },
     { Indicador: "Avaliações enviadas", Valor: k.evaluationsSubmitted },
-    { Indicador: "Avaliações em rascunho", Valor: k.evaluationsDraft },
     { Indicador: "Critérios calibrados", Valor: k.calibratedCriteria },
     { Indicador: "Ajuste médio da calibração (pts)", Valor: r1(k.avgCalibrationShift) },
     { Indicador: "Penalidades lançadas", Valor: k.penaltiesCount },
@@ -55,13 +54,16 @@ export async function exportAnalyticsXlsx(data: AnalyticsOverview): Promise<void
     "Faltam (pts)": r.gap, "Bônus hoje (R$)": r.currentBonus, "Na próxima (R$)": r.potentialBonus,
   })));
   add("Avaliadores", data.evaluators.map(e => ({
-    Avaliador: e.name, Enviadas: e.submitted, Rascunhos: e.drafts, "Nota média dada": e.avgGiven,
+    Avaliador: e.name, Enviadas: e.submitted, "Nota média dada": e.avgGiven,
     "Ajuste da calibração (pts)": e.calibrationBias, "Casos calibrados": e.biasSamples, "Dias até enviar": e.avgDaysToSubmit,
   })));
   add("Penalidades e méritos", data.adjustments.map(a => ({
     Tipo: a.kind === "merit" ? "Mérito" : "Penalidade", Lançamento: a.label, Ocorrências: a.occurrences, Pontos: a.points, Pessoas: a.employees,
   })));
-  add("Clientes", data.clients.map(c => ({ Cliente: c.client, "Nota média": c.avgScore, Eventos: c.events })));
+  add("Mais penalidades", data.topPenalized.map(p => ({ Colaborador: p.name, Tipos: p.types.join(", "), Ocorrências: p.occurrences, Pontos: -p.points })));
+  add("Mais méritos", data.topMerited.map(p => ({ Colaborador: p.name, Tipos: p.types.join(", "), Ocorrências: p.occurrences, Pontos: p.points })));
+  const clients = data.clients.filter(c => c.client !== "Sem cliente");
+  if (clients.length > 0) add("Clientes", clients.map(c => ({ Cliente: c.client, "Nota média": c.avgScore, Eventos: c.events })));
 
   XLSX.writeFile(wb, `analises-${cycleSlug(data.cycle.name)}.xlsx`);
 }
@@ -90,7 +92,7 @@ export async function exportEventsReportXlsx(report: import("@workspace/api-clie
   })), [11, 46, 20, 16, 22, 14, 12, 12, 11, 12, 10]);
   add("Critérios por evento", events.flatMap(e => e.criteria.map(c => ({
     Data: br(e.startDate), Evento: e.name, Critério: c.name, Área: c.area ?? "", Peso: c.weight,
-    "Média dos avaliadores (0-10)": n2(c.evaluatorAvg), "Calibrada pelo RH (0-10)": n2(c.calibrated), "Nota usada (0-10)": n2(c.used),
+    "Média dos avaliadores (0-10)": n2(c.evaluatorAvg), "Calibrada (0-10)": n2(c.calibrated), "Nota usada (0-10)": n2(c.used),
     "Justificativa da calibração": c.calibrationReason ?? "",
     "Conta na nota": c.weight > 0 ? "Sim" : "Não (peso 0)",
   }))), [11, 46, 34, 16, 6, 12, 12, 10, 50, 14]);

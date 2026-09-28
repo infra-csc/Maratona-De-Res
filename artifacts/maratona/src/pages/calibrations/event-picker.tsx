@@ -6,6 +6,7 @@ import { ChevronsUpDown, X } from "lucide-react";
 import { formatEventSubtitle } from "@/lib/utils";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { calibrationEventChip } from "./helpers";
+import { HScroller } from "@/components/shared";
 import type { ApiEvent, CycleWeekend, EventStatusFilter, PickerPalette } from "./types";
 
 export type EventPickerProps = {
@@ -139,9 +140,9 @@ export function EventPicker({
 
                 {/* ── Date weekend chips (horizontal scroll) ── */}
                 {cycleWeekends.length > 0 && (
-                  <div className="flex items-center gap-0 px-3.5 py-2 overflow-x-auto" style={{ borderBottom: `1px solid ${pk.border}`, backgroundColor: pk.bg, scrollbarWidth: "none" }}>
-                    <span className="text-[11px] font-black uppercase shrink-0 mr-2.5" style={{ color: pk.muted, fontFamily: CONDENSED }}>Fim de semana</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2.5 px-3.5 py-2" style={{ borderBottom: `1px solid ${pk.border}`, backgroundColor: pk.bg }}>
+                    <span className="text-[11px] font-black uppercase shrink-0" style={{ color: pk.muted, fontFamily: CONDENSED }}>Fim de semana</span>
+                    <HScroller label="fins de semana" className="flex-1">
                       {cycleWeekends.map(w => {
                         const active = filterDateFrom === w.sat && filterDateTo === w.sun;
                         return (
@@ -157,13 +158,13 @@ export function EventPicker({
                           >{w.label}</button>
                         );
                       })}
-                      {(filterDateFrom || filterDateTo) && (
-                        <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-                          className="text-[11px] font-black uppercase shrink-0 px-2 hover:opacity-70 transition-opacity"
-                          style={{ color: pk.muted }}
-                        >× Limpar</button>
-                      )}
-                    </div>
+                    </HScroller>
+                    {(filterDateFrom || filterDateTo) && (
+                      <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                        className="text-[11px] font-black uppercase shrink-0 px-1 hover:opacity-70 transition-opacity"
+                        style={{ color: pk.muted }}
+                      >× Limpar</button>
+                    )}
                   </div>
                 )}
 

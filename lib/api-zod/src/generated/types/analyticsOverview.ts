@@ -5,6 +5,7 @@
  * Maratona de Resultados API
  * OpenAPI spec version: 0.1.0
  */
+import type { AnalyticsAdjustedPerson } from './analyticsAdjustedPerson';
 import type { AnalyticsOverviewAdjustmentsItem } from './analyticsOverviewAdjustmentsItem';
 import type { AnalyticsOverviewClientsItem } from './analyticsOverviewClientsItem';
 import type { AnalyticsOverviewConformityItem } from './analyticsOverviewConformityItem';
@@ -31,5 +32,9 @@ export interface AnalyticsOverview {
   nearNextFaixa: AnalyticsOverviewNearNextFaixaItem[];
   evaluators: AnalyticsOverviewEvaluatorsItem[];
   adjustments: AnalyticsOverviewAdjustmentsItem[];
+  /** Colaboradores que mais perderam pontos com penalidades no ciclo (até 10) */
+  topPenalized: AnalyticsAdjustedPerson[];
+  /** Colaboradores que mais ganharam pontos com méritos no ciclo (até 10) */
+  topMerited: AnalyticsAdjustedPerson[];
   clients: AnalyticsOverviewClientsItem[];
 }

@@ -12,6 +12,7 @@ export * from './absenceKind';
 export * from './absenceUpdate';
 export * from './adminPublicToken';
 export * from './adminPublicTokenInput';
+export * from './analyticsAdjustedPerson';
 export * from './analyticsOverview';
 export * from './analyticsOverviewAdjustmentsItem';
 export * from './analyticsOverviewAdjustmentsItemKind';

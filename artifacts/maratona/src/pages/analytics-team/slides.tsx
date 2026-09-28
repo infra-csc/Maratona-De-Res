@@ -169,7 +169,7 @@ export function buildSlides(s: TeamStory): SlideDef[] {
   if (s.topEvents.length) {
     slides.push({
       id: "destaques", eyebrow: "Para comemorar", title: "Eventos destaque", icon: Trophy,
-      lead: () => "As maiores notas finais do ciclo, com a calibração do RH e a matriz já aplicadas.",
+      lead: () => "As maiores notas finais do ciclo, com a calibração e a matriz já aplicadas.",
       body: big => (
         <ol className={cn("grid gap-4", big ? "grid-cols-3" : "grid-cols-1 md:grid-cols-3")}>
           {s.topEvents.map((e, i) => (
@@ -260,7 +260,7 @@ export function buildSlides(s: TeamStory): SlideDef[] {
     body: big => (
       <ol className={cn("grid gap-4", big ? "grid-cols-2 text-[22px]" : "grid-cols-1 md:grid-cols-2 text-[14px]")}>
         {[
-          ["Nota de cada evento", "As áreas avaliam os critérios de 0 a 10 e o RH calibra quando precisa. A média ponderada vira a nota do evento, de 0 a 100."],
+          ["Nota de cada evento", "As áreas avaliam os critérios de 0 a 10 e a calibração ajusta quando precisa. A média ponderada vira a nota do evento, de 0 a 100."],
           ["Matriz de conformidade", `Cada "Não" na matriz desconta ${Number.isInteger(s.pointsPerNo) ? s.pointsPerNo : n1(s.pointsPerNo)} pontos da nota do evento para toda a equipe que trabalhou nele.`],
           ["Nota do ciclo", "Média das notas dos eventos confirmados de que você participou. Penalidades descontam e méritos somam."],
           ["Bônus", `Com pelo menos ${s.minEvents} eventos no ciclo, a nota final define a faixa, e a faixa define o bônus e o valor de cada evento extra.`],

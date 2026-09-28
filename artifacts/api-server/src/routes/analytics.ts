@@ -70,9 +70,11 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
       conduta: eventConformitiesTable.conduta, guardaEquipamentos: eventConformitiesTable.guardaEquipamentos,
     }).from(eventConformitiesTable).where(inArray(eventConformitiesTable.eventId, ids))),
     db.select({
-      employeeId: absencesTable.employeeId, penaltyType: absencesTable.penaltyType, kind: absencesTable.kind,
+      employeeId: absencesTable.employeeId, employeeName: employeesTable.name, penaltyType: absencesTable.penaltyType, kind: absencesTable.kind,
       points: absencesTable.points, quantity: absencesTable.quantity,
-    }).from(absencesTable).where(and(eq(absencesTable.cycleId, cycle.id))),
+    }).from(absencesTable)
+      .leftJoin(employeesTable, eq(absencesTable.employeeId, employeesTable.id))
+      .where(and(eq(absencesTable.cycleId, cycle.id))),
     loadPenaltyLabels(),
     // Catálogo inteiro (poucas dezenas de linhas): liga cópias por evento à origem.
     db.select({ id: criteriaTable.id, name: criteriaTable.name, eventScoped: criteriaTable.eventScoped, sourceCriterionId: criteriaTable.sourceCriterionId }).from(criteriaTable),
@@ -104,7 +106,7 @@ router.get("/analytics/overview", requireRole("admin", "rh", "diretoria"), async
     conformities: confs,
     criteriaCatalog: catalog.map(c => ({ id: c.id, name: c.name, eventScoped: c.eventScoped, sourceCriterionId: c.sourceCriterionId ?? null })),
     adjustments: absences.map(a => ({
-      employeeId: a.employeeId, label: labels.get(a.penaltyType) ?? a.penaltyType,
+      employeeId: a.employeeId, employeeName: a.employeeName, label: labels.get(a.penaltyType) ?? a.penaltyType,
       kind: a.kind === "merit" ? "merit" as const : "penalty" as const, points: a.points, quantity: a.quantity,
     })),
   });

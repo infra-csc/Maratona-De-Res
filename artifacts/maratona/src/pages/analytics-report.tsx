@@ -94,9 +94,8 @@ function summaryLines(d: AnalyticsOverview): string[] {
   if (weakest && strongest && weakest !== strongest) out.push(`Critério mais fraco: ${weakest.name} (${n1(weakest.avgScore)}); mais forte: ${strongest.name} (${n1(strongest.avgScore)}).`);
   const worst = [...d.conformity].filter(c => c.naoPct != null && c.nao > 0).sort((a, b) => (b.naoPct ?? 0) - (a.naoPct ?? 0))[0];
   if (worst) out.push(`Na matriz de conformidade, "${worst.label}" teve mais "Não": ${n1(worst.naoPct)}% das respostas.`);
-  if (k.avgCalibrationShift != null) out.push(`A calibração do RH moveu as notas em média ${k.avgCalibrationShift > 0 ? "+" : ""}${n1(k.avgCalibrationShift)} ponto(s) em ${plural(k.calibratedCriteria, "critério", "critérios")}.`);
+  if (k.avgCalibrationShift != null) out.push(`A calibração moveu as notas em média ${k.avgCalibrationShift > 0 ? "+" : ""}${n1(k.avgCalibrationShift)} ponto(s) em ${plural(k.calibratedCriteria, "critério", "critérios")}.`);
   if (d.nearNextFaixa.length > 0) out.push(`${plural(d.nearNextFaixa.length, "elegível está", "elegíveis estão")} a até 3 pontos da próxima faixa que paga bônus.`);
-  if (k.evaluationsDraft > 0) out.push(`${plural(k.evaluationsDraft, "avaliação parada", "avaliações paradas")} em rascunho.`);
   return out;
 }
 
@@ -178,7 +177,7 @@ function Report({ data }: { data: AnalyticsOverview }) {
             <Kpi label="Eventos confirmados" value={`${k.eventsConfirmed}/${k.eventsTotal}`} detail={`${pct(k.eventsConfirmed, k.eventsTotal)}% do ciclo`} />
             <Kpi label="Elegíveis ao bônus" value={`${k.eligible}/${k.collaborators}`} detail={`${k.withBonus} com bônus`} />
             <Kpi label="Bônus projetado" value={brl(k.bonusTotal)} detail="Soma dos elegíveis" />
-            <Kpi label="Avaliações enviadas" value={String(k.evaluationsSubmitted)} detail={`${k.evaluationsDraft} em rascunho`} />
+            <Kpi label="Avaliações enviadas" value={String(k.evaluationsSubmitted)} detail="Notas enviadas pelos avaliadores" />
             <Kpi label="Critérios calibrados" value={String(k.calibratedCriteria)} detail={k.avgCalibrationShift != null ? `ajuste médio ${n1(k.avgCalibrationShift)} pts` : undefined} />
             <Kpi label="Penalidades / méritos" value={`${k.penaltiesCount} / ${k.meritsCount}`} detail="lançamentos no ciclo" />
           </div>
@@ -188,7 +187,7 @@ function Report({ data }: { data: AnalyticsOverview }) {
           <Table head={["Fim de semana", "Nota média", "Eventos"]} rows={data.scoreTrend.map(t => [t.label, <span key="v"><Bar value={t.avgScore} max={maxTrend} />{n1(t.avgScore)}</span>, t.events])} />
         </Section>
 
-        <Section title="Critérios" lead="Eventos confirmados, do mais fraco para o mais forte (0 a 100). Nota usada = calibrada pelo RH quando existe; senão, média dos avaliadores. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) aparece uma vez por área; na nota do evento as duas entram pela média.">
+        <Section title="Critérios" lead="Eventos confirmados, do mais fraco para o mais forte (0 a 100). Nota usada = calibrada quando existe; senão, média dos avaliadores. Critério avaliado por duas áreas (ex.: Qualidade da Entrega, Atendimento e Ativação) aparece uma vez por área; na nota do evento as duas entram pela média.">
           <Table head={["Critério", "Área", "Nota usada", "Avaliadores", "Calibrada", "Eventos"]} align={["l", "l", "r", "r", "r", "r"]}
             rows={data.criteria.map(c => [c.name, c.area ?? "—", <span key="v"><Bar value={c.avgScore} max={100} />{n1(c.avgScore)}</span>, n1(c.evaluatorAvg), c.calibratedCount > 0 ? `${n1(c.calibratedAvg)} (${c.calibratedCount})` : "—", c.eventsCount])} />
         </Section>
@@ -208,22 +207,33 @@ function Report({ data }: { data: AnalyticsOverview }) {
             rows={data.nearNextFaixa.map(r => [r.name, n1(r.finalResult), r.currentFaixa ?? "—", r.nextFaixa, `${n1(r.gap)} pt`, brl(r.currentBonus), brl(r.potentialBonus)])} />
         </Section>
 
-        <Section title="Avaliadores" lead={'"Ajuste" compara a nota do avaliador com a calibrada pelo RH (positivo = RH subiu). "Dias até enviar" conta a partir do fim do evento.'}>
-          <Table head={["Avaliador", "Enviadas", "Rascunhos", "Nota média", "Ajuste", "Dias até enviar"]}
-            rows={data.evaluators.map(e => [e.name, e.submitted, e.drafts, n1(e.avgGiven), e.biasSamples >= 3 ? `${(e.calibrationBias ?? 0) > 0 ? "+" : ""}${n1(e.calibrationBias)}` : "—", n1(e.avgDaysToSubmit)])} />
+        <Section title="Avaliadores" lead={'"Ajuste" compara a nota do avaliador com a calibrada (positivo = a calibração subiu a nota). "Dias até enviar" conta a partir do fim do evento.'}>
+          <Table head={["Avaliador", "Enviadas", "Nota média", "Ajuste", "Dias até enviar"]}
+            rows={data.evaluators.map(e => [e.name, e.submitted, n1(e.avgGiven), e.biasSamples >= 3 ? `${(e.calibrationBias ?? 0) > 0 ? "+" : ""}${n1(e.calibrationBias)}` : "—", n1(e.avgDaysToSubmit)])} />
         </Section>
 
-        <Section title="Penalidades, méritos e clientes">
+        <Section title="Penalidades e méritos">
           <Table head={["Lançamento", "Tipo", "Ocorrências", "Pontos", "Pessoas"]} align={["l", "l", "r", "r", "r"]}
             rows={data.adjustments.map(a => [a.label, a.kind === "merit" ? "Mérito" : "Penalidade", a.occurrences, `${a.kind === "merit" ? "+" : "−"}${a.points}`, a.employees])} />
-          <Table head={["Cliente", "Nota média", "Eventos"]} rows={data.clients.map(c => [c.client, n1(c.avgScore), c.events])} />
+          {data.topPenalized.length > 0 && (
+            <Table head={["Mais penalidades", "Tipos", "Ocorrências", "Pontos"]} align={["l", "l", "r", "r"]}
+              rows={data.topPenalized.map(p => [p.name, p.types.join(", "), p.occurrences, `−${n1(p.points)}`])} />
+          )}
+          {data.topMerited.length > 0 && (
+            <Table head={["Mais méritos", "Tipos", "Ocorrências", "Pontos"]} align={["l", "l", "r", "r"]}
+              rows={data.topMerited.map(p => [p.name, p.types.join(", "), p.occurrences, `+${n1(p.points)}`])} />
+          )}
+          {/* Cliente só quando os eventos têm cliente informado. */}
+          {data.clients.some(c => c.client !== "Sem cliente") && (
+            <Table head={["Cliente", "Nota média", "Eventos"]} rows={data.clients.filter(c => c.client !== "Sem cliente").map(c => [c.client, n1(c.avgScore), c.events])} />
+          )}
         </Section>
 
         {/* ── Regras de negócio (valores em vigor, vindos da API) ── */}
         <Section title="Regras de negócio" lead="Como a nota e o bônus são calculados hoje no sistema." breakBefore>
           <ol className="space-y-2.5 text-[13px] leading-relaxed list-decimal pl-5">
             <li><strong>O que conta.</strong> Só eventos com resultados confirmados pelo RH entram na nota, na elegibilidade e no bônus. Concorrem os colaboradores da casa; freelas não entram no ranking e a participação como "Sup Ceno" é informativa.</li>
-            <li><strong>Nota do evento (performance).</strong> Cada critério recebe nota de 0 a 10. Vale a nota calibrada pelo RH quando existe; senão, a média dos avaliadores do critério. A nota do evento é a média ponderada pelos pesos dos critérios, convertida para 0 a 100.</li>
+            <li><strong>Nota do evento (performance).</strong> Cada critério recebe nota de 0 a 10. Vale a nota calibrada quando existe; senão, a média dos avaliadores do critério. A nota do evento é a média ponderada pelos pesos dos critérios, convertida para 0 a 100.</li>
             <li><strong>Matriz de conformidade.</strong> Quatro itens (EPI, estaiamento e aterramento, guarda de equipamentos, conduta). Cada "Sim" vale {fmtNum(rs.conformityItemPoints, 0)} pontos e item sem resposta conta como "Sim". O que falta para 100 vira desconto de {fmtNum(rs.conformityPenaltyFactor * 100, 0)}%: cada "Não" tira {fmtNum(rs.conformityPenaltyPerNo, 0)} pontos da nota do evento, que fica entre 0 e 100.</li>
             <li><strong>Nota final do ciclo.</strong> Média das notas dos eventos confirmados, menos (penalidades − méritos) dividido pelo número de eventos, entre 0 e 100. Nota 0 legítima conta na média; evento sem nota nenhuma fica de fora.</li>
             <li><strong>Elegibilidade.</strong> É preciso ter pelo menos {rs.minEvents} eventos confirmados no ciclo. O RH pode definir a elegibilidade de um colaborador manualmente, registrando o motivo.</li>
