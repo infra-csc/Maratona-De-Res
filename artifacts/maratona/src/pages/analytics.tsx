@@ -14,6 +14,7 @@ import { getAnalyticsEventsReport } from "@workspace/api-client-react";
 import { PageHeader, EmptyState, LoadingState, StatusBadge, StatTile } from "@/components/shared";
 import { CONDENSED, BODY } from "@/lib/premium-theme";
 import { fmtDate, fmtNum } from "@/lib/utils";
+import { AnalyticsTabs } from "./analytics-team/analytics-tabs";
 
 // Paleta dos gráficos validada (dataviz/validate_palette) contra as superfícies
 // do app: série 1 = lima da marca escurecido para barra/linha (#6f8300 claro,
@@ -209,6 +210,8 @@ function AnalyticsView({ data, updatedAt, refreshing, onRefresh }: {
           </div>
         }
       />
+
+      <AnalyticsTabs current="gestao" />
 
       {/* ── Indicadores ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="analytics-kpis">
